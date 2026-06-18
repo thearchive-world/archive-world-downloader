@@ -1,0 +1,29 @@
+# Mechanical formatting source of truth for the Archive World Downloader Java tree.
+# Checkstyle (config/checkstyle/checkstyle.xml) enforces the subset a CI lint can check;
+# this file is what editors read so source conforms before the linter runs.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.java]
+indent_size = 4
+max_line_length = 120
+# No wildcard imports: force a per-name import always.
+ij_java_class_count_to_use_import_on_demand = 999
+ij_java_names_count_to_use_import_on_demand = 999
+# Three blank-line-separated groups: static imports, then all other imports, then own code (world.thearchive.**) last.
+ij_java_imports_layout = $*,|,*,|,world.thearchive.**
+ij_java_use_single_class_imports = true
+
+[*.{json,json5,yml,yaml,md,toml}]
+indent_size = 2
+
+[*.{bat,cmd}]
+end_of_line = crlf

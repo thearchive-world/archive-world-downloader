@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  Lint-only Checkstyle config for the Archive World Downloader Java tree.
+  It checks the rules a linter can decide; the rules that need human judgment
+  are not enforced here.
+
+  .editorconfig owns indentation (Checkstyle here only bans tabs, it does not
+  re-assert an indent size, so the two never disagree).
+
+  Wired into the build by build-logic/wdl.java-conventions.gradle.kts (the
+  checkstyle plugin; checkstyleMain and checkstyleTest run as part of the check task).
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <!-- We indent with spaces; ban tab characters anywhere in a file. -->
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="true"/>
+    </module>
+
+    <module name="NewlineAtEndOfFile">
+        <property name="lineSeparator" value="lf"/>
+    </module>
+
+    <!-- 120-column limit. Package, import, and URL-bearing lines are exempt. -->
+    <module name="LineLength">
+        <property name="max" value="120"/>
+        <property name="ignorePattern" value="^package |^import |https?://"/>
+    </module>
+
+    <module name="TreeWalker">
+
+        <!-- Imports: no wildcards, no unused or redundant, our group order. -->
+        <module name="AvoidStarImport"/>
+        <module name="RedundantImport"/>
+        <module name="UnusedImports"/>
+        <module name="IllegalImport"/>
+        <module name="CustomImportOrder">
+            <property name="customImportOrderRules"
+                      value="STATIC###THIRD_PARTY_PACKAGE###SPECIAL_IMPORTS"/>
+            <property name="specialImportsRegExp" value="^world\.thearchive\."/>
+            <property name="sortImportsInGroupAlphabetically" value="true"/>
+            <property name="separateLineBetweenGroups" value="true"/>
+        </module>
+
+        <!-- Naming. Defaults enforce PascalCase types, camelCase members and
+             methods, SCREAMING_SNAKE_CASE constants. -->
+        <module name="PackageName">
+            <property name="format" value="^[a-z]+(\.[a-z][a-z0-9_]*)*$"/>
+        </module>
+        <!-- Type names are PascalCase. The only underscores allowed are inside a
+             version-band prefix: Mc, a dotted Minecraft version with the dots written as
+             underscores (Mc1_21_11; the numeric 26.1.2 / 26.2 schemes fit unchanged as
+             Mc26_1_2 / Mc26_2), then a PascalCase role. This mirrors how PackageName
+             admits mc1_21_11; the default format rejects every underscore. -->
+        <module name="TypeName">
+            <property name="format" value="^(Mc[0-9]+(_[0-9]+)+[A-Z][a-zA-Z0-9]*|[A-Z][a-zA-Z0-9]*)$"/>
+        </module>
+        <!-- A package-private type may legally disagree with its filename, which compiles and runs
+             but breaks IDE navigation and Gradle's test-name filter, both of which key on the
+             class name rather than the file. -->
+        <module name="OuterTypeFilename"/>
+        <module name="MethodName"/>
+        <module name="MemberName"/>
+        <module name="ParameterName"/>
+        <module name="LocalVariableName"/>
+        <module name="LocalFinalVariableName"/>
+        <!-- Constants are SCREAMING_SNAKE_CASE, but the conventions reserve camelCase for a
+             static final that holds behavior or mutable internals (a controller, codec, parser,
+             cache), which is not a constant. Checkstyle cannot tell deeply-immutable from
+             stateful, so the format admits both shapes; the deeply-immutable-only rule stays a
+             judgment call in the style reference. -->
+        <module name="ConstantName">
+            <property name="format" value="^([A-Z][A-Z0-9]*(_[A-Z0-9]+)*|[a-z][a-zA-Z0-9]*)$"/>
+        </module>
+        <module name="StaticVariableName"/>
+        <!-- Type parameters: a single capital for canonical roles (T, R, K, V, E) or a
+             descriptive PascalCase name when the role is non-obvious. The default
+             ^[A-Z]$ would reject the descriptive form the conventions permit. -->
+        <module name="ClassTypeParameterName">
+            <property name="format" value="^[A-Z][a-zA-Z0-9]*$"/>
+        </module>
+        <module name="MethodTypeParameterName">
+            <property name="format" value="^[A-Z][a-zA-Z0-9]*$"/>
+        </module>
+
+        <!-- Acronyms as words: at most one consecutive capital in an identifier.
+             allowedAbbreviationLength=0 permits a single capital (strict as-words), so
+             containerID / isSP / mapID are caught; value 1 would allow a 2-capital run
+             and miss them. Constants and static fields are skipped (ignoreStatic /
+             ignoreFinal default true), so SCREAMING_SNAKE_CASE is unaffected. -->
+        <module name="AbbreviationAsWordInName">
+            <property name="allowedAbbreviationLength" value="0"/>
+            <property name="tokens"
+                      value="CLASS_DEF,INTERFACE_DEF,ENUM_DEF,ANNOTATION_DEF,RECORD_DEF,
+                             METHOD_DEF,PARAMETER_DEF,VARIABLE_DEF,PATTERN_VARIABLE_DEF"/>
+        </module>
+
+        <!-- Braces: end-of-line opening, required around control bodies. -->
+        <module name="LeftCurly"/>
+        <module name="RightCurly"/>
+        <module name="NeedBraces">
+            <property name="allowSingleLineStatement" value="true"/>
+        </module>
+
+        <!-- Correctness hygiene both loaders enforce. -->
+        <module name="MissingOverride"/>
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="expected|ignored"/>
+        </module>
+        <module name="OneTopLevelClass"/>
+        <module name="UpperEll"/>
+        <module name="ModifierOrder"/>
+
+        <!-- Javadoc structure only; presence is not mandated. -->
+        <module name="JavadocStyle">
+            <property name="checkFirstSentence" value="false"/>
+        </module>
+        <module name="AtclauseOrder">
+            <property name="tagOrder" value="@param, @return, @throws, @deprecated"/>
+        </module>
+    </module>
+</module>
