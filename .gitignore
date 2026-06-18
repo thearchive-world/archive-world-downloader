@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+
+# Loom / ModDevGradle run + generated dirs
+run/
+runs/
+.run/
+*.launch
+
+# Minecraft bootstrap output from headless unit tests
+logs/
+crash-reports/
+
+# Verification output written beside the build: the check gate and the tip-acceptance tiers
+*.log
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+out/
+
+# OS
+.DS_Store
+Thumbs.db

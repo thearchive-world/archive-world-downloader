@@ -1,0 +1,32 @@
+# Plugin versions for the build. Library/runtime coordinates (Minecraft, Parchment, the loaders)
+# stay in gradle.properties because they are templated into the mod metadata at build time.
+#
+# The nullness/test tool libraries (JSpecify, Error Prone core, NullAway, the JUnit BOM) live in
+# [libraries] below rather than as literals in the build-logic convention plugins that consume them:
+# only coordinates in this catalog are visible to Dependabot, so cataloging them is what keeps their
+# versions from silently ageing. The convention plugins read them back through VersionCatalogsExtension,
+# because the type-safe libs accessor is not generated inside precompiled script plugins
+# (gradle/gradle#15383).
+
+[versions]
+loom = "1.17.11"
+moddev = "2.0.141"
+spotless = "8.7.0"
+errorprone-plugin = "5.1.0"
+
+[plugins]
+loom = { id = "fabric-loom", version.ref = "loom" }
+moddev = { id = "net.neoforged.moddev", version.ref = "moddev" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+
+[libraries]
+# The Error Prone plugin is applied by wdl.nullness-conventions, so build-logic depends on its
+# marker artifact rather than declaring it via the plugins block.
+errorprone-gradle-plugin = { module = "net.ltgt.gradle:gradle-errorprone-plugin", version.ref = "errorprone-plugin" }
+
+# Nullness + test tool libraries consumed by the build-logic convention plugins; catalogued so Dependabot
+# tracks their currency (see the header note). The JUnit BOM's 6.x major is held back in dependabot.yml.
+jspecify        = { module = "org.jspecify:jspecify",                  version = "1.0.0" }
+errorprone-core = { module = "com.google.errorprone:error_prone_core", version = "2.50.0" }
+nullaway        = { module = "com.uber.nullaway:nullaway",             version = "0.13.7" }
+junit-bom       = { module = "org.junit:junit-bom",                    version = "5.14.4" }
