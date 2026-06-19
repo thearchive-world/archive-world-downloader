@@ -1,0 +1,37 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "LGPL-3.0-or-later"
+issueTrackerURL = "https://github.com/thearchive-world/archive-world-downloader/issues"
+
+# NB: deliberately no services array. NeoForge loads a mod jar that has no module-info.java as a
+# JPMS automatic module, and the services array makes FML declare module uses directives on it,
+# which JPMS forbids for automatic modules ("Automatic modules can not declare service dependences",
+# crashes FMLLoader at startup, in both the client and the FML-JUnit test harness). It is also
+# unnecessary: Wdl.initialize() resolves VersionAdapter with the CLASSLOADER form
+# ServiceLoader.load(Iface, Wdl.class.getClassLoader()), which scans the META-INF/services provider
+# files directly and needs no uses (the PlatformBridge is constructed by WdlNeoForge and passed in,
+# so it is never discovered). The provider files under META-INF/services/ are all that is needed.
+
+[[mods]]
+modId = "wdl"
+version = "${version}"
+displayName = "Archive World Downloader"
+authors = "terbin"
+displayURL = "https://modrinth.com/mod/${mod_id}"
+description = "Keep the multiplayer worlds you visit. As you explore, the mod saves the terrain, mobs, and maps around you into a singleplayer world you can open offline, and containers save their contents when you open them. Everything comes from your own game, so nothing runs on the server."
+
+# Loader floor = gradle.properties neoforge_version_min (a deliberate value, not the build coordinate);
+# the exact minecraft pin below already locks the band one-to-one, so the upper bound stays open.
+[[dependencies.wdl]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${neoforge_version_min},)"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies.wdl]]
+modId = "minecraft"
+type = "required"
+versionRange = "[${minecraft_version}]"
+ordering = "AFTER"
+side = "CLIENT"

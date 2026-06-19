@@ -48,6 +48,22 @@ neoForge {
             client()
         }
     }
+
+}
+
+tasks.named<ProcessResources>("processResources") {
+    // Keep neoforge.mods.toml's templated fields in sync with gradle.properties: the mod version, the
+    // MC pin, and the NeoForge floor (neoforge_version_min, a deliberate value distinct from the build
+    // coordinate neoforge_version). The :common resource merge and the .gitkeep exclude are handled by
+    // wdl.common-merge.
+    val tokens = mapOf(
+        "version" to project.version.toString(),
+        "minecraft_version" to project.property("minecraft_version").toString(),
+        "neoforge_version_min" to project.property("neoforge_version_min").toString(),
+        "mod_id" to project.property("mod_id").toString(),
+    )
+    inputs.properties(tokens)
+    filesMatching("META-INF/neoforge.mods.toml") { expand(tokens) }
 }
 
 // The plain jar is the producing task; the guard is shared with the Fabric sibling (see build-logic).
