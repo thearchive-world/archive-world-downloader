@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "wdl",
+  "version": "${version}",
+  "name": "Archive World Downloader",
+  "description": "Keep the multiplayer worlds you visit. As you explore, the mod saves the terrain, mobs, and maps around you into a singleplayer world you can open offline, and containers save their contents when you open them. Everything comes from your own game, so nothing runs on the server.",
+  "authors": [
+    "terbin"
+  ],
+  "contact": {
+    "homepage": "https://modrinth.com/mod/${mod_id}",
+    "sources": "https://github.com/thearchive-world/archive-world-downloader",
+    "issues": "https://github.com/thearchive-world/archive-world-downloader/issues"
+  },
+  "license": "LGPL-3.0-or-later",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "world.thearchive.wdl.fabric.WdlFabricClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${fabric_loader_version_min}",
+    "fabric-api": "*",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=${java_version}"
+  }
+}
