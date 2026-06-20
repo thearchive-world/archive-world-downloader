@@ -24,6 +24,9 @@ public final class Wdl {
 
     /** Called once by the running loader's client entrypoint, with that loader's bridge. */
     public static void initialize(PlatformBridge platformBridge) {
+        // Route core's java.util.logging into latest.log first, so a fail-soft warning from any core step is
+        // visible (the MC runtime does not forward JUL to the log on its own).
+        CoreLogHandler.install();
         bridge = platformBridge;
         LOGGER.info("Archive World Downloader {} on {} {}", platformBridge.modVersion(),
                 platformBridge.loaderName(), platformBridge.loaderVersion());
