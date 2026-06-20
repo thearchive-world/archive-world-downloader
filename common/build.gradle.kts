@@ -1,3 +1,5 @@
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
     id("net.neoforged.moddev")     // version comes from the root apply-false declaration
     id("com.diffplug.spotless")    // applied per-subproject, not via build-logic (see below)
@@ -52,4 +54,76 @@ val commonResources = configurations.create("commonResources") {
 artifacts {
     add("commonJava", file("src/main/java"))
     add("commonResources", file("src/main/resources"))
+}
+
+// --- core invariant: world.thearchive.wdl.core.** imports only from the allowlisted prefixes ---
+// Keeps cross-branch cherry-picks of core viable as era-bands accrue. A fail-closed ALLOWLIST rather than
+// a net.minecraft denylist: an MC-bundled library (com.mojang, gson, netty, joml,
+// slf4j) compiles clean under both compileJava and the checkCoreJava8 floor compile (--release 8 accepts
+// newer classfiles on the classpath), yet its presence and version vary per band, so it must not creep into
+// core. A new core dependency is a deliberate amendment here, never an accident. It is a line-level import
+// scan, wired into the check task.
+val checkCoreImports = tasks.register("checkCoreImports") {
+    group = "verification"
+    description = "Fails if core/ imports anything outside the allowlisted prefixes"
+    val allowedPrefixes = listOf("java.", "it.unimi.dsi.fastutil.", "org.jspecify.", "world.thearchive.wdl.core.")
+    val coreFiles = layout.projectDirectory.dir("src/main/java/world/thearchive/wdl/core")
+        .asFileTree.matching { include("**/*.java") }
+    // Capture a plain File as a local here, not projectDir inside doLast: a Project accessor read
+    // at execution time is a script-object reference the configuration cache cannot serialize.
+    val baseDir = layout.projectDirectory.asFile
+    inputs.property("allowedPrefixes", allowedPrefixes)
+    inputs.files(coreFiles)
+    doLast {
+        val offenders = coreFiles.files.flatMap { file ->
+            file.readLines().mapNotNull { line ->
+                val trimmed = line.trim()
+                if (!trimmed.startsWith("import ")) {
+                    return@mapNotNull null
+                }
+                val imported = trimmed.removePrefix("import ").removePrefix("static ").trimStart().removeSuffix(";")
+                if (allowedPrefixes.none { imported.startsWith(it) }) {
+                    "  - ${file.relativeTo(baseDir)}: import $imported"
+                } else {
+                    null
+                }
+            }
+        }
+        if (offenders.isNotEmpty()) {
+            throw GradleException(
+                "core invariant violated. core/ may import only ${allowedPrefixes.joinToString()} but found:\n" +
+                    offenders.joinToString("\n")
+            )
+        }
+    }
+}
+// --- core invariant 2: world.thearchive.wdl.core.** must compile on the Java 8 floor ---
+// core/ is cherry-picked byte-identical to the deep (<=1.16) bands, which run on Java 8, so it must use no
+// Java 9+ language feature (record, var, pattern instanceof, switch expression) or JDK API (List.of,
+// Optional.isEmpty, Stream.toList). checkCoreImports fences net.minecraft.*; this fences the language level by
+// recompiling core under --release 8, which the band toolchain (21) would otherwise silently accept. --release
+// (unlike source/target compatibility) restricts the visible JDK API, not just the bytecode version, so it
+// catches API creep as well as syntax. Only enforced on the modern bands: a Java-8 band compiles core on JDK 8
+// natively (the check is moot there, and --release postdates JDK 8 so it cannot run).
+val checkCoreJava8 = tasks.register<JavaCompile>("checkCoreJava8") {
+    group = "verification"
+    description = "Fails if core/ uses any construct unavailable on the Java 8 floor"
+    source = fileTree("src/main/java/world/thearchive/wdl/core") { include("**/*.java") }
+    classpath = sourceSets["main"].compileClasspath
+    destinationDirectory = layout.buildDirectory.dir("core-java8-check")
+    options.release = 8
+    options.compilerArgs.add("-Xlint:-options")
+    // A plain floor compile: NullAway/Error Prone already ran on the real compileJava, so here only javac's
+    // --release enforcement is wanted; leaving Error Prone on would run its default checks under --release 8.
+    options.errorprone.enabled = false
+    javaCompiler = javaToolchains.compilerFor {
+        languageVersion = JavaLanguageVersion.of(providers.gradleProperty("java_version").get().toInt())
+    }
+}
+tasks.named("check") {
+    dependsOn(checkCoreImports)
+    // The Java-8 floor compile is moot on a band whose toolchain already is Java 8 (see checkCoreJava8).
+    if (providers.gradleProperty("java_version").get().toInt() > 8) {
+        dependsOn(checkCoreJava8)
+    }
 }
