@@ -49,6 +49,17 @@ neoForge {
         }
     }
 
+    // --- per-loader smoke test on a production-faithful FML module load ---
+    // MDG NeoForge-mode's unitTest{} block boots FMLLoader (the SAME mod-loading path the client
+    // uses) and loads the test/ classes AS the mod. This is strictly stronger than a plain-classpath
+    // test: it reproduces the real JPMS module setup, so it catches mod-LOAD failures a flat-classpath
+    // test cannot: it catches the automatic-module uses crash that a services array in
+    // neoforge.mods.toml triggers. ServiceLoader resolution is then exercised
+    // against the loaded mod's own classloader.
+    unitTest {
+        enable()
+        testedMod = mods[property("mod_id") as String]
+    }
 }
 
 tasks.named<ProcessResources>("processResources") {
