@@ -120,8 +120,46 @@ val checkCoreJava8 = tasks.register<JavaCompile>("checkCoreJava8") {
         languageVersion = JavaLanguageVersion.of(providers.gradleProperty("java_version").get().toInt())
     }
 }
+// --- band guard: the plug's declared era-band floor must cover the targeted minecraft_version ---
+// A sibling of checkCoreImports above: a plug cherry-picked onto a branch whose minecraft_version predates
+// its band fails here. The reverse (an older plug on a newer branch) is caught instead by compilation
+// against the divergent vanilla save types.
+val checkPlugBand = tasks.register("checkPlugBand") {
+    group = "verification"
+    description = "Fails if the plug's BAND_FLOOR is above the targeted minecraft_version"
+    // A local inside this lambda, read via the project-scoped providers accessor. Two traps the
+    // configuration cache springs here: a top-level val is a script-object field it cannot serialize
+    // (so keep this local, captured by value in doLast), and bare property() would bind to the task
+    // receiver (Task.property cannot see project properties), so go through providers.gradleProperty.
+    val minecraftVersion = providers.gradleProperty("minecraft_version").get()
+    val adapterSource = layout.projectDirectory
+        .file("src/main/java/world/thearchive/wdl/adapter/impl/VersionAdapterImpl.java")
+    inputs.property("minecraftVersion", minecraftVersion)
+    inputs.file(adapterSource)
+    doLast {
+        val floor = Regex("BAND_FLOOR\\s*=\\s*\"([^\"]+)\"")
+            .find(adapterSource.asFile.readText())?.groupValues?.get(1)
+            ?: throw GradleException("VersionAdapterImpl.BAND_FLOOR not found; the plug declares no band")
+        // Numeric per-component compare; lexical is wrong ("1.21.4" sorts above "1.21.10" as strings).
+        val target = minecraftVersion.split(".").map(String::toInt)
+        val base = floor.split(".").map(String::toInt)
+        for (i in 0 until maxOf(target.size, base.size)) {
+            val targetPart = target.getOrElse(i) { 0 }
+            val floorPart = base.getOrElse(i) { 0 }
+            if (targetPart != floorPart) {
+                if (targetPart < floorPart) {
+                    throw GradleException(
+                        "plug band mismatch: minecraft_version=$minecraftVersion predates the plug's " +
+                            "BAND_FLOOR=$floor (a plug must not land on a branch whose version predates its band)"
+                    )
+                }
+                break
+            }
+        }
+    }
+}
 tasks.named("check") {
-    dependsOn(checkCoreImports)
+    dependsOn(checkCoreImports, checkPlugBand)
     // The Java-8 floor compile is moot on a band whose toolchain already is Java 8 (see checkCoreJava8).
     if (providers.gradleProperty("java_version").get().toInt() > 8) {
         dependsOn(checkCoreJava8)
