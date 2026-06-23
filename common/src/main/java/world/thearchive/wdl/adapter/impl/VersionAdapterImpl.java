@@ -1,0 +1,45 @@
+// Copyright (C) Archive World Downloader contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+package world.thearchive.wdl.adapter.impl;
+
+import java.nio.file.Path;
+
+import world.thearchive.wdl.adapter.ChunkCodec;
+import world.thearchive.wdl.adapter.LevelDataWriter;
+import world.thearchive.wdl.adapter.VersionAdapter;
+import world.thearchive.wdl.adapter.WorldPaths;
+
+/**
+ * The {@link VersionAdapter} plug for this branch (MC 1.21.11; the package note records the era band it serves): binds
+ * the chunk-save axes ({@link ChunkCodec}, {@link WorldPaths}, {@link LevelDataWriter}) to their concrete
+ * implementations. Registered via {@code META-INF/services/world.thearchive.wdl.adapter.VersionAdapter}.
+ */
+public final class VersionAdapterImpl implements VersionAdapter {
+    /**
+     * The floor of the era band this plug serves (see the package note). The build's {@code checkPlugBand} task asserts
+     * the targeted {@code minecraft_version} from {@code gradle.properties} is at or above this, the intentional guard
+     * that a plug never lands on a branch whose MC version predates its band. A version newer than the band is caught
+     * instead by compile failure against the divergent vanilla save types.
+     */
+    static final String BAND_FLOOR = "1.21.10";
+
+    private static final ChunkCodec chunkCodec = new ChunkCodecImpl();
+
+    private static final LevelDataWriter levelDataWriter = new LevelDataWriterImpl();
+
+    @Override
+    public ChunkCodec chunkCodec() {
+        return chunkCodec;
+    }
+
+    @Override
+    public LevelDataWriter levelDataWriter() {
+        return levelDataWriter;
+    }
+
+    @Override
+    public WorldPaths worldPaths(Path saveRoot) {
+        return new WorldPathsImpl(saveRoot);
+    }
+}
