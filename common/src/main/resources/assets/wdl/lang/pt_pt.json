@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "A transferir %s.",
+  "wdl.chat.start_needs_name": "Uma transferência precisa de um nome. Usa /wdl start <nome> para começar.",
+  "wdl.chat.saving": "A guardar...",
+  "wdl.chat.downloaded": "%1$s transferido: %2$s, %3$s, %4$s em %5$s.",
+  "wdl.chat.chunks": "chunks %s",
+  "wdl.chat.entities": "entidades %s",
+  "wdl.chat.containers": "contentores %s",
+  "wdl.chat.status.recording": "A transferir: %s, %s, %s.",
+  "wdl.chat.status.saving": "A guardar a transferência no disco...",
+  "wdl.chat.status.idle": "Inativo. Usa /wdl start <nome> para começar a transferir.",
+  "wdl.chat.not_downloading": "Não estás a transferir. Usa /wdl start <nome> para começar.",
+  "wdl.chat.config_file": "Ficheiro de configuração: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Já estás a transferir.",
+  "wdl.refuse.saving_in_progress.body": "Ainda a guardar a transferência. Tenta novamente quando terminar.",
+  "wdl.refuse.join_multiplayer.body": "Entra num servidor multijogador para transferir o respetivo mundo."
+}

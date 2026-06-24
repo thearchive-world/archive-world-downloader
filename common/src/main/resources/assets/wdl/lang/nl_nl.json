@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "%s wordt gedownload.",
+  "wdl.chat.start_needs_name": "Een download heeft een naam nodig. Gebruik /wdl start <naam> om te beginnen.",
+  "wdl.chat.saving": "Opslaan...",
+  "wdl.chat.downloaded": "%1$s gedownload: %2$s, %3$s, %4$s in %5$s.",
+  "wdl.chat.chunks": "chunks %s",
+  "wdl.chat.entities": "entiteiten %s",
+  "wdl.chat.containers": "containers %s",
+  "wdl.chat.status.recording": "Bezig met downloaden: %s, %s, %s.",
+  "wdl.chat.status.saving": "De download wordt naar schijf opgeslagen...",
+  "wdl.chat.status.idle": "Inactief. Gebruik /wdl start <naam> om te beginnen met downloaden.",
+  "wdl.chat.not_downloading": "Er wordt niet gedownload. Gebruik /wdl start <naam> om te beginnen.",
+  "wdl.chat.config_file": "Configuratiebestand: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Er wordt al gedownload.",
+  "wdl.refuse.saving_in_progress.body": "De download wordt nog opgeslagen. Probeer het opnieuw zodra dat klaar is.",
+  "wdl.refuse.join_multiplayer.body": "Maak verbinding met een server om de wereld ervan te downloaden."
+}

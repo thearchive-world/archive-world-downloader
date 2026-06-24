@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "Downloader %s.",
+  "wdl.chat.start_needs_name": "En download skal have et navn. Brug /wdl start <navn> for at begynde.",
+  "wdl.chat.saving": "Gemmer...",
+  "wdl.chat.downloaded": "Downloadede %s: %s, %s, %s på %s.",
+  "wdl.chat.chunks": "klodser %s",
+  "wdl.chat.entities": "objekter %s",
+  "wdl.chat.containers": "beholdere %s",
+  "wdl.chat.status.recording": "Downloader: %s, %s, %s.",
+  "wdl.chat.status.saving": "Gemmer downloaden på disken...",
+  "wdl.chat.status.idle": "Inaktiv. Brug /wdl start <navn> for at begynde at downloade.",
+  "wdl.chat.not_downloading": "Downloader ikke. Brug /wdl start <navn> for at begynde.",
+  "wdl.chat.config_file": "Konfigurationsfil: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Downloader allerede.",
+  "wdl.refuse.saving_in_progress.body": "Gemmer stadig downloaden. Prøv igen, når den er færdig.",
+  "wdl.refuse.join_multiplayer.body": "Tilslut dig en multiplayer-server for at downloade dens verden."
+}

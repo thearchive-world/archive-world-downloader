@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "正在下載 %s。",
+  "wdl.chat.start_needs_name": "下載需要一個名稱。請使用 /wdl start <名稱> 開始。",
+  "wdl.chat.saving": "儲存中...",
+  "wdl.chat.downloaded": "已下載 %1$s：%2$s、%3$s、%4$s，耗時 %5$s。",
+  "wdl.chat.chunks": "%s 個區塊",
+  "wdl.chat.entities": "%s 個實體",
+  "wdl.chat.containers": "%s 個容器",
+  "wdl.chat.status.recording": "正在下載：%s、%s、%s。",
+  "wdl.chat.status.saving": "正在將下載儲存至磁碟...",
+  "wdl.chat.status.idle": "閒置中。請使用 /wdl start <名稱> 開始下載。",
+  "wdl.chat.not_downloading": "目前未在下載。請使用 /wdl start <名稱> 開始。",
+  "wdl.chat.config_file": "設定檔：%s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "已在下載中。",
+  "wdl.refuse.saving_in_progress.body": "下載仍在儲存中。完成後請重試。",
+  "wdl.refuse.join_multiplayer.body": "請加入多人遊戲伺服器以下載其世界。"
+}

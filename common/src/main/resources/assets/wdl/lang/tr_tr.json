@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "%s indiriliyor.",
+  "wdl.chat.start_needs_name": "Bir indirmenin ada ihtiyacı var. Başlamak için /wdl start <name> komutunu kullanın.",
+  "wdl.chat.saving": "Kaydediliyor...",
+  "wdl.chat.downloaded": "%s indirildi: %s, %s, %s; %s içinde.",
+  "wdl.chat.chunks": "yığın %s",
+  "wdl.chat.entities": "varlık %s",
+  "wdl.chat.containers": "kap %s",
+  "wdl.chat.status.recording": "İndiriliyor: %s, %s, %s.",
+  "wdl.chat.status.saving": "İndirme diske kaydediliyor...",
+  "wdl.chat.status.idle": "Beklemede. İndirmeye başlamak için /wdl start <name> komutunu kullanın.",
+  "wdl.chat.not_downloading": "İndirme yok. Başlamak için /wdl start <name> komutunu kullanın.",
+  "wdl.chat.config_file": "Yapılandırma dosyası: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Zaten indiriliyor.",
+  "wdl.refuse.saving_in_progress.body": "İndirme hâlâ kaydediliyor. Bitince tekrar deneyin.",
+  "wdl.refuse.join_multiplayer.body": "Dünyasını indirmek için bir çok oyunculu sunucuya katılın."
+}

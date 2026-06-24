@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "Pobieranie %s.",
+  "wdl.chat.start_needs_name": "Pobieranie wymaga nazwy. Użyj /wdl start <nazwa>, aby rozpocząć.",
+  "wdl.chat.saving": "Zapisywanie…",
+  "wdl.chat.downloaded": "Pobrano %s: %s, %s, %s w %s.",
+  "wdl.chat.chunks": "chunki %s",
+  "wdl.chat.entities": "byty %s",
+  "wdl.chat.containers": "pojemniki %s",
+  "wdl.chat.status.recording": "Pobieranie: %s, %s, %s.",
+  "wdl.chat.status.saving": "Zapisywanie pobrania na dysk…",
+  "wdl.chat.status.idle": "Bezczynny. Użyj /wdl start <nazwa>, aby rozpocząć pobieranie.",
+  "wdl.chat.not_downloading": "Pobieranie nie trwa. Użyj /wdl start <nazwa>, aby rozpocząć.",
+  "wdl.chat.config_file": "Plik konfiguracyjny: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Pobieranie już trwa.",
+  "wdl.refuse.saving_in_progress.body": "Zapisywanie pobrania wciąż trwa. Spróbuj ponownie, gdy się zakończy.",
+  "wdl.refuse.join_multiplayer.body": "Dołącz do serwera wieloosobowego, aby pobrać jego świat."
+}

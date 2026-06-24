@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "%s wird heruntergeladen.",
+  "wdl.chat.start_needs_name": "Ein Download braucht einen Namen. Verwende /wdl start <Name>, um zu beginnen.",
+  "wdl.chat.saving": "Wird gespeichert …",
+  "wdl.chat.downloaded": "%1$s heruntergeladen: %2$s, %3$s, %4$s in %5$s.",
+  "wdl.chat.chunks": "Chunks %s",
+  "wdl.chat.entities": "Objekte %s",
+  "wdl.chat.containers": "Behälter %s",
+  "wdl.chat.status.recording": "Wird heruntergeladen: %s, %s, %s.",
+  "wdl.chat.status.saving": "Der Download wird auf der Festplatte gespeichert …",
+  "wdl.chat.status.idle": "Inaktiv. Verwende /wdl start <Name>, um den Download zu starten.",
+  "wdl.chat.not_downloading": "Es läuft kein Download. Verwende /wdl start <Name>, um zu beginnen.",
+  "wdl.chat.config_file": "Konfigurationsdatei: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Es läuft bereits ein Download.",
+  "wdl.refuse.saving_in_progress.body": "Der Download wird noch gespeichert. Versuche es erneut, wenn er fertig ist.",
+  "wdl.refuse.join_multiplayer.body": "Tritt einem Mehrspieler-Server bei, um dessen Welt herunterzuladen."
+}

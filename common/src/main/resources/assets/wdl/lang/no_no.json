@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "Laster ned %s.",
+  "wdl.chat.start_needs_name": "En nedlasting trenger et navn. Bruk /wdl start <navn> for å begynne.",
+  "wdl.chat.saving": "Lagrer...",
+  "wdl.chat.downloaded": "Lastet ned %1$s: %2$s, %3$s, %4$s på %5$s.",
+  "wdl.chat.chunks": "verdensstykker %s",
+  "wdl.chat.entities": "enheter %s",
+  "wdl.chat.containers": "beholdere %s",
+  "wdl.chat.status.recording": "Laster ned: %s, %s, %s.",
+  "wdl.chat.status.saving": "Lagrer nedlastingen til disk...",
+  "wdl.chat.status.idle": "Inaktiv. Bruk /wdl start <navn> for å begynne å laste ned.",
+  "wdl.chat.not_downloading": "Laster ikke ned. Bruk /wdl start <navn> for å begynne.",
+  "wdl.chat.config_file": "Konfigurasjonsfil: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Laster ned allerede.",
+  "wdl.refuse.saving_in_progress.body": "Lagrer fortsatt nedlastingen. Prøv igjen når det er ferdig.",
+  "wdl.refuse.join_multiplayer.body": "Koble til en flerspillerserver for å laste ned verdenen dens."
+}

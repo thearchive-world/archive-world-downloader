@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "Скачивается %s.",
+  "wdl.chat.start_needs_name": "Скачиванию нужно название. Используйте /wdl start <название>, чтобы начать.",
+  "wdl.chat.saving": "Сохранение...",
+  "wdl.chat.downloaded": "Мир %1$s скачан: %2$s, %3$s, %4$s за %5$s.",
+  "wdl.chat.chunks": "чанки %s",
+  "wdl.chat.entities": "сущности %s",
+  "wdl.chat.containers": "контейнеры %s",
+  "wdl.chat.status.recording": "Скачивание: %s, %s, %s.",
+  "wdl.chat.status.saving": "Сохранение скачивания на диск...",
+  "wdl.chat.status.idle": "Ожидание. Используйте /wdl start <название>, чтобы начать скачивание.",
+  "wdl.chat.not_downloading": "Скачивание не выполняется. Используйте /wdl start <название>, чтобы начать.",
+  "wdl.chat.config_file": "Файл конфигурации: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Скачивание уже выполняется.",
+  "wdl.refuse.saving_in_progress.body": "Скачивание ещё сохраняется на диск. Повторите попытку, когда оно завершится.",
+  "wdl.refuse.join_multiplayer.body": "Подключитесь к сетевому серверу, чтобы скачать его мир."
+}

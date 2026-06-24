@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "%s 다운로드 중.",
+  "wdl.chat.start_needs_name": "다운로드에는 이름이 필요합니다. 시작하려면 /wdl start <이름> 명령을 사용하세요.",
+  "wdl.chat.saving": "저장 중...",
+  "wdl.chat.downloaded": "%s 다운로드 완료: %s, %s, %s, 소요 시간 %s.",
+  "wdl.chat.chunks": "청크 %s개",
+  "wdl.chat.entities": "개체 %s개",
+  "wdl.chat.containers": "컨테이너 %s개",
+  "wdl.chat.status.recording": "다운로드 중: %s, %s, %s.",
+  "wdl.chat.status.saving": "다운로드를 디스크에 저장하는 중...",
+  "wdl.chat.status.idle": "대기 중. 다운로드를 시작하려면 /wdl start <이름> 명령을 사용하세요.",
+  "wdl.chat.not_downloading": "다운로드 중이 아닙니다. 시작하려면 /wdl start <이름> 명령을 사용하세요.",
+  "wdl.chat.config_file": "설정 파일: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "이미 다운로드 중입니다.",
+  "wdl.refuse.saving_in_progress.body": "다운로드를 아직 저장하는 중입니다. 완료되면 다시 시도하세요.",
+  "wdl.refuse.join_multiplayer.body": "세계를 다운로드하려면 멀티플레이 서버에 접속하세요."
+}

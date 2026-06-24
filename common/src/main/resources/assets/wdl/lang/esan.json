@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "Dêccargando %s.",
+  "wdl.chat.start_needs_name": "Una dêccarga neçeçita un nombre. Uça /wdl start <nombre> pa empeçâh.",
+  "wdl.chat.saving": "Guardando...",
+  "wdl.chat.downloaded": "Dêccargao %s: %s, %s, %s en %s.",
+  "wdl.chat.chunks": "chunks %s",
+  "wdl.chat.entities": "entidadê %s",
+  "wdl.chat.containers": "contenedorê %s",
+  "wdl.chat.status.recording": "Dêccargando: %s, %s, %s.",
+  "wdl.chat.status.saving": "Guardando la dêccarga n'er dîcco...",
+  "wdl.chat.status.idle": "Inâttibo. Uça /wdl start <nombre> pa empeçâh a dêccargâh.",
+  "wdl.chat.not_downloading": "No çe êttá dêccargando. Uça /wdl start <nombre> pa empeçâh.",
+  "wdl.chat.config_file": "Arxibo de configuraçión: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Ya çe êttá dêccargando.",
+  "wdl.refuse.saving_in_progress.body": "Aún çe êttá guardando la dêccarga. Inténtalo de nuebo cuando termine.",
+  "wdl.refuse.join_multiplayer.body": "Únete a un çerbidôh murtihugadôh pa dêccargâh çu mundo."
+}

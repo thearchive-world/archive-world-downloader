@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "%sをダウンロード中です。",
+  "wdl.chat.start_needs_name": "ダウンロードには名前が必要です。開始するには /wdl start <名前> を使用してください。",
+  "wdl.chat.saving": "保存中…",
+  "wdl.chat.downloaded": "%sをダウンロードしました：%s、%s、%s（所要時間 %s）。",
+  "wdl.chat.chunks": "%sチャンク",
+  "wdl.chat.entities": "%sエンティティ",
+  "wdl.chat.containers": "%sコンテナ",
+  "wdl.chat.status.recording": "ダウンロード中：%s、%s、%s。",
+  "wdl.chat.status.saving": "ダウンロードをディスクに保存中…",
+  "wdl.chat.status.idle": "待機中です。ダウンロードを開始するには /wdl start <名前> を使用してください。",
+  "wdl.chat.not_downloading": "ダウンロードしていません。開始するには /wdl start <名前> を使用してください。",
+  "wdl.chat.config_file": "設定ファイル：%s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "すでにダウンロード中です。",
+  "wdl.refuse.saving_in_progress.body": "ダウンロードをまだ保存中です。完了してからもう一度お試しください。",
+  "wdl.refuse.join_multiplayer.body": "ワールドをダウンロードするには、マルチプレイサーバーに参加してください。"
+}

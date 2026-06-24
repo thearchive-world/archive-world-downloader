@@ -1,0 +1,18 @@
+{
+  "wdl.chat.downloading": "Plunderin' %s.",
+  "wdl.chat.start_needs_name": "A plunder needs a name. Use /wdl start <name> t' begin.",
+  "wdl.chat.saving": "Stowin'...",
+  "wdl.chat.downloaded": "Plundered %1$s: %2$s, %3$s, %4$s in %5$s.",
+  "wdl.chat.chunks": "chunks %s",
+  "wdl.chat.entities": "beasties %s",
+  "wdl.chat.containers": "coffers %s",
+  "wdl.chat.status.recording": "Plunderin': %s, %s, %s.",
+  "wdl.chat.status.saving": "Stowin' th' plunder t' th' hold...",
+  "wdl.chat.status.idle": "Slackin' off. Use /wdl start <name> t' begin plunderin'.",
+  "wdl.chat.not_downloading": "Not plunderin'. Use /wdl start <name> t' begin.",
+  "wdl.chat.config_file": "Scribble file: %s",
+  "wdl.chat.data": "%s",
+  "wdl.refuse.already_downloading.body": "Already plunderin'.",
+  "wdl.refuse.saving_in_progress.body": "Still stowin' th' plunder. Try again when it be done.",
+  "wdl.refuse.join_multiplayer.body": "Board a server t' plunder its sea."
+}
