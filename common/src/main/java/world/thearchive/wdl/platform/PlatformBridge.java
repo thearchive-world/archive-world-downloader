@@ -5,6 +5,8 @@ package world.thearchive.wdl.platform;
 
 import java.nio.file.Path;
 
+import world.thearchive.wdl.core.ChatCopy;
+
 /**
  * Loader-services SPI: the thin seam between the loader-agnostic mod and a concrete mod loader. One implementation per
  * loader (Fabric, NeoForge), constructed by that loader's entrypoint and handed to {@code Wdl.initialize} (the loader
@@ -42,4 +44,11 @@ public interface PlatformBridge {
 
     /** Whether a mod with the given id is loaded. */
     boolean isModLoaded(String modId);
+
+    /**
+     * Surface a composed persistent chat line: each segment renders its tint or the vanilla default, and a clickable
+     * segment opens its target (URL in the OS browser, file or folder in the OS file browser) with the raw target as
+     * its hover.
+     */
+    void sendChat(ChatCopy line);
 }
