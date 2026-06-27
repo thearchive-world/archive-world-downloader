@@ -34,18 +34,26 @@ public final class ConfigSchema {
             + "# Config schema version, set by the mod (do not edit); lets a future version migrate an old config.\n"
             + "configVersion=" + WdlConfig.CONFIG_VERSION + "\n";
 
+    private static final String ENCODE_BUDGET_MILLIS_PREAMBLE = ""
+            + "# Max milliseconds per tick (1 to 10) spent encoding chunks/entities, so loading a fresh area\n"
+            + "# or flying fast never stutters the frame; the rest spills to later ticks (the download lags\n"
+            + "# exploration by a few ticks). Higher catches up faster but costs more per frame; lower is\n"
+            + "# smoother but lags more behind you.\n";
+
     private static final String SHOW_CHAT_MESSAGES_PREAMBLE = ""
             + "\n"
             + "# Chat notices from the mod, like the update-available line. Set false to silence them; notices\n"
             + "# inside the mod's own screens are unaffected.\n";
 
     static final List<ConfigOption> OPTIONS = Collections.unmodifiableList(Arrays.asList(
+            ConfigOption.rangedInteger("encodeBudgetMillis", "2", 1, 10, config -> config.encodeBudgetMillis(),
+                    ENCODE_BUDGET_MILLIS_PREAMBLE),
             ConfigOption.booleanOption("showChatMessages", "true", config -> config.showChatMessages(),
                     SHOW_CHAT_MESSAGES_PREAMBLE)));
 
     private static final Map<String, ConfigOption> BY_KEY = Collections.unmodifiableMap(indexByKey(OPTIONS));
 
-    static final List<ConfigOption> REPORT_ORDER = report("showChatMessages");
+    static final List<ConfigOption> REPORT_ORDER = report("encodeBudgetMillis", "showChatMessages");
 
     /**
      * Read every option, defaulting any key that is missing or present-but-unparseable to its descriptor default
