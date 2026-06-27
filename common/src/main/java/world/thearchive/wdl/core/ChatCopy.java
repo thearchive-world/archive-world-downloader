@@ -132,6 +132,15 @@ public final class ChatCopy {
         return ivoryLine("wdl.chat.downloaded", arguments);
     }
 
+    /** The completion destination line whose link opens the download's save folder. */
+    public static ChatCopy savedTo(String folderName, String folderPath) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(amber(folderName));
+        arguments.add(new Argument("wdl.chat.open_save_folder", "", OptionalInt.of(BrandColors.TEAL),
+                new Click(Click.Kind.OPEN_FILE, folderPath)));
+        return ivoryLine("wdl.chat.saved_to", arguments);
+    }
+
     /** The {@code /wdl status} reply: live counts while recording, else the phase or the idle hint. */
     public static ChatCopy status(CaptureState state, CaptureCounts counts) {
         if (state == CaptureState.RECORDING) {
@@ -162,6 +171,14 @@ public final class ChatCopy {
 
     public static ChatCopy joinMultiplayer() {
         return ivoryLine("wdl.refuse.join_multiplayer.body", new ArrayList<>());
+    }
+
+    public static ChatCopy nothingCaptured() {
+        return ivoryLine("wdl.chat.nothing_captured", new ArrayList<>());
+    }
+
+    public static ChatCopy worldNameFallback() {
+        return ivoryLine("wdl.chat.world_name_fallback", new ArrayList<>());
     }
 
     public static ChatCopy configFile(String path) {
