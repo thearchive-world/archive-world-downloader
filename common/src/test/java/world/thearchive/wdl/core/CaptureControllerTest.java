@@ -36,6 +36,7 @@ class CaptureControllerTest {
         int finishes;
         boolean saveDone; // the test flips this true to signal the background save has completed
         CaptureCounts counts = CaptureCounts.EMPTY;
+        SaveStage saveStage = SaveStage.NONE;
         float saveProgress;
 
         @Override
@@ -56,6 +57,16 @@ class CaptureControllerTest {
         @Override
         public CaptureCounts counts() {
             return counts;
+        }
+
+        @Override
+        public SaveStage saveStage() {
+            return saveStage;
+        }
+
+        @Override
+        public float saveProgress() {
+            return saveProgress;
         }
     }
 
@@ -334,6 +345,40 @@ class CaptureControllerTest {
 
         now[0] = 200_000L;
         assertEquals(0L, controller.elapsedMillis(), "cleared once past the linger");
+    }
+
+    @Test
+    void saveStageIsNoneAndProgressZeroUnlessSaving() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        session.saveStage = SaveStage.WRITING_MAPS; // a session value that must not leak outside SAVING
+        session.saveProgress = 0.5f;
+
+        assertEquals(SaveStage.NONE, controller.saveStage(), "none while idle");
+        assertEquals(0.0f, controller.saveProgress());
+
+        controller.start(() -> session);
+        assertEquals(SaveStage.NONE, controller.saveStage(), "none while recording (no bar during capture)");
+        assertEquals(0.0f, controller.saveProgress());
+    }
+
+    @Test
+    void saveStageAndProgressDelegateToTheSessionWhileSaving() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+
+        session.saveStage = SaveStage.COMPRESSING;
+        session.saveProgress = 0.75f;
+        controller.stop(); // -> SAVING
+
+        assertEquals(SaveStage.COMPRESSING, controller.saveStage());
+        assertEquals(0.75f, controller.saveProgress());
+
+        session.saveDone = true;
+        controller.tick(); // -> IDLE
+        assertEquals(SaveStage.NONE, controller.saveStage(), "no bar once the save completes");
+        assertEquals(0.0f, controller.saveProgress());
     }
 
     @Test

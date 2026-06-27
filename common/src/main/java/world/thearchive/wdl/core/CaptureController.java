@@ -68,6 +68,12 @@ public final class CaptureController {
 
         /** Live progress so far, as MC-free counts (read for the status command and HUD). */
         CaptureCounts counts();
+
+        /** The current finalization phase while the background save drains, for the HUD bar. */
+        SaveStage saveStage();
+
+        /** The current finalization phase's fraction in {@code [0, 1]}; 0 unless a save is draining. */
+        float saveProgress();
     }
 
     private final LongSupplier clockMillis;
@@ -131,6 +137,16 @@ public final class CaptureController {
             return frozenElapsedMillis;
         }
         return 0L;
+    }
+
+    /** The finalization phase while saving; {@link SaveStage#NONE} otherwise (no bar during capture or idle). */
+    public SaveStage saveStage() {
+        return state == CaptureState.SAVING && session != null ? session.saveStage() : SaveStage.NONE;
+    }
+
+    /** The finalization phase's fraction while saving; 0 otherwise. */
+    public float saveProgress() {
+        return state == CaptureState.SAVING && session != null ? session.saveProgress() : 0.0f;
     }
 
     /**
