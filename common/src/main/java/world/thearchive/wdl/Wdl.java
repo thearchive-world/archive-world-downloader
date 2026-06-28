@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.ServiceLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.ServerData;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -19,6 +20,7 @@ import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
+import world.thearchive.wdl.core.browse.TargetResolver;
 import world.thearchive.wdl.platform.PlatformBridge;
 
 /**
@@ -43,6 +45,11 @@ public final class Wdl {
 
     private static final CaptureController controller = new CaptureController();
 
+    // The download-start flow, constructed by initialize() once the bridge is live; never null in operation,
+    // so its uninitialized-field check is suppressed here.
+    @SuppressWarnings("NullAway.Init")
+    private static ResumeFlow resumeFlow;
+
     private Wdl() {}
 
     /** Called once by the running loader's client entrypoint, with that loader's bridge. */
@@ -58,6 +65,9 @@ public final class Wdl {
                 platformBridge.loaderName(), platformBridge.loaderVersion());
         WdlConfig.load(configPath()); // materialize the documented default file on first run, so it can be edited
         LOGGER.info("config file: {}", configPath());
+        resumeFlow = new ResumeFlow(platformBridge, () -> WdlConfig.load(configPath()), Wdl::startDownload);
+
+        platformBridge.registerToggleKeybind(Wdl::onToggle);
         platformBridge.onClientTickEnd(Wdl::onClientTick);
         platformBridge.onDisconnect(controller::onDisconnect);
     }
@@ -78,6 +88,20 @@ public final class Wdl {
 
     private static void onClientTick() {
         controller.tick();
+    }
+
+    /** Keybind handler (client main thread): start a download, or stop and save the running one. */
+    private static void onToggle() {
+        if (controller.state() != CaptureState.IDLE) {
+            controller.stop();
+            return;
+        }
+        PlatformBridge platform = platform();
+        if (platform.isRemoteWorld() && !hasSourceIdentity()) {
+            platform.sendChat(ChatCopy.startNeedsName());
+            return;
+        }
+        resumeFlow.begin(defaultBaseName(), true);
     }
 
     /**
@@ -105,6 +129,26 @@ public final class Wdl {
         if (config.showChatMessages()) {
             platform.sendChat(ChatCopy.downloading(target.folderName()));
         }
+    }
+
+    /**
+     * The default base name for a keybind start, before any date suffix: the current server's name when it sanitizes to
+     * a usable folder name, else a generic default, so the implicit path always carries a usable name into
+     * {@link ResumeFlow#begin}.
+     */
+    private static String defaultBaseName() {
+        ServerData server = Minecraft.getInstance().getCurrentServer();
+        String name = server != null ? server.name : null;
+        return name != null && TargetResolver.hasUsableName(name) ? name : "world";
+    }
+
+    /**
+     * Whether this session has a server identity at all. False only when nothing is being connected to as a server,
+     * which is genuine singleplayer. Deliberately does not inspect the name: a server whose name sanitizes to nothing
+     * still has an identity, and refusing it would take away an implicit start that works.
+     */
+    private static boolean hasSourceIdentity() {
+        return Minecraft.getInstance().getCurrentServer() != null;
     }
 
     private static Path configPath() {
