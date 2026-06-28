@@ -40,6 +40,13 @@ public final class ConfigSchema {
             + "# exploration by a few ticks). Higher catches up faster but costs more per frame; lower is\n"
             + "# smoother but lags more behind you.\n";
 
+    private static final String APPEND_DATE_SUFFIX_PREAMBLE = ""
+            + "\n"
+            + "# Add a -YYYY-MM-DD date to a new download's save folder (and to the world's name inside it), so\n"
+            + "# downloads of the same place made on different days sit side by side instead of clashing. On by\n"
+            + "# default. Set false to use the name exactly as typed; a same-name download then lands on the\n"
+            + "# existing folder and merges into it rather than overwriting.\n";
+
     private static final String SHOW_CHAT_MESSAGES_PREAMBLE = ""
             + "\n"
             + "# Chat notices from the mod, like the update-available line. Set false to silence them; notices\n"
@@ -48,12 +55,14 @@ public final class ConfigSchema {
     static final List<ConfigOption> OPTIONS = Collections.unmodifiableList(Arrays.asList(
             ConfigOption.rangedInteger("encodeBudgetMillis", "2", 1, 10, config -> config.encodeBudgetMillis(),
                     ENCODE_BUDGET_MILLIS_PREAMBLE),
+            ConfigOption.booleanOption("appendDateSuffix", "true", config -> config.appendDateSuffix(),
+                    APPEND_DATE_SUFFIX_PREAMBLE),
             ConfigOption.booleanOption("showChatMessages", "true", config -> config.showChatMessages(),
                     SHOW_CHAT_MESSAGES_PREAMBLE)));
 
     private static final Map<String, ConfigOption> BY_KEY = Collections.unmodifiableMap(indexByKey(OPTIONS));
 
-    static final List<ConfigOption> REPORT_ORDER = report("encodeBudgetMillis", "showChatMessages");
+    static final List<ConfigOption> REPORT_ORDER = report("encodeBudgetMillis", "appendDateSuffix", "showChatMessages");
 
     /**
      * Read every option, defaulting any key that is missing or present-but-unparseable to its descriptor default

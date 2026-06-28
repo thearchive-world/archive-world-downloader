@@ -32,16 +32,23 @@ public final class WdlConfig {
     private static final Logger LOGGER = Logger.getLogger(WdlConfig.class.getName());
 
     private final int encodeBudgetMillis;
+    private final boolean appendDateSuffix;
     private final boolean showChatMessages;
 
-    private WdlConfig(int encodeBudgetMillis, boolean showChatMessages) {
+    private WdlConfig(int encodeBudgetMillis, boolean appendDateSuffix, boolean showChatMessages) {
         this.encodeBudgetMillis = encodeBudgetMillis;
+        this.appendDateSuffix = appendDateSuffix;
         this.showChatMessages = showChatMessages;
     }
 
     /** Max milliseconds per tick spent encoding chunks/entities; the rest spills to later ticks (smoothness knob). */
     public int encodeBudgetMillis() {
         return encodeBudgetMillis;
+    }
+
+    /** Whether a new download's resolved name is decorated with a {@code -YYYY-MM-DD} suffix (default on). */
+    public boolean appendDateSuffix() {
+        return appendDateSuffix;
     }
 
     /** Whether the mod's chat notices (the update-available line) are shown; in-screen notices ignore it. */
@@ -88,7 +95,8 @@ public final class WdlConfig {
      */
     static WdlConfig parse(Properties properties, List<String> malformed) {
         ConfigValues values = ConfigSchema.read(properties, malformed);
-        return new WdlConfig(values.integer("encodeBudgetMillis"), values.booleanValue("showChatMessages"));
+        return new WdlConfig(values.integer("encodeBudgetMillis"), values.booleanValue("appendDateSuffix"),
+                values.booleanValue("showChatMessages"));
     }
 
     /**
