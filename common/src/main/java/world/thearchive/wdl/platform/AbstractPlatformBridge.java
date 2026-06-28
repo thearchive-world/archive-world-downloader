@@ -23,6 +23,22 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     @Override
+    public final void registerToggleKeybind(Runnable onToggle) {
+        registerKeybind("key.wdl.toggle", onToggle);
+    }
+
+    @Override
+    public final void registerDownloadsKeybind(Runnable onOpen) {
+        registerKeybind("key.wdl.open_downloads", onOpen);
+    }
+
+    /**
+     * Register an unbound key mapping for {@code keyId} under the wdl category; {@code onPress} runs once per press on
+     * the client main thread.
+     */
+    protected abstract void registerKeybind(String keyId, Runnable onPress);
+
+    @Override
     public boolean isRemoteWorld() {
         Minecraft mc = Minecraft.getInstance();
         // getConnection() is null until Minecraft.player is assigned, which is what keeps this false during

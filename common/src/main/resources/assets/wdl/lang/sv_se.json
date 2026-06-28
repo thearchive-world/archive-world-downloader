@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Växla världsnedladdning",
+  "key.wdl.open_downloads": "Öppna nedladdningsskärmen",
   "wdl.chat.downloading": "Laddar ned %s.",
   "wdl.chat.start_needs_name": "En nedladdning behöver ett namn. Använd /wdl start <name> för att börja.",
   "wdl.chat.saving": "Sparar...",

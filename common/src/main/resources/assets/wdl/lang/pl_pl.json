@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Przełącz pobieranie świata",
+  "key.wdl.open_downloads": "Otwórz ekran pobierania",
   "wdl.chat.downloading": "Pobieranie %s.",
   "wdl.chat.start_needs_name": "Pobieranie wymaga nazwy. Użyj /wdl start <nazwa>, aby rozpocząć.",
   "wdl.chat.saving": "Zapisywanie…",

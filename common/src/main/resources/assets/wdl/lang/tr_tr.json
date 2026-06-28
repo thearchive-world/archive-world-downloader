@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Dünya İndirmeyi Aç/Kapa",
+  "key.wdl.open_downloads": "İndirmeler Ekranını Aç",
   "wdl.chat.downloading": "%s indiriliyor.",
   "wdl.chat.start_needs_name": "Bir indirmenin ada ihtiyacı var. Başlamak için /wdl start <name> komutunu kullanın.",
   "wdl.chat.saving": "Kaydediliyor...",

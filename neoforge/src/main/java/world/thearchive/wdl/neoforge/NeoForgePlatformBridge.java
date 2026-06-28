@@ -3,17 +3,58 @@
 
 package world.thearchive.wdl.neoforge;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import java.nio.file.Path;
+import java.util.Objects;
+import net.minecraft.client.KeyMapping;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import org.lwjgl.glfw.GLFW;
 
+import world.thearchive.wdl.client.WdlKeyBinds;
 import world.thearchive.wdl.platform.AbstractPlatformBridge;
 
-/** The NeoForge half of the loader seam: NeoForge event bus and {@link ModList} metadata, nothing else. */
+/**
+ * NeoForge implementation of {@link world.thearchive.wdl.platform.PlatformBridge PlatformBridge}, constructed by
+ * {@link WdlNeoForge} with the mod event bus injected into its {@code @Mod} constructor; every NeoForge / vanilla call
+ * happens inside the methods.
+ *
+ * <p>The four loader-specific methods (keybind/tick/disconnect/config-directory) map to NeoForge's own event buses (cf.
+ * {@code FabricPlatformBridge}, which maps the same four to Fabric's APIs); {@code isRemoteWorld} and {@code sendChat}
+ * are pure-vanilla and inherited from {@link AbstractPlatformBridge}.
+ *
+ * <p>NeoForge splits a <i>mod</i> event bus (lifecycle/registration, e.g. {@link RegisterKeyMappingsEvent}) from the
+ * <i>game</i> event bus ({@link NeoForge#EVENT_BUS}, gameplay, e.g. {@link ClientTickEvent.Post}). A {@code KeyMapping}
+ * can only be registered by listening to {@link RegisterKeyMappingsEvent} on the mod bus, and the loader injects that
+ * bus into the {@code @Mod} constructor, which runs before the event fires. {@link WdlNeoForge} therefore passes that
+ * injected bus straight to this bridge's constructor, which holds it for {@link #registerKeybind}.
+ */
 final class NeoForgePlatformBridge extends AbstractPlatformBridge {
+    /** The mod event bus, injected into {@link WdlNeoForge}'s {@code @Mod} constructor and handed here. */
+    private final IEventBus modEventBus;
+
+    NeoForgePlatformBridge(IEventBus modEventBus) {
+        this.modEventBus = Objects.requireNonNull(modEventBus, "modEventBus");
+    }
+
+    /** The mapping registers on the mod bus; its clicks poll on the game bus once per client tick. */
+    @Override
+    protected void registerKeybind(String keyId, Runnable onPress) {
+        KeyMapping key = new KeyMapping(keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
+                WdlKeyBinds.CATEGORY);
+        modEventBus.addListener(RegisterKeyMappingsEvent.class, event -> event.register(key));
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> {
+            while (key.consumeClick()) {
+                onPress.run();
+            }
+        });
+    }
+
     @Override
     public void onClientTickEnd(Runnable callback) {
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> callback.run());

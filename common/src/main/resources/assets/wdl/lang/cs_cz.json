@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Přepnout stahování světa",
+  "key.wdl.open_downloads": "Otevřít obrazovku stažení",
   "wdl.chat.downloading": "Stahování %s.",
   "wdl.chat.start_needs_name": "Stažení potřebuje název. Pro zahájení použij /wdl start <name>.",
   "wdl.chat.saving": "Ukládání…",

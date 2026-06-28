@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Iniciar/parar transferência",
+  "key.wdl.open_downloads": "Abrir transferência",
   "wdl.chat.downloading": "A transferir %s.",
   "wdl.chat.start_needs_name": "Uma transferência precisa de um nome. Usa /wdl start <nome> para começar.",
   "wdl.chat.saving": "A guardar...",

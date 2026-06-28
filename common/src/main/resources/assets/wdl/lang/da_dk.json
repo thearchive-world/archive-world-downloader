@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Slå verdensdownload til/fra",
+  "key.wdl.open_downloads": "Åbn downloadskærmen",
   "wdl.chat.downloading": "Downloader %s.",
   "wdl.chat.start_needs_name": "En download skal have et navn. Brug /wdl start <navn> for at begynde.",
   "wdl.chat.saving": "Gemmer...",

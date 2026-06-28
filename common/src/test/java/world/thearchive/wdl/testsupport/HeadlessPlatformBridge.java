@@ -25,6 +25,12 @@ public class HeadlessPlatformBridge implements PlatformBridge {
     }
 
     @Override
+    public void registerToggleKeybind(Runnable onToggle) {}
+
+    @Override
+    public void registerDownloadsKeybind(Runnable onOpen) {}
+
+    @Override
     public void onClientTickEnd(Runnable callback) {}
 
     @Override

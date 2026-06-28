@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Start/stop download",
+  "key.wdl.open_downloads": "Open downloadscherm",
   "wdl.chat.downloading": "%s wordt gedownload.",
   "wdl.chat.start_needs_name": "Een download heeft een naam nodig. Gebruik /wdl start <naam> om te beginnen.",
   "wdl.chat.saving": "Opslaan...",

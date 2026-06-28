@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Iniciar/parar download",
+  "key.wdl.open_downloads": "Abrir download",
   "wdl.chat.downloading": "Baixando %s.",
   "wdl.chat.start_needs_name": "Um download precisa de um nome. Use /wdl start <nome> para começar.",
   "wdl.chat.saving": "Salvando...",

@@ -4,6 +4,7 @@
 package world.thearchive.wdl.neoforge;
 
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 
 import world.thearchive.wdl.Wdl;
@@ -15,7 +16,7 @@ import world.thearchive.wdl.Wdl;
  */
 @Mod(value = "wdl", dist = Dist.CLIENT)
 public final class WdlNeoForge {
-    public WdlNeoForge() {
-        Wdl.initialize(new NeoForgePlatformBridge());
+    public WdlNeoForge(IEventBus modEventBus) {
+        Wdl.initialize(new NeoForgePlatformBridge(modEventBus));
     }
 }

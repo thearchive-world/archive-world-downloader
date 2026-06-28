@@ -3,15 +3,31 @@
 
 package world.thearchive.wdl.fabric;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import java.nio.file.Path;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.KeyMapping;
+import org.lwjgl.glfw.GLFW;
 
+import world.thearchive.wdl.client.WdlKeyBinds;
 import world.thearchive.wdl.platform.AbstractPlatformBridge;
 
 /** The Fabric half of the loader seam: Fabric API events and {@link FabricLoader} metadata, nothing else. */
 public final class FabricPlatformBridge extends AbstractPlatformBridge {
+    @Override
+    protected void registerKeybind(String keyId, Runnable onPress) {
+        KeyMapping key = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, WdlKeyBinds.CATEGORY));
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            while (key.consumeClick()) {
+                onPress.run();
+            }
+        });
+    }
+
     @Override
     public void onClientTickEnd(Runnable callback) {
         ClientTickEvents.END_CLIENT_TICK.register(client -> callback.run());

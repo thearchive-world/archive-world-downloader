@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "開始/停止下載",
+  "key.wdl.open_downloads": "開啟下載",
   "wdl.chat.downloading": "正在下載 %s。",
   "wdl.chat.start_needs_name": "下載需要一個名稱。請使用 /wdl start <名稱> 開始。",
   "wdl.chat.saving": "儲存中...",

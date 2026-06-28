@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "ワールドダウンロードの切り替え",
+  "key.wdl.open_downloads": "ダウンロード画面を開く",
   "wdl.chat.downloading": "%sをダウンロード中です。",
   "wdl.chat.start_needs_name": "ダウンロードには名前が必要です。開始するには /wdl start <名前> を使用してください。",
   "wdl.chat.saving": "保存中…",

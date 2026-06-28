@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Toggle th' plunder",
+  "key.wdl.open_downloads": "Open th' plunder",
   "wdl.chat.downloading": "Plunderin' %s.",
   "wdl.chat.start_needs_name": "A plunder needs a name. Use /wdl start <name> t' begin.",
   "wdl.chat.saving": "Stowin'...",

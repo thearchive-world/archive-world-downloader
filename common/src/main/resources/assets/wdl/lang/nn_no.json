@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Start/stans nedlasting",
+  "key.wdl.open_downloads": "Opna nedlasting",
   "wdl.chat.downloading": "Lastar ned %s.",
   "wdl.chat.start_needs_name": "Ei nedlasting treng eit namn. Bruk /wdl start <namn> for å byrja.",
   "wdl.chat.saving": "Lagrar...",

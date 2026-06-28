@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "Kytke maailman lataus",
+  "key.wdl.open_downloads": "Avaa Lataukset-näyttö",
   "wdl.chat.downloading": "Ladataan %s.",
   "wdl.chat.start_needs_name": "Lataus tarvitsee nimen. Aloita komennolla /wdl start <name>.",
   "wdl.chat.saving": "Tallennetaan...",

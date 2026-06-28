@@ -1,4 +1,7 @@
 {
+  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.wdl.toggle": "세계 다운로드 전환",
+  "key.wdl.open_downloads": "다운로드 화면 열기",
   "wdl.chat.downloading": "%s 다운로드 중.",
   "wdl.chat.start_needs_name": "다운로드에는 이름이 필요합니다. 시작하려면 /wdl start <이름> 명령을 사용하세요.",
   "wdl.chat.saving": "저장 중...",

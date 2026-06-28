@@ -15,6 +15,12 @@ import world.thearchive.wdl.core.ChatCopy;
  * <p>Deliberately free of {@code net.minecraft.*} in its signatures so the core can depend on it.
  */
 public interface PlatformBridge {
+    /** Register the capture-toggle keybind; {@code onToggle} runs on each press (client main thread). */
+    void registerToggleKeybind(Runnable onToggle);
+
+    /** Register the open-downloads-screen keybind (default unbound); {@code onOpen} runs on each press. */
+    void registerDownloadsKeybind(Runnable onOpen);
+
     /** Run {@code callback} at the end of every client tick (client main thread). */
     void onClientTickEnd(Runnable callback);
 
