@@ -590,7 +590,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             WorldPaths paths = adapter.worldPaths(saveRoot);
             this.levelDatFile = saveRoot.resolve("level.dat"); // read on a resume to keep the world's name
             LevelDataWriter levelDataWriter = adapter.levelDataWriter();
-            LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(registries, resolveWorldName());
+            LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(registries, config.worldOutput(),
+                    resolveWorldName());
             writer = new AsyncSaveWriter(
                     dimension -> new SimpleRegionStorage(paths.regionStorageInfo(dimension),
                             paths.regionDirectory(dimension), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK),

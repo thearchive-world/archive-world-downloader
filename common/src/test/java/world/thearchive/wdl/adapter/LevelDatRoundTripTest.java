@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
+import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -41,7 +42,7 @@ class LevelDatRoundTripTest {
     @Test
     void levelDatRoundTripsVoidDimensionsSeedAndDataVersion(@TempDir Path directory) throws IOException {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, null);
+        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
         DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
 
         CompoundTag dataTag = built.worldData().createTag(built.registries(), null);
@@ -74,14 +75,14 @@ class LevelDatRoundTripTest {
         // Precondition mirrors a real multiplayer client: dimension types + biomes synced, no LEVEL_STEM.
         assertTrue(registries.lookup(Registries.LEVEL_STEM).isEmpty(),
                 "precondition: client-like reg has no LEVEL_STEM");
-        assertDoesNotThrow(() -> writer.buildLevelData(registries, null),
+        assertDoesNotThrow(() -> writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null),
                 "must derive void dimensions, not fail");
     }
 
     @Test
     void savesLevelDatThroughTheProductionLevelStorageAccess(@TempDir Path saves) throws IOException {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, null);
+        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
 
         // Drive the REAL production save (LevelStorageAccess.saveDataTag) rather than a hand-rolled NbtIo write,
         // so the headless suite guards the band-specific saveDataTag call inside LevelDataWriter.save()
@@ -110,7 +111,7 @@ class LevelDatRoundTripTest {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("named")) {
-            writer.save(access, writer.buildLevelData(registries, "My Base"));
+            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, "My Base"));
         }
         assertEquals("My Base", levelName(saves.resolve("named")), "the typed name is written as LevelName");
     }
@@ -120,7 +121,7 @@ class LevelDatRoundTripTest {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("unnamed")) {
-            writer.save(access, writer.buildLevelData(registries, null));
+            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null));
         }
         assertEquals("Archive World Downloader", levelName(saves.resolve("unnamed")),
                 "a null name falls back to the writer default");
