@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.Properties;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +25,22 @@ class ConfigSchemaTest {
             Object reparsed = option.type.parse(option, formatted, new ArrayList<>());
             assertEquals(parsedDefault, reparsed, option.key + " must round-trip format then parse");
         }
+    }
+
+    @Test
+    void literalNestedDefaultsMatchTheSchemaDerivedOnes() {
+        WdlConfig derived = WdlConfig.parse(new Properties());
+
+        WorldOutputConfig world = derived.worldOutput();
+        assertEquals(WorldOutputConfig.DEFAULTS.overrideGameRules(), world.overrideGameRules());
+        assertEquals(WorldOutputConfig.DEFAULTS.overrideWorldDefaults(), world.overrideWorldDefaults());
+        assertEquals(WorldOutputConfig.DEFAULTS.allowCommands(), world.allowCommands());
+        assertEquals(WorldOutputConfig.DEFAULTS.skipVoidChunks(), world.skipVoidChunks());
+        assertEquals(WorldOutputConfig.DEFAULTS.autoDownload(), world.autoDownload());
+        assertEquals(WorldOutputConfig.DEFAULTS.worldType(), world.worldType());
+        assertEquals(WorldOutputConfig.DEFAULTS.worldSeed(), world.worldSeed());
+        assertEquals(WorldOutputConfig.DEFAULTS.generateFeatures(), world.generateFeatures());
+        assertTrue(world.gameRuleOverrides().isEmpty());
     }
 
     @Test

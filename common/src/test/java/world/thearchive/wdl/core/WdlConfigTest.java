@@ -94,6 +94,17 @@ class WdlConfigTest {
     }
 
     @Test
+    void parseClampsEncodeBudgetMillisToItsOneToTenBound() {
+        Properties tooHigh = new Properties();
+        tooHigh.setProperty("encodeBudgetMillis", "100");
+        assertEquals(10, WdlConfig.parse(tooHigh).encodeBudgetMillis(), "encodeBudgetMillis clamps to its 10ms cap");
+
+        Properties tooLow = new Properties();
+        tooLow.setProperty("encodeBudgetMillis", "0");
+        assertEquals(1, WdlConfig.parse(tooLow).encodeBudgetMillis(), "encodeBudgetMillis clamps to its 1ms floor");
+    }
+
+    @Test
     void configVersionIsStampedInTheDefaultFile(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
 
@@ -101,6 +112,16 @@ class WdlConfigTest {
 
         assertTrue(Files.readString(file).contains("configVersion=1"),
                 "the materialized default file stamps the schema version");
+    }
+
+    @Test
+    void loadWritesTheAllowCommandsDefault(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("wdl.properties");
+
+        WdlConfig.load(file);
+
+        assertTrue(Files.readString(file).contains("allowCommands=true"),
+                "the materialized default file documents the cheats knob, default on");
     }
 
     @Test
@@ -120,6 +141,92 @@ class WdlConfigTest {
 
         assertTrue(WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS).isEmpty(),
                 "the schema version is metadata and never shows up in the settings diff");
+    }
+
+    @Test
+    void worldOutputDefaultsToBothMastersOnAndBothKnobsOff() {
+        WorldOutputConfig worldOutput = WdlConfig.parse(new Properties()).worldOutput();
+
+        assertTrue(worldOutput.overrideGameRules());
+        assertTrue(worldOutput.overrideWorldDefaults());
+        assertFalse(worldOutput.skipVoidChunks());
+        assertFalse(worldOutput.autoDownload());
+        assertTrue(worldOutput.gameRuleOverrides().isEmpty());
+    }
+
+    @Test
+    void parseDelegatesTheWorldOutputKeys() {
+        Properties properties = new Properties();
+        properties.setProperty("skipVoidChunks", "true");
+        properties.setProperty("autoDownload", "true");
+        properties.setProperty("gamerule.spawn_mobs", "false");
+
+        WorldOutputConfig worldOutput = WdlConfig.parse(properties).worldOutput();
+
+        assertTrue(worldOutput.skipVoidChunks());
+        assertTrue(worldOutput.autoDownload());
+        assertEquals("false", worldOutput.gameRuleOverrides().get("spawn_mobs"));
+    }
+
+    @Test
+    void changedFromIncludesWorldOutputChange() {
+        Properties properties = new Properties();
+        properties.setProperty("autoDownload", "true"); // default false
+
+        Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
+
+        assertEquals("true", changed.get("autoDownload"));
+    }
+
+    @Test
+    void changedFromIsScalarOnlyAndExcludesGameRuleOverrides() {
+        Properties properties = new Properties();
+        properties.setProperty("gamerule.spawn_mobs", "true");
+
+        assertFalse(WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS).containsKey("gamerule.spawn_mobs"),
+                "changedFrom is a complete scalar diff; the override list is not part of it");
+    }
+
+    @Test
+    void loadRoundTripsTheWorldOutputDefaults(@TempDir Path directory) {
+        Path file = directory.resolve("wdl.properties");
+
+        WdlConfig first = WdlConfig.load(file);
+        WdlConfig reloaded = WdlConfig.load(file);
+
+        assertEquals(first.worldOutput().overrideGameRules(), reloaded.worldOutput().overrideGameRules());
+        assertEquals(first.worldOutput().overrideWorldDefaults(), reloaded.worldOutput().overrideWorldDefaults());
+        assertEquals(first.worldOutput().allowCommands(), reloaded.worldOutput().allowCommands());
+        assertEquals(first.worldOutput().skipVoidChunks(), reloaded.worldOutput().skipVoidChunks());
+        assertEquals(first.worldOutput().autoDownload(), reloaded.worldOutput().autoDownload());
+    }
+
+    @Test
+    void parseHealsMalformedWorldOutputBooleanToItsDefault() {
+        Properties properties = new Properties();
+        properties.setProperty("overrideGamerules", "ture"); // the sharp edge: a typo disabling a default-on flag
+
+        assertTrue(WdlConfig.parse(properties).worldOutput().overrideGameRules(),
+                "a malformed default-on flag heals to its default, not a silent false");
+    }
+
+    @Test
+    void loadHealsOnlyTheMalformedKeysAndKeepsValidEdits(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("wdl.properties");
+        Files.writeString(file, "overrideGamerules=ture\nskipVoidChunks=true\ngamerule.spawn_mobs=false\n");
+
+        WdlConfig config = WdlConfig.load(file);
+
+        assertTrue(config.worldOutput().overrideGameRules(), "the malformed default-on flag heals to its default");
+        assertTrue(config.worldOutput().skipVoidChunks(),
+                "a valid edit alongside the malformed one is preserved, not reset");
+        assertEquals("false", config.worldOutput().gameRuleOverrides().get("spawn_mobs"),
+                "a valid gamerule override survives the per-key heal");
+        String rewritten = Files.readString(file);
+        assertTrue(rewritten.contains("overrideGamerules=true"), "the healed key is rewritten valid");
+        assertTrue(rewritten.contains("skipVoidChunks=true"), "the preserved edit is written back");
+        assertTrue(rewritten.contains("gamerule.spawn_mobs=false"), "the preserved override is written back");
+        assertTrue(rewritten.contains("configVersion="), "the rewrite is the full documented file");
     }
 
     @Test
@@ -165,5 +272,17 @@ class WdlConfigTest {
 
         assertEquals(original, Files.readString(file),
                 "configVersion is metadata read outside parse(); a bad value keeps its silent fallback, no reset");
+    }
+
+    @Test
+    void loadDoesNotHealGarbageGameRuleOverride(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("wdl.properties");
+        String original = "gamerule.spawn_mobs=banana\n";
+        Files.writeString(file, original);
+
+        WdlConfig.load(file);
+
+        assertEquals(original, Files.readString(file),
+                "gamerule.* values are raw strings validated per band at write time, never healed at parse time");
     }
 }

@@ -34,11 +34,14 @@ public final class WdlConfig {
     private final int encodeBudgetMillis;
     private final boolean appendDateSuffix;
     private final boolean showChatMessages;
+    private final WorldOutputConfig worldOutput;
 
-    private WdlConfig(int encodeBudgetMillis, boolean appendDateSuffix, boolean showChatMessages) {
+    private WdlConfig(int encodeBudgetMillis, boolean appendDateSuffix, boolean showChatMessages,
+            WorldOutputConfig worldOutput) {
         this.encodeBudgetMillis = encodeBudgetMillis;
         this.appendDateSuffix = appendDateSuffix;
         this.showChatMessages = showChatMessages;
+        this.worldOutput = worldOutput;
     }
 
     /** Max milliseconds per tick spent encoding chunks/entities; the rest spills to later ticks (smoothness knob). */
@@ -56,13 +59,20 @@ public final class WdlConfig {
         return showChatMessages;
     }
 
+    /** The world-output options (game-rule overrides, world-open defaults, and the two capture knobs). */
+    public WorldOutputConfig worldOutput() {
+        return worldOutput;
+    }
+
     /**
      * The capture-time settings diffed against {@code baseline}: only the leaves that differ, keyed by their config
      * key, in declaration order. Values render via the locale-independent {@code toString} of the JDK types, so the
      * diff is stable on any machine. With no change the map is empty.
      */
     Map<String, String> changedFrom(WdlConfig baseline) {
-        return ConfigSchema.reportDiff(this, baseline);
+        Map<String, String> changed = ConfigSchema.reportDiff(this, baseline);
+        changed.putAll(ConfigSchema.worldOutputDiff(this, baseline));
+        return changed;
     }
 
     /**
@@ -96,15 +106,15 @@ public final class WdlConfig {
     static WdlConfig parse(Properties properties, List<String> malformed) {
         ConfigValues values = ConfigSchema.read(properties, malformed);
         return new WdlConfig(values.integer("encodeBudgetMillis"), values.booleanValue("appendDateSuffix"),
-                values.booleanValue("showChatMessages"));
+                values.booleanValue("showChatMessages"), WorldOutputConfig.from(values, properties));
     }
 
     /**
      * Load the config at {@code file}, or materialize the documented default file (and return {@link #DEFAULTS}) if it
      * is absent. A file holding a malformed typed value (a non-boolean for a flag, a non-integer for a count) has only
-     * that key healed to its default, every other valid setting kept, and the healed result is written back, rather
-     * than silently parsed as the wrong thing. Falls back to {@link #DEFAULTS} if the file cannot be read or written,
-     * so a broken or unwritable config never stops the mod.
+     * that key healed to its default, every other valid setting kept (including any {@code gamerule.*} override), and
+     * the healed result is written back, rather than silently parsed as the wrong thing. Falls back to
+     * {@link #DEFAULTS} if the file cannot be read or written, so a broken or unwritable config never stops the mod.
      */
     public static WdlConfig load(Path file) {
         try {
