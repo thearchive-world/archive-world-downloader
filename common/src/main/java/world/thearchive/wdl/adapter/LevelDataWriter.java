@@ -43,6 +43,18 @@ public interface LevelDataWriter {
             @Nullable String worldName);
 
     /**
+     * Reconstruct this band's client-side worldgen registries ahead of time, off the render thread, so the first
+     * {@code DEFAULT}/{@code FLAT} download's {@link #buildLevelData} finds them already built instead of decoding them
+     * synchronously on the client tick. Idempotent and safe to call before any download; the dispatched result is
+     * byte-identical to building on demand.
+     *
+     * <p>The default is a no-op: a band whose captured world needs no worldgen reconstruction (VOID-only, or one that
+     * never reaches this cost) inherits it untouched. A band that <b>does</b> reconstruct worldgen must override this
+     * or its first such download silently freezes the render thread again.
+     */
+    default void warmWorldgen() {}
+
+    /**
      * Write the built {@link LevelData} to {@code access} via the band-correct vanilla
      * {@code LevelStorageAccess.saveDataTag} form. This lives on the SPI (not in the shared capture session) because
      * the vanilla signatures drift across bands (the {@code saveDataTag} {@code RegistryAccess} argument drops at
