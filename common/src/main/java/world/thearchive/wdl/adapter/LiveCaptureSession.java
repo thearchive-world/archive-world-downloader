@@ -165,7 +165,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     public LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config, ClientLevel level,
             DownloadTarget target, Runnable saveCompletePoke) {
-        this(adapter, bridge, config, level, level.dimension(), level.registryAccess(), target, saveCompletePoke);
+        this(adapter, bridge, config, level,
+                VanillaDimensions.forType(level.dimensionTypeRegistration().unwrapKey().orElse(null)),
+                level.registryAccess(), target, saveCompletePoke);
     }
 
     /**
@@ -629,8 +631,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // Defer the heavy serialize to the writer thread: the thunk closes over the detached snapshot, the
             // per-band codec and the frozen registries, all immutable, so the render thread never runs
             // SerializableChunkData.write. The target dimension is read here on main, at submit time.
+            boolean synthesizeBlending = VanillaDimensions.shouldSynthesizeBlending(config.worldOutput().worldType(),
+                    targetDimension);
             activeWriter.submitChunk(targetDimension, pos,
-                    () -> codec.encode(snapshot, registries, false),
+                    () -> codec.encode(snapshot, registries, synthesizeBlending),
                     // Terrain is read whole on every capture, so a copy a resumed folder already holds says
                     // nothing this snapshot does not, and the fresh one stands alone.
                     (onDisk, fresh) -> 0);
