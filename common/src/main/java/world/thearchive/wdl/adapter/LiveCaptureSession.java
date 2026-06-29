@@ -27,7 +27,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
@@ -43,6 +45,7 @@ import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.FlushPolicy;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SaveStage;
+import world.thearchive.wdl.core.VoidChunkPolicy;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.platform.PlatformBridge;
 
@@ -83,8 +86,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // The ClientLevel being captured. Null on a session built by the level-free constructor, so dereference it
     // only through level().
     private final @Nullable ClientLevel level;
-    // The dimension this capture is laid out under, which is the level's own key: on a vanilla world that
-    // is also the folder key, and a server that names its worlds itself lays out under its own name.
+    // The vanilla single-player dimension this capture is laid out under, chosen by the captured
+    // dimension's TYPE so non-standard server level keys (e.g. Multiverse's minecraft:worlds/2b2t/2b2t_1)
+    // still write to the vanilla ./region / DIM-1 / DIM1 folders, not a nested dimensions/ns/path one.
     private final ResourceKey<Level> targetDimension;
     // Connection-global (ClientLevel takes it from the packet listener, shared across a respawn's new level).
     private final RegistryAccess registries;
@@ -620,6 +624,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     void flushBuffer(AsyncSaveWriter activeWriter, boolean all, int centerX, int centerZ, int keepHot) {
         ChunkCodec codec = adapter.chunkCodec();
+        // skipVoidChunks (default off): omit a captured chunk that carries nothing worth saving. Honored under
+        // every generator (a user choice); under DEFAULT/FLAT a dropped void position regenerates as terrain, an
+        // accepted trade stated in the config copy, so this is deliberately not gated on the world type.
+        boolean skipVoid = config.worldOutput().skipVoidChunks();
         Iterator<Map.Entry<ChunkPos, ChunkSnapshotSource>> entries = captured.entrySet().iterator();
         while (entries.hasNext()) {
             Map.Entry<ChunkPos, ChunkSnapshotSource> entry = entries.next();
@@ -628,6 +636,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 continue;
             }
             ChunkSnapshotSource snapshot = entry.getValue();
+            if (skipVoid && isVoidChunk(snapshot)) {
+                // Lossless: a VOID world regenerates this position as air identically, so dropping it (and its
+                // allCaptured position) keeps the count and resume honest.
+                allCaptured.remove(pos.toLong());
+                entries.remove();
+                continue;
+            }
             // Defer the heavy serialize to the writer thread: the thunk closes over the detached snapshot, the
             // per-band codec and the frozen registries, all immutable, so the render thread never runs
             // SerializableChunkData.write. The target dimension is read here on main, at submit time.
@@ -640,6 +655,26 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     (onDisk, fresh) -> 0);
             entries.remove();
         }
+    }
+
+    /**
+     * Whether this captured chunk is void (safe to omit): no non-air blocks and no block-entities. The decision is
+     * taken here, against the artifact about to be written, so it cannot drift from what is thrown away.
+     */
+    private static boolean isVoidChunk(ChunkSnapshotSource snapshot) {
+        boolean hasBlockEntities = !snapshot.blockEntities().isEmpty();
+        return VoidChunkPolicy.isVoidChunk(hasNonAirBlocks(snapshot), hasBlockEntities, false, false);
+    }
+
+    /** Whether any captured section of {@code snapshot} holds a non-air block state. */
+    private static boolean hasNonAirBlocks(ChunkSnapshotSource snapshot) {
+        for (SerializableChunkData.SectionData section : snapshot.sections()) {
+            LevelChunkSection chunkSection = section.chunkSection();
+            if (chunkSection != null && !chunkSection.hasOnlyAir()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
