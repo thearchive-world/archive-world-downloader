@@ -84,14 +84,21 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // What this download targets: a fresh folder (NEW) or an existing wdl-managed one to add to (RESUME).
     private final DownloadTarget target;
     // The ClientLevel being captured. Null on a session built by the level-free constructor, so dereference it
-    // only through level().
-    private final @Nullable ClientLevel level;
+    // only through level(). Non-final: rebound when the player follows a portal into another dimension.
+    private @Nullable ClientLevel level;
     // The vanilla single-player dimension this capture is laid out under, chosen by the captured
     // dimension's TYPE so non-standard server level keys (e.g. Multiverse's minecraft:worlds/2b2t/2b2t_1)
     // still write to the vanilla ./region / DIM-1 / DIM1 folders, not a nested dimensions/ns/path one.
-    private final ResourceKey<Level> targetDimension;
+    // Non-final: rebound on a dimension change to lay the new dimension out under its own folder.
+    private ResourceKey<Level> targetDimension;
     // Connection-global (ClientLevel takes it from the packet listener, shared across a respawn's new level).
     private final RegistryAccess registries;
+
+    /**
+     * What a dimension change does to every store whose contents belong to one dimension. The stores register with it
+     * at construction and it owns the order they are drained, swapped, and cleared in.
+     */
+    private final DimensionRebind<ResourceKey<Level>> dimensionRebind = new DimensionRebind<>();
 
     /**
      * The bounded keep-hot working buffer: captured chunk snapshots not yet flushed to disk, keyed by position
@@ -102,11 +109,23 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private final Map<ChunkPos, ChunkSnapshotSource> captured = new LinkedHashMap<>();
 
     /**
-     * Captured chunk positions (as {@link ChunkPos#toLong()}), retained for the whole session: it dedups re-captures
-     * and survives a flush-and-drop of the chunk tag. Positions are tiny, so this stays small even when the chunk tags
-     * themselves must stream to disk.
+     * Captured chunk positions per dimension (as {@link ChunkPos#toLong()}), retained for the whole session: the
+     * position space is dimension-local (the overworld and the nether share positions), so following the player across
+     * a portal must not let one dimension's captures dedup the other's. {@link #allCaptured} references the current
+     * dimension's set; this map backs the per-dimension chunk count at finish.
      */
-    private final LongOpenHashSet allCaptured = new LongOpenHashSet();
+    private final Map<ResourceKey<Level>, LongOpenHashSet> capturedByDimension = new LinkedHashMap<>();
+
+    /**
+     * The current dimension's captured-position set (a reference into {@link #capturedByDimension}, swapped on a
+     * dimension rebind): it dedups re-captures and survives a flush-and-drop of the chunk tag. Positions are tiny, so
+     * this stays small even when the chunk tags themselves must stream to disk.
+     *
+     * <p>The empty instance here is a placeholder that definite initialization needs and nothing reads: the
+     * constructor's {@link DimensionRebind#bind} replaces it with the starting dimension's own set, which is also the
+     * only place the swap is expressed, so the reset list cannot fall out of step with the stores.
+     */
+    private LongOpenHashSet allCaptured = new LongOpenHashSet();
 
     /**
      * The wall-clock deadline ({@link System#nanoTime}) for this tick's chunk capture: one per-tick time budget, so
@@ -145,15 +164,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Chunks whose terrain snapshot threw, so the position reached neither the buffer nor the captured set and the
      * reopened world has none of that chunk's terrain, falling back to its own generator there (main thread). Deduped
-     * by {@link #captureFailed}, since the same position is retried every tick it stays loaded.
+     * by {@link #captureFailedByDimension}, since the same position is retried every tick it stays loaded.
      */
     private int chunksCaptureFailed;
 
     /**
-     * The positions {@link #chunksCaptureFailed} has already counted: the square retries a failing position every tick
-     * it stays loaded, so an undeduped tally would inflate without bound.
+     * The positions {@link #chunksCaptureFailed} has already counted, per dimension: the square retries a failing
+     * position every tick it stays loaded, so an undeduped tally would inflate without bound, and the position space is
+     * dimension-local, so one dimension's failing position must not dedup another's. Held as a plain map rather than a
+     * swapped current-dimension reference like {@link #allCaptured}, because nothing reads it per tick.
      */
-    private final LongOpenHashSet captureFailed = new LongOpenHashSet();
+    private final Map<ResourceKey<Level>, LongOpenHashSet> captureFailedByDimension = new LinkedHashMap<>();
 
     /**
      * Finish-time work the end-of-stream guard degraded to skipped (main thread). The degradation is deliberate, since
@@ -192,6 +213,51 @@ public final class LiveCaptureSession implements CaptureController.Session {
         this.level = level;
         this.targetDimension = targetDimension;
         this.registries = registries;
+        registerDimensionScopedStores();
+        dimensionRebind.bind(targetDimension);
+    }
+
+    /**
+     * Enroll every store whose contents belong to one dimension with {@link #dimensionRebind}, which then owns both
+     * what a dimension change does to each and the order it does it in. A store enrolled here is one whose keys are
+     * dimension-local, so the same key names a different thing in the next dimension.
+     */
+    private void registerDimensionScopedStores() {
+        dimensionRebind.registerDrain(this::writeOutDimensionBeingLeft);
+        dimensionRebind.registerSwap(dimension -> this.allCaptured = capturedFor(dimension));
+    }
+
+    /**
+     * Follow the player into a new dimension: hand every dimension-scoped store to {@link #dimensionRebind}, whose
+     * drain lands the old dimension's buffered chunks in its own folder before its swap retargets to the new one. The
+     * writer target advances after that call, since the drain writes through it and must reach the dimension being
+     * left, and the bound level advances with it. The registries are connection-global, so they need no rebind. Capture
+     * resumes this same tick in the new dimension.
+     */
+    private void rebindDimension(ClientLevel newLevel) {
+        ResourceKey<Level> newTarget = VanillaDimensions
+                .forType(newLevel.dimensionTypeRegistration().unwrapKey().orElse(null));
+        dimensionRebind.rebind(newTarget);
+        this.level = newLevel;
+        this.targetDimension = newTarget;
+    }
+
+    /**
+     * Write out the dimension being left: flush the whole buffer, which submits it under the writer target that still
+     * names that dimension. Nothing is opened on demand here, since a rebind before the first flush pump means the
+     * world could not be opened at all, and what stays buffered is then held for a dimension the session has left.
+     */
+    private void writeOutDimensionBeingLeft() {
+        AsyncSaveWriter activeWriter = this.writer;
+        if (activeWriter == null) {
+            return;
+        }
+        flushBuffer(activeWriter, true, 0, 0, 0);
+    }
+
+    /** The captured-position set for {@code dimension}, created empty on first use (the per-dimension dedup). */
+    private LongOpenHashSet capturedFor(ResourceKey<Level> dimension) {
+        return capturedByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
     }
 
     /**
@@ -207,9 +273,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return bound;
     }
 
-    /** The distinct chunk positions captured this session. */
+    /** Total captured chunks across every dimension followed this session (the live and headline count). */
     private int totalCapturedChunks() {
-        return allCaptured.size();
+        int total = 0;
+        for (LongOpenHashSet positions : capturedByDimension.values()) {
+            total += positions.size();
+        }
+        return total;
     }
 
     /** Whether this tick's budget still has time left; gates each chunk snapshot. */
@@ -264,6 +334,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     public void captureTick() {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
+        ClientLevel current = minecraft.level;
+        if (player != null && current != null && current != level()) {
+            rebindDimension(current); // follow the player across a portal; capture resumes below
+        }
         @Nullable
         ChunkPos hotCenter = null;
         if (player != null && minecraft.level == level()) {
@@ -343,7 +417,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * <p>Package-private so the tally it feeds stays testable.
      */
     void recordChunkCaptureLoss(ChunkPos pos, Throwable cause) {
-        if (captureFailed.add(pos.toLong())) {
+        LongOpenHashSet counted = captureFailedByDimension.computeIfAbsent(targetDimension,
+                dimension -> new LongOpenHashSet());
+        if (counted.add(pos.toLong())) {
             chunksCaptureFailed++;
             LOGGER.warn("failed to capture chunk {}; the reopened world has none of that chunk's terrain", pos, cause);
         }
