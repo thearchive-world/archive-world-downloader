@@ -81,6 +81,17 @@ class WdlConfigTest {
     }
 
     @Test
+    void changedFromReportsForceMobPersistenceWhenEnabled() {
+        Properties properties = new Properties();
+        properties.setProperty("forceMobPersistence", "true"); // the default is false
+
+        Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
+
+        assertEquals(1, changed.size());
+        assertEquals("true", changed.get("forceMobPersistence"));
+    }
+
+    @Test
     void loadWritesEachScalarBooleanDefault(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
 
@@ -91,6 +102,44 @@ class WdlConfigTest {
             assertTrue(written.contains(toggle.key() + "=true"),
                     "the materialized default file documents " + toggle.key() + ", default on");
         }
+    }
+
+    @Test
+    void parseReadsTheNearbyRecaptureMode() {
+        Properties properties = new Properties();
+        properties.setProperty("recaptureChunks", "NEARBY");
+
+        assertEquals(RecaptureMode.NEARBY, WdlConfig.parse(properties).recaptureChunks());
+    }
+
+    @Test
+    void aStaleRecaptureBooleanSelfHealsToEverywhere() {
+        Properties properties = new Properties();
+        properties.setProperty("recaptureChunks", "true"); // a leftover from the retired boolean, not a valid mode
+
+        assertEquals(RecaptureMode.EVERYWHERE, WdlConfig.parse(properties).recaptureChunks(),
+                "a stale boolean value fails the enum parse and heals to the default, not to a silent OFF");
+    }
+
+    @Test
+    void parseFallsBackToDefaultOnMalformedInt() {
+        Properties properties = new Properties();
+        properties.setProperty("recaptureSeconds", "not-a-number");
+
+        WdlConfig config = WdlConfig.parse(properties);
+
+        assertEquals(15, config.recaptureSeconds(), "a malformed int keeps the default");
+    }
+
+    @Test
+    void parseClampsRecaptureSecondsToItsFiveToSixtyBound() {
+        Properties tooHigh = new Properties();
+        tooHigh.setProperty("recaptureSeconds", "120");
+        assertEquals(60, WdlConfig.parse(tooHigh).recaptureSeconds(), "recaptureSeconds clamps to its 60s ceiling");
+
+        Properties tooLow = new Properties();
+        tooLow.setProperty("recaptureSeconds", "1");
+        assertEquals(5, WdlConfig.parse(tooLow).recaptureSeconds(), "recaptureSeconds clamps to its 5s floor");
     }
 
     @Test

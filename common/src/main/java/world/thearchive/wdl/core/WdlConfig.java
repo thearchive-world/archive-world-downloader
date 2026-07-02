@@ -31,22 +31,57 @@ public final class WdlConfig {
 
     private static final Logger LOGGER = Logger.getLogger(WdlConfig.class.getName());
 
+    private final boolean captureEntities;
+    private final RecaptureMode recaptureChunks;
+    private final int recaptureSeconds;
     private final int encodeBudgetMillis;
+    private final boolean forceMobPersistence;
+    private final boolean dumpReceivedFrames;
     private final boolean appendDateSuffix;
     private final boolean showChatMessages;
     private final WorldOutputConfig worldOutput;
 
-    private WdlConfig(int encodeBudgetMillis, boolean appendDateSuffix, boolean showChatMessages,
-            WorldOutputConfig worldOutput) {
+    private WdlConfig(boolean captureEntities, RecaptureMode recaptureChunks, int recaptureSeconds,
+            int encodeBudgetMillis, boolean forceMobPersistence, boolean dumpReceivedFrames,
+            boolean appendDateSuffix, boolean showChatMessages, WorldOutputConfig worldOutput) {
+        this.captureEntities = captureEntities;
+        this.recaptureChunks = recaptureChunks;
+        this.recaptureSeconds = recaptureSeconds;
         this.encodeBudgetMillis = encodeBudgetMillis;
+        this.forceMobPersistence = forceMobPersistence;
+        this.dumpReceivedFrames = dumpReceivedFrames;
         this.appendDateSuffix = appendDateSuffix;
         this.showChatMessages = showChatMessages;
         this.worldOutput = worldOutput;
     }
 
+    public boolean captureEntities() {
+        return captureEntities;
+    }
+
+    /** How current the download keeps the world as the player records (snapshot-once, nearby-only, or on revisit). */
+    public RecaptureMode recaptureChunks() {
+        return recaptureChunks;
+    }
+
+    /** How often (seconds) the whole set of nearby buffered chunks is refreshed while recording. */
+    public int recaptureSeconds() {
+        return recaptureSeconds;
+    }
+
     /** Max milliseconds per tick spent encoding chunks/entities; the rest spills to later ticks (smoothness knob). */
     public int encodeBudgetMillis() {
         return encodeBudgetMillis;
+    }
+
+    /** Whether to stamp {@code PersistenceRequired} on every captured mob ({@code true}) or only named ones. */
+    public boolean forceMobPersistence() {
+        return forceMobPersistence;
+    }
+
+    /** Diagnostic (default off): dump every received item frame's position to {@code wdl/received-item-frames.txt}. */
+    public boolean dumpReceivedFrames() {
+        return dumpReceivedFrames;
     }
 
     /** Whether a new download's resolved name is decorated with a {@code -YYYY-MM-DD} suffix (default on). */
@@ -105,8 +140,16 @@ public final class WdlConfig {
      */
     static WdlConfig parse(Properties properties, List<String> malformed) {
         ConfigValues values = ConfigSchema.read(properties, malformed);
-        return new WdlConfig(values.integer("encodeBudgetMillis"), values.booleanValue("appendDateSuffix"),
-                values.booleanValue("showChatMessages"), WorldOutputConfig.from(values, properties));
+        return new WdlConfig(
+                values.booleanValue("captureEntities"),
+                values.enumValue("recaptureChunks", RecaptureMode.class),
+                values.integer("recaptureSeconds"),
+                values.integer("encodeBudgetMillis"),
+                values.booleanValue("forceMobPersistence"),
+                values.booleanValue("dumpReceivedFrames"),
+                values.booleanValue("appendDateSuffix"),
+                values.booleanValue("showChatMessages"),
+                WorldOutputConfig.from(values, properties));
     }
 
     /**

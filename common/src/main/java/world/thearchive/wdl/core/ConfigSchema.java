@@ -36,11 +36,40 @@ public final class ConfigSchema {
             + "# Config schema version, set by the mod (do not edit); lets a future version migrate an old config.\n"
             + "configVersion=" + WdlConfig.CONFIG_VERSION + "\n";
 
+    private static final String CAPTURE_TOGGLES_PREAMBLE = ""
+            + "\n"
+            + "# Content toggles: which kinds of data to include in the download. The world's terrain is always\n"
+            + "# downloaded; these choose the extra data kinds, so set any to false to skip it.\n";
+
+    private static final String RECAPTURE_CHUNKS_PREAMBLE = ""
+            + "\n"
+            + "# How current the download keeps the world as you explore (a lower mode costs less per tick).\n"
+            + "# OFF: Download each area once and keep it as you first saw it.\n"
+            + "# NEARBY: Keep the area around you up to date, but leave already-downloaded areas as you first\n"
+            + "# saved them.\n"
+            + "# EVERYWHERE (default): Keep areas you revisit up to date too, re-saving terrain that changed\n"
+            + "# while you were away. Contents are the exception: a Chest, Barrel, or Lectern can only be\n"
+            + "# saved by opening it, so a revisit refreshes the blocks but keeps the items from the last\n"
+            + "# time you opened it. Reopen a container to bring its contents up to date.\n";
+
+    private static final String RECAPTURE_SECONDS_PREAMBLE = ""
+            + "# How often (seconds, 5 to 60) the full set of nearby chunks is refreshed. Higher is cheaper\n"
+            + "# but lets a far change wait longer before it is refreshed; the area right around you stays\n"
+            + "# current regardless.\n";
+
     private static final String ENCODE_BUDGET_MILLIS_PREAMBLE = ""
             + "# Max milliseconds per tick (1 to 10) spent encoding chunks/entities, so loading a fresh area\n"
             + "# or flying fast never stutters the frame; the rest spills to later ticks (the download lags\n"
             + "# exploration by a few ticks). Higher catches up faster but costs more per frame; lower is\n"
             + "# smoother but lags more behind you.\n";
+
+    private static final String FORCE_MOB_PERSISTENCE_PREAMBLE = ""
+            + "\n"
+            + "# Keep every mob you download from despawning when the world is opened, not just name-tagged ones.\n"
+            + "# Name-tagged mobs (pets, named Villagers) always survive the open regardless of this setting.\n"
+            + "# Off by default: leaving it off matches vanilla, where an ordinary un-named mob may wander off or\n"
+            + "# despawn. Set true to pin every downloaded mob in place so your scene comes out exactly as "
+            + "downloaded.\n";
 
     private static final String WORLD_TYPE_PREAMBLE = ""
             + "\n"
@@ -109,9 +138,24 @@ public final class ConfigSchema {
             + "# Chat notices from the mod, like the update-available line. Set false to silence them; notices\n"
             + "# inside the mod's own screens are unaffected.\n";
 
+    private static final String DUMP_RECEIVED_FRAMES_PREAMBLE = ""
+            + "\n"
+            + "# Diagnostics (advanced); leave off for normal use.\n"
+            + "# Dumps the position of every item frame the client received to wdl/received-item-frames.txt,\n"
+            + "# so a missing frame can be checked against what was actually received (a download-loss audit).\n"
+            + "# Off by default; it collects every received item frame in memory and writes a file at save.\n";
+
     static final List<ConfigOption> OPTIONS = Collections.unmodifiableList(Arrays.asList(
+            ConfigOption.dataLossBoolean("captureEntities", "true", config -> config.captureEntities(),
+                    CAPTURE_TOGGLES_PREAMBLE),
+            ConfigOption.enumOption("recaptureChunks", "EVERYWHERE", name -> RecaptureMode.valueOf(name),
+                    config -> config.recaptureChunks(), RECAPTURE_CHUNKS_PREAMBLE),
+            ConfigOption.rangedInteger("recaptureSeconds", "15", 5, 60, config -> config.recaptureSeconds(),
+                    RECAPTURE_SECONDS_PREAMBLE),
             ConfigOption.rangedInteger("encodeBudgetMillis", "2", 1, 10, config -> config.encodeBudgetMillis(),
                     ENCODE_BUDGET_MILLIS_PREAMBLE),
+            ConfigOption.booleanOption("forceMobPersistence", "false", config -> config.forceMobPersistence(),
+                    FORCE_MOB_PERSISTENCE_PREAMBLE),
             ConfigOption.enumOption("worldType", "VOID", name -> WorldType.valueOf(name),
                     config -> config.worldOutput().worldType(), WORLD_TYPE_PREAMBLE),
             ConfigOption.longSeed("worldSeed", "0", config -> config.worldOutput().worldSeed(), WORLD_SEED_PREAMBLE),
@@ -131,11 +175,15 @@ public final class ConfigSchema {
             ConfigOption.booleanOption("appendDateSuffix", "true", config -> config.appendDateSuffix(),
                     APPEND_DATE_SUFFIX_PREAMBLE),
             ConfigOption.booleanOption("showChatMessages", "true", config -> config.showChatMessages(),
-                    SHOW_CHAT_MESSAGES_PREAMBLE)));
+                    SHOW_CHAT_MESSAGES_PREAMBLE),
+            ConfigOption.booleanOption("dumpReceivedFrames", "false", config -> config.dumpReceivedFrames(),
+                    DUMP_RECEIVED_FRAMES_PREAMBLE)));
 
     private static final Map<String, ConfigOption> BY_KEY = Collections.unmodifiableMap(indexByKey(OPTIONS));
 
-    static final List<ConfigOption> REPORT_ORDER = report("encodeBudgetMillis", "appendDateSuffix", "showChatMessages");
+    static final List<ConfigOption> REPORT_ORDER = report(
+            "captureEntities", "recaptureChunks", "recaptureSeconds", "encodeBudgetMillis",
+            "forceMobPersistence", "dumpReceivedFrames", "appendDateSuffix", "showChatMessages");
 
     static final List<ConfigOption> WORLD_OUTPUT_REPORT_ORDER = report(
             "overrideGamerules", "overrideWorldDefaults",
