@@ -726,9 +726,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     targetDimension);
             activeWriter.submitChunk(targetDimension, pos,
                     () -> codec.encode(snapshot, registries, synthesizeBlending),
-                    // Terrain is read whole on every capture, so a copy a resumed folder already holds says
-                    // nothing this snapshot does not, and the fresh one stands alone.
-                    (onDisk, fresh) -> 0);
+                    ChunkMerge::merge);
             entries.remove();
         }
     }
