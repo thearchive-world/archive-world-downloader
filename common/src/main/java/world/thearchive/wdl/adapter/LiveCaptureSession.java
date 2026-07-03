@@ -4,10 +4,12 @@
 package world.thearchive.wdl.adapter;
 
 import com.mojang.logging.LogUtils;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -43,6 +45,8 @@ import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.FlushPolicy;
+import world.thearchive.wdl.core.RecaptureMode;
+import world.thearchive.wdl.core.RecapturePolicy;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.core.VoidChunkPolicy;
@@ -74,6 +78,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // leaves it. The buffer is therefore bounded by the (renderDistance + this) square around the player,
     // independent of how far the capture roams.
     private static final int KEEP_HOT_MARGIN = 2;
+
+    // Re-capture: the immediate edit zone is the (2*radius+1) square around the player, re-encoded
+    // unconditionally so the player's own nearby edits (including block-entity-data edits like sign text,
+    // which never flip a chunk's unsaved flag) stay current. Radius 1 is the 3x3 surroundings.
+    private static final int EDIT_ZONE_RADIUS = 1;
+    // The edit zone runs on a coarse cadence (once per second) rather than every tick: a per-encode cost
+    // measurement showed an every-tick 3x3 is a continuous main-thread cost out of step with the "few-second
+    // latency is immaterial" premise, so the immediate-area freshness guarantee is instead carried by a
+    // save-time re-capture burst, and this cadence only lowers in-session latency for the player's vicinity.
+    private static final int EDIT_ZONE_PERIOD_TICKS = 20;
+    private static final int TICKS_PER_SECOND = 20;
 
     private final VersionAdapter adapter;
     private final PlatformBridge bridge;
@@ -128,11 +143,32 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private LongOpenHashSet allCaptured = new LongOpenHashSet();
 
     /**
-     * The wall-clock deadline ({@link System#nanoTime}) for this tick's chunk capture: one per-tick time budget, so
-     * loading a fresh render-distance square or flying fast spills across ticks instead of stuttering one frame. The
-     * chunk passes only capture (snapshot) on this thread; the heavy serialize runs on the writer.
-     * {@link Long#MAX_VALUE} means unbounded, the state between ticks and at finish (the finish drain must capture
-     * every chunk still loaded).
+     * Positions a block-STATE change marked unsaved since the last re-encode, pushed here by the
+     * {@link LevelChunk.UnsavedListener} installed at first capture (change-driven, low-latency rung). A bounded slice
+     * is drained and re-encoded each tick. Nulled at {@link #finish()} teardown so the listeners still attached to
+     * loaded chunks become no-ops and stop pinning the finished session's set.
+     */
+    private @Nullable LongOpenHashSet dirty = new LongOpenHashSet();
+
+    /**
+     * The always-on round-robin floor's work queue over the hot buffer: refilled from {@link #captured}'s keys when
+     * drained, so every hot chunk is re-encoded within the configured period. It is the only rung that catches
+     * block-entity-data edits (sign/lectern/banner text), which never mark a chunk unsaved.
+     */
+    private final ArrayDeque<ChunkPos> floorQueue = new ArrayDeque<>();
+
+    /** Positions first-captured on the current tick, so the edit zone does not redundantly re-encode them. */
+    private final LongOpenHashSet capturedThisTick = new LongOpenHashSet();
+
+    /** Client ticks elapsed while capturing, driving the edit zone's coarse cadence. */
+    private long captureTicks;
+
+    /**
+     * The wall-clock deadline ({@link System#nanoTime}) for this tick's chunk capture: one shared per-tick time budget
+     * drained new-capture-first, then the re-capture rungs, so loading a fresh render-distance square or flying fast
+     * spills across ticks instead of stuttering one frame. The chunk passes only capture (snapshot) on this thread; the
+     * heavy serialize runs on the writer. {@link Long#MAX_VALUE} means unbounded, the state between ticks and at finish
+     * (the finish drain must capture every chunk still loaded).
      */
     private long encodeDeadlineNanos = Long.MAX_VALUE;
 
@@ -225,6 +261,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void registerDimensionScopedStores() {
         dimensionRebind.registerDrain(this::writeOutDimensionBeingLeft);
         dimensionRebind.registerSwap(dimension -> this.allCaptured = capturedFor(dimension));
+        dimensionRebind.registerClear(capturedThisTick::clear);
+        // Stale old-dimension positions; the new dimension refills the queue from its own buffer.
+        dimensionRebind.registerClear(floorQueue::clear);
     }
 
     /**
@@ -342,11 +381,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
         ChunkPos hotCenter = null;
         if (player != null && minecraft.level == level()) {
             hotCenter = anchorEntity(minecraft, player).chunkPosition();
+            capturedThisTick.clear();
             // One per-tick budget bounds the first-tick render-distance burst and the fast fly-over. A chunk the
             // budget does not reach spills to a later tick rather than stuttering this frame, which costs nothing
             // because terrain re-offers itself while it stays loaded.
             encodeDeadlineNanos = System.nanoTime() + config.encodeBudgetMillis() * 1_000_000L;
             captureLoadedChunks(minecraft, player, hotCenter);
+            if (config.recaptureChunks().refreshesHotChunks()) {
+                recaptureHotChunks(hotCenter);
+            }
+            captureTicks++;
         }
         // The flush pump runs regardless of the guard above: when capture pauses (the player is gone or in
         // another dimension) the bounded buffer must keep draining to disk instead of accumulating until
@@ -368,7 +412,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    /** Snapshot each loaded chunk in the render-distance square that this session has not captured yet. */
+    /**
+     * Snapshot each loaded chunk in the render-distance square: a chunk not captured this session is a first capture,
+     * and a chunk captured earlier and since flushed from the keep-hot buffer is re-buffered on revisit when the mode
+     * overwrites revisited areas, so its terrain re-flushes current the next time it leaves the keep-hot window. A
+     * still-hot chunk is left to the hot re-capture path.
+     */
     private void captureSquareAround(Minecraft minecraft, ChunkPos center) {
         int radius = minecraft.options.getEffectiveRenderDistance();
         ClientChunkCache chunkSource = level().getChunkSource();
@@ -376,13 +425,20 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
         // Nearest-to-player first (by Chebyshev ring), so when the encode budget spills the square across ticks
         // the visible area fills first and the lag never concentrates on one side.
+        RecaptureMode recaptureMode = config.recaptureChunks();
         int[] offsets = ringOffsets(radius);
         for (int i = 0; i < offsets.length; i += 2) {
             ChunkPos pos = new ChunkPos(center.x + offsets[i], center.z + offsets[i + 1]);
             long posKey = pos.toLong();
-            // The cheap in-memory check comes before getChunk, so a stationary player in a captured area never
-            // pays a per-tick getChunk.
-            if (allCaptured.contains(posKey)) {
+            // The cheap in-memory checks come before getChunk, so a stationary player in a captured area never
+            // pays a per-tick getChunk: a still-hot chunk is left to the hot re-capture path, and a chunk captured
+            // earlier and since flushed is re-buffered only on revisit, and only when the mode overwrites
+            // revisited areas.
+            if (captured.containsKey(pos)) {
+                continue;
+            }
+            boolean revisit = allCaptured.contains(posKey);
+            if (revisit && !recaptureMode.overwritesRevisitedChunks()) {
                 continue;
             }
             LevelChunk chunk = chunkSource.getChunk(pos.x, pos.z, ChunkStatus.FULL, false);
@@ -401,7 +457,162 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
             captured.put(pos, snapshot);
             allCaptured.add(posKey);
+            if (recaptureMode.refreshesHotChunks()) {
+                attachRecapture(chunk, pos);
+            }
         }
+    }
+
+    /**
+     * Clear-then-attach: clear the chunk's construction-time {@code unsaved=true} FIRST, THEN install the listener, so
+     * the immediate-fire on a still-unsaved chunk does not flag every first-captured chunk dirty. After this the
+     * listener fires only on a real post-capture block-STATE change. The lambda guards on {@link #dirty} being non-null
+     * so it is inert after {@link #finish()} teardown.
+     */
+    private void attachRecapture(LevelChunk chunk, ChunkPos pos) {
+        capturedThisTick.add(pos.toLong());
+        chunk.tryMarkSaved();
+        chunk.setUnsavedListener(changed -> {
+            LongOpenHashSet dirtySet = dirty;
+            if (dirtySet != null) {
+                dirtySet.add(changed.toLong());
+            }
+        });
+    }
+
+    /**
+     * Keep the chunks near the player current as they change while recording, by re-encoding their buffered tags in
+     * place. Three rungs run together: the always-fresh edit zone (the player's own nearby edits, on a coarse cadence),
+     * a bounded drain of the change-driven dirty set (low-latency block-state changes), and the always-on round-robin
+     * floor (the mandatory backstop for block-entity-data edits the change-driven rung structurally cannot see). Each
+     * only ever replaces a still-hot chunk's buffered tag: it never touches {@link #allCaptured}, never writes, and
+     * never revives a flushed chunk.
+     */
+    private void recaptureHotChunks(ChunkPos anchor) {
+        LongOpenHashSet dirtySet = dirty;
+        if (dirtySet == null) {
+            return; // torn down (defensive: captureTick stops before this once finish() runs)
+        }
+        ClientChunkCache chunkSource = level().getChunkSource();
+        ChunkCodec codec = adapter.chunkCodec();
+        LongOpenHashSet reencodedThisTick = new LongOpenHashSet();
+
+        if (captureTicks % EDIT_ZONE_PERIOD_TICKS == 0) {
+            recaptureEditZone(anchor, codec, chunkSource, reencodedThisTick);
+        }
+        int slice = RecapturePolicy.floorSliceSize(captured.size(), config.recaptureSeconds(), TICKS_PER_SECOND);
+        drainDirtySlice(dirtySet, slice, codec, chunkSource, reencodedThisTick);
+        runFloorSlice(slice, codec, chunkSource, reencodedThisTick);
+    }
+
+    /**
+     * Re-encode the edit zone around {@code center} unconditionally (not dirty-gated): a block-entity-data edit such as
+     * sign text sets no dirty signal, so the edit zone is the load-bearing catcher for the player's own nearby
+     * block-entity-data edits. Iterates the keep-hot buffer (bounded by the keep-hot square) and picks its edit-zone
+     * members; replacing a buffered value never structurally modifies the key set, so iterating it directly is safe.
+     */
+    private void recaptureEditZone(ChunkPos center, ChunkCodec codec, ClientChunkCache chunkSource,
+            LongOpenHashSet reencodedThisTick) {
+        for (ChunkPos pos : captured.keySet()) {
+            if (!RecapturePolicy.isInEditZone(pos.x, pos.z, center.x, center.z, EDIT_ZONE_RADIUS)) {
+                continue;
+            }
+            if (!hasEncodeBudget()) {
+                return; // the shared per-tick encode budget is spent; finish runs it unbounded
+            }
+            reencode(pos, codec, chunkSource, reencodedThisTick);
+        }
+    }
+
+    /** Re-encode up to {@code slice} of the change-driven dirty positions; the rest wait for later ticks. */
+    private void drainDirtySlice(LongOpenHashSet dirtySet, int slice, ChunkCodec codec,
+            ClientChunkCache chunkSource, LongOpenHashSet reencodedThisTick) {
+        if (slice <= 0 || dirtySet.isEmpty()) {
+            return;
+        }
+        int batchSize = Math.min(slice, dirtySet.size());
+        long[] batch = new long[batchSize]; // snapshot first: reencode removes from dirtySet as it goes
+        LongIterator keys = dirtySet.iterator();
+        for (int i = 0; i < batchSize; i++) {
+            batch[i] = keys.nextLong();
+        }
+        for (long key : batch) {
+            if (!hasEncodeBudget()) {
+                return; // the shared per-tick encode budget is spent
+            }
+            reencode(new ChunkPos(key), codec, chunkSource, reencodedThisTick);
+        }
+    }
+
+    /**
+     * Re-encode up to {@code slice} hot chunks blindly, advancing the round-robin cursor and refilling it from the
+     * current buffer when drained, so the whole hot set is refreshed within the configured period. Budget is per cursor
+     * step, not per encode, so a step that skips an already-handled or departed chunk still bounds the work; stale
+     * entries for flushed chunks are dropped as the cursor passes them.
+     */
+    private void runFloorSlice(int slice, ChunkCodec codec, ClientChunkCache chunkSource,
+            LongOpenHashSet reencodedThisTick) {
+        for (int step = 0; step < slice; step++) {
+            if (!hasEncodeBudget()) {
+                return; // the shared per-tick encode budget is spent
+            }
+            if (floorQueue.isEmpty()) {
+                floorQueue.addAll(captured.keySet());
+                if (floorQueue.isEmpty()) {
+                    return; // nothing buffered to refresh
+                }
+            }
+            reencode(floorQueue.remove(), codec, chunkSource, reencodedThisTick);
+        }
+    }
+
+    /**
+     * Replace one still-hot chunk's buffered tag with a fresh encode of its current live state, then re-arm the dirty
+     * listener. Skips a chunk already re-encoded this tick or first-captured this tick, and a candidate that is no
+     * longer eligible (flushed, so never revived; or its live chunk has unloaded past the keep-hot margin, so the last
+     * buffered snapshot stands). A throwing capture is logged and the prior buffered snapshot is kept, isolating the
+     * failure to one chunk.
+     */
+    private void reencode(ChunkPos pos, ChunkCodec codec, ClientChunkCache chunkSource,
+            LongOpenHashSet reencodedThisTick) {
+        long key = pos.toLong();
+        if (reencodedThisTick.contains(key) || capturedThisTick.contains(key)) {
+            return;
+        }
+        LevelChunk chunk = chunkSource.getChunk(pos.x, pos.z, ChunkStatus.FULL, false);
+        if (!RecapturePolicy.shouldRecapture(captured.containsKey(pos), chunk != null)) {
+            dirtyRemove(key); // a flushed chunk's stale dirty entry is dropped so the set stays bounded
+            return;
+        }
+        if (chunk == null) {
+            return; // unreachable given shouldRecapture above; the explicit check narrows nullness
+        }
+        try {
+            captured.put(pos, codec.capture(chunk, registries));
+            reencodedThisTick.add(key);
+            dirtyRemove(key);
+            chunk.tryMarkSaved(); // re-arm the listener's false->true transition for the next change
+        } catch (RuntimeException e) {
+            LOGGER.warn("failed to re-capture chunk {}", pos, e);
+        }
+    }
+
+    private void dirtyRemove(long key) {
+        LongOpenHashSet dirtySet = dirty;
+        if (dirtySet != null) {
+            dirtySet.remove(key);
+        }
+    }
+
+    /**
+     * Detach the re-capture change tracking at session teardown: drop the dirty set so the
+     * {@link LevelChunk.UnsavedListener}s still attached to loaded {@link ClientLevel} chunks become inert (they guard
+     * on it being non-null) and stop pinning this finished session's set until those chunks unload. A later session
+     * re-installs its own listeners at its own first capture.
+     */
+    private void detachRecapture() {
+        dirty = null;
+        floorQueue.clear();
     }
 
     /**
@@ -484,12 +695,26 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The finish proper: the exits that write nothing, and the drain that hands the writer everything it still needs.
-     * Leaves the end-of-stream signal to {@link #completeThroughWriter}, which owes it whether this returns or throws.
+     * The finish proper: the save-time re-capture burst, the capture teardown, the exits that write nothing, and the
+     * drain that hands the writer everything it still needs. Leaves the end-of-stream signal to
+     * {@link #completeThroughWriter}, which owes it whether this returns or throws.
      */
     private void finishCapture() {
-        // The finish drain must write everything still buffered, so the per-tick encode budget does not apply here.
+        // The finish drain must encode everything still loaded, so the per-tick encode budget does not apply
+        // here (the burst below runs unbounded).
         encodeDeadlineNanos = Long.MAX_VALUE;
+        // Save-time re-capture burst: refresh the player's immediate area one last time so a
+        // just-placed block or edited sign is current at save, the freshness guarantee the coarse-cadence
+        // edit zone leaves to here. Bounded to the edit zone (~9 chunks), a trivial main-thread cost. Run
+        // before detaching so it sees the live state; skipped if the player is gone (a disconnect-flushed save).
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer player = minecraft.player;
+        if (config.recaptureChunks().refreshesHotChunks() && player != null && minecraft.level == level()) {
+            capturedThisTick.clear(); // finish() is its own moment: the burst refreshes the area unconditionally
+            ChunkPos anchor = anchorEntity(minecraft, player).chunkPosition();
+            recaptureEditZone(anchor, adapter.chunkCodec(), level().getChunkSource(), new LongOpenHashSet());
+        }
+        detachRecapture(); // teardown: release the dirty set; loaded chunks' listeners become inert
         if (totalCapturedChunks() == 0) {
             if (chunksCaptureFailed > 0) {
                 // This exit reports no tally, so without this a capture that threw on every chunk is
@@ -776,7 +1001,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         // The chat figure is the distinct captured-chunk total rather than the writer's write tally, which
-        // counts a position twice when a resume rewrites one this session also captured.
+        // double-counts a chunk written once then re-flushed on a revisit.
         CaptureCounts counts = counts();
         if (config.showChatMessages()) {
             bridge.sendChat(ChatCopy.downloaded(saveName, counts.chunks(), counts.entities(), counts.containers(),
