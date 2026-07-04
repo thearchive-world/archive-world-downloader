@@ -6,7 +6,7 @@ package world.thearchive.wdl.adapter;
 import java.nio.file.Path;
 
 /**
- * The per-era-band Service Provider Interface: aggregates the three active version-specific axes the loader-agnostic
+ * The per-era-band Service Provider Interface: aggregates the four active version-specific axes the loader-agnostic
  * core orchestrates over. Exactly one implementation is registered per branch (via {@code META-INF/services}) and
  * resolved through {@link java.util.ServiceLoader}.
  *
@@ -17,6 +17,8 @@ import java.nio.file.Path;
  */
 public interface VersionAdapter {
     ChunkCodec chunkCodec();
+
+    EntitySink entitySink();
 
     LevelDataWriter levelDataWriter();
 
