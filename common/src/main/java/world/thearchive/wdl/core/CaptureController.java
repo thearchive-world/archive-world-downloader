@@ -89,6 +89,8 @@ public final class CaptureController {
     // constructor parameter: the adapter layer wires the real poll at startup, and the controller stays MC-free.
     private BooleanSupplier transferStopPoll = () -> false;
 
+    private final SendRangeEstimator sendRange = new SendRangeEstimator();
+
     // The frozen counts held through SAVING and the done linger (the live session is gone during the
     // save). Armed at stop() and re-armed with the written totals once the save completes, read by counts()
     // while not recording, cleared at the next start() or once the controller has been idle past the hold
@@ -169,9 +171,17 @@ public final class CaptureController {
         this.transferStopPoll = transferStopPoll;
     }
 
+    /**
+     * The estimator holds one running max per dimension, fed by the sampler-gated feeds; cleared on start and stop.
+     */
+    public SendRangeEstimator sendRange() {
+        return sendRange;
+    }
+
     /** Begin recording with a fresh session (no-op unless idle). */
     public void start(Supplier<Session> sessionFactory) {
         if (state == CaptureState.IDLE) {
+            sendRange.clear();
             session = sessionFactory.get();
             state = CaptureState.RECORDING;
             startMillis = clockMillis.getAsLong();
@@ -224,6 +234,7 @@ public final class CaptureController {
             frozenElapsedMillis = Math.max(0L, clockMillis.getAsLong() - startMillis);
             state = CaptureState.SAVING;
             active.finish(); // returns at once, but may already have re-entered tick() and reached IDLE
+            sendRange.clear();
         }
     }
 
