@@ -1,0 +1,10 @@
+accessWidener	v2	named
+
+# WDL: the connection packet tee reaches the connection's Netty pipeline through the private,
+# non-final Connection.channel. Non-final, so accessible (read) alone suffices; no mutable. The NeoForge
+# analog is the access transformer at neoforge/src/main/resources/META-INF/accesstransformer.cfg.
+accessible	field	net/minecraft/network/Connection	channel	Lio/netty/channel/Channel;
+
+# WDL: a relative-move packet (the common walk update) carries its entity id in a protected field with no public
+# getter, so the tee reads it to feed the move to the accumulator off the Netty thread. Read-only, so accessible.
+accessible	field	net/minecraft/network/protocol/game/ClientboundMoveEntityPacket	entityId	I

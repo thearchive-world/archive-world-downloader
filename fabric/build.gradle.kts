@@ -13,6 +13,12 @@ base {
     archivesName.set("${property("mod_archives_base")}-fabric")
 }
 
+loom {
+    // Compile-time widening for the inbound entity tee: read access on the private, non-final
+    // Connection.channel. Runtime application is declared in fabric.mod.json; both point at the same file.
+    accessWidenerPath.set(file("src/main/resources/wdl.accesswidener"))
+}
+
 // Spotless is applied per-subproject, not via build-logic: loaded from the included build, its
 // Eclipse JDT formatter fails intermittently under the configuration cache + build cache + parallel
 // execution, while from the root buildscript classpath it is stable. See :common for the full note.
