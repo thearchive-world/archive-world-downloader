@@ -5,17 +5,28 @@ package world.thearchive.wdl.testsupport;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.ValueInput;
 import org.jspecify.annotations.Nullable;
+
+import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 
 /**
  * Shared block-entity NBT fixtures for the merge tests: the tag vanilla writes for a block entity, a chunk tag wrapping
- * a {@code "block_entities"} list, and by-position lookups into that list. Hoisted here so the merge tests share one
- * copy rather than each carrying its own.
+ * a {@code "block_entities"} list, and by-position lookups into that list. Hoisted here so the
+ * container/lectern/interaction merge tests share one copy rather than each carrying its own.
  *
  * <p>{@link #blockEntity} is the producer's own output rather than a hand-listed set of keys, and {@link #chunkTagWith}
  * re-checks every tag handed to it against {@link FixtureFidelity}, so a fixture that overlays keys onto the base is
@@ -33,6 +44,29 @@ public final class BlockEntityFixtures {
     }
 
     /**
+     * As {@link #blockEntity} for a block entity the player renamed, so a merge can be shown to leave a real sibling
+     * field alone. An invented probe key would serve the same test and fail the fidelity gate, since no vanilla writer
+     * emits it.
+     */
+    public static CompoundTag namedBlockEntity(String id, int x, int y, int z, String customName) {
+        BlockEntity blockEntity = FixtureFidelity.newBlockEntity(id, x, y, z);
+        blockEntity.setComponents(DataComponentMap.builder()
+                .set(DataComponents.CUSTOM_NAME, Component.literal(customName))
+                .build());
+        return FixtureFidelity.save(blockEntity);
+    }
+
+    /** The custom name a {@link #namedBlockEntity} tag carries, or {@code ""} when it carries none. */
+    public static String customNameOf(CompoundTag blockEntityTag) {
+        RegistryAccess registries = TestRegistries.frozen();
+        ValueInput input = TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntityTag);
+        Component name = input.read("components", DataComponentMap.CODEC)
+                .map(components -> components.get(DataComponents.CUSTOM_NAME))
+                .orElse(null);
+        return name == null ? "" : name.getString();
+    }
+
+    /**
      * A block entity carrying a key no vanilla writer emits, for the one property that needs exactly that: the chunk
      * codec must pass a block entity's NBT through opaquely, since the tags it re-encodes come from the client and may
      * have been written by a foreign or modded server. A probe vanilla itself round-trips cannot prove that, because a
@@ -44,6 +78,21 @@ public final class BlockEntityFixtures {
         CompoundTag tag = blockEntity(id, x, y, z);
         tag.putString(key, value);
         return tag;
+    }
+
+    /**
+     * The open-time holder the band sink produces for a container of {@code containerSize} whose every slot is empty,
+     * stamped with {@code blockEntityId} as the open-time write stamps it so a fold's type gate is exercised rather
+     * than bypassed. Built through the sink rather than by hand because the emptiness is the subject wherever this is
+     * used: an empty container serializes {@code "Items"} as a present empty list, which is what a re-captured
+     * container that nobody opened also looks like.
+     */
+    public static CompoundTag emptyContainerHolder(int containerSize, String blockEntityId) {
+        RegistryAccess registries = TestRegistries.frozen();
+        CompoundTag holder = new ContainerSinkImpl()
+                .captureItems(NonNullList.withSize(containerSize, ItemStack.EMPTY), registries);
+        holder.putString("wdl_block_entity_id", blockEntityId);
+        return holder;
     }
 
     /** The {@code "bees"} list vanilla writes for one occupant per named {@code ticksInHive}. */

@@ -6,6 +6,7 @@ package world.thearchive.wdl.adapter.impl;
 import java.nio.file.Path;
 
 import world.thearchive.wdl.adapter.ChunkCodec;
+import world.thearchive.wdl.adapter.ContainerSink;
 import world.thearchive.wdl.adapter.EntitySink;
 import world.thearchive.wdl.adapter.LevelDataWriter;
 import world.thearchive.wdl.adapter.VersionAdapter;
@@ -13,8 +14,9 @@ import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
  * The {@link VersionAdapter} plug for this branch (MC 1.21.11; the package note records the era band it serves): binds
- * the chunk-save axes ({@link ChunkCodec}, {@link WorldPaths}, {@link LevelDataWriter}) and {@link EntitySink} to their
- * concrete implementations. Registered via {@code META-INF/services/world.thearchive.wdl.adapter.VersionAdapter}.
+ * the chunk-save axes ({@link ChunkCodec}, {@link WorldPaths}, {@link LevelDataWriter}), {@link EntitySink} and
+ * {@link ContainerSink} to their concrete implementations. Registered via
+ * {@code META-INF/services/world.thearchive.wdl.adapter.VersionAdapter}.
  */
 public final class VersionAdapterImpl implements VersionAdapter {
     /**
@@ -29,6 +31,8 @@ public final class VersionAdapterImpl implements VersionAdapter {
 
     private static final EntitySink entitySink = new EntitySinkImpl();
 
+    private static final ContainerSink containerSink = new ContainerSinkImpl();
+
     private static final LevelDataWriter levelDataWriter = new LevelDataWriterImpl();
 
     @Override
@@ -39,6 +43,11 @@ public final class VersionAdapterImpl implements VersionAdapter {
     @Override
     public EntitySink entitySink() {
         return entitySink;
+    }
+
+    @Override
+    public ContainerSink containerSink() {
+        return containerSink;
     }
 
     @Override

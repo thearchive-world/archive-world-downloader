@@ -1,0 +1,43 @@
+// Copyright (C) Archive World Downloader contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+package world.thearchive.wdl.adapter;
+
+import net.minecraft.core.NonNullList;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.item.ItemStack;
+
+/**
+ * Per-band container-capture axis: serialize an open container's items into the vanilla block-entity {@code "Items"}
+ * NBT and merge them into a captured block-entity tag. Container contents are the one piece of world data the client
+ * receives only while the player has the container open (via {@code ClientboundContainerSetContentPacket}), never in
+ * the chunk packet, so a captured chunk's chest is structurally present but empty until this axis fills it in.
+ *
+ * <p>Mirrors {@link EntitySink}'s two-step seam. The live step ({@link #captureItems(NonNullList, RegistryAccess)})
+ * serializes the items the session lifted from the open menu's container slots; it is client-coupled (the items come
+ * from the live menu). The pure step ({@link #merge(CompoundTag, CompoundTag)}) sets {@code "Items"} on a copy of an
+ * already-captured block-entity tag and is what the headless round-trip exercises.
+ *
+ * <p>Per-band from the start: vanilla serializes items via {@code ContainerHelper.saveAllItems}, whose signature
+ * follows the entity seam (1.21.11 takes a {@code ValueOutput}, the codec layer, while the &le;1.21.8 sub-band takes
+ * the older {@code CompoundTag} form), so each band has its own implementation, differing only in that one serialize
+ * call. Both produce the same on-disk {@code "Items"} format that the band's own block entity reads back, so
+ * {@link #merge} is band-agnostic.
+ */
+public interface ContainerSink {
+    /**
+     * Serialize {@code items} (a container-sized list with each captured stack at its container-slot index, empty slots
+     * are {@code ItemStack.EMPTY}) into a holder {@link CompoundTag} carrying the vanilla {@code "Items"} list (slot
+     * byte + stack), exactly as a block entity would save it. Server-free: a discarding problem reporter replaces the
+     * world-scoped one, mirroring {@link EntitySink}'s lift.
+     */
+    CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries);
+
+    /**
+     * Set {@code "Items"} on a copy of {@code blockEntityTag} from {@code capturedItemsHolder}, leaving every other
+     * field intact (id, x/y/z, CustomName, ...): the captured chunk's block entity gains its real contents with no
+     * clobber. The input tag is not mutated.
+     */
+    CompoundTag merge(CompoundTag blockEntityTag, CompoundTag capturedItemsHolder);
+}
