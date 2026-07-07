@@ -34,6 +34,7 @@ import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.SaveProgress;
+import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.BlockEntityFixtures;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
@@ -119,8 +120,8 @@ class CarryForwardWiringTest {
         properties.setProperty("captureEntities", "false");
         WdlConfig config = WdlConfig.parse(properties);
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, Level.OVERWORLD, TestRegistries.frozen(),
-                new DownloadTarget("headless", null, DownloadMode.NEW), () -> {});
+                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                new DownloadTarget("headless", null, DownloadMode.NEW), new SendRangeEstimator(), false, () -> {});
     }
 
     private static WorldPaths paths(Path save) throws Exception {

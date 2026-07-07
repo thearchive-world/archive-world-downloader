@@ -12,6 +12,7 @@ import net.minecraft.client.multiplayer.ServerData;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
+import world.thearchive.wdl.adapter.ConnectionTee;
 import world.thearchive.wdl.adapter.LiveCaptureSession;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.core.CaptureController;
@@ -70,6 +71,9 @@ public final class Wdl {
         platformBridge.registerToggleKeybind(Wdl::onToggle);
         platformBridge.onClientTickEnd(Wdl::onClientTick);
         platformBridge.onDisconnect(controller::onDisconnect);
+        // A backend transfer (play-to-configuration re-entry) fires no disconnect hook on either loader, so the
+        // tee raises its own signal and the controller polls it each tick, stopping the download the same way.
+        controller.setTransferStopPoll(ConnectionTee::consumeTransferSignal);
     }
 
     /** The running loader's bridge. Throws if read before {@link #initialize}, which is a wiring bug. */
@@ -125,7 +129,11 @@ public final class Wdl {
             return; // no live start path reaches here without a loaded world; a silent guard before level is used
         }
         WdlConfig config = WdlConfig.load(configPath());
-        controller.start(() -> new LiveCaptureSession(adapter, platform, config, level, target, controller::tick));
+        // State-independent of captureEntities, so a signal raised between downloads is discarded for every
+        // download kind, not only when an entity capture activates.
+        ConnectionTee.clearTransferSignal();
+        controller.start(() -> new LiveCaptureSession(adapter, platform, config, level, target,
+                controller.sendRange(), minecraft.getCameraEntity() != minecraft.player, controller::tick));
         if (config.showChatMessages()) {
             platform.sendChat(ChatCopy.downloading(target.folderName()));
         }

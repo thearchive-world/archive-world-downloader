@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.minecraft.world.level.Level;
@@ -21,6 +22,7 @@ import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.SaveProgress;
+import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
@@ -44,11 +46,20 @@ class LiveCaptureSessionFailSoftTest {
         TestRegistries.frozen(); // initialize the vanilla static constants the value types touch
     }
 
-    /** A session with no bound level, which is all the end-of-stream contract needs. */
+    /**
+     * A session with no bound level, which is all the end-of-stream contract needs. Entity capture is off so the
+     * constructor publishes no process-wide capture into the static activation slot, which only finish() would clear;
+     * the toggle is asserted rather than assumed, since an unrecognized config key falls back to the default, which is
+     * on.
+     */
     private static LiveCaptureSession session(Path configDirectory) {
+        Properties properties = new Properties();
+        properties.setProperty("captureEntities", "false");
+        WdlConfig config = WdlConfig.parse(properties);
+        assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                WdlConfig.DEFAULTS, null, Level.OVERWORLD, TestRegistries.frozen(),
-                new DownloadTarget("headless", null, DownloadMode.NEW), () -> {});
+                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                new DownloadTarget("headless", null, DownloadMode.NEW), new SendRangeEstimator(), false, () -> {});
     }
 
     /**
