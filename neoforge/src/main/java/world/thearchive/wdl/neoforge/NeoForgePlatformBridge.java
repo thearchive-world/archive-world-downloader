@@ -106,4 +106,25 @@ final class NeoForgePlatformBridge extends AbstractPlatformBridge {
     public boolean isModLoaded(String modId) {
         return ModList.get().isLoaded(modId);
     }
+
+    /**
+     * True. The patched {@code MultiPlayerGameMode.performUseItemOn} posts {@code RightClickBlock} before its spectator
+     * return, and {@code CommonHooks.onRightClickBlock} posts to the bus unconditionally.
+     */
+    @Override
+    public boolean observesSpectatorBlockClick() {
+        return true;
+    }
+
+    /**
+     * False, the opposite of the block axis, and by this loader's own design ("don't fire for spectators to match
+     * non-specific EntityInteract"). {@code EntityInteract} is posted only from {@code CommonHooks.onInteractEntity},
+     * called inside the else of the spectator branch of the patched {@code Player.interactOn}, and the client never
+     * reaches that method for a spectator anyway: both {@code MultiPlayerGameMode.interact} and {@code interactAt}
+     * return PASS for one after sending the packet.
+     */
+    @Override
+    public boolean observesSpectatorEntityClick() {
+        return false;
+    }
 }

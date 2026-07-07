@@ -71,4 +71,25 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
     public boolean isModLoaded(String modId) {
         return FabricLoader.getInstance().isModLoaded(modId);
     }
+
+    /**
+     * False. The mixin backing {@code UseBlockCallback} is injected into {@code MultiPlayerGameMode.useItemOn} above
+     * vanilla's own spectator return, but its handler body opens with its own spectator return, ahead of the invoker
+     * call, and says so ("vanilla spectator check happens later, repeat it before the event to avoid false
+     * invocations"), so no listener runs. The injection site is not what decides this; the handler body is.
+     */
+    @Override
+    public boolean observesSpectatorBlockClick() {
+        return false;
+    }
+
+    /**
+     * True, the opposite of the block axis. {@code UseEntityCallback} is invoked as the first statement of a mixin on
+     * {@code Minecraft.startUseItem}, whose handler body carries no gamemode test, and vanilla reaches that call site
+     * for a spectator.
+     */
+    @Override
+    public boolean observesSpectatorEntityClick() {
+        return true;
+    }
 }

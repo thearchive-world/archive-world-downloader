@@ -52,6 +52,20 @@ public interface PlatformBridge {
     boolean isModLoaded(String modId);
 
     /**
+     * Whether this loader's block use hook observes a right-click a SPECTATOR made. Vanilla is not what decides this:
+     * the client sends the use packet and the server opens the menu for any clicked block carrying a
+     * {@code MenuProvider} in its SPECTATOR branch, so a spectator's block open is real on every loader. What differs
+     * is whether the loader hands the observation over, and the two loaders differ on it in opposite directions from
+     * {@link #observesSpectatorEntityClick}. Read by the open-container bind: the crosshair fallback exists only to
+     * cover the axis the loader is blind on, so on a loader that observes this axis the block leg would fire for
+     * nothing but opens the click chain did not account for, where a crosshair is a guess and not provenance.
+     */
+    boolean observesSpectatorBlockClick();
+
+    /** Whether this loader's entity use hook observes a right-click a SPECTATOR made; see the block sibling. */
+    boolean observesSpectatorEntityClick();
+
+    /**
      * Surface a composed persistent chat line: each segment renders its tint or the vanilla default, and a clickable
      * segment opens its target (URL in the OS browser, file or folder in the OS file browser) with the raw target as
      * its hover.

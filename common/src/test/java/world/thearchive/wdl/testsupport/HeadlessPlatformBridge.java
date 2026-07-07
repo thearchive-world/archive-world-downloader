@@ -70,6 +70,20 @@ public class HeadlessPlatformBridge implements PlatformBridge {
     }
 
     @Override
+    public boolean observesSpectatorBlockClick() {
+        // Neither shipped loader answers false to both of these: Fabric is false/true and NeoForge
+        // true/false. This pair is the most permissive input the crosshair rule takes, so a headless test
+        // that ever reaches resolveOpenTarget would exercise a configuration nothing ships. Nothing does
+        // today, because that path needs a live client; make these match a real loader before one can.
+        return false;
+    }
+
+    @Override
+    public boolean observesSpectatorEntityClick() {
+        return false;
+    }
+
+    @Override
     public void sendChat(ChatCopy line) {
         throw new AssertionError("a headless test surfaced player chat: " + line);
     }
