@@ -5,6 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
@@ -22,6 +23,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -46,6 +49,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The wiring guard for what a chunk flush lets its on-disk prior carry forward, driven end to end through a real region
  * file: the decision lives in which read-merge the flush hands the writer, and a test that calls a merge itself passes
  * whichever merge it chose, which is exactly what a mis-wired call site does not change.
+ *
+ * <p>The suppressed and unsuppressed cases are the point as a pair. A position a placement replaced carries nothing on
+ * the flush that acts on it and carries normally on the one after, and an ordinary revisit carries its own capture
+ * forward throughout, so a suppression widened to everything is as red as one that suppresses nothing.
  */
 class CarryForwardWiringTest {
     private static RegistryAccess.Frozen registries;
@@ -74,6 +81,83 @@ class CarryForwardWiringTest {
         assertFalse(result.failed(), "the drain hit no hard error");
         assertEquals(List.of("minecraft:diamond"), itemsOnDisk(paths, pos),
                 "a re-walk through this world's own chunk carries its captured contents forward as before");
+    }
+
+    /**
+     * A placement suppresses the carry-forward for the flush that acts on it and no longer. What that flush leaves on
+     * disk is already post-placement, so the visit after it is reading this download's own capture; holding the
+     * suppression would erase that capture on every later pass, which is the shape a permanent refusal always has.
+     */
+    @Test
+    void aReplacedPositionSuppressesOnceAndNotForever(@TempDir Path temporary) throws Exception {
+        ChunkPos pos = new ChunkPos(chest);
+        LiveCaptureSession session = session(temporary);
+        WorldPaths paths = paths(temporary.resolve("save"));
+        placeBlockAt(session, chest);
+
+        writePrior(paths, pos, chestHolding("minecraft:diamond"));
+        captureChunk(session, pos, snapshotWithEmptyChest());
+        AsyncSaveWriter first = saveWriter(paths);
+        session.flushBuffer(first, true, 0, 0, 0);
+        assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed(), "the first flush landed");
+        assertEquals(List.of(), itemsOnDisk(paths, pos),
+                "the block on disk was the one the placement replaced, so nothing of it carries");
+
+        writePrior(paths, pos, chestHolding("minecraft:emerald"));
+        captureChunk(session, pos, snapshotWithEmptyChest());
+        AsyncSaveWriter second = saveWriter(paths);
+        session.flushBuffer(second, true, 0, 0, 0);
+        assertFalse(second.finish().get(30, TimeUnit.SECONDS).failed(), "the second flush landed");
+        assertEquals(List.of("minecraft:emerald"), itemsOnDisk(paths, pos),
+                "and the visit after it carries forward what this download archived for the new block");
+    }
+
+    /**
+     * The open-time half of the same wiring: what a container this flush captured leaves on disk. The merge cannot tell
+     * this case from an ordinary revisit, because both fresh sides carry the same empty {@code "Items"}; only the
+     * positions the flush derives from its own drained holders separate them, so a flush that stopped deriving them, or
+     * handed over an empty list, would restore items the player watched leave and no other case here would move.
+     */
+    @Test
+    void aContainerThisFlushCapturedEmptyIsLeftEmptyOnDisk(@TempDir Path temporary) throws Exception {
+        ChunkPos pos = new ChunkPos(chest);
+        LiveCaptureSession session = session(temporary);
+        WorldPaths paths = paths(temporary.resolve("save"));
+
+        writePrior(paths, pos, chestHolding("minecraft:diamond"));
+        captureChunk(session, pos, snapshotWithEmptyChest());
+        stashContainer(session, chest, BlockEntityFixtures.emptyContainerHolder(27, "minecraft:chest"));
+
+        AsyncSaveWriter writer = saveWriter(paths);
+        session.flushBuffer(writer, true, 0, 0, 0);
+        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
+
+        assertFalse(result.failed(), "the drain hit no hard error");
+        assertEquals(List.of(), itemsOnDisk(paths, pos),
+                "the open saw an empty chest, so the flush must leave it empty rather than restore what the "
+                        + "earlier write archived there");
+    }
+
+    /** The open-time container capture at {@code pos}, the stash the per-chunk flush drains and folds. */
+    @SuppressWarnings("unchecked")
+    private static void stashContainer(LiveCaptureSession session, BlockPos pos, CompoundTag holder)
+            throws Exception {
+        Field field = LiveCaptureSession.class.getDeclaredField("containerStash");
+        field.setAccessible(true);
+        ((Map<BlockPos, StashHolder>) field.get(session)).put(pos, StashHolder.of(holder));
+    }
+
+    /**
+     * Land a placement in {@code pos} through the recognizer the loader hook calls, so the session's own callback is
+     * what marks the cell. Seeding the set directly would prove the flush consumes it and leave the line that fills it
+     * unpinned, which is the half the defect lived in.
+     */
+    private static void placeBlockAt(LiveCaptureSession session, BlockPos pos) throws Exception {
+        Field field = LiveCaptureSession.class.getDeclaredField("interactionCapture");
+        field.setAccessible(true);
+        InteractionCapture capture = (InteractionCapture) field.get(session);
+        assertNotNull(capture, "the fixture must publish a recognizer, or the placement reaches nothing");
+        capture.recordPlaceAt(pos, new ItemStack(Items.CHEST));
     }
 
     /** A captured chunk holding one chest exactly as the client saves it, which is with no contents. */

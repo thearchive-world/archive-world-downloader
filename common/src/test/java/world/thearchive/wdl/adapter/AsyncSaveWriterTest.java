@@ -8,13 +8,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
+import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPosOrNull;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -22,20 +26,28 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
+import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.testsupport.EntityFixtures;
@@ -567,6 +579,50 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.entityChunksFailed(),
                 "the lost entity chunk is counted, so the session's finish can read the save partial");
         assertEquals(0, result.chunksFailed(), "and it is counted apart from the region tally");
+    }
+
+    @Test
+    void theWriterThreadFoldMergesContainerItemsIntoTheChunk(@TempDir Path save) throws Exception {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        Path region = Files.createDirectories(save.resolve("region"));
+        ContainerSink sink = new ContainerSinkImpl();
+
+        AsyncSaveWriter writer = new AsyncSaveWriter(
+                dimension -> storage(region, "chunk"),
+                dimension -> {
+                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
+                },
+                () -> {},
+                (chunksFailed, entityChunksFailed) -> {},
+                () -> null,
+                () -> {}, new SaveProgress());
+
+        // A captured chunk carrying an empty chest block entity, plus the open-time Items holder for that chest:
+        // the fold runs inside the writer-thread thunk, on the freshly encoded tag.
+        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
+                List.of(blockEntity("minecraft:chest", 2, 64, 2)));
+        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
+        items.set(0, new ItemStack(Items.DIAMOND, 5));
+        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        holders.put(new BlockPos(2, 64, 2), sink.captureItems(items, registries));
+
+        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+            CompoundTag tag = codec.encode(snapshot, registries, false);
+            ContainerMerge.mergeChunkStash(sink, tag, new ChunkPos(0, 0), holders);
+            return tag;
+        }, ChunkMerge::merge);
+        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
+
+        assertFalse(result.failed());
+        try (SimpleRegionStorage in = storage(region, "chunk")) {
+            CompoundTag back = in.read(new ChunkPos(0, 0)).join().orElseThrow();
+            CompoundTag chest = findByPosOrNull(back, 2, 64, 2);
+            assertNotNull(chest, "the chest block entity is on disk");
+            NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
+            ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, chest), decoded);
+            assertEquals(Items.DIAMOND, decoded.get(0).getItem(), "the writer-thread fold merged the captured Items");
+            assertEquals(5, decoded.get(0).getCount());
+        }
     }
 
     @Test

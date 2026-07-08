@@ -4,11 +4,15 @@
 package world.thearchive.wdl.adapter;
 
 import com.mojang.logging.LogUtils;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -21,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -28,7 +33,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtAccounter;
@@ -44,8 +52,18 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.BrewingStandMenu;
+import net.minecraft.world.inventory.CrafterMenu;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.CrafterBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -61,7 +79,10 @@ import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.core.CaptureController;
 import world.thearchive.wdl.core.CaptureCounts;
 import world.thearchive.wdl.core.CaptureOrder;
+import world.thearchive.wdl.core.CapturedContainers;
 import world.thearchive.wdl.core.ChatCopy;
+import world.thearchive.wdl.core.ContainerAssociation;
+import world.thearchive.wdl.core.CrafterSlots;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.FlushPolicy;
@@ -93,6 +114,9 @@ import world.thearchive.wdl.platform.PlatformBridge;
  */
 public final class LiveCaptureSession implements CaptureController.Session {
     private static final Logger LOGGER = LogUtils.getLogger();
+
+    /** Sentinel for {@link #openContainerId} when no container menu is currently open. */
+    private static final int NO_MENU = -1;
 
     // How many chunks past the render-distance capture square to keep buffered before flushing to disk.
     // Containers are opened far inside render distance, so any non-negative margin keeps merge-before-flush
@@ -127,6 +151,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private double lastTickPlayerX;
     private double lastTickPlayerZ;
     private boolean tickBaselineValid;
+    // Weak so a session outliving a disconnect cannot pin the old player, and through it that level's chunks.
+    private WeakReference<LocalPlayer> lastPlayer = new WeakReference<>(null);
     // What this download targets: a fresh folder (NEW) or an existing wdl-managed one to add to (RESUME).
     private final DownloadTarget target;
     // The ClientLevel being captured. Null on a session built by the level-free constructor, so dereference it
@@ -216,6 +242,61 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int @Nullable [] ringOffsetsCache;
     private int ringOffsetsRadius = -1;
 
+    /** The MC-free guard deciding which block a freshly-opened container menu binds to. */
+    private final ContainerAssociation association = new ContainerAssociation();
+
+    /** The open menu's change gate: the per-tick stash re-serializes only when this reports a change. */
+    private final MenuChangeTracker stashChangeTracker = new MenuChangeTracker();
+
+    /**
+     * Captured container {@code "Items"} holders keyed by block pos; last-seen-while-open wins. Each is merged into its
+     * chunk's tag (and dropped) just before that chunk is flushed, by {@link ContainerMerge#mergeChunkStash}.
+     */
+    private final Map<BlockPos, StashHolder> containerStash = new LinkedHashMap<>();
+
+    /**
+     * Positions a block placement landed in this session, held per dimension and swapped on a portal like
+     * {@link #capturedBlockKeys}. The on-disk carry-forward matches a fresh block entity to its prior copy on position
+     * and type, which a same-type replacement satisfies, so without this the archived contents of the block that was
+     * there are written onto the one that replaced it on the next visit.
+     *
+     * <p>Drained by the flush that acts on it, like the stashes. What that flush leaves on disk is already
+     * post-placement, so the visit after it carries forward this download's own capture; keeping the position would
+     * instead erase that capture on every later pass, which is the shape a permanent refusal always has.
+     */
+    private final Map<ResourceKey<Level>, LongOpenHashSet> replacedBlockKeysByDimension = new LinkedHashMap<>();
+    private LongOpenHashSet replacedBlockKeys = new LongOpenHashSet();
+
+    /**
+     * The standing captured-set the unsaved-container outline reads: which loaded containers had their rich contents
+     * captured this session, so their rim clears. Populated at the stash content-gate the {@code stash*} family puts at
+     * and, for a placed content-bearing container, the instant the interaction recognizer records it, optimistically
+     * before the flush confirms it, the way the open-time stash marks a chest on open and
+     * {@link #onBookshelfSlotCaptured} marks a bookshelf slot. So membership tracks contents-stashed-for-save, not the
+     * live stash (which drains mid-session and would otherwise re-show a flushed container's rim). Removal is rare and
+     * each case un-stashes the content it un-marks: a cell a placement lands in, whose captured block is being replaced
+     * ({@link #onBlockPlacedAt}), and a holder whose unpack failed as its chunk drained. Block containers, double-chest
+     * halves, and placed containers enter by block pos key, held per dimension and swapped on a portal like
+     * {@link #allCaptured} so a position in one dimension never dedups another's. Main-thread only, like the rest of
+     * capture; the cross-seam view contract is {@link CapturedContainers}.
+     */
+    private final Map<ResourceKey<Level>, LongOpenHashSet> capturedBlockKeysByDimension = new LinkedHashMap<>();
+    private LongOpenHashSet capturedBlockKeys = new LongOpenHashSet();
+    // The block-entity registry id recorded per captured pos, the one id both staleness gates compare against:
+    // each compares it against a like-for-like id to catch a same-position block replacement. Gate 1 rides
+    // a copy on the drained holder (wdl_block_entity_id) for the writer thread; Gate 2 reads this map through
+    // the outline.
+    // Held per dimension and swapped on a portal like capturedBlockKeys so one dimension's pos never shadows
+    // another's, last-recorded-wins on re-open.
+    private final Map<ResourceKey<Level>, Long2ObjectMap<String>> capturedBlockTypesByDimension = new LinkedHashMap<>();
+    private Long2ObjectMap<String> capturedBlockTypes = new Long2ObjectOpenHashMap<>();
+    // The chiseled-bookshelf captured-slot masks the outline reads (per pos, bit n = slot n): a bookshelf is
+    // captured one slot at a time, so a whole-block flag in capturedBlockKeys cannot express it. Held per
+    // dimension and swapped on a portal like capturedBlockKeys, OR-updated when the interaction recognizer
+    // records a book insert.
+    private final Map<ResourceKey<Level>, Long2IntOpenHashMap> bookshelfSlotsByDimension = new LinkedHashMap<>();
+    private Long2IntOpenHashMap bookshelfSlots = new Long2IntOpenHashMap();
+
     /**
      * The per-tick entity accumulation buffer of already-serialized entity tags, keyed by UUID and drained by
      * flush-eligibility alongside the terrain so it stays bounded as the player roams. Fed by two sources: the packet
@@ -234,6 +315,25 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * the tee, which has no session reference, can reach it.
      */
     private final @Nullable EntityPacketCapture packetCapture;
+
+    /**
+     * The interaction-prediction recognizer, published like {@link #packetCapture} so the per-loader use-block hook can
+     * reach it. Created only when {@code captureContainers} is on (otherwise the hook no-ops); its recording is coupled
+     * to {@code recaptureChunks}, since the reconcile gate can confirm a candidate only against a re-captured snapshot.
+     * Null when interaction capture is off.
+     */
+    private final @Nullable InteractionCapture interactionCapture;
+
+    /**
+     * Remembers the block or entity the local player just right-clicked, published like {@link #interactionCapture} so
+     * the per-loader use hooks can reach it, so the open-container bind seeds from the clicked target rather than the
+     * crosshair, which keeps drifting until the menu freezes the camera. Created only when container capture is on (the
+     * bind path's own flag); null otherwise.
+     */
+    private final @Nullable OpenClickTracker openClickTracker;
+
+    /** Recognize-and-lift for an open container menu: decide what the menu is and lift its slots into a holder. */
+    private final ContainerCapture containerCapture;
 
     /** Which path is capturing an entity, so its write, skip, or drop is tallied to the right counter. */
     enum EntitySource {
@@ -320,6 +420,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** Primed entities lost when their whole entity-chunk threw or nulled out during flush; counted, not residual. */
     private int primeFlushDrops;
 
+    /** containerId of the menu currently tracked, or {@link #NO_MENU} when none is open. */
+    private int openContainerId = NO_MENU;
+
     /** The background writer draining captured tags to disk; opened lazily on the first chunk to flush. */
     private @Nullable AsyncSaveWriter writer;
 
@@ -355,6 +458,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * swapped current-dimension reference like {@link #allCaptured}, because nothing reads it per tick.
      */
     private final Map<ResourceKey<Level>, LongOpenHashSet> captureFailedByDimension = new LinkedHashMap<>();
+
+    /** Block-container merges lost to a throw (writer thread); folds into the partial-finish predicate. */
+    private int blockContainersFailed;
+
+    /**
+     * Predicted interactions (a bookshelf book, a jukebox disc, a placed shulker or beehive) that no chunk flush ever
+     * reached, so nothing of them was written (main thread). Counted at the two whole-buffer drains, the dimension
+     * rebind and the finish, since only what neither reached is unrecoverable.
+     */
+    private int interactionCapturesLost;
 
     /** Entities lost to a whole-entity-chunk flush throw or a create failure, both paths (main thread). */
     private int structuralEntitiesLost;
@@ -419,6 +532,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (this.packetCapture != null) {
             EntityPacketCapture.activate(this.packetCapture);
         }
+        this.interactionCapture = config.captureContainers()
+                ? new InteractionCapture(adapter.containerSink(), registries,
+                        config.recaptureChunks().refreshesHotChunks(), this::isInteractionChunkCapturable,
+                        this::onBookshelfSlotCaptured, this::onPlacedContainerCaptured, this::onBlockPlacedAt)
+                : null;
+        if (this.interactionCapture != null) {
+            InteractionCapture.activate(this.interactionCapture);
+        }
+        this.openClickTracker = config.captureContainers() ? new OpenClickTracker() : null;
+        if (this.openClickTracker != null) {
+            OpenClickTracker.activate(this.openClickTracker);
+        }
+        this.containerCapture = new ContainerCapture(adapter, bridge, registries, openClickTracker);
     }
 
     /**
@@ -428,21 +554,32 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private void registerDimensionScopedStores() {
         dimensionRebind.registerDrain(this::writeOutDimensionBeingLeft);
+        dimensionRebind.registerDrain(this::countDroppedInteractionCaptures);
         dimensionRebind.registerSwap(dimension -> this.allCaptured = capturedFor(dimension));
+        dimensionRebind.registerSwap(dimension -> this.capturedBlockKeys = capturedBlockKeysFor(dimension));
+        dimensionRebind.registerSwap(dimension -> this.replacedBlockKeys = replacedBlockKeysFor(dimension));
+        dimensionRebind.registerSwap(dimension -> this.bookshelfSlots = bookshelfSlotsFor(dimension));
+        dimensionRebind.registerSwap(dimension -> this.capturedBlockTypes = capturedBlockTypesFor(dimension));
         dimensionRebind.registerClear(capturedThisTick::clear);
         // Stale old-dimension positions; the new dimension refills the queue from its own buffer.
         dimensionRebind.registerClear(floorQueue::clear);
         // The cross-dimension jump is not a spurious fast tick; the Respawn already armed the suppression
         // window in-stream.
         dimensionRebind.registerClear(() -> tickBaselineValid = false);
+        dimensionRebind.registerClear(() -> {
+            if (openClickTracker != null) {
+                openClickTracker.reset(); // an old-dimension click must not seed a same-coordinate open here
+            }
+        });
     }
 
     /**
      * Follow the player into a new dimension: hand every dimension-scoped store to {@link #dimensionRebind}, whose
-     * drain lands the old dimension's held entities and buffered chunks in its own folder before its swap retargets to
+     * drains land the old dimension's held entities and buffered chunks in its own folder before its swaps retarget to
      * the new one. The writer target, the bound level and the live dimension key advance after that call, since the
-     * drain writes through them and must reach the dimension being left. The registries are connection-global, so they
-     * need no rebind. Capture resumes this same tick in the new dimension.
+     * drains write through them and must reach the dimension being left. The registries are connection-global, so they
+     * need no rebind; the open menu closes on a dimension change, so the menu-bound stashes reset on the next tick.
+     * Capture resumes this same tick in the new dimension.
      */
     private void rebindDimension(ClientLevel newLevel) {
         ResourceKey<Level> newTarget = VanillaDimensions
@@ -501,6 +638,26 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return capturedByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
     }
 
+    /** The placement-replaced position set for {@code dimension}, created empty on first use. */
+    private LongOpenHashSet replacedBlockKeysFor(ResourceKey<Level> dimension) {
+        return replacedBlockKeysByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
+    }
+
+    /** The outline captured-block set for {@code dimension}, created empty on first use (the per-dimension dedup). */
+    private LongOpenHashSet capturedBlockKeysFor(ResourceKey<Level> dimension) {
+        return capturedBlockKeysByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
+    }
+
+    /** The outline bookshelf captured-slot masks for {@code dimension}, created empty on first use. */
+    private Long2IntOpenHashMap bookshelfSlotsFor(ResourceKey<Level> dimension) {
+        return bookshelfSlotsByDimension.computeIfAbsent(dimension, key -> new Long2IntOpenHashMap());
+    }
+
+    /** The captured block-entity type ids for {@code dimension}, created empty on first use (the staleness gate). */
+    private Long2ObjectMap<String> capturedBlockTypesFor(ResourceKey<Level> dimension) {
+        return capturedBlockTypesByDimension.computeIfAbsent(dimension, key -> new Long2ObjectOpenHashMap<>());
+    }
+
     /**
      * The bound level. Never throws in production, where every session carries one; on a level-free session it turns
      * the first capture dereference into a loud failure instead of letting the tick rebind the session to whatever
@@ -512,6 +669,96 @@ public final class LiveCaptureSession implements CaptureController.Session {
             throw new IllegalStateException("a capture path ran on a session built without a level");
         }
         return bound;
+    }
+
+    /**
+     * Whether an interaction predicted in {@code chunk} can still reach disk (the interaction recognizer's gate): the
+     * chunk is buffered now, has not been captured yet so its first capture is still coming, or is a revisit this mode
+     * re-buffers. False for a chunk already written and frozen, where the reconcile gate has no post-interaction
+     * block-state to read and no flush ever drains the candidate. Recording one there clears the outline's rim for
+     * content that cannot be written, which tells the player the opposite of the truth; refusing it leaves the rim
+     * armed, which is what a re-visit needs to see.
+     */
+    private boolean isInteractionChunkCapturable(ChunkPos chunk) {
+        return captured.containsKey(chunk) || !allCaptured.contains(chunk.toLong())
+                || config.recaptureChunks().overwritesRevisitedChunks();
+    }
+
+    /**
+     * Count and name every interaction prediction left unwritten, draining the recognizer's stashes: content the player
+     * put in the world that no chunk flush ever reached. Runs at the dimension rebind and at finish, the two
+     * whole-buffer drains, so what it sees is only what nothing else could rescue. Reported per position because the
+     * aggregate gives no way to learn which shelf or hive is short.
+     *
+     * <p>At the rebind the drain is mandatory rather than merely honest: an old-dimension candidate's position must not
+     * carry into the new dimension's shared {@link ChunkPos} space, where a same-type block could take wrong-dimension
+     * content.
+     */
+    private void countDroppedInteractionCaptures() {
+        InteractionCapture capture = this.interactionCapture;
+        if (capture == null) {
+            return;
+        }
+        List<BlockPos> dropped = capture.drainResidualPositions();
+        if (dropped.isEmpty()) {
+            return;
+        }
+        interactionCapturesLost += dropped.size();
+        LOGGER.warn("{} predicted interactions were never written: their chunk was not captured again before the "
+                + "download moved on, so the book, disc or placed container the player put there is missing from "
+                + "the save", dropped.size());
+        for (BlockPos pos : dropped) {
+            LOGGER.info("predicted interaction at {} was dropped; its content is missing from the save", pos);
+        }
+    }
+
+    /**
+     * Record an optimistically-captured bookshelf slot (the interaction recognizer's callback): OR the slot into the
+     * outline's per-dimension mask, so its rim clears the instant the book goes in, the way the open-time stash marks a
+     * chest on open. A bookshelf is captured one slot at a time, so a whole-block flag cannot express it.
+     */
+    private void onBookshelfSlotCaptured(long posKey, int slot, int occupiedBeforeInsert) {
+        bookshelfSlots.put(posKey, bookshelfSlots.get(posKey) | (1 << slot));
+    }
+
+    /**
+     * Record an optimistically-captured placed container (the interaction recognizer's callback): mark its pos captured
+     * this session so the outline clears its rim the moment it is placed, the way {@link #onBookshelfSlotCaptured}
+     * marks a bookshelf slot and the open-time stash marks a chest on open, and record its block-entity type so Gate 2
+     * re-rims the position if a different container later replaces it (the same pairing the open-time stashes make
+     * through {@link #recordBlockType}). The flush reconcile still decides whether the contents reach disk; a placement
+     * that loses its cell to a later block is no longer loaded to rim, so the optimistic mark cannot mis-clear a live
+     * container.
+     */
+    private void onPlacedContainerCaptured(long posKey, String blockTypeId) {
+        capturedBlockKeys.add(posKey);
+        capturedBlockTypes.put(posKey, blockTypeId);
+    }
+
+    /**
+     * Drop everything this session captured for a cell a placement is landing in (the interaction recognizer's
+     * callback): the block those holders were lifted from is being replaced, and a replacement of the same block-entity
+     * type leaves both the position key and the merge-time type gate matching, so no downstream guard can tell the
+     * stale contents from the new block's. The outline sets go with it, so a rim cleared by the old block's capture
+     * does not keep claiming the new one is downloaded.
+     */
+    private void onBlockPlacedAt(long posKey) {
+        containerStash.remove(BlockPos.of(posKey));
+        unmarkCaptured(posKey);
+        // The store this staleness also reaches is on disk, where the carry-forward matches position and type
+        // and so cannot tell a same-type replacement from the block it replaced.
+        replacedBlockKeys.add(posKey);
+    }
+
+    /**
+     * Un-mark a position the outline was told carries downloaded contents, for a placement that gives those contents
+     * up. Membership tracks contents-stashed-for-save, so a rim left clear over a container nothing will write tells
+     * the player the opposite of the truth.
+     */
+    private void unmarkCaptured(long posKey) {
+        capturedBlockKeys.remove(posKey);
+        capturedBlockTypes.remove(posKey);
+        bookshelfSlots.remove(posKey);
     }
 
     /** Total captured chunks across every dimension followed this session (the live and headline count). */
@@ -578,6 +825,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
         ClientLevel current = minecraft.level;
         if (player != null && current != null && current != level()) {
             rebindDimension(current); // follow the player across a portal; capture resumes below
+        }
+        if (player != null && lastPlayer.get() != player) {
+            lastPlayer = new WeakReference<>(player);
+            if (openClickTracker != null) {
+                // A respawn builds a fresh LocalPlayer even when the dimension is unchanged, and copies the
+                // old entity id onto it, so object identity is the only signal that one happened. Without
+                // this, dying with a latched click on a barrel and opening a same-size container at the
+                // respawn point inside the window writes it onto the death-site barrel's pos.
+                openClickTracker.reset();
+            }
         }
         @Nullable
         ChunkPos hotCenter = null;
@@ -652,6 +909,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
             captureLoadedChunks(minecraft, player, hotCenter);
             if (config.recaptureChunks().refreshesHotChunks()) {
                 recaptureHotChunks(hotCenter);
+            }
+            if (config.captureContainers()) {
+                captureOpenContainer(minecraft, player);
+                compactClosedStashHolders();
+            }
+            if (openClickTracker != null) {
+                openClickTracker.tick();
+                openClickTracker.dismissClickOnMountedVehicle(player.getVehicle());
+                openClickTracker.claimOpenInventoryRequest(player.getVehicle());
             }
             captureTicks++;
         }
@@ -1003,6 +1269,24 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
+     * Re-encode the still-loaded chunks holding a pending interaction candidate, just before {@link #detachRecapture}
+     * drops the dirty set (the interaction staleness window). {@link #reencode} no-ops an unloaded chunk, whose
+     * snapshot is already frozen at its last-loaded authoritative state, so only the loaded ones refresh and the
+     * reconcile gate then reads a post-ack snapshot. Skips a chunk the edit-zone burst already refreshed this tick (the
+     * shared {@code reencodedThisTick}).
+     */
+    private void reencodePendingInteractionChunks(ClientChunkCache chunkSource, ChunkCodec codec,
+            LongOpenHashSet reencodedThisTick) {
+        InteractionCapture capture = this.interactionCapture;
+        if (capture == null) {
+            return;
+        }
+        for (ChunkPos pos : capture.pendingCandidateChunks()) {
+            reencode(pos, codec, chunkSource, reencodedThisTick);
+        }
+    }
+
+    /**
      * Record one chunk whose terrain snapshot threw: count it once for that position, however many ticks it re-throws
      * for. Neither membership guard above the snapshot call holds for such a position, since it enters neither the
      * keep-hot buffer nor the captured set, so the square retries it every tick it stays loaded and in range and an
@@ -1026,6 +1310,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
     @Override
     public CaptureCounts counts() {
         return new CaptureCounts(totalCapturedChunks(), 0, 0);
+    }
+
+    @Override
+    public CapturedContainers capturedContainers() {
+        // Every container this session captures is keyed by block pos, so the borne-container identities and the
+        // shared ender flag are empty by construction rather than by a read that could go stale.
+        return new CapturedContainers(capturedBlockKeys, Collections.emptySet(), false, bookshelfSlots,
+                capturedBlockTypes);
     }
 
     @Override
@@ -1058,6 +1350,259 @@ public final class LiveCaptureSession implements CaptureController.Session {
             reported = true;
         }
         return true;
+    }
+
+    /**
+     * Capture an open container's contents. Container items arrive only while the player has the container open (via
+     * {@code ClientboundContainerSetContentPacket}), never in the chunk packet, so they are stashed here and merged
+     * into their chunk's tag just before it flushes. Each recognition axis has its own bind leg and its own confidence
+     * test, and an open that no leg claims confidently is DROPPED: mis-binding would write the wrong items onto a block
+     * (a corrupt archive) while an empty container is correct. The double chest and the crafter each bind through their
+     * own leg rather than being dropped; what is dropped is an open whose target the click chain cannot account for,
+     * and any open whose slot count fails its leg's size guard.
+     *
+     * <p>The binding is decided once when the menu first appears, from the target the player clicked (see
+     * {@link ContainerCapture#resolveOpenTarget}, since the live crosshair keeps drifting until the menu freezes the
+     * camera), and the contents are re-captured every tick while it stays open: last-seen-wins absorbs the one-tick lag
+     * before the content packet populates the slots, and any edits the player makes.
+     */
+    private void captureOpenContainer(Minecraft minecraft, LocalPlayer player) {
+        AbstractContainerMenu menu = player.containerMenu;
+        if (menu == null || menu == player.inventoryMenu) {
+            association.close(); // no container open (the default inventory menu is "nothing")
+            stashChangeTracker.reset();
+            openContainerId = NO_MENU;
+            return;
+        }
+        if (menu.containerId != openContainerId) {
+            openContainerId = menu.containerId; // a new menu just appeared; decide its binding now
+            stashChangeTracker.reset(); // the new menu must stash at least once, whatever its slots hold
+            // Bind to the target the open resolved to, not the live crosshair: the crosshair keeps tracking the view
+            // during the click-to-open round trip (no screen is open yet, so the camera is not frozen), so a nudge
+            // while the container opens would otherwise bind the wrong block or drop the open. An open no click
+            // accounts for resolves to an empty target and binds nothing, outside spectator.
+            ContainerCapture.OpenTarget target = containerCapture.resolveOpenTarget(minecraft, player);
+            BlockPos block = target.block();
+            if (containerCapture.isDoubleChestOpen(level(), menu, block)) {
+                bindOpenedDoubleChest(menu, player, block);
+            } else if (menu instanceof CrafterMenu crafterMenu) {
+                bindOpenedCrafter(crafterMenu, block);
+            } else {
+                bindOpenedContainer(menu, player, block);
+            }
+        }
+        // Dispatch the stash by the remembered bind KIND, not the menu type: a double chest and a normal chest
+        // are both a ChestMenu, so only the kind set at bind time tells them apart.
+        association.boundPos().ifPresent(posKey -> {
+            int[] data = menuDataVector(menu);
+            if (!stashChangeTracker.changedSince(menu.slots, 0, data)) {
+                return; // unchanged since the last stash: last-seen-wins needs no re-serialize this tick
+            }
+            switch (association.boundKind()) {
+                case DOUBLE_CHEST -> stashDoubleChestItems(menu, player);
+                case CRAFTER -> stashCrafterItems((CrafterMenu) menu, posKey);
+                case CONTAINER -> stashContainerItems(menu, player, posKey);
+                default -> {}
+            }
+        });
+    }
+
+    /** Translate the open target (the block, the menu's slot count, the block's size) into primitives. */
+    private void bindOpenedContainer(AbstractContainerMenu menu, LocalPlayer player, @Nullable BlockPos target) {
+        boolean atBlock = false;
+        long posKey = 0L;
+        int menuSlotCount = 0;
+        int blockContainerSize = 0;
+        if (target != null) {
+            atBlock = true;
+            posKey = target.asLong();
+            menuSlotCount = ContainerCapture.countBlockSlots(menu, player);
+            // The client builds the menu from its MenuType with a generic SimpleContainer (never the block's
+            // BlockEntity, nor a CompoundContainer for a double chest), so identity can't tie the menu to the
+            // block. Instead bind only when the target block has its own storage container (size > 0,
+            // excludes non-container blocks and ender chests, which are not BaseContainerBlockEntity) whose
+            // size matches the menu's block-slot count; the guard drops the rest (a double chest is a 54-slot
+            // menu over a 27-slot half -> mismatch).
+            if (level().getBlockEntity(target) instanceof BaseContainerBlockEntity blockContainer) {
+                blockContainerSize = blockContainer.getContainerSize();
+            }
+        }
+        OptionalLong bound = association.open(atBlock, posKey, menuSlotCount, blockContainerSize);
+        if (bound.isPresent()) {
+            LOGGER.debug("bound open container to {}", BlockPos.of(bound.getAsLong()));
+        } else if (target != null) {
+            // Only a real block hit that the size guard rejected is signal (the mis-bind it avoided); a
+            // null target is a menu with nothing to bind (targetless GUI, superseded click) and is already
+            // explained by resolveOpenTarget's own logging, so it stays silent here.
+            LOGGER.info("dropped open container at {}: menuSlots={}, blockContainerSize={}, chunkLoaded={}",
+                    target, menuSlotCount, blockContainerSize,
+                    level().hasChunk(SectionPos.blockToSectionCoord(target.getX()),
+                            SectionPos.blockToSectionCoord(target.getZ())));
+        }
+    }
+
+    /**
+     * Translate the crafter-open target into primitives for {@link ContainerAssociation#openCrafter}. The crafter menu
+     * is exclusive to crafters, so menu-plus-block plus the crafting-grid size is the confident match
+     * ({@code menuIsCrafter} is true at this call site, the dispatch already matched it; the parameter keeps the
+     * negative unit-testable in the core). The count is taken over the menu's own crafting container, so the result
+     * slot the crafter menu also carries is not counted against the block's nine.
+     */
+    private void bindOpenedCrafter(CrafterMenu menu, @Nullable BlockPos target) {
+        boolean atBlock = false;
+        long posKey = 0L;
+        boolean blockIsCrafter = false;
+        int menuCraftingSlotCount = 0;
+        int crafterContainerSize = 0;
+        if (target != null) {
+            atBlock = true;
+            posKey = target.asLong();
+            menuCraftingSlotCount = ContainerCapture.countCrafterInputSlots(menu);
+            if (level().getBlockEntity(target) instanceof CrafterBlockEntity crafter) {
+                blockIsCrafter = true;
+                crafterContainerSize = crafter.getContainerSize();
+            }
+        }
+        OptionalLong bound = association.openCrafter(atBlock, posKey, true, blockIsCrafter,
+                menuCraftingSlotCount, crafterContainerSize);
+        if (bound.isPresent()) {
+            LOGGER.debug("bound open crafter to {}", BlockPos.of(bound.getAsLong()));
+        }
+    }
+
+    /**
+     * Translate the double-chest open signals into primitives for {@link ContainerAssociation#openDoubleChest}. The
+     * double-chest analog of {@link #bindOpenedContainer}: a large chest opens a 54-slot {@code ChestMenu} over two
+     * 27-slot halves, which the single-block path drops on the 54-vs-27 mismatch. The bind candidate is the target half
+     * plus its connected partner (derived from the target block state via {@link ChestBlock#getConnectedBlockPos}); the
+     * sum of the two halves' sizes is the mis-bind guard. Which target half is the RIGHT one is the only left/right
+     * line here; the core stores the two halves in menu-slot order from it. If the partner is not a loaded chest the
+     * combined size stays at one half and the sum guard drops the open (empty, correct); in practice both halves are
+     * always loaded when a double opens.
+     */
+    private void bindOpenedDoubleChest(AbstractContainerMenu menu, LocalPlayer player, @Nullable BlockPos target) {
+        boolean atBlock = false;
+        boolean atRightHalf = false;
+        long targetPosKey = 0L;
+        long partnerPosKey = 0L;
+        int menuSlotCount = 0;
+        int combinedContainerSize = 0;
+        if (target != null) {
+            BlockState state = level().getBlockState(target);
+            if (level().getBlockEntity(target) instanceof ChestBlockEntity targetHalf
+                    && state.hasProperty(ChestBlock.TYPE) && state.getValue(ChestBlock.TYPE) != ChestType.SINGLE) {
+                atBlock = true;
+                atRightHalf = state.getValue(ChestBlock.TYPE) == ChestType.RIGHT; // the only left/right line
+                targetPosKey = target.asLong();
+                BlockPos partner = ChestBlock.getConnectedBlockPos(target, state);
+                partnerPosKey = partner.asLong();
+                menuSlotCount = ContainerCapture.countBlockSlots(menu, player); // 54 for a real double open
+                combinedContainerSize = targetHalf.getContainerSize(); // 27
+                if (level().getBlockEntity(partner) instanceof ChestBlockEntity partnerBlockEntity) {
+                    combinedContainerSize += partnerBlockEntity.getContainerSize(); // + 27 = 54
+                }
+            }
+        }
+        if (association.openDoubleChest(atBlock, atRightHalf, targetPosKey, partnerPosKey,
+                menuSlotCount, combinedContainerSize)) {
+            LOGGER.debug("bound double chest at {} + {}", BlockPos.of(targetPosKey), BlockPos.of(partnerPosKey));
+        }
+    }
+
+    /**
+     * Record the captured block-entity type at {@code pos} for both staleness gates: stamp it on the drained
+     * {@code holder} as {@code wdl_block_entity_id} for the writer-thread merge gate (Gate 1) and into the
+     * per-dimension type map the outline reads for the rim gate (Gate 2). A missing block entity (the open menu's block
+     * already gone) leaves the holder untyped, so both gates fall back to their pre-gate behavior.
+     */
+    @SuppressWarnings("NullAway") // getKey is non-null for a live block entity's registered type
+    private void recordBlockType(BlockPos pos, CompoundTag holder) {
+        BlockEntity blockEntity = level().getBlockEntity(pos);
+        if (blockEntity != null) {
+            String typeId = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString();
+            holder.putString("wdl_block_entity_id", typeId);
+            capturedBlockTypes.put(pos.asLong(), typeId);
+        }
+    }
+
+    /** Record the block type, stash the drained holder by pos, and mark the block captured. */
+    private void stashBlockHolder(Map<BlockPos, StashHolder> stash, BlockPos pos, CompoundTag holder) {
+        recordBlockType(pos, holder);
+        stash.put(pos, StashHolder.of(holder));
+        capturedBlockKeys.add(pos.asLong());
+    }
+
+    /**
+     * Serialize the bound block container's current slots (each at its container-slot index) and stash them keyed by
+     * block pos, overwriting any earlier capture for the same open menu (last-seen-wins).
+     */
+    private void stashContainerItems(AbstractContainerMenu menu, LocalPlayer player, long posKey) {
+        CompoundTag holder = containerCapture.captureBlockSlots(menu, player);
+        if (holder != null) {
+            if (menu instanceof BrewingStandMenu brewingStand) {
+                // Items capture stays generic; only the rider is menu-typed, and the write itself
+                // is the pure tested helper.
+                ContainerCapture.putBrewingState(holder, brewingStand.getBrewingTicks(),
+                        brewingStand.getFuel());
+            }
+            stashBlockHolder(containerStash, BlockPos.of(posKey), holder);
+        }
+    }
+
+    /**
+     * Serialize the bound crafter's input slots and menu-only state and stash them keyed by block pos, overwriting any
+     * earlier capture for the same open menu (last-seen-wins, like every block stash).
+     */
+    private void stashCrafterItems(CrafterMenu menu, long posKey) {
+        CompoundTag holder = containerCapture.captureCrafterSlots(menu);
+        if (holder != null) {
+            stashBlockHolder(containerStash, BlockPos.of(posKey), holder);
+        }
+    }
+
+    /**
+     * The menu-only ContainerData values the change gate tracks beside the slots: the crafter's nine disabled flags
+     * plus triggered, the brewing stand's brew time plus fuel. Every other menu tracks no data; the state-less constant
+     * keeps the per-tick call allocation-free for them.
+     */
+    private static int[] menuDataVector(AbstractContainerMenu menu) {
+        if (menu instanceof CrafterMenu crafter) {
+            int[] data = new int[CrafterSlots.SLOT_COUNT + 1];
+            for (int i = 0; i < CrafterSlots.SLOT_COUNT; i++) {
+                data[i] = crafter.isSlotDisabled(i) ? 1 : 0;
+            }
+            data[CrafterSlots.SLOT_COUNT] = crafter.isPowered() ? 1 : 0;
+            return data;
+        }
+        if (menu instanceof BrewingStandMenu brewingStand) {
+            return new int[] { brewingStand.getBrewingTicks(), brewingStand.getFuel() };
+        }
+        return MenuChangeTracker.NO_DATA;
+    }
+
+    /**
+     * Split a bound double-chest menu's 54 slots 27/27 and stash each half into the existing block
+     * {@link #containerStash} keyed by its own block pos, so the per-chunk {@link ContainerMerge#mergeChunkStash} folds
+     * each into its chest block entity unchanged (a chunk-boundary straddle works because each half is keyed by its own
+     * pos and matched within its own chunk tag). The two halves are stored in menu-slot order by the core, so
+     * {@link ContainerAssociation#boundPos} is the first/RIGHT half (menu slots 0..n/2) and
+     * {@link ContainerAssociation#boundSecondaryPos} the second/LEFT half. Last-seen-wins, like every block stash.
+     */
+    private void stashDoubleChestItems(AbstractContainerMenu menu, LocalPlayer player) {
+        OptionalLong first = association.boundPos(); // the first/RIGHT half pos (menu slots 0..n/2)
+        OptionalLong second = association.boundSecondaryPos(); // the second/LEFT half pos (menu slots n/2..n)
+        if (first.isEmpty() || second.isEmpty()) {
+            return; // bound but a half pos is missing (defensive)
+        }
+        int half = ContainerCapture.countBlockSlots(menu, player) / 2; // 27
+        CompoundTag firstHolder = containerCapture.captureHalfSlots(menu, player, 0, half);
+        CompoundTag secondHolder = containerCapture.captureHalfSlots(menu, player, half, 2 * half);
+        if (firstHolder != null) {
+            stashBlockHolder(containerStash, BlockPos.of(first.getAsLong()), firstHolder);
+        }
+        if (secondHolder != null) {
+            stashBlockHolder(containerStash, BlockPos.of(second.getAsLong()), secondHolder);
+        }
     }
 
     private void pumpFlush(@Nullable ChunkPos hotCenter) {
@@ -1098,10 +1643,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
         LocalPlayer player = minecraft.player;
         if (config.recaptureChunks().refreshesHotChunks() && player != null && minecraft.level == level()) {
             capturedThisTick.clear(); // finish() is its own moment: the burst refreshes the area unconditionally
+            LongOpenHashSet reencodedThisTick = new LongOpenHashSet();
             ChunkPos anchor = anchorEntity(minecraft, player).chunkPosition();
-            recaptureEditZone(anchor, adapter.chunkCodec(), level().getChunkSource(), new LongOpenHashSet());
+            recaptureEditZone(anchor, adapter.chunkCodec(), level().getChunkSource(), reencodedThisTick);
+            // Close the interaction staleness window: re-encode any still-loaded pending-candidate chunk
+            // outside the edit zone before the dirty set is dropped, so the reconcile gate reads a post-ack
+            // snapshot rather than a stale-present one and cannot persist content the player just reverted.
+            reencodePendingInteractionChunks(level().getChunkSource(), adapter.chunkCodec(), reencodedThisTick);
         }
         detachRecapture(); // teardown: release the dirty set; loaded chunks' listeners become inert
+        deactivateInteractionCapture(); // stop the use-block hook feeding this session; the drain reads the instance
+        deactivateOpenClickTracker(); // stop the use hooks seeding this session's open bind
         if (totalCapturedChunks() == 0) {
             if (chunksCaptureFailed > 0) {
                 // This exit reports no tally, so without this a capture that threw on every chunk is
@@ -1150,6 +1702,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         countUnboundDimensionFrames();
         reportEntityReconciliation(); // after the flush, so the at-submit write tally is complete
+        countDroppedInteractionCaptures(); // likewise: only what the whole-buffer drain could not reach
     }
 
     /**
@@ -1226,6 +1779,29 @@ public final class LiveCaptureSession implements CaptureController.Session {
         EntityPacketCapture capture = this.packetCapture;
         if (capture != null) {
             EntityPacketCapture.deactivate(capture);
+        }
+    }
+
+    /**
+     * Deactivate the interaction recognizer so the connection-scoped use-block hook stops feeding it (a later session
+     * activates its own). Called once at finish-time teardown; the finish drain still reads the instance directly, so
+     * the publication can fall before the drain. Idempotent.
+     */
+    private void deactivateInteractionCapture() {
+        InteractionCapture capture = this.interactionCapture;
+        if (capture != null) {
+            InteractionCapture.deactivate(capture);
+        }
+    }
+
+    /**
+     * Deactivate the open-click tracker so the connection-scoped use hooks stop seeding this session's open bind (a
+     * later session activates its own). Called once at finish-time teardown. Idempotent.
+     */
+    private void deactivateOpenClickTracker() {
+        OpenClickTracker tracker = this.openClickTracker;
+        if (tracker != null) {
+            OpenClickTracker.deactivate(tracker);
         }
     }
 
@@ -1489,12 +2065,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Hand every eligible buffered chunk to the writer and drop it from the buffer, then drain the entity buffer on the
-     * same eligibility. With {@code all} the whole buffer is flushed (the finish-time drain and the capture-paused
-     * drain); otherwise only chunks farther than {@code keepHot} from the center. Package-private so the submit its
-     * thunks feed stays testable; every production caller is in this class and reaches it behind the client.
+     * Merge each eligible buffered chunk's pending container stash into its tag, hand the tag to the writer, and drop
+     * it from the buffer, then drain the entity buffer on the same eligibility. With {@code all} the whole buffer is
+     * flushed (the finish-time drain and the capture-paused drain); otherwise only chunks farther than {@code keepHot}
+     * from the center. Merge-before-flush: a container opened while the chunk was hot is folded in before the tag
+     * leaves memory, and distance-gating means no new container can be opened in a chunk being flushed. Package-private
+     * so the block-container tally its submit thunks feed stays testable; every production caller is in this class and
+     * reaches it behind the client.
      */
     void flushBuffer(AsyncSaveWriter activeWriter, boolean all, int centerX, int centerZ, int keepHot) {
+        ContainerSink containerSink = adapter.containerSink();
         ChunkCodec codec = adapter.chunkCodec();
         // skipVoidChunks (default off): omit a captured chunk that carries nothing worth saving. Honored under
         // every generator (a user choice); under DEFAULT/FLAT a dropped void position regenerates as terrain, an
@@ -1507,6 +2087,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         Set<ChunkPos> bufferedEntityChunks = skipVoid ? entityBuffer.bufferedChunks() : Collections.emptySet();
         LongSet accumulatedEntityChunks = skipVoid && packetCapture != null ? packetCapture.chunks(liveDimensionId)
                 : LongSets.EMPTY_SET;
+        Set<ChunkPos> pendingInteractionChunks = skipVoid && interactionCapture != null
+                ? interactionCapture.pendingCandidateChunks()
+                : Collections.emptySet();
         Iterator<Map.Entry<ChunkPos, ChunkSnapshotSource>> entries = captured.entrySet().iterator();
         while (entries.hasNext()) {
             Map.Entry<ChunkPos, ChunkSnapshotSource> entry = entries.next();
@@ -1515,36 +2098,66 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 continue;
             }
             ChunkSnapshotSource snapshot = entry.getValue();
-            if (skipVoid && isVoidChunk(pos, snapshot, bufferedEntityChunks, accumulatedEntityChunks)) {
+            if (skipVoid
+                    && isVoidChunk(pos, snapshot, bufferedEntityChunks, accumulatedEntityChunks,
+                            pendingInteractionChunks)) {
                 // Lossless: a VOID world regenerates this position as air identically, so dropping it (and its
                 // allCaptured position) keeps the count and resume honest.
                 allCaptured.remove(pos.toLong());
                 entries.remove();
                 continue;
             }
-            // Defer the heavy serialize to the writer thread: the thunk closes over the detached snapshot, the
-            // per-band codec and the frozen registries, all immutable, so the render thread never runs
-            // SerializableChunkData.write. The target dimension is read here on main, at submit time.
+            // Drain this chunk's open-time holders out of the shared stash into a per-submit bundle the writer
+            // thunk then solely owns, so only immutable, detached data crosses to the writer (the thread-handoff
+            // boundary rule).
+            Map<BlockPos, CompoundTag> containers = drainChunkHolders(containerStash, pos);
+            // The positions whose holder will actually land, matched on main against the snapshot's block
+            // entities the way the writer-side fold re-makes the match against the encoded tag: without them the
+            // read-merge cannot tell a container captured this pass from one never captured.
+            List<BlockPos> landingContainers = ChunkFlushPlan.landingHolderPositions(snapshot, containers);
+            // Defer the heavy serialize plus the pure container fold to the writer thread: the thunk closes over
+            // the detached snapshot, the drained holders, the per-band codec and sink, and the frozen registries,
+            // all immutable, so the render thread never runs SerializableChunkData.write. The target dimension is
+            // read here on main, at submit time, so a rebind cannot misroute.
             boolean synthesizeBlending = VanillaDimensions.shouldSynthesizeBlending(config.worldOutput().worldType(),
                     targetDimension);
+            // Consumed by this write, not held: the copy this write leaves on disk is post-placement, so the
+            // next visit's carry-forward is reading its own capture rather than the replaced block's. Holding
+            // it would suppress forever, which erases what this download archived on every later pass.
+            // Committed here, at enqueue, with the residual that follows from it: an encode throw or a failed
+            // or preserved write leaves the prior on disk with the suppression already spent, so the next
+            // visit carries the replaced block's contents forward. The alternative is not holding it, which is
+            // the routine erasure above, but confirming per position across the writer boundary, which is
+            // state this side cannot read without a second producer on main-thread data.
+            LongSet replacedHere = ChunkFlushPlan.replacedIn(pos, replacedBlockKeys);
+            replacedBlockKeys.removeAll(replacedHere);
             activeWriter.submitChunk(targetDimension, pos,
-                    () -> codec.encode(snapshot, registries, synthesizeBlending),
-                    ChunkMerge::merge);
+                    () -> {
+                        CompoundTag tag = codec.encode(snapshot, registries, synthesizeBlending);
+                        blockContainersFailed += ContainerMerge.mergeChunkStash(containerSink, tag, pos,
+                                containers).failed();
+                        return tag;
+                    }, ChunkFlushPlan.readMerge(snapshot, landingContainers, replacedHere));
             entries.remove();
+        }
+        if (all) {
+            sweepOrphanedHolders(activeWriter);
         }
         flushEntityBuffer(activeWriter, all, centerX, centerZ, keepHot);
     }
 
     /**
-     * Whether {@code pos}'s captured chunk is void (safe to omit): no non-air blocks, no block-entities, and no
-     * captured entities, buffered or still accumulated. The decision is taken here, against the artifact about to be
+     * Whether {@code pos}'s captured chunk is void (safe to omit): no non-air blocks, no block-entities, no captured
+     * entities (buffered or accumulated), no captured containers, and no pending interaction prediction (else dropping
+     * the chunk would leak its undrained stash entry). The decision is taken here, against the artifact about to be
      * written, so it cannot drift from what is thrown away.
      */
     private boolean isVoidChunk(ChunkPos pos, ChunkSnapshotSource snapshot, Set<ChunkPos> bufferedEntityChunks,
-            LongSet accumulatedEntityChunks) {
+            LongSet accumulatedEntityChunks, Set<ChunkPos> pendingInteractionChunks) {
         boolean hasEntities = bufferedEntityChunks.contains(pos) || accumulatedEntityChunks.contains(pos.toLong());
+        boolean hasContainers = anyHolderInChunk(containerStash, pos) || pendingInteractionChunks.contains(pos);
         return VoidChunkPolicy.isVoidChunk(
-                hasNonAirBlocks(snapshot), !snapshot.blockEntities().isEmpty(), hasEntities, false);
+                hasNonAirBlocks(snapshot), !snapshot.blockEntities().isEmpty(), hasEntities, hasContainers);
     }
 
     /** Whether any captured section of {@code snapshot} holds a non-air block state. */
@@ -1556,6 +2169,106 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
         }
         return false;
+    }
+
+    /** Whether {@code stash} holds any open-time container holder located in {@code pos}'s chunk. */
+    private static boolean anyHolderInChunk(Map<BlockPos, ?> stash, ChunkPos pos) {
+        for (BlockPos holderPos : stash.keySet()) {
+            if (new ChunkPos(holderPos).equals(pos)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Drain (remove and return) the stash holders located in {@code pos}'s chunk, unpacked and bundled for the
+     * writer-thread fold. Mirrors {@link ContainerMerge}'s per-chunk locator, but on the main thread, so the shared
+     * stash is left holding only other chunks' still-open holders. An unpack failure drops that one holder rather than
+     * aborting the per-tick flush, and un-marks the position as captured, so the outline re-rims it and a re-open can
+     * recover the contents; a retry would deterministically re-fail against the same packed bytes.
+     */
+    private Map<BlockPos, CompoundTag> drainChunkHolders(Map<BlockPos, StashHolder> stash, ChunkPos pos) {
+        Map<BlockPos, CompoundTag> bundle = new LinkedHashMap<>();
+        Iterator<Map.Entry<BlockPos, StashHolder>> holders = stash.entrySet().iterator();
+        while (holders.hasNext()) {
+            Map.Entry<BlockPos, StashHolder> holder = holders.next();
+            if (new ChunkPos(holder.getKey()).equals(pos)) {
+                try {
+                    bundle.put(holder.getKey(), holder.getValue().unpack());
+                } catch (IOException e) {
+                    long posKey = holder.getKey().asLong();
+                    capturedBlockKeys.remove(posKey);
+                    capturedBlockTypes.remove(posKey);
+                    LOGGER.warn("failed to unpack stashed container {}; its contents are lost and its outline re-arms",
+                            holder.getKey(), e);
+                }
+                holders.remove();
+            }
+        }
+        return bundle;
+    }
+
+    /**
+     * Sweep the container holders still stashed after a whole-buffer drain: the open-time contents of a container
+     * opened in a chunk that had already left the keep-hot buffer. Its chunk is on disk but was never re-buffered (the
+     * allCaptured skip in {@link #captureLoadedChunks}), so the per-chunk drain never reached its holder; fold each
+     * residual holder into its on-disk chunk through a writer-thread read-modify-write, so backtracking through an
+     * already-flushed base still saves what the player opened. Runs only on a whole-buffer drain ({@code all}), never
+     * per tick, so it adds no per-tick whole-stash pass. Finish and the dimension rebind always reach it (both call
+     * {@link #flushBuffer} directly); the capture-paused drain reaches it only alongside a non-empty keep-hot buffer,
+     * since {@link #pumpFlush} returns early on an empty buffer, so finish is the backstop that guarantees every
+     * residual holder is swept. The rebind drain runs it before the dimension swap under the old dimension, so a
+     * residual holder never crosses a portal into another dimension's {@link ChunkPos} space.
+     */
+    private void sweepOrphanedHolders(AsyncSaveWriter activeWriter) {
+        if (containerStash.isEmpty()) {
+            return;
+        }
+        ContainerSink containerSink = adapter.containerSink();
+        ResourceKey<Level> dimension = targetDimension;
+        for (ChunkPos pos : ChunkFlushPlan.residualHolderChunks(containerStash.keySet())) {
+            Map<BlockPos, CompoundTag> containers = drainChunkHolders(containerStash, pos);
+            activeWriter.submitChunkRewrite(dimension, pos, onDisk -> {
+                MergeTally tally = ContainerMerge.mergeChunkStash(containerSink, onDisk, pos, containers);
+                blockContainersFailed += tally.failed();
+                return tally.merged();
+            });
+        }
+    }
+
+    /**
+     * Pack at most one closed holder per tick to its gzip bytes, oldest first, skipping the open menu's bound positions
+     * (still last-seen-wins overwritten). Without this the stash retains every not-yet-flushed holder as a full tag
+     * tree, which a dense storage-room session grows to hundreds of megabytes of heap; one holder per tick bounds the
+     * pack cost while still outpacing any human open rate.
+     */
+    private void compactClosedStashHolders() {
+        for (Map.Entry<BlockPos, StashHolder> entry : containerStash.entrySet()) {
+            StashHolder holder = entry.getValue();
+            if (!holder.shouldCompact() || isBoundOpen(entry.getKey().asLong())) {
+                continue;
+            }
+            try {
+                holder.compact();
+                return;
+            } catch (IOException e) {
+                // Unreachable in practice: the pack writes to a memory stream. The holder keeps its live
+                // tree and retires itself from packing, so this warns once per holder and the pump moves on
+                // to the next candidate rather than head-of-line blocking on a permanent failure.
+                LOGGER.warn("failed to pack stashed container {}; it stays live in memory", entry.getKey(), e);
+            }
+        }
+    }
+
+    /** Whether {@code posKey} is a bound position of the currently-open menu (either double-chest half). */
+    private boolean isBoundOpen(long posKey) {
+        OptionalLong bound = association.boundPos();
+        if (bound.isPresent() && bound.getAsLong() == posKey) {
+            return true;
+        }
+        OptionalLong secondary = association.boundSecondaryPos();
+        return secondary.isPresent() && secondary.getAsLong() == posKey;
     }
 
     /**
@@ -1867,17 +2580,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * download reporting either as clean would be asserting something untrue about what reached disk. Package-private
      * so the verdict stays testable.
      *
-     * <p>The two tallies accrue on different threads: the writer's arrive as arguments across its completed future or
-     * its finalize call, and the session's are main-thread. A reader added outside those edges must supply its own
-     * ordering.
+     * <p>These tallies accrue on two threads: the writer's own arrive as arguments across its completed future or its
+     * finalize call, the block-container merge count is written on the writer thread from inside a submitted thunk, and
+     * the rest are main-thread. The plain ints are correct for the production readers because each sits behind the
+     * writer's queue drain or its completed future, not because they are single-threaded. A reader added outside those
+     * edges must supply its own ordering.
      */
     boolean isPartialSave(int chunksFailed, int entityChunksFailed) {
         return failedWriteCount(chunksFailed, entityChunksFailed) > 0;
     }
 
     private int failedWriteCount(int chunksFailed, int entityChunksFailed) {
-        return chunksFailed + entityChunksFailed + chunksCaptureFailed + structuralEntitiesLost
-                + finishStepsFailed;
+        return chunksFailed + entityChunksFailed + chunksCaptureFailed + blockContainersFailed
+                + interactionCapturesLost + structuralEntitiesLost + finishStepsFailed;
     }
 
     /** Report the background save's outcome to the player (called on the main thread, once, when it completes). */
@@ -1903,8 +2618,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // surfaces report. Logged even when each is zero: a reader who cannot tell "nothing else was lost" from
         // "this build had no such line" cannot check the clean verdict at all.
         LOGGER.info("counted capture losses for {}: {} chunk writes, {} entity-chunk writes, {} chunk captures, "
-                + "{} structural entities, {} finish steps", saveName, result.chunksFailed(),
-                result.entityChunksFailed(), chunksCaptureFailed, structuralEntitiesLost, finishStepsFailed);
+                + "{} block containers, {} predicted interactions, {} structural entities, {} finish steps",
+                saveName, result.chunksFailed(), result.entityChunksFailed(), chunksCaptureFailed,
+                blockContainersFailed, interactionCapturesLost, structuralEntitiesLost, finishStepsFailed);
     }
 
     /** Surface a failed save in the log, which is where the cause a player can act on lives. */
