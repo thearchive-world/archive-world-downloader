@@ -69,6 +69,12 @@ public final class CaptureController {
         /** Live progress so far, as MC-free counts (read for the status command and HUD). */
         CaptureCounts counts();
 
+        /**
+         * The live captured-set: which loaded containers had their contents captured this session, read by the
+         * unsaved-container outline to decide which still carry a rim. Same-thread read, no snapshot.
+         */
+        CapturedContainers capturedContainers();
+
         /** The current finalization phase while the background save drains, for the HUD bar. */
         SaveStage saveStage();
 
@@ -125,6 +131,18 @@ public final class CaptureController {
             return frozenCounts;
         }
         return CaptureCounts.EMPTY;
+    }
+
+    /**
+     * The live captured-set while recording, {@link CapturedContainers#EMPTY} otherwise. Unlike the counts it is not
+     * held through saving: the unsaved-container rims are a live to-do list that stops the moment the capture ends and
+     * the drain begins, so the outline reads an empty set once idle.
+     */
+    public CapturedContainers capturedContainers() {
+        if (state == CaptureState.RECORDING && session != null) {
+            return session.capturedContainers();
+        }
+        return CapturedContainers.EMPTY;
     }
 
     /**

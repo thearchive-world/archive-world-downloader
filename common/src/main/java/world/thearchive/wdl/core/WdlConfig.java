@@ -32,6 +32,7 @@ public final class WdlConfig {
     private static final Logger LOGGER = Logger.getLogger(WdlConfig.class.getName());
 
     private final boolean captureEntities;
+    private final boolean captureContainers;
     private final RecaptureMode recaptureChunks;
     private final int recaptureSeconds;
     private final int encodeBudgetMillis;
@@ -41,10 +42,12 @@ public final class WdlConfig {
     private final boolean showChatMessages;
     private final WorldOutputConfig worldOutput;
 
-    private WdlConfig(boolean captureEntities, RecaptureMode recaptureChunks, int recaptureSeconds,
+    private WdlConfig(boolean captureEntities, boolean captureContainers,
+            RecaptureMode recaptureChunks, int recaptureSeconds,
             int encodeBudgetMillis, boolean forceMobPersistence, boolean dumpReceivedFrames,
             boolean appendDateSuffix, boolean showChatMessages, WorldOutputConfig worldOutput) {
         this.captureEntities = captureEntities;
+        this.captureContainers = captureContainers;
         this.recaptureChunks = recaptureChunks;
         this.recaptureSeconds = recaptureSeconds;
         this.encodeBudgetMillis = encodeBudgetMillis;
@@ -57,6 +60,10 @@ public final class WdlConfig {
 
     public boolean captureEntities() {
         return captureEntities;
+    }
+
+    public boolean captureContainers() {
+        return captureContainers;
     }
 
     /** How current the download keeps the world as the player records (snapshot-once, nearby-only, or on revisit). */
@@ -142,6 +149,7 @@ public final class WdlConfig {
         ConfigValues values = ConfigSchema.read(properties, malformed);
         return new WdlConfig(
                 values.booleanValue("captureEntities"),
+                values.booleanValue("captureContainers"),
                 values.enumValue("recaptureChunks", RecaptureMode.class),
                 values.integer("recaptureSeconds"),
                 values.integer("encodeBudgetMillis"),

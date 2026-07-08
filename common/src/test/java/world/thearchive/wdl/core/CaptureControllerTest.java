@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -36,6 +38,7 @@ class CaptureControllerTest {
         int finishes;
         boolean saveDone; // the test flips this true to signal the background save has completed
         CaptureCounts counts = CaptureCounts.EMPTY;
+        CapturedContainers capturedContainers = CapturedContainers.EMPTY;
         SaveStage saveStage = SaveStage.NONE;
         float saveProgress;
 
@@ -57,6 +60,11 @@ class CaptureControllerTest {
         @Override
         public CaptureCounts counts() {
             return counts;
+        }
+
+        @Override
+        public CapturedContainers capturedContainers() {
+            return capturedContainers;
         }
 
         @Override
@@ -253,6 +261,21 @@ class CaptureControllerTest {
     @Test
     void countsAreEmptyWhenIdle() {
         assertSame(CaptureCounts.EMPTY, controller().counts());
+    }
+
+    @Test
+    void capturedContainersDelegateToSessionWhileRecording() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        session.capturedContainers = new CapturedContainers(LongSet.of(99L), Set.of(), false);
+        controller.start(() -> session);
+
+        assertTrue(controller.capturedContainers().containsBlock(99L));
+    }
+
+    @Test
+    void capturedContainersAreEmptyWhenIdle() {
+        assertSame(CapturedContainers.EMPTY, controller().capturedContainers());
     }
 
     @Test

@@ -148,6 +148,7 @@ public final class ConfigSchema {
     static final List<ConfigOption> OPTIONS = Collections.unmodifiableList(Arrays.asList(
             ConfigOption.dataLossBoolean("captureEntities", "true", config -> config.captureEntities(),
                     CAPTURE_TOGGLES_PREAMBLE),
+            ConfigOption.dataLossBoolean("captureContainers", "true", config -> config.captureContainers(), ""),
             ConfigOption.enumOption("recaptureChunks", "EVERYWHERE", name -> RecaptureMode.valueOf(name),
                     config -> config.recaptureChunks(), RECAPTURE_CHUNKS_PREAMBLE),
             ConfigOption.rangedInteger("recaptureSeconds", "15", 5, 60, config -> config.recaptureSeconds(),
@@ -182,7 +183,7 @@ public final class ConfigSchema {
     private static final Map<String, ConfigOption> BY_KEY = Collections.unmodifiableMap(indexByKey(OPTIONS));
 
     static final List<ConfigOption> REPORT_ORDER = report(
-            "captureEntities", "recaptureChunks", "recaptureSeconds", "encodeBudgetMillis",
+            "captureEntities", "captureContainers", "recaptureChunks", "recaptureSeconds", "encodeBudgetMillis",
             "forceMobPersistence", "dumpReceivedFrames", "appendDateSuffix", "showChatMessages");
 
     static final List<ConfigOption> WORLD_OUTPUT_REPORT_ORDER = report(
