@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
@@ -44,6 +45,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.Mth;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.entity.Entity;
@@ -51,7 +53,9 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.animal.equine.AbstractChestedHorse;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.BrewingStandMenu;
 import net.minecraft.world.inventory.CrafterMenu;
@@ -255,6 +259,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private final Map<BlockPos, StashHolder> containerStash = new LinkedHashMap<>();
 
     /**
+     * Captured container-vehicle {@code "Items"} holders keyed by entity {@link UUID}; last-seen-while-open wins. The
+     * entity sibling of {@link #containerStash}: a chest minecart, hopper minecart, chest boat, or chest raft reaches
+     * the client only through its open menu, so it is lifted there and merged into its entity's tag in the
+     * {@code entities/} region when that entity's chunk flushes (by {@link EntityContainerMerge#mergeEntityStash},
+     * incidentally again at {@link #finish()}), not into a chunk block entity.
+     */
+    private final Map<UUID, CompoundTag> entityContainerStash = new LinkedHashMap<>();
+
+    /**
      * Positions a block placement landed in this session, held per dimension and swapped on a portal like
      * {@link #capturedBlockKeys}. The on-disk carry-forward matches a fresh block entity to its prior copy on position
      * and type, which a same-type replacement satisfies, so without this the archived contents of the block that was
@@ -277,8 +290,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * each case un-stashes the content it un-marks: a cell a placement lands in, whose captured block is being replaced
      * ({@link #onBlockPlacedAt}), and a holder whose unpack failed as its chunk drained. Block containers, double-chest
      * halves, and placed containers enter by block pos key, held per dimension and swapped on a portal like
-     * {@link #allCaptured} so a position in one dimension never dedups another's. Main-thread only, like the rest of
-     * capture; the cross-seam view contract is {@link CapturedContainers}.
+     * {@link #allCaptured} so a position in one dimension never dedups another's; borne containers enter by
+     * globally-unique entity UUID, staying session-wide. Main-thread only, like the rest of capture; the cross-seam
+     * view contract is {@link CapturedContainers}.
      */
     private final Map<ResourceKey<Level>, LongOpenHashSet> capturedBlockKeysByDimension = new LinkedHashMap<>();
     private LongOpenHashSet capturedBlockKeys = new LongOpenHashSet();
@@ -296,6 +310,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // records a book insert.
     private final Map<ResourceKey<Level>, Long2IntOpenHashMap> bookshelfSlotsByDimension = new LinkedHashMap<>();
     private Long2IntOpenHashMap bookshelfSlots = new Long2IntOpenHashMap();
+    private final Set<UUID> capturedEntityIds = new HashSet<>();
 
     /**
      * The per-tick entity accumulation buffer of already-serialized entity tags, keyed by UUID and drained by
@@ -420,6 +435,32 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** Primed entities lost when their whole entity-chunk threw or nulled out during flush; counted, not residual. */
     private int primeFlushDrops;
 
+    /** The UUID of the container vehicle the live menu is bound to, set once at bind time; read by the stash. */
+    private @Nullable UUID boundEntityUuid;
+
+    /**
+     * The root vehicle and its non-player passengers, held from the standalone entity write so the RootVehicle copy is
+     * not duplicated by a region-file copy on the same UUID.
+     */
+    private final Set<UUID> excludedRootVehicleUuids = new HashSet<>();
+
+    /**
+     * The captured contents of every container vehicle folded into a standalone entity write this session, kept by UUID
+     * after the stash drains. A vehicle's items reach the client only through its open menu, so every serialize after
+     * that first fold is empty; keeping the holder lets a later flush of the same vehicle, in another entity-chunk or
+     * another dimension, be written carrying its contents too, so a reader that reaches any copy finds the loot rather
+     * than an empty vehicle. It does not reduce the archive to one copy; see
+     * {@link EntityContainerMerge#refoldFlushedContainers} for that residual.
+     *
+     * <p>Read at finish as well, where {@link #foldRidingVehicleContents} folds it into the ridden mount's
+     * {@code RootVehicle} tag when the stash has already drained, which is what lets that mount be written whole rather
+     * than skipped.
+     *
+     * <p>Bounded by the number of container vehicles the player opened, each holding one container's worth of items, so
+     * it is a far smaller retention than the block container stash that precedes it.
+     */
+    private final Map<UUID, CompoundTag> foldedContainerVehicles = new HashMap<>();
+
     /** containerId of the menu currently tracked, or {@link #NO_MENU} when none is open. */
     private int openContainerId = NO_MENU;
 
@@ -444,6 +485,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** The save-directory name (the target's folder, verbatim), used to open the world and report the save. */
     private final String saveName;
 
+    /** How many stashed container vehicles were merged into their captured entity tags (for the saved message). */
+    private int mergedEntityContainers;
+
     /**
      * Chunks whose terrain snapshot threw, so the position reached neither the buffer nor the captured set and the
      * reopened world has none of that chunk's terrain, falling back to its own generator there (main thread). Deduped
@@ -462,6 +506,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** Block-container merges lost to a throw (writer thread); folds into the partial-finish predicate. */
     private int blockContainersFailed;
 
+    /** Container-vehicle merges lost to a throw (main thread); folds into the partial-finish predicate. */
+    private int entityContainersFailed;
+
+    /** Opened container vehicles whose captured contents were never folded into a saved entity (main thread). */
+    private int containerVehiclesLost;
+
     /**
      * Predicted interactions (a bookshelf book, a jukebox disc, a placed shulker or beehive) that no chunk flush ever
      * reached, so nothing of them was written (main thread). Counted at the two whole-buffer drains, the dimension
@@ -471,6 +521,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** Entities lost to a whole-entity-chunk flush throw or a create failure, both paths (main thread). */
     private int structuralEntitiesLost;
+
+    /**
+     * A prior download's parked mount the resumed release could not place (main thread). At most one per download,
+     * since the prior level.dat records at most one RootVehicle, and the whole mount rather than a part of it: this
+     * session's own level.dat overwrites the only copy it had.
+     */
+    private int resumedMountsLost;
 
     /**
      * Finish-time work the end-of-stream guard degraded to skipped (main thread). The degradation is deliberate, since
@@ -1314,9 +1371,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     @Override
     public CapturedContainers capturedContainers() {
-        // Every container this session captures is keyed by block pos, so the borne-container identities and the
-        // shared ender flag are empty by construction rather than by a read that could go stale.
-        return new CapturedContainers(capturedBlockKeys, Collections.emptySet(), false, bookshelfSlots,
+        // No ender chest is captured, so the shared ender flag is false by construction rather than by a read that
+        // could go stale.
+        return new CapturedContainers(capturedBlockKeys, capturedEntityIds, false, bookshelfSlots,
                 capturedBlockTypes);
     }
 
@@ -1355,11 +1412,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Capture an open container's contents. Container items arrive only while the player has the container open (via
      * {@code ClientboundContainerSetContentPacket}), never in the chunk packet, so they are stashed here and merged
-     * into their chunk's tag just before it flushes. Each recognition axis has its own bind leg and its own confidence
-     * test, and an open that no leg claims confidently is DROPPED: mis-binding would write the wrong items onto a block
-     * (a corrupt archive) while an empty container is correct. The double chest and the crafter each bind through their
-     * own leg rather than being dropped; what is dropped is an open whose target the click chain cannot account for,
-     * and any open whose slot count fails its leg's size guard.
+     * into their target at {@link #finish()}. Each recognition axis has its own bind leg and its own confidence test,
+     * and an open that no leg claims confidently is DROPPED: mis-binding would write the wrong items onto a block or
+     * entity (a corrupt archive) while an empty container is correct. The double chest, the crafter, the chested animal
+     * and the container vehicle each bind through their own leg rather than being dropped; what is dropped is an open
+     * whose target the click chain cannot account for, and any open whose slot count fails its leg's size guard.
      *
      * <p>The binding is decided once when the menu first appears, from the target the player clicked (see
      * {@link ContainerCapture#resolveOpenTarget}, since the live crosshair keeps drifting until the menu freezes the
@@ -1383,15 +1440,30 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // accounts for resolves to an empty target and binds nothing, outside spectator.
             ContainerCapture.OpenTarget target = containerCapture.resolveOpenTarget(minecraft, player);
             BlockPos block = target.block();
+            Entity entity = target.entity();
+            boolean vehicleClaimsOpen = config.captureEntities()
+                    && containerCapture.shouldClaimVehicleOpen(player, entity, target.vehicleIntent());
+            AbstractChestedHorse chestedAnimal = config.captureEntities()
+                    ? containerCapture.chestedAnimal(menu)
+                    : null;
+            // Branch order is load-bearing: the chested-animal branch precedes the entity-vehicle branch.
+            // shouldClaimVehicleOpen is menu-type-blind, so a strength-1 llama's horse menu (5
+            // non-player slots) ridden alongside a hopper minecart (size 5) would otherwise be claimed by the
+            // vehicle branch and mis-merge the chest into the minecart. Only a mount menu names a chested
+            // animal (no vehicle opens one), so peeling it off first cannot starve a vehicle capture.
             if (containerCapture.isDoubleChestOpen(level(), menu, block)) {
                 bindOpenedDoubleChest(menu, player, block);
+            } else if (chestedAnimal != null) {
+                bindOpenedChestedAnimal(menu, player, chestedAnimal);
+            } else if (vehicleClaimsOpen) {
+                bindOpenedEntityContainer(menu, player, entity);
             } else if (menu instanceof CrafterMenu crafterMenu) {
                 bindOpenedCrafter(crafterMenu, block);
             } else {
                 bindOpenedContainer(menu, player, block);
             }
         }
-        // Dispatch the stash by the remembered bind KIND, not the menu type: a double chest and a normal chest
+        // Dispatch the stash by the remembered bind KIND, not the menu type: a chest minecart and a normal chest
         // are both a ChestMenu, so only the kind set at bind time tells them apart.
         association.boundPos().ifPresent(posKey -> {
             int[] data = menuDataVector(menu);
@@ -1399,6 +1471,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 return; // unchanged since the last stash: last-seen-wins needs no re-serialize this tick
             }
             switch (association.boundKind()) {
+                case ENTITY -> stashEntityContainerItems(menu, player);
+                case CHESTED_ANIMAL -> stashChestedAnimalItems(menu, player);
                 case DOUBLE_CHEST -> stashDoubleChestItems(menu, player);
                 case CRAFTER -> stashCrafterItems((CrafterMenu) menu, posKey);
                 case CONTAINER -> stashContainerItems(menu, player, posKey);
@@ -1510,6 +1584,58 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
+     * Translate the container-vehicle open signals into primitives for {@link ContainerAssociation#openEntityContainer}
+     * and, on a confident bind, store the entity UUID the finish merge keys on. The bind target is the target vehicle,
+     * or, when there is none, the container vehicle the player is riding (the press-E flow: a chest boat opens its menu
+     * via {@code player.getVehicle()}, firing no use event). The UUID is read once here (not re-read per tick): the
+     * bind key is stable, so a minecart that keeps rolling while open still captures correctly and merges into whatever
+     * chunk it ends in. A NULL target vehicle at the bind tick drops the open. A REMOVED one does not: the type test
+     * stays true for an entity already taken out of the world and the clicked reference is held strongly, so a
+     * destroyed chest minecart still binds by UUID and its stash merges onto an entity the save may not carry.
+     */
+    private void bindOpenedEntityContainer(AbstractContainerMenu menu, LocalPlayer player, @Nullable Entity target) {
+        boolean atEntity = false;
+        boolean entityIsVehicle = false;
+        int menuSlotCount = 0;
+        int entityContainerSize = 0;
+        UUID uuid = null;
+        Entity vehicle = target instanceof ContainerEntity ? target : player.getVehicle();
+        if (vehicle instanceof ContainerEntity containerVehicle) {
+            atEntity = true;
+            entityIsVehicle = true;
+            entityContainerSize = containerVehicle.getContainerSize();
+            uuid = vehicle.getUUID();
+            menuSlotCount = ContainerCapture.countBlockSlots(menu, player);
+        }
+        if (association.openEntityContainer(atEntity, entityIsVehicle, menuSlotCount, entityContainerSize)
+                && uuid != null) {
+            boundEntityUuid = uuid;
+            LOGGER.debug("bound open entity container to {}", uuid);
+        }
+    }
+
+    /**
+     * Translate the chested-animal open signals into primitives for {@link ContainerAssociation#openChestedAnimal} and,
+     * on a confident bind, store the entity UUID the finish merge keys on. The chested-animal analog of
+     * {@link #bindOpenedEntityContainer}, with one difference that is the whole point of it: the animal is the one the
+     * MENU names, so nothing about the crosshair or the ridden vehicle can put another animal's chest on this open. The
+     * chest size is the live size ({@code getInventoryColumns() * 3}; llama strength is synced), and the menu
+     * chest-slot count is read the same tick, so the slot-count match still drops a stale or mismatched open. The UUID
+     * is read once here; a chested animal that wanders while the menu stays open still merges into whatever chunk it
+     * ends in.
+     */
+    private void bindOpenedChestedAnimal(AbstractContainerMenu menu, LocalPlayer player,
+            AbstractChestedHorse animal) {
+        int entityChestSize = animal.getInventoryColumns() * 3; // live size; llama strength is synced
+        int menuChestSlotCount = ContainerCapture.countChestSlots(menu, player);
+        if (association.openChestedAnimal(true, true, menuChestSlotCount, entityChestSize)) {
+            UUID uuid = animal.getUUID();
+            boundEntityUuid = uuid;
+            LOGGER.debug("bound open chested animal to {}", uuid);
+        }
+    }
+
+    /**
      * Record the captured block-entity type at {@code pos} for both staleness gates: stamp it on the drained
      * {@code holder} as {@code wdl_block_entity_id} for the writer-thread merge gate (Gate 1) and into the
      * per-dimension type map the outline reads for the rim gate (Gate 2). A missing block entity (the open menu's block
@@ -1602,6 +1728,42 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         if (secondHolder != null) {
             stashBlockHolder(containerStash, BlockPos.of(second.getAsLong()), secondHolder);
+        }
+    }
+
+    /**
+     * Serialize the open container-vehicle menu's synthetic block slots (the client's synced vehicle contents) into the
+     * {@link #entityContainerStash} keyed by the bound UUID, last-seen-wins. Reuses the container serialize; the merge
+     * into the entity's tag in the {@code entities/} region happens at {@link #finish()}.
+     */
+    private void stashEntityContainerItems(AbstractContainerMenu menu, LocalPlayer player) {
+        UUID uuid = boundEntityUuid;
+        if (uuid == null) {
+            return; // bound but no uuid (defensive)
+        }
+        CompoundTag holder = containerCapture.captureBlockSlots(menu, player);
+        if (holder != null) {
+            entityContainerStash.put(uuid, holder);
+            capturedEntityIds.add(uuid);
+        }
+    }
+
+    /**
+     * Serialize the open chested-animal menu's chest slots (the client's synced chest contents) into the
+     * {@link #entityContainerStash} keyed by the bound UUID, last-seen-wins. The chested-animal analog of
+     * {@link #stashEntityContainerItems}; it lifts the chest slots only ({@link ContainerCapture#captureChestSlots},
+     * not the saddle/body), and the merge into the animal's tag in the {@code entities/} region happens when its chunk
+     * flushes, through the same {@link EntityContainerMerge#mergeEntityStash} the container vehicles use.
+     */
+    private void stashChestedAnimalItems(AbstractContainerMenu menu, LocalPlayer player) {
+        UUID uuid = boundEntityUuid;
+        if (uuid == null) {
+            return; // bound but no uuid (defensive)
+        }
+        CompoundTag holder = containerCapture.captureChestSlots(menu, player);
+        if (holder != null) {
+            entityContainerStash.put(uuid, holder);
+            capturedEntityIds.add(uuid);
         }
     }
 
@@ -1703,6 +1865,24 @@ public final class LiveCaptureSession implements CaptureController.Session {
         countUnboundDimensionFrames();
         reportEntityReconciliation(); // after the flush, so the at-submit write tally is complete
         countDroppedInteractionCaptures(); // likewise: only what the whole-buffer drain could not reach
+        if (!entityContainerStash.isEmpty()) {
+            // Only the unrecoverable remainder reaches here: an opened vehicle re-approached after its
+            // chunk flushed re-accumulates and re-flushes with its contents folded in, draining its stash
+            // entry before this check, so whatever survives was never folded into a saved top-level entity.
+            // The user interacted with this storage and its items are absent, so surface it as a loss.
+            containerVehiclesLost = entityContainerStash.size();
+            LOGGER.warn("{} opened container vehicles' captured contents were not saved: the vehicle was not "
+                    + "written as a top-level entity we could fold them into (its terrain was never captured, it "
+                    + "saved nested as a passenger, or its reconstruct or flush failed), so the items the player "
+                    + "opened are lost", entityContainerStash.size());
+            // Logged directly rather than through a loss voice because no throwable exists to key a stack
+            // budget on; the aggregate count above gives no way to learn which mount saved empty.
+            for (UUID vehicle : entityContainerStash.keySet()) {
+                LOGGER.info("container vehicle {} saved without the contents the player opened; they are missing "
+                        + "from the save", vehicle);
+            }
+        }
+        releaseResumedDismountedMount(activeWriter);
     }
 
     /**
@@ -1950,6 +2130,57 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
+     * Fold the captured open-time contents into the mount record by {@code "Items"}, each node asked for the contents
+     * captured against its own {@code "UUID"}, the same merge the standalone vehicle path applies. The live client
+     * mount serializes with empty {@code "Items"} (the menu is a throwaway container, not the entity), so this is
+     * required, not redundant. The record holds the whole tree from its root, so the entity whose menu was opened need
+     * not be that root, and while the player rides, the record is that tree's only copy on disk. Draining the stash
+     * entry keeps the finish-time "contents not saved" warning from counting it. A merge throw is isolated and tallied,
+     * the {@link EntityContainerMerge} discipline: that node then saves valid but empty. Package-private so the
+     * entity-container tally it feeds stays testable.
+     */
+    CompoundTag foldRidingVehicleContents(CompoundTag vehicleTag) {
+        // Into a copy, because a node below the root is folded in place: the tag handed in stays exactly what
+        // the entity serialize produced, the no-mutate discipline the container sink itself keeps.
+        CompoundTag result = vehicleTag.copy();
+        for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(result).entrySet()) {
+            foldEntityContents(node.getKey(), node.getValue());
+        }
+        return result;
+    }
+
+    /** Fold the open-time contents captured against {@code uuid} into that entity's own node, in place. */
+    private void foldEntityContents(UUID uuid, CompoundTag entityTag) {
+        CompoundTag holder = entityContainerStash.remove(uuid);
+        boolean fromRetention = holder == null;
+        if (holder == null) {
+            // Reboarded without reopening: the stash drained into an earlier standalone write, but the holder
+            // was retained for exactly this, so the mount is written whole instead of being skipped.
+            //
+            // This does leave the mount on disk twice, once standalone and once under RootVehicle, under the
+            // same-UUID residency rule EntityContainerMerge.refoldFlushedContainers states in full. Both copies
+            // carry the contents, so no loot rides on which one a given load keeps. A passenger that boarded
+            // after the standalone write does: it exists only in the RootVehicle copy. Still strictly better
+            // than skipping the mount, which dropped that passenger every time.
+            holder = foldedContainerVehicles.get(uuid);
+        }
+        if (holder == null) {
+            return;
+        }
+        try {
+            // The sink returns a merged copy and sets only "Items", so a node that lives inside the record takes
+            // that one list back rather than replacing itself.
+            entityTag.put("Items", adapter.containerSink().merge(entityTag, holder).getListOrEmpty("Items"));
+            if (!fromRetention) {
+                mergedEntityContainers++; // a retained holder was already counted at the write it came from
+            }
+        } catch (RuntimeException e) {
+            entityContainersFailed++;
+            LOGGER.warn("skipping ridden vehicle {} container merge: the mount saves without its contents", uuid, e);
+        }
+    }
+
+    /**
      * The {@code LevelName} to write into level.dat: a new download uses the target's resolved name, while a resume
      * preserves the existing world's name read from the prior level.dat (null when absent or unreadable, letting the
      * writer apply its default), so re-running into a folder never renames the world it already produced.
@@ -1978,6 +2209,108 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
         }
         return null;
+    }
+
+    /**
+     * Release a prior download's parked mount as a standalone entity on a resume, so a mount the player rode in an
+     * earlier download and has since left is preserved as a world entity rather than lost. A mount ridden at a finish
+     * is a one-player vehicle the entity capture refuses, so that finish saved it only as its level.dat RootVehicle,
+     * and this resume's own level.dat replaces that record wholesale. Nothing else carries it forward.
+     *
+     * <p>Skipped when this finish already preserved that mount itself by writing it as a standalone entity.
+     *
+     * <p>Routed to the dimension the PRIOR tag records, not to the live {@link #targetDimension}: the position comes
+     * from the prior tag too, and this session can finish anywhere, so pairing prior coordinates with the current
+     * dimension would write the mount into a folder it was never in and leave the one it was parked in empty. The
+     * writer opens the named dimension's entities storage on demand exactly as it does for a session that follows the
+     * player across a portal, and this submit precedes the end-of-stream marker.
+     *
+     * <p>Fail-soft. Every exit that reaches the release proper and does not write counts, since the mount and its
+     * archived contents are then preserved nowhere this method can see. A write the writer thread then declines is
+     * outside that guarantee. Package-private so the one path carrying a prior download's mount forward stays testable;
+     * every production caller runs behind the client singleton.
+     */
+    void releaseResumedDismountedMount(AsyncSaveWriter activeWriter) {
+        if (target.mode() != DownloadMode.RESUME) {
+            return;
+        }
+        CompoundTag priorPlayer = readPriorPlayerTag();
+        if (priorPlayer == null
+                || !(priorPlayer.get("RootVehicle") instanceof CompoundTag priorRoot)
+                || !(priorRoot.get("Entity") instanceof CompoundTag priorEntity)) {
+            return;
+        }
+        // Read before this check rather than after, because whether the finish is a no-op is a question about
+        // WHICH mount the player ended on, which only the prior tag answers.
+        UUID priorMountUuid = EntityMerge.readUuid(priorEntity);
+        if (priorMountUuid != null && savedEntities.contains(priorMountUuid)) {
+            return;
+        }
+        try {
+            ResourceKey<Level> priorDimension = VanillaDimensions.forId(priorPlayer.getStringOr("Dimension", ""));
+            if (priorDimension == null) {
+                recordResumedMountLoss("its prior level.dat names no dimension this download writes");
+                return;
+            }
+            ChunkPos pos = mountEntityChunk(priorEntity);
+            if (pos == null) {
+                recordResumedMountLoss("its prior tag carries no readable position");
+                return;
+            }
+            CompoundTag envelope = adapter.entitySink().encodeChunk(List.of(priorEntity.copy()), pos);
+            if (envelope == null) {
+                recordResumedMountLoss("the entity sink refused its tag");
+                return;
+            }
+            activeWriter.submitEntity(priorDimension, pos, envelope);
+        } catch (RuntimeException e) {
+            resumedMountsLost++;
+            LOGGER.warn("could not release the resumed dismounted mount to a standalone entity; it and the "
+                    + "contents the previous download archived in it are absent from the save", e);
+        }
+    }
+
+    /** Count and surface a prior download's parked mount the release could not place (main thread). */
+    private void recordResumedMountLoss(String reason) {
+        resumedMountsLost++;
+        LOGGER.warn("could not release the resumed dismounted mount to a standalone entity: {}; it and the "
+                + "contents the previous download archived in it are absent from the save", reason);
+    }
+
+    /**
+     * The {@link ChunkPos} an entity tag's {@code "Pos"} (a three-double x, y, z list) lands in, or null when
+     * {@code "Pos"} is missing or malformed.
+     */
+    private @Nullable ChunkPos mountEntityChunk(CompoundTag entity) {
+        ListTag pos = entity.getList("Pos").orElse(null);
+        if (pos == null) {
+            return null;
+        }
+        Optional<Double> x = pos.getDouble(0);
+        Optional<Double> y = pos.getDouble(1);
+        Optional<Double> z = pos.getDouble(2);
+        if (x.isEmpty() || y.isEmpty() || z.isEmpty()) {
+            return null;
+        }
+        return new ChunkPos(new BlockPos(Mth.floor(x.get()), Mth.floor(y.get()), Mth.floor(z.get())));
+    }
+
+    /**
+     * The prior level.dat's {@code Data.Player} compound, or null when the folder is fresh, the file is unreadable, or
+     * the level.dat carries no player (fail-soft). A plain main-thread {@link NbtIo} file read, not MC-state-coupled,
+     * so the cross-queue immutability invariant holds.
+     */
+    private @Nullable CompoundTag readPriorPlayerTag() {
+        try {
+            CompoundTag data = readPriorData();
+            if (data != null && data.get("Player") instanceof CompoundTag player) {
+                return player;
+            }
+            return null;
+        } catch (IOException | RuntimeException e) {
+            LOGGER.warn("failed to read the prior level.dat player data on resume", e);
+            return null;
+        }
     }
 
     /** The prior level.dat's {@code Data} compound, or null when absent; a present but unreadable file throws. */
@@ -2291,11 +2624,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Drain one entity-chunk: build the envelope and submit it. Package-private so the write and flush-drop tallies it
-     * feeds stay testable; its only production caller is the entity flush pump.
+     * Drain one entity-chunk: build the envelope, fold in the vehicle containers, submit. Package-private so the
+     * entity-container tally it feeds stays testable; its only production caller is the entity flush pump.
      */
     void flushEntityChunk(AsyncSaveWriter activeWriter, ChunkPos pos) {
         List<CompoundTag> tags = entityBuffer.drainChunk(pos);
+        dropExcludedRootVehicles(tags); // a mount captured into RootVehicle is not also written standalone
         if (tags.isEmpty()) {
             return;
         }
@@ -2309,12 +2643,63 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 countEntityFlushDrop(tags);
                 return;
             }
+            entityContainersFailed += EntityContainerMerge.refoldFlushedContainers(adapter.containerSink(),
+                    envelope, foldedContainerVehicles, entityContainerStash).failed();
+            recordStandaloneFoldedContainers(tags);
+            MergeTally entityTally = EntityContainerMerge.mergeEntityStash(adapter.containerSink(),
+                    envelope, entityContainerStash);
+            mergedEntityContainers += entityTally.merged();
+            entityContainersFailed += entityTally.failed();
             activeWriter.submitEntity(targetDimension, pos, envelope);
             countEntitiesSubmitted(tags); // tally writes here, at successful submit, not at buffer time
         } catch (RuntimeException e) {
             LOGGER.warn("skipping {} entities for chunk {}: encode/merge failed", tags.size(), pos, e);
             countEntityFlushDrop(tags);
         }
+    }
+
+    /**
+     * Retain the holder of every container vehicle in this drained chunk whose captured contents are about to be folded
+     * into the standalone entity write, keyed by UUID, before {@code mergeEntityStash} drains the stash. A reopened
+     * menu replaces the retained holder here with its fresher capture.
+     */
+    private void recordStandaloneFoldedContainers(List<CompoundTag> tags) {
+        for (CompoundTag tag : tags) {
+            UUID uuid = EntityMerge.readUuid(tag);
+            if (uuid == null) {
+                continue;
+            }
+            CompoundTag holder = entityContainerStash.get(uuid);
+            if (holder != null) {
+                // Retain a copy rather than the holder itself: the sink aliases the list it is handed into the
+                // envelope crossing to the writer, and this retention outlives that envelope.
+                foldedContainerVehicles.put(uuid, holder.copy());
+            }
+        }
+    }
+
+    /**
+     * Drop from a drained entity-chunk any UUID captured into the player's RootVehicle this finish, so a primed or
+     * reconstructed mount is not also written standalone (a same-UUID clash on load). {@code drainChunk} returns a
+     * fresh mutable list, so the {@code removeIf} is safe; the source tally is dropped too, since a filtered mount is
+     * player-state, not a standalone write. The set is empty until finish, so mid-session flushes are untouched. A
+     * primed mount already flushed to disk before finish cannot be retracted here; that is the accepted UUID-collision
+     * residual, and it self-heals only when both copies land in one level: a mount the player rode into another
+     * dimension leaves a copy behind that no load can drop, which is a standing residual of this path rather than
+     * something it handles.
+     */
+    private void dropExcludedRootVehicles(List<CompoundTag> tags) {
+        if (excludedRootVehicleUuids.isEmpty()) {
+            return;
+        }
+        tags.removeIf(tag -> {
+            UUID uuid = EntityMerge.readUuid(tag);
+            if (uuid == null || !excludedRootVehicleUuids.contains(uuid)) {
+                return false;
+            }
+            bufferedEntitySources.remove(uuid);
+            return true;
+        });
     }
 
     /** Tally each submitted entity to its write counter by the source recorded when it was buffered. */
@@ -2592,7 +2977,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     private int failedWriteCount(int chunksFailed, int entityChunksFailed) {
         return chunksFailed + entityChunksFailed + chunksCaptureFailed + blockContainersFailed
-                + interactionCapturesLost + structuralEntitiesLost + finishStepsFailed;
+                + entityContainersFailed + containerVehiclesLost + interactionCapturesLost + structuralEntitiesLost
+                + resumedMountsLost + finishStepsFailed;
     }
 
     /** Report the background save's outcome to the player (called on the main thread, once, when it completes). */
@@ -2604,6 +2990,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // The chat figure is the distinct captured-chunk total rather than the writer's write tally, which
         // double-counts a chunk written once then re-flushed on a revisit.
         CaptureCounts counts = counts();
+        int containers = mergedEntityContainers + result.mergedContainers();
         if (config.showChatMessages()) {
             bridge.sendChat(ChatCopy.downloaded(saveName, counts.chunks(), counts.entities(), counts.containers(),
                     Wdl.elapsedMillis()));
@@ -2611,16 +2998,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     .toAbsolutePath();
             bridge.sendChat(ChatCopy.savedTo(saveName, saveFolder.toString()));
         }
-        LOGGER.info("saved {} chunks ({} new, {} re-captured, {} failed), {} entity-chunks ({} failed) to {}",
-                result.chunksWritten(), result.chunksNew(), result.chunksRecaptured(), result.chunksFailed(),
-                result.entityChunksWritten(), result.entityChunksFailed(), saveName);
+        LOGGER.info("saved {} chunks ({} new, {} re-captured, {} failed), {} entity-chunks ({} failed), "
+                + "{} containers to {}", result.chunksWritten(), result.chunksNew(), result.chunksRecaptured(),
+                result.chunksFailed(), result.entityChunksWritten(), result.entityChunksFailed(), containers,
+                saveName);
         // Every term of the partial-finish sum, so a reader can add them up and reach the verdict the completion
         // surfaces report. Logged even when each is zero: a reader who cannot tell "nothing else was lost" from
         // "this build had no such line" cannot check the clean verdict at all.
         LOGGER.info("counted capture losses for {}: {} chunk writes, {} entity-chunk writes, {} chunk captures, "
-                + "{} block containers, {} predicted interactions, {} structural entities, {} finish steps",
+                + "{} block containers, {} entity containers, {} container vehicles, {} predicted interactions, "
+                + "{} structural entities, {} resumed mounts, {} finish steps",
                 saveName, result.chunksFailed(), result.entityChunksFailed(), chunksCaptureFailed,
-                blockContainersFailed, interactionCapturesLost, structuralEntitiesLost, finishStepsFailed);
+                blockContainersFailed, entityContainersFailed, containerVehiclesLost, interactionCapturesLost,
+                structuralEntitiesLost, resumedMountsLost, finishStepsFailed);
     }
 
     /** Surface a failed save in the log, which is where the cause a player can act on lives. */
