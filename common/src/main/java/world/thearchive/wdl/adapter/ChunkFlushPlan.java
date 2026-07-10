@@ -26,7 +26,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * state, which is what lets the call sites be driven directly rather than only through a live capture session. That
  * matters more here than the arithmetic each member does: a merge has tests, and a call site that stops passing it an
  * argument, wraps it in a condition, or stops making it at all is neither a deletion nor a compile error, so nothing
- * but a test of the call site itself sees it.
+ * but a test of the call site itself sees it. Three separate defects have lived on exactly these lines with a green
+ * suite behind them.
  */
 final class ChunkFlushPlan {
     private ChunkFlushPlan() {}
@@ -69,6 +70,45 @@ final class ChunkFlushPlan {
             }
         }
         return inChunk;
+    }
+
+    /**
+     * Fold this chunk's drained holders into the freshly encoded tag. The three stashes are separate merges rather than
+     * one because each carries a different captured datum onto a different key, and a band merge that throws is
+     * isolated per stash. The merged count is returned beside the failed one that production reads, because it is what
+     * lets a test tell the three merges apart.
+     */
+    static MergeTally foldChunkStashes(CompoundTag tag, ChunkPos pos, ContainerSink containerSink,
+            LecternSink lecternSink, Map<BlockPos, CompoundTag> containers,
+            Map<BlockPos, CompoundTag> lecterns, Map<BlockPos, CompoundTag> holders) {
+        MergeTally items = ContainerMerge.mergeChunkStash(containerSink, tag, pos, containers);
+        MergeTally books = ContainerMerge.mergeLecternChunkStash(lecternSink, tag, pos, lecterns);
+        MergeTally fields = ContainerMerge.mergeHolderChunkStash(tag, pos, holders);
+        return sum(items, books, fields);
+    }
+
+    /**
+     * Fold residual container and lectern holders into a chunk already on disk, for a position whose chunk left the
+     * buffer before its holder was drained. Returns the two merges summed, so the caller reports one merged and one
+     * failed count for the rewrite.
+     */
+    static MergeTally foldResidualHolders(CompoundTag onDisk, ChunkPos pos, ContainerSink containerSink,
+            LecternSink lecternSink, Map<BlockPos, CompoundTag> containers,
+            Map<BlockPos, CompoundTag> lecterns) {
+        MergeTally items = ContainerMerge.mergeChunkStash(containerSink, onDisk, pos, containers);
+        MergeTally books = ContainerMerge.mergeLecternChunkStash(lecternSink, onDisk, pos, lecterns);
+        return sum(items, books);
+    }
+
+    /** Add the tallies componentwise. */
+    private static MergeTally sum(MergeTally... tallies) {
+        int merged = 0;
+        int failed = 0;
+        for (MergeTally tally : tallies) {
+            merged += tally.merged();
+            failed += tally.failed();
+        }
+        return new MergeTally(merged, failed);
     }
 
     /**
@@ -126,10 +166,14 @@ final class ChunkFlushPlan {
         return occupancy;
     }
 
-    /** The distinct chunks the given holder positions fall in, each listed once. */
-    static Set<ChunkPos> residualHolderChunks(Set<BlockPos> containerPositions) {
+    /** The distinct chunks the given container and lectern holder positions fall in, each listed once. */
+    static Set<ChunkPos> residualHolderChunks(Set<BlockPos> containerPositions,
+            Set<BlockPos> lecternPositions) {
         Set<ChunkPos> chunks = new LinkedHashSet<>();
         for (BlockPos pos : containerPositions) {
+            chunks.add(new ChunkPos(pos));
+        }
+        for (BlockPos pos : lecternPositions) {
             chunks.add(new ChunkPos(pos));
         }
         return chunks;

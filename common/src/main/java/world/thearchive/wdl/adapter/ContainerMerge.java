@@ -17,9 +17,11 @@ import org.slf4j.Logger;
 /**
  * Merges captured open-time block-entity data into the matching captured block-entity tag, keyed by {@link BlockPos},
  * with per-entry failure isolation that mirrors {@link RegionChunkWriter}: a merge that throws is logged and skipped so
- * one bad entry can never abort the whole save. The locator is the block entity's own {@code x/y/z} metadata:
- * {@link #mergeChunkStash} writes container {@code "Items"} plus the whitelisted open-time state keys onto the block
- * entity it finds there. The streaming capture calls it per chunk, just before that chunk is flushed to disk.
+ * one bad entry can never abort the whole save. Several axes share the {@code x/y/z} locator: {@link #mergeChunkStash}
+ * writes container {@code "Items"} plus the whitelisted open-time state keys, {@link #mergeLecternChunkStash} writes
+ * lectern {@code "Book"}/{@code "Page"}, and {@link #mergeHolderChunkStash} copies an interaction-predicted holder's
+ * own keys (a jukebox disc's {@code "RecordItem"}, a beehive's {@code "bees"}) onto its block entity. The streaming
+ * capture calls each per chunk, just before that chunk is flushed to disk.
  *
  * <p>Portable across the <em>post-1.18</em> chunk format: the flat {@code "block_entities"} list and a block entity's
  * {@code x/y/z} metadata are vanilla-stable there, so only the per-band {@code "Items"} serialization (behind
@@ -69,9 +71,47 @@ final class ContainerMerge {
     }
 
     /**
+     * The lectern sibling of {@link #mergeChunkStash}: merge (and drain) just the lectern-book stash entries located in
+     * {@code pos}'s chunk into {@code chunkTag}, setting {@code "Book"}/{@code "Page"} on the matching lectern block
+     * entity. Same {@code x/y/z} locator, per-entry isolation, and drain semantics; a lectern BE and any container BE
+     * are distinct entities, so the two merges never interfere.
+     */
+    static MergeTally mergeLecternChunkStash(LecternSink sink, CompoundTag chunkTag, ChunkPos pos,
+            Map<BlockPos, CompoundTag> stash) {
+        return mergeStashWith(sink::merge, chunkTag, pos, stash);
+    }
+
+    /**
+     * The interaction-predicted sibling of {@link #mergeChunkStash}: copy each stash holder's own keys (a jukebox
+     * disc's {@code "RecordItem"}, a beehive's {@code "bees"}) onto the matching block entity in {@code pos}'s chunk.
+     * Band-stable: a plain copy of the keys the holder already carries with no per-band sink, since each was encoded
+     * with the public codec. One method serves every single-key content type.
+     */
+    static MergeTally mergeHolderChunkStash(CompoundTag chunkTag, ChunkPos pos, Map<BlockPos, CompoundTag> stash) {
+        return mergeStashWith(ContainerMerge::mergeHolderFields, chunkTag, pos, stash);
+    }
+
+    /**
+     * Copy every key {@code holder} carries onto a copy of {@code blockEntityTag}, leaving its other fields intact (the
+     * {@link ContainerSink#merge} no-clobber discipline). Uses only the band-stable {@code get}/{@code put}/
+     * {@code copy} NBT ops, so the interaction holder writes need no per-band sink. An empty holder leaves the block
+     * entity unchanged (fail-soft).
+     */
+    private static CompoundTag mergeHolderFields(CompoundTag blockEntityTag, CompoundTag holder) {
+        CompoundTag merged = blockEntityTag.copy();
+        for (String key : holder.keySet()) {
+            Tag value = holder.get(key);
+            if (value != null) {
+                merged.put(key, value);
+            }
+        }
+        return merged;
+    }
+
+    /**
      * The shared locator: walk {@code stash}, and for every entry in {@code pos}'s chunk, drain it and apply
-     * {@code merge} to the matching captured block entity. Independent of <em>what</em> the merge writes, so the loop
-     * is verified once and reused by every axis that shares the locator.
+     * {@code merge} to the matching captured block entity. Independent of <em>what</em> the merge writes
+     * ({@code "Items"} vs {@code "Book"}/{@code "Page"}), so both axes share the verified loop.
      */
     private static MergeTally mergeStashWith(BiFunction<CompoundTag, CompoundTag, CompoundTag> merge,
             CompoundTag chunkTag, ChunkPos pos, Map<BlockPos, CompoundTag> stash) {
