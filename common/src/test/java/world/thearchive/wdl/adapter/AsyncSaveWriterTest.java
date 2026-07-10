@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
+import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPosOrNull;
 
 import java.io.IOException;
@@ -48,6 +49,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.testsupport.EntityFixtures;
@@ -55,9 +57,9 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The off-main-thread save writer drained against a real {@link SimpleRegionStorage}: chunk encode thunks submitted
- * from the (test) main thread are resolved on the writer's own thread, the finalizer (the level.dat stand-in) runs
- * there too, and the completion future reports the per-target tallies. This is the headless half of the
+ * The off-main-thread save writer drained against a real {@link SimpleRegionStorage}: chunk encode-and-fold thunks
+ * submitted from the (test) main thread are resolved on the writer's own thread, the finalizer (the level.dat stand-in)
+ * runs there too, and the completion future reports the per-target tallies. This is the headless half of the
  * no-render-freeze contract; the live freeze itself is not exercised headless.
  */
 class AsyncSaveWriterTest {
@@ -626,6 +628,44 @@ class AsyncSaveWriterTest {
     }
 
     @Test
+    void theWriterThreadFoldMergesLecternBookIntoTheChunk(@TempDir Path save) throws Exception {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        Path region = Files.createDirectories(save.resolve("region"));
+        LecternSink sink = new LecternSinkImpl();
+
+        AsyncSaveWriter writer = new AsyncSaveWriter(
+                dimension -> storage(region, "chunk"),
+                dimension -> {
+                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
+                },
+                () -> {},
+                (chunksFailed, entityChunksFailed) -> {},
+                () -> null,
+                () -> {}, new SaveProgress());
+
+        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
+                List.of(blockEntity("minecraft:lectern", 3, 64, 3)));
+        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        holders.put(new BlockPos(3, 64, 3), sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 4, registries));
+
+        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+            CompoundTag tag = codec.encode(snapshot, registries, false);
+            ContainerMerge.mergeLecternChunkStash(sink, tag, new ChunkPos(0, 0), holders);
+            return tag;
+        }, ChunkMerge::merge);
+        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
+
+        assertFalse(result.failed());
+        try (SimpleRegionStorage in = storage(region, "chunk")) {
+            CompoundTag back = in.read(new ChunkPos(0, 0)).join().orElseThrow();
+            CompoundTag lectern = findByPosOrNull(back, 3, 64, 3);
+            assertNotNull(lectern, "the lectern block entity is on disk");
+            assertTrue(lectern.getCompoundOrEmpty("Book").contains("id"), "the writer-thread fold merged the Book");
+            assertEquals(4, lectern.getIntOr("Page", -1), "and its Page");
+        }
+    }
+
+    @Test
     void preflightRunsBeforeAnyChunkReachesStorage(@TempDir Path save) throws Exception {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
@@ -794,6 +834,56 @@ class AsyncSaveWriterTest {
         assertTrue(result.failed(), "the finalizer failure aborts the save");
         assertFalse(outputsRan.get(), "a failed save is never zipped or sized (the export + size outputs are skipped)");
         assertNull(result.zipFileName(), "a failed save reports no zip name");
+    }
+
+    @Test
+    void resumeScanReportsThePriorOnDiskChunkToTheObserver(@TempDir Path save) throws Exception {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        Path region = Files.createDirectories(save.resolve("region"));
+        ContainerSink sink = new ContainerSinkImpl();
+
+        // Prior session: write a chunk carrying a filled chest to disk.
+        AsyncSaveWriter first = new AsyncSaveWriter(
+                dimension -> storage(region, "chunk"),
+                dimension -> {
+                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
+                },
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
+                List.of(blockEntity("minecraft:chest", 2, 64, 2)));
+        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
+        items.set(0, new ItemStack(Items.DIAMOND, 5));
+        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        holders.put(new BlockPos(2, 64, 2), sink.captureItems(items, registries));
+        first.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+            CompoundTag tag = codec.encode(snapshot, registries, false);
+            ContainerMerge.mergeChunkStash(sink, tag, new ChunkPos(0, 0), holders);
+            return tag;
+        }, ChunkMerge::merge);
+        assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
+
+        // Resume: a read-only scan hands the prior on-disk chunk and its dimension to the observer, without writing.
+        AtomicReference<ResourceKey<Level>> observedDimension = new AtomicReference<>();
+        AtomicReference<CompoundTag> observed = new AtomicReference<>();
+        AsyncSaveWriter second = new AsyncSaveWriter(
+                dimension -> storage(region, "chunk"),
+                dimension -> {
+                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
+                },
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+        second.observeResumeReads((dimension, onDisk) -> {
+            observedDimension.set(dimension);
+            observed.set(onDisk);
+        });
+        second.submitResumeScan(Level.OVERWORLD, new ChunkPos(0, 0));
+        assertFalse(second.finish().get(30, TimeUnit.SECONDS).failed());
+
+        assertEquals(Level.OVERWORLD, observedDimension.get(), "the scan reported the chunk's dimension");
+        CompoundTag onDisk = observed.get();
+        assertNotNull(onDisk, "the scan handed the prior on-disk chunk to the observer");
+        CompoundTag chest = findByPosOrNull(onDisk, 2, 64, 2);
+        assertNotNull(chest, "the observer saw the prior chest block entity");
+        assertFalse(chest.getListOrEmpty("Items").isEmpty(), "the prior chest carries the captured Items");
     }
 
     @Test
@@ -1044,15 +1134,9 @@ class AsyncSaveWriterTest {
     void aChunkPreservedWhenTheReadFailsIsCountedLost(@TempDir Path save) throws Exception {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
-        CompoundTag prior = codec.encode(SyntheticChunks.full(registries, true), registries, false);
-        try (SimpleRegionStorage seed = storage(region, "chunk")) {
-            seed.write(new ChunkPos(0, 0), prior).join();
-            seed.synchronize(true).join();
-        }
-        CompoundTag onDiskBefore;
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
-            onDiskBefore = in.read(new ChunkPos(0, 0)).join().orElseThrow();
-        }
+        List<BlockPos> chests = List.of(new BlockPos(2, 64, 2));
+        ChunkSnapshotSource snapshot = chunkWithChests(registries, chests);
+        writeOpenedChests(region, registries, snapshot, chests);
 
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -1067,7 +1151,7 @@ class AsyncSaveWriterTest {
                 new SaveProgress());
 
         writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, false), registries, false), ChunkMerge::merge);
+                () -> codec.encode(snapshot, registries, false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(1, result.chunksFailed(), "the capture never reached the save, so it counts like a failure");
@@ -1075,8 +1159,8 @@ class AsyncSaveWriterTest {
         assertEquals(1, finalizedChunksFailed.get(),
                 "the finalize sees it too, so the completion record cannot stamp this download clean");
         try (SimpleRegionStorage in = storage(region, "chunk")) {
-            assertEquals(onDiskBefore, in.read(new ChunkPos(0, 0)).join().orElseThrow(),
-                    "the prior the writer refused to overwrite is still on disk, unchanged");
+            assertEquals(Items.DIAMOND, firstItemOf(in, registries, new ChunkPos(0, 0), 2, 64, 2).getItem(),
+                    "the prior the writer refused to overwrite is still on disk");
         }
     }
 
@@ -1148,6 +1232,115 @@ class AsyncSaveWriterTest {
     }
 
     /**
+     * Both read-merges carry the prior forward in place, one block entity or one entity at a time, so a merge that
+     * throws part-way leaves the fresh tag holding some of the prior's captured content and none of the rest. Writing
+     * that tag lands a copy the merge stopped filling and counts it a clean re-captured write.
+     */
+    @Test
+    void aChunkWhoseCarryForwardThrowsPartWayKeepsTheWholeOnDiskCopy(@TempDir Path save) throws Exception {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        Path region = Files.createDirectories(save.resolve("region"));
+        BlockPos carried = new BlockPos(2, 64, 2);
+        BlockPos unreached = new BlockPos(3, 64, 3);
+        List<BlockPos> chests = List.of(carried, unreached);
+        ChunkSnapshotSource snapshot = chunkWithChests(registries, chests);
+        writeOpenedChests(region, registries, snapshot, chests);
+
+        AtomicBoolean merged = new AtomicBoolean(false);
+        AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
+        AsyncSaveWriter writer = new AsyncSaveWriter(
+                dimension -> storage(region, "chunk"),
+                dimension -> {
+                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
+                },
+                () -> {},
+                (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
+                () -> null,
+                () -> {},
+                new SaveProgress());
+        // Reaching one chest and then throwing is the state the real merges leave, since both carry in place.
+        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(snapshot, registries, false),
+                (onDisk, fresh) -> {
+                    merged.set(true);
+                    findByPos(fresh, carried.getX(), carried.getY(), carried.getZ()).put("Items",
+                            findByPos(onDisk, carried.getX(), carried.getY(), carried.getZ())
+                                    .getListOrEmpty("Items").copy());
+                    throw new IllegalStateException("a carry-forward that throws part-way through the chunk");
+                });
+        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
+
+        assertTrue(merged.get(), "the arm under test is the merge arm, so the injected carry-forward must have run");
+        try (SimpleRegionStorage in = storage(region, "chunk")) {
+            // Only the unreached chest can show this. The carried one holds the stack either way, because the
+            // merge copied it into the fresh tag before throwing, so asserting on it would prove nothing.
+            assertEquals(Items.DIAMOND, firstItemOf(in, registries, new ChunkPos(0, 0), unreached.getX(),
+                    unreached.getY(), unreached.getZ()).getItem(),
+                    "the chest the carry-forward never reached kept its contents, so no partial tag was written");
+        }
+        assertEquals(0, result.chunksWritten(), "the half-merged tag was not written");
+        assertEquals(1, result.chunksFailed(), "and the capture that went nowhere is counted lost");
+        assertEquals(1, finalizedChunksFailed.get(),
+                "so the completion record cannot stamp this download clean");
+    }
+
+    /** A chunk snapshot carrying an empty chest block entity at each of {@code chests}. */
+    private static ChunkSnapshotSource chunkWithChests(RegistryAccess.Frozen registries, List<BlockPos> chests) {
+        List<CompoundTag> blockEntities = new ArrayList<>();
+        for (BlockPos chest : chests) {
+            blockEntities.add(blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()));
+        }
+        return SyntheticChunks.fullWithBlockEntities(registries, true, blockEntities);
+    }
+
+    /**
+     * Land {@code snapshot} in {@code region} with every chest opened and holding one stack. Asserts both properties
+     * the cases built on it rest on: the stack reached the region file, and a fresh encode of the same snapshot does
+     * not carry it, so a revisit re-captures the chests empty.
+     */
+    private void writeOpenedChests(Path region, RegistryAccess.Frozen registries, ChunkSnapshotSource snapshot,
+            List<BlockPos> chests) throws Exception {
+        ContainerSink sink = new ContainerSinkImpl();
+        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
+        items.set(0, new ItemStack(Items.DIAMOND, 5));
+        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        for (BlockPos chest : chests) {
+            holders.put(chest, sink.captureItems(items, registries));
+        }
+        AsyncSaveWriter writer = newWriter(region);
+        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+            CompoundTag tag = codec.encode(snapshot, registries, false);
+            ContainerMerge.mergeChunkStash(sink, tag, new ChunkPos(0, 0), holders);
+            return tag;
+        }, ChunkMerge::merge);
+        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed());
+        CompoundTag revisit = codec.encode(snapshot, registries, false);
+        try (SimpleRegionStorage in = storage(region, "chunk")) {
+            for (BlockPos chest : chests) {
+                assertEquals(Items.DIAMOND, firstItemOf(in, registries, new ChunkPos(0, 0), chest.getX(),
+                        chest.getY(), chest.getZ()).getItem(),
+                        "the prior session's stack reached the region file at " + chest);
+                assertTrue(findByPos(revisit, chest.getX(), chest.getY(), chest.getZ())
+                        .getListOrEmpty("Items").isEmpty(),
+                        "the fold must not write back into the snapshot at " + chest + ", or a revisit would "
+                                + "re-capture the prior's contents and every on-disk assertion here is vacuous");
+            }
+        }
+    }
+
+    /** Slot 0 of the block entity saved at {@code x/y/z} in {@code pos}'s on-disk chunk. */
+    private static ItemStack firstItemOf(SimpleRegionStorage storage, RegistryAccess registries, ChunkPos pos,
+            int x, int y, int z) {
+        CompoundTag chunk = storage.read(pos).join().orElseThrow();
+        CompoundTag blockEntity = findByPosOrNull(chunk, x, y, z);
+        assertNotNull(blockEntity, "no block entity at " + x + "/" + y + "/" + z + " in " + pos);
+        NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
+        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntity),
+                decoded);
+        return decoded.get(0);
+    }
+
+    /**
      * The flush is the last step before the level.dat write, and vanilla's is a channel force. Letting a failure
      * through would cost the folder its level.dat and leave a world that does not open at all, which is a far worse
      * trade than the durability doubt a failed force leaves. Nothing is counted for it, and that is the other half of
@@ -1194,8 +1387,10 @@ class AsyncSaveWriterTest {
 
     @Test
     void theWriterAppliesTheReadMergeEachSubmitSupplied(@TempDir Path save) throws Exception {
-        // Every other case here passes the same merge, so none of them would notice the writer ignoring the one
-        // each submit supplied and applying a fixed merge of its own instead.
+        // Every other case here passes the same merge the writer used to hardcode, so none of them would notice
+        // the per-chunk merge being ignored. Production's only merge is a closure built per chunk, carrying the
+        // bookshelf occupancy and the open-time positions; if it were dropped the carry-forward would silently
+        // fall back to its unknown-everything behavior and no test would move.
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         int[] applied = { 0 };

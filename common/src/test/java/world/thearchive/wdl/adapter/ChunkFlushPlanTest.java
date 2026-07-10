@@ -31,6 +31,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
@@ -39,19 +40,25 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The guard for the per-chunk flush wiring: the arguments a flushed chunk reads off its snapshot and hands to the
  * writer, and the merges the writer thunks apply.
  *
- * <p>These call sites are where a defect can live with the whole suite green, because a merge that has good tests
- * proves nothing about whether production still calls it, calls it with the arguments that make it chunk-specific, or
- * calls it at all. Each case here drives the wiring and asserts the artifact, so reverting a line to the version that
- * preceded it turns one red.
+ * <p>These call sites are where three separate defects have lived with the whole suite green, because a merge that has
+ * good tests proves nothing about whether production still calls it, calls it with the arguments that make it
+ * chunk-specific, or calls it at all. Each case here drives the wiring and asserts the artifact, so reverting a line to
+ * the version that preceded it turns one red.
  */
 class ChunkFlushPlanTest {
     private static RegistryAccess registries;
 
     private final ContainerSink containerSink = new ContainerSinkImpl();
+    private final LecternSink lecternSink = new LecternSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
         registries = TestRegistries.frozen();
+    }
+
+    /** Built on demand, never as a static initializer: ChunkPos static init needs the vanilla bootstrap. */
+    private static ChunkPos origin() {
+        return new ChunkPos(0, 0);
     }
 
     private static CompoundTag bookshelf(int x, int y, int z, int... slots) {
@@ -74,6 +81,37 @@ class ChunkFlushPlanTest {
         items.set(0, ItemFixtures.stack(itemId));
         return containerSink.captureItems(items, registries);
     }
+
+    private static Map<BlockPos, CompoundTag> stash(BlockPos pos, CompoundTag holder) {
+        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        stash.put(pos, holder);
+        return stash;
+    }
+
+    /** A sink whose merge throws, the band-merge failure the fold has to isolate and count. */
+    private static final ContainerSink THROWING_CONTAINER_SINK = new ContainerSink() {
+        @Override
+        public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
+            throw new AssertionError("the failure path never serializes items");
+        }
+
+        @Override
+        public CompoundTag merge(CompoundTag blockEntityTag, CompoundTag capturedItemsHolder) {
+            throw new IllegalStateException("a band container merge blew up");
+        }
+    };
+
+    private static final LecternSink THROWING_LECTERN_SINK = new LecternSink() {
+        @Override
+        public CompoundTag captureBook(ItemStack book, int page, RegistryAccess registries) {
+            throw new AssertionError("the failure path never serializes a book");
+        }
+
+        @Override
+        public CompoundTag merge(CompoundTag blockEntityTag, CompoundTag capturedBookHolder) {
+            throw new IllegalStateException("a band lectern merge blew up");
+        }
+    };
 
     @Test
     void theReadMergeHonorsTheBookshelfOccupancyItWasBuiltWith() {
@@ -194,6 +232,88 @@ class ChunkFlushPlanTest {
         tag.putIntArray("disabled_slots", disabledSlots);
         tag.putInt("triggered", triggered);
         return tag;
+    }
+
+    @Test
+    void foldChunkStashesMergesEveryStashOntoItsOwnBlockEntity() {
+        CompoundTag chunkTag = chunkTagWith(
+                blockEntity("minecraft:chest", 1, 64, 1),
+                blockEntity("minecraft:lectern", 2, 64, 2));
+
+        Map<BlockPos, CompoundTag> containers = stash(new BlockPos(1, 64, 1), itemsHolder("minecraft:diamond"));
+        Map<BlockPos, CompoundTag> lecterns = stash(new BlockPos(2, 64, 2),
+                lecternSink.captureBook(ItemFixtures.writtenBook(2), 1, registries));
+
+        MergeTally tally = ChunkFlushPlan.foldChunkStashes(chunkTag, origin(), containerSink, lecternSink,
+                containers, lecterns, Map.of());
+
+        assertEquals(2, tally.merged(), "each stash folded its own block entity");
+        assertEquals(0, tally.failed());
+        assertFalse(findByPos(chunkTag, 1, 64, 1).getListOrEmpty("Items").isEmpty(), "the chest gained its items");
+        assertTrue(findByPos(chunkTag, 2, 64, 2).contains("Book"), "the lectern gained its book");
+        assertTrue(containers.isEmpty() && lecterns.isEmpty(),
+                "and every stash is drained, since the chunk is leaving memory");
+    }
+
+    @Test
+    void foldChunkStashesCountsEveryThrowingBandMergeAsFailed() {
+        CompoundTag chunkTag = chunkTagWith(
+                blockEntity("minecraft:chest", 1, 64, 1),
+                blockEntity("minecraft:lectern", 2, 64, 2));
+
+        MergeTally tally = ChunkFlushPlan.foldChunkStashes(chunkTag, origin(), THROWING_CONTAINER_SINK,
+                THROWING_LECTERN_SINK,
+                stash(new BlockPos(1, 64, 1), new CompoundTag()),
+                stash(new BlockPos(2, 64, 2), new CompoundTag()),
+                Map.of());
+
+        assertEquals(2, tally.failed(), "both throwing band merges are counted, not just the first");
+        assertEquals(0, tally.merged());
+    }
+
+    @Test
+    void foldChunkStashesLeavesAnotherChunksEntriesForItsOwnFlush() {
+        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:chest", 1, 64, 1));
+        Map<BlockPos, CompoundTag> containers = stash(new BlockPos(100, 64, 100),
+                itemsHolder("minecraft:diamond"));
+
+        MergeTally tally = ChunkFlushPlan.foldChunkStashes(chunkTag, origin(), containerSink, lecternSink,
+                containers, Map.of(), Map.of());
+
+        assertEquals(0, tally.merged());
+        assertFalse(containers.isEmpty(), "a holder in another chunk waits for that chunk's own flush");
+    }
+
+    @Test
+    void foldResidualHoldersSumsBothMergesOntoTheOnDiskChunk() {
+        CompoundTag onDisk = chunkTagWith(
+                blockEntity("minecraft:chest", 1, 64, 1),
+                blockEntity("minecraft:lectern", 2, 64, 2));
+
+        MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, origin(), containerSink, lecternSink,
+                stash(new BlockPos(1, 64, 1), itemsHolder("minecraft:diamond")),
+                stash(new BlockPos(2, 64, 2),
+                        lecternSink.captureBook(ItemFixtures.writtenBook(2), 1, registries)));
+
+        assertEquals(2, tally.merged(), "both the container and the lectern rewrite land");
+        assertEquals(0, tally.failed());
+        assertFalse(findByPos(onDisk, 1, 64, 1).getListOrEmpty("Items").isEmpty());
+        assertTrue(findByPos(onDisk, 2, 64, 2).contains("Book"));
+    }
+
+    @Test
+    void foldResidualHoldersCountsEveryThrowingBandMergeAsFailed() {
+        CompoundTag onDisk = chunkTagWith(
+                blockEntity("minecraft:chest", 1, 64, 1),
+                blockEntity("minecraft:lectern", 2, 64, 2));
+
+        MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, origin(), THROWING_CONTAINER_SINK,
+                THROWING_LECTERN_SINK,
+                stash(new BlockPos(1, 64, 1), new CompoundTag()),
+                stash(new BlockPos(2, 64, 2), new CompoundTag()));
+
+        assertEquals(2, tally.failed(), "both throwing merges are counted, not just the first");
+        assertEquals(0, tally.merged());
     }
 
     @Test

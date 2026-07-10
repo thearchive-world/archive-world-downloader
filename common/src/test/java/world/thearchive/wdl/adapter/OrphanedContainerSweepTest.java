@@ -40,17 +40,19 @@ import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The orphaned open-time container loss: a container opened in a chunk that had already left the keep-hot buffer is
- * stashed by block pos, but the per-chunk flush only ever drains the still-buffered chunks, and the chunk is never
- * re-buffered (the allCaptured skip), so its captured contents were silently dropped. The trigger is the normal way a
- * storage base is downloaded: backtracking through chunks already flown past. The fix folds each such residual holder
- * into its on-disk chunk through a writer-thread read-modify-write ({@link AsyncSaveWriter#submitChunkRewrite} over
- * {@link RegionChunkWriter#rewriteExisting}), reusing the {@link ContainerMerge} fold.
+ * The orphaned open-time container and lectern loss: a container or lectern opened in a chunk that had already left the
+ * keep-hot buffer is stashed by block pos, but the per-chunk flush only ever drains the still-buffered chunks, and the
+ * chunk is never re-buffered (the allCaptured skip), so its captured contents were silently dropped. The trigger is the
+ * normal way a storage base is downloaded: backtracking through chunks already flown past. The fix folds each such
+ * residual holder into its on-disk chunk through a writer-thread read-modify-write
+ * ({@link AsyncSaveWriter#submitChunkRewrite} over {@link RegionChunkWriter#rewriteExisting}), reusing the
+ * {@link ContainerMerge} fold.
  *
  * <p>These headless tests drive the real writer against a real {@link SimpleRegionStorage}, the seam the fix lives at:
  * a chunk is flushed to disk carrying an empty container (the flushed-empty orphaned state a backtrack-and-open lands
@@ -154,6 +156,34 @@ class OrphanedContainerSweepTest {
     }
 
     @Test
+    void orphanedLecternBookIsFoldedOntoTheFlushedOnDiskLectern(@TempDir Path save) throws Exception {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        Path region = Files.createDirectories(save.resolve("region"));
+        LecternSink sink = new LecternSinkImpl();
+        ChunkPos chunk = new ChunkPos(0, 0);
+        BlockPos lecternPos = new BlockPos(3, 64, 3);
+
+        flushEmptyChunk(region, chunk, registries, List.of(blockEntity("minecraft:lectern", 3, 64, 3)));
+
+        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        holders.put(lecternPos, sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 7, registries));
+
+        AsyncSaveWriter sweep = regionWriter(region);
+        sweep.submitChunkRewrite(Level.OVERWORLD, chunk,
+                onDisk -> ContainerMerge.mergeLecternChunkStash(sink, onDisk, chunk, holders).merged());
+        assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
+
+        try (SimpleRegionStorage in = storage(region)) {
+            CompoundTag back = in.read(chunk).join().orElseThrow(() -> new AssertionError("chunk missing on disk"));
+            CompoundTag lectern = blockEntityAt(back, 3, 64, 3);
+            assertNotNull(lectern, "the lectern block entity is on disk");
+            assertEquals("minecraft:writable_book", lectern.getCompoundOrEmpty("Book").getStringOr("id", ""),
+                    "the orphaned lectern book reached the on-disk lectern with its item identity");
+            assertEquals(7, lectern.getIntOr("Page", -1), "and its reading page");
+        }
+    }
+
+    @Test
     void bothOrphanedDoubleChestHalvesInSeparateChunksAreRecovered(@TempDir Path save) throws Exception {
         // A double chest straddling a chunk boundary keys each half by its own pos into its own chunk (the split
         // anomaly: the server sends both halves together, so one half saved and one lost is a mod-side loss). When
@@ -243,17 +273,20 @@ class OrphanedContainerSweepTest {
     }
 
     @Test
-    void residualHolderChunksGroupsTheContainerStashByChunkListingEachOnce() {
-        // The orphan-selection reduction the session sweep runs over its container stash: several holders sharing a
-        // chunk collapse to a single rewrite target.
+    void residualHolderChunksGroupsBothStashesByChunkListingEachOnce() {
+        // The orphan-selection reduction the session sweep runs over its two stashes: both stashes contribute, and
+        // several holders sharing a chunk collapse to a single rewrite target.
         Set<BlockPos> containers = new LinkedHashSet<>(List.of(
                 new BlockPos(2, 64, 2),     // chunk (0,0)
                 new BlockPos(15, 70, 15),   // chunk (0,0) too
                 new BlockPos(16, 64, 3)));  // chunk (1,0)
+        Set<BlockPos> lecterns = new LinkedHashSet<>(List.of(
+                new BlockPos(1, 65, 1),     // chunk (0,0)
+                new BlockPos(40, 64, 8)));  // chunk (2,0)
 
-        Set<ChunkPos> chunks = ChunkFlushPlan.residualHolderChunks(containers);
+        Set<ChunkPos> chunks = ChunkFlushPlan.residualHolderChunks(containers, lecterns);
 
-        assertEquals(Set.of(new ChunkPos(0, 0), new ChunkPos(1, 0)), chunks,
-                "holders sharing a chunk collapse to one target");
+        assertEquals(Set.of(new ChunkPos(0, 0), new ChunkPos(1, 0), new ChunkPos(2, 0)), chunks,
+                "both stashes contribute and holders sharing a chunk collapse to one target");
     }
 }
