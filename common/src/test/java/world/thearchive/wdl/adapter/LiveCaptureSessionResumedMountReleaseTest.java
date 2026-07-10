@@ -418,6 +418,11 @@ class LiveCaptureSessionResumedMountReleaseTest {
         }
 
         @Override
+        public LecternSink lecternSink() {
+            return real.lecternSink();
+        }
+
+        @Override
         public LevelDataWriter levelDataWriter() {
             return real.levelDataWriter();
         }
