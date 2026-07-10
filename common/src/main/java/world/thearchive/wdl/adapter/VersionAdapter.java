@@ -6,9 +6,9 @@ package world.thearchive.wdl.adapter;
 import java.nio.file.Path;
 
 /**
- * The per-era-band Service Provider Interface: aggregates the five active version-specific axes the loader-agnostic
- * core orchestrates over. Exactly one implementation is registered per branch (via {@code META-INF/services}) and
- * resolved through {@link java.util.ServiceLoader}.
+ * The per-era-band Service Provider Interface: aggregates the six active version-specific axes the loader-agnostic core
+ * orchestrates over. Exactly one implementation is registered per branch (via {@code META-INF/services}) and resolved
+ * through {@link java.util.ServiceLoader}.
  *
  * <p>{@code BlockStateModel} and a per-band world-height axis are intentionally absent from the active SPI: each stays
  * dormant until a deferred deep band needs it (the Flattening band &le;1.12.2, and the pre-1.18 fixed-height bands,
@@ -21,6 +21,8 @@ public interface VersionAdapter {
     EntitySink entitySink();
 
     ContainerSink containerSink();
+
+    LecternSink lecternSink();
 
     LevelDataWriter levelDataWriter();
 
