@@ -82,6 +82,12 @@ class ChunkFlushPlanTest {
         return containerSink.captureItems(items, registries);
     }
 
+    private static CompoundTag discHolder(String discId) {
+        CompoundTag holder = new CompoundTag();
+        holder.put("RecordItem", ItemFixtures.itemTag(discId));
+        return holder;
+    }
+
     private static Map<BlockPos, CompoundTag> stash(BlockPos pos, CompoundTag holder) {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(pos, holder);
@@ -238,20 +244,23 @@ class ChunkFlushPlanTest {
     void foldChunkStashesMergesEveryStashOntoItsOwnBlockEntity() {
         CompoundTag chunkTag = chunkTagWith(
                 blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:lectern", 2, 64, 2));
+                blockEntity("minecraft:lectern", 2, 64, 2),
+                blockEntity("minecraft:jukebox", 3, 64, 3));
 
         Map<BlockPos, CompoundTag> containers = stash(new BlockPos(1, 64, 1), itemsHolder("minecraft:diamond"));
         Map<BlockPos, CompoundTag> lecterns = stash(new BlockPos(2, 64, 2),
                 lecternSink.captureBook(ItemFixtures.writtenBook(2), 1, registries));
+        Map<BlockPos, CompoundTag> holders = stash(new BlockPos(3, 64, 3), discHolder("minecraft:music_disc_cat"));
 
         MergeTally tally = ChunkFlushPlan.foldChunkStashes(chunkTag, origin(), containerSink, lecternSink,
-                containers, lecterns, Map.of());
+                containers, lecterns, holders);
 
-        assertEquals(2, tally.merged(), "each stash folded its own block entity");
+        assertEquals(3, tally.merged(), "each of the three stashes folded its own block entity");
         assertEquals(0, tally.failed());
         assertFalse(findByPos(chunkTag, 1, 64, 1).getListOrEmpty("Items").isEmpty(), "the chest gained its items");
         assertTrue(findByPos(chunkTag, 2, 64, 2).contains("Book"), "the lectern gained its book");
-        assertTrue(containers.isEmpty() && lecterns.isEmpty(),
+        assertTrue(findByPos(chunkTag, 3, 64, 3).contains("RecordItem"), "the jukebox gained its disc");
+        assertTrue(containers.isEmpty() && lecterns.isEmpty() && holders.isEmpty(),
                 "and every stash is drained, since the chunk is leaving memory");
     }
 
@@ -259,16 +268,17 @@ class ChunkFlushPlanTest {
     void foldChunkStashesCountsEveryThrowingBandMergeAsFailed() {
         CompoundTag chunkTag = chunkTagWith(
                 blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:lectern", 2, 64, 2));
+                blockEntity("minecraft:lectern", 2, 64, 2),
+                blockEntity("minecraft:jukebox", 3, 64, 3));
 
         MergeTally tally = ChunkFlushPlan.foldChunkStashes(chunkTag, origin(), THROWING_CONTAINER_SINK,
                 THROWING_LECTERN_SINK,
                 stash(new BlockPos(1, 64, 1), new CompoundTag()),
                 stash(new BlockPos(2, 64, 2), new CompoundTag()),
-                Map.of());
+                stash(new BlockPos(3, 64, 3), discHolder("minecraft:music_disc_cat")));
 
         assertEquals(2, tally.failed(), "both throwing band merges are counted, not just the first");
-        assertEquals(0, tally.merged());
+        assertEquals(1, tally.merged(), "and the holder fold beside them still lands");
     }
 
     @Test
