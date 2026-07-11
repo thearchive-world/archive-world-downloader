@@ -13,7 +13,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -31,6 +33,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
+import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.adapter.impl.WorldPathsImpl;
 import world.thearchive.wdl.testsupport.BlockEntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
@@ -48,6 +52,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  */
 class RegionIntegrationTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
+    private final ContainerSink containerSink = new ContainerSinkImpl();
+    private final LecternSink lecternSink = new LecternSinkImpl();
 
     private static SimpleRegionStorage storage(WorldPaths paths, Path regionDirectory) {
         return new SimpleRegionStorage(
@@ -220,6 +226,53 @@ class RegionIntegrationTest {
             CompoundTag back = in.read(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
             assertEquals(1, findByPos(back, 4, 64, 9).getListOrEmpty("Items").size(),
                     "a chunk the player walked past again must not lose the chest an earlier flush archived");
+        }
+    }
+
+    /**
+     * The opened half, and the reason it cannot be told from a plain re-walk by the tags alone: both fresh sides carry
+     * the same present-but-empty {@code "Items"}, and only the open-time positions the flush derives separate a
+     * container this write looked inside from one it merely re-captured.
+     */
+    @Test
+    void aChestOpenedAndFoundEmptyIsWrittenEmptyIntoTheRegionFile(@TempDir Path save) throws IOException {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        WorldPaths paths = new WorldPathsImpl(save);
+        Path region = paths.regionDirectory(Level.OVERWORLD);
+        ChunkPos pos = new ChunkPos(0, 0);
+        BlockPos chestPos = new BlockPos(4, 64, 9);
+
+        try (SimpleRegionStorage out = storage(paths, region)) {
+            ChunkSnapshotSource captured = chestSnapshot(registries, chestPos, "minecraft:diamond");
+            RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, registries, false),
+                    ChunkFlushPlan.readMerge(captured, List.of(), LongSet.of()));
+            out.synchronize(true).join();
+
+            ChunkSnapshotSource emptied = chestSnapshot(registries, chestPos);
+            Map<BlockPos, CompoundTag> containers = new LinkedHashMap<>();
+            containers.put(chestPos, BlockEntityFixtures.emptyContainerHolder(27, "minecraft:chest"));
+            List<BlockPos> landing = ChunkFlushPlan.landingHolderPositions(emptied, containers);
+            CompoundTag fresh = codec.encode(emptied, registries, false);
+            MergeTally folded = ChunkFlushPlan.foldChunkStashes(fresh, pos, containerSink, lecternSink, containers,
+                    Map.of(), Map.of());
+            assertEquals(1, folded.merged(), "the open-time holder landed, so the fresh side is what the open saw");
+            RegionChunkWriter.MergeWriteResult written = RegionChunkWriter.writeMerging(out, pos, fresh,
+                    ChunkFlushPlan.readMerge(emptied, landing, LongSet.of()));
+            out.synchronize(true).join();
+
+            // Without these the case cannot tell the skip firing from the merge never running at all, which is
+            // the same green either way.
+            assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_RECAPTURED, written.outcome(),
+                    "the prior chunk was found on disk, so the merge really ran over it");
+            assertEquals(0, written.mergeBacks(), "and carried nothing back into the container it captured");
+        }
+
+        try (SimpleRegionStorage in = storage(paths, region)) {
+            CompoundTag back = in.read(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
+            CompoundTag chest = findByPos(back, 4, 64, 9);
+            assertTrue(chest.get("Items") instanceof ListTag items && items.isEmpty(),
+                    "the chest is left with the present-but-empty list a vanilla chest writes, not with the items "
+                            + "the player watched leave");
         }
     }
 
