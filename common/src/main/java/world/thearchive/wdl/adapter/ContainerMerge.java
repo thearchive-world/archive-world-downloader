@@ -5,6 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import com.mojang.logging.LogUtils;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 import net.minecraft.core.BlockPos;
@@ -89,6 +90,25 @@ final class ContainerMerge {
      */
     static MergeTally mergeHolderChunkStash(CompoundTag chunkTag, ChunkPos pos, Map<BlockPos, CompoundTag> stash) {
         return mergeStashWith(ContainerMerge::mergeHolderFields, chunkTag, pos, stash);
+    }
+
+    /**
+     * Apply the open-time-over-place precedence: return the confirmed place-time {@code "Items"} candidates that
+     * survive, namely those whose pos is not already held by an open-time container in {@code openTimeBundle}. An
+     * opened menu is ground truth and supersedes a place-time snapshot for the same pos, which can have gone stale
+     * after the placement was opened and edited. The surviving entries join the open-time bundle for the one per-chunk
+     * {@code "Items"} merge. Membership is tested against the already-drained bundle, since the shared container stash
+     * is emptied into it before this runs.
+     */
+    static Map<BlockPos, CompoundTag> mergePlaceCandidates(Map<BlockPos, CompoundTag> openTimeBundle,
+            Map<BlockPos, CompoundTag> confirmedPlace) {
+        Map<BlockPos, CompoundTag> surviving = new LinkedHashMap<>();
+        for (Map.Entry<BlockPos, CompoundTag> entry : confirmedPlace.entrySet()) {
+            if (!openTimeBundle.containsKey(entry.getKey())) {
+                surviving.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return surviving;
     }
 
     /**
