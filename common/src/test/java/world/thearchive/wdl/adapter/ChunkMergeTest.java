@@ -17,14 +17,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChiseledBookShelfBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.BlockEntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
+import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -631,6 +636,29 @@ class ChunkMergeTest {
         assertArrayEquals(new int[] { 8 }, merged.getIntArray("disabled_slots").orElseThrow(),
                 "the fresh non-default capture stands");
         assertEquals(1, merged.getIntOr("triggered", -1), "and so does the flag it captured beside it");
+    }
+
+    @Test
+    void theOccupancyProducerAndTheMergeThatConsumesItAgreeOnTheirKeying() {
+        // The producer keys on a packed BlockPos and the merge re-packs one out of the saved tag. A silent
+        // disagreement between the two would send every bookshelf to the unknown-occupancy fallback, which
+        // looks exactly like the fix working and would restore the phantom this axis exists to prevent.
+        RegistryAccess registries = TestRegistries.frozen();
+        BlockPos pos = new BlockPos(4, 64, 9);
+        BlockState shelf = Blocks.CHISELED_BOOKSHELF.defaultBlockState()
+                .setValue(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.get(1), true)
+                .setValue(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.get(2), true);
+        ChunkSnapshotSource snapshot = SyntheticChunks.withBlockEntityAt(registries, pos, shelf,
+                blockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, pos.getX(), pos.getY(), pos.getZ()));
+
+        Long2IntOpenHashMap occupancy = ChunkFlushPlan.bookshelfOccupancy(snapshot);
+
+        assertEquals(0b110, occupancy.get(pos.asLong()), "the producer records the mask the block-state carries");
+        CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9, 0, 1, 2));
+        CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9));
+        ChunkMerge.merge(onDisk, fresh, occupancy, LongSet.of(), LongSet.of());
+        assertEquals(List.of(1, 2), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
+                "and the merge finds it under the same key, so slot 0 is dropped rather than kept by fallback");
     }
 
     @Test
