@@ -10,13 +10,14 @@ import world.thearchive.wdl.adapter.ContainerSink;
 import world.thearchive.wdl.adapter.EntitySink;
 import world.thearchive.wdl.adapter.LecternSink;
 import world.thearchive.wdl.adapter.LevelDataWriter;
+import world.thearchive.wdl.adapter.PlayerSink;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
  * The {@link VersionAdapter} plug for this branch (MC 1.21.11; the package note records the era band it serves): binds
  * the chunk-save axes ({@link ChunkCodec}, {@link WorldPaths}, {@link LevelDataWriter}), {@link EntitySink},
- * {@link ContainerSink} and {@link LecternSink} to their concrete implementations. Registered via
+ * {@link ContainerSink}, {@link LecternSink}, and {@link PlayerSink} to their concrete implementations. Registered via
  * {@code META-INF/services/world.thearchive.wdl.adapter.VersionAdapter}.
  */
 public final class VersionAdapterImpl implements VersionAdapter {
@@ -35,6 +36,8 @@ public final class VersionAdapterImpl implements VersionAdapter {
     private static final ContainerSink containerSink = new ContainerSinkImpl();
 
     private static final LecternSink lecternSink = new LecternSinkImpl();
+
+    private static final PlayerSink playerSink = new PlayerSinkImpl();
 
     private static final LevelDataWriter levelDataWriter = new LevelDataWriterImpl();
 
@@ -56,6 +59,11 @@ public final class VersionAdapterImpl implements VersionAdapter {
     @Override
     public LecternSink lecternSink() {
         return lecternSink;
+    }
+
+    @Override
+    public PlayerSink playerSink() {
+        return playerSink;
     }
 
     @Override
