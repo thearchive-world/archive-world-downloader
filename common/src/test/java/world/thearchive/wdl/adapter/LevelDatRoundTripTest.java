@@ -89,7 +89,7 @@ class LevelDatRoundTripTest {
         // (that call drops its RegistryAccess argument at 26.1.2).
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("wdltest")) {
-            writer.save(access, built);
+            writer.save(access, built, null);
         }
 
         Path levelDat = saves.resolve("wdltest").resolve("level.dat");
@@ -111,7 +111,7 @@ class LevelDatRoundTripTest {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("named")) {
-            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, "My Base"));
+            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, "My Base"), null);
         }
         assertEquals("My Base", levelName(saves.resolve("named")), "the typed name is written as LevelName");
     }
@@ -121,7 +121,7 @@ class LevelDatRoundTripTest {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("unnamed")) {
-            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null));
+            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null), null);
         }
         assertEquals("Archive World Downloader", levelName(saves.resolve("unnamed")),
                 "a null name falls back to the writer default");

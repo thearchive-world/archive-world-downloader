@@ -56,12 +56,18 @@ public interface LevelDataWriter {
 
     /**
      * Write the built {@link LevelData} to {@code access} via the band-correct vanilla
-     * {@code LevelStorageAccess.saveDataTag} form. This lives on the SPI (not in the shared capture session) because
-     * the vanilla signatures drift across bands (the {@code saveDataTag} {@code RegistryAccess} argument drops at
-     * 26.1.2), so keeping the call here lets each band own its form while the shared session stays version-agnostic and
-     * cherry-pickable.
+     * {@code LevelStorageAccess.saveDataTag} form, optionally attaching a captured player. This lives on the SPI (not
+     * in the shared capture session) because the vanilla signatures drift across bands (the {@code saveDataTag}
+     * {@code RegistryAccess} argument drops at 26.1.2, and the {@code setSpawn} form differs: {@code RespawnData} on
+     * 1.21.10+ vs {@code SpawnX/Y/Z} on 1.21.4), so keeping the call here lets each band own its form while the shared
+     * session stays version-agnostic and cherry-pickable.
+     *
+     * <p>With a non-null {@code player}: flip {@code GameType}, set the world spawn to the capture dimension +
+     * position, write the captured {@code Difficulty}, and route the captured tag into the {@code "Player"} slot (the
+     * 3-argument {@code saveDataTag}). With {@code null}: today's behavior, no player, default spawn, the void world's
+     * survival default.
      */
-    void save(LevelStorageSource.LevelStorageAccess access, LevelData data);
+    void save(LevelStorageSource.LevelStorageAccess access, LevelData data, @Nullable CapturedPlayer player);
 
     /**
      * This band's curated safe game-rule set as the settings menu binds it: one {@link CuratedGameRule} per curated

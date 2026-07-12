@@ -43,11 +43,13 @@ import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
+import net.minecraft.world.level.storage.LevelData.RespawnData;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
+import world.thearchive.wdl.adapter.CapturedPlayer;
 import world.thearchive.wdl.adapter.LevelDataWriter;
 import world.thearchive.wdl.core.CuratedGameRule;
 import world.thearchive.wdl.core.GameRuleResolution;
@@ -103,8 +105,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         GameRuleResolution gameRuleResolution = applyGameRules(gameRules, worldOutput);
 
         String levelName = worldName == null || worldName.isEmpty() ? LEVEL_NAME : worldName;
-        // Cheats are the world-defaults master's to impose; with it off the world opens vanilla, so cheats fall
-        // back to off here. Noon is a fixed invariant, applied unconditionally below.
+        // Cheats and game mode are the world-defaults master's to impose; with it off the world opens vanilla,
+        // so cheats fall back to off here. Noon is a fixed invariant, applied unconditionally below.
         boolean allowCommands = worldOutput.overrideWorldDefaults() && worldOutput.allowCommands();
         LevelSettings settings = new LevelSettings(
                 levelName, GameType.SURVIVAL, false, Difficulty.NORMAL, allowCommands,
@@ -222,10 +224,21 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     }
 
     @Override
-    public void save(LevelStorageSource.LevelStorageAccess access, LevelData data) {
-        // 1.21.x form: saveDataTag(RegistryAccess, WorldData). The 26.x band's implementation uses the
+    public void save(LevelStorageSource.LevelStorageAccess access, LevelData data,
+            @Nullable CapturedPlayer player) {
+        // 1.21.x form: saveDataTag(RegistryAccess, WorldData[, Player]). The 26.x band's implementation uses the
         // single-argument saveDataTag(WorldData) form (the RegistryAccess argument was dropped at 26.1.2).
-        access.saveDataTag(data.registries(), data.worldData());
+        if (player == null) {
+            access.saveDataTag(data.registries(), data.worldData());
+            return;
+        }
+        // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
+        PrimaryLevelData levelData = (PrimaryLevelData) data.worldData();
+        levelData.setGameType(player.gameType());
+        levelData.setSpawn(RespawnData.of(player.dimension(), player.spawnPos(), player.yaw(), player.pitch()));
+        levelData.setDifficulty(player.difficulty());
+        // The 3-argument saveDataTag routes the captured tag into createTag's "Player" slot.
+        access.saveDataTag(data.registries(), data.worldData(), player.playerTag());
     }
 
     /**
