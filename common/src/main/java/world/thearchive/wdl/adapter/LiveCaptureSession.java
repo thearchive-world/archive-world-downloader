@@ -30,9 +30,13 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.function.Supplier;
+import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
@@ -42,12 +46,15 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Mth;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
+import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
@@ -62,6 +69,7 @@ import net.minecraft.world.inventory.CrafterMenu;
 import net.minecraft.world.inventory.LecternMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
@@ -141,6 +149,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // latency is immaterial" premise, so the immediate-area freshness guarantee is instead carried by a
     // save-time re-capture burst, and this cadence only lowers in-session latency for the player's vicinity.
     private static final int EDIT_ZONE_PERIOD_TICKS = 20;
+    // Stats refresh cadence: re-request the async stats counter every 3 min so finish reads a
+    // near-live copy. Low-stakes value: stats are lifetime-cumulative, so a few minutes' staleness is a
+    // rounding error against an hours-plus counter. 3600 ticks = 3 min at 20 tps.
+    private static final int STATS_REFRESH_PERIOD_TICKS = 3600;
     private static final int TICKS_PER_SECOND = 20;
 
     private final VersionAdapter adapter;
@@ -450,6 +462,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private @Nullable UUID boundEntityUuid;
 
     /**
+     * The seated player's mount, captured at finish before the entity drain and attached to the level.dat player tag as
+     * vanilla's {@code RootVehicle} record ({@link #rootVehicleAttach} is the direct vehicle UUID,
+     * {@link #rootVehicleTag} the root vehicle NBT). Both null unless the player finished riding a vehicle carrying
+     * only itself. Main-thread-only scratch, deliberately not volatile: the RootVehicle NBT crosses to the writer
+     * thread only folded into the immutable {@link CapturedPlayer} through the existing volatile publish.
+     */
+    private @Nullable UUID rootVehicleAttach;
+
+    private @Nullable CompoundTag rootVehicleTag;
+
+    /**
      * The root vehicle and its non-player passengers, held from the standalone entity write so the RootVehicle copy is
      * not duplicated by a region-file copy on the same UUID.
      */
@@ -471,6 +494,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * it is a far smaller retention than the block container stash that precedes it.
      */
     private final Map<UUID, CompoundTag> foldedContainerVehicles = new HashMap<>();
+
+    /**
+     * The finish-snapshot of the local player, assembled on the main thread in {@link #finish()} and read by the writer
+     * thread when the finalizer writes level.dat. Volatile because it crosses that boundary; the writer's queue already
+     * establishes the happens-before, the keyword documents it. Stays null on a disconnect-flush or when the assembly
+     * fails soft, and the level.dat write degrades to the openable void-world output.
+     */
+    private volatile @Nullable CapturedPlayer capturedPlayer;
+    private volatile @Nullable CapturedProgress capturedProgress;
 
     /** containerId of the menu currently tracked, or {@link #NO_MENU} when none is open. */
     private int openContainerId = NO_MENU;
@@ -544,8 +576,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int resumedMountsLost;
 
     /**
-     * Finish-time work the end-of-stream guard degraded to skipped (main thread). The degradation is deliberate, since
-     * a finalized save beats an aborted one; what would not be is reporting the download that took it as clean.
+     * Finish-time capture steps {@link #failSoft} degraded to absent (main thread). The degradation is deliberate,
+     * since an openable void-world level.dat beats an aborted save; what would not be is stamping the download clean
+     * over it.
      */
     private int finishStepsFailed;
 
@@ -986,6 +1019,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (config.captureContainers()) {
                 captureOpenContainer(minecraft, player);
                 compactClosedStashHolders();
+            }
+            // Warm + refresh the async stats counter on one guarded modulo path. captureTicks starts at 0
+            // so this fires on the first guarded tick (warm-up) and every STATS_REFRESH_PERIOD_TICKS after; the
+            // counter carries across portals on the same connection. Plain vanilla client API (no mixin).
+            if (captureTicks % STATS_REFRESH_PERIOD_TICKS == 0) {
+                ClientPacketListener connection = minecraft.getConnection();
+                if (connection != null) {
+                    connection.send(new ServerboundClientCommandPacket(
+                            ServerboundClientCommandPacket.Action.REQUEST_STATS));
+                }
             }
             if (openClickTracker != null) {
                 openClickTracker.tick();
@@ -1903,6 +1946,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // Stop the inbound tee before the finish drain so no spawn arrives mid-drain to be left unwritten and
         // uncounted; the drain and the reconciliation then see a settled accumulator.
         deactivatePacketCapture();
+        // Snapshot a ridden vehicle into the player's RootVehicle before the drain, so its UUID is held from the
+        // standalone write below and its stashed contents drain before the not-saved check. The mount is
+        // player-state, so this is not gated on captureEntities.
+        if (player != null && minecraft.level == level()) {
+            prepareRootVehicleCapture(player);
+        }
         retryRefusedPrimes();
         // Drain the held packet accumulator: every non-player entity in a captured chunk, including the fly-past
         // tail that unloaded long ago and even after a disconnect-flush, at its last
@@ -1946,6 +1995,25 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         + "from the save", vehicle);
             }
         }
+        // Snapshot and assemble the local player for level.dat (skipped on a disconnect-flush). Fail-soft:
+        // a serialize throw here, after chunks have committed, must not abort before
+        // activeWriter.finish() and leave a chunks-without-level.dat unopenable world plus a leaked lock, so
+        // any throw degrades to a null capturedPlayer (the openable void-world level.dat) and the save runs on.
+        if (player != null && minecraft.level == level()) {
+            this.capturedPlayer = failSoft("player", () -> assembleCapturedPlayer(player, minecraft));
+            this.capturedProgress = failSoft("progress", () -> assembleCapturedProgress(player, minecraft));
+            UUID salvageAttach = rootVehicleAttach;
+            CompoundTag salvageMount = rootVehicleTag;
+            if (this.capturedPlayer == null && salvageMount != null && salvageAttach != null) {
+                // The full player assembly threw (the void-world fail-soft), but a seated mount was already
+                // excluded from the standalone write and its loot drained from the stash, so a bare void-world
+                // level.dat would drop the mount and its capture-once contents from both the entities region and
+                // level.dat. Salvage a minimal player carrying just the RootVehicle. Its own fail-soft: if even
+                // this throws, the void-world level.dat stands and the mount is lost (the accepted worst case).
+                this.capturedPlayer = failSoft("salvaged mount",
+                        () -> assembleSalvageMountPlayer(player, minecraft, salvageAttach, salvageMount));
+            }
+        }
         releaseResumedDismountedMount(activeWriter);
     }
 
@@ -1959,11 +2027,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * a writer already open behind it.
      *
      * <p>It signals the one end of stream, the finalizing one, on every path. A download that captured nothing reaches
-     * it too, and the finalize then writes level.dat over the one a resumed folder already has. That is deliberate and
-     * it is the better of two bad outcomes: vanilla renames the replaced file to level.dat_old rather than dropping it,
-     * and lists a folder holding either, so the record is recoverable and the folder stays openable. Skipping the
-     * finalize instead leaves a folder that wrote chunks with no level.dat at all, which vanilla's world list does not
-     * show.
+     * it too, and the finalize then writes level.dat over the one a resumed folder already has, in the void-world form
+     * since no player snapshot was assembled. That is deliberate and it is the better of two bad outcomes: vanilla
+     * renames the replaced file to level.dat_old rather than dropping it, and lists a folder holding either, so the
+     * record is recoverable and the folder stays openable. Skipping the finalize instead leaves a folder that wrote
+     * chunks with no level.dat at all, which vanilla's world list does not show.
      *
      * <p>A throw counts as a degraded finish step, and that is what keeps a download whose remaining finish work never
      * reached the writer from reading clean. Both halves are needed: the save must reach a terminal state, and a save
@@ -2149,8 +2217,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return positions != null ? positions : new LongOpenHashSet();
     }
 
+    /**
+     * How many of {@code drained} nothing else saved. A mount captured into the player's RootVehicle is excluded, the
+     * same way promoteChunk excludes it, because it reaches disk inside level.dat and counting its abandoned frame
+     * would report a loss the download did not take.
+     */
     private int abandonedCount(List<? extends PacketEntity<?, ?, ?>> drained) {
-        return drained.size();
+        int abandoned = 0;
+        for (PacketEntity<?, ?, ?> frame : drained) {
+            if (!excludedRootVehicleUuids.contains(frame.uuid())) {
+                abandoned++;
+            }
+        }
+        return abandoned;
     }
 
     /**
@@ -2190,6 +2269,50 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     reconciliation.flushDrops() + reconciliation.primedFlushDrops(), reconciliation.createDrops(),
                     reconciliation.encodeFailures() + reconciliation.primedEncodeFailures(),
                     reconciliation.abortDrops(), reconciliation.unboundDimensionDrops());
+        }
+    }
+
+    /**
+     * Snapshot a seated player's root vehicle into {@link #rootVehicleTag} before the entity drain, mirroring
+     * {@code ServerPlayer.saveParentVehicle}. Client main thread only (it reads live entity relationships and runs
+     * {@code entity.save} over the live tree), never from a background/overlay read path. The whole fallible body is
+     * per-unit failure-isolated like {@link #encodeSingleEntity}: {@code captureRootVehicle}'s {@code entity.save}
+     * throws a {@code ReportedException} on a codec-rejecting modded or rolled-back entity, which without this catch
+     * would propagate into {@link #finish()} and abort it before the writer finalizes, hanging the writer with the
+     * session lock held. On a throw or a refused save the mount stays on the standard entity paths and the player loads
+     * without a mount; the position anchor still fires.
+     */
+    private void prepareRootVehicleCapture(LocalPlayer player) {
+        if (!player.isPassenger()) {
+            return; // the common fast path; isPassenger is a field read that cannot throw
+        }
+        // Everything fallible is inside the try, including the vehicle-tree traversals: a modded Entity could
+        // override getVehicle/getRootVehicle/hasExactlyOnePlayerPassenger to throw, and any throw here must not
+        // propagate into finish() and hang the writer. A return inside the try is a normal exit (the catch does
+        // not fire).
+        try {
+            Entity root = player.getRootVehicle();
+            Entity direct = player.getVehicle();
+            if (direct == null || root == player || !root.hasExactlyOnePlayerPassenger()) {
+                return; // ServerPlayer.saveParentVehicle's own condition
+            }
+            Set<UUID> excluded = new HashSet<>();
+            root.getSelfAndPassengers().forEach(entity -> {
+                if (!(entity instanceof Player)) {
+                    excluded.add(entity.getUUID());
+                }
+            });
+            CompoundTag entityTag = adapter.entitySink().captureRootVehicle(root, registries,
+                    config.forceMobPersistence());
+            if (entityTag == null) {
+                return;
+            }
+            entityTag = foldRidingVehicleContents(entityTag);
+            excludedRootVehicleUuids.addAll(excluded);
+            this.rootVehicleAttach = direct.getUUID();
+            this.rootVehicleTag = entityTag;
+        } catch (RuntimeException e) {
+            LOGGER.warn("skipping the ridden vehicle capture: the player loads without a mount", e);
         }
     }
 
@@ -2245,43 +2368,123 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The {@code LevelName} to write into level.dat: a new download uses the target's resolved name, while a resume
-     * preserves the existing world's name read from the prior level.dat (null when absent or unreadable, letting the
-     * writer apply its default), so re-running into a folder never renames the world it already produced.
+     * Assemble the immutable player finish-snapshot from the live client (main thread): serialize the player, apply the
+     * unconditional death-location strip, the canonical {@code "Dimension"} and the capture-anchor position, then
+     * bundle the spawn position, gamemode, and difficulty. Everything in the returned {@link CapturedPlayer} is
+     * finished, so it crosses to the writer thread safely. Throwing is the caller's fail-soft contract.
      */
-    private @Nullable String resolveWorldName() {
-        if (target.mode() == DownloadMode.RESUME) {
-            return readPriorLevelName();
+    private CapturedPlayer assembleCapturedPlayer(LocalPlayer player, Minecraft minecraft) {
+        Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
+        CompoundTag raw = adapter.playerSink().capturePlayer(player, registries);
+        PlayerTag.stripDeathLocation(raw);
+        PlayerTag.setDimension(raw, targetDimension);
+        PlayerTag.setPosition(raw, anchor.blockPosition(), anchor.getYRot(), anchor.getXRot());
+        if (rootVehicleTag != null && rootVehicleAttach != null) {
+            PlayerTag.setRootVehicle(raw, rootVehicleAttach, rootVehicleTag);
         }
-        return target.worldName();
+        if (target.mode() == DownloadMode.RESUME) {
+            restorePriorMountContents(raw); // restore a prior download's mount contents on a same-mount seated resume
+        }
+        // Creative only when the world-defaults master imposes it; with the master off the world opens in the
+        // player's real game mode, matching cheats and time/weather falling back. gameMode is non-null here (a
+        // player is present), but the field is @Nullable, so guard and fall back to the survival default.
+        GameType gameType = GameType.CREATIVE;
+        if (!config.worldOutput().overrideWorldDefaults()) {
+            MultiPlayerGameMode gameMode = minecraft.gameMode;
+            gameType = gameMode != null ? gameMode.getPlayerMode() : GameType.SURVIVAL;
+            if (gameType == GameType.SPECTATOR) {
+                // Vanilla applies the saved game type to every opener, so a spectator stamp opens the world in
+                // spectator, and on a world shipped without cheats there is no way back out. Fall back to the
+                // mode the viewer held before spectating, or survival when that is unknown or itself spectator.
+                GameType previous = gameMode != null ? gameMode.getPreviousPlayerMode() : null;
+                gameType = previous != null && previous != GameType.SPECTATOR ? previous : GameType.SURVIVAL;
+            }
+        }
+        Difficulty difficulty = level().getLevelData().getDifficulty();
+        return new CapturedPlayer(raw, anchor.blockPosition(), anchor.getYRot(), anchor.getXRot(),
+                targetDimension, gameType, difficulty);
     }
 
-    /** The prior level.dat's {@code Data.LevelName}, or null when it is absent or unreadable (fail-soft). */
-    private @Nullable String readPriorLevelName() {
-        try {
-            CompoundTag data = readPriorData();
-            if (data != null) {
-                return data.getString("LevelName").orElse(null);
-            }
-        } catch (IOException | RuntimeException e) {
-            // The level.dat is present but unreadable, so the resume cannot preserve the world's name and falls
-            // back to the default. Surface it rather than renaming the world silently (the read can fail on a
-            // transient file lock, which the Windows gate has shown is real).
-            LOGGER.warn("failed to read the prior level.dat name on resume; using the default name", e);
-            if (config.showChatMessages()) {
-                bridge.sendChat(ChatCopy.worldNameFallback());
-            }
+    /**
+     * Salvage a minimal player finish-snapshot carrying only the seated mount's {@code RootVehicle} record and a safe
+     * spawn, for the fail-soft path where {@link #assembleCapturedPlayer} threw after the mount was already excluded
+     * from the standalone write and its loot drained from the stash. Rebuilds a fresh tag rather than reusing the
+     * partial one the throw left: only the dimension, the safe position, and the RootVehicle, none of the fallible
+     * player-state serialization. The real game mode and the rest of the player state are lost with the failed
+     * assembly, so it opens survival at the mount, which is strictly better than losing the mount too.
+     */
+    private CapturedPlayer assembleSalvageMountPlayer(LocalPlayer player, Minecraft minecraft, UUID attach,
+            CompoundTag mountTag) {
+        Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
+        CompoundTag raw = new CompoundTag();
+        PlayerTag.setDimension(raw, targetDimension);
+        PlayerTag.setPosition(raw, anchor.blockPosition(), anchor.getYRot(), anchor.getXRot());
+        PlayerTag.setRootVehicle(raw, attach, mountTag);
+        Difficulty difficulty = level().getLevelData().getDifficulty();
+        return new CapturedPlayer(raw, anchor.blockPosition(), anchor.getYRot(), anchor.getXRot(),
+                targetDimension, GameType.SURVIVAL, difficulty);
+    }
+
+    /**
+     * Assemble the immutable progress finish-snapshot from the live client (main thread): the advancement progress
+     * (client-held) and, if a stats reply has landed, the enumerated statistics, each rendered to detached JSON bytes
+     * so the writer thread never touches the still-mutating live structures. Throwing is the caller's fail-soft
+     * contract.
+     */
+    private CapturedProgress assembleCapturedProgress(LocalPlayer player, Minecraft minecraft) {
+        int dataVersion = currentDataVersion();
+        // Per-surface fail-soft: an advancement-encode throw nulls only this blob, so the sibling stats
+        // surface still lands (mirroring the writer's per-file isolation). The outer failSoft on the whole
+        // assembly stays the backstop for the shared steps, the data version and the uuid.
+        byte[] advancements = failSoft("advancements", () -> {
+            ClientPacketListener connection = minecraft.getConnection();
+            Map<String, AdvancementProgress> byId = connection != null
+                    ? AdvancementSnapshot.byId(connection.getAdvancements())
+                    : Map.of();
+            return PlayerProgressSerializer.advancementsJson(byId, dataVersion);
+        });
+        byte[] stats = PlayerProgressSerializer.statsJson(player.getStats(), dataVersion);
+        if (stats == null) {
+            LOGGER.warn("statistics not captured: no stats reply received before finish");
         }
-        return null;
+        return new CapturedProgress(player.getUUID(), advancements, stats);
+    }
+
+    /** The data version, read band-stably via the vanilla {@link NbtUtils#addCurrentDataVersion} stamp. */
+    private static int currentDataVersion() {
+        CompoundTag probe = new CompoundTag();
+        NbtUtils.addCurrentDataVersion(probe);
+        return probe.getIntOr("DataVersion", 0);
+    }
+
+    /**
+     * Restore a prior download's captured mount contents on a resume that finished seated in the same mount without
+     * reopening its container: the fresh serialize carries empty menu-only contents, and the wholesale rewrite of
+     * level.dat's Player slot would drop the prior download's folded loot. A resume that finished un-seated carries
+     * nothing (see {@link PlayerTag#restorePriorMountContents}): a dismounted mount is a normal world entity, captured
+     * by the standalone entity path, so writing it into the Player slot would wrongly re-seat the player and collide
+     * same-UUID with the standalone copy. Runs as its own RESUME block, after the fresh {@code setRootVehicle}.
+     * Fail-soft on a missing or unreadable prior level.dat.
+     */
+    private void restorePriorMountContents(CompoundTag raw) {
+        CompoundTag priorPlayer = readPriorPlayerTag();
+        if (priorPlayer == null) {
+            return;
+        }
+        PlayerTag.restorePriorMountContents(priorPlayer, raw);
     }
 
     /**
      * Release a prior download's parked mount as a standalone entity on a resume, so a mount the player rode in an
      * earlier download and has since left is preserved as a world entity rather than lost. A mount ridden at a finish
      * is a one-player vehicle the entity capture refuses, so that finish saved it only as its level.dat RootVehicle,
-     * and this resume's own level.dat replaces that record wholesale. Nothing else carries it forward.
+     * and this resume's own player tag replaces that record wholesale. Nothing else carries it forward.
      *
-     * <p>Skipped when this finish already preserved that mount itself by writing it as a standalone entity.
+     * <p>Skipped when this finish already preserved that mount itself, either by writing it as a standalone entity or
+     * by capturing it into the player's own RootVehicle, the latter matched by UUID against the whole captured mount
+     * tree rather than against its root. The root is not the mount: a mount can be ridden while itself riding another
+     * vehicle, and then the RootVehicle record holds the outer vehicle with the mount nested under it. Matching the
+     * root alone would release a mount the player is still on, putting a second copy of it in the world.
      *
      * <p>Routed to the dimension the PRIOR tag records, not to the live {@link #targetDimension}: the position comes
      * from the prior tag too, and this session can finish anywhere, so pairing prior coordinates with the current
@@ -2305,13 +2508,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         // Read before this check rather than after, because whether the finish is a no-op is a question about
-        // WHICH mount the player ended on, which only the prior tag answers.
+        // WHICH mount the player ended on, which only the prior tag answers. The exclusion set is this finish's
+        // captured mount tree and is empty when no mount was captured, so a null capturedPlayer (the
+        // disconnect flush and the failed assembly) falls through to the release, which is where it belongs.
         UUID priorMountUuid = EntityMerge.readUuid(priorEntity);
-        if (priorMountUuid != null && savedEntities.contains(priorMountUuid)) {
+        if (priorMountUuid != null && (savedEntities.contains(priorMountUuid)
+                || (capturedPlayer != null && excludedRootVehicleUuids.contains(priorMountUuid)))) {
             return;
         }
         try {
-            ResourceKey<Level> priorDimension = VanillaDimensions.forId(priorPlayer.getStringOr("Dimension", ""));
+            ResourceKey<Level> priorDimension = PlayerTag.dimensionOf(priorPlayer);
             if (priorDimension == null) {
                 recordResumedMountLoss("its prior level.dat names no dimension this download writes");
                 return;
@@ -2388,6 +2594,61 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
+     * The {@code LevelName} to write into level.dat: a new download uses the target's resolved name, while a resume
+     * preserves the existing world's name read from the prior level.dat (null when absent or unreadable, letting the
+     * writer apply its default), so re-running into a folder never renames the world it already produced.
+     */
+    private @Nullable String resolveWorldName() {
+        if (target.mode() == DownloadMode.RESUME) {
+            return readPriorLevelName();
+        }
+        return target.worldName();
+    }
+
+    /** The prior level.dat's {@code Data.LevelName}, or null when it is absent or unreadable (fail-soft). */
+    private @Nullable String readPriorLevelName() {
+        try {
+            CompoundTag data = readPriorData();
+            if (data != null) {
+                return data.getString("LevelName").orElse(null);
+            }
+        } catch (IOException | RuntimeException e) {
+            // The level.dat is present but unreadable, so the resume cannot preserve the world's name and falls
+            // back to the default. Surface it rather than renaming the world silently (the read can fail on a
+            // transient file lock, which the Windows gate has shown is real).
+            LOGGER.warn("failed to read the prior level.dat name on resume; using the default name", e);
+            if (config.showChatMessages()) {
+                bridge.sendChat(ChatCopy.worldNameFallback());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Run a finish-time capture assembly and degrade a throw to a null snapshot (fail-soft): a serialize bug in one
+     * step then drops that step to absent (the player path opens at the default spawn with no Player tag, taking the
+     * inventory and the game mode with it; the progress path writes no advancement or statistics file) instead of
+     * aborting the save after chunks have committed and leaving a chunks-without-level.dat unopenable world.
+     *
+     * <p>The degradation is deliberate and stays. What does not is reporting the download that took it as clean, so
+     * every degraded step counts toward the partial-finish verdict, and {@code step} names on the line which one it
+     * was: several steps share this, and a line naming none of them leaves a reader unable to tell a lost player from
+     * lost advancements.
+     *
+     * <p>Package-private and an instance method, so the tally it feeds and the fail-soft contract are both
+     * headless-testable on one session.
+     */
+    <T> @Nullable T failSoft(String step, Supplier<T> assembly) {
+        try {
+            return assembly.get();
+        } catch (RuntimeException e) {
+            finishStepsFailed++;
+            LOGGER.warn("failed to capture the {} at finish; the world is saved without it", step, e);
+            return null;
+        }
+    }
+
+    /**
      * Bind the writer a world open would have installed, standing in for the tail of {@link #ensureWriter}, which
      * cannot run headlessly because it resolves the level source through the client singleton. It has no production
      * caller and is not an alternative way to open a world: production opens one in {@code ensureWriter}, which also
@@ -2450,7 +2711,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
                             paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
                             DataFixTypes.ENTITY_CHUNK),
                     () -> {},
-                    (chunksFailed, entityChunksFailed) -> levelDataWriter.save(access, levelData),
+                    // Read the volatile capturedPlayer/capturedProgress LAZILY inside the thunk: ensureWriter
+                    // builds this thunk at the first incremental flush, mid-capture, before finish() sets the
+                    // fields, so a snapshot taken here would always be null. The thunk runs on the writer thread
+                    // strictly after the chunk drain, so the fields set in finish() are visible.
+                    (chunksFailed, entityChunksFailed) -> {
+                        levelDataWriter.save(access, levelData, capturedPlayer);
+                        PlayerProgressWriter.write(saveRoot, capturedProgress);
+                    },
                     () -> null,
                     access, progress);
             return writer;
@@ -2962,6 +3230,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         List<Promoted> built = new ArrayList<>();
         Map<Integer, Entity> byId = new HashMap<>();
         for (PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> frame : held) {
+            if (excludedRootVehicleUuids.contains(frame.uuid())) {
+                continue; // captured into the player's RootVehicle; not also a standalone entity (same-UUID clash)
+            }
             Entity entity = reconstructPacketEntity(frame);
             if (entity != null) {
                 built.add(new Promoted(frame, entity));

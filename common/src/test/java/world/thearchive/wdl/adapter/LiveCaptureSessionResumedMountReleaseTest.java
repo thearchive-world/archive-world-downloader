@@ -18,6 +18,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -25,8 +26,10 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
+import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
 import org.jspecify.annotations.Nullable;
@@ -52,12 +55,15 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * standalone entity before that happens. Everything it fails to write is gone for good, including whatever the previous
  * download archived inside a chest boat or a chested animal.
  *
- * <p>Two axes. ROUTING: the position and the dimension must come from the same tag, so the cross-dimension case asserts
- * both the arrival and the absence, since a write that reaches the right folder while also reaching the wrong one is
- * still a corrupt save. COUNTING: each exit that reaches the release proper and writes nothing is asserted twice over,
- * on the named counter and on the verdict the completion record stamps from, since a counter no term of the sum reads
- * reports nothing; and every no-op is asserted in the other direction, on the absence of the WRITE rather than the
- * absence of a loss, because a path that wrongly runs and succeeds also loses nothing.
+ * <p>Three axes. ROUTING: the position and the dimension must come from the same tag, so the cross-dimension case
+ * asserts both the arrival and the absence, since a write that reaches the right folder while also reaching the wrong
+ * one is still a corrupt save. IDENTITY: the release must decline exactly when this finish already saved the prior
+ * mount inside the player's own RootVehicle, which is a question about the whole captured mount tree rather than its
+ * root, so the two mounts here share an entity type and differ only by UUID and one of them rides nested inside the
+ * other. COUNTING: each exit that reaches the release proper and writes nothing is asserted twice over, on the named
+ * counter and on the verdict the completion record stamps from, since a counter no term of the sum reads reports
+ * nothing; and every no-op is asserted in the other direction, on the absence of the WRITE rather than the absence of a
+ * loss, because a path that wrongly runs and succeeds also loses nothing.
  *
  * <p>The release is driven directly, package-private for that, because every production caller runs behind the client
  * singleton; what that leaves unpinned is finish() calling it at all, and calling it in the right place, which only the
@@ -67,6 +73,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  */
 class LiveCaptureSessionResumedMountReleaseTest {
     private static final UUID MOUNT = UUID.fromString("f4c1a8d2-3b76-4e05-9a1c-8d2e6b70f513");
+    private static final UUID OTHER_MOUNT = UUID.fromString("0a7e2c95-641b-4d38-8f02-b3d54e18a7c6");
     private static final String MOUNT_LOOT = "minecraft:diamond";
     // x is negative and just below a chunk boundary, so flooring and truncating land in DIFFERENT chunks and a
     // locator that casts instead of flooring misses. x and z also differ, so an axis swap misses too.
@@ -213,6 +220,67 @@ class LiveCaptureSessionResumedMountReleaseTest {
     }
 
     @Test
+    void aResumeThatFinishedOnTheSameMountReportsNoLoss(@TempDir Path temporary) throws Exception {
+        Path save = temporary.resolve("save");
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
+        writePriorLevelDat(session, save, Level.NETHER, mount());
+        // Still riding the SAME mount at the finish, so this session's own level.dat carries it and releasing
+        // it as a standalone entity would write a second copy of a mount that was never dropped.
+        seatedOn(session, mount(), MOUNT);
+        WorldPaths paths = paths(save);
+        AsyncSaveWriter writer = saveWriter(paths);
+
+        session.releaseResumedDismountedMount(writer);
+        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
+
+        assertNull(entityChunk(paths, Level.NETHER, mountChunk()), "the fresh RootVehicle is the mount's copy");
+        assertEquals(0, losses(session), "nothing was lost, so nothing may be counted");
+        assertFalse(session.isPartialSave(0, 0), "so the finish verdict stays clean");
+    }
+
+    @Test
+    void aResumeThatFinishedOnAnotherMountStillReleasesThePriorOne(@TempDir Path temporary) throws Exception {
+        Path save = temporary.resolve("save");
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.OVERWORLD);
+        writePriorLevelDat(session, save, Level.NETHER, mount());
+        // Rode a donkey in the previous download, rode a boat in this one. The fresh record replaces the prior
+        // one in the Player slot, so the donkey is preserved by nothing unless it is released here, and being
+        // seated on SOMETHING is not the same question as being seated on THAT mount.
+        seatedOn(session, otherMount(), OTHER_MOUNT);
+        WorldPaths paths = paths(save);
+        AsyncSaveWriter writer = saveWriter(paths);
+
+        session.releaseResumedDismountedMount(writer);
+        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
+
+        CompoundTag released = entityChunk(paths, Level.NETHER, mountChunk());
+        assertNotNull(released, "the mount ridden away from is a world entity and belongs where it was left");
+        assertEquals(MOUNT.toString(), soleEntityUuid(released), "and it is the prior mount, not the fresh one");
+        assertFalse(session.isPartialSave(0, 0), "a released mount is not a loss");
+    }
+
+    @Test
+    void aPriorMountNestedInsideThisFinishesMountIsNotReleasedAgain(@TempDir Path temporary) throws Exception {
+        Path save = temporary.resolve("save");
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
+        writePriorLevelDat(session, save, Level.NETHER, mount());
+        // The player is riding the prior mount, but that mount is itself in a boat, so the RootVehicle record
+        // holds the OUTER boat with the mount nested under it. The mount is still under the player and still
+        // saved by this finish, so releasing it would put a second copy of it in the world.
+        seatedOn(session, EntityFixtures.entityCarrying(otherMount(), mount()), OTHER_MOUNT, MOUNT);
+        WorldPaths paths = paths(save);
+        AsyncSaveWriter writer = saveWriter(paths);
+
+        session.releaseResumedDismountedMount(writer);
+        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
+
+        assertNull(entityChunk(paths, Level.NETHER, mountChunk()),
+                "a mount the player is still on must not also be written standalone");
+        assertEquals(0, losses(session), "nothing was lost, so nothing may be counted");
+        assertFalse(session.isPartialSave(0, 0), "so the finish verdict stays clean");
+    }
+
+    @Test
     void aFinishWhosePlayerAssemblyFailedStillReleasesThePriorMount(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
@@ -263,10 +331,18 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return new ChunkPos(-71, 30);
     }
 
+    /**
+     * A second mount of the SAME entity type, so identity rests on the UUID alone. Two boats is also the realistic
+     * switch; a donkey against a boat would let a check comparing entity types pass by accident.
+     */
+    private static CompoundTag otherMount() {
+        return EntityFixtures.entityAt("minecraft:chest_boat", OTHER_MOUNT, 8.5, 64.0, 8.5);
+    }
+
     /** A prior level.dat player tag: the dimension it finished in, and the mount it was riding if any. */
     private static CompoundTag priorPlayerTag(ResourceKey<Level> dimension, @Nullable CompoundTag mount) {
         CompoundTag player = new CompoundTag();
-        player.putString("Dimension", dimension.identifier().toString());
+        PlayerTag.setDimension(player, dimension);
         if (mount != null) {
             CompoundTag root = new CompoundTag();
             root.put("Entity", mount);
@@ -294,6 +370,22 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path levelDat = save.resolve("level.dat");
         NbtIo.writeCompressed(root, levelDat);
         set(session, "levelDatFile", levelDat);
+    }
+
+    /**
+     * Put the session in the state a finish that captured a mount leaves behind: the player tag carrying the
+     * RootVehicle record, AND the exclusion set holding every entity of the captured mount tree. Both, because
+     * production writes them together and the release reads the set; seeding only the tag would let a check that
+     * consults the wrong one pass.
+     */
+    private static void seatedOn(LiveCaptureSession session, CompoundTag root, UUID... capturedTree)
+            throws Exception {
+        CompoundTag playerTag = new CompoundTag();
+        PlayerTag.setRootVehicle(playerTag, capturedTree[0], root); // the tree's root; nothing here reads Attach
+        set(session, "capturedPlayer", new CapturedPlayer(playerTag, BlockPos.ZERO, 0f, 0f, Level.NETHER,
+                GameType.SURVIVAL, Difficulty.NORMAL));
+        Set<UUID> excluded = state(session, "excludedRootVehicleUuids");
+        excluded.addAll(List.of(capturedTree));
     }
 
     /**
@@ -420,6 +512,11 @@ class LiveCaptureSessionResumedMountReleaseTest {
         @Override
         public LecternSink lecternSink() {
             return real.lecternSink();
+        }
+
+        @Override
+        public PlayerSink playerSink() {
+            return real.playerSink();
         }
 
         @Override

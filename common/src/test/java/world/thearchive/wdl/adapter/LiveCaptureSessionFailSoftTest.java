@@ -6,6 +6,8 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
@@ -13,6 +15,10 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -28,17 +34,19 @@ import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The headless guard for the fail-soft finish: the finish body runs after chunks have committed to disk, so an uncaught
- * throw on its way to the end-of-stream marker would park the writer thread in its queue for the rest of the game
- * session, holding the world's session lock, with no level.dat written, the future the controller polls never
- * completed, and nothing at all reported to the player. {@link LiveCaptureSession#completeThroughWriter} degrades any
- * throw to a finalized save instead, so the folder is openable and the download ends.
+ * The headless guard for the fail-soft: the finish-time player assembly runs after chunks have committed to disk, so an
+ * uncaught serialize throw there would abort before the writer finalizes and leave a chunks-without-level.dat
+ * unopenable world plus a leaked lock. {@link LiveCaptureSession#failSoft} degrades any throw to a null snapshot, which
+ * the (separately tested) null-{@code CapturedPlayer} level.dat path writes as the openable void world. The remaining
+ * "the writer still finalizes" half is the last two tests here: the fail-soft above covers the throws it was written
+ * for, and the guard those two pin covers the finish body wholesale, including the steps between the last submit and
+ * the end-of-stream marker that no fail-soft wraps.
  *
- * <p>The degradation is deliberate, so the second half here is that it is not silent: a finish that skipped the rest of
- * its work lost whatever that work would have written, and a verdict that still read clean over it would be asserting
- * something untrue. Both halves are asserted for each, since neither alone is enough: the counter moved (the verdict
- * sums every term, so a step charged to a sibling counter still reads partial) and the verdict turned partial (a
- * counter no term of the sum reads is a loss nothing reports).
+ * <p>The degradation is deliberate, so the second half here is that it is not silent: a level.dat written with no
+ * Player tag has lost the download's inventory, ender chest and game mode, and a verdict that still read clean over
+ * that would be asserting something untrue. Both halves are asserted for each, since neither alone is enough: the
+ * counter moved (the verdict sums every term, so a step charged to a sibling counter still reads partial) and the
+ * verdict turned partial (a counter no term of the sum reads is a loss nothing reports).
  */
 class LiveCaptureSessionFailSoftTest {
     @BeforeAll
@@ -47,19 +55,73 @@ class LiveCaptureSessionFailSoftTest {
     }
 
     /**
-     * A session with no bound level, which is all the end-of-stream contract needs. Entity capture is off so the
-     * constructor publishes no process-wide capture into the static activation slot, which only finish() would clear;
-     * the toggle is asserted rather than assumed, since an unrecognized config key falls back to the default, which is
-     * on.
+     * A session with no bound level, which is all the fail-soft contract needs. Entity and container capture are off so
+     * the constructor publishes no process-wide capture into the static activation slots, which only finish() would
+     * clear; the toggles are asserted rather than assumed, since an unrecognized config key falls back to the default,
+     * which is on for both.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
         properties.setProperty("captureEntities", "false");
+        properties.setProperty("captureContainers", "false");
         WdlConfig config = WdlConfig.parse(properties);
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
+        assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
                 config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SendRangeEstimator(), false, () -> {});
+    }
+
+    @Test
+    void failSoftDegradesThrowingAssemblyToNull(@TempDir Path temporary) {
+        LiveCaptureSession session = session(temporary);
+
+        assertNull(session.failSoft("player", () -> {
+            throw new IllegalStateException("player serialize blew up");
+        }), "a throwing assembly degrades to a null capturedPlayer so the openable void-world save still runs");
+    }
+
+    @Test
+    void failSoftPassesThroughSuccessfulAssembly(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(temporary);
+        CapturedPlayer captured = new CapturedPlayer(new CompoundTag(), BlockPos.ZERO, 0.0F, 0.0F,
+                Level.OVERWORLD, GameType.CREATIVE, Difficulty.NORMAL);
+
+        assertSame(captured, session.failSoft("player", () -> captured), "a successful assembly passes through");
+        assertEquals(0, losses(session), "and a step that worked counts no loss");
+        assertFalse(session.isPartialSave(0, 0), "so the finish reads clean");
+    }
+
+    @Test
+    void aDegradedFinishStepLandsInTheFinishStepTallyAndTurnsTheVerdictPartial(@TempDir Path temporary)
+            throws Exception {
+        LiveCaptureSession session = session(temporary);
+        assertFalse(session.isPartialSave(0, 0), "nothing has degraded, so the finish reads clean");
+
+        session.failSoft("player", () -> {
+            throw new IllegalStateException("player serialize blew up");
+        });
+
+        assertEquals(1, losses(session),
+                "the level.dat is written with no Player tag, so the loss is counted as one");
+        assertTrue(session.isPartialSave(0, 0), "and that makes the finish partial rather than clean");
+    }
+
+    @Test
+    void eachDegradedStepIsCountedOnItsOwn(@TempDir Path temporary) throws Exception {
+        // These are independent losses, and one of them (the salvaged mount) runs only because another
+        // already failed, so a tally that latched on the first would under-report every finish that lost
+        // more than one snapshot.
+        LiveCaptureSession session = session(temporary);
+
+        session.failSoft("player", () -> {
+            throw new IllegalStateException("the player assembly blew up");
+        });
+        session.failSoft("progress", () -> {
+            throw new IllegalStateException("the progress assembly blew up");
+        });
+
+        assertEquals(2, losses(session), "a lost player and a lost progress snapshot are two losses, not one");
     }
 
     /**
