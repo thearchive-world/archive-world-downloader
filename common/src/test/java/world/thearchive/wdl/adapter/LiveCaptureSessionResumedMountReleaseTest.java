@@ -520,6 +520,11 @@ class LiveCaptureSessionResumedMountReleaseTest {
         }
 
         @Override
+        public MapSink mapSink() {
+            return real.mapSink();
+        }
+
+        @Override
         public LevelDataWriter levelDataWriter() {
             return real.levelDataWriter();
         }

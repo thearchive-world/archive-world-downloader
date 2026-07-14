@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -30,6 +31,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.client.Minecraft;
@@ -47,6 +49,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -85,6 +88,8 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
 import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.phys.AABB;
 import org.jspecify.annotations.Nullable;
@@ -101,6 +106,7 @@ import world.thearchive.wdl.core.CrafterSlots;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.FlushPolicy;
+import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.core.RecaptureMode;
 import world.thearchive.wdl.core.RecapturePolicy;
 import world.thearchive.wdl.core.SaveProgress;
@@ -458,6 +464,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** Primed entities lost when their whole entity-chunk threw or nulled out during flush; counted, not residual. */
     private int primeFlushDrops;
 
+    /**
+     * The container-vehicle holders already map-remapped, by identity: the remap is not idempotent (remapping an
+     * already-archived id blanks the map), and one holder can be reached twice, once by a mid-session entity flush and
+     * again by the finish-time ridden-vehicle fold.
+     */
+    private final Set<CompoundTag> preparedEntityContainers = Collections.newSetFromMap(new IdentityHashMap<>());
+
     /** The UUID of the container vehicle the live menu is bound to, set once at bind time; read by the stash. */
     private @Nullable UUID boundEntityUuid;
 
@@ -504,11 +517,30 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private volatile @Nullable CapturedPlayer capturedPlayer;
     private volatile @Nullable CapturedProgress capturedProgress;
 
+    /**
+     * The on-sight map archive: the live remap table (the persisted manifest, the session-to-archive resolution, and
+     * the streaming gate) that resolves each filled map as it is seen and streams its data through
+     * {@link #streamMapData} at first image, so a map in a container whose chunk flushes mid-roam is captured before
+     * the holder drains rather than lost at finish. Created in {@link #ensureWriter} (where the save path, hence the
+     * manifest, is known) on the main thread before the writer thread starts, so the writer-thread finalizer sees the
+     * reference; the finalizer reads only its idcounts floor, the map files having streamed during capture. The
+     * headless suite binds a caller-built one through {@link #bindWorldOpen}, which reproduces that ordering rather
+     * than resolving anything itself. Stays null only if the world never opened for writing.
+     */
+    private @Nullable MapArchive mapArchive;
+
+    /** The wdl-private map-id manifest file ({@code <save>/wdl/map-ids}); resolved in {@link #ensureWriter}. */
+    private @Nullable Path mapIdsFile;
+
     /** containerId of the menu currently tracked, or {@link #NO_MENU} when none is open. */
     private int openContainerId = NO_MENU;
 
     /** The background writer draining captured tags to disk; opened lazily on the first chunk to flush. */
     private @Nullable AsyncSaveWriter writer;
+
+    // The per-dimension save paths, resolved with the writer in ensureWriter and read by the on-sight map stream to
+    // find the data directory. Null until the writer opens.
+    private @Nullable WorldPaths worldPaths;
 
     /** The save's level.dat ({@code <save>/level.dat}); read on a resume to keep the world's existing name. */
     private @Nullable Path levelDatFile;
@@ -535,6 +567,53 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int mergedEntityContainers;
 
     /**
+     * Captured maps lost to a failed write: the map's own data file, or a map with no writer to stream to, or one
+     * imaged after the finish batch closed. Every increment has a matching per-item loss line naming the map, so a
+     * reader can reconcile the count against the log. A non-zero tally makes the finish partial, not clean. Atomic so
+     * no increment is lost whichever thread runs the write task; that the read sees a complete count is the writer's
+     * queue drain and completed future, not this type.
+     */
+    private final AtomicInteger mapsFailed = new AtomicInteger();
+
+    /**
+     * The finalize-time idcounts write, counted apart from {@link #mapsFailed} because it loses no captured map: it is
+     * one shared file whose failure risks the reopened world reissuing captured ids. Folding it in would let the
+     * map-loss count exceed the per-item lines that explain it. Written on the writer thread.
+     */
+    private int idCountsFailed;
+
+    /**
+     * Where {@link #streamMapData} puts a map write once the finish drain has begun, instead of submitting it as its
+     * own uncounted task: the batch is handed to the writer as one unit so it can report the map phase over a known
+     * total. Null while capturing, when each map streams on sight and no bar is drawn anyway, and null again once the
+     * writer owns the batch, so the batched map tags are released rather than held through the rest of the finalize.
+     */
+    private @Nullable List<Runnable> finishMapWrites;
+
+    /**
+     * Set once the finish batch has been handed to the writer, which is what tells a null {@link #finishMapWrites}
+     * after the handover apart from the same null before the drain began. A map imaged past that point has no batch
+     * left to join and the writer drops post-finish work, so it is a loss to count.
+     */
+    private boolean finishBatchClosed;
+
+    /**
+     * The map-id manifest read lost to a fault. Its consequence lands in this download, which then re-images every map
+     * the folder already holds under fresh ids, and nothing later in the session can undo that, so it counts once and
+     * stays counted. Main thread, at world-open.
+     */
+    private int mapManifestReadFailed;
+
+    /**
+     * Whether the manifest on disk is stale as this download ends. The end state of one file rather than a tally of
+     * attempts, so both arms of the write assign it. Written on the writer thread at finalize.
+     *
+     * <p>Held apart from {@link #mapsFailed} for the reason {@link #idCountsFailed} is: no captured map is lost here,
+     * and folding it in would let the map-loss count exceed the per-item lines that explain it.
+     */
+    private boolean mapManifestStale;
+
+    /**
      * Chunks whose terrain snapshot threw, so the position reached neither the buffer nor the captured set and the
      * reopened world has none of that chunk's terrain, falling back to its own generator there (main thread). Deduped
      * by {@link #captureFailedByDimension}, since the same position is retried every tick it stays loaded.
@@ -554,6 +633,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** Container-vehicle merges lost to a throw (main thread); folds into the partial-finish predicate. */
     private int entityContainersFailed;
+
+    /** Captured map items whose id remap threw and now render blank (main thread); folds into the predicate. */
+    private int mapsRemapFailed;
 
     /** Opened container vehicles whose captured contents were never folded into a saved entity (main thread). */
     private int containerVehiclesLost;
@@ -1943,6 +2025,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
             completeWithoutWriter();
             return;
         }
+        // From here every newly imaged map batches instead of streaming alone, so the writer can report the map
+        // phase over a known total. Armed before the first finish-time remap below and handed over after the last
+        // one; the local spares that handover a null check on the field.
+        List<Runnable> mapWrites = new ArrayList<>();
+        this.finishMapWrites = mapWrites;
+        // Filled maps are captured on-sight (the live remap table streams each one as it is first imaged): a
+        // container's maps are remapped and serialized in flushBuffer just before the holder drains, and the
+        // still-live sources are handled at finish: the carried inventory in assembleCapturedPlayer, and the
+        // packet-captured item frames / dropped items / container vehicles when their tags drain.
         // Stop the inbound tee before the finish drain so no spawn arrives mid-drain to be left unwritten and
         // uncounted; the drain and the reconciliation then see a settled accumulator.
         deactivatePacketCapture();
@@ -2015,6 +2106,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
         }
         releaseResumedDismountedMount(activeWriter);
+        // After every remap site above, so the batch is complete and queues behind the last chunk and entity
+        // write: the bar then finishes the chunk phase and advances through the map phase.
+        activeWriter.submitMapBatch(mapWrites);
+        this.finishMapWrites = null; // the writer holds its own copy; dropping ours frees the batched map tags
+        this.finishBatchClosed = true;
     }
 
     /**
@@ -2031,7 +2127,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * since no player snapshot was assembled. That is deliberate and it is the better of two bad outcomes: vanilla
      * renames the replaced file to level.dat_old rather than dropping it, and lists a folder holding either, so the
      * record is recoverable and the folder stays openable. Skipping the finalize instead leaves a folder that wrote
-     * chunks with no level.dat at all, which vanilla's world list does not show.
+     * chunks with no level.dat at all, which vanilla's world list does not show, and leaves the map-id floor
+     * unpersisted so a new map in the reopened save can overwrite an archived one.
      *
      * <p>A throw counts as a degraded finish step, and that is what keeps a download whose remaining finish work never
      * reached the writer from reading clean. Both halves are needed: the save must reach a terminal state, and a save
@@ -2342,7 +2439,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         boolean fromRetention = holder == null;
         if (holder == null) {
             // Reboarded without reopening: the stash drained into an earlier standalone write, but the holder
-            // was retained for exactly this, so the mount is written whole instead of being skipped.
+            // was retained for exactly this, so the mount is written whole instead of being skipped. Use the
+            // retained object itself and never a copy of it: the guard below is keyed on identity, and a copy
+            // would read as unprepared and re-run the non-idempotent map remap over ids that are already
+            // archive ids.
             //
             // This does leave the mount on disk twice, once standalone and once under RootVehicle, under the
             // same-UUID residency rule EntityContainerMerge.refoldFlushedContainers states in full. Both copies
@@ -2353,6 +2453,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         if (holder == null) {
             return;
+        }
+        // Guard by holder identity, exactly as prepareEntityContainers does: while the player rides, a
+        // mid-session entity flush already remapped this same holder once, and the map remap is non-idempotent
+        // (remapping an already-archived id blanks the map). Prepare only a not-yet-prepared holder; an
+        // already-prepared one is remapped correctly from that one call.
+        if (preparedEntityContainers.add(holder)) {
+            remapHolderItems(holder, uuid);
         }
         try {
             // The sink returns a merged copy and sets only "Items", so a node that lives inside the record takes
@@ -2377,6 +2484,20 @@ public final class LiveCaptureSession implements CaptureController.Session {
         Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
         CompoundTag raw = adapter.playerSink().capturePlayer(player, registries);
         PlayerTag.stripDeathLocation(raw);
+        // On-sight map remap of the carried items: rewrite and serialize each carried map on the captured
+        // copy, once, at finish (never on the live object). Two passes for the two vanilla homes: the
+        // 36-slot Inventory list, then the equipment compound (offhand and armor).
+        MapArchive archive = this.mapArchive;
+        if (archive != null) {
+            archive.remap(raw, "Inventory");
+            if (raw.get("equipment") instanceof CompoundTag equipment) {
+                for (String slot : equipment.keySet()) {
+                    if (equipment.get(slot) instanceof CompoundTag item) {
+                        archive.remapItem(item);
+                    }
+                }
+            }
+        }
         PlayerTag.setDimension(raw, targetDimension);
         PlayerTag.setPosition(raw, anchor.blockPosition(), anchor.getYRot(), anchor.getXRot());
         if (rootVehicleTag != null && rootVehicleAttach != null) {
@@ -2649,13 +2770,212 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Bind the writer a world open would have installed, standing in for the tail of {@link #ensureWriter}, which
-     * cannot run headlessly because it resolves the level source through the client singleton. It has no production
-     * caller and is not an alternative way to open a world: production opens one in {@code ensureWriter}, which also
-     * takes the session lock this one knows nothing about.
+     * The {@link MapArchive.ImageResolver}: resolve a session-local map id to its serialized inner data tag, or null if
+     * the client never received its colors (a chest-only or nested map, the imageless case). The imaged map is
+     * auto-locked so the archived image is frozen against the void-world repaint. Runs on the main thread (every
+     * {@link MapArchive#archiveIdFor} call is), where the mutable {@code MapItemSavedData} may be read.
      */
-    void bindWorldOpen(AsyncSaveWriter bound) {
+    private @Nullable Tag resolveMapImage(int sessionId) {
+        MapItemSavedData saved = level().getMapData(new MapId(sessionId));
+        if (saved == null) {
+            return null; // colors never received (imageless): skipped, never fabricated
+        }
+        return adapter.mapSink().serializeMap(saved.locked(), registries);
+    }
+
+    /**
+     * Load the map-id manifest, degrading a read failure to an empty manifest so a download never stops, and counting
+     * that degradation: this download then re-images every map the folder already holds, and its archived ids are no
+     * longer distinguishable from fresh ones, which is the same shared-file consequence a failed manifest write leaves
+     * behind. The floor is raised outside that catch on purpose: the counter high-water lives in the manifest, so
+     * folding the two reads into one try would let a fault in the floor scan discard a manifest that parsed cleanly,
+     * and the empty manifest that replaced it would restart at 0 and write this download's first map over the prior
+     * download's {@code data/map_0.dat}. Package-private so the tally it feeds stays testable.
+     */
+    MapManifest loadManifest(Path file, Path dataDirectory) {
+        MapManifest manifest;
+        try {
+            manifest = MapManifest.load(file);
+        } catch (IOException | RuntimeException e) {
+            mapManifestReadFailed++;
+            LOGGER.warn("failed to read the map-id manifest; resuming as if every map is new, with ids above"
+                    + " those already on disk", e);
+            manifest = MapManifest.empty();
+        }
+        manifest.raiseCounterAbove(onDiskMapIdFloor(dataDirectory));
+        return manifest;
+    }
+
+    /** The highest map id the folder is already known to have used, or -1 if it holds none. */
+    private static int onDiskMapIdFloor(Path dataDirectory) {
+        return Math.max(dataFileFloor(dataDirectory), idCountsFloor(dataDirectory));
+    }
+
+    /**
+     * The map-id floor from the existing {@code data/map_<n>.dat} files, or -1 if that read faults. Its own -1 fallback
+     * keeps a fault in this source from discarding the idcounts floor read independently below.
+     */
+    private static int dataFileFloor(Path dataDirectory) {
+        try {
+            return MapManifest.highestDataFileId(dataDirectory);
+        } catch (IOException | RuntimeException e) {
+            LOGGER.warn("failed to read the map id floor from the data files; ignoring that source", e);
+            return -1;
+        }
+    }
+
+    /**
+     * The map-id floor from a prior {@code idcounts.dat}, or -1 if that read faults. Its own -1 fallback keeps a fault
+     * in this source from discarding the data-file floor read independently above. It can exceed the data-file source,
+     * which is why both are read: an imageless id writes no data file, so a prior download whose highest id was
+     * imageless is recorded here and nowhere else. It only reaches disk at finalize, so a prior download that crashed
+     * leaves this source empty and the data-file scan carrying the floor alone.
+     */
+    private static int idCountsFloor(Path dataDirectory) {
+        try {
+            return MapDataWriter.readIdCounts(dataDirectory);
+        } catch (IOException | RuntimeException e) {
+            LOGGER.warn("failed to read the map id floor from idcounts.dat; ignoring that source", e);
+            return -1;
+        }
+    }
+
+    /**
+     * The one map data write task, shared by the on-sight streaming arm and the finish batch. It absorbs its own
+     * {@link IOException}, which a {@link Runnable} could not throw anyway, and its own {@link RuntimeException}, which
+     * it must absorb because the shared task catches would log a runtime throw without counting it, and an uncounted
+     * loss lets the finish report a download that lost maps as clean. {@code failures} is incremented once per failed
+     * write and never otherwise, and the line beside it names the lost map. Package-private so the counting contract
+     * stays testable.
+     */
+    static Runnable mapWriteTask(Path dataDirectory, String key, Tag dataTag, AtomicInteger failures) {
+        return () -> {
+            try {
+                MapDataWriter.write(dataDirectory, key, dataTag);
+            } catch (IOException | RuntimeException e) {
+                failures.incrementAndGet();
+                LOGGER.warn("failed to write map data {}; it renders blank in the reopened world", key, e);
+            }
+        };
+    }
+
+    /**
+     * The on-sight map stream: hand one first-imaged map's data tag to the writer thread to land as
+     * {@code data/map_<id>.dat}. A map imaged during capture is submitted alone, so it reaches disk at once and a
+     * crashed capture keeps the maps it already saw. One imaged during the finish drain joins {@link #finishMapWrites}
+     * instead, because a display wall can image five figures of them in that one drain and the bar has to advance over
+     * them rather than sit frozen on the chunk phase; a crash inside those few seconds loses an unopenable save anyway,
+     * so nothing durable is traded for the bar. Called on the main thread from the remap paths, which all run behind
+     * {@code ensureWriter}; the write runs on the writer thread, interleaved with the chunk drain. Whatever write is
+     * handed to either arm must catch and count its own failure; see {@link #mapWriteTask}. Neither arm counts, both
+     * absorb a runtime throw, so a write that does not increment the tally reports a download that lost maps as clean.
+     * Package-private so the tally this hands the task stays testable.
+     */
+    void streamMapData(int archiveId, Tag dataTag) {
+        AsyncSaveWriter activeWriter = this.writer;
+        WorldPaths paths = this.worldPaths;
+        if (activeWriter == null || paths == null) {
+            // Unreachable from production today: every remap site runs behind ensureWriter, which sets both.
+            // Counted and logged so a future pre-writer remap site becomes visible instead of losing a map the
+            // archive's imaged gate already considers streamed.
+            mapsFailed.incrementAndGet();
+            LOGGER.info("map data {} had no writer to stream to; it is missing from the save",
+                    new MapId(archiveId).key());
+            return;
+        }
+        Path dataDirectory = paths.dataDirectory();
+        String key = new MapId(archiveId).key();
+        if (finishBatchClosed) {
+            // Unreachable today: every remap site precedes the handover, and the inbound hooks are detached
+            // before it. Counted and logged so a future late remap site becomes visible instead of losing a map
+            // to a writer that drops post-finish work.
+            mapsFailed.incrementAndGet();
+            LOGGER.info("map data {} was imaged after the finish batch closed; it is missing from the save", key);
+            return;
+        }
+        Runnable write = mapWriteTask(dataDirectory, key, dataTag, mapsFailed);
+        List<Runnable> batch = this.finishMapWrites;
+        if (batch != null) {
+            batch.add(write);
+            return;
+        }
+        activeWriter.submit(write);
+    }
+
+    /**
+     * Write the finalize-time idcounts, after level.dat: the streamed map files are already on disk, so this is the one
+     * remaining data/ write. Runs on the writer thread at finalize; the statements here name no thread, but the
+     * {@code mapArchive} they read is non-volatile and is visible there because world-open assigns it before that
+     * thread exists. Caught so an idcounts IO failure never aborts the otherwise-complete save; the cost is that the
+     * reopened world's allocator may reissue a captured id, logged as such. Package-private so the tally it feeds stays
+     * testable.
+     */
+    void writeIdCounts(WorldPaths paths) {
+        MapArchive archive = this.mapArchive;
+        if (archive == null) {
+            return; // the world never opened for writing
+        }
+        Tag idCounts = archive.idCountsTag();
+        if (idCounts == null) {
+            return; // no id was referenced or seeded this session
+        }
+        try {
+            MapDataWriter.writeIdCounts(paths.dataDirectory(), idCounts);
+        } catch (IOException | RuntimeException e) {
+            idCountsFailed++;
+            LOGGER.warn("failed to write idcounts; the reopened world may reissue captured map ids", e);
+        }
+    }
+
+    /**
+     * Rewrite the map-id manifest on the writer thread, after the {@code data/} files, via the atomic-move save so a
+     * torn write leaves the prior manifest intact. Fail-soft: a manifest write failure is logged and recorded, never
+     * thrown, so it can never abort the otherwise-complete save while a resume that would silently re-image every map
+     * in the folder is still reported. Package-private so the flag it sets stays testable.
+     */
+    void saveMapManifest() {
+        MapArchive archive = this.mapArchive;
+        Path file = this.mapIdsFile;
+        if (archive == null || file == null) {
+            return;
+        }
+        try {
+            archive.manifest().save(file);
+            mapManifestStale = false;
+        } catch (IOException | RuntimeException e) {
+            mapManifestStale = true;
+            LOGGER.warn("failed to update the map-id manifest; a resume of this folder re-images every map it "
+                    + "already holds", e);
+        }
+    }
+
+    /**
+     * The manifest losses this download carries: the read fault, which nothing repairs, plus one for the written file
+     * if it is still stale as the download ends.
+     */
+    private int mapManifestLosses() {
+        return mapManifestReadFailed + (mapManifestStale ? 1 : 0);
+    }
+
+    /**
+     * Bind the three world-open surfaces the map-tally paths read, standing in for the tail of {@link #ensureWriter},
+     * which cannot run headlessly because it resolves the level source through the client singleton. It has no
+     * production caller and is not an alternative way to open a world: production binds these three in
+     * {@code ensureWriter}, which also takes the session lock this one knows nothing about. The writer arrives as a
+     * factory rather than an instance so the paths and the archive are published before the writer thread exists, the
+     * same edge {@code ensureWriter} gets by constructing the writer last; handing over a running writer instead would
+     * race the finalizer's read of them. The other surfaces that step binds ({@code mapIdsFile} and
+     * {@code levelDatFile}) stay unset, so the manifest path stays closed on such a session.
+     *
+     * @param writerFactory must construct the writer inside {@code get()}; handing back one that already exists reopens
+     *                      the race this parameter shape is here to close
+     */
+    AsyncSaveWriter bindWorldOpen(WorldPaths paths, MapArchive archive, Supplier<AsyncSaveWriter> writerFactory) {
+        this.worldPaths = paths;
+        this.mapArchive = archive;
+        AsyncSaveWriter bound = writerFactory.get();
         this.writer = bound;
+        return bound;
     }
 
     /**
@@ -2700,7 +3020,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // thread; the writer thread only writes the finished data.
             Path saveRoot = access.getDimensionPath(Level.OVERWORLD);
             WorldPaths paths = adapter.worldPaths(saveRoot);
+            this.worldPaths = paths;
+            Path manifestFile = MapManifest.pathIn(saveRoot);
+            this.mapIdsFile = manifestFile;
             this.levelDatFile = saveRoot.resolve("level.dat"); // read on a resume to keep the world's name
+
+            // Load the map-id manifest once at world-open (empty for a fresh download; seeded past every used
+            // id on a resume). The live remap table streams each map on-sight from here on.
+            this.mapArchive = new MapArchive(loadManifest(manifestFile, paths.dataDirectory()),
+                    this::resolveMapImage, this::streamMapData);
             LevelDataWriter levelDataWriter = adapter.levelDataWriter();
             LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(registries, config.worldOutput(),
                     resolveWorldName());
@@ -2715,9 +3043,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     // builds this thunk at the first incremental flush, mid-capture, before finish() sets the
                     // fields, so a snapshot taken here would always be null. The thunk runs on the writer thread
                     // strictly after the chunk drain, so the fields set in finish() are visible.
+                    // level.dat is written FIRST, then idcounts (the map files themselves streamed during
+                    // capture), each write caught, so a map IO failure never aborts before level.dat (an
+                    // unopenable save) or fails it.
                     (chunksFailed, entityChunksFailed) -> {
                         levelDataWriter.save(access, levelData, capturedPlayer);
                         PlayerProgressWriter.write(saveRoot, capturedProgress);
+                        writeIdCounts(paths);
+                        saveMapManifest(); // after the data/ files, so a torn write never precedes them
                     },
                     () -> null,
                     access, progress);
@@ -2774,10 +3107,40 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 continue;
             }
             // Drain this chunk's open-time holders out of the shared stashes into a per-submit bundle the writer
-            // thunk then solely owns, so only immutable, detached data crosses to the writer (the thread-handoff
-            // boundary rule).
+            // thunk then solely owns. The main thread prepares them (the map remap below) and forgets them, so
+            // only immutable, detached data crosses to the writer (the thread-handoff boundary rule).
             Map<BlockPos, CompoundTag> containers = drainChunkHolders(containerStash, pos);
             Map<BlockPos, CompoundTag> lecterns = drainChunkHolders(lecternStash, pos);
+            // On-sight map remap of each drained holder exactly once, here at drain time and never as a
+            // whole-stash pass: the stash holds every not-yet-flushed container, which a dense storage room keeps
+            // hot for a whole session, so a per-tick pass over it scales with everything opened (with hundreds of
+            // shulker-filled chests, one pass made the client tick take tens of milliseconds), while the
+            // drain-time prepare costs only the holders actually flushing and still precedes everything
+            // writer-bound. A map in a chest whose chunk flushes mid-roam is thereby captured before it leaves
+            // memory.
+            prepareDrainedItems(containers);
+            // Drain and reconcile this chunk's interaction-predicted candidates against the captured snapshot's
+            // block-state. The confirmed "Items" (placed shulker, bookshelf books) are map remapped like the
+            // open-time path, then folded into the container bundle behind the open-time-wins precedence (an
+            // opened container at the same pos supersedes a possibly-stale place snapshot). The jukebox/beehive
+            // holders carry to the writer thunk for their own field-copy merge.
+            final Map<BlockPos, CompoundTag> holders;
+            if (interactionCapture != null) {
+                // Placed-shulker durability: drainChunk reconciles each candidate against this snapshot, the very
+                // one the writer thunk below encodes and merges against, so a jukebox-then-shulker replacement at
+                // one pos is dropped by the confirm predicate before it can merge. Keep the reconcile on the same
+                // snapshot as the position merge; a live read or a different snapshot here reopens that hole.
+                InteractionCapture.ChunkBundles confirmed = interactionCapture.drainChunk(pos, snapshot);
+                // Drop the open-time-wins losers before the remap, since prepareDrainedItems allocates a map id
+                // and writes map_<id>.dat per holder: remapping a same-pos loser would orphan that file.
+                Map<BlockPos, CompoundTag> placedItems = ContainerMerge.mergePlaceCandidates(containers,
+                        confirmed.items());
+                prepareDrainedItems(placedItems);
+                containers.putAll(placedItems);
+                holders = confirmed.holders();
+            } else {
+                holders = Map.of();
+            }
             // The positions whose holder will actually land, matched on main against the snapshot's block
             // entities the way the writer-side fold re-makes the match against the encoded tag: without them the
             // read-merge cannot tell a container captured this pass from one never captured.
@@ -2803,7 +3166,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     () -> {
                         CompoundTag tag = codec.encode(snapshot, registries, synthesizeBlending);
                         blockContainersFailed += ChunkFlushPlan.foldChunkStashes(tag, pos, containerSink,
-                                lecternSink, containers, lecterns, Map.of()).failed();
+                                lecternSink, containers, lecterns, holders).failed();
                         return tag;
                     }, ChunkFlushPlan.readMerge(snapshot, landingContainers, replacedHere));
             entries.remove();
@@ -2901,6 +3264,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 lecternStash.keySet())) {
             Map<BlockPos, CompoundTag> containers = drainChunkHolders(containerStash, pos);
             Map<BlockPos, CompoundTag> lecterns = drainChunkHolders(lecternStash, pos);
+            prepareDrainedItems(containers); // on-sight map remap, exactly as the buffered drain does
             activeWriter.submitChunkRewrite(dimension, pos, onDisk -> {
                 MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, pos, containerSink,
                         lecternSink, containers, lecterns);
@@ -2963,6 +3327,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (entityBuffer.isEmpty()) {
             return;
         }
+        prepareEntityContainers(); // map-remap any new vehicle holders once, before the merge drains them
         for (ChunkPos pos : entityBuffer.bufferedChunks()) {
             if (all || FlushPolicy.shouldFlush(pos.x, pos.z, centerX, centerZ, keepHot)) {
                 flushEntityChunk(activeWriter, pos);
@@ -2971,8 +3336,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Drain one entity-chunk: build the envelope, fold in the vehicle containers, submit. Package-private so the
-     * entity-container tally it feeds stays testable; its only production caller is the entity flush pump.
+     * Drain one entity-chunk: build the envelope, fold in the vehicle containers, remap framed maps, submit.
+     * Package-private so the entity-container and map-remap tallies it feeds stay testable; its only production caller
+     * is the entity flush pump.
      */
     void flushEntityChunk(AsyncSaveWriter activeWriter, ChunkPos pos) {
         List<CompoundTag> tags = entityBuffer.drainChunk(pos);
@@ -2997,6 +3363,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     envelope, entityContainerStash);
             mergedEntityContainers += entityTally.merged();
             entityContainersFailed += entityTally.failed();
+            MapArchive archive = this.mapArchive;
+            if (archive != null) {
+                remapEntityItems(envelope, archive);
+            }
             activeWriter.submitEntity(targetDimension, pos, envelope);
             countEntitiesSubmitted(tags); // tally writes here, at successful submit, not at buffer time
         } catch (RuntimeException e) {
@@ -3019,8 +3389,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
             CompoundTag holder = entityContainerStash.get(uuid);
             if (holder != null) {
                 // Retain a copy rather than the holder itself: the sink aliases the list it is handed into the
-                // envelope crossing to the writer, and this retention outlives that envelope.
-                foldedContainerVehicles.put(uuid, holder.copy());
+                // envelope crossing to the writer, and this retention outlives that envelope. Mark the copy
+                // prepared in the same breath, because it is a copy of an already-remapped holder and the map
+                // remap is not idempotent; a later fold must not re-run it.
+                CompoundTag retained = holder.copy();
+                preparedEntityContainers.add(retained);
+                foldedContainerVehicles.put(uuid, retained);
             }
         }
     }
@@ -3076,6 +3450,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 primeFlushDrops++;
             } else {
                 reconstructFlushDrops++;
+            }
+        }
+    }
+
+    /**
+     * On-sight map-remap each captured vehicle/animal container holder, exactly once per holder (tracked by identity),
+     * before {@link EntityContainerMerge} folds it into its entity tag, via the shared {@link #remapHolderItems}
+     * sanitization.
+     */
+    private void prepareEntityContainers() {
+        for (Map.Entry<UUID, CompoundTag> entry : entityContainerStash.entrySet()) {
+            if (preparedEntityContainers.add(entry.getValue())) {
+                remapHolderItems(entry.getValue(), entry.getKey());
             }
         }
     }
@@ -3310,25 +3697,82 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
+     * Map remap a drained {@code "Items"} holder bundle (the open-time containers and the confirmed place/insert
+     * holders) before it joins the writer-bound submit: a holder can carry a filled map, and an un-remapped map id
+     * would collide with an archive id and render the wrong map. Called only on holders that will merge, never on a
+     * still-stashed one, so the non-idempotent remap runs exactly once per holder.
+     */
+    private void prepareDrainedItems(Map<BlockPos, CompoundTag> holders) {
+        for (Map.Entry<BlockPos, CompoundTag> entry : holders.entrySet()) {
+            remapHolderItems(entry.getValue(), entry.getKey());
+        }
+    }
+
+    /**
+     * On-sight {@link MapArchive#remap} a captured container holder's {@code "Items"}, the shared container
+     * sanitization the open-time, placed-container, and entity-container paths run. Per-holder fail-soft, so a
+     * serialize bug renders that one map blank rather than aborting the flush. {@code identifier} labels the holder in
+     * the loss line, which takes a block position for a block container and a UUID for a container vehicle.
+     */
+    private void remapHolderItems(CompoundTag holder, Object identifier) {
+        MapArchive archive = this.mapArchive;
+        if (archive != null) {
+            try {
+                archive.remap(holder, "Items");
+            } catch (RuntimeException e) {
+                mapsRemapFailed++;
+                LOGGER.warn("map remap failed for holder {}; its map renders blank", identifier, e);
+            }
+        }
+    }
+
+    /**
+     * Remap (and on-sight serialize) the maps of each entity's displayed single {@code "Item"} in an encoded
+     * entity-chunk tag: an item frame's framed map and a dropped item entity's map. Walks the post-1.17
+     * {@code "Entities"} list; entities with no {@code "Item"} are skipped. Runs inside the per-chunk try.
+     */
+    private void remapEntityItems(CompoundTag entityChunkTag, MapArchive archive) {
+        if (!(entityChunkTag.get("Entities") instanceof ListTag entities)) {
+            return;
+        }
+        for (int i = 0; i < entities.size(); i++) {
+            if (entities.get(i) instanceof CompoundTag entity && entity.get("Item") instanceof CompoundTag item) {
+                try {
+                    archive.remapItem(item);
+                } catch (RuntimeException e) {
+                    // Per-item fail-soft, the remapHolderItems discipline: a single bad framed/dropped map item
+                    // renders blank rather than throwing out of flushEntityChunk and losing the whole
+                    // already-drained entity-chunk.
+                    mapsRemapFailed++;
+                    LOGGER.warn("map remap failed for entity {}; its map renders blank",
+                            EntityMerge.readUuid(entity), e);
+                }
+            }
+        }
+    }
+
+    /**
      * Whether this download lost anything, over the writer's own tallies and this session's. A write that missed disk
      * and a snapshot that threw before one was even offered are the same event from the save's point of view, and a
      * download reporting either as clean would be asserting something untrue about what reached disk. Package-private
      * so the verdict stays testable.
      *
      * <p>These tallies accrue on two threads: the writer's own arrive as arguments across its completed future or its
-     * finalize call, the block-container merge count is written on the writer thread from inside a submitted thunk, and
-     * the rest are main-thread. The plain ints are correct for the production readers because each sits behind the
-     * writer's queue drain or its completed future, not because they are single-threaded. A reader added outside those
-     * edges must supply its own ordering.
+     * finalize call, the block-container merge count is written on the writer thread from inside a submitted thunk, the
+     * map data writes, the idcounts write and the manifest staleness flag land there too, and the rest are main-thread.
+     * Only the map write tally is atomic, and the plain ints beside it are correct for the production readers because
+     * each sits behind the writer's queue drain or its completed future, not because they are single-threaded. A reader
+     * added outside those edges must supply its own ordering.
      */
     boolean isPartialSave(int chunksFailed, int entityChunksFailed) {
         return failedWriteCount(chunksFailed, entityChunksFailed) > 0;
     }
 
     private int failedWriteCount(int chunksFailed, int entityChunksFailed) {
-        return chunksFailed + entityChunksFailed + chunksCaptureFailed + blockContainersFailed
-                + entityContainersFailed + containerVehiclesLost + interactionCapturesLost + structuralEntitiesLost
-                + resumedMountsLost + finishStepsFailed;
+        return chunksFailed + entityChunksFailed + chunksCaptureFailed + mapsFailed.get() + mapsRemapFailed
+                + idCountsFailed + mapManifestLosses() + blockContainersFailed + entityContainersFailed
+                + containerVehiclesLost + interactionCapturesLost + structuralEntitiesLost + resumedMountsLost
+                + finishStepsFailed;
     }
 
     /** Report the background save's outcome to the player (called on the main thread, once, when it completes). */
@@ -3356,9 +3800,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // surfaces report. Logged even when each is zero: a reader who cannot tell "nothing else was lost" from
         // "this build had no such line" cannot check the clean verdict at all.
         LOGGER.info("counted capture losses for {}: {} chunk writes, {} entity-chunk writes, {} chunk captures, "
-                + "{} block containers, {} entity containers, {} container vehicles, {} predicted interactions, "
+                + "{} maps, {} map remaps, {} idcounts, {} map manifest, {} block containers, "
+                + "{} entity containers, {} container vehicles, {} predicted interactions, "
                 + "{} structural entities, {} resumed mounts, {} finish steps",
                 saveName, result.chunksFailed(), result.entityChunksFailed(), chunksCaptureFailed,
+                mapsFailed.get(), mapsRemapFailed, idCountsFailed, mapManifestLosses(),
                 blockContainersFailed, entityContainersFailed, containerVehiclesLost, interactionCapturesLost,
                 structuralEntitiesLost, resumedMountsLost, finishStepsFailed);
     }

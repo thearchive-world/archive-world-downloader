@@ -6,6 +6,7 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderReferencing;
 
 import java.lang.reflect.Field;
 import java.nio.file.Files;
@@ -38,6 +39,7 @@ import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
+import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.WdlConfig;
@@ -166,6 +168,51 @@ class EntityVehicleRelocationTest {
         assertTrue(EntityMerge.hasCapturedContent(folded),
                 "the mount the player is riding at finish carries the contents its earlier open captured");
         assertTrue(itemIds(folded).contains("minecraft:diamond"), "and they are the items that were captured");
+    }
+
+    @Test
+    void aReboardedMountsMapIsNotRemappedTwice(@TempDir Path temporary) throws Exception {
+        // The map remap is documented non-idempotent: a second pass reads an already-archived id as a session
+        // id and re-resolves it, so the mount's map ends up naming a different picture or no file at all. The
+        // guard is an identity-keyed set, which means anything that re-copies a retained holder silently
+        // defeats it, and level.dat is where the damage lands.
+        LiveCaptureSession session = session(temporary);
+        WorldPaths paths = paths(temporary.resolve("save"));
+        AsyncSaveWriter writer = saveWriter(paths);
+        bindArchive(session, new MapArchive(MapManifest.empty(), id -> null, (archiveId, dataTag) -> {}));
+        stashEntityContainer(session, VEHICLE, holderReferencing(sink, registries, 4242));
+        bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
+
+        session.flushEntityChunk(writer, opened); // remaps once and retains the holder
+        writer.finish().get(30, TimeUnit.SECONDS);
+        int archivedId = mapIdOf(retainedHolder(session, VEHICLE));
+
+        CompoundTag mount = session.foldRidingVehicleContents(entity(VEHICLE));
+
+        assertEquals(archivedId, mapIdOf(mount),
+                "the retained holder was already remapped, so folding it into the ridden mount must keep the "
+                        + "archive id it already carries; a second pass re-resolves that id as a session id and "
+                        + "the mount ends up naming another map's picture, or none");
+    }
+
+    /** The map id the first item of a tag's container contents references. */
+    private static int mapIdOf(CompoundTag tag) {
+        ListTag items = (ListTag) tag.get("Items");
+        CompoundTag components = (CompoundTag) ((CompoundTag) items.get(0)).get("components");
+        return ((net.minecraft.nbt.NumericTag) components.get("minecraft:map_id")).intValue();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static CompoundTag retainedHolder(LiveCaptureSession session, UUID uuid) throws Exception {
+        Field field = LiveCaptureSession.class.getDeclaredField("foldedContainerVehicles");
+        field.setAccessible(true);
+        return ((Map<UUID, CompoundTag>) field.get(session)).get(uuid);
+    }
+
+    private static void bindArchive(LiveCaptureSession session, MapArchive archive) throws Exception {
+        Field field = LiveCaptureSession.class.getDeclaredField("mapArchive");
+        field.setAccessible(true);
+        field.set(session, archive);
     }
 
     /** The item ids of an entity tag's container contents, for telling one capture of a vehicle from another. */

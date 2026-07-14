@@ -27,6 +27,7 @@ import org.junit.jupiter.api.io.TempDir;
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
+import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.WdlConfig;
@@ -126,12 +127,15 @@ class LiveCaptureSessionFailSoftTest {
 
     /**
      * Bind a session to a writer with no storage behind it, which is all the end-of-stream contract needs: the guard
-     * submits nothing, so the drain opens no storage, and what matters is whether the writer reached its finalize at
-     * all. The finalizer arrives as a parameter so a test can read the session through it, on the writer thread, at the
-     * instant the production one writes level.dat.
+     * submits nothing, so the drain opens neither target, and what matters is whether the writer reached its finalize
+     * at all. The finalizer arrives as a parameter so a test can read the session through it, on the writer thread, at
+     * the instant the production one writes level.dat.
      */
-    private static AsyncSaveWriter bindWriter(LiveCaptureSession session, AsyncSaveWriter.Finalizer finalizer) {
-        AsyncSaveWriter writer = new AsyncSaveWriter(
+    private static AsyncSaveWriter bindWriter(LiveCaptureSession session, Path temporary,
+            AsyncSaveWriter.Finalizer finalizer) {
+        WorldPaths paths = new VersionAdapterImpl().worldPaths(temporary.resolve("save"));
+        MapArchive archive = new MapArchive(MapManifest.empty(), id -> null, (archiveId, dataTag) -> {});
+        return session.bindWorldOpen(paths, archive, () -> new AsyncSaveWriter(
                 dimension -> {
                     throw new AssertionError("no chunk was submitted, so the region storage must not open");
                 },
@@ -142,9 +146,7 @@ class LiveCaptureSessionFailSoftTest {
                 finalizer,
                 () -> null,
                 () -> {},
-                new SaveProgress());
-        session.bindWorldOpen(writer);
-        return writer;
+                new SaveProgress()));
     }
 
     /**
@@ -159,7 +161,7 @@ class LiveCaptureSessionFailSoftTest {
         LiveCaptureSession session = session(temporary);
         AtomicBoolean partialAtFinalize = new AtomicBoolean(false);
         AtomicBoolean finalized = new AtomicBoolean(false);
-        AsyncSaveWriter writer = bindWriter(session, (chunksFailed, entityChunksFailed) -> {
+        AsyncSaveWriter writer = bindWriter(session, temporary, (chunksFailed, entityChunksFailed) -> {
             finalized.set(true);
             partialAtFinalize.set(session.isPartialSave(chunksFailed, entityChunksFailed));
         });
@@ -188,7 +190,7 @@ class LiveCaptureSessionFailSoftTest {
     @Test
     void anErrorOnTheWayToTheMarkerIsCaughtLikeAnyOtherThrow(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
-        AsyncSaveWriter writer = bindWriter(session, (chunksFailed, entityChunksFailed) -> {});
+        AsyncSaveWriter writer = bindWriter(session, temporary, (chunksFailed, entityChunksFailed) -> {});
 
         session.completeThroughWriter(Runnable::run, () -> {
             throw new StackOverflowError("a finish step recursed off the stack");
@@ -209,7 +211,8 @@ class LiveCaptureSessionFailSoftTest {
         LiveCaptureSession session = session(temporary);
         AtomicBoolean ran = new AtomicBoolean(false);
         AtomicBoolean finalized = new AtomicBoolean(false);
-        AsyncSaveWriter writer = bindWriter(session, (chunksFailed, entityChunksFailed) -> finalized.set(true));
+        AsyncSaveWriter writer = bindWriter(session, temporary,
+                (chunksFailed, entityChunksFailed) -> finalized.set(true));
 
         session.completeThroughWriter(Runnable::run, () -> ran.set(true));
         AsyncSaveWriter.SaveResult result = writer.result().get(30, TimeUnit.SECONDS);
@@ -230,7 +233,7 @@ class LiveCaptureSessionFailSoftTest {
     @Test
     void finishItselfReachesTheEndOfStreamThroughTheGuard(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
-        AsyncSaveWriter writer = bindWriter(session, (chunksFailed, entityChunksFailed) -> {});
+        AsyncSaveWriter writer = bindWriter(session, temporary, (chunksFailed, entityChunksFailed) -> {});
 
         session.finish();
 
