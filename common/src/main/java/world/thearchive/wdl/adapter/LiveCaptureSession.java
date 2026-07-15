@@ -465,9 +465,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int primeFlushDrops;
 
     /**
-     * The container-vehicle holders already map-remapped, by identity: the remap is not idempotent (remapping an
-     * already-archived id blanks the map), and one holder can be reached twice, once by a mid-session entity flush and
-     * again by the finish-time ridden-vehicle fold.
+     * The container-vehicle holders already scrubbed and map-remapped, by identity: the remap is not idempotent
+     * (remapping an already-archived id blanks the map), and one holder can be reached twice, once by a mid-session
+     * entity flush and again by the finish-time ridden-vehicle fold.
      */
     private final Set<CompoundTag> preparedEntityContainers = Collections.newSetFromMap(new IdentityHashMap<>());
 
@@ -2415,13 +2415,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Fold the captured open-time contents into the mount record by {@code "Items"}, each node asked for the contents
-     * captured against its own {@code "UUID"}, the same merge the standalone vehicle path applies. The live client
-     * mount serializes with empty {@code "Items"} (the menu is a throwaway container, not the entity), so this is
-     * required, not redundant. The record holds the whole tree from its root, so the entity whose menu was opened need
-     * not be that root, and while the player rides, the record is that tree's only copy on disk. Draining the stash
-     * entry keeps the finish-time "contents not saved" warning from counting it. A merge throw is isolated and tallied,
-     * the {@link EntityContainerMerge} discipline: that node then saves valid but empty. Package-private so the
-     * entity-container tally it feeds stays testable.
+     * captured against its own {@code "UUID"}, the same scrub + map-remap + merge the standalone vehicle path applies,
+     * then scrub the record's item-borne coordinates. The live client mount serializes with empty {@code "Items"} (the
+     * menu is a throwaway container, not the entity), so this is required, not redundant. The record holds the whole
+     * tree from its root, so the entity whose menu was opened need not be that root, and while the player rides, the
+     * record is that tree's only copy on disk. Draining the stash entry keeps the finish-time "contents not saved"
+     * warning from counting it. A merge throw is isolated and tallied, the {@link EntityContainerMerge} discipline:
+     * that node then saves valid but empty. Package-private so the entity-container tally it feeds stays testable.
      */
     CompoundTag foldRidingVehicleContents(CompoundTag vehicleTag) {
         // Into a copy, because a node below the root is folded in place: the tag handed in stays exactly what
@@ -2430,6 +2430,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(result).entrySet()) {
             foldEntityContents(node.getKey(), node.getValue());
         }
+        ItemLocationScrub.scrubEntity(result);
         return result;
     }
 
@@ -2455,11 +2456,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         // Guard by holder identity, exactly as prepareEntityContainers does: while the player rides, a
-        // mid-session entity flush already remapped this same holder once, and the map remap is non-idempotent
-        // (remapping an already-archived id blanks the map). Prepare only a not-yet-prepared holder; an
-        // already-prepared one is remapped correctly from that one call.
+        // mid-session entity flush already scrubbed+remapped this same holder once, and the map remap is
+        // non-idempotent (remapping an already-archived id blanks the map). Prepare only a not-yet-prepared
+        // holder; an already-prepared one is scrubbed and remapped correctly from that one call.
         if (preparedEntityContainers.add(holder)) {
-            remapHolderItems(holder, uuid);
+            scrubAndRemapItems(holder, uuid);
         }
         try {
             // The sink returns a merged copy and sets only "Items", so a node that lives inside the record takes
@@ -2484,6 +2485,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
         CompoundTag raw = adapter.playerSink().capturePlayer(player, registries);
         PlayerTag.stripDeathLocation(raw);
+        // The player tag is entity-shaped, so the entity scrub covers the Inventory list and the
+        // equipment compound (offhand and armor live there, not in Inventory, since 1.21.5).
+        ItemLocationScrub.scrubEntity(raw);
         // On-sight map remap of the carried items: rewrite and serialize each carried map on the captured
         // copy, once, at finish (never on the live object). Two passes for the two vanilla homes: the
         // 36-slot Inventory list, then the equipment compound (offhand and armor).
@@ -2584,15 +2588,21 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * level.dat's Player slot would drop the prior download's folded loot. A resume that finished un-seated carries
      * nothing (see {@link PlayerTag#restorePriorMountContents}): a dismounted mount is a normal world entity, captured
      * by the standalone entity path, so writing it into the Player slot would wrongly re-seat the player and collide
-     * same-UUID with the standalone copy. Runs as its own RESUME block, after the fresh {@code setRootVehicle}.
-     * Fail-soft on a missing or unreadable prior level.dat.
+     * same-UUID with the standalone copy. Runs as its own RESUME block, after the fresh {@code setRootVehicle}. Scrubs
+     * the restored mount's own coordinates on the {@code Entity} child (not {@code scrub(raw, key)}, a no-op on a
+     * compound, and not {@code scrubEntity(raw)}, which does not descend a RootVehicle child); the prior session
+     * already map-remapped it, so it is not re-remapped. Fail-soft on a missing or unreadable prior level.dat.
      */
     private void restorePriorMountContents(CompoundTag raw) {
         CompoundTag priorPlayer = readPriorPlayerTag();
         if (priorPlayer == null) {
             return;
         }
-        PlayerTag.restorePriorMountContents(priorPlayer, raw);
+        if (PlayerTag.restorePriorMountContents(priorPlayer, raw)
+                && raw.get("RootVehicle") instanceof CompoundTag rootVehicle
+                && rootVehicle.get("Entity") instanceof CompoundTag entity) {
+            ItemLocationScrub.scrubEntity(entity);
+        }
     }
 
     /**
@@ -3107,23 +3117,23 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 continue;
             }
             // Drain this chunk's open-time holders out of the shared stashes into a per-submit bundle the writer
-            // thunk then solely owns. The main thread prepares them (the map remap below) and forgets them, so
-            // only immutable, detached data crosses to the writer (the thread-handoff boundary rule).
+            // thunk then solely owns. The main thread prepares them (scrub + map remap below) and forgets them,
+            // so only immutable, detached data crosses to the writer (the thread-handoff boundary rule).
             Map<BlockPos, CompoundTag> containers = drainChunkHolders(containerStash, pos);
             Map<BlockPos, CompoundTag> lecterns = drainChunkHolders(lecternStash, pos);
-            // On-sight map remap of each drained holder exactly once, here at drain time and never as a
-            // whole-stash pass: the stash holds every not-yet-flushed container, which a dense storage room keeps
-            // hot for a whole session, so a per-tick pass over it scales with everything opened (with hundreds of
-            // shulker-filled chests, one pass made the client tick take tens of milliseconds), while the
-            // drain-time prepare costs only the holders actually flushing and still precedes everything
+            // Scrub and on-sight map remap each drained holder exactly once, here at drain time and
+            // never as a whole-stash pass: the stash holds every not-yet-flushed container, which a dense storage
+            // room keeps hot for a whole session, so a per-tick pass over it scales with everything opened (with
+            // hundreds of shulker-filled chests, one pass made the client tick take tens of milliseconds), while
+            // the drain-time prepare costs only the holders actually flushing and still precedes everything
             // writer-bound. A map in a chest whose chunk flushes mid-roam is thereby captured before it leaves
             // memory.
             prepareDrainedItems(containers);
             // Drain and reconcile this chunk's interaction-predicted candidates against the captured snapshot's
-            // block-state. The confirmed "Items" (placed shulker, bookshelf books) are map remapped like the
-            // open-time path, then folded into the container bundle behind the open-time-wins precedence (an
-            // opened container at the same pos supersedes a possibly-stale place snapshot). The jukebox/beehive
-            // holders carry to the writer thunk for their own field-copy merge.
+            // block-state. The confirmed "Items" (placed shulker, bookshelf books) are scrubbed and map
+            // remapped like the open-time path, then folded into the container bundle behind the open-time-wins
+            // precedence (an opened container at the same pos supersedes a possibly-stale place snapshot). The
+            // jukebox/beehive holders carry to the writer thunk for their own field-copy merge.
             final Map<BlockPos, CompoundTag> holders;
             if (interactionCapture != null) {
                 // Placed-shulker durability: drainChunk reconciles each candidate against this snapshot, the very
@@ -3152,6 +3162,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // dimension is read here on main, at submit time, so a rebind cannot misroute.
             boolean synthesizeBlending = VanillaDimensions.shouldSynthesizeBlending(config.worldOutput().worldType(),
                     targetDimension);
+            // Blank any item-borne coordinate riding a block entity's own NBT (a compass in a decorated pot or on a
+            // shelf), the one item-borne surface the item-list scrub above never sees. Done here, on the main
+            // thread and only for the chunks draining this pass, so the writer thunk encodes an already-scrubbed
+            // snapshot: the block-entity NBT is our detached copy, and this is the block-entity analogue of the
+            // per-drained-holder prepare, never a per-tick pass over the whole buffer.
+            for (CompoundTag blockEntity : snapshot.blockEntities()) {
+                ItemLocationScrub.scrubBlockEntity(blockEntity);
+            }
             // Consumed by this write, not held: the copy this write leaves on disk is post-placement, so the
             // next visit's carry-forward is reading its own capture rather than the replaced block's. Holding
             // it would suppress forever, which erases what this download archived on every later pass.
@@ -3264,7 +3282,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 lecternStash.keySet())) {
             Map<BlockPos, CompoundTag> containers = drainChunkHolders(containerStash, pos);
             Map<BlockPos, CompoundTag> lecterns = drainChunkHolders(lecternStash, pos);
-            prepareDrainedItems(containers); // on-sight map remap, exactly as the buffered drain does
+            prepareDrainedItems(containers); // scrub and on-sight map remap, exactly as the buffered drain does
             activeWriter.submitChunkRewrite(dimension, pos, onDisk -> {
                 MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, pos, containerSink,
                         lecternSink, containers, lecterns);
@@ -3327,7 +3345,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (entityBuffer.isEmpty()) {
             return;
         }
-        prepareEntityContainers(); // map-remap any new vehicle holders once, before the merge drains them
+        prepareEntityContainers(); // scrub + map-remap any new vehicle holders once, before the merge drains them
         for (ChunkPos pos : entityBuffer.bufferedChunks()) {
             if (all || FlushPolicy.shouldFlush(pos.x, pos.z, centerX, centerZ, keepHot)) {
                 flushEntityChunk(activeWriter, pos);
@@ -3363,6 +3381,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     envelope, entityContainerStash);
             mergedEntityContainers += entityTally.merged();
             entityContainersFailed += entityTally.failed();
+            scrubEntityItems(envelope);
             MapArchive archive = this.mapArchive;
             if (archive != null) {
                 remapEntityItems(envelope, archive);
@@ -3390,8 +3409,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (holder != null) {
                 // Retain a copy rather than the holder itself: the sink aliases the list it is handed into the
                 // envelope crossing to the writer, and this retention outlives that envelope. Mark the copy
-                // prepared in the same breath, because it is a copy of an already-remapped holder and the map
-                // remap is not idempotent; a later fold must not re-run it.
+                // prepared in the same breath, because it is a copy of an already-scrubbed, already-remapped
+                // holder and the map remap is not idempotent; a later fold must not re-run it.
                 CompoundTag retained = holder.copy();
                 preparedEntityContainers.add(retained);
                 foldedContainerVehicles.put(uuid, retained);
@@ -3455,14 +3474,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * On-sight map-remap each captured vehicle/animal container holder, exactly once per holder (tracked by identity),
-     * before {@link EntityContainerMerge} folds it into its entity tag, via the shared {@link #remapHolderItems}
-     * sanitization.
+     * Scrub the item-borne coordinates and on-sight map-remap each captured vehicle/animal container holder, exactly
+     * once per holder (tracked by identity), before {@link EntityContainerMerge} folds it into its entity tag, via the
+     * shared {@link #scrubAndRemapItems} sanitization.
      */
     private void prepareEntityContainers() {
         for (Map.Entry<UUID, CompoundTag> entry : entityContainerStash.entrySet()) {
             if (preparedEntityContainers.add(entry.getValue())) {
-                remapHolderItems(entry.getValue(), entry.getKey());
+                scrubAndRemapItems(entry.getValue(), entry.getKey());
             }
         }
     }
@@ -3697,24 +3716,26 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Map remap a drained {@code "Items"} holder bundle (the open-time containers and the confirmed place/insert
-     * holders) before it joins the writer-bound submit: a holder can carry a filled map, and an un-remapped map id
-     * would collide with an archive id and render the wrong map. Called only on holders that will merge, never on a
-     * still-stashed one, so the non-idempotent remap runs exactly once per holder.
+     * Scrub and map remap a drained {@code "Items"} holder bundle (the open-time containers and the confirmed
+     * place/insert holders) before it joins the writer-bound submit: a holder can carry a lodestone compass or a filled
+     * map, and an un-remapped map id would collide with an archive id and render the wrong map. Called only on holders
+     * that will merge, never on a still-stashed one, so the non-idempotent remap runs exactly once per holder.
      */
     private void prepareDrainedItems(Map<BlockPos, CompoundTag> holders) {
         for (Map.Entry<BlockPos, CompoundTag> entry : holders.entrySet()) {
-            remapHolderItems(entry.getValue(), entry.getKey());
+            scrubAndRemapItems(entry.getValue(), entry.getKey());
         }
     }
 
     /**
-     * On-sight {@link MapArchive#remap} a captured container holder's {@code "Items"}, the shared container
-     * sanitization the open-time, placed-container, and entity-container paths run. Per-holder fail-soft, so a
-     * serialize bug renders that one map blank rather than aborting the flush. {@code identifier} labels the holder in
-     * the loss line, which takes a block position for a block container and a UUID for a container vehicle.
+     * Scrub the item-borne coordinates and on-sight {@link MapArchive#remap} a captured container holder's
+     * {@code "Items"}, the shared container sanitization the open-time, placed-container, and entity-container paths
+     * run. {@link ItemLocationScrub} is null-safe and total, so the scrub cannot throw; the remap is per-holder
+     * fail-soft, so a serialize bug renders that one map blank rather than aborting the flush. {@code identifier}
+     * labels the holder in the loss line.
      */
-    private void remapHolderItems(CompoundTag holder, Object identifier) {
+    private void scrubAndRemapItems(CompoundTag holder, Object identifier) {
+        ItemLocationScrub.scrub(holder, "Items");
         MapArchive archive = this.mapArchive;
         if (archive != null) {
             try {
@@ -3722,6 +3743,22 @@ public final class LiveCaptureSession implements CaptureController.Session {
             } catch (RuntimeException e) {
                 mapsRemapFailed++;
                 LOGGER.warn("map remap failed for holder {}; its map renders blank", identifier, e);
+            }
+        }
+    }
+
+    /**
+     * Blank item-borne coordinates on every entity in an encoded entity-chunk tag (and their passengers). Walks the
+     * post-1.17 {@code "Entities"} list; {@link ItemLocationScrub#scrubEntity} recurses each entity's own
+     * {@code "Passengers"}, so this stays a flat top-level loop. Runs inside the per-chunk try.
+     */
+    private void scrubEntityItems(CompoundTag entityChunkTag) {
+        if (!(entityChunkTag.get("Entities") instanceof ListTag entities)) {
+            return;
+        }
+        for (int i = 0; i < entities.size(); i++) {
+            if (entities.get(i) instanceof CompoundTag entity) {
+                ItemLocationScrub.scrubEntity(entity);
             }
         }
     }
@@ -3740,7 +3777,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 try {
                     archive.remapItem(item);
                 } catch (RuntimeException e) {
-                    // Per-item fail-soft, the remapHolderItems discipline: a single bad framed/dropped map item
+                    // Per-item fail-soft, the scrubAndRemapItems discipline: a single bad framed/dropped map item
                     // renders blank rather than throwing out of flushEntityChunk and losing the whole
                     // already-drained entity-chunk.
                     mapsRemapFailed++;
