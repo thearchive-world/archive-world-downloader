@@ -107,6 +107,13 @@ public final class ChatCopy {
         return ivoryLine("wdl.chat.downloading", arguments);
     }
 
+    /** The resume start line, the counterpart of {@link #downloading} when continuing an existing folder. */
+    public static ChatCopy resuming(String folderName) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(amber(folderName));
+        return ivoryLine("wdl.chat.resuming", arguments);
+    }
+
     /**
      * The start refusal when no usable name was given (bare {@code /wdl start}, a name that sanitizes to nothing, or an
      * implicit start with no server name to fall back on), pointing at {@code /wdl start <name>}.
@@ -175,6 +182,12 @@ public final class ChatCopy {
 
     public static ChatCopy nothingCaptured() {
         return ivoryLine("wdl.chat.nothing_captured", new ArrayList<>());
+    }
+
+    /** The passive caution when a download starts with a core capture kind off; wholly amber, not rust. */
+    public static ChatCopy capturePartiallyDisabled() {
+        return new ChatCopy("wdl.chat.capture_partially_disabled", OptionalInt.of(BrandColors.AMBER),
+                new ArrayList<>());
     }
 
     public static ChatCopy worldNameFallback() {

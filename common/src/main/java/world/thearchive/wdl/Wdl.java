@@ -17,6 +17,7 @@ import world.thearchive.wdl.adapter.LiveCaptureSession;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.core.CaptureController;
 import world.thearchive.wdl.core.CaptureState;
+import world.thearchive.wdl.core.CaptureToggleGuard;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
@@ -135,7 +136,12 @@ public final class Wdl {
         controller.start(() -> new LiveCaptureSession(adapter, platform, config, level, target,
                 controller.sendRange(), minecraft.getCameraEntity() != minecraft.player, controller::tick));
         if (config.showChatMessages()) {
-            platform.sendChat(ChatCopy.downloading(target.folderName()));
+            platform.sendChat(target.mode() == DownloadMode.RESUME
+                    ? ChatCopy.resuming(target.folderName())
+                    : ChatCopy.downloading(target.folderName()));
+            if (CaptureToggleGuard.isCapturePartiallyDisabled(config)) {
+                platform.sendChat(ChatCopy.capturePartiallyDisabled()); // passive indicator at the start action
+            }
         }
     }
 
