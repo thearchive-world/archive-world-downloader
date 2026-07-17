@@ -182,6 +182,11 @@ public final class ConfigSchema {
 
     private static final Map<String, ConfigOption> BY_KEY = Collections.unmodifiableMap(indexByKey(OPTIONS));
 
+    /** The option for {@code key}, failing fast if there is no such descriptor row. */
+    public static ConfigOption option(String key) {
+        return Objects.requireNonNull(BY_KEY.get(key), key);
+    }
+
     static final List<ConfigOption> REPORT_ORDER = report(
             "captureEntities", "captureContainers", "recaptureChunks", "recaptureSeconds", "encodeBudgetMillis",
             "forceMobPersistence", "dumpReceivedFrames", "appendDateSuffix", "showChatMessages");
