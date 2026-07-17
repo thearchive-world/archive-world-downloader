@@ -39,6 +39,7 @@ class CaptureControllerTest {
         boolean saveDone; // the test flips this true to signal the background save has completed
         CaptureCounts counts = CaptureCounts.EMPTY;
         CapturedContainers capturedContainers = CapturedContainers.EMPTY;
+        RecoveredCoverage recoveredCoverage = RecoveredCoverage.EMPTY;
         SaveStage saveStage = SaveStage.NONE;
         float saveProgress;
 
@@ -65,6 +66,11 @@ class CaptureControllerTest {
         @Override
         public CapturedContainers capturedContainers() {
             return capturedContainers;
+        }
+
+        @Override
+        public RecoveredCoverage recoveredCoverage() {
+            return recoveredCoverage;
         }
 
         @Override
@@ -276,6 +282,21 @@ class CaptureControllerTest {
     @Test
     void capturedContainersAreEmptyWhenIdle() {
         assertSame(CapturedContainers.EMPTY, controller().capturedContainers());
+    }
+
+    @Test
+    void recoveredCoverageDelegatesToSessionWhileRecording() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        session.recoveredCoverage = new RecoveredCoverage(LongSet.of(42L));
+        controller.start(() -> session);
+
+        assertTrue(controller.recoveredCoverage().contains(42L));
+    }
+
+    @Test
+    void recoveredCoverageIsEmptyWhenIdle() {
+        assertSame(RecoveredCoverage.EMPTY, controller().recoveredCoverage());
     }
 
     @Test

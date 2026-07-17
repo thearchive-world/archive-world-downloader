@@ -109,6 +109,7 @@ import world.thearchive.wdl.core.FlushPolicy;
 import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.core.RecaptureMode;
 import world.thearchive.wdl.core.RecapturePolicy;
+import world.thearchive.wdl.core.RecoveredCoverage;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.core.SendRangeEstimator;
@@ -340,6 +341,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private final Map<ResourceKey<Level>, Long2IntOpenHashMap> bookshelfSlotsByDimension = new LinkedHashMap<>();
     private Long2IntOpenHashMap bookshelfSlots = new Long2IntOpenHashMap();
     private final Set<UUID> capturedEntityIds = new HashSet<>();
+
+    /**
+     * The resume recovered-coverage scan: on a resumed download the writer thread feeds it each prior on-disk chunk it
+     * carries forward, and it publishes the positions captured in a prior session for the outline to mark recovered.
+     * Wired to the writer in {@link #ensureWriter}; empty on a fresh download.
+     */
+    private final RecoveredScan recoveredScan = new RecoveredScan();
 
     /**
      * The per-tick entity accumulation buffer of already-serialized entity tags, keyed by UUID and drained by
@@ -1516,6 +1524,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // could go stale.
         return new CapturedContainers(capturedBlockKeys, capturedEntityIds, false, bookshelfSlots,
                 capturedBlockTypes);
+    }
+
+    @Override
+    public RecoveredCoverage recoveredCoverage() {
+        return recoveredScan.coverage(targetDimension);
     }
 
     @Override
@@ -3064,6 +3077,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     },
                     () -> null,
                     access, progress);
+            // Observe each carried-forward on-disk chunk for the outline's recovered-coverage scan.
+            // Self-gating: the writer reads the prior chunk only when one exists, so this is a no-op on a fresh
+            // download and runs only on a resume, reusing the writer's own read rather than a second region store.
+            // The entities-store sibling marks a prior-captured container entity recovered by its UUID the same way.
+            writer.observeResumeReads(recoveredScan::record);
+            writer.observeEntityResumeReads(recoveredScan::recordEntities);
             return writer;
         } catch (RuntimeException e) {
             closeQuietly(access); // never handed to a writer, so release the session lock here

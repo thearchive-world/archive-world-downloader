@@ -75,6 +75,13 @@ public final class CaptureController {
          */
         CapturedContainers capturedContainers();
 
+        /**
+         * The prior-session recovered coverage the resume scan has published, read by the outline so a re-arriving
+         * prior-captured container settles to the recovered hue rather than unsaved. Empty on a fresh download;
+         * published by the writer thread as one atomic reference swap, read here.
+         */
+        RecoveredCoverage recoveredCoverage();
+
         /** The current finalization phase while the background save drains, for the HUD bar. */
         SaveStage saveStage();
 
@@ -194,6 +201,14 @@ public final class CaptureController {
      */
     public SendRangeEstimator sendRange() {
         return sendRange;
+    }
+
+    /** The prior-session recovered coverage while recording, {@link RecoveredCoverage#EMPTY} otherwise. */
+    public RecoveredCoverage recoveredCoverage() {
+        if (state == CaptureState.RECORDING && session != null) {
+            return session.recoveredCoverage();
+        }
+        return RecoveredCoverage.EMPTY;
     }
 
     /** Begin recording with a fresh session (no-op unless idle). */
