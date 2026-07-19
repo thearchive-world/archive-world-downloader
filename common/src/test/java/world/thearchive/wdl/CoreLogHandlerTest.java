@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.CoreLogHandler.Severity;
 import world.thearchive.wdl.core.WdlConfig;
+import world.thearchive.wdl.core.export.FinalizeOutputs;
 
 class CoreLogHandlerTest {
     private record Captured(Severity severity, String loggerName, String message, @Nullable Throwable thrown) {}
@@ -153,6 +154,7 @@ class CoreLogHandlerTest {
 
     @Test
     void theNamespaceIsAnAncestorOfEveryCoreLogger() {
+        assertTrue(FinalizeOutputs.class.getName().startsWith(CoreLogHandler.NAMESPACE));
         assertTrue(WdlConfig.class.getName().startsWith(CoreLogHandler.NAMESPACE));
     }
 }

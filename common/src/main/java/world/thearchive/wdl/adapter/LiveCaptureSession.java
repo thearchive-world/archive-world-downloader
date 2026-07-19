@@ -116,6 +116,7 @@ import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.SendRangeSampler;
 import world.thearchive.wdl.core.VoidChunkPolicy;
 import world.thearchive.wdl.core.WdlConfig;
+import world.thearchive.wdl.core.export.FinalizeOutputs;
 import world.thearchive.wdl.platform.PlatformBridge;
 
 /**
@@ -3061,7 +3062,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     dimension -> new SimpleRegionStorage(paths.entitiesStorageInfo(dimension),
                             paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
                             DataFixTypes.ENTITY_CHUNK),
-                    () -> {},
+                    // Pre-merge safety copy on a resume, on the writer thread before any chunk is written into the
+                    // folder; a no-op for a fresh download. saveRoot and target are settled before the writer
+                    // starts, so the thunk closes over stable values.
+                    () -> FinalizeOutputs.backupBeforeResume(saveRoot, target.mode(), true),
                     // Read the volatile capturedPlayer/capturedProgress LAZILY inside the thunk: ensureWriter
                     // builds this thunk at the first incremental flush, mid-capture, before finish() sets the
                     // fields, so a snapshot taken here would always be null. The thunk runs on the writer thread
@@ -3075,7 +3079,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         writeIdCounts(paths);
                         saveMapManifest(); // after the data/ files, so a torn write never precedes them
                     },
-                    () -> null,
+                    // Finish-time output after the folder is fully written and closed: the export zip.
+                    // The download screen reads each row's size by walking the folder.
+                    () -> FinalizeOutputs.exportZip(saveRoot, true, progress),
                     access, progress);
             // Observe each carried-forward on-disk chunk for the outline's recovered-coverage scan.
             // Self-gating: the writer reads the prior chunk only when one exists, so this is a no-op on a fresh
