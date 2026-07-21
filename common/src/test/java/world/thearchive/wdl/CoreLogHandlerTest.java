@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.CoreLogHandler.Severity;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.core.export.FinalizeOutputs;
+import world.thearchive.wdl.core.report.DownloadReportStore;
 
 class CoreLogHandlerTest {
     private record Captured(Severity severity, String loggerName, String message, @Nullable Throwable thrown) {}
@@ -33,7 +34,7 @@ class CoreLogHandlerTest {
     };
 
     // When a test attaches to a live logger, restore it afterward so the global java.util.logging state the
-    // next test sees is unchanged.
+    // next test sees is unchanged (the DownloadReportStoreTest discipline).
     @Nullable
     private Logger attachedTo;
     @Nullable
@@ -156,5 +157,6 @@ class CoreLogHandlerTest {
     void theNamespaceIsAnAncestorOfEveryCoreLogger() {
         assertTrue(FinalizeOutputs.class.getName().startsWith(CoreLogHandler.NAMESPACE));
         assertTrue(WdlConfig.class.getName().startsWith(CoreLogHandler.NAMESPACE));
+        assertTrue(DownloadReportStore.class.getName().startsWith(CoreLogHandler.NAMESPACE));
     }
 }
