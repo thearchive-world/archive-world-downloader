@@ -3,11 +3,17 @@
 
 package world.thearchive.wdl.core.export;
 
+import java.io.BufferedReader;
+import java.io.FilterInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -23,6 +29,7 @@ import java.util.zip.ZipFile;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.core.browse.SinglePlayerTaint;
+import world.thearchive.wdl.core.report.StrictReportReader;
 
 /**
  * The clean-source discovery scan for a tainted-folder restore: the newest qualifying zip in the saves directory whose
@@ -31,8 +38,9 @@ import world.thearchive.wdl.core.browse.SinglePlayerTaint;
  * segment on any slash or backslash boundary; no duplicate entry names once lowercased and trailing-slash normalized;
  * no file entry path-prefixes another entry; the exact-case file folder/level.dat exists; no entry path names a
  * server-only artifact per {@link SinglePlayerTaint#entryPathIsServerArtifact}; and the exact-case record
- * folder/wdl/download.jsonl stays within {@link #MAX_RECORD_BYTES} uncompressed. Qualifying candidates order by file
- * modification time, newest first.
+ * folder/wdl/download.jsonl stays within {@link #MAX_RECORD_BYTES} uncompressed and yields a parseable newest
+ * finishedAt. Qualifying candidates order by recorded finish, newest first, with the file modification time breaking
+ * ties.
  *
  * <p>The scan never throws: a failure judging one candidate excludes that candidate, each exclusion logged with the
  * candidate name and failing rule at FINE, and a harness-level failure logs one WARN and reports no source.
@@ -40,7 +48,7 @@ import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 public final class RestoreSource {
     private static final Logger LOGGER = Logger.getLogger(RestoreSource.class.getName());
 
-    /** Uncompressed cap on the record entry: an at-cap record passes, an over-cap record excludes. */
+    /** Uncompressed cap on the record entry read: an at-cap record reads, an over-cap record excludes. */
     static final long MAX_RECORD_BYTES = 8L * 1024 * 1024;
 
     // Ceiling on the central-directory entry count judged per candidate, read cheaply from the count field
@@ -51,11 +59,13 @@ public final class RestoreSource {
     private final Path zip;
     private final long size;
     private final FileTime mtime;
+    private final Instant finishedAt;
 
-    private RestoreSource(Path zip, long size, FileTime mtime) {
+    private RestoreSource(Path zip, long size, FileTime mtime, Instant finishedAt) {
         this.zip = zip;
         this.size = size;
         this.mtime = mtime;
+        this.finishedAt = finishedAt;
     }
 
     public Path zip() {
@@ -68,6 +78,10 @@ public final class RestoreSource {
 
     public FileTime mtime() {
         return mtime;
+    }
+
+    public Instant finishedAt() {
+        return finishedAt;
     }
 
     /**
@@ -83,7 +97,8 @@ public final class RestoreSource {
                 if (judged == null) {
                     continue;
                 }
-                if (best == null || judged.mtime.compareTo(best.mtime) > 0) {
+                if (best == null || judged.finishedAt.isAfter(best.finishedAt)
+                        || (judged.finishedAt.equals(best.finishedAt) && judged.mtime.compareTo(best.mtime) > 0)) {
                     best = judged;
                 }
             }
@@ -217,11 +232,56 @@ public final class RestoreSource {
         if (recordEntry.getSize() > MAX_RECORD_BYTES || recordEntry.getCompressedSize() > MAX_RECORD_BYTES) {
             return excluded(zip, "record size cap");
         }
-        return new RestoreSource(zip, Files.size(zip), Files.getLastModifiedTime(zip));
+        Optional<Instant> finishedAt;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                new CappedInputStream(zipFile.getInputStream(recordEntry)), StandardCharsets.UTF_8))) {
+            finishedAt = StrictReportReader.latestFinishedAt(reader);
+        }
+        if (!finishedAt.isPresent()) {
+            return excluded(zip, "record finishedAt");
+        }
+        return new RestoreSource(zip, Files.size(zip), Files.getLastModifiedTime(zip), finishedAt.get());
     }
 
     private static @Nullable RestoreSource excluded(Path zip, String rule) {
         LOGGER.fine("excluded " + zip.getFileName() + ": " + rule);
         return null;
+    }
+
+    /**
+     * Counts uncompressed bytes delivered and fails the read past MAX_RECORD_BYTES, whatever sizes the central
+     * directory claims, so a lying or absent size never lets a decompression bomb through.
+     */
+    private static final class CappedInputStream extends FilterInputStream {
+        private long delivered;
+
+        CappedInputStream(InputStream in) {
+            super(in);
+        }
+
+        @Override
+        public int read() throws IOException {
+            int result = in.read();
+            if (result >= 0) {
+                count(1);
+            }
+            return result;
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            int readCount = in.read(buffer, offset, length);
+            if (readCount > 0) {
+                count(readCount);
+            }
+            return readCount;
+        }
+
+        private void count(int bytes) throws IOException {
+            delivered += bytes;
+            if (delivered > MAX_RECORD_BYTES) {
+                throw new IOException("record entry exceeds " + MAX_RECORD_BYTES + " uncompressed bytes");
+            }
+        }
     }
 }
