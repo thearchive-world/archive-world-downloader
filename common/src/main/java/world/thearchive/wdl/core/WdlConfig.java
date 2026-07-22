@@ -118,6 +118,20 @@ public final class WdlConfig {
     }
 
     /**
+     * The settings to show in the download report: every scalar field that differs from {@link #DEFAULTS}, plus each
+     * configured game-rule override by its {@code gamerule.<id>} key. An override is inherently a non-default setting
+     * (the model has no per-rule default), so it is listed here rather than diffed by {@link #changedFrom(WdlConfig)}.
+     * With a pristine config the map is empty.
+     */
+    public Map<String, String> nonDefaultSettings() {
+        Map<String, String> settings = changedFrom(DEFAULTS);
+        for (Map.Entry<String, String> override : worldOutput.gameRuleOverrides().entrySet()) {
+            settings.put(WorldOutputConfig.GAME_RULE_PREFIX + override.getKey(), override.getValue());
+        }
+        return settings;
+    }
+
+    /**
      * The config schema version stamped in {@code properties}, or the current {@link #CONFIG_VERSION} when the key is
      * absent (a hand-deleted version line is treated as current, since no migrator exists yet). This is file-format
      * metadata read outside the schema, not a user setting, so it never appears in {@link #changedFrom(WdlConfig)} and

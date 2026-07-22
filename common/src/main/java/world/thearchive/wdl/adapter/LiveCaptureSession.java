@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,6 +41,7 @@ import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
@@ -117,6 +120,14 @@ import world.thearchive.wdl.core.SendRangeSampler;
 import world.thearchive.wdl.core.VoidChunkPolicy;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.core.export.FinalizeOutputs;
+import world.thearchive.wdl.core.report.DimensionChunks;
+import world.thearchive.wdl.core.report.DownloadCounts;
+import world.thearchive.wdl.core.report.DownloadCountsBuilder;
+import world.thearchive.wdl.core.report.DownloadIdentity;
+import world.thearchive.wdl.core.report.DownloadReportStore;
+import world.thearchive.wdl.core.report.ReportEnvironment;
+import world.thearchive.wdl.core.report.SaveChunks;
+import world.thearchive.wdl.core.report.WorldIconWriter;
 import world.thearchive.wdl.platform.PlatformBridge;
 
 /**
@@ -569,6 +580,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** The save-directory name (the target's folder, verbatim), used to open the world and report the save. */
     private final String saveName;
 
+    /** How many stashed containers were merged into their captured chunk tags (for the saved-world message). */
+    private int mergedContainers;
+
     /** How many stashed lectern books were merged into their captured chunk tags (for the saved-world message). */
     private int mergedLecterns;
 
@@ -590,6 +604,38 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * map-loss count exceed the per-item lines that explain it. Written on the writer thread.
      */
     private int idCountsFailed;
+
+    /**
+     * The voice for a captured map lost to its own write. These three are instance fields on purpose: each bounds its
+     * stacks over one download, so hoisting any of them to a static leaves every download after the first with no stack
+     * for a cause the first already spent.
+     */
+    private final CaptureLossLog mapWriteLoss = new CaptureLossLog(LOGGER,
+            "failed to write map data {}", "it renders blank in the reopened world");
+
+    /**
+     * The voice for a captured container holder whose map-id remap threw. Says "holder" because this path is handed a
+     * block position for a block container and a UUID for a container vehicle, and a bare UUID here would be
+     * indistinguishable from the framed-item voice's own line.
+     */
+    private final CaptureLossLog mapRemapLoss = new CaptureLossLog(LOGGER,
+            "map remap failed for holder {}", "its map renders blank");
+
+    /**
+     * The voice for a framed or dropped map item whose remap threw. Kept apart from the holder voice for its own stack
+     * budget, not for its wording: a shared instance would leave whichever path lost second with no stack whenever the
+     * two fail the same way.
+     */
+    private final CaptureLossLog mapEntityRemapLoss = new CaptureLossLog(LOGGER,
+            "map remap failed for entity {}", "its map renders blank");
+
+    /**
+     * The voice for a chunk whose terrain snapshot threw. One root cause fails every chunk of a kind alike, and the
+     * square retries a failing position every tick it stays loaded, so this voice's stack budget rides on top of the
+     * per-position dedup in {@link #recordChunkCaptureLoss} rather than instead of it.
+     */
+    private final CaptureLossLog chunkCaptureLoss = new CaptureLossLog(LOGGER,
+            "failed to capture chunk {}", "the reopened world has none of that chunk's terrain");
 
     /**
      * Where {@link #streamMapData} puts a map write once the finish drain has begun, instead of submitting it as its
@@ -672,6 +718,38 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * over it.
      */
     private int finishStepsFailed;
+
+    /**
+     * The per-download report writer (the sentinel at world-open, the rendering from the writer preflight after the
+     * pre-resume backup, complete just before finalize). Fail-soft.
+     */
+    private final DownloadReportStore report = new DownloadReportStore();
+
+    /**
+     * Accumulates the report's dedup-correct counts over the session: containers at bind time (a double chest as one),
+     * entities at submit, chunks at finish. Touched only on the client main thread, like the rest of capture. The
+     * player count is settled later (it depends on the write succeeding), not through this.
+     */
+    private final DownloadCountsBuilder reportCounts = new DownloadCountsBuilder();
+
+    /** The save root and stamped identity, set when the report begins at world-open; read at finish. */
+    private @Nullable Path reportRoot;
+    private @Nullable DownloadIdentity reportIdentity;
+    private @Nullable ReportEnvironment reportEnvironment;
+
+    /**
+     * The source server's icon bytes, snapshotted on the main thread in {@link #finish()} (where {@code
+     * getCurrentServer()} is live) and read by the writer thread, the same discipline as {@link #capturedPlayer}. Null
+     * in singleplayer or on a connect that cached no icon, so no icon file is written.
+     */
+    private volatile byte @Nullable [] reportIconBytes;
+
+    /**
+     * The completion inputs frozen at end-of-capture, handed to the writer thread to write the completion marker.
+     * Volatile because the writer-thread finalizer reads it; the writer's queue already establishes the happens-before,
+     * the keyword documents it (the {@link #capturedPlayer} discipline).
+     */
+    private volatile @Nullable PendingReport pendingReport;
 
     /**
      * The {@code saveCompletePoke} argument re-polls the controller once the save has completed, and does only that:
@@ -1247,6 +1325,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
             UUID uuid = entity.getUUID();
             if (entity.shouldBeSaved()) {
+                reportCounts.addEntity(uuid); // dedup-by-UUID; matches the packet path's count semantics
                 primeRefusedEntities.remove(uuid);
             } else if (!savedEntities.contains(uuid)) {
                 primeRefusedEntities.add(uuid);
@@ -1310,6 +1389,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 if (entityBuffer.chunkOf(uuid) != null) {
                     continue;
                 }
+                reportCounts.addEntity(uuid);
                 CompoundTag tag = encodeSingleEntity(entity, pos, EntitySource.PRIMED);
                 if (tag != null) {
                     entityBuffer.accumulate(uuid, pos, tag);
@@ -1495,9 +1575,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Record one chunk whose terrain snapshot threw: count it once for that position, however many ticks it re-throws
-     * for. Neither membership guard above the snapshot call holds for such a position, since it enters neither the
-     * keep-hot buffer nor the captured set, so the square retries it every tick it stays loaded and in range and an
-     * undeduped tally would inflate without bound.
+     * for, and name it once on the loss voice. Neither membership guard above the snapshot call holds for such a
+     * position, since it enters neither the keep-hot buffer nor the captured set, so the square retries it every tick
+     * it stays loaded and in range and an undeduped tally would inflate without bound.
      *
      * <p>A count is never retracted, so a position whose snapshot threw once and succeeded on a later tick still reads
      * as one loss and reports the download partial. That is the safe direction on a path a healthy capture never takes
@@ -1510,13 +1590,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 dimension -> new LongOpenHashSet());
         if (counted.add(pos.toLong())) {
             chunksCaptureFailed++;
-            LOGGER.warn("failed to capture chunk {}; the reopened world has none of that chunk's terrain", pos, cause);
+            chunkCaptureLoss.lost(pos, cause);
         }
     }
 
     @Override
     public CaptureCounts counts() {
-        return new CaptureCounts(totalCapturedChunks(), 0, 0);
+        // Containers and entities read the dedup-correct running tally (a double chest as one, each entity once
+        // by UUID), not the stash sums, which double-count a chest pair and never carry an entity figure. Chunks
+        // stay the live captured-position total: the report tally only gains chunks at finish, so it is empty
+        // here while recording.
+        return new CaptureCounts(totalCapturedChunks(), reportCounts.containerCount(), reportCounts.entityCount());
     }
 
     @Override
@@ -1663,6 +1747,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         OptionalLong bound = association.open(atBlock, posKey, menuSlotCount, blockContainerSize);
         if (bound.isPresent()) {
+            reportCounts.addContainer("b:" + bound.getAsLong());
             LOGGER.debug("bound open container to {}", BlockPos.of(bound.getAsLong()));
         } else if (target != null) {
             // Only a real block hit that the size guard rejected is signal (the mis-bind it avoided); a
@@ -1695,6 +1780,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         OptionalLong bound = association.openLectern(atBlock, posKey, blockIsLectern, menuSlotCount,
                 ContainerCapture.LECTERN_CONTAINER_SIZE);
         if (bound.isPresent()) {
+            reportCounts.addContainer("l:" + bound.getAsLong());
             LOGGER.debug("bound open lectern to {}", BlockPos.of(bound.getAsLong()));
         }
     }
@@ -1724,6 +1810,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         OptionalLong bound = association.openCrafter(atBlock, posKey, true, blockIsCrafter,
                 menuCraftingSlotCount, crafterContainerSize);
         if (bound.isPresent()) {
+            reportCounts.addContainer("b:" + bound.getAsLong());
             LOGGER.debug("bound open crafter to {}", BlockPos.of(bound.getAsLong()));
         }
     }
@@ -1763,6 +1850,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         if (association.openDoubleChest(atBlock, atRightHalf, targetPosKey, partnerPosKey,
                 menuSlotCount, combinedContainerSize)) {
+            reportCounts.addContainer("d:" + targetPosKey); // a double chest is one container in the count
             LOGGER.debug("bound double chest at {} + {}", BlockPos.of(targetPosKey), BlockPos.of(partnerPosKey));
         }
     }
@@ -1794,6 +1882,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (association.openEntityContainer(atEntity, entityIsVehicle, menuSlotCount, entityContainerSize)
                 && uuid != null) {
             boundEntityUuid = uuid;
+            reportCounts.addContainer("v:" + uuid);
             LOGGER.debug("bound open entity container to {}", uuid);
         }
     }
@@ -1815,6 +1904,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (association.openChestedAnimal(true, true, menuChestSlotCount, entityChestSize)) {
             UUID uuid = animal.getUUID();
             boundEntityUuid = uuid;
+            reportCounts.addContainer("a:" + uuid);
             LOGGER.debug("bound open chested animal to {}", uuid);
         }
     }
@@ -2120,6 +2210,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
         }
         releaseResumedDismountedMount(activeWriter);
+        // Snapshot the source server's icon on the main thread (getCurrentServer is live only while connected);
+        // the writer thread reads the frozen bytes. Reading at finish, not begin, also catches an icon pushed
+        // mid-session after join. Null in singleplayer or with no cached icon, so no icon file is written.
+        ServerData iconServer = minecraft.getCurrentServer();
+        this.reportIconBytes = iconServer != null ? iconServer.getIconBytes() : null;
+        prepareReportCompletion(); // freeze the end-of-capture counts before the writer finalizes
         // After every remap site above, so the batch is complete and queues behind the last chunk and entity
         // write: the bar then finishes the chunk phase and advances through the map phase.
         activeWriter.submitMapBatch(mapWrites);
@@ -2168,9 +2264,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         } finally {
             AsyncSaveWriter activeWriter = writer;
             if (activeWriter != null) {
-                // End-of-stream; the writer drains, finalizes, completes its future, and the poke then reaches the
-                // game thread off the tick, so a suspended tick cannot strand the save.
-                activeWriter.finish().whenComplete((result, error) -> mainThread.execute(saveCompletePoke));
+                // end-of-stream; the writer drains, finalizes, completes its future, then the marshal pokes the
+                // completion back to the game thread (off the tick, so a paused replay does not strand it).
+                CompletionMarshal.scheduleCompletionPoke(activeWriter.finish(), mainThread, saveCompletePoke);
             } else if (failure != null) {
                 // No writer means nothing was written and no lock is held, but it also means no future for the
                 // controller to poll, so this finish has to end itself or the download never leaves saving.
@@ -2869,16 +2965,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * {@link IOException}, which a {@link Runnable} could not throw anyway, and its own {@link RuntimeException}, which
      * it must absorb because the shared task catches would log a runtime throw without counting it, and an uncounted
      * loss lets the finish report a download that lost maps as clean. {@code failures} is incremented once per failed
-     * write and never otherwise, and the line beside it names the lost map. Package-private so the counting contract
-     * stays testable.
+     * write and never otherwise, and {@code loss} names every lost map on its own line while carrying the stack once
+     * per distinct cause type. Package-private so the counting contract stays testable.
      */
-    static Runnable mapWriteTask(Path dataDirectory, String key, Tag dataTag, AtomicInteger failures) {
+    static Runnable mapWriteTask(Path dataDirectory, String key, Tag dataTag, AtomicInteger failures,
+            CaptureLossLog loss) {
         return () -> {
             try {
                 MapDataWriter.write(dataDirectory, key, dataTag);
             } catch (IOException | RuntimeException e) {
                 failures.incrementAndGet();
-                LOGGER.warn("failed to write map data {}; it renders blank in the reopened world", key, e);
+                loss.lost(key, e);
             }
         };
     }
@@ -2901,7 +2998,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (activeWriter == null || paths == null) {
             // Unreachable from production today: every remap site runs behind ensureWriter, which sets both.
             // Counted and logged so a future pre-writer remap site becomes visible instead of losing a map the
-            // archive's imaged gate already considers streamed.
+            // archive's imaged gate already considers streamed. Logged directly rather than through the write
+            // voice because no throwable exists here, and inventing one would spend that voice's stack budget
+            // for its type on a loss whose cause is the message itself.
             mapsFailed.incrementAndGet();
             LOGGER.info("map data {} had no writer to stream to; it is missing from the save",
                     new MapId(archiveId).key());
@@ -2917,7 +3016,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             LOGGER.info("map data {} was imaged after the finish batch closed; it is missing from the save", key);
             return;
         }
-        Runnable write = mapWriteTask(dataDirectory, key, dataTag, mapsFailed);
+        Runnable write = mapWriteTask(dataDirectory, key, dataTag, mapsFailed, mapWriteLoss);
         List<Runnable> batch = this.finishMapWrites;
         if (batch != null) {
             batch.add(write);
@@ -3053,6 +3152,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // id on a resume). The live remap table streams each map on-sight from here on.
             this.mapArchive = new MapArchive(loadManifest(manifestFile, paths.dataDirectory()),
                     this::resolveMapImage, this::streamMapData);
+            beginReport(minecraft, saveRoot);
             LevelDataWriter levelDataWriter = adapter.levelDataWriter();
             LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(registries, config.worldOutput(),
                     resolveWorldName());
@@ -3063,9 +3163,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
                             paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
                             DataFixTypes.ENTITY_CHUNK),
                     // Pre-merge safety copy on a resume, on the writer thread before any chunk is written into the
-                    // folder; a no-op for a fresh download. saveRoot and target are settled before the writer
-                    // starts, so the thunk closes over stable values.
-                    () -> FinalizeOutputs.backupBeforeResume(saveRoot, target.mode(), true),
+                    // folder; a no-op for a fresh download. The in-progress download.md regenerates strictly after
+                    // the backup, so the zip archives the prior session's rendering untouched (begin wrote only
+                    // the crash sentinel, which the zipper excludes). saveRoot and target are settled before the
+                    // writer starts, so the thunk closes over stable values.
+                    () -> {
+                        FinalizeOutputs.backupBeforeResume(saveRoot, target.mode(), true);
+                        report.refreshHumanRendering(saveRoot);
+                    },
                     // Read the volatile capturedPlayer/capturedProgress LAZILY inside the thunk: ensureWriter
                     // builds this thunk at the first incremental flush, mid-capture, before finish() sets the
                     // fields, so a snapshot taken here would always be null. The thunk runs on the writer thread
@@ -3078,6 +3183,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         PlayerProgressWriter.write(saveRoot, capturedProgress);
                         writeIdCounts(paths);
                         saveMapManifest(); // after the data/ files, so a torn write never precedes them
+                        // the finish marker, just before the storages/access close; carries the writer's soft
+                        // tally so the record stamps the real clean-or-partial status
+                        writeReportCompletion(chunksFailed, entityChunksFailed);
                     },
                     // Finish-time output after the folder is fully written and closed: the export zip.
                     // The download screen reads each row's size by walking the folder.
@@ -3172,6 +3280,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         confirmed.items());
                 prepareDrainedItems(placedItems);
                 containers.putAll(placedItems);
+                tallyInteractionMerges(placedItems.keySet(), confirmed.holders().keySet());
                 holders = confirmed.holders();
             } else {
                 holders = Map.of();
@@ -3180,7 +3289,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // entities the way the writer-side fold re-makes the match against the encoded tag: without them the
             // read-merge cannot tell a container captured this pass from one never captured.
             List<BlockPos> landingContainers = ChunkFlushPlan.landingHolderPositions(snapshot, containers);
+            mergedContainers += landingContainers.size();
             mergedLecterns += ChunkFlushPlan.landingHolderPositions(snapshot, lecterns).size();
+            mergedContainers += ChunkFlushPlan.landingHolderPositions(snapshot, holders).size();
             // Defer the heavy serialize plus the pure container/lectern fold to the writer thread: the thunk
             // closes over the detached snapshot, the drained holders, the per-band codec and sinks, and the frozen
             // registries, all immutable, so the render thread never runs SerializableChunkData.write. The target
@@ -3695,6 +3806,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 nestedPassengers++; // saved nested in its vehicle's tag, a received spawn that is not a written root
                 continue;
             }
+            if (entity.shouldBeSaved()) {
+                reportCounts.addEntity(promoted.frame().uuid()); // dedup-by-UUID
+            }
             CompoundTag tag = encodeSingleEntity(entity, pos, EntitySource.RECONSTRUCTED);
             if (tag != null) {
                 entityBuffer.accumulate(promoted.frame().uuid(), pos, tag);
@@ -3767,8 +3881,27 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 archive.remap(holder, "Items");
             } catch (RuntimeException e) {
                 mapsRemapFailed++;
-                LOGGER.warn("map remap failed for holder {}; its map renders blank", identifier, e);
+                mapRemapLoss.lost(identifier, e);
             }
+        }
+    }
+
+    /**
+     * Tally each confirmed interaction-prediction merge to the dedup-correct report counter, the way open-time merges
+     * tally, keyed by pos so each container counts once. A placed shulker, a jukebox disc, and a beehive count here at
+     * confirm (flush) time, so their live count lags until the chunk roams out of the hot window.
+     */
+    private void tallyInteractionMerges(Set<BlockPos> items, Set<BlockPos> holders) {
+        tallyInteractionPositions(items);
+        tallyInteractionPositions(holders);
+    }
+
+    private void tallyInteractionPositions(Set<BlockPos> positions) {
+        for (BlockPos pos : positions) {
+            if (bookshelfSlots.containsKey(pos.asLong())) {
+                continue; // a bookshelf is tallied on its own full-cycle path, never here on the any-slot confirm
+            }
+            reportCounts.addContainer("i:" + pos.asLong());
         }
     }
 
@@ -3802,12 +3935,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 try {
                     archive.remapItem(item);
                 } catch (RuntimeException e) {
-                    // Per-item fail-soft, the scrubAndRemapItems discipline: a single bad framed/dropped map item
-                    // renders blank rather than throwing out of flushEntityChunk and losing the whole
-                    // already-drained entity-chunk.
+                    // Per-item fail-soft, the scrubAndRemapItems discipline: a single bad
+                    // framed/dropped map item renders blank rather than throwing out of flushEntityChunk
+                    // and losing the whole already-drained entity-chunk.
                     mapsRemapFailed++;
-                    LOGGER.warn("map remap failed for entity {}; its map renders blank",
-                            EntityMerge.readUuid(entity), e);
+                    mapEntityRemapLoss.lost(EntityMerge.readUuid(entity), e);
                 }
             }
         }
@@ -3843,32 +3975,40 @@ public final class LiveCaptureSession implements CaptureController.Session {
             reportSaveFailure(result.error());
             return;
         }
-        // The chat figure is the distinct captured-chunk total rather than the writer's write tally, which
-        // double-counts a chunk written once then re-flushed on a revisit.
-        CaptureCounts counts = counts();
-        int containers = mergedEntityContainers + result.mergedContainers();
+        // Fallback to the writer-thread finalizer's completion write; idempotent, so at-most-once. Carries the
+        // same soft tally so a fallback write stamps the same clean-or-partial status the finalizer would.
+        writeReportCompletion(result.chunksFailed(), result.entityChunksFailed());
+        int failed = failedWriteCount(result.chunksFailed(), result.entityChunksFailed());
+        boolean partial = failed > 0;
+        // The chat figures are the dedup'd counts: the distinct captured-chunk total, not the writer's
+        // new-plus-re-captured write tally, which double-counts a chunk written once then re-flushed on a
+        // revisit. The merge fold below stays log-only diagnostics (it overcounts).
+        int distinctChunks = totalCapturedChunks();
+        int containers = mergedContainers + mergedEntityContainers + result.mergedContainers();
         if (config.showChatMessages()) {
-            bridge.sendChat(ChatCopy.downloaded(saveName, counts.chunks(), counts.entities(), counts.containers(),
-                    Wdl.elapsedMillis()));
+            bridge.sendChat(ChatCopy.downloaded(saveName, distinctChunks,
+                    reportCounts.entityCount(), reportCounts.containerCount(), Wdl.elapsedMillis()));
+            if (partial) {
+                bridge.sendChat(ChatCopy.downloadIncomplete(failed));
+            }
             Path saveFolder = Minecraft.getInstance().getLevelSource().getBaseDir().resolve(saveName)
                     .toAbsolutePath();
             bridge.sendChat(ChatCopy.savedTo(saveName, saveFolder.toString()));
         }
-        LOGGER.info("saved {} chunks ({} new, {} re-captured, {} failed), {} entity-chunks ({} failed), "
-                + "{} containers, {} lecterns to {}", result.chunksWritten(), result.chunksNew(),
-                result.chunksRecaptured(), result.chunksFailed(), result.entityChunksWritten(),
-                result.entityChunksFailed(), containers, mergedLecterns, saveName);
-        // Every term of the partial-finish sum, so a reader can add them up and reach the verdict the completion
-        // surfaces report. Logged even when each is zero: a reader who cannot tell "nothing else was lost" from
-        // "this build had no such line" cannot check the clean verdict at all.
-        LOGGER.info("counted capture losses for {}: {} chunk writes, {} entity-chunk writes, {} chunk captures, "
-                + "{} maps, {} map remaps, {} idcounts, {} map manifest, {} block containers, "
-                + "{} entity containers, {} container vehicles, {} predicted interactions, "
-                + "{} structural entities, {} resumed mounts, {} finish steps",
-                saveName, result.chunksFailed(), result.entityChunksFailed(), chunksCaptureFailed,
-                mapsFailed.get(), mapsRemapFailed, idCountsFailed, mapManifestLosses(),
-                blockContainersFailed, entityContainersFailed, containerVehiclesLost, interactionCapturesLost,
-                structuralEntitiesLost, resumedMountsLost, finishStepsFailed);
+        LOGGER.info("saved {} chunks ({} new, {} re-captured, {} failed), {} entity-chunks ({} failed, "
+                + "{} carried forward on re-flush), {} containers, {} lecterns to {}", result.chunksWritten(),
+                result.chunksNew(), result.chunksRecaptured(), result.chunksFailed(),
+                result.entityChunksWritten(), result.entityChunksFailed(), result.entitiesCarriedForward(),
+                containers, mergedLecterns, saveName);
+        // The terms of the partial-finish sum the line above does not name, so that adding the two it does name
+        // reproduces the count the chat reports. Logged even when every term is zero: a reader who cannot tell
+        // "nothing else was lost" from "this build had no such line" cannot check the clean verdict at all.
+        LOGGER.info("counted capture losses for {}: {} chunk captures, {} maps, {} map remaps, {} idcounts, "
+                + "{} map manifest, {} block containers, {} entity containers, {} container vehicles, "
+                + "{} predicted interactions, {} structural entities, {} resumed mounts, {} finish steps",
+                saveName, chunksCaptureFailed, mapsFailed.get(), mapsRemapFailed, idCountsFailed,
+                mapManifestLosses(), blockContainersFailed, entityContainersFailed, containerVehiclesLost,
+                interactionCapturesLost, structuralEntitiesLost, resumedMountsLost, finishStepsFailed);
     }
 
     /** Surface a failed save in the log, which is where the cause a player can act on lives. */
@@ -3883,4 +4023,127 @@ public final class LiveCaptureSession implements CaptureController.Session {
             LOGGER.warn("failed to close the world save access", e);
         }
     }
+
+    /**
+     * Stamp the download report's identity and settings diff into the save folder before the save begins, marking the
+     * folder as wdl-managed. Runs once at world-open ({@link #ensureWriter}) and writes only the crash sentinel; the
+     * human rendering follows from the writer preflight, after the pre-resume backup, so the backup archives the prior
+     * session's download.md. The store is fail-soft, so a report write failure never blocks the save.
+     */
+    private void beginReport(Minecraft minecraft, Path saveRoot) {
+        DownloadIdentity identity = buildReportIdentity(minecraft);
+        ReportEnvironment environment = buildReportEnvironment(minecraft);
+        this.reportRoot = saveRoot;
+        this.reportIdentity = identity;
+        this.reportEnvironment = environment;
+        report.begin(saveRoot, identity, environment, config.nonDefaultSettings());
+    }
+
+    /** Read the MC-side environment facts (server brand, simulation distance, dimension, MC + mod version). */
+    private ReportEnvironment buildReportEnvironment(Minecraft minecraft) {
+        String brand = "";
+        LocalPlayer player = minecraft.player;
+        if (player != null && player.connection.serverBrand() != null) {
+            brand = player.connection.serverBrand();
+        }
+        return new ReportEnvironment(brand, level().getServerSimulationDistance(),
+                targetDimension.identifier().toString(), Wdl.mcVersion(), bridge.modVersion());
+    }
+
+    /** Read the few MC-side identity facts (downloader, source, loader) into the MC-free report identity. */
+    private DownloadIdentity buildReportIdentity(Minecraft minecraft) {
+        String downloaderName = "";
+        String downloaderUuid = "";
+        LocalPlayer player = minecraft.player;
+        if (player != null) {
+            downloaderName = player.getGameProfile().name();
+            downloaderUuid = player.getGameProfile().id().toString();
+        }
+        String address = "";
+        String sourceName = "";
+        String motd = "";
+        String sourceKind = "unidentified";
+        ServerData server = minecraft.getCurrentServer();
+        if (server != null) {
+            address = server.ip;
+            sourceName = server.name;
+            motd = server.motd.getString();
+            sourceKind = "";
+        }
+        String worldName = target.worldName();
+        String downloadName = worldName != null ? worldName : "";
+        return new DownloadIdentity(UUID.randomUUID().toString(), Instant.now().truncatedTo(ChronoUnit.SECONDS),
+                downloaderName, downloaderUuid, address, sourceName, motd, bridge.loaderName(),
+                bridge.loaderVersion(), downloadName, sourceKind);
+    }
+
+    /**
+     * Freeze the chunk, entity, and container counts at the end-of-capture moment into {@link #pendingReport}. The
+     * container and entity counts were accumulated during capture; the chunks are fed here from the retained position
+     * set.
+     */
+    private void prepareReportCompletion() {
+        Path root = reportRoot;
+        DownloadIdentity identity = reportIdentity;
+        ReportEnvironment environment = reportEnvironment;
+        if (root == null || identity == null || environment == null) {
+            return; // the report never began (defensive: ensureWriter stamps it before finish reaches here)
+        }
+        // Build the per-dimension breakdown straight from the already-deduped position sets: each dimension
+        // keeps its own ResourceKey identity and its own count, so a shared packed position in two dimensions
+        // counts once in each, as it should.
+        List<DimensionChunks> dimensions = new ArrayList<>();
+        int chunkTotal = 0;
+        for (Map.Entry<ResourceKey<Level>, LongOpenHashSet> dimension : capturedByDimension.entrySet()) {
+            int chunks = dimension.getValue().size();
+            dimensions.add(new DimensionChunks(dimension.getKey().identifier().toString(), chunks));
+            chunkTotal += chunks;
+        }
+        this.pendingReport = new PendingReport(root, identity, environment,
+                config.nonDefaultSettings(), Instant.now().truncatedTo(ChronoUnit.SECONDS),
+                chunkTotal, reportCounts.entityCount(), reportCounts.containerCount(), dimensions);
+    }
+
+    /**
+     * Write the download report's completion record once, the authoritative finish marker. Reachable from the
+     * writer-thread finalizer (the clean-finish path) and again from the main-thread {@link #report} fallback;
+     * {@link DownloadReportStore#complete} is idempotent and fail-soft, so exactly one record results and a report
+     * write failure never corrupts the save. The save-chunk scan is handed over lazily and runs after the final drain,
+     * so it sees every flushed region write and the store's at-most-once latch keeps it from running twice.
+     */
+    private void writeReportCompletion(int chunksFailed, int entityChunksFailed) {
+        PendingReport pending = pendingReport;
+        if (pending == null) {
+            return; // nothing began, or finish() returned early before freezing the counts
+        }
+        WorldIconWriter.write(pending.saveRoot(), reportIconBytes); // bytes were snapshotted on the main thread
+        boolean clean = !isPartialSave(chunksFailed, entityChunksFailed);
+        report.complete(pending.saveRoot(), pending.identity(), pending.environment(), pending.settings(),
+                pending.finishedAt(), new DownloadCounts(pending.chunks(), pending.entities(),
+                        pending.containers(), pending.dimensions()),
+                this::scanSaveChunks, clean);
+    }
+
+    /**
+     * The in-save chunk totals at this finish instant, from the on-disk region headers; empty without paths. The catch
+     * is the supplier-boundary backstop: a scan failure of any kind degrades to a zero total (which the report renders
+     * as a session-counts fallback) rather than reaching the store's catch and costing the completion record of a
+     * fully-written download.
+     */
+    private SaveChunks scanSaveChunks() {
+        try {
+            WorldPaths paths = worldPaths;
+            return paths == null
+                    ? new SaveChunks(0, List.of())
+                    : SaveChunks.scan(paths.onDiskRegionDirectories());
+        } catch (RuntimeException e) {
+            LOGGER.warn("save-total scan failed; the report keeps the session counts only", e);
+            return new SaveChunks(0, List.of());
+        }
+    }
+
+    /** The completion inputs frozen at end-of-capture, immutable so they cross to the writer thread safely. */
+    private record PendingReport(Path saveRoot, DownloadIdentity identity, ReportEnvironment environment,
+            Map<String, String> settings, Instant finishedAt, int chunks, int entities, int containers,
+            List<DimensionChunks> dimensions) {}
 }

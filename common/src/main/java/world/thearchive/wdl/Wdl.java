@@ -6,6 +6,7 @@ package world.thearchive.wdl;
 import com.mojang.logging.LogUtils;
 import java.nio.file.Path;
 import java.util.ServiceLoader;
+import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ServerData;
@@ -53,6 +54,11 @@ public final class Wdl {
     private static ResumeFlow resumeFlow;
 
     private Wdl() {}
+
+    /** The current MC version via its Mojmap name. */
+    public static String mcVersion() {
+        return SharedConstants.getCurrentVersion().name();
+    }
 
     /** Called once by the running loader's client entrypoint, with that loader's bridge. */
     public static void initialize(PlatformBridge platformBridge) {
