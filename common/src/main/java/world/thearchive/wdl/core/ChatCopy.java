@@ -13,8 +13,9 @@ import org.jspecify.annotations.Nullable;
  * The composed copy of one download chat line: a wdl.chat translation key whose en_us pattern is the line template,
  * plus the ordered arguments filling its slots. Each argument is a literal value or a keyed sub-pattern with one
  * insert, carries its {@link BrandColors} tint or empty to inherit the line's, and may carry a click affordance the
- * platform bridge renders with the raw target as hover text. MC-free so every decision is headless-testable against the
- * shipped lang file.
+ * platform bridge renders with the raw target as hover text. Every line wears the three-tone treatment (ivory line
+ * template, amber inserted values, teal links) except the save-failure line, which is wholly rust. MC-free so every
+ * decision is headless-testable against the shipped lang file.
  */
 public final class ChatCopy {
     /**
@@ -114,6 +115,14 @@ public final class ChatCopy {
         return ivoryLine("wdl.chat.resuming", arguments);
     }
 
+    /** The {@code /wdl start <name>} rejection when the name is already a download, pointing at {@code /wdl resume}. */
+    public static ChatCopy downloadExists(String folderName) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(amber(folderName));
+        arguments.add(amber(folderName));
+        return ivoryLine("wdl.chat.download_exists", arguments);
+    }
+
     /**
      * The start refusal when no usable name was given (bare {@code /wdl start}, a name that sanitizes to nothing, or an
      * implicit start with no server name to fall back on), pointing at {@code /wdl start <name>}.
@@ -139,6 +148,18 @@ public final class ChatCopy {
         return ivoryLine("wdl.chat.downloaded", arguments);
     }
 
+    /**
+     * The partial-finish warning shown after {@link #downloaded} when the download lost something, wholly amber (the
+     * recoverable-state tint). {@code failed} sums every counted capture loss, which is not only writes that missed
+     * disk: a file can reach disk with content missing from it, and that counts here too. Heterogeneous units, so it is
+     * a magnitude rather than a cardinality, and the log carries the breakdown.
+     */
+    public static ChatCopy downloadIncomplete(int failed) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(amber(Integer.toString(failed)));
+        return new ChatCopy("wdl.chat.download_incomplete", OptionalInt.of(BrandColors.AMBER), arguments);
+    }
+
     /** The completion destination line whose link opens the download's save folder. */
     public static ChatCopy savedTo(String folderName, String folderPath) {
         List<Argument> arguments = new ArrayList<>();
@@ -148,8 +169,11 @@ public final class ChatCopy {
         return ivoryLine("wdl.chat.saved_to", arguments);
     }
 
-    /** The {@code /wdl status} reply: live counts while recording, else the phase or the idle hint. */
-    public static ChatCopy status(CaptureState state, CaptureCounts counts) {
+    /**
+     * The {@code /wdl status} reply: live counts while recording, else the phase or the idle hint. While restoring,
+     * {@code sweep} picks the launch-cleanup line over the restore line (the caller knows which it dispatched).
+     */
+    public static ChatCopy status(CaptureState state, CaptureCounts counts, boolean sweep) {
         if (state == CaptureState.RECORDING) {
             List<Argument> arguments = new ArrayList<>();
             arguments.add(amberCount("wdl.chat.chunks", counts.chunks()));
@@ -160,6 +184,10 @@ public final class ChatCopy {
         if (state == CaptureState.SAVING) {
             return ivoryLine("wdl.chat.status.saving", new ArrayList<>());
         }
+        if (state == CaptureState.RESTORING) {
+            return ivoryLine(sweep ? "wdl.chat.status.restoring_sweep" : "wdl.chat.status.restoring",
+                    new ArrayList<>());
+        }
         return ivoryLine("wdl.chat.status.idle", new ArrayList<>());
     }
 
@@ -167,9 +195,31 @@ public final class ChatCopy {
         return ivoryLine("wdl.refuse.already_downloading.body", new ArrayList<>());
     }
 
-    /** The refusal shown when a start is attempted while the previous download is still saving. */
+    /** The refusal shown when a start or resume is attempted while the previous download is still saving. */
     static ChatCopy savingInProgress() {
         return ivoryLine("wdl.refuse.saving_in_progress.body", new ArrayList<>());
+    }
+
+    /** The refusal shown when a start or resume is attempted while a restore is replacing a download folder. */
+    static ChatCopy restoringInProgress() {
+        return ivoryLine("wdl.chat.busy_restoring", new ArrayList<>());
+    }
+
+    /** The refusal shown while the launch sweep is still cleaning up what an earlier restore left behind. */
+    static ChatCopy restoreSweepInProgress() {
+        return ivoryLine("wdl.chat.busy_restoring_sweep", new ArrayList<>());
+    }
+
+    /**
+     * The start/resume refusal for a capture that is not idle: the running case ({@link #alreadyDownloading}), the
+     * still-saving case ({@link #savingInProgress}), or the restore cases, where {@code sweep} picks the launch-cleanup
+     * flavor over the player-invoked restore (the caller knows which it dispatched); the idle state never reaches here.
+     */
+    public static ChatCopy busy(CaptureState state, boolean sweep) {
+        if (state == CaptureState.RESTORING) {
+            return sweep ? restoreSweepInProgress() : restoringInProgress();
+        }
+        return state == CaptureState.SAVING ? savingInProgress() : alreadyDownloading();
     }
 
     public static ChatCopy notDownloading() {
@@ -178,6 +228,10 @@ public final class ChatCopy {
 
     public static ChatCopy joinMultiplayer() {
         return ivoryLine("wdl.refuse.join_multiplayer.body", new ArrayList<>());
+    }
+
+    public static ChatCopy resumeCancelled() {
+        return ivoryLine("wdl.chat.resume_cancelled", new ArrayList<>());
     }
 
     public static ChatCopy nothingCaptured() {
@@ -192,6 +246,61 @@ public final class ChatCopy {
 
     public static ChatCopy worldNameFallback() {
         return ivoryLine("wdl.chat.world_name_fallback", new ArrayList<>());
+    }
+
+    public static ChatCopy noSuchDownload(String name) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(amber(name));
+        return ivoryLine("wdl.chat.no_such_download", arguments);
+    }
+
+    /** The command/auto refusal for a singleplayer-opened download; steers the player to start a fresh download. */
+    public static ChatCopy refuseTainted() {
+        return ivoryLine("wdl.refuse.tainted.body", new ArrayList<>());
+    }
+
+    /** The command/auto refusal for a target that is the currently-open world. */
+    public static ChatCopy refuseLoaded() {
+        return ivoryLine("wdl.refuse.loaded_world.body", new ArrayList<>());
+    }
+
+    /**
+     * The flow-channel refusal for a name occupied by a file or a folder that is not a wdl download; {@code folderName}
+     * is the filesystem-reported spelling, carried for the copy to name. {@code suggestRename} selects the variant that
+     * adds the name-choosing advice, shown on the name-entry surfaces (a typed name or quick start, where the player
+     * has something to change); the row and chip surfaces pass false, since nothing there involves choosing a name.
+     */
+    public static ChatCopy refuseOccupant(String folderName, boolean suggestRename) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(amber(folderName));
+        return ivoryLine(suggestRename ? "wdl.refuse.occupant.body_named_advice" : "wdl.refuse.occupant.body",
+                arguments);
+    }
+
+    /** The flow-channel refusal for a download folder that no longer exists at its name. */
+    public static ChatCopy refuseFolderMissing(String folderName) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(amber(folderName));
+        return ivoryLine("wdl.refuse.folder_missing.body", arguments);
+    }
+
+    /** The flow-channel refusal for a NEW name a torn restore attempt still stages under the temporary root. */
+    public static ChatCopy refuseTornAttempt() {
+        return ivoryLine("wdl.refuse.torn_attempt.body", new ArrayList<>());
+    }
+
+    /** The skipped game-rule override warning; {@code ids} is the comma-joined identifier list. */
+    public static ChatCopy gameRuleOverridesSkipped(String ids) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(new Argument(null, ids, OptionalInt.empty(), null));
+        return ivoryLine("wdl.chat.gamerule_overrides_skipped", arguments);
+    }
+
+    /** The terminal save-failure line, wholly rust; {@code reason} names the failure category or its message. */
+    public static ChatCopy saveFailed(SaveFailureReason reason) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(new Argument(reason.translationKey(), reason.text(), OptionalInt.empty(), null));
+        return new ChatCopy("wdl.chat.save_failed", OptionalInt.of(BrandColors.RUST), arguments);
     }
 
     public static ChatCopy configFile(String path) {

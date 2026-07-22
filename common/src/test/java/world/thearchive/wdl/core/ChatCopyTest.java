@@ -6,6 +6,7 @@ package world.thearchive.wdl.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.google.gson.Gson;
@@ -22,8 +23,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The download chat copy is MC-free and unit-tested headless: the line templates are wdl.chat translation keys resolved
- * here against the shipped en_us lang file, and the tints ride the composed keys and arguments rather than the strings
- * the catalogs carry.
+ * here against the shipped en_us lang file, the three-tone treatment (ivory line template, amber inserted values, teal
+ * link) rides the composed keys and arguments, and the click affordances carry their raw targets for the platform
+ * bridge to render.
  */
 class ChatCopyTest {
     private static final Map<String, String> LANG = Collections.unmodifiableMap(loadLang());
@@ -36,6 +38,24 @@ class ChatCopyTest {
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
         assertEquals(List.of("base_20260703"), tintedTexts(line, BrandColors.AMBER));
         assertEquals(0, clickableCount(line));
+    }
+
+    @Test
+    void resumingResolvesWithTheFolderNameAmberOverIvoryTemplate() {
+        ChatCopy line = ChatCopy.resuming("base_20260703");
+
+        assertEquals("Resuming base_20260703.", resolve(line));
+        assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
+        assertEquals(List.of("base_20260703"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(0, clickableCount(line));
+    }
+
+    @Test
+    void downloadExistsPointsToResumeWithTheNameAmber() {
+        ChatCopy line = ChatCopy.downloadExists("museum");
+
+        assertEquals("\"museum\" already exists. Use /wdl resume museum to continue it.", resolve(line));
+        assertEquals(List.of("museum", "museum"), tintedTexts(line, BrandColors.AMBER));
     }
 
     @Test
@@ -66,6 +86,30 @@ class ChatCopyTest {
     }
 
     @Test
+    void busyPicksTheRunningSavingOrRestoringRefusalByState() {
+        assertEquals("Already downloading.", resolve(ChatCopy.busy(CaptureState.RECORDING, false)));
+        assertEquals("Still saving the download. Try again when it's done.",
+                resolve(ChatCopy.busy(CaptureState.SAVING, false)));
+        assertEquals("Still restoring the download. Try again when it's done.",
+                resolve(ChatCopy.busy(CaptureState.RESTORING, false)));
+        assertEquals("Still cleaning up an earlier restore. Try again when it's done.",
+                resolve(ChatCopy.busy(CaptureState.RESTORING, true)));
+    }
+
+    @Test
+    void busyRestoringLinesResolveAsIvoryTemplatesOnTheirPinnedKeys() {
+        ChatCopy restore = ChatCopy.busy(CaptureState.RESTORING, false);
+        ChatCopy sweep = ChatCopy.busy(CaptureState.RESTORING, true);
+
+        assertEquals("wdl.chat.busy_restoring", restore.translationKey());
+        assertEquals("wdl.chat.busy_restoring_sweep", sweep.translationKey());
+        assertEquals(OptionalInt.of(BrandColors.IVORY), restore.templateColor());
+        assertEquals(OptionalInt.of(BrandColors.IVORY), sweep.templateColor());
+        assertEquals(List.of(), restore.arguments());
+        assertEquals(List.of(), sweep.arguments());
+    }
+
+    @Test
     void downloadedResolvesTheSummaryWithEveryValueAmberAndDistinct() {
         ChatCopy line = ChatCopy.downloaded("w", 1234, 56, 7, 125_000);
 
@@ -91,8 +135,31 @@ class ChatCopyTest {
     }
 
     @Test
+    void downloadIncompleteRendersAmberWithTheFailedCount() {
+        ChatCopy line = ChatCopy.downloadIncomplete(5);
+
+        assertEquals("Note: this download is incomplete. 5 could not be saved; check the log.", resolve(line));
+        assertEquals(OptionalInt.of(BrandColors.AMBER), line.templateColor());
+        assertEquals(List.of("5"), tintedTexts(line, BrandColors.AMBER));
+    }
+
+    @Test
+    void savedToCarriesTheTealOpenFolderLink() {
+        ChatCopy line = ChatCopy.savedTo("w", "/saves/w");
+
+        assertEquals("Saved to w. (click to open save folder)", resolve(line));
+        assertEquals(List.of("w"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(1, clickableCount(line));
+        ChatCopy.Argument link = clickableArguments(line).get(0);
+        assertEquals(OptionalInt.of(BrandColors.TEAL), link.color());
+        ChatCopy.Click click = requireClick(link);
+        assertEquals(ChatCopy.Click.Kind.OPEN_FILE, click.kind());
+        assertEquals("/saves/w", click.target());
+    }
+
+    @Test
     void statusRecordingResolvesWithAmberCounts() {
-        ChatCopy line = ChatCopy.status(CaptureState.RECORDING, new CaptureCounts(580, 7, 341));
+        ChatCopy line = ChatCopy.status(CaptureState.RECORDING, new CaptureCounts(580, 7, 341), false);
 
         assertEquals("Downloading: chunks 580, entities 341, containers 7.", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
@@ -101,8 +168,8 @@ class ChatCopyTest {
 
     @Test
     void statusSavingAndIdleResolveAsIvoryTemplates() {
-        ChatCopy saving = ChatCopy.status(CaptureState.SAVING, CaptureCounts.EMPTY);
-        ChatCopy idle = ChatCopy.status(CaptureState.IDLE, CaptureCounts.EMPTY);
+        ChatCopy saving = ChatCopy.status(CaptureState.SAVING, CaptureCounts.EMPTY, false);
+        ChatCopy idle = ChatCopy.status(CaptureState.IDLE, CaptureCounts.EMPTY, false);
 
         assertEquals("Saving the download to disk...", resolve(saving));
         assertEquals("Idle. Use /wdl start <name> to begin downloading.", resolve(idle));
@@ -111,24 +178,111 @@ class ChatCopyTest {
     }
 
     @Test
+    void statusRestoringResolvesTheRestoreOrSweepLine() {
+        ChatCopy restoring = ChatCopy.status(CaptureState.RESTORING, CaptureCounts.EMPTY, false);
+        ChatCopy sweep = ChatCopy.status(CaptureState.RESTORING, CaptureCounts.EMPTY, true);
+
+        assertEquals("Restoring the download from its backup...", resolve(restoring));
+        assertEquals("Cleaning up an earlier restore...", resolve(sweep));
+        assertEquals("wdl.chat.status.restoring", restoring.translationKey());
+        assertEquals("wdl.chat.status.restoring_sweep", sweep.translationKey());
+        assertEquals(OptionalInt.of(BrandColors.IVORY), restoring.templateColor());
+        assertEquals(OptionalInt.of(BrandColors.IVORY), sweep.templateColor());
+    }
+
+    @Test
     void statusCarriesNoTip() {
-        assertFalse(resolve(ChatCopy.status(CaptureState.RECORDING, CaptureCounts.EMPTY)).contains("Tip:"),
+        assertFalse(resolve(ChatCopy.status(CaptureState.RECORDING, CaptureCounts.EMPTY, false)).contains("Tip:"),
                 "the recording status must not bring back the retired Tip nudge");
-        assertFalse(resolve(ChatCopy.status(CaptureState.IDLE, CaptureCounts.EMPTY)).contains("Tip:"),
+        assertFalse(resolve(ChatCopy.status(CaptureState.IDLE, CaptureCounts.EMPTY, false)).contains("Tip:"),
                 "the idle status must not bring back the retired Tip nudge");
     }
 
     @Test
     void noticesResolveAsIvoryTemplates() {
         List<ChatCopy> notices = List.of(ChatCopy.alreadyDownloading(), ChatCopy.notDownloading(),
-                ChatCopy.joinMultiplayer());
+                ChatCopy.joinMultiplayer(), ChatCopy.resumeCancelled(), ChatCopy.nothingCaptured(),
+                ChatCopy.worldNameFallback(), ChatCopy.refuseTainted(), ChatCopy.refuseLoaded());
 
         assertEquals("Already downloading.", resolve(notices.get(0)));
         assertEquals("Not downloading. Use /wdl start <name> to begin.", resolve(notices.get(1)));
         assertEquals("Join a multiplayer server to download its world.", resolve(notices.get(2)));
+        assertEquals("Resume cancelled.", resolve(notices.get(3)));
+        assertEquals("Nothing downloaded. No chunks were saved.", resolve(notices.get(4)));
+        assertEquals("Could not read the existing world name, so the default name is used.", resolve(notices.get(5)));
+        assertEquals("This world was opened in singleplayer and may contain generated (non-server) chunks. "
+                + "Start a fresh download instead of resuming.", resolve(notices.get(6)));
+        assertEquals("That world is currently open.", resolve(notices.get(7)));
         for (ChatCopy notice : notices) {
             assertEquals(OptionalInt.of(BrandColors.IVORY), notice.templateColor(), notice.translationKey());
         }
+    }
+
+    @Test
+    void flowChannelStartRefusalsShareTheToastBodiesAsIvoryLines() {
+        ChatCopy occupant = ChatCopy.refuseOccupant("base", false);
+        ChatCopy occupantAdvice = ChatCopy.refuseOccupant("base", true);
+        ChatCopy folderMissing = ChatCopy.refuseFolderMissing("base");
+        ChatCopy tornAttempt = ChatCopy.refuseTornAttempt();
+
+        assertEquals("wdl.refuse.occupant.body", occupant.translationKey());
+        assertEquals("wdl.refuse.occupant.body_named_advice", occupantAdvice.translationKey());
+        assertEquals("wdl.refuse.folder_missing.body", folderMissing.translationKey());
+        assertEquals("wdl.refuse.torn_attempt.body", tornAttempt.translationKey());
+        assertEquals("\"base\" is taken by something that isn't a download.", resolve(occupant));
+        assertEquals("\"base\" is taken by something that isn't a download. "
+                + "Choose another name, or move the folder aside.", resolve(occupantAdvice));
+        assertEquals("The download folder \"base\" no longer exists.", resolve(folderMissing));
+        assertEquals("An earlier restore left unfinished cleanup for that name. "
+                + "Open the Downloads screen to finish it, or wait for the cleanup to complete.",
+                resolve(tornAttempt));
+        for (ChatCopy refusal : List.of(occupant, occupantAdvice, folderMissing, tornAttempt)) {
+            assertEquals(OptionalInt.of(BrandColors.IVORY), refusal.templateColor(), refusal.translationKey());
+        }
+        for (ChatCopy named : List.of(occupant, occupantAdvice, folderMissing)) {
+            assertEquals("base", named.arguments().get(0).text(), named.translationKey());
+            assertEquals(OptionalInt.of(BrandColors.AMBER), named.arguments().get(0).color());
+        }
+        assertEquals(List.of(), tornAttempt.arguments());
+    }
+
+    @Test
+    void noSuchDownloadTintsTheNameAmber() {
+        ChatCopy line = ChatCopy.noSuchDownload("w");
+
+        assertEquals("No download named \"w\". Use /wdl start <name> to begin a new one.", resolve(line));
+        assertEquals(List.of("w"), tintedTexts(line, BrandColors.AMBER));
+    }
+
+    @Test
+    void gameRuleOverridesSkippedResolvesCountFreeOverIvory() {
+        ChatCopy line = ChatCopy.gameRuleOverridesSkipped("doFoo, doBar");
+
+        assertEquals("Some game-rule overrides don't apply to this Minecraft version and were skipped: "
+                + "doFoo, doBar", resolve(line));
+        assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
+        assertEquals(List.of(), tintedTexts(line, BrandColors.AMBER));
+    }
+
+    @Test
+    void capturePartiallyDisabledIsWhollyAmber() {
+        ChatCopy line = ChatCopy.capturePartiallyDisabled();
+
+        assertEquals("Note: some content toggles are off, so this download will be missing that content.",
+                resolve(line));
+        assertEquals(OptionalInt.of(BrandColors.AMBER), line.templateColor(),
+                "the caution rides the amber template, not the ivory notice template");
+        assertEquals(List.of(), line.arguments());
+        assertEquals(0, clickableCount(line));
+    }
+
+    @Test
+    void saveFailedIsWhollyRust() {
+        ChatCopy line = ChatCopy.saveFailed(SaveFailureReason.keyed("wdl.reason.access_denied"));
+
+        assertEquals("Save failed: access denied", resolve(line));
+        assertEquals(OptionalInt.of(BrandColors.RUST), line.templateColor());
+        assertEquals(OptionalInt.empty(), line.arguments().get(0).color(), "the description inherits the rust");
     }
 
     @Test
@@ -140,6 +294,18 @@ class ChatCopyTest {
         assertEquals(List.of("/config/wdl.properties"), tintedTexts(file, BrandColors.AMBER));
         assertEquals("captureEntities=true", resolve(values));
         assertEquals(OptionalInt.of(BrandColors.IVORY), values.templateColor());
+    }
+
+    @Test
+    void onlyTheFolderLinkArgumentCarriesItsClickTarget() {
+        ChatCopy line = ChatCopy.savedTo("w", "/saves/w");
+
+        for (ChatCopy.Argument argument : line.arguments()) {
+            if (!"wdl.chat.open_save_folder".equals(argument.translationKey())) {
+                assertNull(argument.click(), argument.text());
+            }
+        }
+        assertEquals(1, clickableCount(line));
     }
 
     /** Resolves a composed line to its en_us copy, failing on any key the lang file does not carry. */
@@ -209,5 +375,11 @@ class ChatCopyTest {
 
     private static int clickableCount(ChatCopy line) {
         return clickableArguments(line).size();
+    }
+
+    private static ChatCopy.Click requireClick(ChatCopy.Argument argument) {
+        ChatCopy.Click click = argument.click();
+        assertNotNull(click);
+        return click;
     }
 }
