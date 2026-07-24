@@ -4,20 +4,25 @@
 package world.thearchive.wdl.neoforge;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.brigadier.CommandDispatcher;
 import java.nio.file.Path;
 import java.util.Objects;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
 import world.thearchive.wdl.platform.AbstractPlatformBridge;
+import world.thearchive.wdl.platform.WdlCommands;
 
 /**
  * NeoForge implementation of {@link world.thearchive.wdl.platform.PlatformBridge PlatformBridge}, constructed by
@@ -126,5 +131,17 @@ final class NeoForgePlatformBridge extends AbstractPlatformBridge {
     @Override
     public boolean observesSpectatorEntityClick() {
         return false;
+    }
+
+    /**
+     * {@link RegisterClientCommandsEvent} fires on the GAME bus (it extends {@code Event}), so register it on
+     * {@link NeoForge#EVENT_BUS}, the same bus this bridge already uses for ticks and disconnect.
+     */
+    @Override
+    public void registerCommands(WdlCommands commands) {
+        NeoForge.EVENT_BUS.addListener(RegisterClientCommandsEvent.class, event -> {
+            CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+            dispatcher.register(wdlCommandTree(commands, Commands::literal, Commands::argument));
+        });
     }
 }
