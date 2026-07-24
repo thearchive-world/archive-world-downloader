@@ -3,8 +3,14 @@
 
 package world.thearchive.wdl.platform;
 
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.logging.LogUtils;
 import java.net.URI;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -88,5 +94,34 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             rendered = rendered.withColor(line.templateColor().getAsInt());
         }
         return rendered;
+    }
+
+    /** Run a /wdl action and report Brigadier success. */
+    private static int run(Runnable action) {
+        action.run();
+        return 1;
+    }
+
+    /**
+     * Build the /wdl command tree once, source-generic, so each loader registers the same grammar with only its own
+     * literal and argument builder factories. The action lambdas never read the command source.
+     */
+    protected static <S> LiteralArgumentBuilder<S> wdlCommandTree(WdlCommands commands,
+            Function<String, LiteralArgumentBuilder<S>> literal,
+            BiFunction<String, ArgumentType<String>, RequiredArgumentBuilder<S, String>> argument) {
+        return literal.apply("wdl")
+                .executes(context -> run(commands.status())) // bare /wdl shows status, never auto-starts
+                .then(literal.apply("start")
+                        .executes(context -> run(commands.start()))
+                        .then(argument.apply("name", StringArgumentType.greedyString())
+                                .executes(context -> run(() -> commands.startNamed()
+                                        .accept(StringArgumentType.getString(context, "name"))))))
+                .then(literal.apply("stop").executes(context -> run(commands.stop())))
+                .then(literal.apply("status").executes(context -> run(commands.status())))
+                .then(literal.apply("config").executes(context -> run(commands.config())))
+                .then(literal.apply("downloads").executes(context -> run(commands.openDownloads())))
+                .then(literal.apply("resume").then(argument.apply("folder", StringArgumentType.greedyString())
+                        .executes(context -> run(() -> commands.resume()
+                                .accept(StringArgumentType.getString(context, "folder"))))));
     }
 }

@@ -7,6 +7,7 @@ import java.nio.file.Path;
 
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.platform.PlatformBridge;
+import world.thearchive.wdl.platform.WdlCommands;
 
 /**
  * A {@link PlatformBridge} that registers nothing and surfaces nothing, for headless tests that need a bridge only
@@ -87,4 +88,7 @@ public class HeadlessPlatformBridge implements PlatformBridge {
     public void sendChat(ChatCopy line) {
         throw new AssertionError("a headless test surfaced player chat: " + line);
     }
+
+    @Override
+    public void registerCommands(WdlCommands commands) {}
 }

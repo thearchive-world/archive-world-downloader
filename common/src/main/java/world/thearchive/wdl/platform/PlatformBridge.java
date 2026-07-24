@@ -71,4 +71,10 @@ public interface PlatformBridge {
      * its hover.
      */
     void sendChat(ChatCopy line);
+
+    /**
+     * Register the {@code /wdl} client command; the loader builds the Brigadier tree and dispatches to
+     * {@code commands}' actions on the client main thread.
+     */
+    void registerCommands(WdlCommands commands);
 }
