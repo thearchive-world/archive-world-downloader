@@ -5,6 +5,7 @@ package world.thearchive.wdl;
 
 import com.mojang.logging.LogUtils;
 import java.nio.file.Path;
+import java.util.OptionalLong;
 import java.util.ServiceLoader;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
@@ -17,11 +18,13 @@ import world.thearchive.wdl.adapter.ConnectionTee;
 import world.thearchive.wdl.adapter.LiveCaptureSession;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.core.CaptureController;
+import world.thearchive.wdl.core.CaptureCounts;
 import world.thearchive.wdl.core.CaptureState;
 import world.thearchive.wdl.core.CaptureToggleGuard;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
+import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.core.browse.TargetResolver;
 import world.thearchive.wdl.platform.PlatformBridge;
@@ -48,6 +51,8 @@ public final class Wdl {
 
     private static final CaptureController controller = new CaptureController();
 
+    private static volatile WdlConfig currentConfig = WdlConfig.DEFAULTS;
+
     // The download-start flow, constructed by initialize() once the bridge is live; never null in operation,
     // so its uninitialized-field check is suppressed here.
     @SuppressWarnings("NullAway.Init")
@@ -71,7 +76,7 @@ public final class Wdl {
                 .orElseThrow(() -> new IllegalStateException("No VersionAdapter service is registered"));
         LOGGER.info("Archive World Downloader {} on {} {}", platformBridge.modVersion(),
                 platformBridge.loaderName(), platformBridge.loaderVersion());
-        WdlConfig.load(configPath()); // materialize the documented default file on first run, so it can be edited
+        currentConfig = WdlConfig.load(configPath()); // materialize the default config file on first run
         LOGGER.info("config file: {}", configPath());
         resumeFlow = new ResumeFlow(platformBridge, () -> WdlConfig.load(configPath()), Wdl::startDownload);
 
@@ -92,9 +97,39 @@ public final class Wdl {
         return current;
     }
 
+    /** The current capture state. */
+    public static CaptureState state() {
+        return controller.state();
+    }
+
+    /** Live counts while recording, the stop-time frozen snapshot through saving and the done linger. */
+    public static CaptureCounts counts() {
+        return controller.counts();
+    }
+
     /** The capture's elapsed wall-clock time, frozen at stop through saving and the done linger. */
     public static long elapsedMillis() {
         return controller.elapsedMillis();
+    }
+
+    /** The finalization phase while saving, {@link SaveStage#NONE} otherwise. */
+    public static SaveStage saveStage() {
+        return controller.saveStage();
+    }
+
+    /** The finalization phase's fraction while saving, 0 otherwise. */
+    public static float saveProgress() {
+        return controller.saveProgress();
+    }
+
+    /** Milliseconds since the last save completed while within the done-linger hold, else empty. */
+    public static OptionalLong doneElapsedMillis() {
+        return controller.doneElapsedMillis();
+    }
+
+    /** The most recently loaded config (no disk IO on the render path). */
+    public static WdlConfig config() {
+        return currentConfig;
     }
 
     private static void onClientTick() {
@@ -136,6 +171,7 @@ public final class Wdl {
             return; // no live start path reaches here without a loaded world; a silent guard before level is used
         }
         WdlConfig config = WdlConfig.load(configPath());
+        currentConfig = config;
         // State-independent of captureEntities, so a signal raised between downloads is discarded for every
         // download kind, not only when an entity capture activates.
         ConnectionTee.clearTransferSignal();

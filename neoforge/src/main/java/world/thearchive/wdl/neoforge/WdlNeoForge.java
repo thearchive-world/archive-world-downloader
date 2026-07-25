@@ -3,26 +3,41 @@
 
 package world.thearchive.wdl.neoforge;
 
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.resources.Identifier;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.InteractionCapture;
 import world.thearchive.wdl.adapter.MountMenuReader;
 import world.thearchive.wdl.adapter.OpenClickTracker;
+import world.thearchive.wdl.client.WdlHudOverlay;
+import world.thearchive.wdl.client.WdlKeyBinds;
 
 /**
- * NeoForge client entrypoint, the analog of {@code WdlFabricClient#onInitializeClient}. The {@code @Mod} constructor
- * fires after all mod constructors and is where the loader-agnostic {@link Wdl#initialize} is handed this loader's
- * {@link NeoForgePlatformBridge}.
+ * NeoForge client entrypoint (the analog of {@code WdlFabricClient#onInitializeClient}).
+ *
+ * <p>Runs at registration time: the {@code @Mod} constructor fires <i>after</i> all mod constructors but <i>before</i>
+ * {@link RegisterKeyMappingsEvent} and {@link RegisterGuiLayersEvent}, so it is the right (and only correct) point to
+ * add the mod-bus listeners that register the keybinds and the HUD layer. We hand the injected mod event bus to a new
+ * {@link NeoForgePlatformBridge} and pass it to the loader-agnostic {@link Wdl#initialize}.
  *
  * <p>It also installs the connection packet tee on each play connection, the analog of the Fabric
- * {@code ClientPlayConnectionEvents.JOIN} hook. The tee is always installed (entity packet capture is the default
- * mechanism) and no-ops while no download is running.
+ * {@code ClientPlayConnectionEvents.JOIN} hook, and registers the capture HUD overlay plus its peek keybind. The HUD
+ * layer registers above all others rather than relative to a vanilla layer, so it inherits no gamemode render condition
+ * and stays visible in creative and spectator; the render body is shared. The tee is always installed (entity packet
+ * capture is the default mechanism) and no-ops while no download is running.
+ *
+ * <p>{@code dist = Dist.CLIENT}: this is a client-only mod, so the entrypoint never loads on a dedicated server.
  */
 @Mod(value = "wdl", dist = Dist.CLIENT)
 public final class WdlNeoForge {
@@ -43,5 +58,15 @@ public final class WdlNeoForge {
         // the clicked entity rather than the drifting crosshair. No-ops outside a download.
         NeoForge.EVENT_BUS.addListener((PlayerInteractEvent.EntityInteract event) -> OpenClickTracker
                 .dispatchUseEntity(event.getEntity(), event.getLevel(), event.getTarget()));
+
+        KeyMapping peekKey = new KeyMapping(
+                "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY);
+        modEventBus.addListener(RegisterKeyMappingsEvent.class, event -> event.register(peekKey));
+        WdlHudOverlay.bindPeekKey(peekKey);
+        // Register above all layers rather than relative to a gamemode-gated vanilla layer (the experience bar is
+        // hidden in creative, the hotbar in spectator), so the overlay draws in every gamemode; it self-gates F1
+        // and blocking screens itself.
+        modEventBus.addListener(RegisterGuiLayersEvent.class, event -> event.registerAboveAll(
+                Identifier.fromNamespaceAndPath("wdl", "hud"), WdlHudOverlay::render));
     }
 }
