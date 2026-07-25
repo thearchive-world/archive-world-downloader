@@ -92,4 +92,19 @@ class ConfigTypeTest {
         }
         assertEquals("1.0", option.type.format(1.0f));
     }
+
+    @Test
+    void enumParsesUppercasedAndFlagsUnknownConstant() {
+        ConfigOption option = ConfigOption.enumOption("anchor", "TOP_CENTER",
+                name -> HudAnchor.valueOf(name), accessor, "");
+        List<String> malformed = flags();
+
+        assertEquals(HudAnchor.BOTTOM_RIGHT, option.type.parse(option, "bottom_right", malformed),
+                "the raw value is uppercased before lookup");
+        assertTrue(malformed.isEmpty());
+
+        assertNull(option.type.parse(option, "DIAGONAL", malformed));
+        assertTrue(malformed.contains("anchor"));
+        assertEquals("TOP_CENTER", option.type.format(HudAnchor.TOP_CENTER));
+    }
 }
