@@ -41,11 +41,12 @@ public final class WdlConfig {
     private final boolean appendDateSuffix;
     private final boolean showChatMessages;
     private final WorldOutputConfig worldOutput;
+    private final HudConfig hud;
 
     private WdlConfig(boolean captureEntities, boolean captureContainers,
             RecaptureMode recaptureChunks, int recaptureSeconds,
             int encodeBudgetMillis, boolean forceMobPersistence, boolean dumpReceivedFrames,
-            boolean appendDateSuffix, boolean showChatMessages, WorldOutputConfig worldOutput) {
+            boolean appendDateSuffix, boolean showChatMessages, WorldOutputConfig worldOutput, HudConfig hud) {
         this.captureEntities = captureEntities;
         this.captureContainers = captureContainers;
         this.recaptureChunks = recaptureChunks;
@@ -56,6 +57,7 @@ public final class WdlConfig {
         this.appendDateSuffix = appendDateSuffix;
         this.showChatMessages = showChatMessages;
         this.worldOutput = worldOutput;
+        this.hud = hud;
     }
 
     public boolean captureEntities() {
@@ -104,6 +106,11 @@ public final class WdlConfig {
     /** The world-output options (game-rule overrides, world-open defaults, and the two capture knobs). */
     public WorldOutputConfig worldOutput() {
         return worldOutput;
+    }
+
+    /** The HUD-overlay options (anchor, offset, layout, peek mode, panel, linger, tint). */
+    public HudConfig hud() {
+        return hud;
     }
 
     /**
@@ -171,7 +178,8 @@ public final class WdlConfig {
                 values.booleanValue("dumpReceivedFrames"),
                 values.booleanValue("appendDateSuffix"),
                 values.booleanValue("showChatMessages"),
-                WorldOutputConfig.from(values, properties));
+                WorldOutputConfig.from(values, properties),
+                HudConfig.from(values));
     }
 
     /**

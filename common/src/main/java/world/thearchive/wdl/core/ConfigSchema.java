@@ -145,6 +145,33 @@ public final class ConfigSchema {
             + "# so a missing frame can be checked against what was actually received (a download-loss audit).\n"
             + "# Off by default; it collects every received item frame in memory and writes a file at save.\n";
 
+    private static final String SHOW_HUD_PREAMBLE = ""
+            + "\n"
+            + "# Rendered HUD overlay: the live download status drawn on screen while a download runs and saves.\n"
+            + "# Master: draw it at all. On by default. Set false to rely on the chat status line.\n";
+
+    private static final String HUD_ANCHOR_PREAMBLE = ""
+            + "# Where it anchors. One of TOP_LEFT, TOP_CENTER, TOP_RIGHT, MIDDLE_LEFT, MIDDLE_CENTER,\n"
+            + "# MIDDLE_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT (the bottom center is left for the hotbar).\n";
+
+    private static final String HUD_OFFSET_X_PREAMBLE = ""
+            + "# Pixel nudge from the anchor (-200 to 200), clamped to the screen.\n";
+
+    private static final String HUD_DETAILED_PREAMBLE = ""
+            + "# Show the detailed multi-line layout by default. When off, the peek key reveals it live.\n";
+
+    private static final String HUD_PEEK_MODE_PREAMBLE = ""
+            + "# How the peek key reveals the detailed layout: HOLD shows it while held, TOGGLE flips it per press.\n";
+
+    private static final String HUD_BACKGROUND_PREAMBLE = ""
+            + "# Draw a panel behind the overlay. Off by default, so the text is drawn with a drop shadow instead.\n";
+
+    private static final String HUD_PANEL_OPACITY_PREAMBLE = ""
+            + "# Panel opacity as a percent (0 to 100) when the panel is shown.\n";
+
+    private static final String HUD_DONE_LINGER_SECONDS_PREAMBLE = ""
+            + "# How long (seconds, 0 to 30) the done frame holds after a save before it fades out.\n";
+
     static final List<ConfigOption> OPTIONS = Collections.unmodifiableList(Arrays.asList(
             ConfigOption.dataLossBoolean("captureEntities", "true", config -> config.captureEntities(),
                     CAPTURE_TOGGLES_PREAMBLE),
@@ -178,7 +205,23 @@ public final class ConfigSchema {
             ConfigOption.booleanOption("showChatMessages", "true", config -> config.showChatMessages(),
                     SHOW_CHAT_MESSAGES_PREAMBLE),
             ConfigOption.booleanOption("dumpReceivedFrames", "false", config -> config.dumpReceivedFrames(),
-                    DUMP_RECEIVED_FRAMES_PREAMBLE)));
+                    DUMP_RECEIVED_FRAMES_PREAMBLE),
+            ConfigOption.booleanOption("showHud", "true", config -> config.hud().showHud(), SHOW_HUD_PREAMBLE),
+            ConfigOption.enumOption("hudAnchor", "TOP_CENTER", name -> HudAnchor.valueOf(name),
+                    config -> config.hud().anchor(), HUD_ANCHOR_PREAMBLE),
+            ConfigOption.rangedInteger("hudOffsetX", "0", -200, 200, config -> config.hud().offsetX(),
+                    HUD_OFFSET_X_PREAMBLE),
+            ConfigOption.rangedInteger("hudOffsetY", "0", -200, 200, config -> config.hud().offsetY(), ""),
+            ConfigOption.booleanOption("hudDetailed", "false", config -> config.hud().detailed(),
+                    HUD_DETAILED_PREAMBLE),
+            ConfigOption.enumOption("hudPeekMode", "HOLD", name -> HudPeekMode.valueOf(name),
+                    config -> config.hud().peekMode(), HUD_PEEK_MODE_PREAMBLE),
+            ConfigOption.booleanOption("hudBackground", "false", config -> config.hud().background(),
+                    HUD_BACKGROUND_PREAMBLE),
+            ConfigOption.rangedInteger("hudPanelOpacity", "56", 0, 100, config -> config.hud().panelOpacity(),
+                    HUD_PANEL_OPACITY_PREAMBLE),
+            ConfigOption.rangedInteger("hudDoneLingerSeconds", "8", 0, 30, config -> config.hud().doneLingerSeconds(),
+                    HUD_DONE_LINGER_SECONDS_PREAMBLE)));
 
     private static final Map<String, ConfigOption> BY_KEY = Collections.unmodifiableMap(indexByKey(OPTIONS));
 
