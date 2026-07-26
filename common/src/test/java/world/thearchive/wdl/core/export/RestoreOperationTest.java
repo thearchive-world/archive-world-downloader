@@ -114,6 +114,17 @@ class RestoreOperationTest {
 
     @Test
     void preconditionsRefusePerCause() throws IOException {
+        taintedWorldWithCleanExport("World");
+        RestoreSource source = RestoreSource.find(saves, "World").get();
+        // NOT_MANAGED: strip wdl/ after pinning (the swapped-occupant backstop).
+        deleteRecursively(saves.resolve("World/wdl"));
+        assertEquals(RestoreOperation.Outcome.NOT_MANAGED, runOp("World", source));
+        // FOLDER_MISSING vs FILE_OCCUPANT split on what exists at the name.
+        deleteRecursively(saves.resolve("World"));
+        assertEquals(RestoreOperation.Outcome.FOLDER_MISSING, runOp("World", source));
+        Files.write(saves.resolve("World"), new byte[] { 1 });
+        assertEquals(RestoreOperation.Outcome.FILE_OCCUPANT, runOp("World", source));
+        Files.delete(saves.resolve("World"));
         // NOT_TAINTED: a clean managed folder refuses honestly.
         taintedWorldWithCleanExport("World2");
         deleteRecursively(saves.resolve("World2/playerdata"));

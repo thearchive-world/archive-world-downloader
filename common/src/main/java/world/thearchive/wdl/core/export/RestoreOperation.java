@@ -42,14 +42,16 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jspecify.annotations.Nullable;
 
+import world.thearchive.wdl.core.browse.DownloadFolders;
 import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 import world.thearchive.wdl.core.browse.SinglePlayerTaint.TaintState;
 
 /**
  * The guarded replace of a tainted download folder from its pinned clean export. One run re-proves the preconditions on
- * the worker (tainted, source unchanged, not the loaded world, not locked), optionally snapshots the folder beside
- * itself first, extracts the export into a per-attempt staging directory under {@code saves/.wdl-restore-work/}, and
- * swaps the extracted copy in with atomic moves, keeping the original as a kept-aside until the install is in place.
+ * the worker (managed folder, tainted, source unchanged, not the loaded world, not locked), optionally snapshots the
+ * folder beside itself first, extracts the export into a per-attempt staging directory under
+ * {@code saves/.wdl-restore-work/}, and swaps the extracted copy in with atomic moves, keeping the original as a
+ * kept-aside until the install is in place.
  *
  * <p>{@link #run()} never throws (Throwable-inclusive) and always yields a {@link Result}; every phase is preceded by
  * an abort check so a quitting client backs out instead of racing the shutdown. A restore whose world already swapped
@@ -433,8 +435,17 @@ public final class RestoreOperation {
         }
     }
 
-    /** The pinned refusal order: taint, source identity, loaded world, folder probe. */
+    /** The pinned refusal order: managed split, taint, source identity, loaded world, folder probe. */
     private @Nullable Outcome checkPreconditions(Path folder) {
+        if (!DownloadFolders.isWdlManaged(folder)) {
+            if (!Files.exists(folder)) {
+                return Outcome.FOLDER_MISSING;
+            }
+            if (!Files.isDirectory(folder)) {
+                return Outcome.FILE_OCCUPANT;
+            }
+            return Outcome.NOT_MANAGED;
+        }
         TaintState taint = SinglePlayerTaint.classify(folder);
         if (taint == TaintState.CLEAN) {
             return Outcome.NOT_TAINTED;
