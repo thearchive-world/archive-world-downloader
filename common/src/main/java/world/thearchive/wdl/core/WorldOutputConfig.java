@@ -28,12 +28,13 @@ public final class WorldOutputConfig {
      * Both masters on, creative on, cheats on, both capture knobs off, no rule overrides, and the honest void generator
      * (no seed, no structures).
      */
-    public static final WorldOutputConfig DEFAULTS = new WorldOutputConfig(true, Collections.emptyMap(), true,
+    public static final WorldOutputConfig DEFAULTS = new WorldOutputConfig(true, Collections.emptyMap(), true, true,
             true, false, false, WorldType.VOID, 0L, false);
 
     private final boolean overrideGameRules;
     private final Map<String, String> gameRuleOverrides;
     private final boolean overrideWorldDefaults;
+    private final boolean openInCreative;
     private final boolean allowCommands;
     private final boolean skipVoidChunks;
     private final boolean autoDownload;
@@ -42,12 +43,13 @@ public final class WorldOutputConfig {
     private final boolean generateFeatures;
 
     WorldOutputConfig(boolean overrideGameRules, Map<String, String> gameRuleOverrides,
-            boolean overrideWorldDefaults,
+            boolean overrideWorldDefaults, boolean openInCreative,
             boolean allowCommands, boolean skipVoidChunks, boolean autoDownload,
             WorldType worldType, long worldSeed, boolean generateFeatures) {
         this.overrideGameRules = overrideGameRules;
         this.gameRuleOverrides = Collections.unmodifiableMap(new TreeMap<>(gameRuleOverrides));
         this.overrideWorldDefaults = overrideWorldDefaults;
+        this.openInCreative = openInCreative;
         this.allowCommands = allowCommands;
         this.skipVoidChunks = skipVoidChunks;
         this.autoDownload = autoDownload;
@@ -69,6 +71,11 @@ public final class WorldOutputConfig {
     /** Master: when off, creative game mode and cheats are not imposed; the world opens in your captured mode. */
     public boolean overrideWorldDefaults() {
         return overrideWorldDefaults;
+    }
+
+    /** Whether the downloaded world opens in creative game mode (gated by {@link #overrideWorldDefaults()}). */
+    public boolean openInCreative() {
+        return openInCreative;
     }
 
     /**
@@ -124,6 +131,7 @@ public final class WorldOutputConfig {
                 values.booleanValue("overrideGamerules"),
                 parseGameRuleOverrides(properties),
                 values.booleanValue("overrideWorldDefaults"),
+                values.booleanValue("openInCreative"),
                 values.booleanValue("allowCommands"),
                 values.booleanValue("skipVoidChunks"),
                 values.booleanValue("autoDownload"),

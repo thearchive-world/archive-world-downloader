@@ -33,28 +33,57 @@ public final class WdlConfig {
 
     private final boolean captureEntities;
     private final boolean captureContainers;
+    private final boolean captureAdvancements;
+    private final boolean captureStatistics;
     private final RecaptureMode recaptureChunks;
     private final int recaptureSeconds;
+    private final boolean savePlayerInventory;
+    private final boolean savePlayerEnderChest;
+    private final boolean saveItemCoordinates;
+    private final boolean lockDownloadedMaps;
+    private final boolean remapMapIds;
     private final int encodeBudgetMillis;
     private final boolean forceMobPersistence;
     private final boolean dumpReceivedFrames;
+    private final boolean zipOnFinish;
+    private final boolean zipOnResume;
     private final boolean appendDateSuffix;
+    private final boolean confirmResume;
+    private final boolean blockTaintedResume;
+    private final boolean showToasts;
     private final boolean showChatMessages;
     private final WorldOutputConfig worldOutput;
     private final HudConfig hud;
 
     private WdlConfig(boolean captureEntities, boolean captureContainers,
+            boolean captureAdvancements, boolean captureStatistics,
             RecaptureMode recaptureChunks, int recaptureSeconds,
-            int encodeBudgetMillis, boolean forceMobPersistence, boolean dumpReceivedFrames,
-            boolean appendDateSuffix, boolean showChatMessages, WorldOutputConfig worldOutput, HudConfig hud) {
+            boolean savePlayerInventory, boolean savePlayerEnderChest, boolean saveItemCoordinates,
+            boolean lockDownloadedMaps, boolean remapMapIds, int encodeBudgetMillis, boolean forceMobPersistence,
+            boolean dumpReceivedFrames, boolean zipOnFinish, boolean zipOnResume, boolean appendDateSuffix,
+            boolean confirmResume, boolean blockTaintedResume, boolean showToasts,
+            boolean showChatMessages,
+            WorldOutputConfig worldOutput, HudConfig hud) {
         this.captureEntities = captureEntities;
         this.captureContainers = captureContainers;
+        this.captureAdvancements = captureAdvancements;
+        this.captureStatistics = captureStatistics;
         this.recaptureChunks = recaptureChunks;
         this.recaptureSeconds = recaptureSeconds;
+        this.savePlayerInventory = savePlayerInventory;
+        this.savePlayerEnderChest = savePlayerEnderChest;
+        this.saveItemCoordinates = saveItemCoordinates;
+        this.lockDownloadedMaps = lockDownloadedMaps;
+        this.remapMapIds = remapMapIds;
         this.encodeBudgetMillis = encodeBudgetMillis;
         this.forceMobPersistence = forceMobPersistence;
         this.dumpReceivedFrames = dumpReceivedFrames;
+        this.zipOnFinish = zipOnFinish;
+        this.zipOnResume = zipOnResume;
         this.appendDateSuffix = appendDateSuffix;
+        this.confirmResume = confirmResume;
+        this.blockTaintedResume = blockTaintedResume;
+        this.showToasts = showToasts;
         this.showChatMessages = showChatMessages;
         this.worldOutput = worldOutput;
         this.hud = hud;
@@ -68,6 +97,16 @@ public final class WdlConfig {
         return captureContainers;
     }
 
+    /** Whether to capture the player's advancement progress into {@code advancements/<uuid>.json}. */
+    public boolean captureAdvancements() {
+        return captureAdvancements;
+    }
+
+    /** Whether to capture the player's statistics into {@code stats/<uuid>.json}. */
+    public boolean captureStatistics() {
+        return captureStatistics;
+    }
+
     /** How current the download keeps the world as the player records (snapshot-once, nearby-only, or on revisit). */
     public RecaptureMode recaptureChunks() {
         return recaptureChunks;
@@ -76,6 +115,34 @@ public final class WdlConfig {
     /** How often (seconds) the whole set of nearby buffered chunks is refreshed while recording. */
     public int recaptureSeconds() {
         return recaptureSeconds;
+    }
+
+    /** Whether to write the captured inventory (and selected slot) into the download. */
+    public boolean savePlayerInventory() {
+        return savePlayerInventory;
+    }
+
+    /** Whether to write the captured ender-chest contents (captured open-time) into the download. */
+    public boolean savePlayerEnderChest() {
+        return savePlayerEnderChest;
+    }
+
+    /** Whether to keep item-borne coordinates ({@code true}) or blank them for privacy ({@code false}). */
+    public boolean saveItemCoordinates() {
+        return saveItemCoordinates;
+    }
+
+    /** Whether captured filled maps are auto-locked ({@code true}, frozen image) or left live ({@code false}). */
+    public boolean lockDownloadedMaps() {
+        return lockDownloadedMaps;
+    }
+
+    /**
+     * Whether captured filled maps are re-keyed to stable archive ids ({@code true}) or keep the original server ids
+     * ({@code false}).
+     */
+    public boolean remapMapIds() {
+        return remapMapIds;
     }
 
     /** Max milliseconds per tick spent encoding chunks/entities; the rest spills to later ticks (smoothness knob). */
@@ -93,9 +160,39 @@ public final class WdlConfig {
         return dumpReceivedFrames;
     }
 
+    /** Whether a finished download is also zipped to {@code <folder>.zip} beside the folder (default on). */
+    public boolean zipOnFinish() {
+        return zipOnFinish;
+    }
+
+    /**
+     * Whether a resume first zips the existing folder to {@code <folder>-pre-resume.zip} before merging (default on).
+     */
+    public boolean zipOnResume() {
+        return zipOnResume;
+    }
+
     /** Whether a new download's resolved name is decorated with a {@code -YYYY-MM-DD} suffix (default on). */
     public boolean appendDateSuffix() {
         return appendDateSuffix;
+    }
+
+    /** Whether resuming into an existing folder asks for confirmation first, or continues silently (default on). */
+    public boolean confirmResume() {
+        return confirmResume;
+    }
+
+    /**
+     * Whether resuming into a folder opened in singleplayer is blocked; off downgrades to a per-attempt confirm
+     * (default on).
+     */
+    public boolean blockTaintedResume() {
+        return blockTaintedResume;
+    }
+
+    /** Whether the job-done toasts (download complete, download error) are shown (default on). */
+    public boolean showToasts() {
+        return showToasts;
     }
 
     /** Whether the mod's chat notices (the update-available line) are shown; in-screen notices ignore it. */
@@ -164,19 +261,32 @@ public final class WdlConfig {
     /**
      * As {@link #parse(Properties)}, but recording into {@code malformed} the key of any typed scalar whose present
      * value does not parse to its type (a non-boolean for a flag, a non-integer for a count), so {@link #load(Path)}
-     * can self-heal the file. A missing key keeps its default and is not malformed.
+     * can self-heal the file. A missing key keeps its default and is not malformed, and the sparse {@code gamerule.*}
+     * overrides are raw strings validated per band at write time, not here.
      */
     static WdlConfig parse(Properties properties, List<String> malformed) {
         ConfigValues values = ConfigSchema.read(properties, malformed);
         return new WdlConfig(
                 values.booleanValue("captureEntities"),
                 values.booleanValue("captureContainers"),
+                values.booleanValue("captureAdvancements"),
+                values.booleanValue("captureStatistics"),
                 values.enumValue("recaptureChunks", RecaptureMode.class),
                 values.integer("recaptureSeconds"),
+                values.booleanValue("savePlayerInventory"),
+                values.booleanValue("savePlayerEnderChest"),
+                values.booleanValue("saveItemCoordinates"),
+                values.booleanValue("lockDownloadedMaps"),
+                values.booleanValue("remapMapIds"),
                 values.integer("encodeBudgetMillis"),
                 values.booleanValue("forceMobPersistence"),
                 values.booleanValue("dumpReceivedFrames"),
+                values.booleanValue("zipOnFinish"),
+                values.booleanValue("zipOnResume"),
                 values.booleanValue("appendDateSuffix"),
+                values.booleanValue("confirmResume"),
+                values.booleanValue("blockTaintedResume"),
+                values.booleanValue("showToasts"),
                 values.booleanValue("showChatMessages"),
                 WorldOutputConfig.from(values, properties),
                 HudConfig.from(values));

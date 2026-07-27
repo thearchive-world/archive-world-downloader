@@ -16,13 +16,17 @@ import java.util.Properties;
  * The config model: one ordered descriptor list from which the documented template, the parse and validation, the
  * defaults, the download-report diff, and a complete key-to-string projection are all derived, so an option is spelled
  * out once rather than in five parallel places. The typed value objects ({@link WdlConfig} and its nested holders) keep
- * their fields and accessors; only the model's expression is centralized here.
+ * their fields and accessors; only the model's expression is centralized here. Package-private; the settings menu
+ * widens the descriptor when it consumes the option set.
  *
  * <p>Two orderings are preserved because they genuinely differ: {@link #OPTIONS} is in template (file) order, so
  * {@link #renderDefaultTemplate} is a straight in-order walk, while {@link #REPORT_ORDER} is the reportable
  * {@link WdlConfig} scalar keys in value-object field order, which the download report pins. The sparse
  * {@code gamerule.*} overrides are not a descriptor row: they are a dynamic map handled as literal preamble bytes, a
  * harvested map, and a projection append.
+ *
+ * <p>{@link #option(String)} is public so the settings menu can read each option's value shape and default;
+ * {@link #OPTIONS} and the parse, template, and report members stay package-private to their producers.
  */
 public final class ConfigSchema {
     private ConfigSchema() {}
@@ -40,6 +44,10 @@ public final class ConfigSchema {
             + "\n"
             + "# Content toggles: which kinds of data to include in the download. The world's terrain is always\n"
             + "# downloaded; these choose the extra data kinds, so set any to false to skip it.\n";
+
+    private static final String CAPTURE_ADVANCEMENTS_PREAMBLE = ""
+            + "# Player advancements and statistics, written as advancements/<uuid>.json and stats/<uuid>.json.\n"
+            + "# Tied to your account's UUID, so opening on a different account does not auto-inherit them.\n";
 
     private static final String RECAPTURE_CHUNKS_PREAMBLE = ""
             + "\n"
@@ -62,6 +70,43 @@ public final class ConfigSchema {
             + "# or flying fast never stutters the frame; the rest spills to later ticks (the download lags\n"
             + "# exploration by a few ticks). Higher catches up faster but costs more per frame; lower is\n"
             + "# smoother but lags more behind you.\n";
+
+    private static final String OPEN_IN_CREATIVE_PREAMBLE = ""
+            + "\n"
+            + "# Open the downloaded world in Creative mode for whoever opens it.\n"
+            + "# Set false to open in the gamemode you were actually in at save time.\n"
+            + "# Applied only when overrideWorldDefaults is on.\n";
+
+    private static final String SAVE_PLAYER_INVENTORY_PREAMBLE = ""
+            + "\n"
+            + "# Player data written into the download so whoever opens it inherits your stuff and lands at\n"
+            + "# your base. Set any to false to leave that part out.\n";
+
+    private static final String SAVE_PLAYER_ENDER_CHEST_PREAMBLE = ""
+            + "# Your Ender Chest is saved only while you have it open during the download (open it once).\n";
+
+    private static final String SAVE_ITEM_COORDINATES_PREAMBLE = ""
+            + "# Item coordinates are blanked by default for privacy: some items store a location that can point\n"
+            + "# to a base the download does not otherwise reveal. Covers Lodestone-compass targets and the flower\n"
+            + "# positions of Bees inside a silk-touched Beehive, on items in your inventory, your Ender Chest, any\n"
+            + "# container you open, ones stored in a display block such as a decorated pot, and ones held by\n"
+            + "# entities such as item frames, item displays, and mob equipment, including ones nested inside\n"
+            + "# Shulker Boxes and Bundles. Set true to keep them pointing at their locations.\n";
+
+    private static final String LOCK_DOWNLOADED_MAPS_PREAMBLE = ""
+            + "\n"
+            + "# Filled maps you carried or saw framed during the download are written so they render their\n"
+            + "# picture instead of blank. They are locked by default, which freezes that picture: an unlocked\n"
+            + "# map repaints from live terrain when held, and the download's world is empty void, so an unlocked\n"
+            + "# map would repaint to blank. Set false to keep maps live and extendable (and accept that risk).\n";
+
+    private static final String REMAP_MAP_IDS_PREAMBLE = ""
+            + "# Filled maps you downloaded are re-keyed to stable IDs so a server that renumbers map IDs each\n"
+            + "# session can't mislink the wrong picture when you resume a download. On by default. Set false to\n"
+            + "# keep the ORIGINAL server map IDs in the download (a map the server called map_1234 stays map_1234).\n"
+            + "# Faithful to a vanilla server; on a server that renumbers IDs per session, resuming such a download\n"
+            + "# can overwrite one map with another, so leave this on if you resume downloads on that kind of "
+            + "server.\n";
 
     private static final String FORCE_MOB_PERSISTENCE_PREAMBLE = ""
             + "\n"
@@ -103,9 +148,11 @@ public final class ConfigSchema {
             + "# Examples (commented out):\n"
             + "#gamerule.keep_inventory=false\n"
             + "#gamerule.random_tick_speed=0\n"
+            + "# Toggling a rule in the settings menu writes only its on or off value, so it replaces a custom\n"
+            + "# value you hand-set here.\n"
             + "\n"
-            + "# The world-open state the download imposes: cheats.\n"
-            + "# On by default. Set false to open with cheats off.\n";
+            + "# The world-open state the download imposes: creative game mode and cheats.\n"
+            + "# On by default. Set false to open in your real game mode, with cheats off.\n";
 
     private static final String ALLOW_COMMANDS_PREAMBLE = ""
             + "\n"
@@ -126,12 +173,46 @@ public final class ConfigSchema {
             + "\n"
             + "# Automatically start a download when you join a multiplayer server. Off by default.\n";
 
+    private static final String ZIP_ON_FINISH_PREAMBLE = ""
+            + "\n"
+            + "# When a download finishes, also write a .zip of the finished world beside the folder, the\n"
+            + "# shareable copy to send to a friend. The openable folder is kept; the zip is extra. That export\n"
+            + "# is also the clean backup Restore recovers from when a download was opened in singleplayer.\n"
+            + "# On by default. A finish never overwrites an older zip, so each finish adds another (multi-GB\n"
+            + "# worlds add up).\n";
+
+    private static final String ZIP_ON_RESUME_PREAMBLE = ""
+            + "# Before a resume continues into an existing download folder (changing it in place), first zip that\n"
+            + "# folder as a safety copy (<folder>-pre-resume.zip), so a bad resume is recoverable. The same guard\n"
+            + "# covers a restore: before Restore replaces a folder, the folder is zipped as\n"
+            + "# <folder>-singleplayer.zip. On by default.\n";
+
     private static final String APPEND_DATE_SUFFIX_PREAMBLE = ""
             + "\n"
             + "# Add a -YYYY-MM-DD date to a new download's save folder (and to the world's name inside it), so\n"
             + "# downloads of the same place made on different days sit side by side instead of clashing. On by\n"
             + "# default. Set false to use the name exactly as typed; a same-name download then lands on the\n"
-            + "# existing folder and merges into it rather than overwriting.\n";
+            + "# existing folder and merges into it rather than overwriting (asking first unless confirmResume is "
+            + "off).\n";
+
+    private static final String CONFIRM_RESUME_PREAMBLE = ""
+            + "\n"
+            + "# Ask for confirmation before a download continues into an existing folder (a resume, which merges\n"
+            + "# into it rather than overwriting). On by default. Set false to continue silently with no prompt,\n"
+            + "# for a deliberate multi-day download you keep adding to; the backup zip is separate (zipOnResume).\n";
+
+    private static final String BLOCK_TAINTED_RESUME_PREAMBLE = ""
+            + "\n"
+            + "# Block resuming into a download that was opened in singleplayer. Opening a downloaded world in\n"
+            + "# singleplayer makes Minecraft generate the missing chunks (void or fabricated land, not the\n"
+            + "# server's real terrain) and change the save; resuming would merge new downloads on top of that\n"
+            + "# and bake it in. On by default. Set false to warn and ask instead of blocking.\n";
+
+    private static final String SHOW_TOASTS_PREAMBLE = ""
+            + "\n"
+            + "# Show a toast (the pop-up in the top-right corner) when a download finishes or fails, so you\n"
+            + "# learn it even with chat hidden. On by default. Set false to turn the toasts off; chat and HUD\n"
+            + "# messages are unaffected.\n";
 
     private static final String SHOW_CHAT_MESSAGES_PREAMBLE = ""
             + "\n"
@@ -176,12 +257,26 @@ public final class ConfigSchema {
             ConfigOption.dataLossBoolean("captureEntities", "true", config -> config.captureEntities(),
                     CAPTURE_TOGGLES_PREAMBLE),
             ConfigOption.dataLossBoolean("captureContainers", "true", config -> config.captureContainers(), ""),
+            ConfigOption.booleanOption("captureAdvancements", "true", config -> config.captureAdvancements(),
+                    CAPTURE_ADVANCEMENTS_PREAMBLE),
+            ConfigOption.booleanOption("captureStatistics", "true", config -> config.captureStatistics(), ""),
             ConfigOption.enumOption("recaptureChunks", "EVERYWHERE", name -> RecaptureMode.valueOf(name),
                     config -> config.recaptureChunks(), RECAPTURE_CHUNKS_PREAMBLE),
             ConfigOption.rangedInteger("recaptureSeconds", "15", 5, 60, config -> config.recaptureSeconds(),
                     RECAPTURE_SECONDS_PREAMBLE),
             ConfigOption.rangedInteger("encodeBudgetMillis", "2", 1, 10, config -> config.encodeBudgetMillis(),
                     ENCODE_BUDGET_MILLIS_PREAMBLE),
+            ConfigOption.booleanOption("openInCreative", "true", config -> config.worldOutput().openInCreative(),
+                    OPEN_IN_CREATIVE_PREAMBLE),
+            ConfigOption.booleanOption("savePlayerInventory", "true", config -> config.savePlayerInventory(),
+                    SAVE_PLAYER_INVENTORY_PREAMBLE),
+            ConfigOption.booleanOption("savePlayerEnderChest", "true", config -> config.savePlayerEnderChest(),
+                    SAVE_PLAYER_ENDER_CHEST_PREAMBLE),
+            ConfigOption.booleanOption("saveItemCoordinates", "false", config -> config.saveItemCoordinates(),
+                    SAVE_ITEM_COORDINATES_PREAMBLE),
+            ConfigOption.booleanOption("lockDownloadedMaps", "true", config -> config.lockDownloadedMaps(),
+                    LOCK_DOWNLOADED_MAPS_PREAMBLE),
+            ConfigOption.booleanOption("remapMapIds", "true", config -> config.remapMapIds(), REMAP_MAP_IDS_PREAMBLE),
             ConfigOption.booleanOption("forceMobPersistence", "false", config -> config.forceMobPersistence(),
                     FORCE_MOB_PERSISTENCE_PREAMBLE),
             ConfigOption.enumOption("worldType", "VOID", name -> WorldType.valueOf(name),
@@ -200,8 +295,15 @@ public final class ConfigSchema {
                     SKIP_VOID_CHUNKS_PREAMBLE),
             ConfigOption.booleanOption("autoDownload", "false", config -> config.worldOutput().autoDownload(),
                     AUTO_DOWNLOAD_PREAMBLE),
+            ConfigOption.booleanOption("zipOnFinish", "true", config -> config.zipOnFinish(), ZIP_ON_FINISH_PREAMBLE),
+            ConfigOption.booleanOption("zipOnResume", "true", config -> config.zipOnResume(), ZIP_ON_RESUME_PREAMBLE),
             ConfigOption.booleanOption("appendDateSuffix", "true", config -> config.appendDateSuffix(),
                     APPEND_DATE_SUFFIX_PREAMBLE),
+            ConfigOption.booleanOption("confirmResume", "true", config -> config.confirmResume(),
+                    CONFIRM_RESUME_PREAMBLE),
+            ConfigOption.booleanOption("blockTaintedResume", "true", config -> config.blockTaintedResume(),
+                    BLOCK_TAINTED_RESUME_PREAMBLE),
+            ConfigOption.booleanOption("showToasts", "true", config -> config.showToasts(), SHOW_TOASTS_PREAMBLE),
             ConfigOption.booleanOption("showChatMessages", "true", config -> config.showChatMessages(),
                     SHOW_CHAT_MESSAGES_PREAMBLE),
             ConfigOption.booleanOption("dumpReceivedFrames", "false", config -> config.dumpReceivedFrames(),
@@ -231,11 +333,14 @@ public final class ConfigSchema {
     }
 
     static final List<ConfigOption> REPORT_ORDER = report(
-            "captureEntities", "captureContainers", "recaptureChunks", "recaptureSeconds", "encodeBudgetMillis",
-            "forceMobPersistence", "dumpReceivedFrames", "appendDateSuffix", "showChatMessages");
+            "captureEntities", "captureContainers", "captureAdvancements", "captureStatistics",
+            "recaptureChunks", "recaptureSeconds", "savePlayerInventory",
+            "savePlayerEnderChest", "saveItemCoordinates", "lockDownloadedMaps", "remapMapIds", "encodeBudgetMillis",
+            "forceMobPersistence", "dumpReceivedFrames", "zipOnFinish", "zipOnResume", "appendDateSuffix",
+            "confirmResume", "blockTaintedResume", "showToasts", "showChatMessages");
 
     static final List<ConfigOption> WORLD_OUTPUT_REPORT_ORDER = report(
-            "overrideGamerules", "overrideWorldDefaults",
+            "overrideGamerules", "overrideWorldDefaults", "openInCreative",
             "allowCommands", "skipVoidChunks", "autoDownload", "worldType", "worldSeed", "generateFeatures");
 
     /**
