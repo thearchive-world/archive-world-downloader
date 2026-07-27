@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
 import world.thearchive.wdl.core.CuratedGameRule;
+import world.thearchive.wdl.core.SettingsLayout;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -52,6 +53,15 @@ class LevelDatCuratedGameRulesTest {
         assertEquals("false", spawnMobs.curatedValue(), "mob spawning is curated off");
         assertEquals("true", spawnMobs.enabledValue());
         assertEquals("false", spawnMobs.disabledValue());
+    }
+
+    @Test
+    void everyLaidOutGameRuleRowMapsToCuratedRule() {
+        Map<String, CuratedGameRule> byId = curated();
+        assertEquals(byId.size(), SettingsLayout.GAME_RULE_ORDER.size(), "the row order covers the whole curated set");
+        for (String id : SettingsLayout.GAME_RULE_ORDER) {
+            assertTrue(byId.containsKey(id), id + " is laid out as a row but is not in the curated set");
+        }
     }
 
     @Test
