@@ -7,11 +7,17 @@ import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.logging.LogUtils;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import net.minecraft.client.Minecraft;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
@@ -19,6 +25,7 @@ import net.minecraft.network.chat.MutableComponent;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.core.ChatCopy;
+import world.thearchive.wdl.core.browse.DownloadFolders;
 
 /**
  * The loader-agnostic half of {@link PlatformBridge}: everything a loader implementation would otherwise duplicate
@@ -102,6 +109,16 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         return 1;
     }
 
+    /** Suggest the wdl-managed download names for {@code /wdl resume} tab-completion. */
+    private static CompletableFuture<Suggestions> suggestDownloads(SuggestionsBuilder builder) {
+        Path savesDirectory = Minecraft.getInstance().getLevelSource().getBaseDir();
+        try {
+            return SharedSuggestionProvider.suggest(DownloadFolders.listManaged(savesDirectory), builder);
+        } catch (IOException exception) {
+            return builder.buildFuture(); // no suggestions if the saves directory cannot be read
+        }
+    }
+
     /**
      * Build the /wdl command tree once, source-generic, so each loader registers the same grammar with only its own
      * literal and argument builder factories. The action lambdas never read the command source.
@@ -121,6 +138,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                 .then(literal.apply("config").executes(context -> run(commands.config())))
                 .then(literal.apply("downloads").executes(context -> run(commands.openDownloads())))
                 .then(literal.apply("resume").then(argument.apply("folder", StringArgumentType.greedyString())
+                        .suggests((context, builder) -> suggestDownloads(builder))
                         .executes(context -> run(() -> commands.resume()
                                 .accept(StringArgumentType.getString(context, "folder"))))));
     }

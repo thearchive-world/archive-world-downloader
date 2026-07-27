@@ -4,19 +4,26 @@
 package world.thearchive.wdl;
 
 import com.mojang.logging.LogUtils;
+import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.OptionalLong;
 import java.util.ServiceLoader;
+import java.util.concurrent.Executor;
+import java.util.function.Supplier;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.world.level.storage.LevelResource;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.adapter.ConnectionTee;
 import world.thearchive.wdl.adapter.LiveCaptureSession;
 import world.thearchive.wdl.adapter.VersionAdapter;
+import world.thearchive.wdl.client.WdlDownloadsScreen;
 import world.thearchive.wdl.core.CaptureController;
 import world.thearchive.wdl.core.CaptureCounts;
 import world.thearchive.wdl.core.CaptureState;
@@ -26,6 +33,8 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.core.WdlConfig;
+import world.thearchive.wdl.core.browse.DownloadCatalog;
+import world.thearchive.wdl.core.browse.DownloadEntry;
 import world.thearchive.wdl.core.browse.TargetResolver;
 import world.thearchive.wdl.platform.PlatformBridge;
 
@@ -51,7 +60,21 @@ public final class Wdl {
 
     private static final CaptureController controller = new CaptureController();
 
+    // One-shot daemon for the pre-download worldgen warmup, so the reconstruction decode never blocks the client
+    // tick or JVM exit. Idempotent through the reconstruction memo; a repeat trigger just spawns a thread that
+    // finds the registries already built and exits.
+    private static final Executor warmupWorker = daemonWorker("wdl-worldgen-warmup");
+
     private static volatile WdlConfig currentConfig = WdlConfig.DEFAULTS;
+
+    // The display name of the download currently running, set when a capture begins; meaningful only while the
+    // controller is non-idle (it is left stale once the capture finishes and overwritten by the next start).
+    private static @Nullable String activeDownloadName;
+
+    // A screen opened synchronously from a chat command is clobbered on Fabric by ChatScreen's post-dispatch
+    // setScreen(null) (NeoForge patches that close to guard it). Open it on the next client tick instead, after
+    // that close has run. One-shot, last-write-wins; consumed by onClientTick on the client main thread.
+    private static @Nullable Runnable pendingScreenOpen;
 
     // The download-start flow, constructed by initialize() once the bridge is live; never null in operation,
     // so its uninitialized-field check is suppressed here.
@@ -81,6 +104,7 @@ public final class Wdl {
         resumeFlow = new ResumeFlow(platformBridge, () -> WdlConfig.load(configPath()), Wdl::startDownload);
 
         platformBridge.registerToggleKeybind(Wdl::onToggle);
+        platformBridge.registerDownloadsKeybind(Wdl::openDownloadsScreen);
         platformBridge.onClientTickEnd(Wdl::onClientTick);
         platformBridge.onDisconnect(controller::onDisconnect);
         // A backend transfer (play-to-configuration re-entry) fires no disconnect hook on either loader, so the
@@ -132,8 +156,62 @@ public final class Wdl {
         return currentConfig;
     }
 
+    /**
+     * Advance the controller each tick, then consume any pending screen open. The slot is cleared before the open runs,
+     * so a re-entrant defer during the open is preserved rather than dropped.
+     */
     private static void onClientTick() {
         controller.tick();
+        Runnable open = pendingScreenOpen;
+        if (open != null) {
+            pendingScreenOpen = null;
+            open.run();
+        }
+    }
+
+    /** Stash a screen open to run on the next client tick; see {@link #onClientTick} for why. */
+    private static void deferScreen(Runnable open) {
+        pendingScreenOpen = open;
+    }
+
+    /**
+     * Open the download screen with the existing-worlds list collapsed. Deferred to the next client tick; the parent
+     * screen is captured at tick time.
+     */
+    private static void openDownloadsScreen() {
+        deferScreen(() -> showDownloadsScreen(false));
+    }
+
+    /** Build the MC-free browse model and show the screen; run from the deferral on the client main thread. */
+    private static void showDownloadsScreen(boolean expandExistingList) {
+        Minecraft minecraft = Minecraft.getInstance();
+        Path savesDirectory = minecraft.getLevelSource().getBaseDir();
+        Path loadedWorld = loadedWorldPath(minecraft);
+        Supplier<List<DownloadEntry>> entries = () -> {
+            try {
+                return DownloadCatalog.list(savesDirectory, loadedWorld);
+            } catch (IOException | RuntimeException e) {
+                LOGGER.warn("failed to list the downloads for the screen", e);
+                return List.of();
+            }
+        };
+        WdlConfig config = WdlConfig.load(configPath());
+        // Manual path: opening the download screen is the player's download intent and precedes the first flush
+        // by seconds, so warm the worldgen reconstruction now when the chosen generator needs it.
+        WorldgenWarmup.dispatchForScreenOpen(config.worldOutput().worldType(),
+                adapter.levelDataWriter()::warmWorldgen, warmupWorker);
+        minecraft.setScreen(new WdlDownloadsScreen(minecraft.screen, savesDirectory, loadedWorld, entries,
+                expandExistingList, defaultDownloadName(minecraft), config.appendDateSuffix(),
+                CaptureToggleGuard.isCapturePartiallyDisabled(config), platform().modVersion(), mcVersion(),
+                Wdl::startDownload, Wdl::state, controller::stop, activeDownloadName));
+    }
+
+    private static Executor daemonWorker(String name) {
+        return task -> {
+            Thread thread = new Thread(task, name);
+            thread.setDaemon(true);
+            thread.start();
+        };
     }
 
     /** Keybind handler (client main thread): start a download, or stop and save the running one. */
@@ -172,6 +250,7 @@ public final class Wdl {
         }
         WdlConfig config = WdlConfig.load(configPath());
         currentConfig = config;
+        activeDownloadName = target.worldName() != null ? target.worldName() : target.folderName();
         // State-independent of captureEntities, so a signal raised between downloads is discarded for every
         // download kind, not only when an entity capture activates.
         ConnectionTee.clearTransferSignal();
@@ -185,6 +264,18 @@ public final class Wdl {
                 platform.sendChat(ChatCopy.capturePartiallyDisabled()); // passive indicator at the start action
             }
         }
+    }
+
+    /** The currently-loaded local world folder (refused as a target), or null when the world is remote. */
+    static @Nullable Path loadedWorldPath(Minecraft minecraft) {
+        IntegratedServer server = minecraft.getSingleplayerServer();
+        return server != null ? server.getWorldPath(LevelResource.ROOT) : null;
+    }
+
+    /** The in-capture screen label's fallback name: the current server's name, else a generic default. */
+    private static String defaultDownloadName(Minecraft minecraft) {
+        ServerData server = minecraft.getCurrentServer();
+        return server != null && server.name != null && !server.name.isBlank() ? server.name : "download";
     }
 
     /**
