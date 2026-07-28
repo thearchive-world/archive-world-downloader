@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -25,15 +26,26 @@ import net.minecraft.network.chat.MutableComponent;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.core.ChatCopy;
+import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.core.browse.DownloadFolders;
 
 /**
- * The loader-agnostic half of {@link PlatformBridge}: everything a loader implementation would otherwise duplicate
- * because it is answered by the vanilla client rather than by the loader. Each loader subclass supplies only what its
- * own API knows.
+ * Partial {@link PlatformBridge} carrying the methods that are pure vanilla on every loader: {@link #isRemoteWorld()},
+ * {@link #sendChat(ChatCopy)}, and {@link #sendToast(ToastCopy)} use only {@code Minecraft}/{@code Component} APIs that
+ * live on the {@code common} classpath, so each loader bridge inherits them instead of duplicating the logic. The
+ * loader-specific hooks (keybind, ticks, disconnect, config directory, command registration) stay abstract for the
+ * per-loader subclass.
  */
 public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final Logger LOGGER = LogUtils.getLogger();
+
+    // The no-argument ids keep the vanilla default display time (which the accessibility
+    // notification-time multiplier scales). Job-done toasts are always constructed fresh, never
+    // addOrUpdate-reset, so each event surfaces its own toast. Refusals get their own id so a repeated
+    // click cannot queue a parade: one refusal on screen or in the queue is the whole message, and
+    // vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body unwrapped).
+    private static final SystemToast.SystemToastId TOAST_ID = new SystemToast.SystemToastId();
+    private static final SystemToast.SystemToastId REFUSAL_TOAST_ID = new SystemToast.SystemToastId();
 
     @Override
     public final void registerToggleKeybind(Runnable onToggle) {
@@ -101,6 +113,34 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             rendered = rendered.withColor(line.templateColor().getAsInt());
         }
         return rendered;
+    }
+
+    @Override
+    public void sendToast(ToastCopy toast) {
+        Object[] renderedArguments = new Object[toast.arguments().size()];
+        int slot = 0;
+        for (ToastCopy.Argument argument : toast.arguments()) {
+            MutableComponent rendered = argument.translationKey() == null
+                    ? Component.literal(argument.text())
+                    : argument.text().isEmpty()
+                            ? Component.translatable(argument.translationKey())
+                            : Component.translatable(argument.translationKey(), argument.text());
+            if (argument.color().isPresent()) {
+                rendered = rendered.withColor(argument.color().getAsInt());
+            }
+            renderedArguments[slot++] = rendered;
+        }
+        MutableComponent body = Component.translatable(toast.bodyKey(), renderedArguments);
+        if (toast.bodyColor().isPresent()) {
+            body = body.withColor(toast.bodyColor().getAsInt());
+        }
+        Minecraft mc = Minecraft.getInstance();
+        SystemToast.SystemToastId id = toast.refusal() ? REFUSAL_TOAST_ID : TOAST_ID;
+        if (toast.refusal() && mc.getToastManager().getToast(SystemToast.class, id) != null) {
+            return;
+        }
+        mc.getToastManager().addToast(SystemToast.multiline(mc, id,
+                Component.translatable(toast.titleKey()), body));
     }
 
     /** Run a /wdl action and report Brigadier success. */

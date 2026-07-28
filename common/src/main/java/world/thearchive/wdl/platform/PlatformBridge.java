@@ -6,6 +6,7 @@ package world.thearchive.wdl.platform;
 import java.nio.file.Path;
 
 import world.thearchive.wdl.core.ChatCopy;
+import world.thearchive.wdl.core.ToastCopy;
 
 /**
  * Loader-services SPI: the thin seam between the loader-agnostic mod and a concrete mod loader. One implementation per
@@ -71,6 +72,9 @@ public interface PlatformBridge {
      * its hover.
      */
     void sendChat(ChatCopy line);
+
+    /** Enqueue a job-done toast on the vanilla system-toast tray (client main thread). */
+    void sendToast(ToastCopy toast);
 
     /**
      * Register the {@code /wdl} client command; the loader builds the Brigadier tree and dispatches to

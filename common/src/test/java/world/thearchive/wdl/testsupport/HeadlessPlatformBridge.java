@@ -6,16 +6,17 @@ package world.thearchive.wdl.testsupport;
 import java.nio.file.Path;
 
 import world.thearchive.wdl.core.ChatCopy;
+import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.platform.PlatformBridge;
 import world.thearchive.wdl.platform.WdlCommands;
 
 /**
  * A {@link PlatformBridge} that registers nothing and surfaces nothing, for headless tests that need a bridge only
  * because the type under test takes one. Every callback registration is dropped rather than stored: a test whose
- * subject fires one is asserting through the wrong seam, and the player-facing arm throws so a chat reaching a unit
- * test fails loudly instead of passing silently.
+ * subject fires one is asserting through the wrong seam, and the player-facing arms throw so a chat or toast reaching a
+ * unit test fails loudly instead of passing silently.
  *
- * <p>Not final only so a test whose subject IS the surfacing can override that arm. Overriding it to quiet an
+ * <p>Not final only so a test whose subject IS the surfacing can override those two arms. Overriding them to quiet an
  * unexpected chat defeats the point of the throw.
  */
 public class HeadlessPlatformBridge implements PlatformBridge {
@@ -87,6 +88,11 @@ public class HeadlessPlatformBridge implements PlatformBridge {
     @Override
     public void sendChat(ChatCopy line) {
         throw new AssertionError("a headless test surfaced player chat: " + line);
+    }
+
+    @Override
+    public void sendToast(ToastCopy toast) {
+        throw new AssertionError("a headless test surfaced a toast: " + toast);
     }
 
     @Override

@@ -25,11 +25,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SendRangeEstimator;
+import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
@@ -62,13 +64,34 @@ class LiveCaptureSessionFailSoftTest {
      * which is on for both.
      */
     private static LiveCaptureSession session(Path configDirectory) {
+        return session(new HeadlessPlatformBridge(configDirectory));
+    }
+
+    /** The headless bridge with its chat arm recording, for the one path whose subject is that it surfaces. */
+    private static final class SurfacingBridge extends HeadlessPlatformBridge {
+        private boolean surfaced;
+
+        private SurfacingBridge(Path configDirectory) {
+            super(configDirectory);
+        }
+
+        @Override
+        public void sendChat(ChatCopy line) {
+            surfaced = true;
+        }
+
+        @Override
+        public void sendToast(ToastCopy toast) {}
+    }
+
+    private static LiveCaptureSession session(HeadlessPlatformBridge bridge) {
         Properties properties = new Properties();
         properties.setProperty("captureEntities", "false");
         properties.setProperty("captureContainers", "false");
         WdlConfig config = WdlConfig.parse(properties);
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
-        return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
+        return new LiveCaptureSession(new VersionAdapterImpl(), bridge,
                 config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SendRangeEstimator(), false, () -> {});
     }
@@ -246,11 +269,12 @@ class LiveCaptureSessionFailSoftTest {
      * A finish that never opened a world has no writer to signal, and so no future for the controller to poll either.
      * Nothing is at risk on disk there, since the world open closes its own access when it fails before handing one
      * over, but a download that never completes leaves the controller saving for the rest of the session with no way to
-     * start another, so this finish has to end itself.
+     * start another, so this finish has to end and report itself.
      */
     @Test
-    void aThrowWithNoWriterOpenEndsTheDownload(@TempDir Path temporary) throws Exception {
-        LiveCaptureSession session = session(temporary);
+    void aThrowWithNoWriterOpenIsReportedAndEndsTheDownload(@TempDir Path temporary) throws Exception {
+        SurfacingBridge bridge = new SurfacingBridge(temporary);
+        LiveCaptureSession session = session(bridge);
 
         session.completeThroughWriter(Runnable::run, () -> {
             throw new IllegalStateException("the finish blew up before a world was ever opened");
@@ -258,6 +282,7 @@ class LiveCaptureSessionFailSoftTest {
 
         assertEquals(1, losses(session), "the throw still counts, so a later reader cannot read the finish clean");
         assertTrue(session.isPartialSave(0, 0), "and the verdict is partial");
+        assertTrue(bridge.surfaced, "the player is told the download failed rather than left watching it save");
         assertTrue(session.isSaveComplete(), "and the controller can leave the saving state");
     }
 

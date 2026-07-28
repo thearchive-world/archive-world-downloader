@@ -113,10 +113,13 @@ import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.core.RecaptureMode;
 import world.thearchive.wdl.core.RecapturePolicy;
 import world.thearchive.wdl.core.RecoveredCoverage;
+import world.thearchive.wdl.core.SaveFailureComposer;
+import world.thearchive.wdl.core.SaveFailureReason;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.SendRangeSampler;
+import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.core.VoidChunkPolicy;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.core.export.FinalizeOutputs;
@@ -4011,9 +4014,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 interactionCapturesLost, structuralEntitiesLost, resumedMountsLost, finishStepsFailed);
     }
 
-    /** Surface a failed save in the log, which is where the cause a player can act on lives. */
+    /** Surface a failed save in chat, the log, and the error toast, all carrying the same message. */
     private void reportSaveFailure(@Nullable Throwable error) {
+        SaveFailureReason reason = SaveFailureComposer.describe(error);
+        bridge.sendChat(ChatCopy.saveFailed(reason)); // an error is never suppressed by showChatMessages
         LOGGER.error("save failed", error);
+        ToastCopy toast = ToastCopy.error(config.showToasts(), reason);
+        if (toast != null) {
+            bridge.sendToast(toast);
+        }
     }
 
     private static void closeQuietly(AutoCloseable resource) {
