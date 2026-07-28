@@ -5,12 +5,18 @@ package world.thearchive.wdl;
 
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.ServiceLoader;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -20,6 +26,7 @@ import net.minecraft.world.level.storage.LevelResource;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
+import world.thearchive.wdl.adapter.CompletionMarshal;
 import world.thearchive.wdl.adapter.ConnectionTee;
 import world.thearchive.wdl.adapter.LiveCaptureSession;
 import world.thearchive.wdl.adapter.VersionAdapter;
@@ -32,10 +39,15 @@ import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.SaveStage;
+import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.core.browse.DownloadCatalog;
 import world.thearchive.wdl.core.browse.DownloadEntry;
+import world.thearchive.wdl.core.browse.DownloadFolders;
+import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 import world.thearchive.wdl.core.browse.TargetResolver;
+import world.thearchive.wdl.core.export.RestoreOperation;
+import world.thearchive.wdl.core.export.RestoreSource;
 import world.thearchive.wdl.platform.PlatformBridge;
 
 /**
@@ -52,11 +64,12 @@ public final class Wdl {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     // Set once by initialize() from the loader entrypoint before any hook can fire; never null in operation,
-    // a lifecycle NullAway cannot model, so its uninitialized-field check is suppressed here.
+    // a lifecycle NullAway cannot model, so its uninitialized-field check is suppressed on these two.
     @SuppressWarnings("NullAway.Init")
     private static VersionAdapter adapter;
 
-    private static @Nullable PlatformBridge bridge;
+    @SuppressWarnings("NullAway.Init")
+    private static PlatformBridge bridge;
 
     private static final CaptureController controller = new CaptureController();
 
@@ -81,6 +94,25 @@ public final class Wdl {
     @SuppressWarnings("NullAway.Init")
     private static ResumeFlow resumeFlow;
 
+    // The live restore worker's state, volatile because the permanent shutdown hook reads it from its own
+    // thread: the operation for abort and the swap-window read, the worker for the bounded join, the parked
+    // future for the completion poll. Set together by the dispatch and cleared together by the poll, both on
+    // the client main thread.
+    private static volatile @Nullable RestoreOperation activeRestore;
+    private static volatile @Nullable Thread restoreWorker;
+    private static volatile @Nullable CompletableFuture<RestoreOperation.Result> restoreResult;
+
+    // The folder the running restore replaces, for the completion toast; main-thread only.
+    private static @Nullable String restoreFolderName;
+
+    // The launch sweep's parked result; its non-null read doubles as the owner-routed sweep flag that picks
+    // the cleanup flavor of the busy and status copy.
+    private static volatile @Nullable CompletableFuture<RestoreOperation.RestoreSweep.SweepResult> sweepResult;
+
+    // Whether the restore or sweep that most recently returned the controller to idle changed the disk;
+    // the downloads screen gates its entries re-pull on it. Main-thread only.
+    private static boolean lastRestoreChangedDisk = true;
+
     private Wdl() {}
 
     /** The current MC version via its Mojmap name. */
@@ -101,24 +133,18 @@ public final class Wdl {
                 platformBridge.loaderName(), platformBridge.loaderVersion());
         currentConfig = WdlConfig.load(configPath()); // materialize the default config file on first run
         LOGGER.info("config file: {}", configPath());
-        resumeFlow = new ResumeFlow(platformBridge, () -> WdlConfig.load(configPath()), Wdl::startDownload);
+        resumeFlow = new ResumeFlow(bridge, () -> WdlConfig.load(configPath()), Wdl::startDownload);
 
-        platformBridge.registerToggleKeybind(Wdl::onToggle);
-        platformBridge.registerDownloadsKeybind(Wdl::openDownloadsScreen);
-        platformBridge.onClientTickEnd(Wdl::onClientTick);
-        platformBridge.onDisconnect(controller::onDisconnect);
+        bridge.registerToggleKeybind(Wdl::onToggle);
+        bridge.registerDownloadsKeybind(Wdl::openDownloadsScreen);
+        bridge.onClientTickEnd(Wdl::onClientTick);
+        bridge.onDisconnect(controller::onDisconnect);
         // A backend transfer (play-to-configuration re-entry) fires no disconnect hook on either loader, so the
         // tee raises its own signal and the controller polls it each tick, stopping the download the same way.
         controller.setTransferStopPoll(ConnectionTee::consumeTransferSignal);
-    }
-
-    /** The running loader's bridge. Throws if read before {@link #initialize}, which is a wiring bug. */
-    public static PlatformBridge platform() {
-        PlatformBridge current = bridge;
-        if (current == null) {
-            throw new IllegalStateException("Wdl.initialize has not run");
-        }
-        return current;
+        // One permanent hook for the JVM's life rather than one per operation, matching the bounded halt
+        // the vanilla client shutdown hook gives the integrated server.
+        Runtime.getRuntime().addShutdownHook(new Thread(Wdl::abortRestoreOnShutdown, "wdl-restore-shutdown"));
     }
 
     /** The current capture state. */
@@ -162,11 +188,119 @@ public final class Wdl {
      */
     private static void onClientTick() {
         controller.tick();
+        restoreTick();
         Runnable open = pendingScreenOpen;
         if (open != null) {
             pendingScreenOpen = null;
             open.run();
         }
+    }
+
+    /**
+     * The restore and sweep completion poll, the counterpart of the controller's save poll, reached two ways: the
+     * per-tick call, which is what republishes the loaded world each tick while a restore runs (the worker re-probes it
+     * before the swap, so a world opened mid-restore is seen), and the marshaled completion poke, which can drain a
+     * parked future off the tick. Once a parked future completes, return the controller to idle, surface the outcome
+     * copy, and clear the fields. The screen refresh rides the state flip: the downloads screen rebuilds and re-pulls
+     * its entries when RESTORING returns to IDLE.
+     */
+    private static void restoreTick() {
+        RestoreOperation operation = activeRestore;
+        if (operation != null) {
+            operation.publishLoadedWorld(loadedWorldPath(Minecraft.getInstance()));
+            CompletableFuture<RestoreOperation.Result> result = restoreResult;
+            if (result == null || !result.isDone()) {
+                return;
+            }
+            String folderName = restoreFolderName != null ? restoreFolderName : "";
+            activeRestore = null;
+            restoreWorker = null;
+            restoreResult = null;
+            restoreFolderName = null;
+            controller.endRestoring();
+            lastRestoreChangedDisk = true;
+            try {
+                surfaceRestoreOutcome(result.join(), folderName);
+            } catch (CompletionException e) {
+                LOGGER.error("the restore of {} failed unexpectedly", folderName, e);
+            }
+            return;
+        }
+        CompletableFuture<RestoreOperation.RestoreSweep.SweepResult> sweep = sweepResult;
+        if (sweep == null || !sweep.isDone()) {
+            return;
+        }
+        sweepResult = null;
+        controller.endRestoring();
+        try {
+            RestoreOperation.RestoreSweep.SweepResult result = sweep.join();
+            lastRestoreChangedDisk = result.changedDisk();
+            surfaceSweepOutcome(result);
+        } catch (CompletionException e) {
+            lastRestoreChangedDisk = true; // unknown mutation, so fail toward the refresh
+            LOGGER.error("the restore sweep failed unexpectedly", e);
+        }
+    }
+
+    /** The outcome-to-copy table for a finished restore; every cause surfaces as a toast or a log line. */
+    private static void surfaceRestoreOutcome(RestoreOperation.Result result, String folderName) {
+        switch (result.outcome()) {
+            case RESTORED -> bridge.sendToast(ToastCopy.restored(folderName));
+            case RESTORED_WITH_REMNANTS -> {
+                LOGGER.warn("restore of {} left remnants under {}; the next sweep cleans them up",
+                        folderName, RestoreOperation.TEMPORARY_ROOT);
+                bridge.sendToast(ToastCopy.restored(folderName));
+            }
+            case RELOCATED -> {
+                Path sibling = Objects.requireNonNull(result.relocatedTo(), "RELOCATED names its sibling");
+                bridge.sendToast(ToastCopy.restoreRefusedRelocated(folderLabel(sibling)));
+            }
+            case ABORTED -> LOGGER.info("restore of {} aborted by shutdown", folderName);
+            case NOT_MANAGED, FILE_OCCUPANT -> bridge.sendToast(ToastCopy.refuseOccupant(folderName, false));
+            case FOLDER_MISSING -> bridge.sendToast(ToastCopy.refuseFolderMissing(folderName));
+            case NOT_TAINTED -> bridge.sendToast(ToastCopy.restoreRefusedNotTainted());
+            case TAINT_UNKNOWN -> bridge.sendToast(ToastCopy.restoreRefusedTaintUnknown());
+            case SOURCE_CHANGED -> bridge.sendToast(ToastCopy.restoreRefusedSourceChanged());
+            case WORLD_IN_USE -> bridge.sendToast(ToastCopy.restoreRefusedWorldInUse());
+            case SNAPSHOT_FAILED -> bridge.sendToast(ToastCopy.restoreRefusedSnapshotFailed());
+            case DISK_FULL -> bridge.sendToast(ToastCopy.restoreRefusedDiskFull());
+            case EXTRACT_REFUSED -> bridge.sendToast(ToastCopy.restoreRefusedExtractRefused());
+            case SWAP_FAILED -> bridge.sendToast(ToastCopy.restoreRefusedSwapFailed(
+                    describeSurvivingPaths(result.survivingPaths())));
+            default -> LOGGER.error("unexpected restore outcome {} for {}", result.outcome(), folderName);
+        }
+    }
+
+    /** One toast per swept folder, converting the three SweepResult lists to their cleanup notices. */
+    private static void surfaceSweepOutcome(RestoreOperation.RestoreSweep.SweepResult result) {
+        for (Path folder : result.movedBack()) {
+            bridge.sendToast(ToastCopy.sweepMovedBack(folderLabel(folder)));
+        }
+        for (Path sibling : result.relocated()) {
+            bridge.sendToast(ToastCopy.sweepRelocated(folderLabel(sibling)));
+        }
+        for (Path folder : result.missingDeferred()) {
+            bridge.sendToast(ToastCopy.sweepMissingDeferred(folderLabel(folder)));
+        }
+    }
+
+    /** The kept-aside paths a swap failure names, shortened to saves-relative form where possible. */
+    private static String describeSurvivingPaths(List<Path> survivingPaths) {
+        Path savesDirectory = Minecraft.getInstance().getLevelSource().getBaseDir();
+        return survivingPaths.stream()
+                .map(path -> {
+                    try {
+                        return savesDirectory.relativize(path).toString();
+                    } catch (IllegalArgumentException e) {
+                        return path.toString();
+                    }
+                })
+                .collect(Collectors.joining(", "));
+    }
+
+    private static String folderLabel(Path folder) {
+        Path name = folder.getFileName();
+        return name != null ? name.toString() : folder.toString();
     }
 
     /** Stash a screen open to run on the next client tick; see {@link #onClientTick} for why. */
@@ -202,7 +336,7 @@ public final class Wdl {
                 adapter.levelDataWriter()::warmWorldgen, warmupWorker);
         minecraft.setScreen(new WdlDownloadsScreen(minecraft.screen, savesDirectory, loadedWorld, entries,
                 expandExistingList, defaultDownloadName(minecraft), config.appendDateSuffix(),
-                CaptureToggleGuard.isCapturePartiallyDisabled(config), platform().modVersion(), mcVersion(),
+                CaptureToggleGuard.isCapturePartiallyDisabled(config), bridge.modVersion(), mcVersion(),
                 Wdl::startDownload, Wdl::state, controller::stop, activeDownloadName));
     }
 
@@ -214,15 +348,49 @@ public final class Wdl {
         };
     }
 
+    /**
+     * The shutdown hook body: abort any live restore so the worker backs out at its next phase check, and only while
+     * the worker is inside the two-rename swap window wait for it, bounded to three seconds, so the folder is never
+     * abandoned mid-swap by a quitting client.
+     */
+    private static void abortRestoreOnShutdown() {
+        RestoreOperation operation = activeRestore;
+        if (operation == null) {
+            return;
+        }
+        operation.abort();
+        Thread worker = restoreWorker;
+        if (worker == null) {
+            return;
+        }
+        long start = System.nanoTime();
+        long timeoutNanos = TimeUnit.SECONDS.toNanos(3);
+        try {
+            while (operation.inSwapWindow() && worker.isAlive() && System.nanoTime() - start < timeoutNanos) {
+                worker.join(50L);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     /** Keybind handler (client main thread): start a download, or stop and save the running one. */
     private static void onToggle() {
-        if (controller.state() != CaptureState.IDLE) {
+        CaptureState state = controller.state();
+        if (state != CaptureState.IDLE) {
+            if (currentConfig.showChatMessages()) {
+                bridge.sendChat(state == CaptureState.RECORDING
+                        ? ChatCopy.saving()
+                        : ChatCopy.busy(state, isSweepActive()));
+            }
             controller.stop();
             return;
         }
-        PlatformBridge platform = platform();
-        if (platform.isRemoteWorld() && !hasSourceIdentity()) {
-            platform.sendChat(ChatCopy.startNeedsName());
+        // The isRemoteWorld conjunct is load-bearing here, unlike the guard in onServerJoin: no activation gate
+        // precedes this one, so without it a keybind press in a genuine singleplayer world would answer with
+        // the needs-a-name refusal instead of falling through to the join-a-server refusal.
+        if (bridge.isRemoteWorld() && !hasSourceIdentity()) {
+            bridge.sendChat(ChatCopy.startNeedsName());
             return;
         }
         resumeFlow.begin(defaultBaseName(), true);
@@ -230,17 +398,19 @@ public final class Wdl {
 
     /**
      * Begin a download for {@code target}, the single entry point: a {@link DownloadMode#NEW} target writes to its
-     * (already-disambiguated) folder, a {@link DownloadMode#RESUME} re-runs into an existing folder verbatim and adds
-     * to it. Guards a double-start and a local world, re-loads the config so a hand-edit applies on the next download,
-     * then begins a session for the target.
+     * (already-disambiguated) folder, a {@link DownloadMode#RESUME} re-runs into an existing wdl-managed folder
+     * verbatim and adds to it. Guards a double-start and a local world, re-loads the config so hand-edits apply on the
+     * next download, then begins a session for the target.
      */
     private static void startDownload(DownloadTarget target) {
-        if (controller.state() != CaptureState.IDLE) {
+        CaptureState state = controller.state();
+        if (state != CaptureState.IDLE) {
+            sendRefusal(target.origin(), ToastCopy.busy(state, isSweepActive()),
+                    ChatCopy.busy(state, isSweepActive()));
             return;
         }
-        PlatformBridge platform = platform();
-        if (!platform.isRemoteWorld()) {
-            platform.sendChat(ChatCopy.joinMultiplayer());
+        if (!bridge.isRemoteWorld()) {
+            sendRefusal(target.origin(), ToastCopy.joinMultiplayer(), ChatCopy.joinMultiplayer());
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
@@ -250,19 +420,147 @@ public final class Wdl {
         }
         WdlConfig config = WdlConfig.load(configPath());
         currentConfig = config;
+        Path savesDirectory = minecraft.getLevelSource().getBaseDir();
+        if (target.mode() == DownloadMode.NEW
+                && RestoreOperation.attemptReferences(savesDirectory, target.folderName())) {
+            // A torn restore attempt still stages this name under the temporary root; a NEW download landing on
+            // it would race the next sweep's roll-back. The predicate fails open on an unreadable scan.
+            sendRefusal(target.origin(), ToastCopy.refuseTornAttempt(), ChatCopy.refuseTornAttempt());
+            return;
+        }
+        if (target.mode() == DownloadMode.RESUME) {
+            Path saveFolder = savesDirectory.resolve(target.folderName());
+            if (!DownloadFolders.isWdlManaged(saveFolder)) {
+                // The managed re-test ahead of the taint re-test: the folder may have changed since the
+                // confirm cascade classified it. A vanished folder is the missing cause; a file or an
+                // unmanaged directory at the name is a foreign occupant either way.
+                if (Files.exists(saveFolder)) {
+                    // The flow origins came from a typed name or quick start, so they earn the name-choosing
+                    // advice; the screen already surfaced its own advice at the junction, so SCREEN drops it.
+                    boolean suggestRename = target.origin() != DownloadTarget.Origin.SCREEN;
+                    sendRefusal(target.origin(), ToastCopy.refuseOccupant(target.folderName(), suggestRename),
+                            ChatCopy.refuseOccupant(target.folderName(), suggestRename));
+                } else {
+                    sendRefusal(target.origin(), ToastCopy.refuseFolderMissing(target.folderName()),
+                            ChatCopy.refuseFolderMissing(target.folderName()));
+                }
+                return;
+            }
+            if (SinglePlayerTaint.isTainted(saveFolder) && config.blockTaintedResume()) {
+                sendRefusal(target.origin(), ToastCopy.refuseTainted(), ChatCopy.refuseTainted());
+                return;
+            }
+        }
         activeDownloadName = target.worldName() != null ? target.worldName() : target.folderName();
         // State-independent of captureEntities, so a signal raised between downloads is discarded for every
         // download kind, not only when an entity capture activates.
         ConnectionTee.clearTransferSignal();
-        controller.start(() -> new LiveCaptureSession(adapter, platform, config, level, target,
+        controller.start(() -> new LiveCaptureSession(adapter, bridge, config, level, target,
                 controller.sendRange(), minecraft.getCameraEntity() != minecraft.player, controller::tick));
         if (config.showChatMessages()) {
-            platform.sendChat(target.mode() == DownloadMode.RESUME
+            bridge.sendChat(target.mode() == DownloadMode.RESUME
                     ? ChatCopy.resuming(target.folderName())
                     : ChatCopy.downloading(target.folderName()));
             if (CaptureToggleGuard.isCapturePartiallyDisabled(config)) {
-                platform.sendChat(ChatCopy.capturePartiallyDisabled()); // passive indicator at the start action
+                bridge.sendChat(ChatCopy.capturePartiallyDisabled()); // passive indicator at the start action
             }
+        }
+    }
+
+    /** Route a start refusal to its origin's channel: the screen's toast, the command/keybind flows' chat. */
+    private static void sendRefusal(DownloadTarget.Origin origin, ToastCopy toast, ChatCopy chat) {
+        if (DownloadTarget.refusalUsesToast(origin)) {
+            bridge.sendToast(toast);
+        } else {
+            bridge.sendChat(chat);
+        }
+    }
+
+    /** Whether the current RESTORING state belongs to the launch sweep rather than a player restore. */
+    static boolean isSweepActive() {
+        return sweepResult != null;
+    }
+
+    /**
+     * The one restore dispatch (client main thread): flip the idle controller into RESTORING, seed the operation's
+     * loaded-world volatile from this thread, and run the guarded replace of {@code folderName} from
+     * {@code pinnedSource} on a named daemon worker, parking the future for the completion poll, which is marshaled
+     * back to the client thread before the worker starts and backed by the per-tick poll. A controller that is not idle
+     * refuses with the busy toast; the pre-replace snapshot follows {@code zipOnResume}. Public for the downloads
+     * screen's restore confirm and blocked offer, the client-package dispatchers.
+     */
+    public static void launchRestore(Path savesDirectory, String folderName, RestoreSource pinnedSource) {
+        if (!controller.tryBeginRestoring()) {
+            bridge.sendToast(ToastCopy.busy(controller.state(), isSweepActive()));
+            return;
+        }
+        RestoreOperation operation = RestoreOperation.create(savesDirectory, folderName, pinnedSource,
+                WdlConfig.load(configPath()).zipOnResume());
+        operation.publishLoadedWorld(loadedWorldPath(Minecraft.getInstance()));
+        CompletableFuture<RestoreOperation.Result> result = new CompletableFuture<>();
+        activeRestore = operation;
+        restoreResult = result;
+        restoreFolderName = folderName;
+        // RestoreOperation.run is documented never-throws, but an Error escaping its own catch (thrown
+        // while logging or building the failure Result) must still complete the future or the controller
+        // stays RESTORING forever.
+        Thread worker = new Thread(() -> {
+            try {
+                result.complete(operation.run());
+            } catch (Throwable e) {
+                result.completeExceptionally(e);
+            }
+        }, "wdl-restore");
+        worker.setDaemon(true);
+        restoreWorker = worker;
+        // Attach the marshal before starting the worker: attached afterwards it could meet an already-finished
+        // worker and run the poke inline on the dispatching stack, rather than off the game tick where every
+        // other completion lands. The dispatch-failure catch below never completes the future, so the marshal
+        // never fires there; that path self-heals inline.
+        CompletionMarshal.scheduleCompletionPoke(result, Minecraft.getInstance(), Wdl::restoreTick);
+        try {
+            worker.start();
+        } catch (Throwable e) {
+            // The dispatch-failure flip-back: a worker that never started leaves nothing to poll, so the
+            // controller must not stay RESTORING forever.
+            activeRestore = null;
+            restoreWorker = null;
+            restoreResult = null;
+            restoreFolderName = null;
+            controller.endRestoring();
+            LOGGER.error("restore worker for {} failed to start", folderName, e);
+        }
+    }
+
+    /**
+     * The launch-sweep dispatch (client main thread): the identical flip, daemon worker, marshal-before-start and
+     * parked-future machinery as {@link #launchRestore}, with the sweep's future doubling as the flag that routes the
+     * busy and status copy to the cleanup flavor. Public for the downloads screen's open and TTL sweep triggers.
+     */
+    public static void launchSweep(Path savesDirectory) {
+        if (!controller.tryBeginRestoring()) {
+            bridge.sendToast(ToastCopy.busy(controller.state(), isSweepActive()));
+            return;
+        }
+        CompletableFuture<RestoreOperation.RestoreSweep.SweepResult> result = new CompletableFuture<>();
+        sweepResult = result;
+        // Unlike RestoreOperation.run, RestoreSweep.run carries no never-throws contract; an escaped throw
+        // must still complete the future or the controller stays RESTORING forever.
+        Thread worker = new Thread(() -> {
+            try {
+                result.complete(RestoreOperation.RestoreSweep.run(savesDirectory));
+            } catch (Throwable e) {
+                result.completeExceptionally(e);
+            }
+        }, "wdl-restore-sweep");
+        worker.setDaemon(true);
+        CompletionMarshal.scheduleCompletionPoke(result, Minecraft.getInstance(), Wdl::restoreTick);
+        try {
+            worker.start();
+        } catch (Throwable e) {
+            sweepResult = null;
+            controller.endRestoring();
+            LOGGER.error("restore sweep worker failed to start", e);
         }
     }
 
@@ -299,6 +597,22 @@ public final class Wdl {
     }
 
     private static Path configPath() {
-        return platform().configDirectory().resolve("wdl.properties");
+        return bridge.configDirectory().resolve("wdl.properties");
+    }
+
+    /**
+     * The folder the running restore replaces, or null while no player restore runs (the launch sweep holds RESTORING
+     * without one); the downloads screen picks its busy label by it. Client main thread only.
+     */
+    public static @Nullable String restoringFolderName() {
+        return restoreFolderName;
+    }
+
+    /**
+     * Whether the restore or sweep that most recently returned the controller to idle changed the disk; the downloads
+     * screen skips its entries re-pull when a completed sweep never touched it.
+     */
+    public static boolean lastRestoreChangedDisk() {
+        return lastRestoreChangedDisk;
     }
 }
