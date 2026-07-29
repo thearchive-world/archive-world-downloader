@@ -5,6 +5,7 @@ package world.thearchive.wdl.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.ChatFormatting;
@@ -33,6 +35,7 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.layouts.FrameLayout;
 import net.minecraft.client.gui.layouts.GridLayout;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -49,18 +52,25 @@ import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.core.BrandColors;
 import world.thearchive.wdl.core.CaptureState;
 import world.thearchive.wdl.core.DownloadTarget;
+import world.thearchive.wdl.core.MapManifest;
+import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.core.browse.DownloadEntry;
+import world.thearchive.wdl.core.browse.DownloadFolders;
 import world.thearchive.wdl.core.browse.DownloadHealth;
+import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 import world.thearchive.wdl.core.browse.TargetResolver;
+import world.thearchive.wdl.core.export.RestoreOperation;
+import world.thearchive.wdl.core.export.RestoreSource;
 import world.thearchive.wdl.core.export.SizeFormatter;
 import world.thearchive.wdl.core.report.DownloadCounts;
 
 /**
- * The download screen: start a new download with a typed name, or browse the wdl-managed downloads already on disk. The
- * vanilla world-select screen repurposed, built on vanilla widgets (no GUI library): an {@link EditBox} name field, a
- * primary Download button, a Done button, and an {@link ObjectSelectionList} of rows fed the MC-free
- * {@code core/browse} model. Loader-agnostic view code; the keybind entry point lives per loader and routes through
- * {@link Wdl}, which defers the open to the next client tick.
+ * The download screen: start a new download with a typed name, or browse and resume/recover the wdl-managed downloads
+ * already on disk. The vanilla world-select screen repurposed, built on vanilla widgets (no GUI library): an
+ * {@link EditBox} name field, a primary Download/Resume button, a Done button, and an {@link ObjectSelectionList} of
+ * rows fed the MC-free {@code core/browse} model. Loader-agnostic view code; the entry points (keybind, command,
+ * pause-menu button) live per loader and route through {@link Wdl}, which decides per entry point whether the open runs
+ * inline or is deferred to the next client tick.
  */
 public final class WdlDownloadsScreen extends Screen {
     private static final int NAME_MAX_LENGTH = 48;
@@ -90,6 +100,7 @@ public final class WdlDownloadsScreen extends Screen {
 
     private static final String ARROW = "⬈";
     private static final String WARNING_GLYPH = "⚠ ";
+    private static final String RESTORE_GLYPH = "⟲";
     private static final String DOT = "·";
     private static final String SUMMARY_ABSENT = "–"; // an en dash marking a not-applicable cell, not a minus
     private static final String TRIANGLE_EXPANDED = "▼ ";
@@ -105,12 +116,18 @@ public final class WdlDownloadsScreen extends Screen {
     private List<DownloadEntry> entries;
     private final String defaultName;
     private final boolean appendDateSuffix;
+    private final boolean confirmResume;
+    private final boolean blockTaintedResume;
+    private final boolean zipOnResume;
+    private final boolean remapMapIds;
     private final boolean capturePartiallyDisabled;
     private final String modVersion;
     private final String mcVersion;
     private final Consumer<DownloadTarget> onStart;
     private final Supplier<CaptureState> captureState;
     private final Runnable onStop;
+    private final Consumer<ToastCopy> onRefusal;
+    private final BooleanSupplier remoteWorld;
     private final @Nullable String activeDownloadName;
 
     // The existing-worlds list state, remembered across re-opens for the JVM session: it starts collapsed and a
@@ -120,6 +137,8 @@ public final class WdlDownloadsScreen extends Screen {
     private @Nullable EditBox nameField;
     private @Nullable Button primaryButton;
     private @Nullable DownloadList list;
+    private @Nullable DownloadEntry selectedEntry;
+    private boolean suppressNameResponder;
 
     // The capture state init() last built its widgets for; tick() rebuilds when the live state diverges, so a
     // flip between idle and capturing swaps the whole widget set rather than leaving a stale control on screen.
@@ -133,11 +152,22 @@ public final class WdlDownloadsScreen extends Screen {
     private final Map<Path, Long> walkedSizes = new HashMap<>();
     private final Set<Path> scheduledWalks = new HashSet<>();
 
+    // The restore-source availability cache feeding the tainted rows' restore chip, filled by the same
+    // scanner on its availability kind and invalidated wherever the entries list is re-pulled.
+    private final Map<Path, Path> availableSources = new HashMap<>();
+    private final Set<Path> scheduledProbes = new HashSet<>();
+
+    // The wall clock of the last sweep-work probe (never a gameplay-time counter, which pauses with the
+    // game); tick() re-probes at the sweep's own TTL cadence while the screen stays open.
+    private long lastSweepCheckMillis;
+
     public WdlDownloadsScreen(@Nullable Screen parent, Path savesDirectory, @Nullable Path loadedWorld,
             Supplier<List<DownloadEntry>> entriesSupplier, boolean expandExistingList, String defaultName,
-            boolean appendDateSuffix, boolean capturePartiallyDisabled, String modVersion, String mcVersion,
+            boolean appendDateSuffix,
+            boolean confirmResume, boolean blockTaintedResume, boolean zipOnResume, boolean remapMapIds,
+            boolean capturePartiallyDisabled, String modVersion, String mcVersion,
             Consumer<DownloadTarget> onStart, Supplier<CaptureState> captureState, Runnable onStop,
-            @Nullable String activeDownloadName) {
+            Consumer<ToastCopy> onRefusal, BooleanSupplier remoteWorld, @Nullable String activeDownloadName) {
         super(Component.translatable("wdl.screen.downloads.title"));
         this.parent = parent;
         this.savesDirectory = savesDirectory;
@@ -146,15 +176,28 @@ public final class WdlDownloadsScreen extends Screen {
         this.entries = entriesSupplier.get();
         this.defaultName = defaultName;
         this.appendDateSuffix = appendDateSuffix;
+        this.confirmResume = confirmResume;
+        this.blockTaintedResume = blockTaintedResume;
+        this.zipOnResume = zipOnResume;
+        this.remapMapIds = remapMapIds;
         this.capturePartiallyDisabled = capturePartiallyDisabled;
         this.modVersion = modVersion;
         this.mcVersion = mcVersion;
         this.onStart = onStart;
         this.captureState = captureState;
         this.onStop = onStop;
+        this.onRefusal = onRefusal;
+        this.remoteWorld = remoteWorld;
         this.activeDownloadName = activeDownloadName;
         if (expandExistingList && !entries.isEmpty()) {
             listCollapsed = false; // /wdl downloads forces the list open; the choice then persists for the session
+        }
+        // The launch sweep rides the screen open: pending roll-back work under the temporary root is dispatched
+        // from idle here, and the TTL re-check in tick() repeats the probe while the screen stays open.
+        this.lastSweepCheckMillis = Util.getMillis();
+        if (captureState.get() == CaptureState.IDLE
+                && RestoreOperation.RestoreSweep.hasWork(savesDirectory)) {
+            Wdl.launchSweep(savesDirectory);
         }
     }
 
@@ -169,12 +212,14 @@ public final class WdlDownloadsScreen extends Screen {
         this.builtForState = state;
         if (state == CaptureState.IDLE) {
             initIdle();
+        } else if (state == CaptureState.RESTORING) {
+            initRestoring();
         } else {
             initCapturing(state);
         }
     }
 
-    /** Idle: an editable name field, a Download button, and the browsable downloads list. */
+    /** Idle: an editable name field, a Download/Resume button, and the browsable downloads list. */
     private void initIdle() {
         String priorName = this.nameField != null ? this.nameField.getValue() : "";
 
@@ -187,8 +232,9 @@ public final class WdlDownloadsScreen extends Screen {
         this.nameField = addRenderableWidget(field);
 
         int buttonRowY = field.getY() + field.getHeight() + 6;
-        boolean primaryActive = TargetResolver.hasUsableName(priorName);
-        addButtonRow(buttonRowY, downloadLabel(), button -> onPrimary(), primaryActive);
+        Component primaryLabel = this.selectedEntry != null ? resumeLabel() : downloadLabel();
+        boolean primaryActive = this.selectedEntry != null || TargetResolver.hasUsableName(priorName);
+        addButtonRow(buttonRowY, primaryLabel, button -> onPrimary(), primaryActive);
         setPrimaryActive(primaryActive);
 
         int listWidth = listBandWidth();
@@ -217,6 +263,7 @@ public final class WdlDownloadsScreen extends Screen {
         if (this.sizeScanner.isClosed()) {
             this.sizeScanner = new OnDiskSizeScanner();
             this.scheduledWalks.clear();
+            this.scheduledProbes.clear();
         }
         setInitialFocus(field);
     }
@@ -228,6 +275,7 @@ public final class WdlDownloadsScreen extends Screen {
     private void initCapturing(CaptureState state) {
         this.nameField = null;
         this.list = null;
+        this.selectedEntry = null;
 
         String name = this.activeDownloadName != null ? this.activeDownloadName : this.defaultName;
         Component labelText = Component.translatable("wdl.screen.downloads.downloading", name)
@@ -244,6 +292,30 @@ public final class WdlDownloadsScreen extends Screen {
         if (recording) {
             setInitialFocus(primary);
         }
+    }
+
+    /**
+     * Restoring: a busy label (named for the player restore's folder, or the folder-less sweep line) and a Done button,
+     * so the browse affordances wait until the disk settles while Esc and Done still leave.
+     */
+    private void initRestoring() {
+        this.nameField = null;
+        this.primaryButton = null;
+        this.list = null;
+        this.selectedEntry = null;
+
+        String name = Wdl.restoringFolderName();
+        Component labelText = (name != null
+                ? Component.translatable("wdl.screen.downloads.restoring", name)
+                : Component.translatable("wdl.screen.downloads.restoring_sweep"))
+                        .withColor(BrandColors.AMBER);
+        StringWidget label = new StringWidget(this.font.width(labelText), FIELD_HEIGHT, labelText, this.font);
+        centerTopWidget(label);
+        addRenderableWidget(label);
+
+        int buttonRowY = label.getY() + label.getHeight() + 6;
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> onClose())
+                .bounds((this.width - BUTTON_WIDTH) / 2, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT).build());
     }
 
     private void centerTopWidget(AbstractWidget widget) {
@@ -295,8 +367,19 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
+    /** Probe a tainted row's restore source the first time it is drawn; the answer feeds the restore chip. */
+    private void scheduleAvailabilityProbe(Path folder) {
+        if (!this.availableSources.containsKey(folder) && this.scheduledProbes.add(folder)) {
+            this.sizeScanner.submit(folder, true);
+        }
+    }
+
     private Component downloadLabel() {
         return Component.translatable("wdl.screen.downloads.download");
+    }
+
+    private Component resumeLabel() {
+        return Component.translatable("wdl.screen.downloads.resume");
     }
 
     private Component stopLabel() {
@@ -312,6 +395,14 @@ public final class WdlDownloadsScreen extends Screen {
     }
 
     private void onNameTyped(String text) {
+        if (suppressNameResponder) {
+            return;
+        }
+        // Editing the name is a fresh download: drop any selected row and relabel the primary action.
+        this.selectedEntry = null;
+        if (this.primaryButton != null) {
+            this.primaryButton.setMessage(downloadLabel());
+        }
         setPrimaryActive(TargetResolver.hasUsableName(text));
     }
 
@@ -325,12 +416,192 @@ public final class WdlDownloadsScreen extends Screen {
                 : Tooltip.create(Component.translatable("wdl.screen.downloads.download.tooltip")));
     }
 
+    private void onRowSelected(DownloadEntry entry) {
+        this.selectedEntry = entry;
+        if (this.nameField != null) {
+            suppressNameResponder = true;
+            this.nameField.setValue(entry.folderName()); // resume targets the folder verbatim
+            this.nameField.moveCursorToEnd(false); // a long prefilled name shows its end
+            suppressNameResponder = false;
+            setFocused(this.nameField);
+        }
+        if (this.primaryButton != null) {
+            this.primaryButton.setMessage(resumeLabel());
+        }
+        setPrimaryActive(true); // a selected row resumes its folder verbatim, so the name gate does not apply
+    }
+
     private void onPrimary() {
+        DownloadEntry selected = this.selectedEntry;
+        if (selected != null) {
+            resumeEntry(selected);
+            return;
+        }
         String typed = this.nameField != null ? this.nameField.getValue() : "";
         DownloadTarget target = TargetResolver.resolveNew(typed, LocalDate.now(), this.appendDateSuffix);
         switch (TargetResolver.classifyTarget(target.folderName(), this.savesDirectory, this.loadedWorld)) {
+            case REFUSE_LOADED -> refuseLoadedWorld();
+            // Merging into an existing folder is a resume: a RESUME target takes the pre-merge backup and keeps
+            // the world's own level.dat name, where a NEW target would skip the pre-merge backup.
+            case RESUME_EXISTING -> resumeFolder(target.folderName(), true);
             case NEW -> start(target);
         }
+    }
+
+    /** The one-click resume shortcut for a recoverable row: same confirm as the primary Resume. */
+    private void recover(DownloadEntry entry) {
+        resumeEntry(entry);
+    }
+
+    /**
+     * The restore chip's click: re-run the source discovery fresh at the gate (the cached answer only decided to show
+     * the chip), refuse with the source-changed toast when the source vanished, else pin it into the restore confirm
+     * whose Restore dispatches the guarded replace and returns here to show the busy label.
+     */
+    private void restoreEntry(DownloadEntry entry) {
+        Optional<RestoreSource> source = RestoreSource.find(this.savesDirectory, entry.folderName());
+        if (source.isEmpty()) {
+            this.onRefusal.accept(ToastCopy.restoreRefusedSourceChanged());
+            return;
+        }
+        RestoreSource pinned = source.get();
+        if (this.minecraft != null) {
+            this.minecraft.setScreen(ResumeConfirm.createRestore("wdl.screen.downloads.confirm_restore",
+                    entry.folderName(), pinned.zip().getFileName().toString(), this.zipOnResume,
+                    () -> {
+                        Wdl.launchRestore(this.savesDirectory, entry.folderName(), pinned);
+                        this.minecraft.setScreen(this);
+                    },
+                    () -> this.minecraft.setScreen(this)));
+        }
+    }
+
+    private void resumeEntry(DownloadEntry entry) {
+        if (entry.isCurrentlyLoaded()) {
+            refuseLoadedWorld();
+            return;
+        }
+        resumeFolder(entry.folderName(), false);
+    }
+
+    /**
+     * The screen's resume junction, the front-loaded guards mirroring the command flow's so a resume that will be
+     * refused never flashes a backup warning first: the remote-world test, then the managed stat with its per-cause
+     * split (a vanished folder is the missing cause; a file or an unmanaged directory at the name is a foreign occupant
+     * either way, named by its filesystem-reported spelling), then the tainted gate. The typed-name tail passes
+     * {@code suggestRename} so an occupant refusal carries the name-choosing advice; the row and Recover paths pass
+     * false, since a selected row involves no typed name to change.
+     */
+    private void resumeFolder(String folderName, boolean suggestRename) {
+        if (!this.remoteWorld.getAsBoolean()) {
+            this.onRefusal.accept(ToastCopy.joinMultiplayer());
+            return;
+        }
+        DownloadTarget target = TargetResolver.resolveResume(folderName, this.savesDirectory);
+        String resolvedName = target.folderName();
+        Path saveFolder = this.savesDirectory.resolve(resolvedName);
+        if (!DownloadFolders.isWdlManaged(saveFolder)) {
+            this.onRefusal.accept(Files.exists(saveFolder)
+                    ? ToastCopy.refuseOccupant(resolvedName, suggestRename)
+                    : ToastCopy.refuseFolderMissing(resolvedName));
+            return;
+        }
+        gateTaintedThenResume(resolvedName, () -> confirmThenStart(target, resolvedName));
+    }
+
+    private void refuseLoadedWorld() {
+        this.onRefusal.accept(ToastCopy.refuseLoaded());
+    }
+
+    /**
+     * The tainted decision (fresh disk read) as the outermost resume gate: a REFUSE stops with the refusal toast,
+     * unless a fresh source discovery finds a clean backup, in which case the refusal becomes the blocked-offer screen
+     * (a screen click is deliberate by construction) whose Restore dispatches the replace instead; a CONFIRM shows the
+     * tainted confirm whose Continue runs the map-id mismatch gate then a direct start (so the tainted confirm stands
+     * in for the merge confirm, one prompt not two), picking the restorable tip variant when the folder is tainted and
+     * a source exists (an unknown taint keeps the plain tainted copy); and an ALLOW runs the map-id mismatch gate then
+     * {@code allowDownstream}, the caller's normal resume tail. The hard refusal comes before any advisory warn, so a
+     * tainted-and-blocked folder never flashes the mismatch confirm.
+     */
+    private void gateTaintedThenResume(String folderName, Runnable allowDownstream) {
+        SinglePlayerTaint.TaintState taint = SinglePlayerTaint.classify(this.savesDirectory.resolve(folderName));
+        SinglePlayerTaint.Decision decision = SinglePlayerTaint.decide(taint, this.blockTaintedResume);
+        if (decision == SinglePlayerTaint.Decision.REFUSE) {
+            Optional<RestoreSource> source = RestoreSource.find(this.savesDirectory, folderName);
+            if (source.isPresent() && this.minecraft != null) {
+                RestoreSource pinned = source.get();
+                this.minecraft.setScreen(ResumeConfirm.createRestore(
+                        "wdl.screen.downloads.confirm_restore_blocked",
+                        folderName, pinned.zip().getFileName().toString(), this.zipOnResume,
+                        () -> {
+                            Wdl.launchRestore(this.savesDirectory, folderName, pinned);
+                            this.minecraft.setScreen(this);
+                        },
+                        () -> this.minecraft.setScreen(this)));
+                return;
+            }
+            refuseTainted();
+            return;
+        }
+        boolean mismatch = MapManifest.schemeMismatch(this.savesDirectory.resolve(folderName), this.remapMapIds);
+        if (decision == SinglePlayerTaint.Decision.CONFIRM) {
+            DownloadTarget target = TargetResolver.resolveResume(folderName, this.savesDirectory);
+            if (this.minecraft == null) {
+                return;
+            }
+            boolean backupHere = this.zipOnResume && !mismatch;
+            Runnable onContinue = () -> gateMapIdMismatch(folderName, mismatch, this.zipOnResume,
+                    () -> start(target));
+            Runnable onCancel = () -> this.minecraft.setScreen(this);
+            Optional<RestoreSource> source = taint == SinglePlayerTaint.TaintState.TAINTED
+                    ? RestoreSource.find(this.savesDirectory, folderName)
+                    : Optional.empty();
+            this.minecraft.setScreen(source.isPresent()
+                    ? ResumeConfirm.createTaintedRestorable(folderName,
+                            source.get().zip().getFileName().toString(), backupHere, onContinue, onCancel)
+                    : ResumeConfirm.create("wdl.screen.downloads.confirm_tainted", folderName, backupHere,
+                            onContinue, onCancel));
+            return;
+        }
+        gateMapIdMismatch(folderName, mismatch, this.zipOnResume && !this.confirmResume, allowDownstream);
+    }
+
+    /**
+     * When {@code mismatch} is set, show a one-time confirm whose Continue runs {@code proceed}; otherwise run
+     * {@code proceed} now. {@code backupHere} is whether this confirm is the terminal prompt that commits the resume,
+     * so it alone carries the backup reassurance while the earlier gates pass false, showing the line once. The
+     * reusable middle layer between the tainted gate and the resume tail: {@code proceed} is a direct start after the
+     * tainted confirm, or the caller's normal downstream (the merge confirm) on the allow path.
+     */
+    private void gateMapIdMismatch(String folderName, boolean mismatch, boolean backupHere, Runnable proceed) {
+        if (!mismatch) {
+            proceed.run();
+            return;
+        }
+        if (this.minecraft != null) {
+            this.minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
+                    folderName, backupHere,
+                    proceed,
+                    () -> this.minecraft.setScreen(this)));
+        }
+    }
+
+    private void refuseTainted() {
+        this.onRefusal.accept(ToastCopy.refuseTainted());
+    }
+
+    private void confirmThenStart(DownloadTarget target, String folderName) {
+        if (this.minecraft == null) {
+            return;
+        }
+        if (!this.confirmResume) {
+            start(target); // continue silently; the backup is separate, still governed by zipOnResume
+            return;
+        }
+        this.minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
+                folderName, this.zipOnResume,
+                () -> start(target),
+                () -> this.minecraft.setScreen(this))); // cancel returns here, typed name preserved, no backup
     }
 
     private void start(DownloadTarget target) {
@@ -441,21 +712,37 @@ public final class WdlDownloadsScreen extends Screen {
     public void tick() {
         CaptureState state = this.captureState.get();
         if (state != this.builtForState) {
-            // The flip back to idle is the moment disk state changed (a save finished), so the browse model and
-            // the caches are refreshed here, not on resize-driven init() reruns.
-            if (state == CaptureState.IDLE) {
+            // The flip back to idle is the moment disk state changed (a save finished, or a restore or sweep
+            // ended), so the browse model and the caches are refreshed here, not on resize-driven init()
+            // reruns; a completed sweep that never touched the disk skips the re-pull. The availability
+            // cache rides the entries list, so it invalidates on the same re-pull.
+            if (state == CaptureState.IDLE
+                    && (this.builtForState != CaptureState.RESTORING || Wdl.lastRestoreChangedDisk())) {
                 this.entries = this.entriesSupplier.get();
                 this.walkedSizes.clear();
                 this.scheduledWalks.clear();
+                this.availableSources.clear();
+                this.scheduledProbes.clear();
             }
             rebuildWidgets(); // the capture state flipped while open (started, stopped, or finished saving)
             return;
         }
+        if (state == CaptureState.IDLE
+                && Util.getMillis() - this.lastSweepCheckMillis >= RestoreOperation.RestoreSweep.TTL_MS) {
+            this.lastSweepCheckMillis = Util.getMillis();
+            if (RestoreOperation.RestoreSweep.hasWork(this.savesDirectory)) {
+                Wdl.launchSweep(this.savesDirectory);
+            }
+        }
         // Apply finished walks on the render thread: a real on-disk total becomes the row's size; a failed walk
         // is dropped, so the row keeps showing no size rather than a wrong one. A zero total is dropped the same
         // way, harmless because a wdl-managed folder always has level.dat and a wdl/ record, so it is never zero.
+        // An availability answer fills the restore-source cache; a probe that found nothing stays out of it.
         for (OnDiskSizeScanner.Result result : this.sizeScanner.drainCompleted()) {
-            if (result.size().isPresent() && result.size().getAsLong() > 0) {
+            Path source = result.restoreSource();
+            if (source != null) {
+                this.availableSources.put(result.folder(), source);
+            } else if (result.size().isPresent() && result.size().getAsLong() > 0) {
                 this.walkedSizes.put(result.folder(), result.size().getAsLong());
             }
         }
@@ -469,7 +756,27 @@ public final class WdlDownloadsScreen extends Screen {
         this.sizeScanner.close(); // drop queued walks and discard any in-flight result for this closed screen
     }
 
-    /** The name field; Enter submits the primary action only while the button is enabled. */
+    /**
+     * The named row's restore-chip hit box as last rendered, or null while the row is absent or its chip has never been
+     * drawn (source not cached, the row is the loaded world, or the list has not been expanded this open). Collapsing
+     * the list only removes its widget, so a row rendered once keeps its last-rendered rectangle rather than reverting
+     * to null; read the box only while the list is expanded. Exists for the test harness, so the screen gametests read
+     * the live rectangle instead of recomputing pixel math.
+     */
+    public @Nullable ScreenRectangle restoreChipBox(String folderName) {
+        DownloadList downloadList = this.list;
+        if (downloadList == null) {
+            return null;
+        }
+        for (DownloadList.Row row : downloadList.children()) {
+            if (row.entry.folderName().equals(folderName)) {
+                return row.restoreChipBox();
+            }
+        }
+        return null;
+    }
+
+    /** The name field; Enter submits the primary action (download or resume) only while the button is enabled. */
     private final class NameField extends EditBox {
         NameField(Font font, int x, int y, int width, int height, Component message) {
             super(font, x, y, width, height, message);
@@ -487,8 +794,10 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
-    /** The row list: a vanilla selection list of the wdl-managed downloads on disk. */
+    /** The row list: a vanilla selection list whose selection prefills the name field. */
     private final class DownloadList extends ObjectSelectionList<DownloadList.Row> {
+        private boolean suppressPrefill;
+
         DownloadList(Minecraft minecraft, int width, int height, int y, int itemHeight) {
             super(minecraft, width, height, y, itemHeight);
         }
@@ -506,13 +815,23 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
-            // An arrow click highlights the row like a body click.
+            // An arrow / Recover click highlights the row like a body click, but does not prefill the field.
             Row row = getEntryAtPosition(mouseButtonEvent.x(), mouseButtonEvent.y());
             if (row != null && row.handleEdgeClick((int) mouseButtonEvent.x(), (int) mouseButtonEvent.y())) {
+                this.suppressPrefill = true;
                 setSelected(row);
+                this.suppressPrefill = false;
                 return true;
             }
             return super.mouseClicked(mouseButtonEvent, doubleClick);
+        }
+
+        @Override
+        public void setSelected(@Nullable Row entry) {
+            super.setSelected(entry);
+            if (entry != null && !this.suppressPrefill) { // a body click prefills; an edge click only highlights
+                onRowSelected(entry.entry);
+            }
         }
 
         void closeIcons() {
@@ -533,6 +852,8 @@ public final class WdlDownloadsScreen extends Screen {
             private int arrowRight;
             private int recoverLeft = -1;
             private int recoverRight = -1;
+            private int restoreLeft = -1;
+            private int restoreRight = -1;
 
             Row(DownloadEntry entry) {
                 this.entry = entry;
@@ -561,8 +882,11 @@ public final class WdlDownloadsScreen extends Screen {
             @Override
             public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
                     float partialTick) {
-                // Walk only visible rows: a tainted row is never walked, a complete row is walked for its size.
-                if (!this.entry.isTainted() && this.entry.health() == DownloadHealth.COMPLETE) {
+                // Probe or walk only visible rows, on disjoint domains: a tainted row is availability-probed
+                // for its restore chip and never walked, a complete row is walked for its size.
+                if (this.entry.isTainted()) {
+                    scheduleAvailabilityProbe(this.folder);
+                } else if (this.entry.health() == DownloadHealth.COMPLETE) {
                     scheduleSizeWalk(this.folder);
                 }
                 int rowX = getContentX();
@@ -661,21 +985,46 @@ public final class WdlDownloadsScreen extends Screen {
                 this.arrowRight = rightEdge;
                 this.recoverLeft = -1;
                 this.recoverRight = -1;
+                this.restoreLeft = -1;
+                this.restoreRight = -1;
                 boolean overArrow = hovering && inLine(mouseX, mouseY, this.arrowLeft, this.arrowRight, y);
                 guiGraphics.drawString(font, ARROW, this.arrowLeft, y, overArrow ? LINK_HOVER_ARGB : LINK_REST_ARGB);
 
-                // The slot just left of the arrow holds the Singleplayer chip, the Recover chip, the Partial
-                // chip, or the on-disk size. A chip stands in for the size, so a chip row shows no size and,
-                // in renderContent, never walks its folder. A plain row shows its size once it lands.
+                // The slot just left of the arrow holds the Singleplayer chip (joined by the Restore action
+                // chip when a clean source is cached and the row is not the loaded world), the Recover chip,
+                // the Partial chip, or the on-disk size. A chip stands in for the size, so a chip row shows
+                // no size and, in renderContent, never walks its folder. A plain row shows its size once it lands.
                 int slotRight = this.arrowLeft - 4;
                 int slotLeft = this.arrowLeft;
                 if (this.entry.isTainted()) {
+                    Path source = availableSources.get(this.folder);
+                    boolean restorable = false;
+                    if (source != null && !this.entry.isCurrentlyLoaded()) {
+                        restorable = true;
+                        String restoreChip = Component.translatable("wdl.screen.downloads.restore").getString();
+                        this.restoreLeft = slotRight - font.width(restoreChip);
+                        this.restoreRight = slotRight;
+                        boolean overRestore = hovering
+                                && inLine(mouseX, mouseY, this.restoreLeft, this.restoreRight, y);
+                        drawRestoreChip(guiGraphics, restoreChip, this.restoreLeft, y,
+                                overRestore ? LINK_HOVER_ARGB : RECOVER_ARGB);
+                        if (overRestore) {
+                            guiGraphics.setTooltipForNextFrame(font,
+                                    font.split(restoreTooltip(source), TOOLTIP_WRAP_WIDTH), mouseX, mouseY);
+                        }
+                        slotRight = this.restoreLeft - 4;
+                    }
                     String chip = Component.translatable("wdl.screen.downloads.tainted").getString();
                     int chipLeft = slotRight - font.width(chip);
                     guiGraphics.drawString(font, chip, chipLeft, y, TAINTED_ARGB);
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
+                        // With the Restore chip present the tooltip drops the fresh-download advice: the
+                        // chip beside it is the better way out.
                         guiGraphics.setTooltipForNextFrame(font, font.split(
-                                Component.translatable("wdl.screen.downloads.tooltip.tainted"), TOOLTIP_WRAP_WIDTH),
+                                Component.translatable(restorable
+                                        ? "wdl.screen.downloads.tooltip.tainted_restorable"
+                                        : "wdl.screen.downloads.tooltip.tainted"),
+                                TOOLTIP_WRAP_WIDTH),
                                 mouseX, mouseY);
                     }
                     slotLeft = chipLeft;
@@ -716,6 +1065,29 @@ public final class WdlDownloadsScreen extends Screen {
                 return slotLeft;
             }
 
+            /**
+             * The restore glyph comes from the fallback font, whose ink sits high in its line box, so the glyph alone
+             * is drawn a pixel lower while the label stays on the row baseline.
+             */
+            private void drawRestoreChip(GuiGraphics guiGraphics, String chip, int x, int y, int color) {
+                if (chip.startsWith(RESTORE_GLYPH)) {
+                    guiGraphics.drawString(font, RESTORE_GLYPH, x, y + 1, color);
+                    guiGraphics.drawString(font, chip.substring(RESTORE_GLYPH.length()),
+                            x + font.width(RESTORE_GLYPH), y, color);
+                } else {
+                    guiGraphics.drawString(font, chip, x, y, color);
+                }
+            }
+
+            /** The restore chip's tooltip: the action, the source zip, and the snapshot fate by zipOnResume. */
+            private Component restoreTooltip(Path source) {
+                String sourceName = source.getFileName().toString();
+                return zipOnResume
+                        ? Component.translatable("wdl.screen.downloads.tooltip.restore", sourceName,
+                                ResumeConfirm.snapshotZipName(this.entry.folderName()))
+                        : Component.translatable("wdl.screen.downloads.tooltip.restore_no_backup", sourceName);
+            }
+
             /** The on-disk total once its walk lands; absent until then. */
             private OptionalLong effectiveSize() {
                 Long walked = walkedSizes.get(this.folder);
@@ -731,7 +1103,31 @@ public final class WdlDownloadsScreen extends Screen {
                     Util.getPlatform().openPath(this.folder); // the per-row open-folder affordance
                     return true;
                 }
+                if (this.entry.health() == DownloadHealth.RECOVERABLE && this.recoverLeft >= 0
+                        && inLine(mouseX, mouseY, this.recoverLeft, this.recoverRight, this.line2Top)) {
+                    recover(this.entry);
+                    return true;
+                }
+                if (this.entry.isTainted() && this.restoreLeft >= 0
+                        && inLine(mouseX, mouseY, this.restoreLeft, this.restoreRight, this.line2Top)) {
+                    restoreEntry(this.entry);
+                    return true;
+                }
                 return false;
+            }
+
+            /**
+             * The restore chip's live hit box, or null while the chip is absent. The live hit test treats both edges as
+             * inclusive, so the width and height carry the extra pixel: every point inside the reported rectangle
+             * clicks the chip.
+             */
+            @Nullable
+            ScreenRectangle restoreChipBox() {
+                if (this.restoreLeft < 0) {
+                    return null;
+                }
+                return new ScreenRectangle(this.restoreLeft, this.line2Top,
+                        this.restoreRight - this.restoreLeft + 1, font.lineHeight + 1);
             }
 
             void close() {

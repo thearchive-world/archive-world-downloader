@@ -335,9 +335,11 @@ public final class Wdl {
         WorldgenWarmup.dispatchForScreenOpen(config.worldOutput().worldType(),
                 adapter.levelDataWriter()::warmWorldgen, warmupWorker);
         minecraft.setScreen(new WdlDownloadsScreen(minecraft.screen, savesDirectory, loadedWorld, entries,
-                expandExistingList, defaultDownloadName(minecraft), config.appendDateSuffix(),
+                expandExistingList, defaultDownloadName(minecraft), config.appendDateSuffix(), config.confirmResume(),
+                config.blockTaintedResume(), config.zipOnResume(), config.remapMapIds(),
                 CaptureToggleGuard.isCapturePartiallyDisabled(config), bridge.modVersion(), mcVersion(),
-                Wdl::startDownload, Wdl::state, controller::stop, activeDownloadName));
+                Wdl::startDownload, Wdl::state, controller::stop,
+                bridge::sendToast, bridge::isRemoteWorld, activeDownloadName));
     }
 
     private static Executor daemonWorker(String name) {
