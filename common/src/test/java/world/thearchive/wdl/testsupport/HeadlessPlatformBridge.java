@@ -4,6 +4,8 @@
 package world.thearchive.wdl.testsupport;
 
 import java.nio.file.Path;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
@@ -31,6 +33,10 @@ public class HeadlessPlatformBridge implements PlatformBridge {
 
     @Override
     public void registerDownloadsKeybind(Runnable onOpen) {}
+
+    @Override
+    public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
+            Runnable onPrimary, Runnable onConfig) {}
 
     @Override
     public void onClientTickEnd(Runnable callback) {}

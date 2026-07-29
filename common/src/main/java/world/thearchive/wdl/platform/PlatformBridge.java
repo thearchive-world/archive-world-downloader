@@ -4,6 +4,8 @@
 package world.thearchive.wdl.platform;
 
 import java.nio.file.Path;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
@@ -11,7 +13,8 @@ import world.thearchive.wdl.core.ToastCopy;
 /**
  * Loader-services SPI: the thin seam between the loader-agnostic mod and a concrete mod loader. One implementation per
  * loader (Fabric, NeoForge), constructed by that loader's entrypoint and handed to {@code Wdl.initialize} (the loader
- * is known there, so the bridge needs no {@link java.util.ServiceLoader} lookup).
+ * is known there, so unlike the per-band {@code VersionAdapter} the bridge needs no {@link java.util.ServiceLoader}
+ * lookup).
  *
  * <p>Deliberately free of {@code net.minecraft.*} in its signatures so the core can depend on it.
  */
@@ -21,6 +24,17 @@ public interface PlatformBridge {
 
     /** Register the open-downloads-screen keybind (default unbound); {@code onOpen} runs on each press. */
     void registerDownloadsKeybind(Runnable onOpen);
+
+    /**
+     * Add the wdl row to the vanilla pause menu, wired mixin-free through the loader's public screen-init event: a
+     * primary button that reflects capture state, plus a small "..." button that runs {@code onConfig}. The loader
+     * reads {@code primaryLabelKey} and {@code primaryEnabled} once when the pause menu opens (the label is a
+     * {@code wdl} translation key it resolves to a {@code Component}, so the seam stays free of
+     * {@code net.minecraft.*}), and binds a press to {@code onPrimary}, a state-reading dispatch read again at click so
+     * a stale label cannot fire the wrong action.
+     */
+    void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
+            Runnable onPrimary, Runnable onConfig);
 
     /** Run {@code callback} at the end of every client tick (client main thread). */
     void onClientTickEnd(Runnable callback);
@@ -36,7 +50,8 @@ public interface PlatformBridge {
 
     /**
      * Whether the world the client is attached to is served from elsewhere rather than being the user's own local
-     * world. A genuine singleplayer world and a LAN-hosted world are the user's own and are excluded.
+     * world: a real multiplayer server, or a replay of one. A genuine singleplayer world and a LAN-hosted world are the
+     * user's own and are excluded.
      */
     boolean isRemoteWorld();
 
@@ -49,7 +64,7 @@ public interface PlatformBridge {
     /** The running mod's own version (modid {@code "wdl"}), for the download report's Software section. */
     String modVersion();
 
-    /** Whether a mod with the given id is loaded. */
+    /** Whether a mod with the given id is loaded, gating the optional coverage overlay integration. */
     boolean isModLoaded(String modId);
 
     /**

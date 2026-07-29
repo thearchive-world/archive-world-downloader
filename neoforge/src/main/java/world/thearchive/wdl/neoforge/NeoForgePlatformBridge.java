@@ -6,8 +6,15 @@ package world.thearchive.wdl.neoforge;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.CommandDispatcher;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.neoforged.bus.api.IEventBus;
@@ -17,6 +24,7 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.lwjgl.glfw.GLFW;
 
@@ -57,6 +65,30 @@ final class NeoForgePlatformBridge extends AbstractPlatformBridge {
             while (key.consumeClick()) {
                 onPress.run();
             }
+        });
+    }
+
+    @Override
+    public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
+            Runnable onPrimary, Runnable onConfig) {
+        // ScreenEvent.Init.Post fires on the game bus for every screen init; guard to the pause screen and add
+        // the buttons as listeners (a Button is a renderable GuiEventListener), the mixin-free injection path.
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, event -> {
+            if (!(event.getScreen() instanceof PauseScreen)) {
+                return;
+            }
+            List<AbstractWidget> widgets = new ArrayList<>();
+            for (GuiEventListener listener : event.getScreen().children()) {
+                if (listener instanceof AbstractWidget widget) {
+                    widgets.add(widget);
+                }
+            }
+            AbstractWidget anchor = lowest(widgets);
+            if (anchor == null) {
+                return;
+            }
+            buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
+                    .forEach(event::addListener);
         });
     }
 

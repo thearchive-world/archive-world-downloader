@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.core.ChatCopy;
@@ -58,6 +60,10 @@ class ResumeFlowTest {
 
         @Override
         public void registerDownloadsKeybind(Runnable onOpen) {}
+
+        @Override
+        public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
+                Runnable onPrimary, Runnable onConfig) {}
 
         @Override
         public void onClientTickEnd(Runnable callback) {}

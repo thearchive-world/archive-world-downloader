@@ -13,16 +13,23 @@ import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.core.ChatCopy;
@@ -141,6 +148,44 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         }
         mc.getToastManager().addToast(SystemToast.multiline(mc, id,
                 Component.translatable(toast.titleKey()), body));
+    }
+
+    /**
+     * Build the wdl pause-menu row (a primary action button plus a settings button) above {@code anchor}, shifting the
+     * anchor down to open the row. Returns the widgets for the loader to add through its own screen hook; the layout is
+     * loader-agnostic. Returns none in the user's own local world, leaving the anchor unshifted so the vanilla menu
+     * keeps its own spacing.
+     */
+    protected List<AbstractWidget> buildPauseMenuRow(AbstractWidget anchor,
+            Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled, Runnable onPrimary,
+            Runnable onConfig) {
+        // A local world refuses every action this row leads to, and the /wdl commands and downloads keybind
+        // still reach the settings and downloads screens there, so the row is hidden rather than disabled.
+        if (!isRemoteWorld()) {
+            return List.of();
+        }
+        int x = anchor.getX();
+        int y = anchor.getY();
+        int width = anchor.getWidth();
+        anchor.setY(y + 24); // shift the bottom button (Disconnect) down to open a row above it
+        Button primary = Button.builder(Component.translatable(primaryLabelKey.get()), button -> onPrimary.run())
+                .bounds(x, y, width - 24, 20).build();
+        primary.active = primaryEnabled.getAsBoolean();
+        Button config = Button.builder(Component.literal("..."), button -> onConfig.run())
+                .tooltip(Tooltip.create(Component.translatable("wdl.pause.settings.tooltip")))
+                .bounds(x + width - 20, y, 20, 20).build();
+        return List.of(primary, config);
+    }
+
+    /** The lowest existing pause-menu button (Disconnect), the anchor to insert the wdl row above. */
+    protected static @Nullable AbstractWidget lowest(List<AbstractWidget> widgets) {
+        AbstractWidget lowest = null;
+        for (AbstractWidget widget : widgets) {
+            if (lowest == null || widget.getY() > lowest.getY()) {
+                lowest = widget;
+            }
+        }
+        return lowest;
     }
 
     /** Run a /wdl action and report Brigadier success. */

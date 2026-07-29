@@ -5,6 +5,7 @@ package world.thearchive.wdl;
 
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.server.IntegratedServer;
@@ -31,13 +33,18 @@ import world.thearchive.wdl.adapter.ConnectionTee;
 import world.thearchive.wdl.adapter.LiveCaptureSession;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.client.WdlDownloadsScreen;
+import world.thearchive.wdl.client.WdlSettingsScreen;
+import world.thearchive.wdl.core.AtomicFileWrite;
 import world.thearchive.wdl.core.CaptureController;
 import world.thearchive.wdl.core.CaptureCounts;
 import world.thearchive.wdl.core.CaptureState;
 import world.thearchive.wdl.core.CaptureToggleGuard;
 import world.thearchive.wdl.core.ChatCopy;
+import world.thearchive.wdl.core.ConfigSchema;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
+import world.thearchive.wdl.core.SaveFailureComposer;
+import world.thearchive.wdl.core.SaveFailureReason;
 import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.core.WdlConfig;
@@ -86,7 +93,8 @@ public final class Wdl {
 
     // A screen opened synchronously from a chat command is clobbered on Fabric by ChatScreen's post-dispatch
     // setScreen(null) (NeoForge patches that close to guard it). Open it on the next client tick instead, after
-    // that close has run. One-shot, last-write-wins; consumed by onClientTick on the client main thread.
+    // that close has run. One-shot, last-write-wins; consumed by onClientTick and discarded by the inline
+    // pause-menu open (openDownloadsScreenNow), both on the client main thread.
     private static @Nullable Runnable pendingScreenOpen;
 
     // The download-start flow, constructed by initialize() once the bridge is live; never null in operation,
@@ -137,6 +145,8 @@ public final class Wdl {
 
         bridge.registerToggleKeybind(Wdl::onToggle);
         bridge.registerDownloadsKeybind(Wdl::openDownloadsScreen);
+        bridge.addPauseMenuButtons(Wdl::pausePrimaryLabelKey, Wdl::isPausePrimaryEnabled, Wdl::onPausePrimary,
+                Wdl::openSettingsScreen);
         bridge.onClientTickEnd(Wdl::onClientTick);
         bridge.onDisconnect(controller::onDisconnect);
         // A backend transfer (play-to-configuration re-entry) fires no disconnect hook on either loader, so the
@@ -308,12 +318,107 @@ public final class Wdl {
         pendingScreenOpen = open;
     }
 
+    /** Open the in-mod settings screen from the pause-menu config button; edits commit on close. */
+    private static void openSettingsScreen() {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.setScreen(createSettingsScreen(minecraft.screen));
+    }
+
+    /**
+     * Build the in-mod settings screen with {@code parent} as its back target, so a loader mod-config entry point (the
+     * Fabric mod-list hook, the NeoForge config button) opens the same screen as the pause-menu button. Safe before a
+     * world loads: the curated game-rule set reads the band's default rules, not a live level.
+     */
+    public static Screen createSettingsScreen(@Nullable Screen parent) {
+        return new WdlSettingsScreen(parent, WdlConfig.load(configPath()), Wdl::saveConfig,
+                adapter.levelDataWriter().curatedGameRules(), bridge::isModLoaded);
+    }
+
+    /**
+     * Persist an edited config from the settings menu and refresh the in-memory snapshot the per-frame consumers (the
+     * HUD, the outline, the coverage overlay) read, so an edit takes effect without waiting for the next download
+     * start. Writes the documented file atomically, then reloads from disk so the snapshot is the parsed, self-healed
+     * result. A write failure is surfaced to the player on the same chat and toast channel a failed download uses, and
+     * logged; the reload still runs, so the snapshot stays consistent with what is actually on disk (the prior file,
+     * since the write did not land).
+     */
+    private static void saveConfig(WdlConfig config) {
+        Path file = configPath();
+        try {
+            AtomicFileWrite.write(file, ConfigSchema.renderConfigFile(config).getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            LOGGER.warn("failed to write wdl.properties from the settings menu", e);
+            SaveFailureReason reason = SaveFailureComposer.describe(e);
+            bridge.sendChat(ChatCopy.saveFailed(reason)); // an error is never suppressed by showChatMessages
+            ToastCopy toast = ToastCopy.error(config.showToasts(), reason);
+            if (toast != null) {
+                bridge.sendToast(toast);
+            }
+        }
+        currentConfig = WdlConfig.load(file);
+    }
+
+    // The pause-menu primary button's label and enabled-state are resolved once when the pause menu opens, since
+    // PauseScreen is vanilla and we do not own its per-frame tick to refresh them; they can go one open stale
+    // during a drain. onPausePrimary re-reads the state at click, so the action stays correct even when the label
+    // does not.
+
+    /**
+     * The pause-menu primary button's label key for the current state (idle and restoring open / recording stop /
+     * saving): the button stays an open-screen affordance during a restore.
+     */
+    private static String pausePrimaryLabelKey() {
+        return switch (controller.state()) {
+            case IDLE -> "wdl.screen.downloads.open";
+            case RECORDING -> "wdl.screen.downloads.stop_download";
+            case SAVING -> "wdl.screen.downloads.saving";
+            case RESTORING -> "wdl.screen.downloads.open";
+        };
+    }
+
+    /** The primary button is inert only while a save drains; recording offers Stop, idle and restoring open. */
+    private static boolean isPausePrimaryEnabled() {
+        return controller.state() != CaptureState.SAVING;
+    }
+
+    /**
+     * Pause-menu primary press: idle and restoring open the screen, recording stops and returns to the world, saving
+     * no-ops.
+     */
+    private static void onPausePrimary() {
+        switch (controller.state()) {
+            case RECORDING -> {
+                if (currentConfig.showChatMessages()) {
+                    bridge.sendChat(ChatCopy.saving());
+                }
+                controller.stop();
+                Minecraft.getInstance().setScreen(null);
+            }
+            case SAVING -> {} // active == false makes this unreachable by click; the branch is defense in depth
+            case RESTORING -> openDownloadsScreenNow();
+            default -> openDownloadsScreenNow();
+        }
+    }
+
     /**
      * Open the download screen with the existing-worlds list collapsed. Deferred to the next client tick; the parent
      * screen is captured at tick time.
      */
     private static void openDownloadsScreen() {
         deferScreen(() -> showDownloadsScreen(false));
+    }
+
+    /**
+     * Open the download screen directly on the click, for the pause-menu button. The pause button is not
+     * chat-originated, so it needs none of the tick deferral openDownloadsScreen uses to survive Fabric's post-dispatch
+     * chat close; opening inline is what lets it work while a replay's paused timer has suspended the game tick.
+     */
+    private static void openDownloadsScreenNow() {
+        // The inline open consumes the deferred slot the same way a deferred open would. The slot holds any
+        // parked action, a resume start or a confirm as much as a plain open, so this can discard one. The
+        // slot is last-write-wins on every path that writes it.
+        pendingScreenOpen = null;
+        showDownloadsScreen(false);
     }
 
     /** Build the MC-free browse model and show the screen; run from the deferral on the client main thread. */
