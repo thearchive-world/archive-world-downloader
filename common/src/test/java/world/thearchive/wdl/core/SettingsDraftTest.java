@@ -31,6 +31,7 @@ class SettingsDraftTest {
         assertEquals("true", draft.get("captureEntities"));
         assertTrue(draft.getBoolean("captureEntities"));
         assertEquals(15, draft.getInteger("recaptureSeconds"));
+        assertEquals(MarkerHue.RED, draft.getEnum("unscannedColor", MarkerHue.class));
         assertFalse(draft.isDirty(), "an untouched working copy is not dirty");
     }
 

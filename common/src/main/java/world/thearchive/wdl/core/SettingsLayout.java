@@ -30,7 +30,12 @@ public final class SettingsLayout {
                     section("wdl.settings.section.hud", "showHud", "hudDetailed", "hudPeekMode",
                             "hudAnchor", "hudOffsetX", "hudOffsetY", "hudBackground", "hudPanelOpacity",
                             "hudDoneLingerSeconds"),
-                    section("wdl.settings.section.notifications", "showToasts", "showChatMessages")),
+                    section("wdl.settings.section.container_outline", "renderUnsavedOutline",
+                            "outlineDistance", "unscannedColor", "recoveredColor", "outlineLineWidthScale"),
+                    section("wdl.settings.section.chunk_overlay", "renderCoverageOverlay",
+                            "overlayCoveredColor", "overlaySuspectColor"),
+                    section("wdl.settings.section.notifications", "showToasts", "showChatMessages",
+                            "checkForUpdates")),
             tab("world",
                     section("wdl.settings.section.generation", "worldType", "worldSeed", "generateFeatures"),
                     gameRuleGroup("wdl.settings.section.game_rules", "overrideGamerules"),
@@ -45,7 +50,7 @@ public final class SettingsLayout {
                     section("wdl.settings.section.output", "zipOnResume", "confirmResume", "blockTaintedResume",
                             "zipOnFinish", "appendDateSuffix"),
                     section("wdl.settings.section.advanced", "autoDownload", "encodeBudgetMillis",
-                            "dumpReceivedFrames"))));
+                            "dumpReceivedFrames", "outlineDebugTiming"))));
 
     /**
      * The curated game-rule rows in their locked option-set order (the render pairs each with the band's
@@ -61,7 +66,8 @@ public final class SettingsLayout {
      * Config option key to the master toggle key whose off-state grays its row live. A key absent here is never gated.
      * This lives beside {@link #TABS} rather than being read off it because a section's master is not always its
      * template-first option and not every section has one, so the mapping is carried explicitly. The HUD master grays
-     * the rest of the HUD section.
+     * the rest of the HUD section; the outline master grays the container outline rows; the coverage overlay master
+     * grays both its Chunk Overlay tone hues.
      */
     static final Map<String, String> ROW_MASTER = buildRowMaster();
 
@@ -161,8 +167,15 @@ public final class SettingsLayout {
                 "hudBackground", "hudPanelOpacity", "hudDoneLingerSeconds" }) {
             master.put(key, "showHud");
         }
+        for (String key : new String[] { "outlineDistance", "unscannedColor", "recoveredColor",
+                "outlineLineWidthScale" }) {
+            master.put(key, "renderUnsavedOutline");
+        }
         for (String key : new String[] { "openInCreative", "allowCommands" }) {
             master.put(key, "overrideWorldDefaults");
+        }
+        for (String key : new String[] { "overlayCoveredColor", "overlaySuspectColor" }) {
+            master.put(key, "renderCoverageOverlay");
         }
         return Collections.unmodifiableMap(master);
     }

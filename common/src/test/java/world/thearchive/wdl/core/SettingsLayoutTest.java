@@ -75,10 +75,12 @@ class SettingsLayoutTest {
 
     @Test
     void gatedSectionsLeadWithTheirMaster() {
-        // The world-defaults master follows openInCreative in the descriptor's template order, yet its
-        // section must render it first.
+        // The world-defaults master follows openInCreative in the descriptor's template order, yet its section
+        // must render it first; the same holds for the outline master over the container outline rows.
         assertEquals("overrideWorldDefaults", sectionContaining("openInCreative").get(0),
                 "the world-defaults master leads its section");
+        assertEquals("renderUnsavedOutline", sectionContaining("outlineDistance").get(0),
+                "the outline master leads the container outline section");
     }
 
     private static List<String> sectionContaining(String key) {
@@ -104,7 +106,8 @@ class SettingsLayoutTest {
     @Test
     void everyRowMasterPrecedesTheRowsItGates() {
         // A master need not lead a section, but it must render above every row it grays so the dependency
-        // reads top down: the HUD master leads its section.
+        // reads top down: the outline and HUD masters lead their sections, while the coverage master leads
+        // its own Chunk Overlay section above the two hue rows it grays.
         List<String> order = allRowKeys();
         for (Map.Entry<String, String> entry : SettingsLayout.ROW_MASTER.entrySet()) {
             String gated = entry.getKey();
@@ -114,6 +117,18 @@ class SettingsLayoutTest {
             assertTrue(masterAt >= 0 && masterAt < gatedAt,
                     master + " must be laid out above the row it grays (" + gated + ")");
         }
+    }
+
+    @Test
+    void theCoverageHuesGrayWithTheirOwnMasterNotTheOutlineMaster() {
+        // The map coverage overlay is independent of the in-world container outline: both tone hues sit in the
+        // chunk overlay section but gray with the coverage master, while the outline rows gray with the outline master.
+        assertEquals("renderCoverageOverlay", SettingsLayout.masterKey("overlayCoveredColor"),
+                "the covered hue grays with the coverage overlay master");
+        assertEquals("renderCoverageOverlay", SettingsLayout.masterKey("overlaySuspectColor"),
+                "the suspect hue grays with the coverage overlay master");
+        assertEquals("renderUnsavedOutline", SettingsLayout.masterKey("outlineDistance"),
+                "the outline rows gray with the outline master");
     }
 
     @Test

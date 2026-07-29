@@ -40,6 +40,7 @@ import world.thearchive.wdl.core.ConfigSchema;
 import world.thearchive.wdl.core.CuratedGameRule;
 import world.thearchive.wdl.core.HudAnchor;
 import world.thearchive.wdl.core.HudPeekMode;
+import world.thearchive.wdl.core.MarkerHue;
 import world.thearchive.wdl.core.RecaptureMode;
 import world.thearchive.wdl.core.SettingsDraft;
 import world.thearchive.wdl.core.SettingsLayout;
@@ -48,11 +49,11 @@ import world.thearchive.wdl.core.WorldType;
 
 /**
  * The in-mod settings screen: a tabbed, staged editor over the MC-free config model. Each descriptor value-type becomes
- * a vanilla widget (boolean/game-rule toggle, ranged slider, enum cycle, seed/hex field), built from the public widget
- * primitives rather than vanilla's package-private option wrapper so the feature needs no access-widener and no mixin.
- * Edits stage into a {@link SettingsDraft} held on this instance (surviving a resize rebuild); Done and Esc commit,
- * Discard abandons behind a confirm, and disabling a core capture toggle confirms at the change. The rows, their order,
- * and the gamerule group come from {@link SettingsLayout}.
+ * a vanilla widget (boolean/game-rule toggle, ranged slider, enum/marker cycle, seed/hex field), built from the public
+ * widget primitives rather than vanilla's package-private option wrapper so the feature needs no access-widener and no
+ * mixin. Edits stage into a {@link SettingsDraft} held on this instance (surviving a resize rebuild); Done and Esc
+ * commit, Discard abandons behind a confirm, and disabling a core capture toggle confirms at the change. The rows,
+ * their order, and the gamerule group come from {@link SettingsLayout}.
  */
 public final class WdlSettingsScreen extends Screen {
     private static final int TAB_TOP = 6;
@@ -269,9 +270,26 @@ public final class WdlSettingsScreen extends Screen {
                         this.draft.getEnum(key, WorldType.class));
             case "recaptureChunks":
                 return recaptureControl(key);
+            case "unscannedColor":
+                return markerControl(key, MarkerHue.RED);
+            case "recoveredColor":
+                return markerControl(key, MarkerHue.VIOLET);
+            case "overlayCoveredColor":
+                return markerControl(key, MarkerHue.TEAL);
+            case "overlaySuspectColor":
+                return markerControl(key, MarkerHue.AMBER);
             default:
                 throw new IllegalStateException("unmapped enum option " + key);
         }
+    }
+
+    private Control markerControl(String key, MarkerHue brandDefault) {
+        MarkerHue current = this.draft.getEnum(key, MarkerHue.class);
+        List<MarkerHue> values = new ArrayList<>(MarkerHue.presetCycle(brandDefault));
+        if (!values.contains(current)) {
+            values.add(0, current); // a hand-set out-of-cycle hue shows as the current step, then cycles into preset
+        }
+        return cycleControl(key, MarkerHue.class, values, current);
     }
 
     private <E extends Enum<E>> Control cycleControl(String key, Class<E> type, List<E> values, E initial) {

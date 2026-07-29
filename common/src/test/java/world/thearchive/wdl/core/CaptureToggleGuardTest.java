@@ -62,7 +62,9 @@ class CaptureToggleGuardTest {
 
     @Test
     void benignTogglesNeedNoConfirm() {
+        assertEquals(CaptureToggleGuard.NONE, CaptureToggleGuard.whenDisabling("saveItemCoordinates"));
         assertEquals(CaptureToggleGuard.NONE, CaptureToggleGuard.whenDisabling("overrideGamerules"));
+        assertEquals(CaptureToggleGuard.NONE, CaptureToggleGuard.whenDisabling("showHud"));
         assertEquals(CaptureToggleGuard.NONE, CaptureToggleGuard.whenDisabling("skipVoidChunks"));
     }
 

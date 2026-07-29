@@ -51,9 +51,14 @@ public final class WdlConfig {
     private final boolean confirmResume;
     private final boolean blockTaintedResume;
     private final boolean showToasts;
+    private final boolean checkForUpdates;
     private final boolean showChatMessages;
+    private final boolean renderCoverageOverlay;
+    private final MarkerHue overlayCoveredColor;
+    private final MarkerHue overlaySuspectColor;
     private final WorldOutputConfig worldOutput;
     private final HudConfig hud;
+    private final OutlineConfig outline;
 
     private WdlConfig(boolean captureEntities, boolean captureContainers,
             boolean captureAdvancements, boolean captureStatistics,
@@ -61,9 +66,10 @@ public final class WdlConfig {
             boolean savePlayerInventory, boolean savePlayerEnderChest, boolean saveItemCoordinates,
             boolean lockDownloadedMaps, boolean remapMapIds, int encodeBudgetMillis, boolean forceMobPersistence,
             boolean dumpReceivedFrames, boolean zipOnFinish, boolean zipOnResume, boolean appendDateSuffix,
-            boolean confirmResume, boolean blockTaintedResume, boolean showToasts,
+            boolean confirmResume, boolean blockTaintedResume, boolean showToasts, boolean checkForUpdates,
             boolean showChatMessages,
-            WorldOutputConfig worldOutput, HudConfig hud) {
+            boolean renderCoverageOverlay, MarkerHue overlayCoveredColor, MarkerHue overlaySuspectColor,
+            WorldOutputConfig worldOutput, HudConfig hud, OutlineConfig outline) {
         this.captureEntities = captureEntities;
         this.captureContainers = captureContainers;
         this.captureAdvancements = captureAdvancements;
@@ -84,9 +90,14 @@ public final class WdlConfig {
         this.confirmResume = confirmResume;
         this.blockTaintedResume = blockTaintedResume;
         this.showToasts = showToasts;
+        this.checkForUpdates = checkForUpdates;
         this.showChatMessages = showChatMessages;
+        this.renderCoverageOverlay = renderCoverageOverlay;
+        this.overlayCoveredColor = overlayCoveredColor;
+        this.overlaySuspectColor = overlaySuspectColor;
         this.worldOutput = worldOutput;
         this.hud = hud;
+        this.outline = outline;
     }
 
     public boolean captureEntities() {
@@ -195,9 +206,29 @@ public final class WdlConfig {
         return showToasts;
     }
 
+    /** Whether the once-per-launch newer-release check runs at all; off means zero requests (default on). */
+    public boolean checkForUpdates() {
+        return checkForUpdates;
+    }
+
     /** Whether the mod's chat notices (the update-available line) are shown; in-screen notices ignore it. */
     public boolean showChatMessages() {
         return showChatMessages;
+    }
+
+    /** Whether the saved-chunk coverage overlay draws while recording; the master over the two tone hues. */
+    public boolean renderCoverageOverlay() {
+        return renderCoverageOverlay;
+    }
+
+    /** The covered-chunk overlay hue; the overlay packs a fixed alpha onto its {@code rgb()}. */
+    public MarkerHue overlayCoveredColor() {
+        return overlayCoveredColor;
+    }
+
+    /** The suspect-chunk overlay hue, for terrain saved without its decorations in send range. */
+    public MarkerHue overlaySuspectColor() {
+        return overlaySuspectColor;
     }
 
     /** The world-output options (game-rule overrides, world-open defaults, and the two capture knobs). */
@@ -208,6 +239,11 @@ public final class WdlConfig {
     /** The HUD-overlay options (anchor, offset, layout, peek mode, panel, linger, tint). */
     public HudConfig hud() {
         return hud;
+    }
+
+    /** The unsaved-container outline options (master toggle, render distance, the two state hues). */
+    public OutlineConfig outline() {
+        return outline;
     }
 
     /**
@@ -287,9 +323,14 @@ public final class WdlConfig {
                 values.booleanValue("confirmResume"),
                 values.booleanValue("blockTaintedResume"),
                 values.booleanValue("showToasts"),
+                values.booleanValue("checkForUpdates"),
                 values.booleanValue("showChatMessages"),
+                values.booleanValue("renderCoverageOverlay"),
+                values.enumValue("overlayCoveredColor", MarkerHue.class),
+                values.enumValue("overlaySuspectColor", MarkerHue.class),
                 WorldOutputConfig.from(values, properties),
-                HudConfig.from(values));
+                HudConfig.from(values),
+                OutlineConfig.from(values));
     }
 
     /**

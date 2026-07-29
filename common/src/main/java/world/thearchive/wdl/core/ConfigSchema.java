@@ -214,6 +214,13 @@ public final class ConfigSchema {
             + "# learn it even with chat hidden. On by default. Set false to turn the toasts off; chat and HUD\n"
             + "# messages are unaffected.\n";
 
+    private static final String CHECK_FOR_UPDATES_PREAMBLE = ""
+            + "\n"
+            + "# Once per game launch, ask the mod's release list whether a newer release exists for this\n"
+            + "# Minecraft version and loader, and if one does, say so in chat and on the downloads screen.\n"
+            + "# A single small anonymous request at startup; nothing else is sent, and nothing installs\n"
+            + "# itself. Set false to never make the request.\n";
+
     private static final String SHOW_CHAT_MESSAGES_PREAMBLE = ""
             + "\n"
             + "# Chat notices from the mod, like the update-available line. Set false to silence them; notices\n"
@@ -252,6 +259,42 @@ public final class ConfigSchema {
 
     private static final String HUD_DONE_LINGER_SECONDS_PREAMBLE = ""
             + "# How long (seconds, 0 to 30) the done frame holds after a save before it fades out.\n";
+
+    private static final String RENDER_UNSAVED_OUTLINE_PREAMBLE = ""
+            + "\n"
+            + "# In-world outline around containers you have not opened yet this download (the download aid).\n"
+            + "# A rim is drawn on an exposed face of every loaded container whose contents are still missing\n"
+            + "# from the save, so you can see at a glance which Chests still need opening; it clears as you open\n"
+            + "# them. Set false to turn the outline off.\n";
+
+    private static final String OUTLINE_DISTANCE_PREAMBLE = ""
+            + "# How far (blocks, 1 to 256) from you the outline reaches; beyond this a rim is too small to see.\n";
+
+    private static final String UNSCANNED_COLOR_PREAMBLE = ""
+            + "# Rim hue for a still-unsaved container, and for one recovered from a prior download. One of RED,\n"
+            + "# VIOLET, TEAL, AMBER, YELLOW, BLUE, REDDISH_PURPLE, WHITE (a colorblind-checked set).\n";
+
+    private static final String OUTLINE_LINE_WIDTH_SCALE_PREAMBLE = ""
+            + "# Rim line thickness as a multiple of the game's default outline width (0.5 to 4.0); 1.0 is the\n"
+            + "# same weight as the block-selection outline, higher is bolder, lower is finer.\n";
+
+    private static final String OUTLINE_DEBUG_TIMING_PREAMBLE = ""
+            + "# Diagnostic (advanced, default off): log the outline's per-frame render-thread cost and per-tick\n"
+            + "# enumeration cost, for tuning the render distance on a dense base. Leave off for normal use.\n";
+
+    private static final String RENDER_COVERAGE_OVERLAY_PREAMBLE = ""
+            + "\n"
+            + "# Coverage overlay: while a download records, saved chunks show as a translucent highlight on\n"
+            + "# your minimap and world map (needs a supported map mod installed).\n"
+            + "# Master: draw it at all. On by default. Set false to hide the saved-chunk highlight.\n";
+
+    private static final String OVERLAY_COVERED_COLOR_PREAMBLE = ""
+            + "# Highlight hue for a chunk whose entities were saved along with it. One of RED, VIOLET, TEAL,\n"
+            + "# AMBER, YELLOW, BLUE, REDDISH_PURPLE, WHITE (a colorblind-checked set).\n";
+
+    private static final String OVERLAY_SUSPECT_COLOR_PREAMBLE = ""
+            + "# Highlight hue for a chunk whose blocks are saved but whose entities were never confirmed in\n"
+            + "# send range, so its item frames and armor stands may still be missing. Same hue set as above.\n";
 
     static final List<ConfigOption> OPTIONS = Collections.unmodifiableList(Arrays.asList(
             ConfigOption.dataLossBoolean("captureEntities", "true", config -> config.captureEntities(),
@@ -304,6 +347,8 @@ public final class ConfigSchema {
             ConfigOption.booleanOption("blockTaintedResume", "true", config -> config.blockTaintedResume(),
                     BLOCK_TAINTED_RESUME_PREAMBLE),
             ConfigOption.booleanOption("showToasts", "true", config -> config.showToasts(), SHOW_TOASTS_PREAMBLE),
+            ConfigOption.booleanOption("checkForUpdates", "true", config -> config.checkForUpdates(),
+                    CHECK_FOR_UPDATES_PREAMBLE),
             ConfigOption.booleanOption("showChatMessages", "true", config -> config.showChatMessages(),
                     SHOW_CHAT_MESSAGES_PREAMBLE),
             ConfigOption.booleanOption("dumpReceivedFrames", "false", config -> config.dumpReceivedFrames(),
@@ -323,7 +368,26 @@ public final class ConfigSchema {
             ConfigOption.rangedInteger("hudPanelOpacity", "56", 0, 100, config -> config.hud().panelOpacity(),
                     HUD_PANEL_OPACITY_PREAMBLE),
             ConfigOption.rangedInteger("hudDoneLingerSeconds", "8", 0, 30, config -> config.hud().doneLingerSeconds(),
-                    HUD_DONE_LINGER_SECONDS_PREAMBLE)));
+                    HUD_DONE_LINGER_SECONDS_PREAMBLE),
+            ConfigOption.booleanOption("renderUnsavedOutline", "true",
+                    config -> config.outline().renderUnsavedOutline(),
+                    RENDER_UNSAVED_OUTLINE_PREAMBLE),
+            ConfigOption.rangedInteger("outlineDistance", "96", 1, 256, config -> config.outline().outlineDistance(),
+                    OUTLINE_DISTANCE_PREAMBLE),
+            ConfigOption.enumOption("unscannedColor", "RED", name -> MarkerHue.valueOf(name),
+                    config -> config.outline().unscannedColor(), UNSCANNED_COLOR_PREAMBLE),
+            ConfigOption.enumOption("recoveredColor", "VIOLET", name -> MarkerHue.valueOf(name),
+                    config -> config.outline().recoveredColor(), ""),
+            ConfigOption.rangedFloat("outlineLineWidthScale", "1.0", 0.5f, 4.0f,
+                    config -> config.outline().lineWidthScale(), OUTLINE_LINE_WIDTH_SCALE_PREAMBLE),
+            ConfigOption.booleanOption("outlineDebugTiming", "false", config -> config.outline().debugTiming(),
+                    OUTLINE_DEBUG_TIMING_PREAMBLE),
+            ConfigOption.booleanOption("renderCoverageOverlay", "true", config -> config.renderCoverageOverlay(),
+                    RENDER_COVERAGE_OVERLAY_PREAMBLE),
+            ConfigOption.enumOption("overlayCoveredColor", "TEAL", name -> MarkerHue.valueOf(name),
+                    config -> config.overlayCoveredColor(), OVERLAY_COVERED_COLOR_PREAMBLE),
+            ConfigOption.enumOption("overlaySuspectColor", "AMBER", name -> MarkerHue.valueOf(name),
+                    config -> config.overlaySuspectColor(), OVERLAY_SUSPECT_COLOR_PREAMBLE)));
 
     private static final Map<String, ConfigOption> BY_KEY = Collections.unmodifiableMap(indexByKey(OPTIONS));
 
@@ -337,7 +401,7 @@ public final class ConfigSchema {
             "recaptureChunks", "recaptureSeconds", "savePlayerInventory",
             "savePlayerEnderChest", "saveItemCoordinates", "lockDownloadedMaps", "remapMapIds", "encodeBudgetMillis",
             "forceMobPersistence", "dumpReceivedFrames", "zipOnFinish", "zipOnResume", "appendDateSuffix",
-            "confirmResume", "blockTaintedResume", "showToasts", "showChatMessages");
+            "confirmResume", "blockTaintedResume", "showToasts", "checkForUpdates", "showChatMessages");
 
     static final List<ConfigOption> WORLD_OUTPUT_REPORT_ORDER = report(
             "overrideGamerules", "overrideWorldDefaults", "openInCreative",
@@ -410,7 +474,8 @@ public final class ConfigSchema {
 
     /**
      * The reportable {@link WdlConfig} scalars that differ from {@code baseline}, each by its key, in field order.
-     * Excludes the nested world-output options; the caller appends the world-output diff.
+     * Excludes the nested HUD, outline, world-output, and marker-hue options, exactly as the download report does; the
+     * caller appends the world-output diff.
      */
     static Map<String, String> reportDiff(WdlConfig config, WdlConfig baseline) {
         return diffByOrder(REPORT_ORDER, config, baseline);
