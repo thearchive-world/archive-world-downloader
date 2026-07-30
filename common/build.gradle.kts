@@ -165,3 +165,14 @@ tasks.named("check") {
         dependsOn(checkCoreJava8)
     }
 }
+
+repositories {
+    maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
+}
+
+dependencies {
+    // XaeroPlus public API for the overlay binding (compat/xaeroplus), compile-only (never a runtime require).
+    // common is ModDev in Mojmap mode, so pull the NeoForge (Mojmapped) flavor to match the classpath; the
+    // loader subprojects add their own flavor for the source-merged compile.
+    compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+neoforge-${property("minecraft_version")}")
+}

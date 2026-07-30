@@ -33,6 +33,7 @@ spotless {
 
 repositories {
     maven("https://maven.parchmentmc.org")   // Loom layered Parchment mappings live here
+    maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
 }
 
 dependencies {
@@ -43,6 +44,12 @@ dependencies {
     })
     modImplementation("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
+
+    // XaeroPlus public API for the source-merged overlay binding (compat/xaeroplus), compile-only. Loom remaps
+    // the fabric flavor to Mojmap for the compile; there is no runtime require. XaeroPlus hard-depends on
+    // xaeroworldmap, so the whole Xaero family is kept off every run and the headless gametest never hits
+    // Xaero's startup update modal; the manual render gate installs the family in a real client.
+    modCompileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+fabric-${property("minecraft_version")}")
 }
 
 tasks.named<ProcessResources>("processResources") {

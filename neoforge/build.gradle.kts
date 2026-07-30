@@ -79,3 +79,14 @@ tasks.named<ProcessResources>("processResources") {
 
 // The plain jar is the producing task; the guard is shared with the Fabric sibling (see build-logic).
 registerVerifyProductionJar("jar")
+
+repositories {
+    maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
+}
+
+dependencies {
+    // XaeroPlus public API for the source-merged overlay binding (compat/xaeroplus), compile-only. NeoForge is
+    // ModDev (no remap), neoforge flavor, no runtime require. XaeroPlus hard-depends on xaeroworldmap, so the
+    // whole Xaero family stays out of the build; the manual render gate installs it in a real client.
+    compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+neoforge-${property("minecraft_version")}")
+}
