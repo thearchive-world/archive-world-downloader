@@ -82,6 +82,7 @@ registerVerifyProductionJar("jar")
 
 repositories {
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
+    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
 }
 
 dependencies {
@@ -89,4 +90,8 @@ dependencies {
     // ModDev (no remap), neoforge flavor, no runtime require. XaeroPlus hard-depends on xaeroworldmap, so the
     // whole Xaero family stays out of the build; the manual render gate installs it in a real client.
     compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+neoforge-${property("minecraft_version")}")
+
+    // JourneyMap public API for the source-merged overlay binding (compat/journeymap), compile-only. NeoForge
+    // is ModDev (no remap), neoforge flavor, no runtime require.
+    compileOnly("info.journeymap:journeymap-api-neoforge:${property("journeymap_api_version")}-${property("minecraft_version")}")
 }

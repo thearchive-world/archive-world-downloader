@@ -34,6 +34,7 @@ spotless {
 repositories {
     maven("https://maven.parchmentmc.org")   // Loom layered Parchment mappings live here
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
+    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
 }
 
 dependencies {
@@ -50,6 +51,11 @@ dependencies {
     // xaeroworldmap, so the whole Xaero family is kept off every run and the headless gametest never hits
     // Xaero's startup update modal; the manual render gate installs the family in a real client.
     modCompileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+fabric-${property("minecraft_version")}")
+
+    // JourneyMap API for the source-merged overlay binding (compat/journeymap) and the journeymap entrypoint
+    // (WdlJourneyMapPlugin), compile-only. Loom remaps it to Mojmap for the compile; there is no runtime
+    // require, so JourneyMap's absence just means the entrypoint is never queried.
+    modCompileOnly("info.journeymap:journeymap-api-fabric:${property("journeymap_api_version")}-${property("minecraft_version")}")
 }
 
 tasks.named<ProcessResources>("processResources") {
