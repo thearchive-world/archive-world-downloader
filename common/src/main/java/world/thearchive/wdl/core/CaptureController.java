@@ -97,12 +97,25 @@ public final class CaptureController {
     private volatile CaptureState state = CaptureState.IDLE;
     private @Nullable Session session;
 
+    // Saved chunk positions for the coverage overlay: owned here, on the singleton that outlives
+    // individual sessions, so the off-render-thread overlay reads a stably published reference. The live session
+    // writes to it; it is cleared at start and stop so the overlay is empty whenever a capture is not recording.
+    private final SavedChunkIndex savedChunks = new SavedChunkIndex();
+
+    // Covered chunk positions for the two-tone overlay: the saved chunks the recording path brought within entity
+    // send range, drawn in the covered hue while the rest of the saved set draws the suspect hue. Owned here beside
+    // savedChunks and cleared with it, so the overlay has no covered tone whenever a capture is not recording.
+    private final CoveredChunkIndex coveredChunks = new CoveredChunkIndex();
+
+    // The per-dimension send range learned live from received entities, owned here beside coveredChunks so the
+    // overlay's cold-start read (saved until the range is measured) and the covered disc share one estimate across a
+    // session. Cleared at start and stop with the two indexes, so a new capture recalibrates from scratch.
+    private final SendRangeEstimator sendRange = new SendRangeEstimator();
+
     // The backend-transfer stop signal, polled first each recording tick so no tick ever rebinds the re-entered
     // world as a portal trip or recomputes at a stale radius. A field with a never-fire default rather than a
     // constructor parameter: the adapter layer wires the real poll at startup, and the controller stays MC-free.
     private BooleanSupplier transferStopPoll = () -> false;
-
-    private final SendRangeEstimator sendRange = new SendRangeEstimator();
 
     // The frozen counts held through SAVING and the done linger (the live session is gone during the
     // save). Armed at stop() and re-armed with the written totals once the save completes, read by counts()
@@ -152,6 +165,31 @@ public final class CaptureController {
         return CapturedContainers.EMPTY;
     }
 
+    /** The saved-chunk-position index for the coverage overlay; snapshotted off-thread by the supplier. */
+    public SavedChunkIndex savedChunks() {
+        return savedChunks;
+    }
+
+    /** The covered-chunk-position index for the two-tone overlay; snapshotted off-thread by the supplier. */
+    public CoveredChunkIndex coveredChunks() {
+        return coveredChunks;
+    }
+
+    /**
+     * The estimator holds one running max per dimension, fed by the sampler-gated feeds; cleared on start and stop.
+     */
+    public SendRangeEstimator sendRange() {
+        return sendRange;
+    }
+
+    /** The prior-session recovered coverage while recording, {@link RecoveredCoverage#EMPTY} otherwise. */
+    public RecoveredCoverage recoveredCoverage() {
+        if (state == CaptureState.RECORDING && session != null) {
+            return session.recoveredCoverage();
+        }
+        return RecoveredCoverage.EMPTY;
+    }
+
     /**
      * The capture's elapsed wall-clock time: counting up while recording, frozen at the {@code /wdl stop} duration
      * through saving and the done linger, 0 when idle and past the linger.
@@ -196,24 +234,11 @@ public final class CaptureController {
         this.transferStopPoll = transferStopPoll;
     }
 
-    /**
-     * The estimator holds one running max per dimension, fed by the sampler-gated feeds; cleared on start and stop.
-     */
-    public SendRangeEstimator sendRange() {
-        return sendRange;
-    }
-
-    /** The prior-session recovered coverage while recording, {@link RecoveredCoverage#EMPTY} otherwise. */
-    public RecoveredCoverage recoveredCoverage() {
-        if (state == CaptureState.RECORDING && session != null) {
-            return session.recoveredCoverage();
-        }
-        return RecoveredCoverage.EMPTY;
-    }
-
     /** Begin recording with a fresh session (no-op unless idle). */
     public void start(Supplier<Session> sessionFactory) {
         if (state == CaptureState.IDLE) {
+            savedChunks.clear();
+            coveredChunks.clear();
             sendRange.clear();
             session = sessionFactory.get();
             state = CaptureState.RECORDING;
@@ -267,6 +292,8 @@ public final class CaptureController {
             frozenElapsedMillis = Math.max(0L, clockMillis.getAsLong() - startMillis);
             state = CaptureState.SAVING;
             active.finish(); // returns at once, but may already have re-entered tick() and reached IDLE
+            savedChunks.clear();
+            coveredChunks.clear();
             sendRange.clear();
         }
     }

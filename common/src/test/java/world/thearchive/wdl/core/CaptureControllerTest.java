@@ -5,6 +5,7 @@ package world.thearchive.wdl.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -297,6 +298,68 @@ class CaptureControllerTest {
     @Test
     void recoveredCoverageIsEmptyWhenIdle() {
         assertSame(RecoveredCoverage.EMPTY, controller().recoveredCoverage());
+    }
+
+    @Test
+    void savedChunksIsStableAndNonNull() {
+        CaptureController controller = controller();
+        SavedChunkIndex index = controller.savedChunks();
+        assertNotNull(index, "the overlay always has an index to read, even before any capture");
+        assertSame(index, controller.savedChunks(), "one stable reference the off-thread overlay can hold");
+    }
+
+    @Test
+    void startClearsTheSavedChunkOverlay() {
+        CaptureController controller = controller();
+        controller.savedChunks().add("minecraft:overworld", 42L);
+
+        controller.start(FakeSession::new);
+
+        assertEquals(0, controller.savedChunks().snapshot("minecraft:overworld").length,
+                "a fresh capture starts with an empty overlay, not the prior session's chunks");
+    }
+
+    @Test
+    void stopClearsTheSavedChunkOverlay() {
+        CaptureController controller = controller();
+        controller.start(FakeSession::new);
+        controller.savedChunks().add("minecraft:overworld", 42L);
+
+        controller.stop();
+
+        assertEquals(0, controller.savedChunks().snapshot("minecraft:overworld").length,
+                "the overlay is emptied when the capture stops, so nothing draws while idle");
+    }
+
+    @Test
+    void startClearsTheCoveredOverlayAndTheSendRangeEstimate() {
+        CaptureController controller = controller();
+        controller.coveredChunks().recordTrail("minecraft:overworld", 4, 4, 8);
+        controller.coveredChunks().recompute("minecraft:overworld", 1);
+        controller.sendRange().observe("minecraft:overworld", 64);
+
+        controller.start(FakeSession::new);
+
+        assertEquals(0, controller.coveredChunks().snapshot("minecraft:overworld").length,
+                "a fresh capture starts with no covered tone, not the prior session's coverage");
+        assertFalse(controller.sendRange().isCalibrated("minecraft:overworld"),
+                "a new capture recalibrates the send range from scratch");
+    }
+
+    @Test
+    void stopClearsTheCoveredOverlayAndTheSendRangeEstimate() {
+        CaptureController controller = controller();
+        controller.start(FakeSession::new);
+        controller.coveredChunks().recordTrail("minecraft:overworld", 4, 4, 8);
+        controller.coveredChunks().recompute("minecraft:overworld", 1);
+        controller.sendRange().observe("minecraft:overworld", 64);
+
+        controller.stop();
+
+        assertEquals(0, controller.coveredChunks().snapshot("minecraft:overworld").length,
+                "the covered tone is emptied when the capture stops, so nothing draws while idle");
+        assertFalse(controller.sendRange().isCalibrated("minecraft:overworld"),
+                "the estimate does not carry into the next capture");
     }
 
     @Test
