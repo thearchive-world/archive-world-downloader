@@ -37,6 +37,7 @@ import world.thearchive.wdl.adapter.OutlineTracker;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.client.WdlDownloadsScreen;
 import world.thearchive.wdl.client.WdlSettingsScreen;
+import world.thearchive.wdl.compat.xaeroplus.XaeroPlusIntegration;
 import world.thearchive.wdl.core.AtomicFileWrite;
 import world.thearchive.wdl.core.CaptureController;
 import world.thearchive.wdl.core.CaptureCounts;
@@ -165,6 +166,7 @@ public final class Wdl {
         // One permanent hook for the JVM's life rather than one per operation, matching the bounded halt
         // the vanilla client shutdown hook gives the integrated server.
         Runtime.getRuntime().addShutdownHook(new Thread(Wdl::abortRestoreOnShutdown, "wdl-restore-shutdown"));
+        XaeroPlusIntegration.initialize(bridge);
     }
 
     /** The current capture state. */
