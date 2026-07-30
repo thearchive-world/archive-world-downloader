@@ -107,6 +107,7 @@ import world.thearchive.wdl.core.CaptureOrder;
 import world.thearchive.wdl.core.CapturedContainers;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ContainerAssociation;
+import world.thearchive.wdl.core.CoveredChunkIndex;
 import world.thearchive.wdl.core.CrafterSlots;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
@@ -117,10 +118,12 @@ import world.thearchive.wdl.core.OutlineClassifier;
 import world.thearchive.wdl.core.RecaptureMode;
 import world.thearchive.wdl.core.RecapturePolicy;
 import world.thearchive.wdl.core.RecoveredCoverage;
+import world.thearchive.wdl.core.RegionChunkScan;
 import world.thearchive.wdl.core.SaveFailureComposer;
 import world.thearchive.wdl.core.SaveFailureReason;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SaveStage;
+import world.thearchive.wdl.core.SavedChunkIndex;
 import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.SendRangeSampler;
 import world.thearchive.wdl.core.ToastCopy;
@@ -187,9 +190,25 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // The game-thread completion poke (CaptureController.tick), run when the background save completes so the
     // SAVING to IDLE transition lands even while the game tick is suspended.
     private final Runnable saveCompletePoke;
-    // The live send-range estimator (owned by the controller): the per-dimension running max over the three
-    // sampler-gated feeds, the packet capture's arrivals and removals and the seed sweep in captureTick.
+    private final SavedChunkIndex overlayIndex;
+    // The covered half of the two-tone overlay: the chunks the recording path brought within entity send range,
+    // fed a disc at a time from captureTick. The per-crossing disc feed stays unconditional like the saved
+    // record-site; only the resume prior-coverage seed is gated on overlayActive.
+    private final CoveredChunkIndex coveredIndex;
+    // The live send-range estimator (owned by the controller): sizes each coverage disc and gates the cold-start
+    // read. One per-dimension running max over the three sampler-gated feeds (arrivals, removals, and the seed
+    // sweep in captureTick), clamped to the live render distance at read; the per-center caps recorded with the
+    // trail keep the retroactive paint honest when the max grows.
     private final SendRangeEstimator sendRange;
+    // The last chunk center a coverage disc was recorded around, so the disc is re-added only when the player
+    // crosses into a new chunk rather than every tick. Null at construction and after a dimension rebind, so the
+    // first tick in a dimension seeds its disc under the correct live-id partition.
+    private @Nullable ChunkPos lastCoveredCenter;
+    // The radius the covered trail was last laid at this dimension, re-read every tick so a changed radius (the
+    // running max growing on a new sample, or the render-distance clamp dropping) triggers one recompute over
+    // the whole trail rather than leaving the earlier path covered at the stale radius. Reset to 0 with
+    // lastCoveredCenter on a dimension rebind, since the covered set is per dimension.
+    private int lastCoveredRadius;
     // The previous tick's player position, the displacement baseline the sampler's speed gate reads at gate-arm.
     // Invalid at construction and after a dimension rebind, so the first guarded tick (and the first after a
     // cross-dimension jump) arms with displacement 0 instead of a spurious fast tick.
@@ -198,6 +217,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private boolean tickBaselineValid;
     // Weak so a session outliving a disconnect cannot pin the old player, and through it that level's chunks.
     private WeakReference<LocalPlayer> lastPlayer = new WeakReference<>(null);
+    // The overlay's resume prior-coverage seed reads region headers off disk only when a map overlay mod
+    // (XaeroPlus or JourneyMap) will consume them; the per-chunk record-site add stays unconditional. Seeded
+    // once per live dimension id.
+    private final boolean overlayActive;
+    private final Set<String> overlaySeededDimensions = new HashSet<>();
     // What this download targets: a fresh folder (NEW) or an existing wdl-managed one to add to (RESUME).
     private final DownloadTarget target;
     // The ClientLevel being captured. Null on a session built by the level-free constructor, so dereference it
@@ -778,12 +802,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * session touches no client singleton at all.
      */
     public LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config, ClientLevel level,
-            DownloadTarget target, SendRangeEstimator sendRange, boolean cameraDetachedAtStart,
+            DownloadTarget target, SavedChunkIndex overlayIndex, CoveredChunkIndex coveredIndex,
+            SendRangeEstimator sendRange, boolean overlayActive, boolean cameraDetachedAtStart,
             Runnable saveCompletePoke) {
         this(adapter, bridge, config, level,
                 VanillaDimensions.forType(level.dimensionTypeRegistration().unwrapKey().orElse(null)),
-                level.dimension(), level.registryAccess(), target, sendRange, cameraDetachedAtStart,
-                saveCompletePoke);
+                level.dimension(), level.registryAccess(), target, overlayIndex, coveredIndex, sendRange,
+                overlayActive, cameraDetachedAtStart, saveCompletePoke);
     }
 
     /**
@@ -796,13 +821,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config,
             @Nullable ClientLevel level, ResourceKey<Level> targetDimension, ResourceKey<Level> liveDimension,
-            RegistryAccess registries, DownloadTarget target, SendRangeEstimator sendRange,
+            RegistryAccess registries, DownloadTarget target, SavedChunkIndex overlayIndex,
+            CoveredChunkIndex coveredIndex, SendRangeEstimator sendRange, boolean overlayActive,
             boolean cameraDetachedAtStart, Runnable saveCompletePoke) {
         this.adapter = adapter;
         this.bridge = bridge;
         this.config = config;
         this.target = target;
+        this.overlayIndex = overlayIndex;
+        this.coveredIndex = coveredIndex;
         this.sendRange = sendRange;
+        this.overlayActive = overlayActive;
         this.saveCompletePoke = saveCompletePoke;
         this.saveName = target.folderName();
         this.level = level;
@@ -852,6 +881,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         dimensionRebind.registerClear(capturedThisTick::clear);
         // Stale old-dimension positions; the new dimension refills the queue from its own buffer.
         dimensionRebind.registerClear(floorQueue::clear);
+        dimensionRebind.registerClear(() -> {
+            lastCoveredCenter = null; // the first tick in the new dimension seeds its disc under its own key
+            lastCoveredRadius = 0; // the covered set is per dimension, so it recomputes from its own trail
+        });
         // The cross-dimension jump is not a spurious fast tick; the Respawn already armed the suppression
         // window in-stream.
         dimensionRebind.registerClear(() -> tickBaselineValid = false);
@@ -1086,7 +1119,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The entity the capture window and the keep-hot window both center on.
+     * The entity the capture window, the keep-hot window, the coverage disc, and the edit zone all center on, and the
+     * source of the saved world's spawn.
      *
      * <p>The camera entity is what the server centers chunk streaming on: it snaps its own player onto the camera each
      * tick and re-centers tracking there, while sending the owning client no position, so the client's own player
@@ -1154,6 +1188,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             lastTickPlayerZ = player.getZ();
             tickBaselineValid = true;
             int capChunks = Math.max(minecraft.options.getEffectiveRenderDistance(), 2);
+            recordCoveredDisc(hotCenter, capChunks);
             if (capture != null) {
                 SendRangeSampler sampler = capture.sampler();
                 int sweepGeneration = sampler.sweepBeginGeneration();
@@ -1236,6 +1271,34 @@ public final class LiveCaptureSession implements CaptureController.Session {
         pumpFlush(hotCenter);
     }
 
+    /**
+     * Record this tick's entity-coverage disc for the two-tone overlay: every chunk within the measured send range (in
+     * chunks, Euclidean, chunk center) of the player's path is marked covered, so a saved chunk outside every swept
+     * disc is entity-suspect. The radius (the estimator's single per-dimension running max over the three sampler-gated
+     * feeds, clamped to the live render distance) is re-read every tick, ahead of the same-chunk early return, so a
+     * change (the max growing on a new sample, or the clamp dropping with the view distance) triggers one recompute
+     * over the whole trail even while the player stands still; the per-center caps recorded with the trail keep that
+     * retroactive paint honest. The trail append and the disc add stay gated on the player crossing into a new chunk.
+     * Keyed by the live client dimension id so it lines up with the saved record-site and the overlay providers' query.
+     * While the range is still uncalibrated the radius is 0 (only the center chunk), which the overlay's cold-start
+     * read hides by mirroring the saved set until the range is measured. The chunk-granular boundary and the
+     * measured-yet-approximate edge are disclosed in the overlay's config tooltip, not engineered around.
+     */
+    private void recordCoveredDisc(ChunkPos hotCenter, int capChunks) {
+        String dimensionId = level().dimension().identifier().toString();
+        int radius = sendRange.radiusChunks(dimensionId, capChunks);
+        if (radius != lastCoveredRadius) {
+            coveredIndex.recompute(dimensionId, radius); // the range changed: rebuild covered over the whole trail
+            lastCoveredRadius = radius;
+        }
+        if (lastCoveredCenter != null && lastCoveredCenter.equals(hotCenter)) {
+            return;
+        }
+        coveredIndex.recordTrail(dimensionId, hotCenter.x, hotCenter.z, capChunks);
+        coveredIndex.addDisc(dimensionId, hotCenter.x, hotCenter.z, radius);
+        lastCoveredCenter = hotCenter;
+    }
+
     private void captureLoadedChunks(Minecraft minecraft, LocalPlayer player, ChunkPos anchor) {
         captureSquareAround(minecraft, player, anchor);
         ChunkPos playerChunk = player.chunkPosition();
@@ -1261,6 +1324,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(radius);
         ClientChunkCache chunkSource = level().getChunkSource();
         ChunkCodec codec = adapter.chunkCodec();
+
+        // The live client dimension id: on a Multiverse/Paper server this is the server's custom id
+        // (e.g. minecraft:worlds/2b2t/2b2t_1), which is what the overlay providers query the overlay under, so
+        // the overlay index keys by this rather than the vanilla-mapped disk key. Same for every chunk this call.
+        String overlayDimension = level().dimension().identifier().toString();
 
         // Nearest-to-player first (by Chebyshev ring), so when the encode budget spills the square across ticks
         // the visible area fills first and the lag never concentrates on one side.
@@ -1301,15 +1369,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
             captured.put(pos, snapshot);
             allCaptured.add(posKey);
             try {
+                overlayIndex.add(overlayDimension, posKey);
                 // back-fill entities loaded before their AddEntity could be teed
-                captureLoadedEntities(pos, player, plausibleMaxBlocks);
+                captureLoadedEntities(pos, player, plausibleMaxBlocks, overlayDimension);
                 if (recaptureMode.refreshesHotChunks()) {
                     attachRecapture(chunk, pos);
                 }
             } catch (RuntimeException e) {
-                // Uncounted on purpose: what a throw here costs is the tail of this chunk's entity prime, whose
-                // size this catch cannot see (the entities primed before it are buffered and will write), or the
-                // re-capture arm, which costs freshness rather than data.
+                // Uncounted on purpose: what a throw here costs is the overlay's record of this position, the
+                // tail of its entity prime, whose size this catch cannot see (the entities primed before it
+                // are buffered and will write), or the re-capture arm, which costs freshness rather than data.
                 LOGGER.warn("chunk {} was captured but its follow-up steps failed; entities that were already "
                         + "loaded when the download started may be missing from it", pos, e);
             }
@@ -1327,7 +1396,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * wanders is saved at its prime-time position. The captured-chunk privacy gate holds by construction: this runs
      * only for a chunk just added to allCaptured.
      */
-    private void captureLoadedEntities(ChunkPos pos, LocalPlayer player, int plausibleMaxBlocks) {
+    private void captureLoadedEntities(ChunkPos pos, LocalPlayer player, int plausibleMaxBlocks,
+            String overlayDimensionId) {
         EntityPacketCapture capture = this.packetCapture;
         if (capture == null) {
             return; // entity capture is off
@@ -1342,7 +1412,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // hot buffer, so returning through a portal to captured terrain re-seeds; only the OFF and NEARBY
             // modes skip revisits. The prime loop can also see client-side-only entities spawned by other
             // mods, a mod-compat over-claim edge with no vanilla instance, accepted.
-            capture.primeSeed(entity, player.getX(), player.getZ(), plausibleMaxBlocks, liveDimensionId);
+            capture.primeSeed(entity, player.getX(), player.getZ(), plausibleMaxBlocks, overlayDimensionId);
             if (entity instanceof Player || capture.tracks(entity.getId()) || !entity.chunkPosition().equals(pos)) {
                 continue; // players are not saved as entities; a tracked entity is the packet path's; a straddling
                          // entity is buffered only by the chunk it sits in (so it is saved exactly once)
@@ -3376,6 +3446,32 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
+     * Seed the coverage overlay with the current dimension's prior on-disk coverage on a resumed download, once per
+     * live dimension id. Gated on a resume and on a map overlay mod being present, so the header scan is skipped when
+     * nothing will consume it. It runs on the writer thread in order with the drain, off the render thread and never
+     * racing a write, and keys the indexes by the live client id (matching the record-site write and the overlay
+     * providers' query) while reading the vanilla-type-routed region folder. The prior chunks seed both the saved and
+     * the covered index, so a resumed prior draws in the covered hue rather than the suspect one: the prior session's
+     * path was not observed, so marking it suspect would be a guess.
+     */
+    private void maybeSeedOverlayCoverage(AsyncSaveWriter activeWriter) {
+        WorldPaths paths = worldPaths;
+        if (!overlayActive || target.mode() != DownloadMode.RESUME || paths == null) {
+            return;
+        }
+        String dimensionId = level().dimension().identifier().toString();
+        if (!overlaySeededDimensions.add(dimensionId)) {
+            return;
+        }
+        ResourceKey<Level> diskDimension = targetDimension;
+        activeWriter.submit(() -> {
+            long[] priors = RegionChunkScan.presentChunks(paths.regionDirectory(diskDimension));
+            overlayIndex.addAll(dimensionId, priors);
+            coveredIndex.addAll(dimensionId, priors);
+        });
+    }
+
+    /**
      * Merge each eligible buffered chunk's pending container stash into its tag, hand the tag to the writer, and drop
      * it from the buffer, then drain the entity buffer on the same eligibility. With {@code all} the whole buffer is
      * flushed (the finish-time drain and the capture-paused drain); otherwise only chunks farther than {@code keepHot}
@@ -3385,6 +3481,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * reaches it behind the client.
      */
     void flushBuffer(AsyncSaveWriter activeWriter, boolean all, int centerX, int centerZ, int keepHot) {
+        maybeSeedOverlayCoverage(activeWriter);
         ContainerSink containerSink = adapter.containerSink();
         LecternSink lecternSink = adapter.lecternSink();
         ChunkCodec codec = adapter.chunkCodec();

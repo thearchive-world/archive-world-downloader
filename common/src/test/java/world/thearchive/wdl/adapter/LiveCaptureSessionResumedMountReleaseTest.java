@@ -38,9 +38,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.core.CoveredChunkIndex;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.SaveProgress;
+import world.thearchive.wdl.core.SavedChunkIndex;
 import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.EntityFixtures;
@@ -403,7 +405,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(adapter, new HeadlessPlatformBridge(configDirectory), config, null,
                 finishedIn, finishedIn, registries, new DownloadTarget("headless", null, mode),
-                new SendRangeEstimator(), false, () -> {});
+                new SavedChunkIndex(), new CoveredChunkIndex(), new SendRangeEstimator(), false, false, () -> {});
     }
 
     private static LiveCaptureSession resumingSession(VersionAdapter adapter, Path configDirectory,

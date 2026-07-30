@@ -22,10 +22,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.core.CoveredChunkIndex;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.core.SaveProgress;
+import world.thearchive.wdl.core.SavedChunkIndex;
 import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
@@ -76,7 +78,8 @@ class LiveCaptureSessionMapTallyTest {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
                 config, null, Level.OVERWORLD, Level.OVERWORLD, registries,
-                new DownloadTarget("headless", null, DownloadMode.NEW), new SendRangeEstimator(), false,
+                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(), new CoveredChunkIndex(),
+                new SendRangeEstimator(), false, false,
                 () -> {});
     }
 
