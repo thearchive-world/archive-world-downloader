@@ -59,5 +59,6 @@ public final class WdlFabricClient implements ClientModInitializer {
         // spectator), so the overlay would vanish there. Drawing last keeps it visible in every gamemode; the
         // overlay self-gates F1 and blocking screens itself.
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("wdl", "hud"), WdlHudOverlay::render);
+        new FabricOutlineRegistrar().register();
     }
 }

@@ -23,6 +23,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.world.level.storage.LevelResource;
 import org.jspecify.annotations.Nullable;
@@ -31,6 +32,8 @@ import org.slf4j.Logger;
 import world.thearchive.wdl.adapter.CompletionMarshal;
 import world.thearchive.wdl.adapter.ConnectionTee;
 import world.thearchive.wdl.adapter.LiveCaptureSession;
+import world.thearchive.wdl.adapter.OutlineDrawSet;
+import world.thearchive.wdl.adapter.OutlineTracker;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.client.WdlDownloadsScreen;
 import world.thearchive.wdl.client.WdlSettingsScreen;
@@ -84,6 +87,11 @@ public final class Wdl {
     // tick or JVM exit. Idempotent through the reconstruction memo; a repeat trigger just spawns a thread that
     // finds the registries already built and exits.
     private static final Executor warmupWorker = daemonWorker("wdl-worldgen-warmup");
+
+    // The in-world unsaved-container outline: the tick maintains its draw-set, the per-loader render
+    // registrar reads it. The recovered coverage it classifies against is the session's, published by the
+    // off-thread resume scan and read through the controller.
+    private static final OutlineTracker outlineTracker = new OutlineTracker();
 
     private static volatile WdlConfig currentConfig = WdlConfig.DEFAULTS;
 
@@ -198,6 +206,7 @@ public final class Wdl {
      */
     private static void onClientTick() {
         controller.tick();
+        outlineTick();
         restoreTick();
         Runnable open = pendingScreenOpen;
         if (open != null) {
@@ -311,6 +320,29 @@ public final class Wdl {
     private static String folderLabel(Path folder) {
         Path name = folder.getFileName();
         return name != null ? name.toString() : folder.toString();
+    }
+
+    /**
+     * Maintain the unsaved-container outline draw-set after the capture tick, so it reads this tick's fresh
+     * captured-set. Rebuilds it around the player while recording, and empties it otherwise so no rim lingers once the
+     * capture ends. The recovered-coverage set is the latest the off-thread scan has published.
+     */
+    private static void outlineTick() {
+        if (controller.state() != CaptureState.RECORDING) {
+            outlineTracker.clear();
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        ClientLevel level = minecraft.level;
+        LocalPlayer player = minecraft.player;
+        if (level == null || player == null) {
+            outlineTracker.clear();
+            return;
+        }
+        outlineTracker.tick(level, minecraft.gameRenderer.getMainCamera().position(), currentConfig.outline(),
+                currentConfig.captureContainers(), currentConfig.captureEntities(),
+                currentConfig.recaptureChunks().refreshesHotChunks(),
+                controller.capturedContainers(), controller.recoveredCoverage());
     }
 
     /** Stash a screen open to run on the next client tick; see {@link #onClientTick} for why. */
@@ -705,6 +737,11 @@ public final class Wdl {
 
     private static Path configPath() {
         return bridge.configDirectory().resolve("wdl.properties");
+    }
+
+    /** The unsaved-container outline draw-set, read by the per-loader render registrar each frame. */
+    public static OutlineDrawSet outlineDrawSet() {
+        return outlineTracker.drawSet();
     }
 
     /**

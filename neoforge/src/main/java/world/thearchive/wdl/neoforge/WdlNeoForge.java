@@ -68,5 +68,6 @@ public final class WdlNeoForge {
         // and blocking screens itself.
         modEventBus.addListener(RegisterGuiLayersEvent.class, event -> event.registerAboveAll(
                 Identifier.fromNamespaceAndPath("wdl", "hud"), WdlHudOverlay::render));
+        new NeoForgeOutlineRegistrar().register();
     }
 }
