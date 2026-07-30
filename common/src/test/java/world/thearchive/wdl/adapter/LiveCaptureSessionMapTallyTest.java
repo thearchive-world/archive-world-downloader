@@ -72,6 +72,7 @@ class LiveCaptureSessionMapTallyTest {
         WdlConfig config = WdlConfig.parse(properties);
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
+        assertTrue(config.remapMapIds(), "the manifest write path is the remap-on arm, so the fixture needs it on");
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
                 config, null, Level.OVERWORLD, Level.OVERWORLD, registries,

@@ -55,19 +55,21 @@ class LiveCaptureSessionCompletionRecordTest {
 
     /**
      * A session with no bound level, reporting to nobody. Entity and container capture are off so the constructor
-     * publishes no process-wide capture into the static activation slots; chat is off because the headless bridge
-     * throws on it and the chat arm resolves the save folder through the client. All three are asserted rather than
-     * assumed: an unrecognized config key falls back to the default, which is on for all three.
+     * publishes no process-wide capture into the static activation slots; chat and toasts are off because the headless
+     * bridge throws on both and the chat arm resolves the save folder through the client. All four are asserted rather
+     * than assumed: an unrecognized config key falls back to the default, which is on for all four.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
         properties.setProperty("captureEntities", "false");
         properties.setProperty("captureContainers", "false");
         properties.setProperty("showChatMessages", "false");
+        properties.setProperty("showToasts", "false");
         WdlConfig config = WdlConfig.parse(properties);
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         assertFalse(config.showChatMessages(), "the chat arm reaches for a client this session does without");
+        assertFalse(config.showToasts(), "the toast arm reaches for a player this session does without");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
                 config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SendRangeEstimator(), false,
