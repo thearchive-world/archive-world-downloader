@@ -401,6 +401,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private final RecoveredScan recoveredScan = new RecoveredScan();
 
+    // Which chunks have had a recovered-coverage scan requested this dimension, so each on-disk prior is read
+    // once; cleared on a portal so the new dimension re-scans its own chunks (coverage is per dimension).
+    private final LongOpenHashSet recoveryScanned = new LongOpenHashSet();
+
     /**
      * The per-tick entity accumulation buffer of already-serialized entity tags, keyed by UUID and drained by
      * flush-eligibility alongside the terrain so it stays bounded as the player roams. Fed by two sources: the packet
@@ -879,8 +883,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         dimensionRebind.registerSwap(dimension -> this.bookshelfSlots = bookshelfSlotsFor(dimension));
         dimensionRebind.registerSwap(dimension -> this.capturedBlockTypes = capturedBlockTypesFor(dimension));
         dimensionRebind.registerClear(capturedThisTick::clear);
-        // Stale old-dimension positions; the new dimension refills the queue from its own buffer.
+        // Stale old-dimension positions; the new dimension refills the queue from its own buffer and re-scans
+        // its own on-disk priors for recovered coverage.
         dimensionRebind.registerClear(floorQueue::clear);
+        dimensionRebind.registerClear(recoveryScanned::clear);
         dimensionRebind.registerClear(() -> {
             lastCoveredCenter = null; // the first tick in the new dimension seeds its disc under its own key
             lastCoveredRadius = 0; // the covered set is per dimension, so it recomputes from its own trail
@@ -3499,10 +3505,23 @@ public final class LiveCaptureSession implements CaptureController.Session {
         Set<ChunkPos> pendingInteractionChunks = skipVoid && interactionCapture != null
                 ? interactionCapture.pendingCandidateChunks()
                 : Collections.emptySet();
+        boolean resumeDownload = target.mode() == DownloadMode.RESUME;
         Iterator<Map.Entry<ChunkPos, ChunkSnapshotSource>> entries = captured.entrySet().iterator();
         while (entries.hasNext()) {
             Map.Entry<ChunkPos, ChunkSnapshotSource> entry = entries.next();
             ChunkPos pos = entry.getKey();
+            // On a resume, read this chunk's on-disk prior for recovered coverage while it is still in view, once
+            // per chunk, rather than waiting for the flush (by when it has left the outline clamp). The
+            // recovered set feeds only the outline, so the read is skipped whole when the outline is off, and each
+            // axis is gated on its own capture switch (an off axis draws no rim, so its prior is never consulted).
+            if (resumeDownload && config.outline().renderUnsavedOutline() && recoveryScanned.add(pos.toLong())) {
+                if (config.captureContainers()) {
+                    activeWriter.submitResumeScan(targetDimension, pos);
+                }
+                if (config.captureEntities()) {
+                    activeWriter.submitEntityResumeScan(targetDimension, pos);
+                }
+            }
             if (!all && !FlushPolicy.shouldFlush(pos.x, pos.z, centerX, centerZ, keepHot)) {
                 continue;
             }
