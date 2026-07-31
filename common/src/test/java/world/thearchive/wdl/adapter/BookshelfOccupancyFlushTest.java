@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CoveredChunkIndex;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
@@ -161,8 +162,9 @@ class BookshelfOccupancyFlushTest {
         assertFalse(config.captureContainers(), "the whole subject is the containers-off arm, so it must be off");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
                 config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
-                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(), new CoveredChunkIndex(),
-                new SendRangeEstimator(), false, false, () -> {});
+                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
+                new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
+                () -> {});
     }
 
     private static WorldPaths paths(Path save) throws Exception {

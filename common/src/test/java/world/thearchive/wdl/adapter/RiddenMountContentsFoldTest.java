@@ -25,6 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CoveredChunkIndex;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
@@ -144,8 +145,8 @@ class RiddenMountContentsFoldTest {
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
                 config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
-                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(), new CoveredChunkIndex(),
-                new SendRangeEstimator(), false, false,
+                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
+                new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
     }
 }

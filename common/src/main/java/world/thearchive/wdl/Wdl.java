@@ -37,6 +37,7 @@ import world.thearchive.wdl.adapter.OutlineTracker;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.client.WdlDownloadsScreen;
 import world.thearchive.wdl.client.WdlSettingsScreen;
+import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.compat.xaeroplus.XaeroPlusIntegration;
 import world.thearchive.wdl.core.AtomicFileWrite;
 import world.thearchive.wdl.core.CaptureController;
@@ -98,6 +99,8 @@ public final class Wdl {
     // registrar reads it. The recovered coverage it classifies against is the session's, published by the
     // off-thread resume scan and read through the controller.
     private static final OutlineTracker outlineTracker = new OutlineTracker();
+
+    private static BobbyChunkFilter bobbyFilter = BobbyChunkFilter.INACTIVE;
 
     private static volatile WdlConfig currentConfig = WdlConfig.DEFAULTS;
 
@@ -161,6 +164,7 @@ public final class Wdl {
         // later core step is visible (the MC runtime does not forward JUL to the log on its own).
         CoreLogHandler.install();
         bridge = platformBridge;
+        bobbyFilter = BobbyChunkFilter.resolve(bridge);
         adapter = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No VersionAdapter service is registered"));
@@ -661,7 +665,7 @@ public final class Wdl {
         controller.start(() -> new LiveCaptureSession(adapter, bridge, config, level, target,
                 controller.savedChunks(), controller.coveredChunks(), controller.sendRange(),
                 bridge.isModLoaded("xaeroplus") || bridge.isModLoaded("journeymap"),
-                minecraft.getCameraEntity() != minecraft.player,
+                minecraft.getCameraEntity() != minecraft.player, bobbyFilter,
                 controller::tick));
         if (config.showChatMessages()) {
             bridge.sendChat(target.mode() == DownloadMode.RESUME

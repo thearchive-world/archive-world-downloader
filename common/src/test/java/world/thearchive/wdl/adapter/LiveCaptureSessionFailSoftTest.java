@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.CoveredChunkIndex;
 import world.thearchive.wdl.core.DownloadMode;
@@ -40,7 +41,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The headless guard for the fail-soft: the finish-time player assembly runs after chunks have committed to disk, so an
- * uncaught serialize throw there would abort before the writer finalizes and leave a chunks-without-level.dat
+ * uncaught serialize or scrub throw there would abort before the writer finalizes and leave a chunks-without-level.dat
  * unopenable world plus a leaked lock. {@link LiveCaptureSession#failSoft} degrades any throw to a null snapshot, which
  * the (separately tested) null-{@code CapturedPlayer} level.dat path writes as the openable void world. The remaining
  * "the writer still finalizes" half is the last two tests here: the fail-soft above covers the throws it was written
@@ -49,9 +50,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  *
  * <p>The degradation is deliberate, so the second half here is that it is not silent: a level.dat written with no
  * Player tag has lost the download's inventory, ender chest and game mode, and a verdict that still read clean over
- * that would be asserting something untrue. Both halves are asserted for each, since neither alone is enough: the
- * counter moved (the verdict sums every term, so a step charged to a sibling counter still reads partial) and the
- * verdict turned partial (a counter no term of the sum reads is a loss nothing reports).
+ * that would be the completion record asserting something untrue. Both halves are asserted for each, since neither
+ * alone is enough: the counter moved (the verdict sums every term, so a step charged to a sibling counter still reads
+ * partial) and the verdict turned partial (a counter no term of the sum reads is a loss nothing reports). The
+ * production call sites sit past the client reads, so what this pins is the contract they share and not that they still
+ * call it.
  */
 class LiveCaptureSessionFailSoftTest {
     @BeforeAll
@@ -95,8 +98,9 @@ class LiveCaptureSessionFailSoftTest {
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), bridge,
                 config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
-                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(), new CoveredChunkIndex(),
-                new SendRangeEstimator(), false, false, () -> {});
+                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
+                new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
+                () -> {});
     }
 
     @Test
@@ -104,7 +108,7 @@ class LiveCaptureSessionFailSoftTest {
         LiveCaptureSession session = session(temporary);
 
         assertNull(session.failSoft("player", () -> {
-            throw new IllegalStateException("player serialize blew up");
+            throw new IllegalStateException("player serialize/scrub blew up");
         }), "a throwing assembly degrades to a null capturedPlayer so the openable void-world save still runs");
     }
 
@@ -126,7 +130,7 @@ class LiveCaptureSessionFailSoftTest {
         assertFalse(session.isPartialSave(0, 0), "nothing has degraded, so the finish reads clean");
 
         session.failSoft("player", () -> {
-            throw new IllegalStateException("player serialize blew up");
+            throw new IllegalStateException("player serialize/scrub blew up");
         });
 
         assertEquals(1, losses(session),
@@ -155,7 +159,7 @@ class LiveCaptureSessionFailSoftTest {
      * Bind a session to a writer with no storage behind it, which is all the end-of-stream contract needs: the guard
      * submits nothing, so the drain opens neither target, and what matters is whether the writer reached its finalize
      * at all. The finalizer arrives as a parameter so a test can read the session through it, on the writer thread, at
-     * the instant the production one writes level.dat.
+     * the instant the production one writes level.dat and stamps the completion record.
      */
     private static AsyncSaveWriter bindWriter(LiveCaptureSession session, Path temporary,
             AsyncSaveWriter.Finalizer finalizer) {
@@ -203,7 +207,7 @@ class LiveCaptureSessionFailSoftTest {
         assertTrue(finalized.get(),
                 "a throw takes the finalizing end of stream, since the work got far enough to be interrupted");
         assertTrue(partialAtFinalize.get(),
-                "and the finalize that runs on the writer thread already saw the loss, so it cannot read clean");
+                "and the finalize that stamps the completion record already saw the loss, so it cannot read clean");
         assertEquals(1, losses(session), "the throw skipped the rest of the finish, so it counts as one lost step");
         assertTrue(session.isPartialSave(0, 0), "which the main-thread verdict reads as partial too");
     }
@@ -229,8 +233,8 @@ class LiveCaptureSessionFailSoftTest {
 
     /**
      * The same guard on the path that does not throw, which the test above cannot see, and it is not only the ordinary
-     * finish that needs it: the nothing-captured exit returns without submitting anything, and a download reaches it
-     * with a writer already open behind it.
+     * finish that needs it: the nothing-captured exit returns without submitting anything, and a download whose every
+     * chunk was dropped as void reaches it with a writer already open behind it.
      */
     @Test
     void aFinishThatDoesNotThrowReachesTheSameEndOfStreamAndCountsNothing(@TempDir Path temporary) throws Exception {
@@ -270,7 +274,7 @@ class LiveCaptureSessionFailSoftTest {
 
     /**
      * A finish that never opened a world has no writer to signal, and so no future for the controller to poll either.
-     * Nothing is at risk on disk there, since the world open closes its own access when it fails before handing one
+     * Nothing is at risk on disk there, since the world-open closes its own access when it fails before handing one
      * over, but a download that never completes leaves the controller saving for the rest of the session with no way to
      * start another, so this finish has to end and report itself.
      */

@@ -56,6 +56,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CoveredChunkIndex;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
@@ -158,7 +159,8 @@ class LiveCaptureSessionLossTallyTest {
         return new LiveCaptureSession(adapter, new HeadlessPlatformBridge(configDirectory), config, null,
                 Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
                 new DownloadTarget("headless", null, DownloadMode.NEW),
-                new SavedChunkIndex(), new CoveredChunkIndex(), new SendRangeEstimator(), false, false, () -> {});
+                new SavedChunkIndex(), new CoveredChunkIndex(), new SendRangeEstimator(), false, false,
+                BobbyChunkFilter.INACTIVE, () -> {});
     }
 
     /**
@@ -176,8 +178,8 @@ class LiveCaptureSessionLossTallyTest {
         assertTrue(config.worldOutput().skipVoidChunks(), "the void skip is the whole subject, so it must be on");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
                 config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
-                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(), new CoveredChunkIndex(),
-                new SendRangeEstimator(), false, false,
+                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
+                new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
     }
 

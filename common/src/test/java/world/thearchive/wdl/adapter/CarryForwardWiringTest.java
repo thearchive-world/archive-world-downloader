@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CoveredChunkIndex;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
@@ -162,6 +163,38 @@ class CarryForwardWiringTest {
         capture.recordPlaceAt(pos, new ItemStack(Items.CHEST));
     }
 
+    /** The open-time lectern capture at {@code pos}, which a placement in that cell must also drop. */
+    @SuppressWarnings("unchecked")
+    private static void stashLectern(LiveCaptureSession session, BlockPos pos, CompoundTag holder)
+            throws Exception {
+        Field field = LiveCaptureSession.class.getDeclaredField("lecternStash");
+        field.setAccessible(true);
+        ((Map<BlockPos, StashHolder>) field.get(session)).put(pos, StashHolder.of(holder));
+    }
+
+    /**
+     * The lectern half of the placement drop. A lectern captured at a cell and then built over keeps its book keyed to
+     * that position, and the merge gate compares block-entity types, so a lectern placed there would inherit the book
+     * of the one it replaced.
+     */
+    @Test
+    void aPlacementDropsTheLecternCapturedInThatCell(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(temporary);
+        stashLectern(session, chest, new CompoundTag());
+
+        placeBlockAt(session, chest);
+
+        assertEquals(0, lecternStashSize(session),
+                "the lectern the placement built over no longer describes anything at that cell");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static int lecternStashSize(LiveCaptureSession session) throws Exception {
+        Field field = LiveCaptureSession.class.getDeclaredField("lecternStash");
+        field.setAccessible(true);
+        return ((Map<BlockPos, StashHolder>) field.get(session)).size();
+    }
+
     /** A captured chunk holding one chest exactly as the client saves it, which is with no contents. */
     private ChunkSnapshotSource snapshotWithEmptyChest() {
         return SyntheticChunks.withBlockEntityAt(registries, chest, Blocks.CHEST.defaultBlockState(),
@@ -207,8 +240,9 @@ class CarryForwardWiringTest {
         WdlConfig config = WdlConfig.parse(properties);
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
                 config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
-                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(), new CoveredChunkIndex(),
-                new SendRangeEstimator(), false, false, () -> {});
+                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
+                new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
+                () -> {});
     }
 
     private static WorldPaths paths(Path save) throws Exception {

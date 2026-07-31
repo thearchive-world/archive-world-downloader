@@ -101,6 +101,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.Wdl;
+import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CaptureController;
 import world.thearchive.wdl.core.CaptureCounts;
 import world.thearchive.wdl.core.CaptureOrder;
@@ -186,6 +187,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     private final VersionAdapter adapter;
     private final PlatformBridge bridge;
+    private final BobbyChunkFilter bobbyFilter;
     private final WdlConfig config;
     // The game-thread completion poke (CaptureController.tick), run when the background save completes so the
     // SAVING to IDLE transition lands even while the game tick is suspended.
@@ -808,11 +810,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     public LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config, ClientLevel level,
             DownloadTarget target, SavedChunkIndex overlayIndex, CoveredChunkIndex coveredIndex,
             SendRangeEstimator sendRange, boolean overlayActive, boolean cameraDetachedAtStart,
-            Runnable saveCompletePoke) {
+            BobbyChunkFilter bobbyFilter, Runnable saveCompletePoke) {
         this(adapter, bridge, config, level,
                 VanillaDimensions.forType(level.dimensionTypeRegistration().unwrapKey().orElse(null)),
                 level.dimension(), level.registryAccess(), target, overlayIndex, coveredIndex, sendRange,
-                overlayActive, cameraDetachedAtStart, saveCompletePoke);
+                overlayActive, cameraDetachedAtStart, bobbyFilter, saveCompletePoke);
     }
 
     /**
@@ -827,9 +829,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
             @Nullable ClientLevel level, ResourceKey<Level> targetDimension, ResourceKey<Level> liveDimension,
             RegistryAccess registries, DownloadTarget target, SavedChunkIndex overlayIndex,
             CoveredChunkIndex coveredIndex, SendRangeEstimator sendRange, boolean overlayActive,
-            boolean cameraDetachedAtStart, Runnable saveCompletePoke) {
+            boolean cameraDetachedAtStart, BobbyChunkFilter bobbyFilter, Runnable saveCompletePoke) {
         this.adapter = adapter;
         this.bridge = bridge;
+        this.bobbyFilter = bobbyFilter;
         this.config = config;
         this.target = target;
         this.overlayIndex = overlayIndex;
@@ -1305,6 +1308,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
         lastCoveredCenter = hotCenter;
     }
 
+    /**
+     * The live FULL chunk at {@code pos}, or null if none is loaded or it is a Bobby cached chunk. Bobby swaps a cached
+     * {@code FakeChunk} into the {@code ClientChunkCache} slot the server left empty, and it passes the
+     * {@code getLevel()} canary, so it must be excluded here; treating it as null routes it through the existing
+     * "server never sent it" skip.
+     */
+    private @Nullable LevelChunk liveChunkAt(ClientChunkCache chunkSource, ChunkPos pos) {
+        LevelChunk chunk = chunkSource.getChunk(pos.x, pos.z, ChunkStatus.FULL, false);
+        return (chunk == null || bobbyFilter.isBobbyChunk(chunk)) ? null : chunk;
+    }
+
     private void captureLoadedChunks(Minecraft minecraft, LocalPlayer player, ChunkPos anchor) {
         captureSquareAround(minecraft, player, anchor);
         ChunkPos playerChunk = player.chunkPosition();
@@ -1354,13 +1368,18 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (revisit && !recaptureMode.overwritesRevisitedChunks()) {
                 continue;
             }
-            LevelChunk chunk = chunkSource.getChunk(pos.x, pos.z, ChunkStatus.FULL, false);
+            LevelChunk chunk = liveChunkAt(chunkSource, pos);
             if (chunk == null) {
                 continue; // not a loaded chunk at this position (or an unloaded keep-hot margin chunk)
             }
             if (!hasEncodeBudget()) {
                 break; // out of budget: the rest of the square (still uncaptured) spills to a later tick
             }
+            // Safety canary: capture only ever touches Minecraft.level (ClientLevel)
+            // chunks, which are never persisted, so arming their unsaved flag cannot suppress a real singleplayer
+            // save. The chunk comes from the bound level's own source, so this holds for a first capture and a
+            // revisit re-buffer alike.
+            assert chunk.getLevel() == level : "capture touched a chunk outside the bound ClientLevel";
             // The snapshot stands alone in its own try because it is the only statement here whose failure
             // loses the chunk: past the buffer insert the terrain is already committed to flush, so a throw
             // costs this chunk's entity prime or its re-capture arm instead, which is a different loss and a
@@ -1619,7 +1638,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (reencodedThisTick.contains(key) || capturedThisTick.contains(key)) {
             return;
         }
-        LevelChunk chunk = chunkSource.getChunk(pos.x, pos.z, ChunkStatus.FULL, false);
+        LevelChunk chunk = liveChunkAt(chunkSource, pos);
         if (!RecapturePolicy.shouldRecapture(captured.containsKey(pos), chunk != null)) {
             dirtyRemove(key); // a flushed chunk's stale dirty entry is dropped so the set stays bounded
             return;
@@ -1627,6 +1646,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (chunk == null) {
             return; // unreachable given shouldRecapture above; the explicit check narrows nullness
         }
+        // Safety canary: re-capture must only ever touch Minecraft.level
+        // (ClientLevel) chunks, which are never persisted, so clearing their unsaved flag cannot suppress a
+        // real singleplayer save. The chunk is fetched from the bound level's own source, so this holds.
+        assert chunk.getLevel() == level : "re-capture touched a chunk outside the bound ClientLevel";
         try {
             captured.put(pos, codec.capture(chunk, registries));
             reencodedThisTick.add(key);
