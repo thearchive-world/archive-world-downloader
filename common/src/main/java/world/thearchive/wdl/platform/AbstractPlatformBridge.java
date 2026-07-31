@@ -32,6 +32,7 @@ import net.minecraft.network.chat.MutableComponent;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
+import world.thearchive.wdl.compat.flashback.FlashbackReplayProbe;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.core.browse.DownloadFolders;
@@ -54,6 +55,11 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final SystemToast.SystemToastId TOAST_ID = new SystemToast.SystemToastId();
     private static final SystemToast.SystemToastId REFUSAL_TOAST_ID = new SystemToast.SystemToastId();
 
+    // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
+    // inside the methods, never the constructor, and isModLoaded is a loader call. Read only on the client
+    // main thread, so the lazy init needs no synchronization.
+    private @Nullable FlashbackReplayProbe replayProbe;
+
     @Override
     public final void registerToggleKeybind(Runnable onToggle) {
         registerKeybind("key.wdl.toggle", onToggle);
@@ -74,11 +80,21 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     public boolean isRemoteWorld() {
         Minecraft mc = Minecraft.getInstance();
         // getConnection() is null until Minecraft.player is assigned, which is what keeps this false during
-        // the world-load window where the client is already ticking.
+        // the world-load window where a replay server is already installed and the client is already ticking.
         if (mc.getConnection() == null) {
             return false;
         }
-        return !mc.isLocalServer();
+        return !mc.isLocalServer() || isReplayPlayback();
+    }
+
+    // Kept private so nothing invites an off-main-thread read from the coverage overlay, which would break the
+    // lazy init above. isInstance(null) is false, which is the sole guard over the shutdown window where the
+    // singleplayer server field is already cleared but isLocalServer is not.
+    private boolean isReplayPlayback() {
+        if (replayProbe == null) {
+            replayProbe = FlashbackReplayProbe.resolve(isModLoaded(FlashbackReplayProbe.MOD_ID));
+        }
+        return replayProbe.isReplayServer(Minecraft.getInstance().getSingleplayerServer());
     }
 
     @Override
@@ -161,6 +177,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             Runnable onConfig) {
         // A local world refuses every action this row leads to, and the /wdl commands and downloads keybind
         // still reach the settings and downloads screens there, so the row is hidden rather than disabled.
+        // Replay playback is a remote world, so the row is present there and its actions work.
         if (!isRemoteWorld()) {
             return List.of();
         }
