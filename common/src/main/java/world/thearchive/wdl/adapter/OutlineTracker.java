@@ -40,6 +40,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
+import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CapturedContainers;
 import world.thearchive.wdl.core.OutlineClamp;
 import world.thearchive.wdl.core.OutlineClass;
@@ -97,6 +98,7 @@ public final class OutlineTracker {
     private long tickCounter;
     private final TimingWindow tickTiming = new TimingWindow(TIMING_WINDOW_TICKS);
     private boolean errorLogged;
+    private BobbyChunkFilter bobbyFilter = BobbyChunkFilter.INACTIVE;
 
     /** The cached geometry of one logical block container: its reused rim, the ender flag, and the cheap keys. */
     private static final class CachedContainer {
@@ -143,6 +145,11 @@ public final class OutlineTracker {
         drawSet.clear();
         chunkCache.clear();
         lastLevel = null;
+    }
+
+    /** Injected once from Wdl.initialize so the outline scan skips Bobby's cached chunks. */
+    public void useBobbyFilter(BobbyChunkFilter filter) {
+        this.bobbyFilter = filter;
     }
 
     /**
@@ -238,6 +245,11 @@ public final class OutlineTracker {
         LevelChunk chunk = chunkSource.getChunk(cx, cz, ChunkStatus.FULL, false);
         if (chunk == null) {
             entry.nextRescanTick = tickCounter + 1L; // not loaded yet; retry next tick so its containers appear
+            return;
+        }
+        if (bobbyFilter.isBobbyChunk(chunk)) {
+            // Bobby-cached chunk: no live containers to outline. Rescan on the normal cadence, not next tick.
+            entry.nextRescanTick = tickCounter + RESCAN_PERIOD_TICKS + Math.floorMod(key, RESCAN_PERIOD_TICKS);
             return;
         }
         entry.nextRescanTick = tickCounter + RESCAN_PERIOD_TICKS + Math.floorMod(key, RESCAN_PERIOD_TICKS);

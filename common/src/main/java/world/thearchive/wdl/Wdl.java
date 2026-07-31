@@ -165,6 +165,7 @@ public final class Wdl {
         CoreLogHandler.install();
         bridge = platformBridge;
         bobbyFilter = BobbyChunkFilter.resolve(bridge);
+        outlineTracker.useBobbyFilter(bobbyFilter);
         adapter = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No VersionAdapter service is registered"));
