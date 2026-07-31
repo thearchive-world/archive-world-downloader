@@ -47,6 +47,7 @@ import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ConfigSchema;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
+import world.thearchive.wdl.core.ReadyLatch;
 import world.thearchive.wdl.core.SaveFailureComposer;
 import world.thearchive.wdl.core.SaveFailureReason;
 import world.thearchive.wdl.core.SaveStage;
@@ -83,6 +84,8 @@ public final class Wdl {
 
     @SuppressWarnings("NullAway.Init")
     private static PlatformBridge bridge;
+
+    private static final ReadyLatch READY = new ReadyLatch();
 
     private static final CaptureController controller = new CaptureController();
 
@@ -139,6 +142,19 @@ public final class Wdl {
         return SharedConstants.getCurrentVersion().name();
     }
 
+    /**
+     * Run {@code runnable} once the platform bridge is initialized (immediately if it already is). Touches no
+     * {@code journeymap.*} type, so an optional integration can wire itself order-independently.
+     */
+    public static void runWhenReady(Runnable runnable) {
+        READY.runWhenReady(runnable);
+    }
+
+    /** The loader platform bridge, for an optional integration that must reach it (no journeymap.* type here). */
+    public static PlatformBridge platformBridge() {
+        return bridge;
+    }
+
     /** Called once by the running loader's client entrypoint, with that loader's bridge. */
     public static void initialize(PlatformBridge platformBridge) {
         // Route core's java.util.logging into latest.log first, so a fail-soft warning from config load or any
@@ -167,6 +183,7 @@ public final class Wdl {
         // the vanilla client shutdown hook gives the integrated server.
         Runtime.getRuntime().addShutdownHook(new Thread(Wdl::abortRestoreOnShutdown, "wdl-restore-shutdown"));
         XaeroPlusIntegration.initialize(bridge);
+        READY.markReadyAndDrain();
     }
 
     /** The current capture state. */

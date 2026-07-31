@@ -18,6 +18,9 @@
   "entrypoints": {
     "client": [
       "world.thearchive.wdl.fabric.WdlFabricClient"
+    ],
+    "journeymap": [
+      "world.thearchive.wdl.compat.journeymap.WdlJourneyMapPlugin"
     ]
   },
   "depends": {
