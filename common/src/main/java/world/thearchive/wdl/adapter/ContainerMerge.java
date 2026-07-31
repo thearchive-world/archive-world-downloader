@@ -184,7 +184,8 @@ final class ContainerMerge {
      * type claim and always matches: that is the interaction-predicted path, already reconciled against the captured
      * snapshot upstream. The registry-key strings compare like for like ({@code "id"} is written with
      * {@code BLOCK_ENTITY_TYPE.byNameCodec()}, the same key a live {@code getType()} records), so a mismatch means the
-     * position was replaced by a different block entity after capture and the stale items must not be written.
+     * position was replaced by a different block entity after capture and the stale items must not be written. Shared
+     * with {@link LiveCaptureSession}'s merge tally so the count cannot drift from the merge.
      */
     static boolean recordedTypeMatches(CompoundTag holder, CompoundTag blockEntityTag) {
         Tag recorded = holder.get("wdl_block_entity_id");
