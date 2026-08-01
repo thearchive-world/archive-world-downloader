@@ -71,10 +71,12 @@ tasks.named<ProcessResources>("processResources") {
         "version" to project.version.toString(),
         "minecraft_version" to project.property("minecraft_version").toString(),
         "neoforge_version_min" to project.property("neoforge_version_min").toString(),
+        "modrinth_id" to project.property("modrinth_id").toString(),
         "mod_id" to project.property("mod_id").toString(),
     )
     inputs.properties(tokens)
     filesMatching("META-INF/neoforge.mods.toml") { expand(tokens) }
+    filesMatching("wdl-publishing.properties") { expand(tokens) }
 }
 
 // The plain jar is the producing task; the guard is shared with the Fabric sibling (see build-logic).

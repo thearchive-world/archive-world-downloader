@@ -68,10 +68,12 @@ tasks.named<ProcessResources>("processResources") {
         "minecraft_version" to project.property("minecraft_version").toString(),
         "java_version" to project.property("java_version").toString(),
         "fabric_loader_version_min" to project.property("fabric_loader_version_min").toString(),
+        "modrinth_id" to project.property("modrinth_id").toString(),
         "mod_id" to project.property("mod_id").toString(),
     )
     inputs.properties(tokens)
     filesMatching("fabric.mod.json") { expand(tokens) }
+    filesMatching("wdl-publishing.properties") { expand(tokens) }
 }
 
 // Loom's remapJar is the producing task; the guard is shared with the NeoForge sibling (see build-logic).
