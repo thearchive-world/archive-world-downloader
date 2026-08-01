@@ -13,6 +13,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
+import world.thearchive.wdl.core.CaptureController;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.platform.PlatformBridge;
@@ -20,7 +21,8 @@ import world.thearchive.wdl.platform.WdlCommands;
 
 /**
  * The headless slice of the resume flow: the usable-name gate on {@code /wdl start <name>} refuses before the
- * remote-world guard or any resolution runs, so the refusal path never loads config or touches the MC client.
+ * remote-world guard or any resolution runs, so the refusal path never loads config or touches the MC client. The
+ * busy-guard half of the ordering is not pinned here; the fixture's controller stays idle.
  */
 class ResumeFlowTest {
     @Test
@@ -46,8 +48,9 @@ class ResumeFlowTest {
     }
 
     private static ResumeFlow flow(RecordingBridge bridge) {
-        return new ResumeFlow(bridge,
+        return new ResumeFlow(new CaptureController(), bridge,
                 () -> fail("the refusal must not load config"),
+                screen -> fail("the refusal must not defer a screen"),
                 target -> fail("the refusal must not start a download"));
     }
 

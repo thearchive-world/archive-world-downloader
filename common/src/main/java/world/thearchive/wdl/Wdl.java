@@ -67,6 +67,7 @@ import world.thearchive.wdl.core.export.RestoreOperation;
 import world.thearchive.wdl.core.export.RestoreSource;
 import world.thearchive.wdl.core.update.SemVer;
 import world.thearchive.wdl.platform.PlatformBridge;
+import world.thearchive.wdl.platform.WdlCommands;
 import world.thearchive.wdl.update.HttpTransport;
 import world.thearchive.wdl.update.RuntimeInfo;
 import world.thearchive.wdl.update.UpdateAvailable;
@@ -127,8 +128,7 @@ public final class Wdl {
     // pause-menu open (openDownloadsScreenNow), both on the client main thread.
     private static @Nullable Runnable pendingScreenOpen;
 
-    // The download-start flow, constructed by initialize() once the bridge is live; never null in operation,
-    // so its uninitialized-field check is suppressed here.
+    // The resume/confirm state machine, constructed by initialize() once the controller and bridge are live.
     @SuppressWarnings("NullAway.Init")
     private static ResumeFlow resumeFlow;
 
@@ -187,7 +187,8 @@ public final class Wdl {
         currentConfig = WdlConfig.load(configPath()); // materialize the default config file on first run
         LOGGER.info("config file: {}", configPath());
         dispatchUpdateCheck(currentConfig);
-        resumeFlow = new ResumeFlow(bridge, () -> WdlConfig.load(configPath()), Wdl::startDownload);
+        resumeFlow = new ResumeFlow(controller, bridge, () -> WdlConfig.load(configPath()),
+                Wdl::deferScreen, Wdl::startDownload);
 
         bridge.registerToggleKeybind(Wdl::onToggle);
         bridge.registerDownloadsKeybind(Wdl::openDownloadsScreen);
@@ -198,7 +199,10 @@ public final class Wdl {
         // A backend transfer (play-to-configuration re-entry) fires no disconnect hook on either loader, so the
         // tee raises its own signal and the controller polls it each tick, stopping the download the same way.
         controller.setTransferStopPoll(ConnectionTee::consumeTransferSignal);
+        bridge.onServerJoin(Wdl::onServerJoin);
         bridge.onServerJoin(Wdl::onUpdateAvailableJoin);
+        bridge.registerCommands(new WdlCommands(Wdl::onStart, Wdl::onStartNamed, Wdl::onStop, Wdl::onStatus,
+                Wdl::onConfig, Wdl::onResume, Wdl::openDownloadsFromCommand));
         // One permanent hook for the JVM's life rather than one per operation, matching the bounded halt
         // the vanilla client shutdown hook gives the integrated server.
         Runtime.getRuntime().addShutdownHook(new Thread(Wdl::abortRestoreOnShutdown, "wdl-restore-shutdown"));
@@ -517,11 +521,17 @@ public final class Wdl {
     }
 
     /**
-     * Open the download screen with the existing-worlds list collapsed. Deferred to the next client tick; the parent
-     * screen is captured at tick time.
+     * Open the download screen with the existing-worlds list collapsed. Deferred to the next client tick, the same
+     * deferral the command path needs to survive Fabric's post-dispatch chat close; the parent screen is captured at
+     * tick time.
      */
     private static void openDownloadsScreen() {
         deferScreen(() -> showDownloadsScreen(false));
+    }
+
+    /** Open the download screen from {@code /wdl downloads}, with the existing-worlds list expanded. */
+    private static void openDownloadsFromCommand() {
+        deferScreen(() -> showDownloadsScreen(true));
     }
 
     /**
@@ -617,6 +627,36 @@ public final class Wdl {
             return;
         }
         resumeFlow.begin(defaultBaseName(), true);
+    }
+
+    /**
+     * Server-join hook: when {@code autoDownload} is enabled, begin a download on joining a remote world, only while
+     * idle, through the same smart flow as the keybind. A folder that already exists (a same-day rejoin, or any rejoin
+     * with the date suffix off) resumes it via the merge confirm, so Cancel on join aborts the auto-download; with
+     * confirmResume off it continues silently. The config is re-read so a hand-edit applies, and the idle and
+     * activation gates are checked here, so a join into the user's own local world stays a silent no-op. Two skips are
+     * spoken: a restore in progress, and a world served from elsewhere with no server identity behind it, which is
+     * refused aloud rather than started under a generic name. Every other skip cause stays silent.
+     */
+    private static void onServerJoin() {
+        if (!WdlConfig.load(configPath()).worldOutput().autoDownload()) {
+            return;
+        }
+        CaptureState state = controller.state();
+        if (state == CaptureState.RESTORING && bridge.isRemoteWorld()) {
+            bridge.sendChat(ChatCopy.busy(state, isSweepActive()));
+            return;
+        }
+        if (state != CaptureState.IDLE || !bridge.isRemoteWorld()) {
+            return;
+        }
+        // Must stay below the gate above: this hook also fires for the integrated server, so hoisting it would
+        // speak on every genuine singleplayer world load.
+        if (!hasSourceIdentity()) {
+            bridge.sendChat(ChatCopy.startNeedsName());
+            return;
+        }
+        resumeFlow.begin(defaultBaseName(), false);
     }
 
     /**
@@ -853,9 +893,9 @@ public final class Wdl {
     }
 
     /**
-     * The default base name for a keybind start, before any date suffix: the current server's name when it sanitizes to
-     * a usable folder name, else a generic default, so the implicit path always carries a usable name into
-     * {@link ResumeFlow#begin}.
+     * The default base name for a keybind or auto-download start, before any date suffix: the current server's name
+     * when it sanitizes to a usable folder name, else a generic default, so the implicit paths always carry a usable
+     * name into {@link ResumeFlow#begin}.
      */
     private static String defaultBaseName() {
         ServerData server = Minecraft.getInstance().getCurrentServer();
@@ -874,6 +914,56 @@ public final class Wdl {
 
     private static Path configPath() {
         return bridge.configDirectory().resolve("wdl.properties");
+    }
+
+    /** Bare {@code /wdl start}: refused; a download needs a name, so the reply points at {@code /wdl start <name>}. */
+    private static void onStart() {
+        bridge.sendChat(ChatCopy.startNeedsName());
+    }
+
+    /** {@code /wdl start <name>}: start a NEW download of that name, refusing a name that already exists. */
+    private static void onStartNamed(String name) {
+        resumeFlow.startNamed(name);
+    }
+
+    /**
+     * {@code /wdl stop}: stop and save the running download, replying in chat that none is running, or, when chat
+     * messages are on, echoing the saving or busy line for the one it stops.
+     */
+    private static void onStop() {
+        CaptureState state = controller.state();
+        if (state == CaptureState.IDLE) {
+            bridge.sendChat(ChatCopy.notDownloading());
+            return;
+        }
+        if (currentConfig.showChatMessages()) {
+            bridge.sendChat(state == CaptureState.RECORDING
+                    ? ChatCopy.saving()
+                    : ChatCopy.busy(state, isSweepActive()));
+        }
+        controller.stop();
+    }
+
+    /** {@code /wdl resume <name>}: resume an existing wdl-managed download through the merge confirm. */
+    private static void onResume(String name) {
+        resumeFlow.resume(name);
+    }
+
+    /** {@code /wdl status} (and bare {@code /wdl}): the live state and counts, in chat. */
+    private static void onStatus() {
+        bridge.sendChat(ChatCopy.status(controller.state(), controller.counts(), isSweepActive()));
+    }
+
+    /** {@code /wdl config}: the config file path and current values, in chat. */
+    private static void onConfig() {
+        WdlConfig config = WdlConfig.load(configPath());
+        bridge.sendChat(ChatCopy.configFile(configPath().toString()));
+        bridge.sendChat(ChatCopy.data("captureEntities=" + config.captureEntities()
+                + ", captureContainers=" + config.captureContainers()
+                + ", openInCreative=" + config.worldOutput().openInCreative()));
+        bridge.sendChat(ChatCopy.data("savePlayerInventory=" + config.savePlayerInventory()
+                + ", savePlayerEnderChest=" + config.savePlayerEnderChest()
+                + ", saveItemCoordinates=" + config.saveItemCoordinates()));
     }
 
     /** The unsaved-container outline draw-set, read by the per-loader render registrar each frame. */
