@@ -1,4 +1,6 @@
 {
+  "modmenu.summaryTranslation.wdl": "Lade die Mehrspieler-Welt, die du erkundest, als Einzelspieler-Spielstand herunter.",
+  "modmenu.descriptionTranslation.wdl": "Behalte die Mehrspieler-Welten, die du besuchst. Während du erkundest, speichert die Mod das Gelände, Behälter, Kreaturen und Karten um dich herum in einer Einzelspieler-Welt, die du offline öffnen kannst. Alles stammt aus deinem eigenen Spiel, sodass nichts auf dem Server läuft.",
   "key.category.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Welt-Download umschalten",
   "key.wdl.open_downloads": "Downloads-Bildschirm öffnen",

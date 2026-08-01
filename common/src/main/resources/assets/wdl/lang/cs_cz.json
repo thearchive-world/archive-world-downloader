@@ -1,4 +1,6 @@
 {
+  "modmenu.summaryTranslation.wdl": "Stáhni si svět z hry více hráčů, který prozkoumáváš, jako svět pro jednoho hráče.",
+  "modmenu.descriptionTranslation.wdl": "Uchovej si světy z hry více hráčů, které navštěvuješ. Jak prozkoumáváš okolí, mod ukládá terén, schránky, stvoření a mapy kolem tebe do světa pro jednoho hráče, který můžeš otevřít offline. Vše pochází z tvé vlastní hry, takže na serveru nic neběží.",
   "key.category.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Přepnout stahování světa",
   "key.wdl.open_downloads": "Otevřít obrazovku stažení",

@@ -8,10 +8,12 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import org.lwjgl.glfw.GLFW;
@@ -41,9 +43,13 @@ import world.thearchive.wdl.client.WdlKeyBinds;
  */
 @Mod(value = "wdl", dist = Dist.CLIENT)
 public final class WdlNeoForge {
-    public WdlNeoForge(IEventBus modEventBus) {
+    public WdlNeoForge(IEventBus modEventBus, ModContainer modContainer) {
         Wdl.initialize(new NeoForgePlatformBridge(modEventBus));
         MountMenuReader.install(new NeoForgeMountMenuReader());
+        // The mods-list config button: opens the same settings screen the pause-menu button does, with the
+        // mod list as its back target. First-party NeoForge, no soft dependency.
+        modContainer.registerExtensionPoint(IConfigScreenFactory.class,
+                (container, modListScreen) -> Wdl.createSettingsScreen(modListScreen));
         NeoForge.EVENT_BUS.addListener(
                 (ClientPlayerNetworkEvent.LoggingIn event) -> NeoForgeConnectionTee.install(event.getConnection()));
         // Observe the local player's right-clicks for interaction-prediction capture and the open-container

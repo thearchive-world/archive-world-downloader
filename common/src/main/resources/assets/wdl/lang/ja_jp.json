@@ -1,4 +1,6 @@
 {
+  "modmenu.summaryTranslation.wdl": "探索中のマルチプレイのワールドを、シングルプレイのセーブとしてダウンロードします。",
+  "modmenu.descriptionTranslation.wdl": "訪れたマルチプレイのワールドを手元に残しましょう。探索していくと、このMODがあなたの周囲の地形、コンテナ、Mob、地図を、オフラインで開けるシングルプレイのワールドに保存します。すべてはあなた自身のゲームから取得されるため、サーバー上では何も実行されません。",
   "key.category.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "ワールドダウンロードの切り替え",
   "key.wdl.open_downloads": "ダウンロード画面を開く",

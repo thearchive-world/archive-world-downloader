@@ -52,6 +52,11 @@ dependencies {
     // Xaero's startup update modal; the manual render gate installs the family in a real client.
     modCompileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+fabric-${property("minecraft_version")}")
 
+    // ModMenu API for the mod-list config-screen entrypoint (WdlModMenu), compile-only. Loom remaps it to
+    // Mojmap for the compile; there is no runtime require, so ModMenu's absence just means the entrypoint is
+    // never queried. The pinned version supplies only the stable ModMenuApi; the player's own ModMenu runs.
+    modCompileOnly("maven.modrinth:modmenu:${property("modmenu_version")}")
+
     // JourneyMap API for the source-merged overlay binding (compat/journeymap) and the journeymap entrypoint
     // (WdlJourneyMapPlugin), compile-only. Loom remaps it to Mojmap for the compile; there is no runtime
     // require, so JourneyMap's absence just means the entrypoint is never queried.

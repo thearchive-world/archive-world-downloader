@@ -1,4 +1,6 @@
 {
+  "modmenu.summaryTranslation.wdl": "Pobierz świat wieloosobowy, który eksplorujesz, jako zapis jednoosobowy.",
+  "modmenu.descriptionTranslation.wdl": "Zachowaj światy wieloosobowe, które odwiedzasz. W miarę jak eksplorujesz, mod zapisuje teren, pojemniki, stworzenia i mapy wokół ciebie do świata jednoosobowego, który możesz otworzyć offline. Wszystko pochodzi z twojej własnej gry, więc nic nie działa na serwerze.",
   "key.category.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Przełącz pobieranie świata",
   "key.wdl.open_downloads": "Otwórz ekran pobierania",

@@ -19,6 +19,9 @@
     "client": [
       "world.thearchive.wdl.fabric.WdlFabricClient"
     ],
+    "modmenu": [
+      "world.thearchive.wdl.fabric.WdlFabricModMenu"
+    ],
     "journeymap": [
       "world.thearchive.wdl.compat.journeymap.WdlJourneyMapPlugin"
     ]

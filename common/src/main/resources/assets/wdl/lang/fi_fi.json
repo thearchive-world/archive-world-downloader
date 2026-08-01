@@ -1,4 +1,6 @@
 {
+  "modmenu.summaryTranslation.wdl": "Lataa tutkimasi moninpelimaailma yksinpelitallennukseksi.",
+  "modmenu.descriptionTranslation.wdl": "Säilytä vierailemasi moninpelimaailmat. Kun tutkit ympäristöä, modi tallentaa ympärilläsi olevan maaston, säiliöt, olennot ja kartat yksinpelimaailmaan, jonka voit avata ilman verkkoyhteyttä. Kaikki tulee omasta pelistäsi, joten mikään ei toimi palvelimella.",
   "key.category.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Kytke maailman lataus",
   "key.wdl.open_downloads": "Avaa Lataukset-näyttö",
