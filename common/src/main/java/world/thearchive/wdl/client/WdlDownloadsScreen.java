@@ -63,6 +63,8 @@ import world.thearchive.wdl.core.export.RestoreOperation;
 import world.thearchive.wdl.core.export.RestoreSource;
 import world.thearchive.wdl.core.export.SizeFormatter;
 import world.thearchive.wdl.core.report.DownloadCounts;
+import world.thearchive.wdl.update.UpdateAvailable;
+import world.thearchive.wdl.update.UpdateCheck;
 
 /**
  * The download screen: start a new download with a typed name, or browse and resume/recover the wdl-managed downloads
@@ -96,11 +98,19 @@ public final class WdlDownloadsScreen extends Screen {
     private static final int RECOVER_ARGB = BrandColors.opaque(BrandColors.AMBER);
     private static final int TAINTED_ARGB = BrandColors.opaque(BrandColors.RUST);
     private static final int PARTIAL_ARGB = BrandColors.opaque(BrandColors.AMBER); // a partial download's chip
+    private static final int BANNER_FILL_ARGB = 0x99000000 | BrandColors.PANEL;
+    private static final int BANNER_OUTLINE_ARGB = BrandColors.opaque(BrandColors.AMBER);
     private static final int BANNER_GLYPH_ARGB = BrandColors.opaque(BrandColors.AMBER);
+    private static final int BANNER_TEXT_ARGB = BrandColors.opaque(BrandColors.IVORY);
+    private static final int BANNER_LINK_ARGB = BrandColors.opaque(BrandColors.TEAL);
+    private static final int BANNER_LINK_HOVER_ARGB = BrandColors.opaque(BrandColors.TEAL_HOVER);
 
     private static final String ARROW = "⬈";
     private static final String WARNING_GLYPH = "⚠ ";
+    private static final String DISMISS_GLYPH = "✕";
     private static final String RESTORE_GLYPH = "⟲";
+    private static final int BANNER_GAP = 8;
+    private static final int BANNER_HEIGHT = 22;
     private static final String DOT = "·";
     private static final String SUMMARY_ABSENT = "–"; // an en dash marking a not-applicable cell, not a minus
     private static final String TRIANGLE_EXPANDED = "▼ ";
@@ -240,7 +250,7 @@ public final class WdlDownloadsScreen extends Screen {
         int listWidth = listBandWidth();
         int listX = (this.width - listWidth) / 2;
         int belowButtons = addCaptureWarning(buttonRowY + BUTTON_HEIGHT + 8);
-        int headerY = Math.max(belowButtons, TOP_Y + 50);
+        int headerY = Math.max(addUpdateBanner(belowButtons), TOP_Y + 50);
         int linkWidth = this.font.width(openSavesText()) + 8;
         int disclosureWidth = Math.max(listWidth - linkWidth - 4, 80);
         if (!this.entries.isEmpty()) {
@@ -289,6 +299,7 @@ public final class WdlDownloadsScreen extends Screen {
         // a finishing save shows a disabled Saving label, not an actionable Stop
         Button primary = addButtonRow(buttonRowY, recording ? stopLabel() : savingLabel(),
                 button -> stopCapture(), recording);
+        addUpdateBanner(buttonRowY + BUTTON_HEIGHT + 8);
         if (recording) {
             setInitialFocus(primary);
         }
@@ -316,6 +327,7 @@ public final class WdlDownloadsScreen extends Screen {
         int buttonRowY = label.getY() + label.getHeight() + 6;
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> onClose())
                 .bounds((this.width - BUTTON_WIDTH) / 2, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT).build());
+        addUpdateBanner(buttonRowY + BUTTON_HEIGHT + 8);
     }
 
     private void centerTopWidget(AbstractWidget widget) {
@@ -339,9 +351,52 @@ public final class WdlDownloadsScreen extends Screen {
         return primary;
     }
 
-    /** The centered band the existing-worlds list spans. */
+    /** The centered band the existing-worlds list and the update banner both span. */
     private int listBandWidth() {
         return Mth.clamp(this.width - 20, 280, 600);
+    }
+
+    /**
+     * The newer-release banner: a bordered footer notice below the button row, sized to its content (capped at the list
+     * band) and centered, added when a result is held and not dismissed, re-evaluated on every open so a result that
+     * lands after the first open still surfaces; dismissal is remembered on the launch-scoped check, not this recreated
+     * screen. It deliberately ignores showChatMessages: silencing chat must not hide an affordance inside the mod's own
+     * UI. Returns the y where the content below the band resumes, {@code y} untouched when the banner is hidden.
+     */
+    private int addUpdateBanner(int y) {
+        UpdateCheck updateCheck = Wdl.updateCheck();
+        if (!updateCheck.bannerVisible()) {
+            return y;
+        }
+        UpdateAvailable update = updateCheck.available().orElseThrow();
+        Component prose = Component.translatable("wdl.screen.downloads.update_available",
+                update.runningDisplay(), update.latestDisplay());
+        int maxBandWidth = listBandWidth();
+        int modrinthWidth = this.font.width("Modrinth");
+        int curseforgeWidth = this.font.width("CurseForge");
+        int dismissWidth = this.font.width(DISMISS_GLYPH);
+        int leftWidth = this.font.width(WARNING_GLYPH) + this.font.width(prose);
+        // A row too wide for the list band drops the lower-priority CurseForge label rather than
+        // overflowing the box.
+        boolean curseforgeFits = leftWidth + BANNER_GAP + modrinthWidth + BANNER_GAP + curseforgeWidth
+                + BANNER_GAP + dismissWidth <= maxBandWidth - 2 * BANNER_GAP;
+        int innerWidth = leftWidth + BANNER_GAP + modrinthWidth + BANNER_GAP + dismissWidth
+                + (curseforgeFits ? BANNER_GAP + curseforgeWidth : 0);
+        // The edge padding is the one inter-item gap, so every distance across the row reads uniform.
+        int bandWidth = Math.min(innerWidth + 2 * BANNER_GAP, maxBandWidth);
+        int bandX = (this.width - bandWidth) / 2;
+        addRenderableWidget(new BannerPanelWidget(bandX, y, bandWidth, prose));
+        int x = bandX + BANNER_GAP + leftWidth + BANNER_GAP;
+        addRenderableWidget(new BannerLinkWidget(x, y, modrinthWidth, "Modrinth",
+                UpdateCheck.MODRINTH_PAGE_URL));
+        if (curseforgeFits) {
+            x += modrinthWidth + BANNER_GAP;
+            addRenderableWidget(new BannerLinkWidget(x, y, curseforgeWidth, "CurseForge",
+                    UpdateCheck.CURSEFORGE_PAGE_URL));
+        }
+        addRenderableWidget(new BannerDismissWidget(bandX + bandWidth - BANNER_GAP - dismissWidth, y,
+                dismissWidth));
+        return y + BANNER_HEIGHT + 8;
     }
 
     /**
@@ -667,6 +722,87 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
+    /** The banner's bordered band: an amber outline over a subtle panel, with the glyph and prose inside. */
+    private final class BannerPanelWidget extends AbstractWidget {
+        private final Component prose;
+
+        BannerPanelWidget(int x, int y, int width, Component prose) {
+            super(x, y, width, BANNER_HEIGHT, prose);
+            this.prose = prose;
+            this.active = false; // decorative and inert, like a vanilla StringWidget
+        }
+
+        @Override
+        protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            guiGraphics.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), BANNER_FILL_ARGB);
+            guiGraphics.renderOutline(getX(), getY(), getWidth(), getHeight(), BANNER_OUTLINE_ARGB);
+            int textY = getY() + (getHeight() - font.lineHeight) / 2;
+            guiGraphics.drawString(font, WARNING_GLYPH, getX() + BANNER_GAP, textY, BANNER_GLYPH_ARGB);
+            guiGraphics.drawString(font, this.prose, getX() + BANNER_GAP + font.width(WARNING_GLYPH), textY,
+                    BANNER_TEXT_ARGB);
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {}
+    }
+
+    /** One named banner link: an underlined teal label opening its release page in the OS browser. */
+    private final class BannerLinkWidget extends AbstractWidget {
+        private final Component label;
+        private final String url;
+
+        BannerLinkWidget(int x, int y, int width, String label, String url) {
+            super(x, y, width, BANNER_HEIGHT, Component.literal(label));
+            this.label = Component.literal(label).withStyle(ChatFormatting.UNDERLINE);
+            this.url = url;
+            setTooltip(Tooltip.create(Component.literal(url)));
+        }
+
+        @Override
+        protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            int color = isHovered() ? BANNER_LINK_HOVER_ARGB : BANNER_LINK_ARGB;
+            guiGraphics.drawString(font, this.label, getX(), getY() + (getHeight() - font.lineHeight) / 2, color);
+        }
+
+        @Override
+        public void onClick(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
+            Util.getPlatform().openUri(this.url);
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {
+            defaultButtonNarrationText(narrationElementOutput);
+        }
+    }
+
+    /** The banner's dismiss control: hides the banner for the rest of the launch. */
+    private final class BannerDismissWidget extends AbstractWidget {
+        BannerDismissWidget(int x, int y, int width) {
+            super(x, y, width, BANNER_HEIGHT,
+                    Component.translatable("wdl.screen.downloads.update_dismiss"));
+        }
+
+        @Override
+        protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
+            // The glyph comes from the fallback font, whose ink sits high in its line box, so the shared
+            // centering formula reads a pixel high without the nudge.
+            guiGraphics.drawString(font, DISMISS_GLYPH, getX(),
+                    getY() + (getHeight() - font.lineHeight) / 2 + 1, color);
+        }
+
+        @Override
+        public void onClick(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
+            Wdl.updateCheck().dismissBanner();
+            rebuildWidgets();
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {
+            defaultButtonNarrationText(narrationElementOutput);
+        }
+    }
+
     /** The passive capture-disabled caution: an inert amber glyph and label with an explanatory tooltip. */
     private final class CaptureWarningWidget extends AbstractWidget {
         private final Component text;
@@ -674,7 +810,7 @@ public final class WdlDownloadsScreen extends Screen {
         CaptureWarningWidget(int x, int y, int width, Component text) {
             super(x, y, width, HEADER_ROW_HEIGHT, text);
             this.text = text;
-            this.active = false; // a passive indicator, not a control
+            this.active = false; // a passive indicator, like the update banner's panel, not a control
             setTooltip(Tooltip.create(Component.translatable("wdl.screen.downloads.capture_disabled.tooltip")));
         }
 

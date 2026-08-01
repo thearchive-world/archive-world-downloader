@@ -5,12 +5,16 @@ package world.thearchive.wdl;
 
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -61,7 +65,12 @@ import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 import world.thearchive.wdl.core.browse.TargetResolver;
 import world.thearchive.wdl.core.export.RestoreOperation;
 import world.thearchive.wdl.core.export.RestoreSource;
+import world.thearchive.wdl.core.update.SemVer;
 import world.thearchive.wdl.platform.PlatformBridge;
+import world.thearchive.wdl.update.HttpTransport;
+import world.thearchive.wdl.update.RuntimeInfo;
+import world.thearchive.wdl.update.UpdateAvailable;
+import world.thearchive.wdl.update.UpdateCheck;
 
 /**
  * The mod's loader-agnostic entry point. Each loader's own entrypoint constructs its {@link PlatformBridge} and hands
@@ -89,6 +98,10 @@ public final class Wdl {
     private static final ReadyLatch READY = new ReadyLatch();
 
     private static final CaptureController controller = new CaptureController();
+
+    // The launch-scoped newer-release check: dispatched once at initialize, its held result flushed to
+    // chat by the second join hook and shown as the downloads-screen banner.
+    private static final UpdateCheck updateCheck = new UpdateCheck();
 
     // One-shot daemon for the pre-download worldgen warmup, so the reconstruction decode never blocks the client
     // tick or JVM exit. Idempotent through the reconstruction memo; a repeat trigger just spawns a thread that
@@ -173,6 +186,7 @@ public final class Wdl {
                 platformBridge.loaderName(), platformBridge.loaderVersion());
         currentConfig = WdlConfig.load(configPath()); // materialize the default config file on first run
         LOGGER.info("config file: {}", configPath());
+        dispatchUpdateCheck(currentConfig);
         resumeFlow = new ResumeFlow(bridge, () -> WdlConfig.load(configPath()), Wdl::startDownload);
 
         bridge.registerToggleKeybind(Wdl::onToggle);
@@ -184,6 +198,7 @@ public final class Wdl {
         // A backend transfer (play-to-configuration re-entry) fires no disconnect hook on either loader, so the
         // tee raises its own signal and the controller polls it each tick, stopping the download the same way.
         controller.setTransferStopPoll(ConnectionTee::consumeTransferSignal);
+        bridge.onServerJoin(Wdl::onUpdateAvailableJoin);
         // One permanent hook for the JVM's life rather than one per operation, matching the bounded halt
         // the vanilla client shutdown hook gives the integrated server.
         Runtime.getRuntime().addShutdownHook(new Thread(Wdl::abortRestoreOnShutdown, "wdl-restore-shutdown"));
@@ -605,6 +620,56 @@ public final class Wdl {
     }
 
     /**
+     * Dispatch the once-per-launch newer-release check off-thread, on a named daemon worker so it can never block
+     * startup or JVM exit. The boundary declines quietly when the running version does not parse or no project id was
+     * baked in (development shapes with nothing comparable to check); degrading to silence is the feature's contract.
+     */
+    private static void dispatchUpdateCheck(WdlConfig config) {
+        String runningRaw = bridge.modVersion();
+        Optional<SemVer> running = SemVer.parse(runningRaw);
+        String modrinthId = modrinthId();
+        if (running.isEmpty() || modrinthId.isEmpty()) {
+            return;
+        }
+        RuntimeInfo info = new RuntimeInfo(bridge.loaderName().toLowerCase(Locale.ROOT), mcVersion(),
+                running.get(), runningRaw, modrinthId);
+        updateCheck.dispatch(info, config, new HttpTransport(), daemonWorker("wdl-update-check"));
+    }
+
+    /** The Modrinth project id expanded into the jar from gradle.properties at build, or empty if unread. */
+    private static String modrinthId() {
+        try (InputStream stream = Wdl.class.getResourceAsStream("/wdl-publishing.properties")) {
+            if (stream == null) {
+                return "";
+            }
+            Properties properties = new Properties();
+            properties.load(stream);
+            return properties.getProperty("modrinthId", "").trim();
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    /**
+     * Second join hook, deliberately separate from {@link #onServerJoin()} (which early-returns when
+     * {@code autoDownload} is off): the held update result is flushed to chat on the first join after it arrives, at
+     * most once per launch. The chat line respects {@code showChatMessages}; the banner on the downloads screen ignores
+     * that toggle. The config is re-read so a hand-edit applies.
+     */
+    private static void onUpdateAvailableJoin() {
+        Optional<UpdateAvailable> available = updateCheck.available();
+        if (available.isEmpty()) {
+            return;
+        }
+        if (!updateCheck.consumeChatPending(WdlConfig.load(configPath()).showChatMessages())) {
+            return;
+        }
+        UpdateAvailable update = available.get();
+        bridge.sendChat(ChatCopy.updateAvailable(update.runningDisplay(), update.latestDisplay(),
+                UpdateCheck.MODRINTH_PAGE_URL, UpdateCheck.CURSEFORGE_PAGE_URL));
+    }
+
+    /**
      * Begin a download for {@code target}, the single entry point: a {@link DownloadMode#NEW} target writes to its
      * (already-disambiguated) folder, a {@link DownloadMode#RESUME} re-runs into an existing wdl-managed folder
      * verbatim and adds to it. Guards a double-start and a local world, re-loads the config so hand-edits apply on the
@@ -814,6 +879,11 @@ public final class Wdl {
     /** The unsaved-container outline draw-set, read by the per-loader render registrar each frame. */
     public static OutlineDrawSet outlineDrawSet() {
         return outlineTracker.drawSet();
+    }
+
+    /** The launch-scoped update check, read by the downloads screen for its update banner. */
+    public static UpdateCheck updateCheck() {
+        return updateCheck;
     }
 
     /**

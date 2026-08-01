@@ -158,6 +158,18 @@ class ChatCopyTest {
     }
 
     @Test
+    void updateAvailableWearsTheThreeToneTreatment() {
+        ChatCopy line = ChatCopy.updateAvailable("1.0.0-SNAPSHOT", "1.2.0",
+                "https://example.invalid/modrinth", "https://example.invalid/curseforge");
+
+        assertEquals("Archive World Downloader update available: 1.0.0-SNAPSHOT → 1.2.0. Modrinth CurseForge",
+                resolve(line));
+        assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
+        assertEquals(List.of("1.0.0-SNAPSHOT", "1.2.0"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(List.of("Modrinth", "CurseForge"), tintedTexts(line, BrandColors.TEAL));
+    }
+
+    @Test
     void statusRecordingResolvesWithAmberCounts() {
         ChatCopy line = ChatCopy.status(CaptureState.RECORDING, new CaptureCounts(580, 7, 341), false);
 
@@ -294,6 +306,21 @@ class ChatCopyTest {
         assertEquals(List.of("/config/wdl.properties"), tintedTexts(file, BrandColors.AMBER));
         assertEquals("captureEntities=true", resolve(values));
         assertEquals(OptionalInt.of(BrandColors.IVORY), values.templateColor());
+    }
+
+    @Test
+    void updateAvailableLinksOpenTheTwoPageUrls() {
+        ChatCopy line = ChatCopy.updateAvailable("1.0.0-SNAPSHOT", "1.2.0",
+                "https://example.invalid/modrinth", "https://example.invalid/curseforge");
+
+        List<ChatCopy.Argument> links = clickableArguments(line);
+        assertEquals(2, links.size());
+        assertEquals("Modrinth", links.get(0).text());
+        assertEquals(ChatCopy.Click.Kind.OPEN_URL, requireClick(links.get(0)).kind());
+        assertEquals("https://example.invalid/modrinth", requireClick(links.get(0)).target());
+        assertEquals("CurseForge", links.get(1).text());
+        assertEquals(ChatCopy.Click.Kind.OPEN_URL, requireClick(links.get(1)).kind());
+        assertEquals("https://example.invalid/curseforge", requireClick(links.get(1)).target());
     }
 
     @Test

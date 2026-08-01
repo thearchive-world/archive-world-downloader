@@ -13,9 +13,9 @@ import org.jspecify.annotations.Nullable;
  * The composed copy of one download chat line: a wdl.chat translation key whose en_us pattern is the line template,
  * plus the ordered arguments filling its slots. Each argument is a literal value or a keyed sub-pattern with one
  * insert, carries its {@link BrandColors} tint or empty to inherit the line's, and may carry a click affordance the
- * platform bridge renders with the raw target as hover text. Every line wears the three-tone treatment (ivory line
- * template, amber inserted values, teal links) except the save-failure line, which is wholly rust. MC-free so every
- * decision is headless-testable against the shipped lang file.
+ * platform bridge renders with the raw target as hover text. Every line wears the three-tone treatment the banner and
+ * toast established (ivory line template, amber inserted values, teal links) except the save-failure line, which is
+ * wholly rust. MC-free so every decision is headless-testable against the shipped lang file.
  */
 public final class ChatCopy {
     /**
@@ -167,6 +167,19 @@ public final class ChatCopy {
         arguments.add(new Argument("wdl.chat.open_save_folder", "", OptionalInt.of(BrandColors.TEAL),
                 new Click(Click.Kind.OPEN_FILE, folderPath)));
         return ivoryLine("wdl.chat.saved_to", arguments);
+    }
+
+    /** The once-per-launch update notice with the two teal project-page links. */
+    public static ChatCopy updateAvailable(String runningDisplay, String latestDisplay, String modrinthUrl,
+            String curseForgeUrl) {
+        List<Argument> arguments = new ArrayList<>();
+        arguments.add(amber(runningDisplay));
+        arguments.add(amber(latestDisplay));
+        arguments.add(new Argument(null, "Modrinth", OptionalInt.of(BrandColors.TEAL),
+                new Click(Click.Kind.OPEN_URL, modrinthUrl)));
+        arguments.add(new Argument(null, "CurseForge", OptionalInt.of(BrandColors.TEAL),
+                new Click(Click.Kind.OPEN_URL, curseForgeUrl)));
+        return ivoryLine("wdl.chat.update_available", arguments);
     }
 
     /**
