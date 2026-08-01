@@ -1,3 +1,4 @@
+import net.ltgt.gradle.errorprone.errorprone
 import wdl.buildlogic.registerVerifyProductionJar
 
 plugins {
@@ -18,6 +19,54 @@ loom {
     // Connection.channel. Runtime application is declared in fabric.mod.json; both point at the same file.
     accessWidenerPath.set(file("src/main/resources/wdl.accesswidener"))
 }
+
+// Automated capture-verification tier: the official Fabric Client Game Test API boots a real client
+// plus an in-process server and hands the test a real ClientLevel, so the live capture front (the chunk
+// snapshot reading a ClientLevel and the inbound entity Netty tee) runs headlessly. createSourceSet puts
+// the harness in its own gametest source set, off the fast :common:test / build gate. Server game tests
+// are not used here (the tier is client-side), so only the client tests are enabled. eula accepts the
+// Minecraft EULA so the harness may write eula.txt: the tier connects the client to an in-process
+// DEDICATED server over a real connection, and createServer() refuses to start until the EULA is
+// accepted. The maintainer has read and accepted https://aka.ms/MinecraftEULA.
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "wdl-gametest"
+        enableGameTests = false
+        enableClientGameTests = true
+        eula = true
+    }
+}
+
+// WDL inserts a pass-through inbound handler into the Netty pipeline on join (the entity tee), which the
+// client gametest network synchronizer cannot account for; the official remedy is to disable it (see
+// https://docs.fabricmc.net/develop/automatic-testing). configureEach so it applies whenever the
+// clientGameTest run is registered, independent of block order. vmArg is the working run-config VM-arg
+// setter on this Loom; its lazy successors throw on mutation, so the deprecation note stands.
+loom {
+    runs {
+        configureEach {
+            if (name == "clientGameTest") {
+                @Suppress("DEPRECATION")
+                vmArg("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
+            }
+        }
+    }
+}
+
+// The gametest source set is test-scope, so Error Prone / NullAway is off here, mirroring how
+// wdl.nullness-conventions disables it for compileTestJava (NullAway is production-only). The Error Prone
+// plugin otherwise attaches to every JavaCompile, and unconfigured NullAway aborts the gametest compile.
+tasks.named<JavaCompile>("compileGametestJava") {
+    options.errorprone.enabled.set(false)
+}
+
+// Headless CI runs the dev clientGameTest run (runClientGameTest) under a virtual framebuffer (xvfb-run).
+// The Loom ClientProductionRunTask + useXVFB recipe was evaluated and rejected here: it
+// drives the shipped production jar, which does not contain this tier's gametest source set (createSourceSet
+// puts it in a separate mod that the production run never loads), so it boots and exits without running any
+// test. The dev run loads the gametest source set, and xvfb-run supplies the same virtual GL context, so the
+// CI workflow wraps runClientGameTest in xvfb-run instead. This stays off check/build, the fast gate.
 
 // Spotless is applied per-subproject, not via build-logic: loaded from the included build, its
 // Eclipse JDT formatter fails intermittently under the configuration cache + build cache + parallel
@@ -61,6 +110,11 @@ dependencies {
     // (WdlJourneyMapPlugin), compile-only. Loom remaps it to Mojmap for the compile; there is no runtime
     // require, so JourneyMap's absence just means the entrypoint is never queried.
     modCompileOnly("info.journeymap:journeymap-api-fabric:${property("journeymap_api_version")}-${property("minecraft_version")}")
+
+    // JSpecify on the gametest source set so its package-info @NullMarked resolves; compileOnly is not
+    // transitive across source sets. NullAway does not run here (test-scope, disabled above), so the marking
+    // is documentary only, but it keeps the tree visibly consistent with main and test.
+    "gametestCompileOnly"(libs.jspecify)
 }
 
 tasks.named<ProcessResources>("processResources") {

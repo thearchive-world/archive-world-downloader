@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "wdl-gametest",
+  "version": "1.0.0",
+  "name": "Archive World Downloader capture verification",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": []
+  },
+  "depends": {
+    "wdl": "*"
+  }
+}
