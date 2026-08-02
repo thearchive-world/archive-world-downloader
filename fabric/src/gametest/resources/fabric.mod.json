@@ -5,7 +5,10 @@
   "name": "Archive World Downloader capture verification",
   "environment": "client",
   "entrypoints": {
-    "fabric-client-gametest": []
+    "fabric-client-gametest": [
+      "world.thearchive.wdl.fabric.gametest.WdlCaptureClientGameTest",
+      "world.thearchive.wdl.fabric.gametest.WdlLightCaptureTest"
+    ]
   },
   "depends": {
     "wdl": "*"
