@@ -22,6 +22,7 @@ repositories {
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(providers.gradleProperty("java_version").get().toInt())
+        vendor = JvmVendorSpec.ADOPTIUM
     }
 }
 
@@ -51,6 +52,24 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     testLogging {
         events("skipped", "failed")
+    }
+}
+
+// Reproducible archives: constant entry timestamps + stable order, so a jar rebuilt from a tag on the
+// same compile-toolchain JDK is byte-identical. This is a backstop: Loom's remapJar and ModDevGradle's
+// jar are already reproducible, so it locks that against a future default change and covers the sources jar.
+tasks.withType<AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+// Prints the resolved COMPILE-toolchain JDK (the JVM that emits bytecode), read from the toolchain rather
+// than from a shell java on PATH, so the release reproducibility record names the JDK a third party must match.
+tasks.register("printCompileJavaVersion") {
+    val meta = javaToolchains.compilerFor(java.toolchain).map { it.metadata }
+    doLast {
+        val m = meta.get()
+        println("${m.vendor} ${m.jvmVersion} (Java ${m.languageVersion.asInt()})")
     }
 }
 
