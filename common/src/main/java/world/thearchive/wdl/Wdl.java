@@ -74,16 +74,11 @@ import world.thearchive.wdl.update.UpdateAvailable;
 import world.thearchive.wdl.update.UpdateCheck;
 
 /**
- * The mod's loader-agnostic entry point. Each loader's own entrypoint constructs its {@link PlatformBridge} and hands
- * it here, so everything above this line is written once and knows nothing about which loader is running; the per-band
- * {@link VersionAdapter} is the one service genuinely discovered at runtime, so it stays on {@link ServiceLoader}.
- *
- * <p>From there it owns the {@link CaptureController}: it wires the controller's tick to the client tick and its
- * auto-save to the disconnect hook, and {@link #startDownload} is the one place a {@link LiveCaptureSession} is built.
+ * Entry point. Resolves the per-band {@link VersionAdapter} via {@link ServiceLoader} and takes the per-loader
+ * {@link PlatformBridge} from the loader entrypoint, then drives the {@link CaptureController}: the toggle keybind
+ * starts/stops a {@link LiveCaptureSession}, the client tick advances capture, and disconnect auto-saves.
  */
 public final class Wdl {
-    public static final String MOD_ID = "wdl";
-
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final long[] NO_OVERLAY_CHUNKS = new long[0];
@@ -116,6 +111,10 @@ public final class Wdl {
 
     private static BobbyChunkFilter bobbyFilter = BobbyChunkFilter.INACTIVE;
 
+    // The most recently loaded config, cached so the per-frame HUD overlay reads it without disk IO. Refreshed
+    // at initialize and on each download start (the existing "applies on the next download" model). Volatile
+    // because the client thread writes it while the render thread and XaeroPlus's cache-refresh executor read
+    // it; the config objects are deeply immutable, so publishing the reference is all this needs.
     private static volatile WdlConfig currentConfig = WdlConfig.DEFAULTS;
 
     // The display name of the download currently running, set when a capture begins; meaningful only while the
@@ -171,7 +170,11 @@ public final class Wdl {
         return bridge;
     }
 
-    /** Called once by the running loader's client entrypoint, with that loader's bridge. */
+    /**
+     * Wire the capture controller to the loader hooks. Called once from the loader entrypoint, which supplies its own
+     * {@link PlatformBridge} (the loader is known at that point); the per-band {@link VersionAdapter} is the one
+     * service genuinely discovered at runtime, so it stays on {@link ServiceLoader}.
+     */
     public static void initialize(PlatformBridge platformBridge) {
         // Route core's java.util.logging into latest.log first, so a fail-soft warning from config load or any
         // later core step is visible (the MC runtime does not forward JUL to the log on its own).
@@ -182,8 +185,10 @@ public final class Wdl {
         adapter = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No VersionAdapter service is registered"));
-        LOGGER.info("Archive World Downloader {} on {} {}", platformBridge.modVersion(),
-                platformBridge.loaderName(), platformBridge.loaderVersion());
+
+        LOGGER.info("loaded on Minecraft {}: adapter={}, bridge={}",
+                mcVersion(), adapter.getClass().getSimpleName(), bridge.getClass().getSimpleName());
+
         currentConfig = WdlConfig.load(configPath()); // materialize the default config file on first run
         LOGGER.info("config file: {}", configPath());
         dispatchUpdateCheck(currentConfig);
@@ -210,82 +215,364 @@ public final class Wdl {
         READY.markReadyAndDrain();
     }
 
-    /** The current capture state. */
-    public static CaptureState state() {
-        return controller.state();
+    /**
+     * The shutdown hook body: abort any live restore so the worker backs out at its next phase check, and only while
+     * the worker is inside the two-rename swap window wait for it, bounded to three seconds, so the folder is never
+     * abandoned mid-swap by a quitting client.
+     */
+    private static void abortRestoreOnShutdown() {
+        RestoreOperation operation = activeRestore;
+        if (operation == null) {
+            return;
+        }
+        operation.abort();
+        Thread worker = restoreWorker;
+        if (worker == null) {
+            return;
+        }
+        long start = System.nanoTime();
+        long timeoutNanos = TimeUnit.SECONDS.toNanos(3);
+        try {
+            while (operation.inSwapWindow() && worker.isAlive() && System.nanoTime() - start < timeoutNanos) {
+                worker.join(50L);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
-    /** Live counts while recording, the stop-time frozen snapshot through saving and the done linger. */
-    public static CaptureCounts counts() {
-        return controller.counts();
-    }
-
-    /** The capture's elapsed wall-clock time, frozen at stop through saving and the done linger. */
-    public static long elapsedMillis() {
-        return controller.elapsedMillis();
-    }
-
-    /** The finalization phase while saving, {@link SaveStage#NONE} otherwise. */
-    public static SaveStage saveStage() {
-        return controller.saveStage();
-    }
-
-    /** The finalization phase's fraction while saving, 0 otherwise. */
-    public static float saveProgress() {
-        return controller.saveProgress();
-    }
-
-    /** Milliseconds since the last save completed while within the done-linger hold, else empty. */
-    public static OptionalLong doneElapsedMillis() {
-        return controller.doneElapsedMillis();
-    }
-
-    /** The most recently loaded config (no disk IO on the render path). */
-    public static WdlConfig config() {
-        return currentConfig;
+    /** Keybind handler (client main thread): start a download, or stop and save the running one. */
+    private static void onToggle() {
+        CaptureState state = controller.state();
+        if (state != CaptureState.IDLE) {
+            if (currentConfig.showChatMessages()) {
+                bridge.sendChat(state == CaptureState.RECORDING
+                        ? ChatCopy.saving()
+                        : ChatCopy.busy(state, isSweepActive()));
+            }
+            controller.stop();
+            return;
+        }
+        // The isRemoteWorld conjunct is load-bearing here, unlike the guard in onServerJoin: no activation gate
+        // precedes this one, so without it a keybind press in a genuine singleplayer world would answer with
+        // the needs-a-name refusal instead of falling through to the join-a-server refusal.
+        if (bridge.isRemoteWorld() && !hasSourceIdentity()) {
+            bridge.sendChat(ChatCopy.startNeedsName());
+            return;
+        }
+        resumeFlow.begin(defaultBaseName(), true);
     }
 
     /**
-     * The saved chunk-position longs for a dimension, snapshotted thread-safely for the coverage overlay, which reads
-     * off the render thread. Empty whenever no capture is recording (the index is cleared on stop), and empty while
-     * {@code renderCoverageOverlay} is off: the toggle is read live here, on the overlay's own read path, so turning it
-     * off hides the highlight without a restart and turning it back on shows the recorded index at once (the index
-     * keeps filling regardless). The id is the live client key, e.g. {@code level.dimension().identifier().toString()}.
+     * Server-join hook: when {@code autoDownload} is enabled, begin a download on joining a remote world, only while
+     * idle, through the same smart flow as the keybind. A folder that already exists (a same-day rejoin, or any rejoin
+     * with the date suffix off) resumes it via the merge confirm, so Cancel on join aborts the auto-download; with
+     * confirmResume off it continues silently. The config is re-read so a hand-edit applies, and the idle and
+     * activation gates are checked here, so a join into the user's own local world stays a silent no-op. Two skips are
+     * spoken: a restore in progress, and a world served from elsewhere with no server identity behind it, which is
+     * refused aloud rather than started under a generic name. Every other skip cause stays silent.
      */
-    public static long[] overlaySavedChunks(String dimensionId) {
-        if (!currentConfig.renderCoverageOverlay()) {
-            return NO_OVERLAY_CHUNKS;
+    private static void onServerJoin() {
+        if (!WdlConfig.load(configPath()).worldOutput().autoDownload()) {
+            return;
         }
-        return controller.savedChunks().snapshot(dimensionId);
+        CaptureState state = controller.state();
+        if (state == CaptureState.RESTORING && bridge.isRemoteWorld()) {
+            bridge.sendChat(ChatCopy.busy(state, isSweepActive()));
+            return;
+        }
+        if (state != CaptureState.IDLE || !bridge.isRemoteWorld()) {
+            return;
+        }
+        // Must stay below the gate above: this hook also fires for the integrated server, so hoisting it would
+        // speak on every genuine singleplayer world load.
+        if (!hasSourceIdentity()) {
+            bridge.sendChat(ChatCopy.startNeedsName());
+            return;
+        }
+        resumeFlow.begin(defaultBaseName(), false);
     }
 
     /**
-     * The covered chunk-position longs for a dimension: the saved chunks the recording path brought within entity send
-     * range, which the two-tone overlay draws in the covered hue while the rest of the saved set draws the suspect hue.
-     * Gated on the same {@code renderCoverageOverlay} toggle and read the same thread-safe way as
-     * {@link #overlaySavedChunks}; each is its own independent synchronized snapshot, so a chunk may transiently appear
-     * in one and not the other for a single refresh. While {@code captureEntities} is off, no entity is being captured
-     * at all, so every saved chunk draws the suspect hue; this is checked first and short-circuits the cold-start
-     * mirror below, which only applies while entity capture is on. Until the send range has been measured for the
-     * dimension the covered read mirrors the saved set, so the overlay draws single-tone (every saved chunk in the
-     * covered hue) rather than flashing a spurious suspect boundary at a not-yet-known range.
+     * Dispatch the once-per-launch newer-release check off-thread, on a named daemon worker so it can never block
+     * startup or JVM exit. The boundary declines quietly when the running version does not parse or no project id was
+     * baked in (development shapes with nothing comparable to check); degrading to silence is the feature's contract.
      */
-    public static long[] overlayCoveredChunks(String dimensionId) {
-        if (!currentConfig.renderCoverageOverlay()) {
-            return NO_OVERLAY_CHUNKS;
+    private static void dispatchUpdateCheck(WdlConfig config) {
+        String runningRaw = bridge.modVersion();
+        Optional<SemVer> running = SemVer.parse(runningRaw);
+        String modrinthId = modrinthId();
+        if (running.isEmpty() || modrinthId.isEmpty()) {
+            return;
         }
-        if (!currentConfig.captureEntities()) {
-            return NO_OVERLAY_CHUNKS; // no entity is captured in this mode, so no saved chunk is entity-covered
-        }
-        if (!controller.sendRange().isCalibrated(dimensionId)) {
-            return controller.savedChunks().snapshot(dimensionId); // single-tone until the range is measured
-        }
-        return controller.coveredChunks().snapshot(dimensionId);
+        RuntimeInfo info = new RuntimeInfo(bridge.loaderName().toLowerCase(Locale.ROOT), mcVersion(),
+                running.get(), runningRaw, modrinthId);
+        updateCheck.dispatch(info, config, new HttpTransport(), daemonWorker("wdl-update-check"));
     }
 
-    /** A monotonic overlay-data generation, bumped whenever any saved/covered set changes; poll to detect edits. */
-    public static long overlayGeneration() {
-        return controller.savedChunks().version() + controller.coveredChunks().version();
+    private static Executor daemonWorker(String name) {
+        return task -> {
+            Thread thread = new Thread(task, name);
+            thread.setDaemon(true);
+            thread.start();
+        };
+    }
+
+    /** The Modrinth project id expanded into the jar from gradle.properties at build, or empty if unread. */
+    private static String modrinthId() {
+        try (InputStream stream = Wdl.class.getResourceAsStream("/wdl-publishing.properties")) {
+            if (stream == null) {
+                return "";
+            }
+            Properties properties = new Properties();
+            properties.load(stream);
+            return properties.getProperty("modrinthId", "").trim();
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    /**
+     * Second join hook, deliberately separate from {@link #onServerJoin()} (which early-returns when
+     * {@code autoDownload} is off): the held update result is flushed to chat on the first join after it arrives, at
+     * most once per launch. The chat line respects {@code showChatMessages}; the banner on the downloads screen ignores
+     * that toggle. The config is re-read so a hand-edit applies.
+     */
+    private static void onUpdateAvailableJoin() {
+        Optional<UpdateAvailable> available = updateCheck.available();
+        if (available.isEmpty()) {
+            return;
+        }
+        if (!updateCheck.consumeChatPending(WdlConfig.load(configPath()).showChatMessages())) {
+            return;
+        }
+        UpdateAvailable update = available.get();
+        bridge.sendChat(ChatCopy.updateAvailable(update.runningDisplay(), update.latestDisplay(),
+                UpdateCheck.MODRINTH_PAGE_URL, UpdateCheck.CURSEFORGE_PAGE_URL));
+    }
+
+    /**
+     * Begin a download for {@code target}, the single entry point: a {@link DownloadMode#NEW} target writes to its
+     * (already-disambiguated) folder, a {@link DownloadMode#RESUME} re-runs into an existing wdl-managed folder
+     * verbatim and adds to it. Guards a double-start and a local world, re-loads the config so hand-edits apply on the
+     * next download, then begins a session for the target.
+     */
+    private static void startDownload(DownloadTarget target) {
+        CaptureState state = controller.state();
+        if (state != CaptureState.IDLE) {
+            sendRefusal(target.origin(), ToastCopy.busy(state, isSweepActive()),
+                    ChatCopy.busy(state, isSweepActive()));
+            return;
+        }
+        if (!bridge.isRemoteWorld()) {
+            sendRefusal(target.origin(), ToastCopy.joinMultiplayer(), ChatCopy.joinMultiplayer());
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        ClientLevel level = minecraft.level;
+        if (level == null) {
+            return; // no live start path reaches here without a loaded world; a silent guard before level is used
+        }
+        WdlConfig config = WdlConfig.load(configPath());
+        currentConfig = config;
+        Path savesDirectory = minecraft.getLevelSource().getBaseDir();
+        if (target.mode() == DownloadMode.NEW
+                && RestoreOperation.attemptReferences(savesDirectory, target.folderName())) {
+            // A torn restore attempt still stages this name under the temporary root; a NEW download landing on
+            // it would race the next sweep's roll-back. The predicate fails open on an unreadable scan.
+            sendRefusal(target.origin(), ToastCopy.refuseTornAttempt(), ChatCopy.refuseTornAttempt());
+            return;
+        }
+        if (target.mode() == DownloadMode.RESUME) {
+            Path saveFolder = savesDirectory.resolve(target.folderName());
+            if (!DownloadFolders.isWdlManaged(saveFolder)) {
+                // The managed re-test ahead of the taint re-test: the folder may have changed since the
+                // confirm cascade classified it. A vanished folder is the missing cause; a file or an
+                // unmanaged directory at the name is a foreign occupant either way.
+                if (Files.exists(saveFolder)) {
+                    // The flow origins came from a typed name or quick start, so they earn the name-choosing
+                    // advice; the screen already surfaced its own advice at the junction, so SCREEN drops it.
+                    boolean suggestRename = target.origin() != DownloadTarget.Origin.SCREEN;
+                    sendRefusal(target.origin(), ToastCopy.refuseOccupant(target.folderName(), suggestRename),
+                            ChatCopy.refuseOccupant(target.folderName(), suggestRename));
+                } else {
+                    sendRefusal(target.origin(), ToastCopy.refuseFolderMissing(target.folderName()),
+                            ChatCopy.refuseFolderMissing(target.folderName()));
+                }
+                return;
+            }
+            if (SinglePlayerTaint.isTainted(saveFolder) && config.blockTaintedResume()) {
+                sendRefusal(target.origin(), ToastCopy.refuseTainted(), ChatCopy.refuseTainted());
+                return;
+            }
+        }
+        activeDownloadName = target.worldName() != null ? target.worldName() : target.folderName();
+        // State-independent of captureEntities, so a signal raised between downloads is discarded for every
+        // download kind, not only when an entity capture activates.
+        ConnectionTee.clearTransferSignal();
+        controller.start(() -> new LiveCaptureSession(adapter, bridge, config, level, target,
+                controller.savedChunks(), controller.coveredChunks(), controller.sendRange(),
+                bridge.isModLoaded("xaeroplus") || bridge.isModLoaded("journeymap"),
+                minecraft.getCameraEntity() != minecraft.player, bobbyFilter,
+                controller::tick));
+        if (config.showChatMessages()) {
+            bridge.sendChat(target.mode() == DownloadMode.RESUME
+                    ? ChatCopy.resuming(target.folderName())
+                    : ChatCopy.downloading(target.folderName()));
+            if (CaptureToggleGuard.isCapturePartiallyDisabled(config)) {
+                bridge.sendChat(ChatCopy.capturePartiallyDisabled()); // passive indicator at the start action
+            }
+        }
+    }
+
+    /** Route a start refusal to its origin's channel: the screen's toast, the command/keybind flows' chat. */
+    private static void sendRefusal(DownloadTarget.Origin origin, ToastCopy toast, ChatCopy chat) {
+        if (DownloadTarget.refusalUsesToast(origin)) {
+            bridge.sendToast(toast);
+        } else {
+            bridge.sendChat(chat);
+        }
+    }
+
+    /** Whether the current RESTORING state belongs to the launch sweep rather than a player restore. */
+    static boolean isSweepActive() {
+        return sweepResult != null;
+    }
+
+    /**
+     * The one restore dispatch (client main thread): flip the idle controller into RESTORING, seed the operation's
+     * loaded-world volatile from this thread, and run the guarded replace of {@code folderName} from
+     * {@code pinnedSource} on a named daemon worker, parking the future for the completion poll, which is marshaled
+     * back to the client thread before the worker starts and backed by the per-tick poll. A controller that is not idle
+     * refuses with the busy toast; the pre-replace snapshot follows {@code zipOnResume}. Public for the downloads
+     * screen's restore confirm and blocked offer, the client-package dispatchers.
+     */
+    public static void launchRestore(Path savesDirectory, String folderName, RestoreSource pinnedSource) {
+        if (!controller.tryBeginRestoring()) {
+            bridge.sendToast(ToastCopy.busy(controller.state(), isSweepActive()));
+            return;
+        }
+        RestoreOperation operation = RestoreOperation.create(savesDirectory, folderName, pinnedSource,
+                WdlConfig.load(configPath()).zipOnResume());
+        operation.publishLoadedWorld(loadedWorldPath(Minecraft.getInstance()));
+        CompletableFuture<RestoreOperation.Result> result = new CompletableFuture<>();
+        activeRestore = operation;
+        restoreResult = result;
+        restoreFolderName = folderName;
+        // RestoreOperation.run is documented never-throws, but an Error escaping its own catch (thrown
+        // while logging or building the failure Result) must still complete the future or the controller
+        // stays RESTORING forever.
+        Thread worker = new Thread(() -> {
+            try {
+                result.complete(operation.run());
+            } catch (Throwable e) {
+                result.completeExceptionally(e);
+            }
+        }, "wdl-restore");
+        worker.setDaemon(true);
+        restoreWorker = worker;
+        // Attach the marshal before starting the worker: attached afterwards it could meet an already-finished
+        // worker and run the poke inline on the dispatching stack, rather than off the game tick where every
+        // other completion lands. The dispatch-failure catch below never completes the future, so the marshal
+        // never fires there; that path self-heals inline.
+        CompletionMarshal.scheduleCompletionPoke(result, Minecraft.getInstance(), Wdl::restoreTick);
+        try {
+            worker.start();
+        } catch (Throwable e) {
+            // The dispatch-failure flip-back: a worker that never started leaves nothing to poll, so the
+            // controller must not stay RESTORING forever.
+            activeRestore = null;
+            restoreWorker = null;
+            restoreResult = null;
+            restoreFolderName = null;
+            controller.endRestoring();
+            LOGGER.error("restore worker for {} failed to start", folderName, e);
+        }
+    }
+
+    /**
+     * The launch-sweep dispatch (client main thread): the identical flip, daemon worker, marshal-before-start and
+     * parked-future machinery as {@link #launchRestore}, with the sweep's future doubling as the flag that routes the
+     * busy and status copy to the cleanup flavor. Public for the downloads screen's open and TTL sweep triggers.
+     */
+    public static void launchSweep(Path savesDirectory) {
+        if (!controller.tryBeginRestoring()) {
+            bridge.sendToast(ToastCopy.busy(controller.state(), isSweepActive()));
+            return;
+        }
+        CompletableFuture<RestoreOperation.RestoreSweep.SweepResult> result = new CompletableFuture<>();
+        sweepResult = result;
+        // Unlike RestoreOperation.run, RestoreSweep.run carries no never-throws contract; an escaped throw
+        // must still complete the future or the controller stays RESTORING forever.
+        Thread worker = new Thread(() -> {
+            try {
+                result.complete(RestoreOperation.RestoreSweep.run(savesDirectory));
+            } catch (Throwable e) {
+                result.completeExceptionally(e);
+            }
+        }, "wdl-restore-sweep");
+        worker.setDaemon(true);
+        CompletionMarshal.scheduleCompletionPoke(result, Minecraft.getInstance(), Wdl::restoreTick);
+        try {
+            worker.start();
+        } catch (Throwable e) {
+            sweepResult = null;
+            controller.endRestoring();
+            LOGGER.error("restore sweep worker failed to start", e);
+        }
+    }
+
+    /**
+     * Open the download screen with the existing-worlds list collapsed. Deferred to the next client tick, the same
+     * deferral the command path needs to survive Fabric's post-dispatch chat close; the parent screen is captured at
+     * tick time.
+     */
+    private static void openDownloadsScreen() {
+        deferScreen(() -> showDownloadsScreen(false));
+    }
+
+    /** Open the download screen from {@code /wdl downloads}, with the existing-worlds list expanded. */
+    private static void openDownloadsFromCommand() {
+        deferScreen(() -> showDownloadsScreen(true));
+    }
+
+    /**
+     * Open the download screen directly on the click, for the pause-menu button. The pause button is not
+     * chat-originated, so it needs none of the tick deferral openDownloadsScreen uses to survive Fabric's post-dispatch
+     * chat close; opening inline is what lets it work while a replay's paused timer has suspended the game tick.
+     */
+    private static void openDownloadsScreenNow() {
+        // The inline open consumes the deferred slot the same way a deferred open would. The slot holds any
+        // parked action, a resume start or a confirm as much as a plain open, so this can discard one. The
+        // slot is last-write-wins on every path that writes it.
+        pendingScreenOpen = null;
+        showDownloadsScreen(false);
+    }
+
+    /** Build the MC-free browse model and show the screen; run from the deferral on the client main thread. */
+    private static void showDownloadsScreen(boolean expandExistingList) {
+        Minecraft minecraft = Minecraft.getInstance();
+        Path savesDirectory = minecraft.getLevelSource().getBaseDir();
+        Path loadedWorld = loadedWorldPath(minecraft);
+        Supplier<List<DownloadEntry>> entries = () -> {
+            try {
+                return DownloadCatalog.list(savesDirectory, loadedWorld);
+            } catch (IOException | RuntimeException e) {
+                LOGGER.warn("failed to list the downloads for the screen", e);
+                return List.of();
+            }
+        };
+        WdlConfig config = WdlConfig.load(configPath());
+        // Manual path: opening the download screen is the player's download intent and precedes the first flush
+        // by seconds, so warm the worldgen reconstruction now when the chosen generator needs it.
+        WorldgenWarmup.dispatchForScreenOpen(config.worldOutput().worldType(),
+                adapter.levelDataWriter()::warmWorldgen, warmupWorker);
+        minecraft.setScreen(new WdlDownloadsScreen(minecraft.screen, savesDirectory, loadedWorld, entries,
+                expandExistingList, defaultDownloadName(minecraft), config.appendDateSuffix(), config.confirmResume(),
+                config.blockTaintedResume(), config.zipOnResume(), config.remapMapIds(),
+                CaptureToggleGuard.isCapturePartiallyDisabled(config), bridge.modVersion(), mcVersion(),
+                Wdl::startDownload, Wdl::state, controller::stop,
+                bridge::sendToast, bridge::isRemoteWorld, activeDownloadName));
     }
 
     /**
@@ -520,366 +807,6 @@ public final class Wdl {
         }
     }
 
-    /**
-     * Open the download screen with the existing-worlds list collapsed. Deferred to the next client tick, the same
-     * deferral the command path needs to survive Fabric's post-dispatch chat close; the parent screen is captured at
-     * tick time.
-     */
-    private static void openDownloadsScreen() {
-        deferScreen(() -> showDownloadsScreen(false));
-    }
-
-    /** Open the download screen from {@code /wdl downloads}, with the existing-worlds list expanded. */
-    private static void openDownloadsFromCommand() {
-        deferScreen(() -> showDownloadsScreen(true));
-    }
-
-    /**
-     * Open the download screen directly on the click, for the pause-menu button. The pause button is not
-     * chat-originated, so it needs none of the tick deferral openDownloadsScreen uses to survive Fabric's post-dispatch
-     * chat close; opening inline is what lets it work while a replay's paused timer has suspended the game tick.
-     */
-    private static void openDownloadsScreenNow() {
-        // The inline open consumes the deferred slot the same way a deferred open would. The slot holds any
-        // parked action, a resume start or a confirm as much as a plain open, so this can discard one. The
-        // slot is last-write-wins on every path that writes it.
-        pendingScreenOpen = null;
-        showDownloadsScreen(false);
-    }
-
-    /** Build the MC-free browse model and show the screen; run from the deferral on the client main thread. */
-    private static void showDownloadsScreen(boolean expandExistingList) {
-        Minecraft minecraft = Minecraft.getInstance();
-        Path savesDirectory = minecraft.getLevelSource().getBaseDir();
-        Path loadedWorld = loadedWorldPath(minecraft);
-        Supplier<List<DownloadEntry>> entries = () -> {
-            try {
-                return DownloadCatalog.list(savesDirectory, loadedWorld);
-            } catch (IOException | RuntimeException e) {
-                LOGGER.warn("failed to list the downloads for the screen", e);
-                return List.of();
-            }
-        };
-        WdlConfig config = WdlConfig.load(configPath());
-        // Manual path: opening the download screen is the player's download intent and precedes the first flush
-        // by seconds, so warm the worldgen reconstruction now when the chosen generator needs it.
-        WorldgenWarmup.dispatchForScreenOpen(config.worldOutput().worldType(),
-                adapter.levelDataWriter()::warmWorldgen, warmupWorker);
-        minecraft.setScreen(new WdlDownloadsScreen(minecraft.screen, savesDirectory, loadedWorld, entries,
-                expandExistingList, defaultDownloadName(minecraft), config.appendDateSuffix(), config.confirmResume(),
-                config.blockTaintedResume(), config.zipOnResume(), config.remapMapIds(),
-                CaptureToggleGuard.isCapturePartiallyDisabled(config), bridge.modVersion(), mcVersion(),
-                Wdl::startDownload, Wdl::state, controller::stop,
-                bridge::sendToast, bridge::isRemoteWorld, activeDownloadName));
-    }
-
-    private static Executor daemonWorker(String name) {
-        return task -> {
-            Thread thread = new Thread(task, name);
-            thread.setDaemon(true);
-            thread.start();
-        };
-    }
-
-    /**
-     * The shutdown hook body: abort any live restore so the worker backs out at its next phase check, and only while
-     * the worker is inside the two-rename swap window wait for it, bounded to three seconds, so the folder is never
-     * abandoned mid-swap by a quitting client.
-     */
-    private static void abortRestoreOnShutdown() {
-        RestoreOperation operation = activeRestore;
-        if (operation == null) {
-            return;
-        }
-        operation.abort();
-        Thread worker = restoreWorker;
-        if (worker == null) {
-            return;
-        }
-        long start = System.nanoTime();
-        long timeoutNanos = TimeUnit.SECONDS.toNanos(3);
-        try {
-            while (operation.inSwapWindow() && worker.isAlive() && System.nanoTime() - start < timeoutNanos) {
-                worker.join(50L);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    /** Keybind handler (client main thread): start a download, or stop and save the running one. */
-    private static void onToggle() {
-        CaptureState state = controller.state();
-        if (state != CaptureState.IDLE) {
-            if (currentConfig.showChatMessages()) {
-                bridge.sendChat(state == CaptureState.RECORDING
-                        ? ChatCopy.saving()
-                        : ChatCopy.busy(state, isSweepActive()));
-            }
-            controller.stop();
-            return;
-        }
-        // The isRemoteWorld conjunct is load-bearing here, unlike the guard in onServerJoin: no activation gate
-        // precedes this one, so without it a keybind press in a genuine singleplayer world would answer with
-        // the needs-a-name refusal instead of falling through to the join-a-server refusal.
-        if (bridge.isRemoteWorld() && !hasSourceIdentity()) {
-            bridge.sendChat(ChatCopy.startNeedsName());
-            return;
-        }
-        resumeFlow.begin(defaultBaseName(), true);
-    }
-
-    /**
-     * Server-join hook: when {@code autoDownload} is enabled, begin a download on joining a remote world, only while
-     * idle, through the same smart flow as the keybind. A folder that already exists (a same-day rejoin, or any rejoin
-     * with the date suffix off) resumes it via the merge confirm, so Cancel on join aborts the auto-download; with
-     * confirmResume off it continues silently. The config is re-read so a hand-edit applies, and the idle and
-     * activation gates are checked here, so a join into the user's own local world stays a silent no-op. Two skips are
-     * spoken: a restore in progress, and a world served from elsewhere with no server identity behind it, which is
-     * refused aloud rather than started under a generic name. Every other skip cause stays silent.
-     */
-    private static void onServerJoin() {
-        if (!WdlConfig.load(configPath()).worldOutput().autoDownload()) {
-            return;
-        }
-        CaptureState state = controller.state();
-        if (state == CaptureState.RESTORING && bridge.isRemoteWorld()) {
-            bridge.sendChat(ChatCopy.busy(state, isSweepActive()));
-            return;
-        }
-        if (state != CaptureState.IDLE || !bridge.isRemoteWorld()) {
-            return;
-        }
-        // Must stay below the gate above: this hook also fires for the integrated server, so hoisting it would
-        // speak on every genuine singleplayer world load.
-        if (!hasSourceIdentity()) {
-            bridge.sendChat(ChatCopy.startNeedsName());
-            return;
-        }
-        resumeFlow.begin(defaultBaseName(), false);
-    }
-
-    /**
-     * Dispatch the once-per-launch newer-release check off-thread, on a named daemon worker so it can never block
-     * startup or JVM exit. The boundary declines quietly when the running version does not parse or no project id was
-     * baked in (development shapes with nothing comparable to check); degrading to silence is the feature's contract.
-     */
-    private static void dispatchUpdateCheck(WdlConfig config) {
-        String runningRaw = bridge.modVersion();
-        Optional<SemVer> running = SemVer.parse(runningRaw);
-        String modrinthId = modrinthId();
-        if (running.isEmpty() || modrinthId.isEmpty()) {
-            return;
-        }
-        RuntimeInfo info = new RuntimeInfo(bridge.loaderName().toLowerCase(Locale.ROOT), mcVersion(),
-                running.get(), runningRaw, modrinthId);
-        updateCheck.dispatch(info, config, new HttpTransport(), daemonWorker("wdl-update-check"));
-    }
-
-    /** The Modrinth project id expanded into the jar from gradle.properties at build, or empty if unread. */
-    private static String modrinthId() {
-        try (InputStream stream = Wdl.class.getResourceAsStream("/wdl-publishing.properties")) {
-            if (stream == null) {
-                return "";
-            }
-            Properties properties = new Properties();
-            properties.load(stream);
-            return properties.getProperty("modrinthId", "").trim();
-        } catch (IOException e) {
-            return "";
-        }
-    }
-
-    /**
-     * Second join hook, deliberately separate from {@link #onServerJoin()} (which early-returns when
-     * {@code autoDownload} is off): the held update result is flushed to chat on the first join after it arrives, at
-     * most once per launch. The chat line respects {@code showChatMessages}; the banner on the downloads screen ignores
-     * that toggle. The config is re-read so a hand-edit applies.
-     */
-    private static void onUpdateAvailableJoin() {
-        Optional<UpdateAvailable> available = updateCheck.available();
-        if (available.isEmpty()) {
-            return;
-        }
-        if (!updateCheck.consumeChatPending(WdlConfig.load(configPath()).showChatMessages())) {
-            return;
-        }
-        UpdateAvailable update = available.get();
-        bridge.sendChat(ChatCopy.updateAvailable(update.runningDisplay(), update.latestDisplay(),
-                UpdateCheck.MODRINTH_PAGE_URL, UpdateCheck.CURSEFORGE_PAGE_URL));
-    }
-
-    /**
-     * Begin a download for {@code target}, the single entry point: a {@link DownloadMode#NEW} target writes to its
-     * (already-disambiguated) folder, a {@link DownloadMode#RESUME} re-runs into an existing wdl-managed folder
-     * verbatim and adds to it. Guards a double-start and a local world, re-loads the config so hand-edits apply on the
-     * next download, then begins a session for the target.
-     */
-    private static void startDownload(DownloadTarget target) {
-        CaptureState state = controller.state();
-        if (state != CaptureState.IDLE) {
-            sendRefusal(target.origin(), ToastCopy.busy(state, isSweepActive()),
-                    ChatCopy.busy(state, isSweepActive()));
-            return;
-        }
-        if (!bridge.isRemoteWorld()) {
-            sendRefusal(target.origin(), ToastCopy.joinMultiplayer(), ChatCopy.joinMultiplayer());
-            return;
-        }
-        Minecraft minecraft = Minecraft.getInstance();
-        ClientLevel level = minecraft.level;
-        if (level == null) {
-            return; // no live start path reaches here without a loaded world; a silent guard before level is used
-        }
-        WdlConfig config = WdlConfig.load(configPath());
-        currentConfig = config;
-        Path savesDirectory = minecraft.getLevelSource().getBaseDir();
-        if (target.mode() == DownloadMode.NEW
-                && RestoreOperation.attemptReferences(savesDirectory, target.folderName())) {
-            // A torn restore attempt still stages this name under the temporary root; a NEW download landing on
-            // it would race the next sweep's roll-back. The predicate fails open on an unreadable scan.
-            sendRefusal(target.origin(), ToastCopy.refuseTornAttempt(), ChatCopy.refuseTornAttempt());
-            return;
-        }
-        if (target.mode() == DownloadMode.RESUME) {
-            Path saveFolder = savesDirectory.resolve(target.folderName());
-            if (!DownloadFolders.isWdlManaged(saveFolder)) {
-                // The managed re-test ahead of the taint re-test: the folder may have changed since the
-                // confirm cascade classified it. A vanished folder is the missing cause; a file or an
-                // unmanaged directory at the name is a foreign occupant either way.
-                if (Files.exists(saveFolder)) {
-                    // The flow origins came from a typed name or quick start, so they earn the name-choosing
-                    // advice; the screen already surfaced its own advice at the junction, so SCREEN drops it.
-                    boolean suggestRename = target.origin() != DownloadTarget.Origin.SCREEN;
-                    sendRefusal(target.origin(), ToastCopy.refuseOccupant(target.folderName(), suggestRename),
-                            ChatCopy.refuseOccupant(target.folderName(), suggestRename));
-                } else {
-                    sendRefusal(target.origin(), ToastCopy.refuseFolderMissing(target.folderName()),
-                            ChatCopy.refuseFolderMissing(target.folderName()));
-                }
-                return;
-            }
-            if (SinglePlayerTaint.isTainted(saveFolder) && config.blockTaintedResume()) {
-                sendRefusal(target.origin(), ToastCopy.refuseTainted(), ChatCopy.refuseTainted());
-                return;
-            }
-        }
-        activeDownloadName = target.worldName() != null ? target.worldName() : target.folderName();
-        // State-independent of captureEntities, so a signal raised between downloads is discarded for every
-        // download kind, not only when an entity capture activates.
-        ConnectionTee.clearTransferSignal();
-        controller.start(() -> new LiveCaptureSession(adapter, bridge, config, level, target,
-                controller.savedChunks(), controller.coveredChunks(), controller.sendRange(),
-                bridge.isModLoaded("xaeroplus") || bridge.isModLoaded("journeymap"),
-                minecraft.getCameraEntity() != minecraft.player, bobbyFilter,
-                controller::tick));
-        if (config.showChatMessages()) {
-            bridge.sendChat(target.mode() == DownloadMode.RESUME
-                    ? ChatCopy.resuming(target.folderName())
-                    : ChatCopy.downloading(target.folderName()));
-            if (CaptureToggleGuard.isCapturePartiallyDisabled(config)) {
-                bridge.sendChat(ChatCopy.capturePartiallyDisabled()); // passive indicator at the start action
-            }
-        }
-    }
-
-    /** Route a start refusal to its origin's channel: the screen's toast, the command/keybind flows' chat. */
-    private static void sendRefusal(DownloadTarget.Origin origin, ToastCopy toast, ChatCopy chat) {
-        if (DownloadTarget.refusalUsesToast(origin)) {
-            bridge.sendToast(toast);
-        } else {
-            bridge.sendChat(chat);
-        }
-    }
-
-    /** Whether the current RESTORING state belongs to the launch sweep rather than a player restore. */
-    static boolean isSweepActive() {
-        return sweepResult != null;
-    }
-
-    /**
-     * The one restore dispatch (client main thread): flip the idle controller into RESTORING, seed the operation's
-     * loaded-world volatile from this thread, and run the guarded replace of {@code folderName} from
-     * {@code pinnedSource} on a named daemon worker, parking the future for the completion poll, which is marshaled
-     * back to the client thread before the worker starts and backed by the per-tick poll. A controller that is not idle
-     * refuses with the busy toast; the pre-replace snapshot follows {@code zipOnResume}. Public for the downloads
-     * screen's restore confirm and blocked offer, the client-package dispatchers.
-     */
-    public static void launchRestore(Path savesDirectory, String folderName, RestoreSource pinnedSource) {
-        if (!controller.tryBeginRestoring()) {
-            bridge.sendToast(ToastCopy.busy(controller.state(), isSweepActive()));
-            return;
-        }
-        RestoreOperation operation = RestoreOperation.create(savesDirectory, folderName, pinnedSource,
-                WdlConfig.load(configPath()).zipOnResume());
-        operation.publishLoadedWorld(loadedWorldPath(Minecraft.getInstance()));
-        CompletableFuture<RestoreOperation.Result> result = new CompletableFuture<>();
-        activeRestore = operation;
-        restoreResult = result;
-        restoreFolderName = folderName;
-        // RestoreOperation.run is documented never-throws, but an Error escaping its own catch (thrown
-        // while logging or building the failure Result) must still complete the future or the controller
-        // stays RESTORING forever.
-        Thread worker = new Thread(() -> {
-            try {
-                result.complete(operation.run());
-            } catch (Throwable e) {
-                result.completeExceptionally(e);
-            }
-        }, "wdl-restore");
-        worker.setDaemon(true);
-        restoreWorker = worker;
-        // Attach the marshal before starting the worker: attached afterwards it could meet an already-finished
-        // worker and run the poke inline on the dispatching stack, rather than off the game tick where every
-        // other completion lands. The dispatch-failure catch below never completes the future, so the marshal
-        // never fires there; that path self-heals inline.
-        CompletionMarshal.scheduleCompletionPoke(result, Minecraft.getInstance(), Wdl::restoreTick);
-        try {
-            worker.start();
-        } catch (Throwable e) {
-            // The dispatch-failure flip-back: a worker that never started leaves nothing to poll, so the
-            // controller must not stay RESTORING forever.
-            activeRestore = null;
-            restoreWorker = null;
-            restoreResult = null;
-            restoreFolderName = null;
-            controller.endRestoring();
-            LOGGER.error("restore worker for {} failed to start", folderName, e);
-        }
-    }
-
-    /**
-     * The launch-sweep dispatch (client main thread): the identical flip, daemon worker, marshal-before-start and
-     * parked-future machinery as {@link #launchRestore}, with the sweep's future doubling as the flag that routes the
-     * busy and status copy to the cleanup flavor. Public for the downloads screen's open and TTL sweep triggers.
-     */
-    public static void launchSweep(Path savesDirectory) {
-        if (!controller.tryBeginRestoring()) {
-            bridge.sendToast(ToastCopy.busy(controller.state(), isSweepActive()));
-            return;
-        }
-        CompletableFuture<RestoreOperation.RestoreSweep.SweepResult> result = new CompletableFuture<>();
-        sweepResult = result;
-        // Unlike RestoreOperation.run, RestoreSweep.run carries no never-throws contract; an escaped throw
-        // must still complete the future or the controller stays RESTORING forever.
-        Thread worker = new Thread(() -> {
-            try {
-                result.complete(RestoreOperation.RestoreSweep.run(savesDirectory));
-            } catch (Throwable e) {
-                result.completeExceptionally(e);
-            }
-        }, "wdl-restore-sweep");
-        worker.setDaemon(true);
-        CompletionMarshal.scheduleCompletionPoke(result, Minecraft.getInstance(), Wdl::restoreTick);
-        try {
-            worker.start();
-        } catch (Throwable e) {
-            sweepResult = null;
-            controller.endRestoring();
-            LOGGER.error("restore sweep worker failed to start", e);
-        }
-    }
-
     /** The currently-loaded local world folder (refused as a target), or null when the world is remote. */
     static @Nullable Path loadedWorldPath(Minecraft minecraft) {
         IntegratedServer server = minecraft.getSingleplayerServer();
@@ -904,9 +831,10 @@ public final class Wdl {
     }
 
     /**
-     * Whether this session has a server identity at all. False only when nothing is being connected to as a server,
-     * which is genuine singleplayer. Deliberately does not inspect the name: a server whose name sanitizes to nothing
-     * still has an identity, and refusing it would take away an implicit start that works.
+     * Whether this session has a server identity at all. False only when nothing is being connected to as a server:
+     * during replay playback of either replay mod, and in genuine singleplayer. Deliberately does not inspect the name:
+     * a server whose name sanitizes to nothing still has an identity, and refusing it would take away an implicit start
+     * that works today.
      */
     private static boolean hasSourceIdentity() {
         return Minecraft.getInstance().getCurrentServer() != null;
@@ -964,6 +892,84 @@ public final class Wdl {
         bridge.sendChat(ChatCopy.data("savePlayerInventory=" + config.savePlayerInventory()
                 + ", savePlayerEnderChest=" + config.savePlayerEnderChest()
                 + ", saveItemCoordinates=" + config.saveItemCoordinates()));
+    }
+
+    /** The current capture state. */
+    public static CaptureState state() {
+        return controller.state();
+    }
+
+    /** Live counts while recording, the stop-time frozen snapshot through saving and the done linger. */
+    public static CaptureCounts counts() {
+        return controller.counts();
+    }
+
+    /** The capture's elapsed wall-clock time, frozen at stop through saving and the done linger. */
+    public static long elapsedMillis() {
+        return controller.elapsedMillis();
+    }
+
+    /** The finalization phase while saving, {@link SaveStage#NONE} otherwise. */
+    public static SaveStage saveStage() {
+        return controller.saveStage();
+    }
+
+    /** The finalization phase's fraction while saving, 0 otherwise. */
+    public static float saveProgress() {
+        return controller.saveProgress();
+    }
+
+    /** Milliseconds since the last save completed while within the done-linger hold, else empty. */
+    public static OptionalLong doneElapsedMillis() {
+        return controller.doneElapsedMillis();
+    }
+
+    /** The most recently loaded config (no disk IO on the render path). */
+    public static WdlConfig config() {
+        return currentConfig;
+    }
+
+    /**
+     * The saved chunk-position longs for a dimension, snapshotted thread-safely for the coverage overlay, which reads
+     * off the render thread. Empty whenever no capture is recording (the index is cleared on stop), and empty while
+     * {@code renderCoverageOverlay} is off: the toggle is read live here, on the overlay's own read path, so turning it
+     * off hides the highlight without a restart and turning it back on shows the recorded index at once (the index
+     * keeps filling regardless). The id is the live client key, e.g. {@code level.dimension().identifier().toString()}.
+     */
+    public static long[] overlaySavedChunks(String dimensionId) {
+        if (!currentConfig.renderCoverageOverlay()) {
+            return NO_OVERLAY_CHUNKS;
+        }
+        return controller.savedChunks().snapshot(dimensionId);
+    }
+
+    /**
+     * The covered chunk-position longs for a dimension: the saved chunks the recording path brought within entity send
+     * range, which the two-tone overlay draws in the covered hue while the rest of the saved set draws the suspect hue.
+     * Gated on the same {@code renderCoverageOverlay} toggle and read the same thread-safe way as
+     * {@link #overlaySavedChunks}; each is its own independent synchronized snapshot, so a chunk may transiently appear
+     * in one and not the other for a single refresh. While {@code captureEntities} is off, no entity is being captured
+     * at all, so every saved chunk draws the suspect hue; this is checked first and short-circuits the cold-start
+     * mirror below, which only applies while entity capture is on. Until the send range has been measured for the
+     * dimension the covered read mirrors the saved set, so the overlay draws single-tone (every saved chunk in the
+     * covered hue) rather than flashing a spurious suspect boundary at a not-yet-known range.
+     */
+    public static long[] overlayCoveredChunks(String dimensionId) {
+        if (!currentConfig.renderCoverageOverlay()) {
+            return NO_OVERLAY_CHUNKS;
+        }
+        if (!currentConfig.captureEntities()) {
+            return NO_OVERLAY_CHUNKS; // no entity is captured in this mode, so no saved chunk is entity-covered
+        }
+        if (!controller.sendRange().isCalibrated(dimensionId)) {
+            return controller.savedChunks().snapshot(dimensionId); // single-tone until the range is measured
+        }
+        return controller.coveredChunks().snapshot(dimensionId);
+    }
+
+    /** A monotonic overlay-data generation, bumped whenever any saved/covered set changes; poll to detect edits. */
+    public static long overlayGeneration() {
+        return controller.savedChunks().version() + controller.coveredChunks().version();
     }
 
     /** The unsaved-container outline draw-set, read by the per-loader render registrar each frame. */
