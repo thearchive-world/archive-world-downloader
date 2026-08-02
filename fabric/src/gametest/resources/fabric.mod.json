@@ -38,6 +38,11 @@
       "world.thearchive.wdl.fabric.gametest.WdlCoverageOverlayMobRangeTest",
       "world.thearchive.wdl.fabric.gametest.WdlCoverageOverlayEntitiesOffTest",
       "world.thearchive.wdl.fabric.gametest.WdlCoverageOverlayStationarySeedTest",
+      "world.thearchive.wdl.fabric.gametest.WdlCoverageOverlayRemovalSeedOriginTest",
+      "world.thearchive.wdl.fabric.gametest.WdlCoverageOverlayRemovalArrivalOriginTest",
+      "world.thearchive.wdl.fabric.gametest.WdlCoverageOverlayTeleportSuppressionTest",
+      "world.thearchive.wdl.fabric.gametest.WdlCoverageOverlayRespawnFloodTest",
+      "world.thearchive.wdl.fabric.gametest.WdlCoverageOverlayBoostedPairingTest",
       "world.thearchive.wdl.fabric.gametest.WdlSpectateAnchorTest",
       "world.thearchive.wdl.fabric.gametest.WdlCustomLevelKeyRoutingTest",
       "world.thearchive.wdl.fabric.gametest.WdlDimensionRebindEntityCaptureTest"
