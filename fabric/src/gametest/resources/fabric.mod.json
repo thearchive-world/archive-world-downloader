@@ -6,10 +6,13 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
+      "world.thearchive.wdl.fabric.gametest.WdlPausedSaveCompletionTest",
       "world.thearchive.wdl.fabric.gametest.WdlCaptureClientGameTest",
       "world.thearchive.wdl.fabric.gametest.WdlLightCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlGameModeConfigTest",
+      "world.thearchive.wdl.fabric.gametest.WdlHalfFailedCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlPlayerDataCaptureTest",
+      "world.thearchive.wdl.fabric.gametest.WdlStalePlacementCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlStatsAdvancementsCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlWorldOutputConfigTest",
       "world.thearchive.wdl.fabric.gametest.WdlSpectateAnchorTest",
