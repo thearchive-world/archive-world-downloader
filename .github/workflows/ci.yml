@@ -1,0 +1,86 @@
+name: CI
+
+# Build every era-band branch + PR (Java 21). ./gradlew build continuously guards the
+# source-merge gate (:fabric:build -> remap common to intermediary) plus the core invariants
+# (:common:check -> checkCoreImports, checkPlugBand, checkCoreJava8) and the headless unit suite
+# (:common:test).
+on:
+  push:
+    branches:
+      - dev
+      # Era-band branches self-name from their MC version. Match both shapes so a push to any version
+      # branch runs the gate, not just the 1.21.x line: three-part (1.21.11, 1.21.4, 26.1.2) and
+      # two-part (26.2). A "1.21.*" style filter would skip the 26.x bands entirely.
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded runs only for PRs, where only the latest push matters. On push to dev or a version
+  # branch a run is not canceled once it is in progress, so a commit that has started building finishes and
+  # keeps its own status. (A run still pending in the queue can be superseded by a newer push, so this
+  # reduces, not eliminates, bisect gaps on rapid back-to-back pushes.)
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
+# pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # The gate is a few minutes warm, but the first run on a fresh branch pays a cold Loom + ModDev setup
+    # (download + remap Minecraft). Budget generously; the cap only exists to kill a hung run rather than
+    # letting it ride to the 6h default.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # Don't leave the job's GITHUB_TOKEN in .git/config where a later step or a build dependency
+          # could read it; nothing in this workflow pushes back to the repo.
+          persist-credentials: false
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        # basic is the MIT caching provider. The v6 default routes caching through the proprietary
+        # gradle-actions-caching library, whose terms every fork's CI would otherwise accept silently.
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92  # v6.2.0
+        with:
+          cache-provider: basic
+
+      - name: Build (source-merge gate) + core invariant + headless suite
+        run: ./gradlew build --stacktrace
+
+      # Convenience: grab the built jars off a green run without a local build. The real distribution is the
+      # release workflow's publishMods, not these. Exclude the sources / dev jars Loom and ModDev also drop
+      # into libs/ so the artifact carries only the production jar.
+      - name: Upload Fabric artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: archive-wdl-fabric
+          path: |
+            fabric/build/libs/*.jar
+            !fabric/build/libs/*-sources.jar
+            !fabric/build/libs/*-dev.jar
+          if-no-files-found: error
+
+      - name: Upload NeoForge artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: archive-wdl-neoforge
+          path: |
+            neoforge/build/libs/*.jar
+            !neoforge/build/libs/*-sources.jar
+          if-no-files-found: error
