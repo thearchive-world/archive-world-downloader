@@ -5,6 +5,7 @@ plugins {
     id("com.diffplug.spotless")    // applied per-subproject, not via build-logic (see below)
     id("wdl.java-conventions")
     id("wdl.nullness-conventions")
+    id("info.solidsoft.pitest") version "1.19.0" // on-demand mutation testing; common-only, so versioned inline
 }
 
 // Spotless owns mechanical layout, per the shared JDT profile in config/spotless/eclipse-formatter.prefs. It is
@@ -38,6 +39,133 @@ neoForge {
 // JUnit itself comes from wdl.java-conventions.
 neoForge.addModdingDependenciesTo(sourceSets["test"])
 
+// --- PITest mutation testing: on-demand fidelity-gap discovery (./gradlew :common:pitest) ---
+// Mutation testing perturbs production bytecode one change at a time (negate a conditional, drop a void
+// call, swap a return) and re-runs the covering tests. A mutant that no test kills (a "survivor") marks a
+// line whose behavior the suite exercises but does not actually pin: exactly a fidelity test that stays
+// green while the save/encode logic it covers is silently broken. The survivor report is the deliverable.
+//
+// Scope is a fail-closed ALLOWLIST of the durable, cross-band fidelity surface (the core/ pure-logic and
+// adapter/ deterministic-transform classes), never a package glob. A glob would fail open: it would
+// auto-enroll every future IO/session class the moment it lands and drown the real survivors in
+// equivalent-mutant noise from per-band glue. The allowlist fails closed instead, so a new class gets no
+// mutants until deliberately enrolled; PitestAllowlistEnrollmentTest is what keeps that honest, failing the
+// build when a new core/adapter class is neither enrolled here nor explicitly acknowledged-excluded.
+//
+// The minion JVMs inherit sourceSets.test.runtimeClasspath (net.minecraft + the bundled vanilla data pack
+// from addModdingDependenciesTo above), so registry-booting tests run in the minion exactly as under :test.
+// CI-gated by .github/workflows/mutation-testing.yml on dev and version-branch pushes; a new survivor is
+// triaged (killed, suppressed, or rewritten away) rather than absorbed by lowering the floor.
+pitest {
+    pitestVersion = "1.22.1"
+    junit5PluginVersion = "1.2.2" // required: the test platform is JUnit 5; this is PIT's JUnit-Platform bridge
+
+    // The fidelity-critical registry. Exact FQNs, never a package glob (see the rationale above).
+    targetClasses.set(listOf(
+        "world.thearchive.wdl.core.CaptureController",
+        "world.thearchive.wdl.core.CaptureOrder",
+        "world.thearchive.wdl.core.ContainerAssociation",
+        "world.thearchive.wdl.core.CrafterSlots",
+        "world.thearchive.wdl.core.MapManifest",
+        "world.thearchive.wdl.core.MapHash",
+        "world.thearchive.wdl.core.RecapturePolicy",
+        "world.thearchive.wdl.core.RegionMath",
+        "world.thearchive.wdl.core.WdlConfig",
+        "world.thearchive.wdl.core.FlushPolicy",
+        "world.thearchive.wdl.core.CaptureStatus",
+        "world.thearchive.wdl.core.SendRangeEstimator",
+        "world.thearchive.wdl.core.CoveredChunkIndex",
+        "world.thearchive.wdl.core.SendRangeSampler",
+        "world.thearchive.wdl.core.ChunkRectangleReducer",
+        "world.thearchive.wdl.core.ReadyLatch",
+        "world.thearchive.wdl.core.RegionChunkScan",
+        "world.thearchive.wdl.core.OpenClickIntent",
+        "world.thearchive.wdl.core.OutlineClassifier",
+        "world.thearchive.wdl.core.SavedChunkIndex",
+        "world.thearchive.wdl.core.SpectatorCrosshairFallback",
+        "world.thearchive.wdl.core.VoidChunkPolicy",
+        "world.thearchive.wdl.core.WorldOutputConfig",
+        // Subpackage enrollments (core.report, adapter.impl): the PitestAllowlistEnrollmentTest registry
+        // guard reaches only top-level core/ and adapter/ classes, so these are enrolled by hand; its
+        // source-file check still fails the build if an entry here stops resolving to a production class.
+        "world.thearchive.wdl.core.report.DownloadReportFormatter",
+        "world.thearchive.wdl.core.report.SaveChunks",
+        "world.thearchive.wdl.core.report.Json",
+        "world.thearchive.wdl.adapter.CapturedBlockField",
+        "world.thearchive.wdl.adapter.ChunkFlushPlan",
+        "world.thearchive.wdl.adapter.ChunkMerge",
+        "world.thearchive.wdl.adapter.ContainerMerge",
+        "world.thearchive.wdl.adapter.EntityMerge",
+        "world.thearchive.wdl.adapter.EntityContainerMerge",
+        "world.thearchive.wdl.adapter.EntityTreeWalk",
+        "world.thearchive.wdl.adapter.MapIdRemap",
+        "world.thearchive.wdl.adapter.MapIdCollector",
+        "world.thearchive.wdl.adapter.ItemLocationScrub",
+        "world.thearchive.wdl.adapter.BookshelfSlots",
+        "world.thearchive.wdl.adapter.ItemTreeWalk",
+        "world.thearchive.wdl.adapter.NbtMerge",
+        "world.thearchive.wdl.adapter.PlayerProgressSerializer",
+        "world.thearchive.wdl.adapter.PlayerTag",
+        "world.thearchive.wdl.adapter.RecoveredScan",
+        "world.thearchive.wdl.adapter.VanillaDimensions",
+        "world.thearchive.wdl.adapter.impl.NaturalEquipment",
+    ))
+
+    // Every common test is a candidate killer; PIT's coverage analysis selects the ones that touch each
+    // mutated line. This is NOT the plugin default (which mirrors targetClasses by name and would miss a
+    // killer whose test name does not match the class under test, e.g. EntityContainerMerge is pinned by
+    // EntityContainerStashMergeTest, a name PIT would never derive from the class). The *Test suffix is
+    // load-bearing, not decoration: PIT loads every class this glob matches to discover its test units, and a
+    // bare world.thearchive.wdl.* also matches production classes. A production class that names a compile-only
+    // type (the compat/ bindings name JourneyMap and XaeroPlus API types absent at test runtime) then throws
+    // NoClassDefFoundError during discovery, which PIT counts as a non-green baseline and aborts the whole run.
+    // Anchoring on *Test keeps the discovery set to actual test classes (all of ours end in Test; no production
+    // class does), which is exactly the candidate-killer set with no production class swept in.
+    targetTests.set(listOf("world.thearchive.wdl.*Test"))
+
+    // Four methods suppress five classified-equivalent-or-uncoverable mutants at method granularity (the only
+    // mutants no portable test can kill; addDiscInto covers two symmetric-offset mutants under one reason). All
+    // four method names are unique across the targetClasses,
+    // so the name globs hit only the intended methods. MapManifest's two idempotent max-assignments are absent
+    // from this list on purpose: written as Math.max in source, both arms of each are drivable by a test, so
+    // they need no exclusion at all. Never widen this to swallow a real survivor; strengthen the covering test
+    // instead.
+    //   floorSliceSize: the empty-hot-set guard (hotCount <= 0) is equivalent under ConditionalsBoundary
+    //     because the ceil-division fall-through already yields 0 at hotCount == 0.
+    //   mergeOne: the block-entity scan bound (i < size) is equivalent under ConditionalsBoundary because the
+    //     off-by-one only fires on the no-match path, whose extra read is absorbed by the per-entry fail-soft
+    //     catch in mergeStashWith, leaving the merged count and the chunk tag identical.
+    //   schemeMismatch: the fail-soft catch (return false on a genuine disk-read IOException) cannot be
+    //     triggered by a portable unit test, since a readable temp directory never makes Files.list throw and
+    //     the Windows target ignores POSIX permission tricks, so its return-false mutant has no coverage. The
+    //     reachable scheme logic is fully covered by MapManifestTest.schemeMismatchNeedsImagedDataAndModeDifference.
+    //   addDiscInto: flipping either centerX + dx or centerZ + dz to a subtraction under MathMutator is
+    //     equivalent, because dx and dz each range over the symmetric interval from negative radius to radius
+    //     and the inclusion test dx * dx + dz * dz <= radiusSquared is unchanged by negating either offset, so
+    //     the double loop assembles the identical final chunk set either way.
+    excludedMethods.set(listOf("floorSliceSize", "mergeOne", "schemeMismatch", "addDiscInto"))
+
+    outputFormats.set(listOf("HTML", "XML"))
+    timestampedReports = false
+
+    // Ratchet gate: fail the build on any survivor. The floor and the score are the same number, so a run that
+    // passes is a run where every mutant the allowlist generates was killed. A new survivor is triaged (killed,
+    // suppressed with a reason, or rewritten away) rather than absorbed by lowering this; never lower it to
+    // swallow one, and never widen it past the run-to-run variance the gated runs show (none seen).
+    mutationThreshold = 100
+
+    // Incremental history at the plugin's default location under the git-ignored build directory: repeat local
+    // runs re-mutate only changed code against the stored run. A fresh CI checkout has no prior history, so CI
+    // always runs full-scope.
+    enableDefaultIncrementalAnalysis = true
+
+    // Explicit minion thread count, defaulting to a size a standard CI runner carries without oversubscribing;
+    // a larger machine raises it with -PpitestThreads=N. PIT's +auto_threads is deliberately NOT used: its own
+    // docs warn it misreads the core count on CI containers. Each minion boots the vanilla registries, but
+    // memory is ample here, so the ceiling is processor count, not heap.
+    threads.set(providers.gradleProperty("pitestThreads").map { it.toInt() }.orElse(4))
+}
+
 // --- Expose common's main source + resources for source-merge into loader subprojects ---
 // MultiLoader-Template "commonJava"/"commonResources" pattern:
 // the loader (e.g. :fabric) consumes these and compiles common's SOURCE directly into its jar,
@@ -57,8 +185,8 @@ artifacts {
 }
 
 // --- core invariant: world.thearchive.wdl.core.** imports only from the allowlisted prefixes ---
-// Keeps cross-branch cherry-picks of core viable as era-bands accrue. A fail-closed ALLOWLIST rather than
-// a net.minecraft denylist: an MC-bundled library (com.mojang, gson, netty, joml,
+// Keeps cross-branch cherry-picks of core viable as era-bands accrue. A fail-closed ALLOWLIST like the
+// pitest scope above, not a net.minecraft denylist: an MC-bundled library (com.mojang, gson, netty, joml,
 // slf4j) compiles clean under both compileJava and the checkCoreJava8 floor compile (--release 8 accepts
 // newer classfiles on the classpath), yet its presence and version vary per band, so it must not creep into
 // core. A new core dependency is a deliberate amendment here, never an accident. It is a line-level import
