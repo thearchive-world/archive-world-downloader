@@ -11,19 +11,24 @@
       "world.thearchive.wdl.fabric.gametest.WdlLightCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlChestedAnimalCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlContainerCaptureTest",
+      "world.thearchive.wdl.fabric.gametest.WdlDerivedMobPersistenceTest",
       "world.thearchive.wdl.fabric.gametest.WdlDoubleChestCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlEnderChestCaptureTest",
+      "world.thearchive.wdl.fabric.gametest.WdlEntityCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlEntityContainerCaptureTest",
+      "world.thearchive.wdl.fabric.gametest.WdlFramedMapRevisitUnionTest",
       "world.thearchive.wdl.fabric.gametest.WdlGameModeConfigTest",
       "world.thearchive.wdl.fabric.gametest.WdlHalfFailedCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlLecternCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlPlayerDataCaptureTest",
+      "world.thearchive.wdl.fabric.gametest.WdlPreexistingEntityCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlSpectatorContainerCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlStalePlacementCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlStatsAdvancementsCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlWorldOutputConfigTest",
       "world.thearchive.wdl.fabric.gametest.WdlSpectateAnchorTest",
-      "world.thearchive.wdl.fabric.gametest.WdlCustomLevelKeyRoutingTest"
+      "world.thearchive.wdl.fabric.gametest.WdlCustomLevelKeyRoutingTest",
+      "world.thearchive.wdl.fabric.gametest.WdlDimensionRebindEntityCaptureTest"
     ]
   },
   "depends": {
