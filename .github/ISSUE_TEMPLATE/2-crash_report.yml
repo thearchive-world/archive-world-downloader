@@ -1,0 +1,125 @@
+name: Crash report
+description: Report a Minecraft crash, hang, or save corruption while running Archive World Downloader.
+title: "[Crash]: "
+labels: ["crash", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for crashes, freezes, or saves that won't load. For non-crash bugs (wrong behavior, missing items, visual glitches), use the **Bug report** template.
+
+  - type: checkboxes
+    attributes:
+      label: Confirm
+      options:
+        - label: 'This crash mentions Archive World Downloader (or "wdl") in the log, or removing the mod stops it.'
+          required: true
+        - label: I have searched open and closed issues for this crash.
+          required: true
+
+  - type: input
+    id: wdl_version
+    attributes:
+      label: Mod version
+      description: Find it in the in-game mod list, or in the file name (e.g. `archive-wdl-fabric-1.0.0+1.21.11.jar`).
+      placeholder: e.g. 1.0.0+1.21.11
+    validations:
+      required: true
+
+  - type: input
+    id: mc_version
+    attributes:
+      label: Minecraft version
+      description: The version this build targets (the `+` tag in the jar name).
+      placeholder: e.g. 1.21.11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Mod loader
+      options:
+        - Fabric
+        - NeoForge
+    validations:
+      required: true
+
+  - type: dropdown
+    id: launcher
+    attributes:
+      label: Launcher (optional)
+      description: Which launcher did you use to start Minecraft?
+      options:
+        - "Minecraft Launcher (official)"
+        - "Prism Launcher"
+        - "CurseForge App"
+        - "Modrinth App"
+        - "ATLauncher"
+        - "Other (mention in description)"
+
+  - type: input
+    id: java_version
+    attributes:
+      label: Java version (optional)
+      description: Output of `java --version` from the Java the launcher uses. Skip if you don't know how to check.
+      placeholder: e.g. openjdk 21.0.4 2024-07-16 LTS
+
+  - type: dropdown
+    id: when
+    attributes:
+      label: When does the crash happen?
+      options:
+        - "When the game starts"
+        - "When opening or joining a world"
+        - "While playing (during the download)"
+        - "While the world is saving to disk"
+        - "When the download finishes or you disconnect"
+        - "When continuing a previous download"
+        - "When opening the saved world in singleplayer"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: crash_log
+    attributes:
+      label: Crash log
+      description: |
+        Paste the **full** crash report from `.minecraft/crash-reports/` (the file is named `crash-<timestamp>-client.txt`), or attach the file. For freezes without a crash report, attach `.minecraft/logs/latest.log` instead. Do not abridge the stack trace.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: world_survived
+    attributes:
+      label: Did the saved world survive?
+      description: After the crash, can you open the saved world in Minecraft?
+      options:
+        - "Yes, opens fine"
+        - "Opens, but some data is missing or corrupted"
+        - "No, it won't load"
+        - "Haven't tried"
+        - "No world was being downloaded"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we make the crash happen? If it's intermittent, say so and describe how often.
+    validations:
+      required: true
+
+  - type: textarea
+    id: modlist
+    attributes:
+      label: Other mods loaded (optional)
+      description: A screenshot of the mod list screen or a plain list.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else? (optional)

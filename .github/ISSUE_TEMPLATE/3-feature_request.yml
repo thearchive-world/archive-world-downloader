@@ -1,0 +1,49 @@
+name: Feature request
+description: Suggest a feature or enhancement for Archive World Downloader.
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. A few things to know first:
+
+        - Archive World Downloader is multiplayer-focused. Singleplayer is supported, but not the priority.
+        - The mod does not extend Minecraft's render distance or show far-away chunks; that is [Bobby](https://modrinth.com/mod/bobby)'s job.
+        - Bug reports go in the **Bug report** template, not here.
+
+  - type: textarea
+    id: search_terms
+    attributes:
+      label: What did you search for?
+      description: Listing the keywords you tried helps the next person find this idea, and helps us spot duplicates.
+      placeholder: e.g. "save chest contents on disconnect"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What would you like to see?
+      description: A short description of the feature.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why do you want it?
+      description: What server, world, or download scenario does this help with? Concrete examples are much more useful than abstract requests.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What do you do today? (optional)
+      description: How do you handle this without the feature, and what is painful about it?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else? (optional)

@@ -1,0 +1,33 @@
+name: Documentation issue
+description: Report an error, omission, or unclear passage in the docs or README.
+title: "[Docs]: "
+labels: ["docs", "needs-triage"]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Page or file
+      description: Path to the docs file or full URL.
+      placeholder: e.g. docs/USAGE.md or README.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong?
+      description: |
+        Quote the passage and explain the problem: wrong information, missing step, broken link, unclear wording, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix
+      description: How you think it should read (optional).
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context

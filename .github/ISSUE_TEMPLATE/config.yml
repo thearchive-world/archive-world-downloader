@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Q&A and discussions
+    url: https://github.com/thearchive-world/archive-world-downloader/discussions
+    about: Usage questions, ideas, and general discussion go here, not the issue tracker.
+  - name: Modrinth page
+    url: https://modrinth.com/mod/wdl
+    about: Download the mod and read its description.
+  - name: CurseForge page
+    url: https://www.curseforge.com/minecraft/mc-mods/wdl
+    about: Download the mod from CurseForge.
+  - name: Security vulnerabilities
+    url: https://github.com/thearchive-world/archive-world-downloader/security/advisories/new
+    about: Disclose security issues privately via GitHub Security Advisories. Do not file public issues for vulnerabilities.

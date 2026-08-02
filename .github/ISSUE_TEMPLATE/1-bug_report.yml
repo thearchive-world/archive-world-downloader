@@ -1,0 +1,109 @@
+name: Bug report
+description: Report a bug in Archive World Downloader.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Before you start:
+
+        - Please search [open issues](https://github.com/thearchive-world/archive-world-downloader/issues?q=is%3Aissue) and [closed issues](https://github.com/thearchive-world/archive-world-downloader/issues?q=is%3Aissue+is%3Aclosed) in case this is already reported.
+        - For questions or general chat, open a [Discussion](https://github.com/thearchive-world/archive-world-downloader/discussions) instead.
+        - For crashes, freezes, or saves that won't load, use the **Crash report** template.
+
+  - type: checkboxes
+    attributes:
+      label: Confirm
+      options:
+        - label: I downloaded the mod from Modrinth or CurseForge and have not modified it.
+          required: true
+
+  - type: input
+    id: wdl_version
+    attributes:
+      label: Mod version
+      description: Find it in the in-game mod list, or in the file name (e.g. `archive-wdl-fabric-1.0.0+1.21.11.jar`).
+      placeholder: e.g. 1.0.0+1.21.11
+    validations:
+      required: true
+
+  - type: input
+    id: mc_version
+    attributes:
+      label: Minecraft version
+      description: The version this build targets (the `+` tag in the jar name).
+      placeholder: e.g. 1.21.11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Mod loader
+      description: Which loader did you install the mod with?
+      options:
+        - Fabric
+        - NeoForge
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: Tell us what went wrong and what you expected instead. Screenshots and videos help; drag them into the box.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we make the bug happen? The more precise, the faster it gets fixed.
+      placeholder: |
+        1. Connect to a server
+        2. Open a chest
+        3. Disconnect using the WDL HUD
+        4. Open the saved world
+        5. The chest is empty
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log file (optional but very helpful)
+      description: |
+        Drag and drop `.minecraft/logs/latest.log` into the box, or paste the relevant part. If you don't know where this folder is: [where is .minecraft?](https://minecraft.wiki/w/.minecraft).
+      render: shell
+
+  - type: textarea
+    id: modlist
+    attributes:
+      label: Other mods loaded (optional)
+      description: A screenshot of the mod list screen, the output of `/modlist`, or a plain list. Helps us rule out conflicts.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: What part of the mod is affected? (optional)
+      description: Helps us route the bug. Pick anything that fits; skip if you're not sure.
+      multiple: true
+      options:
+        - "Saving the world (chunks, blocks, chests, signs)"
+        - "Saving entities, mobs, or item frames"
+        - "Saving player data (inventory, location)"
+        - "The HUD or status icons"
+        - "The world manager screen"
+        - "Resuming or continuing a previous download"
+        - "Visual overlay on the world (paint, outlines)"
+        - "Configuration screen / settings"
+        - "Translations or non-English text"
+        - "Something else"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else? (optional)
+      description: "Other context: server address if public, when it started happening, which dimension (overworld / nether / end), etc."

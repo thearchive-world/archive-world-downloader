@@ -1,0 +1,99 @@
+name: Translation issue
+description: Report incorrect or missing translations.
+title: "[Lang]: "
+labels: ["translation", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If you are offering to contribute new or updated translations, please open a pull request rather than an issue. Use this template only to report broken, missing, or outdated text.
+
+        Every locale ships the full set of keys, so nothing falls back to English. A string that still reads as English is often deliberate, because your language's own Minecraft keeps that word too; report it anyway if it looks wrong to you.
+
+        One issue can cover several strings in the same locale. This template is for the mod's in-game text; the documentation site is English only.
+
+  - type: dropdown
+    id: locale
+    attributes:
+      label: Locale
+      description: The language code matches the file name under `common/src/main/resources/assets/wdl/lang/`.
+      options:
+        - "cs_cz"
+        - "da_dk"
+        - "de_de"
+        - "en_pt"
+        - "en_us"
+        - "esan"
+        - "es_ar"
+        - "es_cl"
+        - "es_ec"
+        - "es_es"
+        - "es_mx"
+        - "es_uy"
+        - "es_ve"
+        - "fi_fi"
+        - "fr_ca"
+        - "fr_fr"
+        - "it_it"
+        - "ja_jp"
+        - "ko_kr"
+        - "nl_be"
+        - "nl_nl"
+        - "nn_no"
+        - "no_no"
+        - "pl_pl"
+        - "pt_br"
+        - "pt_pt"
+        - "qcb_es"
+        - "ru_ru"
+        - "sv_se"
+        - "tr_tr"
+        - "uk_ua"
+        - "zh_cn"
+        - "zh_tw"
+        - "Other (specify below)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Issue type
+      options:
+        - "Translation is missing (the string is still the English one)"
+        - "Translation is wrong or inaccurate"
+        - "Translation is grammatically incorrect"
+        - "Translation has formatting or placeholder problems (e.g. missing %s, broken \\n)"
+        - "Translation is outdated (English text changed but this locale was not updated)"
+    validations:
+      required: true
+
+  - type: input
+    id: key
+    attributes:
+      label: Translation key
+      description: The `wdl.*` key. Look it up in any `lang/*.json` file.
+      placeholder: e.g. wdl.screen.downloads.title
+
+  - type: textarea
+    id: current_and_suggested
+    attributes:
+      label: Current text and suggested correction
+      description: |
+        Show what the UI shows now and what it should say.
+      placeholder: |
+        Current: "Save World"
+        Suggested: "Welt speichern"
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: A screenshot of the affected UI helps a lot.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
