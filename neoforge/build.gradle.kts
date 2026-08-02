@@ -2,6 +2,7 @@ import wdl.buildlogic.registerVerifyProductionJar
 
 plugins {
     id("net.neoforged.moddev")     // version comes from the root apply-false declaration
+    alias(libs.plugins.mod.publish.plugin)    // release upload; version from the root apply-false declaration
     id("com.diffplug.spotless")    // applied per-subproject, not via build-logic (see :common)
     id("wdl.java-conventions")
     id("wdl.nullness-conventions")
@@ -96,4 +97,37 @@ dependencies {
     // JourneyMap public API for the source-merged overlay binding (compat/journeymap), compile-only. NeoForge
     // is ModDev (no remap), neoforge flavor, no runtime require.
     compileOnly("info.journeymap:journeymap-api-neoforge:${property("journeymap_api_version")}-${property("minecraft_version")}")
+}
+
+// Release publishing (mod-publish-plugin): uploads the NeoForge jar to Modrinth, and attaches that same jar to
+// the single GitHub release :fabric creates (see the github block below). Nothing publishes on an ordinary
+// build; the release workflow drives it on a version tag.
+publishMods {
+    file.set(tasks.jar.flatMap { it.archiveFile })
+    changelog.set(providers.environmentVariable("CHANGELOG").orElse(""))
+    type.set(STABLE)
+    version.set(project.version.toString())
+    displayName.set("Archive World Downloader ${project.version} (NeoForge)")
+    modLoaders.add("neoforge")
+    dryRun.set(
+        providers.environmentVariable("PUBLISH_DRY_RUN").map { it.toBooleanStrict() }.orElse(false),
+    )
+
+    modrinth {
+        projectId.set(providers.gradleProperty("modrinth_id"))
+        accessToken.set(providers.environmentVariable("MODRINTH_TOKEN"))
+        minecraftVersions.add(providers.gradleProperty("minecraft_version"))
+        // Java mod: no Kotlin-for-Forge (or any other) hard runtime dependency to declare.
+    }
+
+    // Attach the NeoForge jar (the top-level file above) to the single GitHub release that :fabric creates,
+    // rather than :fabric pulling it in as an additionalFile(Project) (a Gradle-10 deprecation). parent points
+    // at :fabric's publishGithub task: the plugin then uploads this jar to that task's release instead of
+    // creating a second release, and forcefully inherits repository/commitish/tagName/displayName/version from
+    // it, so only accessToken and the attached file are set here. The parent link also wires the task
+    // ordering, so this upload runs after :fabric has created the release.
+    github {
+        accessToken.set(providers.environmentVariable("GITHUB_TOKEN"))
+        parent(project(":fabric").tasks.named("publishGithub"))
+    }
 }

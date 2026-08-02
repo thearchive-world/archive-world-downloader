@@ -3,6 +3,7 @@ import wdl.buildlogic.registerVerifyProductionJar
 
 plugins {
     id("fabric-loom")     // version comes from the root apply-false declaration
+    alias(libs.plugins.mod.publish.plugin)    // release upload; version from the root apply-false declaration
     id("com.diffplug.spotless")    // applied per-subproject, not via build-logic (see :common)
     id("wdl.java-conventions")
     id("wdl.nullness-conventions")
@@ -137,3 +138,56 @@ tasks.named<ProcessResources>("processResources") {
 
 // Loom's remapJar is the producing task; the guard is shared with the NeoForge sibling (see build-logic).
 registerVerifyProductionJar("remapJar")
+
+// Prints this subproject's resolved version (mod_version + the MC build-metadata, set by wdl.java-conventions)
+// so the release workflow can assert the pushed tag equals the version it is about to publish. Registered on a
+// loader subproject because the root project carries no version; captured into a val for configuration-cache
+// compatibility (no Project access inside the task action).
+tasks.register("printVersion") {
+    val projectVersion = version.toString()
+    doLast { println("PROJECT_VERSION=$projectVersion") }
+}
+
+// Release publishing (mod-publish-plugin), driven by the release workflow on a version tag. It uploads the
+// remapped Fabric jar to Modrinth and creates the single GitHub release that also carries the NeoForge jar
+// (attached by :neoforge's parent-linked github block). The published version is project.version (mod_version +
+// the MC build-metadata, set in wdl.java-conventions), and the changelog arrives via the CHANGELOG env the release
+// workflow sets; nothing publishes on an ordinary build. Coordinates live in gradle.properties.
+publishMods {
+    file.set(tasks.remapJar.flatMap { it.archiveFile })
+    changelog.set(providers.environmentVariable("CHANGELOG").orElse(""))
+    type.set(STABLE)
+    version.set(project.version.toString())
+    displayName.set("Archive World Downloader ${project.version} (Fabric, Quilt)")
+    modLoaders.add("fabric")
+    modLoaders.add("quilt")
+    dryRun.set(
+        providers.environmentVariable("PUBLISH_DRY_RUN").map { it.toBooleanStrict() }.orElse(false),
+    )
+
+    modrinth {
+        projectId.set(providers.gradleProperty("modrinth_id"))
+        accessToken.set(providers.environmentVariable("MODRINTH_TOKEN"))
+        minecraftVersions.add(providers.gradleProperty("minecraft_version"))
+        // WDL is a Java mod: Fabric API is the only hard runtime dependency. ModMenu is an optional soft dep
+        // resolved at compile only, so it is not declared as a Modrinth relation.
+        requires { id.set("P7dR8mSH") } // fabric-api
+    }
+
+    // CurseForge upload stays off until the project enters the moderation queue. The project ID is pinned
+    // (curseforge_id in gradle.properties); adding a curseforge { } block with a CURSEFORGE_TOKEN publishes
+    // the next tag, where the first file is held for moderator review and later files auto-publish.
+
+    github {
+        repository.set("thearchive-world/archive-world-downloader")
+        accessToken.set(providers.environmentVariable("GITHUB_TOKEN"))
+        commitish.set(providers.environmentVariable("GITHUB_REF_NAME"))
+        displayName.set("wdl-${project.version}")
+        // This block creates the single GitHub release and carries the Fabric jar (the top-level file above).
+        // The NeoForge jar rides on this same release: :neoforge's own github block attaches it via the plugin's
+        // parent mechanism (parent(publishGithub)), which uploads to this task's release instead of creating a
+        // second one. So the release still holds both loader jars, with no additionalFile(Project): that
+        // overload resolves the project through Gradle's deprecated dependency-notation path (a hard error in
+        // Gradle 10), whereas parent navigates to a task and sidesteps it.
+    }
+}
