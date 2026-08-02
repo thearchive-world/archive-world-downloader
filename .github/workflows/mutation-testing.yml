@@ -1,0 +1,70 @@
+name: Mutation testing (common)
+
+# The ratcheted PITest gate: :common:pitest mutates the fidelity allowlist and fails below the
+# mutationThreshold floor set in common/build.gradle.kts. It is deliberately separate from ci.yml (the fast
+# source-merge / core-invariant / headless-unit gate) so it never slows that gate, mirroring
+# capture-verification.yml. Each minion forks a JVM that boots the vanilla registries off the test runtime
+# classpath, so this is heavier than the unit gate; the thread count (common/build.gradle.kts) defaults to a
+# size the runner carries without oversubscribing. The floor is only raised as coverage grows, never lowered.
+on:
+  push:
+    branches:
+      - dev
+      # Version branches too (three-part 1.21.11/26.1.2, two-part 26.2), so the ratchet guards every era band.
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+"
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - '.gitattributes'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - '.gitattributes'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR runs; a dev / version-branch run that has started is left to finish (a queued run can
+  # still be superseded by a newer push).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
+# pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  mutation-testing:
+    runs-on: ubuntu-latest
+    # PITest forks a JVM per minion that boots the vanilla registries, so a full run is minutes, not seconds.
+    # Cap it generously so a legitimately slow but green run survives, while a hang still fails fast rather
+    # than running to the 6h default.
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        # basic is the MIT caching provider. The v6 default routes caching through the proprietary
+        # gradle-actions-caching library, whose terms every fork's CI would otherwise accept silently.
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92  # v6.2.0
+        with:
+          cache-provider: basic
+
+      - name: Run the mutation-testing ratchet (:common:pitest)
+        run: ./gradlew :common:pitest --stacktrace
