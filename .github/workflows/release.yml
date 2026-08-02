@@ -1,0 +1,169 @@
+name: Release (Modrinth + GitHub)
+
+# Publishes a tagged release. The tag is the version core plus the MC build-metadata, e.g. 1.0.0+1.21.11
+# or 1.0.0+26.2 (mirrors the jar name archive-wdl-<loader>-<mod_version>+<minecraft_version>.jar). The
+# published version comes from gradle.properties (mod_version + minecraft_version via wdl.java-conventions),
+# not from the tag, so the flow is bump-then-tag: set mod_version to the release value (drop -SNAPSHOT),
+# commit, then tag that commit and push the tag. The guard step below fails the run unless the pushed tag
+# equals that built version, so a stale -SNAPSHOT can't be published and createRelease (tagName defaults to
+# the version) can't mint a tag that differs from the one you pushed.
+#
+# publishMods uploads the Fabric and NeoForge jars to Modrinth and creates one GitHub release carrying
+# both. It is not atomic across the three publish tasks (:fabric:publishModrinth, :fabric:publishGithub,
+# :neoforge:publishModrinth): if one fails after another has already succeeded, a naive re-run re-creates a
+# duplicate Modrinth version and createRelease 422s on the now-existing tag. To retry cleanly, first delete
+# the partial Modrinth version(s) and the GitHub release, then re-push. A first-run dry run (PUBLISH_DRY_RUN=1
+# passed to publishMods) validates coordinates without uploading. Requires MODRINTH_TOKEN in the release
+# environment (the built-in GITHUB_TOKEN covers the GitHub release). CurseForge is pinned but off (see the
+# loader scripts).
+on:
+  push:
+    tags:
+      # Semver core + literal '+' + any MC build-metadata (1.21.11, 26.2, ...). The core gates this to a
+      # real release tag; the metadata is left open so every MC band the release targets matches.
+      - '[0-9]+.[0-9]+.[0-9]+\+*'
+
+permissions:
+  contents: write       # GitHub Release upload
+  id-token: write       # mint the Sigstore OIDC token for attestation
+  attestations: write   # persist the attestation
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a release once it has started (a partial publish is the messy state described above).
+  cancel-in-progress: false
+
+# Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
+# pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release  # a repository secret would be readable by everyone with write access
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
+        with:
+          distribution: temurin
+          # Exact patch, pinned so release builds are byte-for-byte reproducible.
+          java-version: "21.0.11"
+
+      - name: Set up Gradle
+        # basic is the MIT caching provider. The v6 default routes caching through the proprietary
+        # gradle-actions-caching library, whose terms every fork's CI would otherwise accept silently.
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92  # v6.2.0
+        with:
+          cache-provider: basic
+
+      # Fail fast unless the pushed tag equals the version the build will publish (mod_version + MC metadata).
+      # Guards the bump-then-tag flow: a tag pushed before dropping -SNAPSHOT (or against the wrong MC pin)
+      # stops here instead of publishing a mislabeled stable version and minting a divergent release tag.
+      - name: "Guard: pushed tag must equal the built version"
+        run: |
+          set -euo pipefail
+          BUILT=$(./gradlew -q :fabric:printVersion | sed -n 's/^PROJECT_VERSION=//p')
+          echo "pushed tag: ${{ github.ref_name }}"
+          echo "built version: ${BUILT}"
+          if [ "${{ github.ref_name }}" != "${BUILT}" ]; then
+            echo "::error::Pushed tag '${{ github.ref_name }}' != built version '${BUILT}'. Bump mod_version (drop -SNAPSHOT) and match the MC pin before tagging."
+            exit 1
+          fi
+
+      - name: Build
+        run: ./gradlew build --stacktrace
+
+      - name: Resolve authoritative production-jar paths
+        id: jars
+        run: |
+          set -euo pipefail
+          # Command substitution (not < <(...)) so set -e catches a gradle failure; filter to build/libs
+          # jar paths (tolerating stray -q lines); sort for a stable order under parallel execution.
+          out="$(./gradlew -q :fabric:printProductionJar :neoforge:printProductionJar)"
+          mapfile -t JARS < <(printf '%s\n' "$out" | grep -E '/build/libs/.*\.jar$' | sort)
+          if [ "${#JARS[@]}" -ne 2 ]; then
+            echo "::error::expected exactly 2 production jars, got ${#JARS[@]}"; printf '%s\n' "$out"; exit 1
+          fi
+          for j in "${JARS[@]}"; do
+            [ -s "$j" ] || { echo "::error::production jar missing or empty: $j"; exit 1; }
+          done
+          # Comma-delimited single line (actions/attest subject-path accepts commas), printf-joined so IFS
+          # is never left changed. Sorted order puts fabric before neoforge.
+          printf 'paths=%s,%s\n' "${JARS[0]}" "${JARS[1]}" >> "$GITHUB_OUTPUT"
+
+      - name: Build reproducibility record
+        id: repro
+        env:
+          PATHS: ${{ steps.jars.outputs.paths }}
+        run: |
+          set -euo pipefail
+          JDK="$(./gradlew -q :fabric:printCompileJavaVersion | grep -E '\(Java [0-9]+\)$' | tail -n1)"
+          JDK_MAJOR="$(printf '%s' "$JDK" | sed -n 's/.*(Java \([0-9]\+\)).*/\1/p')"
+          EXPECT="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
+          if [ "$JDK_MAJOR" != "$EXPECT" ]; then
+            echo "::error::compile toolchain Java $JDK_MAJOR != java_version $EXPECT"; exit 1
+          fi
+          IFS=',' read -r FAB NEO <<< "$PATHS"
+          FAB_SHA="$(sha256sum "$FAB" | awk '{print $1}')"
+          NEO_SHA="$(sha256sum "$NEO" | awk '{print $1}')"
+          {
+            echo 'record<<EOF'
+            echo ''
+            echo '---'
+            echo '### Reproducibility record'
+            echo "- Build JDK (compile toolchain): ${JDK}"
+            echo "- Reference OS: ${{ runner.os }} (${{ runner.arch }}), GitHub-hosted ubuntu-latest"
+            echo "- \`$(basename "$FAB")\` SHA-256: \`${FAB_SHA}\`"
+            echo "- \`$(basename "$NEO")\` SHA-256: \`${NEO_SHA}\`"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d  # v4.2.1
+        with:
+          subject-path: ${{ steps.jars.outputs.paths }}
+
+      - name: Generate changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@c9bcd8238b6f41e05561348339429d360b1c0247  # v6.2.3
+        with:
+          mode: "COMMIT"
+          configurationJson: |
+            {
+              "template": "#{{CHANGELOG}}",
+              "commit_template": "- #{{TITLE}} (`#{{MERGE_SHA}}`)",
+              "categories": [
+                { "title": "## Features", "labels": ["feat"] },
+                { "title": "## Fixes", "labels": ["fix"] },
+                { "title": "## Build", "labels": ["build"] },
+                { "title": "## CI", "labels": ["ci"] },
+                { "title": "## Other", "labels": [] }
+              ],
+              "label_extractor": [
+                {
+                  "pattern": "^(feat|fix|build|ci|docs|refactor|test|perf|style)(\\(.*\\))?(!)?: ",
+                  "on_property": "title",
+                  "target": "$1"
+                }
+              ]
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # publishMods uploads both loader jars to Modrinth and creates the single GitHub release that carries
+      # them, so no separate upload-artifact step is needed (the release is the durable artifact store).
+      - name: Publish to Modrinth and GitHub
+        run: ./gradlew publishMods
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }}${{ steps.repro.outputs.record }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}

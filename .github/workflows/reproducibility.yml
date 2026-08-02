@@ -1,0 +1,92 @@
+name: Reproducibility
+
+# Advisory (non-required) guard: builds the two production jars twice and fails on any SHA-256 mismatch,
+# so a future plugin/dependency bump that breaks byte-reproducibility is caught per-commit. Same-machine,
+# shared-warm-GRADLE_USER_HOME scope only (a strict subset of the third-party guarantee); the cold-cache /
+# cross-image acceptance lives in the release process, not here. Kept off the fast ci.yml gate, like
+# mutation-testing.yml / capture-verification.yml.
+on:
+  push:
+    branches:
+      - dev
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+"
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - '.gitattributes'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - '.gitattributes'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
+# pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  reproducibility:
+    runs-on: ubuntu-latest
+    # Two full builds; the second reuses the warm GRADLE_USER_HOME Minecraft remap, so budget ~ cold-once
+    # + assemble-twice rather than 2x a cold build.
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
+        with:
+          distribution: temurin
+          # Exact patch, must match release.yml so this verifies the release toolchain.
+          java-version: "21.0.11"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92  # v6.2.0
+        with:
+          cache-disabled: true
+
+      - name: Build, then rebuild clean, and byte-diff the two production jars
+        run: |
+          set -euo pipefail
+          # Resolve the two authoritative jar paths deterministically: capture via command substitution, so
+          # set -e catches a gradle failure (a process-substitution < <(...) would swallow its exit code);
+          # filter to jar paths under build/libs (tolerating any stray -q line); and sort, so parallel
+          # execution (org.gradle.parallel=true races the two subprojects' stdout) can't reorder the list and
+          # false-fail the diff on byte-identical jars.
+          hash_jars() {
+            local out
+            out="$(./gradlew -q :fabric:printProductionJar :neoforge:printProductionJar)"
+            mapfile -t JARS < <(printf '%s\n' "$out" | grep -E '/build/libs/.*\.jar$' | sort)
+            if [ "${#JARS[@]}" -ne 2 ]; then
+              echo "::error::expected exactly 2 production jars, got ${#JARS[@]}"; printf '%s\n' "$out"; exit 1
+            fi
+            for j in "${JARS[@]}"; do
+              [ -s "$j" ] || { echo "::error::production jar missing or empty: $j"; exit 1; }
+            done
+            sha256sum "${JARS[@]}" | awk '{print $1}'
+          }
+          ./gradlew assemble --no-build-cache
+          hash_jars > run1.sha
+          echo "run 1:"; cat run1.sha
+          ./gradlew clean assemble --no-build-cache
+          hash_jars > run2.sha
+          echo "run 2:"; cat run2.sha
+          if ! diff -u run1.sha run2.sha; then
+            echo "::error::production jars are NOT byte-reproducible across two clean builds"; exit 1
+          fi
+          echo "reproducible: both builds produced byte-identical production jars"
