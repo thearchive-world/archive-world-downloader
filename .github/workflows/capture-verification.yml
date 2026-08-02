@@ -1,0 +1,93 @@
+name: Capture verification (Fabric)
+
+# The automated capture-verification tier: a real headless Fabric client drives WDL's capture against a
+# version-pinned fixture world and asserts the on-disk save. It is deliberately separate from ci.yml (the fast
+# source-merge / core-invariant / headless-unit gate) so it never slows that gate or changes its required
+# status. Requiring this tier would deadlock a documentation-only pull request: a workflow the paths-ignore
+# filters above skip leaves its check pending rather than passing, and a pending required check blocks the
+# merge. The client runs under a virtual framebuffer (xvfb-run), a real GL context with no display.
+on:
+  push:
+    branches:
+      - dev
+      # Run the tier on every era-band branch too (three-part 1.21.11/26.1.2, two-part 26.2), not dev alone,
+      # so a push to a version branch still exercises the headless capture. PRs run it regardless.
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+"
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - '.gitattributes'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - '.gitattributes'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR runs; on a dev / version-branch push a run that has started is left to finish so this
+  # tier keeps a per-commit status (a queued-but-not-started run can still be superseded by a newer push).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
+# pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  capture-verification:
+    runs-on: ubuntu-latest
+    # The local run boots the client and works through the scenarios in a few minutes, but a hosted runner
+    # has no warm Gradle or Loom cache and renders through software OpenGL, so the first run pays a cold
+    # setup. Budget generously rather than risk killing a legitimately slow but green run; without a cap a
+    # hung headless client would run to the 6h default.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        # basic is the MIT caching provider. The v6 default routes caching through the proprietary
+        # gradle-actions-caching library, whose terms every fork's CI would otherwise accept silently.
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92  # v6.2.0
+        with:
+          cache-provider: basic
+
+      # xvfb supplies the virtual framebuffer; libgl1-mesa-dri supplies the llvmpipe software rasterizer the
+      # client's GL context needs on a runner with no GPU (it is usually preinstalled, but pin it explicitly).
+      - name: Install Xvfb + software OpenGL (virtual framebuffer for the headless client)
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+
+      # LIBGL_ALWAYS_SOFTWARE pins mesa to llvmpipe so GL never tries a (nonexistent) GPU. --no-configuration-cache
+      # is required because the Loom run task reads a stale argFile under the configuration cache (enabled in
+      # gradle.properties), which fails on cache reuse.
+      - name: Run the Fabric capture-verification tier (headless client)
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run -a ./gradlew :fabric:runClientGameTest --no-configuration-cache --stacktrace
+
+      # The gametest framework writes a screenshot only when a scenario fails, so this artifact is empty on a
+      # green run and carries the failing frame otherwise. if-no-files-found: ignore keeps a green run (and a
+      # future run-dir path change) from failing the step; it is post-mortem only.
+      - name: Upload gametest screenshots
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: capture-verification-screenshots
+          path: fabric/build/run/clientGameTest/screenshots
+          if-no-files-found: ignore
