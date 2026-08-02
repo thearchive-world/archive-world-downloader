@@ -1,0 +1,61 @@
+# Dependabot keeps the two dependency classes it can bump safely current: the GitHub Actions used by the
+# workflows, and the plain-semver Gradle plugins and tool libraries in gradle/libs.versions.toml. Everything Minecraft-
+# coupled is deliberately excluded (see the gradle ignore block): those coordinates carry a +band suffix or a
+# per-band snapshot value that Dependabot would resolve to the wrong band, or sit under a strict constraint
+# from the Minecraft platform that it cannot see, so they stay human-curated. This file is read only from the
+# repository's default branch, which is dev, and it deliberately sets no target-branch: that key opts the
+# ecosystem it sits on out of security updates.
+version: 2
+updates:
+  # Workflow actions: checkout / setup-java / gradle-actions. Grouped into one PR per run so a routine bump of
+  # all three is a single review, not three.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Gradle build plugins (fabric-loom, net.neoforged.moddev, spotless, gradle-errorprone-plugin) plus the
+  # nullness/test tool libraries (Error Prone core, NullAway, the JUnit BOM), all covered because
+  # they live in gradle/libs.versions.toml; Dependabot does not read the build-logic convention plugins that
+  # consume them. The Minecraft runtime + mod coordinates are ignored below because each is band-coupled and
+  # must be bumped by hand against the target band, re-verifying it resolves.
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      gradle-tooling:
+        patterns:
+          - "*"
+    ignore:
+      # JUnit stays on the 5.x line: 6.x raises the baseline to Java 17, which the 1.12.2 band (Java 8)
+      # cannot meet. Allow 5.x minor+patch (incl. security) and suppress only the 6.x major.
+      - dependency-name: "org.junit:junit-bom"
+        update-types: ["version-update:semver-major"]
+      # Modrinth-hosted soft-dependencies (XaeroPlus, ModMenu): XaeroPlus tags each band with a
+      # +<loader>-<mc> SemVer build-metadata suffix, which SemVer defines as precedence-irrelevant.
+      # Dependabot discards it when ranking versions, so an automated bump would cross bands.
+      - dependency-name: "maven.modrinth:*"
+      # Fabric loader + API: the loader tracks a runtime floor and the API version embeds +<mc>; both are
+      # pinned to the target band in gradle.properties.
+      - dependency-name: "net.fabricmc:*"
+      - dependency-name: "net.fabricmc.fabric-api:*"
+      # Parchment mappings: the artifact name embeds the MC version and the version is a dated mappings stamp,
+      # neither of which Dependabot can bump coherently.
+      - dependency-name: "org.parchmentmc.data:*"
+      # JSpecify is shipped by Minecraft itself: minecraft-dependencies:<band> declares
+      # org.jspecify:jspecify:{strictly <version>}, which overrides the catalog entry. That entry is a floor,
+      # not the resolved version, so the band decides what we compile against and a bump PR here can only
+      # fail resolution. Unlike the ignores above, Dependabot ranks this coordinate correctly; it just cannot
+      # see the constraint. Revisit if a band drops jspecify from the platform, which makes our floor live again.
+      - dependency-name: "org.jspecify:jspecify"
