@@ -37,6 +37,22 @@ class DimensionRebindTest {
     }
 
     @Test
+    void noSwapRunsBetweenTwoDrains() {
+        // One drain against one swap cannot tell every drain before every swap from a zip of the two lists, and
+        // the session registers two drains against five swaps.
+        List<String> order = new ArrayList<>();
+        DimensionRebind<String> rebind = new DimensionRebind<>();
+        rebind.registerDrain(() -> order.add("drain-a"));
+        rebind.registerSwap(dimension -> order.add("swap"));
+        rebind.registerDrain(() -> order.add("drain-b"));
+
+        rebind.rebind(NETHER);
+
+        assertEquals(List.of("drain-a", "drain-b", "swap"), order,
+                "the second drain writes into the dimension being left, which the swap has not yet retargeted");
+    }
+
+    @Test
     void drainsRunInRegistrationOrder() {
         // The drains feed each other: entities promote into the buffer that the flush beside them then writes,
         // so their order among themselves is the caller's to state and this must preserve it.
