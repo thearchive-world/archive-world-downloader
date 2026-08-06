@@ -145,6 +145,9 @@ public final class WdlDownloadsScreen extends Screen {
     private static boolean listCollapsed = true;
 
     private @Nullable EditBox nameField;
+    // Typed text only: a state-flip rebuild drops the field and the selected row together, so seeding this
+    // from a row prefill would bring that row's name back under the Download action.
+    private String retainedName = "";
     private @Nullable Button primaryButton;
     private @Nullable DownloadList list;
     private @Nullable DownloadEntry selectedEntry;
@@ -231,19 +234,19 @@ public final class WdlDownloadsScreen extends Screen {
 
     /** Idle: an editable name field, a Download/Resume button, and the browsable downloads list. */
     private void initIdle() {
-        String priorName = this.nameField != null ? this.nameField.getValue() : "";
+        String name = this.selectedEntry != null ? this.selectedEntry.folderName() : this.retainedName;
 
         NameField field = new NameField(this.font, 0, 0, NAME_WIDTH, FIELD_HEIGHT,
                 Component.translatable("wdl.screen.downloads.name"));
         field.setMaxLength(NAME_MAX_LENGTH);
-        field.setValue(priorName);
+        field.setValue(name);
         field.setResponder(this::onNameTyped);
         centerTopWidget(field);
         this.nameField = addRenderableWidget(field);
 
         int buttonRowY = field.getY() + field.getHeight() + 6;
         Component primaryLabel = this.selectedEntry != null ? resumeLabel() : downloadLabel();
-        boolean primaryActive = this.selectedEntry != null || TargetResolver.hasUsableName(priorName);
+        boolean primaryActive = this.selectedEntry != null || TargetResolver.hasUsableName(name);
         addButtonRow(buttonRowY, primaryLabel, button -> onPrimary(), primaryActive);
         setPrimaryActive(primaryActive);
 
@@ -453,6 +456,13 @@ public final class WdlDownloadsScreen extends Screen {
         if (suppressNameResponder) {
             return;
         }
+        // EditBox runs its responder on a bare caret move as well as an edit (moveCursorTo calls onValueChange),
+        // so text still matching the selected row is an arrow key or a click, not an edit, and must leave the
+        // selection alone.
+        if (this.selectedEntry != null && text.equals(this.selectedEntry.folderName())) {
+            return;
+        }
+        this.retainedName = text;
         // Editing the name is a fresh download: drop any selected row and relabel the primary action.
         this.selectedEntry = null;
         if (this.primaryButton != null) {

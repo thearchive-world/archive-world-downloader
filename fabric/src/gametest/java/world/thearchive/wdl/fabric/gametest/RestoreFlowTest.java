@@ -17,6 +17,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.ConfirmScreen;
@@ -66,6 +67,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
             sweepBusyCopy(context, saves, chat);
             junctionStaleRowCauses(context, saves);
             ownerRoutedAutoJoinChat(context, saves, chat);
+            nameFieldAcrossTheSweepFlip(context, saves);
         }
         singleplayerWorldOpenSilent(context);
     }
@@ -313,6 +315,97 @@ public class RestoreFlowTest implements FabricClientGameTest {
             Check.that(context.computeOnClient(client -> Wdl.state()) == CaptureState.IDLE,
                     "a singleplayer world open with auto-download on must start no capture");
         }
+    }
+
+    /**
+     * Case 9: a sweep flipping the open screen through the restoring view and back gives a half-typed name back and
+     * gives nothing back for a row selected before the flip, a caret move over a prefill keeps that row selected, and
+     * the primary action agrees with the field text throughout.
+     */
+    private void nameFieldAcrossTheSweepFlip(ClientGameTestContext context, Path saves) {
+        String folder = "wdl-restore-9";
+        beginCase(context, saves, folder, "");
+        RestoreFixtures.taint(capture(context, folder));
+
+        ScreenDriver.openDownloads(context);
+        context.getInput().typeChars("half-typed");
+        flipThroughSweep(context, saves);
+        Check.that("half-typed".equals(waitForNameField(context)),
+                "a half-typed name must survive the sweep's flip through the restoring view");
+        Check.that(waitForWidgetText(context, resolved("wdl.screen.downloads.download")),
+                "a typed name with no row selected must offer Download");
+
+        ScreenDriver.clickRowBody(context, ScreenDriver.waitForChip(context, folder));
+        Check.that(folder.equals(nameFieldValue(context)), "a row-body click must prefill the field with its folder");
+        Check.that(waitForWidgetText(context, resolved("wdl.screen.downloads.resume")),
+                "a selected row must offer Resume");
+        focusNameField(context);
+        context.getInput().pressKey(GLFW.GLFW_KEY_END);
+        Check.that(folder.equals(nameFieldValue(context))
+                && waitForWidgetText(context, resolved("wdl.screen.downloads.resume")),
+                "a caret move is not an edit, so the row stays selected and the action stays Resume");
+
+        flipThroughSweep(context, saves);
+        Check.that(!folder.equals(waitForNameField(context)),
+                "the flip drops the selected row, so its name must not come back under the Download action");
+        endCase(context, saves, folder);
+    }
+
+    private void flipThroughSweep(ClientGameTestContext context, Path saves) {
+        try (SweepHold hold = holdSweep()) {
+            context.runOnClient(client -> Wdl.launchSweep(saves));
+            for (int tick = 0; tick < IDLE_WAIT_TICKS && nameFieldValue(context) != null; tick++) {
+                context.waitTick();
+            }
+            Check.that(context.computeOnClient(client -> Wdl.state()) == CaptureState.RESTORING
+                    && context.computeOnClient(client -> client.screen instanceof WdlDownloadsScreen)
+                    && nameFieldValue(context) == null,
+                    "the open screen never rebuilt into the restoring view");
+        }
+        waitIdle(context);
+    }
+
+    private static String waitForNameField(ClientGameTestContext context) {
+        for (int tick = 0; tick < IDLE_WAIT_TICKS; tick++) {
+            String value = nameFieldValue(context);
+            if (value != null) {
+                return value;
+            }
+            context.waitTick();
+        }
+        throw new AssertionError("the name field never came back after the flip");
+    }
+
+    /**
+     * Put the keyboard on the name field, the state a click inside it leaves behind. A row-body click cannot be used
+     * for this: the container reassigns focus to the clicked child after it handles the click, so the list keeps it.
+     */
+    private static void focusNameField(ClientGameTestContext context) {
+        context.runOnClient(client -> {
+            if (client.screen instanceof WdlDownloadsScreen screen) {
+                for (GuiEventListener child : screen.children()) {
+                    if (child instanceof EditBox box) {
+                        screen.setFocused(box);
+                        return;
+                    }
+                }
+            }
+        });
+    }
+
+    /** The value in the open download screen's name field, or null when no name field is on screen. */
+    private static @Nullable String nameFieldValue(ClientGameTestContext context) {
+        return context.computeOnClient(client -> {
+            if (!(client.screen instanceof WdlDownloadsScreen screen)) {
+                return null;
+            }
+            for (GuiEventListener child : screen.children()) {
+                if (child instanceof EditBox box) {
+                    return box.getValue();
+                }
+            }
+            return null;
+        });
     }
 
     private void refuseRow(ClientGameTestContext context, String expectedTitleKey, String message) {
