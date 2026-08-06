@@ -127,8 +127,9 @@ enough to review, and squash-merge keeps you as the author of the merged commit.
 
 1. Run `./gradlew build` and make sure it passes before opening the pull request. Continuous
    integration runs the same gate on every push and pull request, and it is the required check to
-   merge. Two heavier tiers (a headless-client capture test and a mutation-testing run) also run and
-   are advisory.
+   merge. Three heavier tiers are advisory: a headless-client capture test, a mutation-testing run,
+   and a byte-reproducibility double build. Each runs only when the pull request touches something
+   that can move its result, so most pull requests skip some of them.
 2. Base the pull request on the `dev` branch, which is the active development branch.
 3. Keep it focused on one change. A smaller, single-purpose pull request is faster to review.
 4. Reference any issue it resolves with `Closes #NN` in the description.
