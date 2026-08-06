@@ -10,14 +10,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Covered chunk positions per dimension, for the two-tone coverage overlay: the chunks the recording path brought
- * within entity send range this session, so their static decorations (item frames, glow item frames, paintings, armor
- * stands) were sent and captured. The overlay draws a saved chunk in the user's covered hue when it is covered here and
- * in their suspect hue when it is not. A direct parallel of {@link SavedChunkIndex}: keyed by the live client dimension
- * id string so it matches what the overlay providers query the overlay under. MC-free (a String partition over fastutil
- * long collections) and headless-testable. Thread-safe: the capture tick writes via {@link #addDisc} and the resume
- * seed via {@link #addAll}, an overlay provider's async draw loop reads via {@link #snapshot}, so every method holds
- * the instance lock and {@code
+ * Covered chunk positions per dimension, for the two-tone coverage overlay: the chunks taken to have had their static
+ * decorations (item frames, glow item frames, paintings, armor stands) sent and captured. The overlay draws a saved
+ * chunk in the user's covered hue when it is covered here and in their suspect hue when it is not. A direct parallel of
+ * {@link SavedChunkIndex}: keyed by the live client dimension id string so it matches what the overlay providers query
+ * the overlay under. MC-free (a String partition over fastutil long collections) and headless-testable. Thread-safe:
+ * the capture tick writes via {@link #addDisc} and the resume seed via {@link #addAll}, an overlay provider's async
+ * draw loop reads via {@link #snapshot}, so every method holds the instance lock and {@code
  * snapshot} returns a detached copy that is safe to hand off-thread.
  *
  * <p>Coverage is stored in two per-dimension sets, so a shrinking send range can be honored. The seed set holds the
@@ -28,13 +27,6 @@ import java.util.Map;
  * <p>Each trail center also carries the view-distance cap in force when it was walked ({@link #recordTrail}), so a
  * dip-then-rise in view distance cannot repaint history: a recompute paints a center at the lesser of the current
  * radius and its own recorded cap, never wider than what that stretch was actually walked at.
- *
- * <p>The disc radius is the measured send range (learned live by {@link SendRangeEstimator} from the raw distances at
- * which decorations and range-10 entities arrive), so a server that lowered its broadcast range is tracked rather than
- * assumed. The coverage is exact except for two edges disclosed plainly in the overlay's config tooltip. The measured
- * range is a lower bound until an entity has been received near the true edge, so the covered boundary can undershoot
- * early in a session. And the disc is chunk-granular, so a decoration near a chunk boundary can be sent or not by up to
- * one chunk relative to the chunk-center test. Both are acceptable for an operator aid.
  */
 public final class CoveredChunkIndex {
     private static final long[] EMPTY = new long[0];
@@ -62,9 +54,8 @@ public final class CoveredChunkIndex {
      * Record the coverage disc around a recording-path chunk under its live dimension id: every chunk whose center is
      * within {@code radius} chunks (Euclidean) of ({@code centerX}, {@code centerZ}). This replays the vanilla
      * decoration send rule at chunk granularity, where the caller passes {@code radius} from the measured send range
-     * ({@link SendRangeEstimator#radiusChunks}): the static decoration types are sent once on entry within that range,
-     * so a chunk inside this disc had its decorations sent and captured. Writes the trail-derived set, so a later
-     * {@link #recompute} at a smaller radius supersedes it.
+     * ({@link SendRangeEstimator#radiusChunks}): the static decoration types are sent once on entry within that range.
+     * Writes the trail-derived set, so a later {@link #recompute} at a smaller radius supersedes it.
      */
     public synchronized void addDisc(String dimensionId, int centerX, int centerZ, int radius) {
         version++;
