@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Nedlasting ufullstendig",
   "wdl.toast.error.title": "Nedlastingsfeil",
   "wdl.toast.error.body": "Lagring mislyktes: %s",
+  "wdl.toast.settings_error.title": "Innstillingsfeil",
   "wdl.toast.busy_restoring.title": "Nedlasting blokkert",
   "wdl.toast.busy_restoring.body": "Tilbakestiller fortsatt nedlastingen. Prøv igjen når det er ferdig.",
   "wdl.toast.busy_restoring_sweep.title": "Nedlasting blokkert",

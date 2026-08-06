@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Transferência incompleta",
   "wdl.toast.error.title": "Erro na transferência",
   "wdl.toast.error.body": "Falha ao guardar: %s",
+  "wdl.toast.settings_error.title": "Erro nas definições",
   "wdl.toast.busy_restoring.title": "Transferência bloqueada",
   "wdl.toast.busy_restoring.body": "Ainda a restaurar a transferência. Tenta novamente quando terminar.",
   "wdl.toast.busy_restoring_sweep.title": "Transferência bloqueada",

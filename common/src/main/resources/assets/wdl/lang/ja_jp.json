@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "ダウンロード不完全",
   "wdl.toast.error.title": "ダウンロードエラー",
   "wdl.toast.error.body": "保存に失敗しました：%s",
+  "wdl.toast.settings_error.title": "設定エラー",
   "wdl.toast.busy_restoring.title": "ダウンロードできません",
   "wdl.toast.busy_restoring.body": "ダウンロードをまだ復旧中です。完了してからもう一度お試しください。",
   "wdl.toast.busy_restoring_sweep.title": "ダウンロードできません",

@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Скачивание неполное",
   "wdl.toast.error.title": "Ошибка скачивания",
   "wdl.toast.error.body": "Сохранение не удалось: %s",
+  "wdl.toast.settings_error.title": "Ошибка настроек",
   "wdl.toast.busy_restoring.title": "Скачивание заблокировано",
   "wdl.toast.busy_restoring.body": "Возврат к резервной копии ещё выполняется. Повторите попытку, когда он завершится.",
   "wdl.toast.busy_restoring_sweep.title": "Скачивание заблокировано",

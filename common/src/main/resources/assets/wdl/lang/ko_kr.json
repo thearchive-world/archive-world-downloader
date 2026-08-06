@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "다운로드 불완전",
   "wdl.toast.error.title": "다운로드 오류",
   "wdl.toast.error.body": "저장 실패: %s",
+  "wdl.toast.settings_error.title": "설정 오류",
   "wdl.toast.busy_restoring.title": "다운로드할 수 없음",
   "wdl.toast.busy_restoring.body": "다운로드를 아직 복원하는 중입니다. 완료되면 다시 시도하세요.",
   "wdl.toast.busy_restoring_sweep.title": "다운로드할 수 없음",

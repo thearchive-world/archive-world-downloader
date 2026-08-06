@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Lataus epätäydellinen",
   "wdl.toast.error.title": "Latausvirhe",
   "wdl.toast.error.body": "Tallennus epäonnistui: %s",
+  "wdl.toast.settings_error.title": "Asetusvirhe",
   "wdl.toast.busy_restoring.title": "Lataus estetty",
   "wdl.toast.busy_restoring.body": "Latausta palautetaan yhä. Yritä uudelleen, kun se on valmis.",
   "wdl.toast.busy_restoring_sweep.title": "Lataus estetty",

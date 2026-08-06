@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "下載不完整",
   "wdl.toast.error.title": "下載錯誤",
   "wdl.toast.error.body": "儲存失敗：%s",
+  "wdl.toast.settings_error.title": "設定錯誤",
   "wdl.toast.busy_restoring.title": "無法下載",
   "wdl.toast.busy_restoring.body": "下載仍在還原中。完成後請重試。",
   "wdl.toast.busy_restoring_sweep.title": "無法下載",

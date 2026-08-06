@@ -4418,7 +4418,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         SaveFailureReason reason = SaveFailureComposer.describe(error);
         bridge.sendChat(ChatCopy.saveFailed(reason)); // an error is never suppressed by showChatMessages
         LOGGER.error("save failed", error);
-        ToastCopy toast = ToastCopy.error(config.showToasts(), reason);
+        ToastCopy toast = ToastCopy.downloadError(config.showToasts(), reason);
         if (toast != null) {
             bridge.sendToast(toast);
         }

@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Завантаження неповне",
   "wdl.toast.error.title": "Помилка завантаження",
   "wdl.toast.error.body": "Не вдалося зберегти: %s",
+  "wdl.toast.settings_error.title": "Помилка налаштувань",
   "wdl.toast.busy_restoring.title": "Завантаження заблоковано",
   "wdl.toast.busy_restoring.body": "Триває відновлення завантаження. Спробуйте знову, коли воно завершиться.",
   "wdl.toast.busy_restoring_sweep.title": "Завантаження заблоковано",

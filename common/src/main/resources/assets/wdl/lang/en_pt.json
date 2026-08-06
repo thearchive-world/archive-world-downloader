@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Plunderin' half-done",
   "wdl.toast.error.title": "Plunder run aground",
   "wdl.toast.error.body": "Stowin' foundered: %s",
+  "wdl.toast.settings_error.title": "Scribbles run aground",
   "wdl.toast.busy_restoring.title": "Plunder belayed",
   "wdl.toast.busy_restoring.body": "Still haulin' th' plunder back. Try again when it be done.",
   "wdl.toast.busy_restoring_sweep.title": "Plunder belayed",

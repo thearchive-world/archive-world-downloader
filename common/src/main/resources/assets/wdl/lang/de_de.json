@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Download unvollständig",
   "wdl.toast.error.title": "Download-Fehler",
   "wdl.toast.error.body": "Speichern fehlgeschlagen: %s",
+  "wdl.toast.settings_error.title": "Einstellungsfehler",
   "wdl.toast.busy_restoring.title": "Download blockiert",
   "wdl.toast.busy_restoring.body": "Der Download wird noch zurückgesetzt. Versuche es erneut, wenn es fertig ist.",
   "wdl.toast.busy_restoring_sweep.title": "Download blockiert",

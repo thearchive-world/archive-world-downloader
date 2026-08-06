@@ -745,9 +745,8 @@ public final class Wdl {
      * Persist an edited config from the settings menu and refresh the in-memory snapshot the per-frame consumers (the
      * HUD, the outline, the coverage overlay) read, so an edit takes effect without waiting for the next download
      * start. Writes the documented file atomically, then reloads from disk so the snapshot is the parsed, self-healed
-     * result. A write failure is surfaced to the player on the same chat and toast channel a failed download uses, and
-     * logged; the reload still runs, so the snapshot stays consistent with what is actually on disk (the prior file,
-     * since the write did not land).
+     * result. A write failure is surfaced to the player in chat and as a toast, and logged; the reload still runs, so
+     * the snapshot stays consistent with what is actually on disk (the prior file, since the write did not land).
      */
     private static void saveConfig(WdlConfig config) {
         Path file = configPath();
@@ -757,7 +756,7 @@ public final class Wdl {
             LOGGER.warn("failed to write wdl.properties from the settings menu", e);
             SaveFailureReason reason = SaveFailureComposer.describe(e);
             bridge.sendChat(ChatCopy.saveFailed(reason)); // an error is never suppressed by showChatMessages
-            ToastCopy toast = ToastCopy.error(config.showToasts(), reason);
+            ToastCopy toast = ToastCopy.settingsError(config.showToasts(), reason);
             if (toast != null) {
                 bridge.sendToast(toast);
             }
