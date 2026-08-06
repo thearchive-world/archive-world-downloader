@@ -255,7 +255,10 @@ class DownloadCatalogTest {
                         new DownloadCounts(10, 5, 2),
                         new SaveChunks(4, Collections.<DimensionChunks>emptyList()), true));
 
-        for (DownloadEntry entry : DownloadCatalog.list(savesDirectory, null)) {
+        List<DownloadEntry> entries = DownloadCatalog.list(savesDirectory, null);
+
+        assertEquals(2, entries.size(), "both fallback rows reach the catalog at all");
+        for (DownloadEntry entry : entries) {
             assertFalse(entry.isChunksOnly(), "a non-exceeding total is not chunks-only");
             DownloadCounts rowCounts = entry.counts();
             assertNotNull(rowCounts);
