@@ -13,17 +13,35 @@ on:
       # Version branches too (three-part 1.21.11/26.1.2, two-part 26.2), so the ratchet guards every era band.
       - "[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+"
+    # An exclusion, not an include list, and targetTests is the reason. It is world.thearchive.wdl.*Test, so
+    # PIT runs every test in the module and aborts unless that baseline is green: anything any test READS is an
+    # input to the score, not just the mutated classes. Three tests scan ../fabric and ../neoforge, six read
+    # assets/wdl/lang, and between them they reach most of common/src/main. What is left below cannot move the
+    # score, and an exclusion also fails in the safe direction: a new top-level directory starts running this
+    # tier rather than silently ceasing to.
     paths-ignore:
       - '**.md'
-      - 'docs/**'
-      - '.gitignore'
+      - '.github/**'
+      - 'art/**'
+      - 'config/**'
+      - '.editorconfig'
       - '.gitattributes'
+      - '.gitignore'
+      - 'LICENSE'
+      - 'GPL-3.0.txt'
   pull_request:
     paths-ignore:
       - '**.md'
-      - 'docs/**'
-      - '.gitignore'
+      - '.github/**'
+      - 'art/**'
+      - 'config/**'
+      - '.editorconfig'
       - '.gitattributes'
+      - '.gitignore'
+      - 'LICENSE'
+      - 'GPL-3.0.txt'
+  # On demand, because .github/** is ignored above and editing this job therefore cannot trigger it.
+  workflow_dispatch:
 
 permissions:
   contents: read
