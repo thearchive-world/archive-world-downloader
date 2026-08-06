@@ -46,6 +46,8 @@ updates:
       # +<loader>-<mc> SemVer build-metadata suffix, which SemVer defines as precedence-irrelevant.
       # Dependabot discards it when ranking versions, so an automated bump would cross bands.
       - dependency-name: "maven.modrinth:*"
+      # JourneyMap API: the version appends -<mc>, so an automated bump would cross bands.
+      - dependency-name: "info.journeymap:*"
       # Fabric loader + API: the loader tracks a runtime floor and the API version embeds +<mc>; both are
       # pinned to the target band in gradle.properties.
       - dependency-name: "net.fabricmc:*"
