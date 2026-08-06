@@ -19,7 +19,7 @@ import world.thearchive.wdl.core.SaveProgress;
  *
  * <ul>
  * <li>{@link #backupBeforeResume} takes the pre-merge safety copy: on a {@link DownloadMode#RESUME} (only), and only
- * when {@code zipOnResume} is on, it zips the existing folder to {@code <folder>-pre-resume.zip} before the merge
+ * when {@code zipOnResume} is on, it zips the existing folder to its next free pre-resume name before the merge
  * modifies it in place.</li>
  * <li>{@link #exportZip} writes the finish-time export zip {@code <folder>.zip} when {@code zipOnFinish} is on. The
  * folder's on-disk size is deliberately not recorded at finish: the download screen reads each row's size by walking
@@ -34,7 +34,12 @@ public final class FinalizeOutputs {
 
     private FinalizeOutputs() {}
 
-    /** Zip the existing folder to {@code <folder>-pre-resume.zip} before a resume merges into it. */
+    /** The file name the pre-resume backup of {@code folderName} would take right now, counter and all. */
+    public static String nextBackupName(Path savesDirectory, String folderName) {
+        return ZipName.nextFreeBackup(savesDirectory, folderName).getFileName().toString();
+    }
+
+    /** Zip the existing folder to its next free pre-resume name before a resume merges into it. */
     public static void backupBeforeResume(Path saveFolder, DownloadMode mode, boolean zipOnResume) {
         if (!zipOnResume || mode != DownloadMode.RESUME) {
             return;

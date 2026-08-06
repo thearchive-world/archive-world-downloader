@@ -95,6 +95,20 @@ class FinalizeOutputsTest {
     }
 
     @Test
+    void theAdvertisedBackupNameIsTheOneTheNextResumeWrites(@TempDir Path saves) throws IOException {
+        Path folder = saveFolder(saves);
+        FinalizeOutputs.backupBeforeResume(folder, DownloadMode.RESUME, true);
+
+        String advertised = FinalizeOutputs.nextBackupName(saves, "world");
+        FinalizeOutputs.backupBeforeResume(folder, DownloadMode.RESUME, true);
+
+        assertEquals("world-pre-resume_(2).zip", advertised,
+                "the bare stem holds the first resume's backup, so the second one is disambiguated");
+        assertTrue(Files.exists(saves.resolve(advertised)),
+                "the name shown before the resume is the file the resume actually wrote");
+    }
+
+    @Test
     void noBackupForFreshDownload(@TempDir Path saves) throws IOException {
         Path folder = saveFolder(saves);
 

@@ -59,6 +59,7 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
 import world.thearchive.wdl.core.browse.DownloadHealth;
 import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 import world.thearchive.wdl.core.browse.TargetResolver;
+import world.thearchive.wdl.core.export.FinalizeOutputs;
 import world.thearchive.wdl.core.export.RestoreOperation;
 import world.thearchive.wdl.core.export.RestoreSource;
 import world.thearchive.wdl.core.export.SizeFormatter;
@@ -625,8 +626,11 @@ public final class WdlDownloadsScreen extends Screen {
                     : Optional.empty();
             this.minecraft.setScreen(source.isPresent()
                     ? ResumeConfirm.createTaintedRestorable(folderName,
-                            source.get().zip().getFileName().toString(), backupHere, onContinue, onCancel)
-                    : ResumeConfirm.create("wdl.screen.downloads.confirm_tainted", folderName, backupHere,
+                            source.get().zip().getFileName().toString(),
+                            FinalizeOutputs.nextBackupName(this.savesDirectory, folderName), backupHere,
+                            onContinue, onCancel)
+                    : ResumeConfirm.create("wdl.screen.downloads.confirm_tainted", folderName,
+                            FinalizeOutputs.nextBackupName(this.savesDirectory, folderName), backupHere,
                             onContinue, onCancel));
             return;
         }
@@ -647,7 +651,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
         if (this.minecraft != null) {
             this.minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
-                    folderName, backupHere,
+                    folderName, FinalizeOutputs.nextBackupName(this.savesDirectory, folderName), backupHere,
                     proceed,
                     () -> this.minecraft.setScreen(this)));
         }
@@ -666,7 +670,7 @@ public final class WdlDownloadsScreen extends Screen {
             return;
         }
         this.minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
-                folderName, this.zipOnResume,
+                folderName, FinalizeOutputs.nextBackupName(this.savesDirectory, folderName), this.zipOnResume,
                 () -> start(target),
                 () -> this.minecraft.setScreen(this))); // cancel returns here, typed name preserved, no backup
     }

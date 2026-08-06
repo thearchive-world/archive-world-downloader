@@ -22,6 +22,7 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
 import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 import world.thearchive.wdl.core.browse.TargetClassification;
 import world.thearchive.wdl.core.browse.TargetResolver;
+import world.thearchive.wdl.core.export.FinalizeOutputs;
 import world.thearchive.wdl.core.export.RestoreOperation;
 import world.thearchive.wdl.core.export.RestoreSource;
 import world.thearchive.wdl.platform.PlatformBridge;
@@ -237,8 +238,10 @@ final class ResumeFlow {
                 };
                 minecraft.setScreen(source.isPresent()
                         ? ResumeConfirm.createTaintedRestorable(folderName, sourceZipName(source.get()),
-                                backupHere, onContinue, onCancel)
-                        : ResumeConfirm.create("wdl.screen.downloads.confirm_tainted", folderName, backupHere,
+                                FinalizeOutputs.nextBackupName(savesDirectory, folderName), backupHere,
+                                onContinue, onCancel)
+                        : ResumeConfirm.create("wdl.screen.downloads.confirm_tainted", folderName,
+                                FinalizeOutputs.nextBackupName(savesDirectory, folderName), backupHere,
                                 onContinue, onCancel));
             });
             return;
@@ -266,7 +269,9 @@ final class ResumeFlow {
         deferScreen.accept(() -> {
             Minecraft minecraft = Minecraft.getInstance();
             minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
-                    folderName, backupHere,
+                    folderName,
+                    FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getBaseDir(), folderName),
+                    backupHere,
                     () -> {
                         minecraft.setScreen(null);
                         proceed.run();
@@ -292,7 +297,9 @@ final class ResumeFlow {
         deferScreen.accept(() -> {
             Minecraft minecraft = Minecraft.getInstance();
             minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
-                    folderName, config.zipOnResume(),
+                    folderName,
+                    FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getBaseDir(), folderName),
+                    config.zipOnResume(),
                     () -> {
                         startDownload.accept(target);
                         minecraft.setScreen(null);
