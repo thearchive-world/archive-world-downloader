@@ -65,14 +65,22 @@ class DownloadFoldersTest {
     }
 
     @Test
-    void resolveManagedResumeRejectsNameThatSanitizesToEmpty(@TempDir Path saves) {
+    void resolveManagedResumeRejectsNameThatSanitizesToEmpty(@TempDir Path saves) throws IOException {
+        // The saves directory is itself marked managed, which is why an empty name has somewhere to resolve to:
+        // without it the probe rejects the empty name by accident and the empty-name guard is unobservable.
+        markManaged(saves);
         assertNull(DownloadFolders.resolveManagedResume("..", saves),
                 "an empty-after-sanitize name is a rejection, not the default-name fallback");
     }
 
     @Test
-    void resolveManagedResumeContainsAndRejectsTraversingName(@TempDir Path saves) {
-        assertNull(DownloadFolders.resolveManagedResume("../../etc/passwd", saves),
+    void resolveManagedResumeContainsAndRejectsTraversingName(@TempDir Path root) throws IOException {
+        // The traversal target is a real managed folder beside the saves directory, so an unsanitized name
+        // would find it: a target outside saves that no later guard can recognize, because resolveResume
+        // reads the traversed path back to its bare basename.
+        Path saves = Files.createDirectories(root.resolve("saves"));
+        markManaged(root.resolve("outside-saves"));
+        assertNull(DownloadFolders.resolveManagedResume("../outside-saves", saves),
                 "a traversing name is sanitized to a contained component, which is not a managed folder");
     }
 
