@@ -534,7 +534,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private int primeSinkSkips;
 
-    /** Primed entities lost because their encode threw or its envelope came back malformed. */
+    /** Primed entities the encode, a malformed envelope, or the finish re-offer around it destroyed. */
     private int primeEncodeFailures;
 
     /** Primed entities lost when their whole entity-chunk threw or nulled out during flush; counted, not residual. */
@@ -1531,8 +1531,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * <p>A still-refused entity is skipped before the encode so the sink skip is not tallied twice. A recovered one
      * leaves its earlier prime-time skip standing, so that diagnostic over-counts; it is a log figure, not an input to
      * the download's verdict.
+     *
+     * <p>Package-private so the loss its own catch counts stays testable.
      */
-    private void retryRefusedPrimes() {
+    void retryRefusedPrimes() {
         EntityPacketCapture capture = this.packetCapture;
         if (capture == null) {
             return;
@@ -1562,6 +1564,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     recordSaved(uuid, entity);
                 }
             } catch (RuntimeException e) {
+                // The try spans past the buffer write, and recordSaved's passenger walk is modded-overridable
+                // too, so a throw after the tag is buffered would otherwise count an entity that reaches disk.
+                if (!savedEntities.contains(uuid)) {
+                    recordEntityEncodeFailure(EntitySource.PRIMED);
+                }
                 LOGGER.warn("skipping the refused-entity retry for {}; it may be missing from the save", uuid, e);
             }
         }
@@ -4076,7 +4083,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return null;
     }
 
-    /** Tally one entity lost to a throwing or malformed encode against the path that was capturing it. */
+    /** Tally one entity the encode, a malformed envelope, or the finish re-offer destroyed, against its path. */
     private void recordEntityEncodeFailure(EntitySource source) {
         if (source == EntitySource.PRIMED) {
             primeEncodeFailures++;

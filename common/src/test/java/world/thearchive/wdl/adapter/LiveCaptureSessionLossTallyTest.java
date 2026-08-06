@@ -744,6 +744,55 @@ class LiveCaptureSessionLossTallyTest {
     }
 
     /**
+     * The finish re-offer's own per-entity catch, which covers the hops around the encode that the encode's own
+     * isolation never sees. A throw in any of them destroys the refused mount the re-offer exists to recover, so it has
+     * to reach the same structural count the encode's throw does. Two entities, so a catch hoisted out of the
+     * per-entity loop, which would destroy every refusal behind the first, cannot pass as one loss.
+     */
+    @Test
+    void anEntityTheRetryThrowsOnReachesTheVerdictThroughTheStructuralLossTally(@TempDir Path temporary)
+            throws Exception {
+        LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
+        installPacketCapture(session);
+        // The level-free fixture throws out of level(), the retry's first hop.
+        Set<UUID> refused = state(session, "primeRefusedEntities");
+        refused.add(VEHICLE);
+        refused.add(FRAME);
+        assertFalse(session.isPartialSave(0, 0), "nothing has been retried, so the finish reads clean");
+
+        session.retryRefusedPrimes();
+        session.reportEntityReconciliation();
+
+        assertEquals(2, losses(session, "primeEncodeFailures"),
+                "both mounts the re-offer could not reach are gone from the save, and both are counted");
+        assertEquals(2, losses(session, "structuralEntitiesLost"),
+                "and they are structural, the arm of the reconciliation the partial verdict reads");
+        assertTrue(session.isPartialSave(0, 0), "so the finish is partial rather than reporting the save clean");
+    }
+
+    /**
+     * The other side of that catch: it spans past the buffer write, so a throw can land on an entity whose tag is
+     * already bound for disk, and counting that one would report a loss the download did not take. Also the guard
+     * against a counter placed at the top of the loop body or in a finally, either of which would turn every download
+     * that recovers a refused mount partial.
+     */
+    @Test
+    void aRetryThrowOnAnEntityAlreadyBoundForDiskCountsNoLoss(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
+        installPacketCapture(session);
+        Set<UUID> saved = state(session, "savedEntities");
+        saved.add(VEHICLE); // in a tag bound for disk, whether from this retry's own write or an earlier nesting
+        Set<UUID> refused = state(session, "primeRefusedEntities");
+        refused.add(VEHICLE);
+
+        session.retryRefusedPrimes();
+        session.reportEntityReconciliation();
+
+        assertEquals(0, losses(session, "primeEncodeFailures"), "the entity reaches disk, so the throw counts nothing");
+        assertFalse(session.isPartialSave(0, 0), "and the download that saved it reports clean");
+    }
+
+    /**
      * The other half of the same split, and the reason it had to be made: the sink refusing an entity is one of
      * vanilla's own non-saves, so the identical null return must leave the download clean. A shared counter promoted to
      * a term would turn every download that primes a mounted mob partial.
