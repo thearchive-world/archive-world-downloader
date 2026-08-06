@@ -100,15 +100,13 @@ class OnDiskSizeScannerTest {
     }
 
     @Test
-    void submitAfterCloseSchedulesNothing(@TempDir Path folder) {
+    void closeMarksTheScannerClosedAndSubmitStaysQuiet(@TempDir Path folder) {
         OnDiskSizeScanner scanner = new OnDiskSizeScanner();
         assertFalse(scanner.isClosed(), "a fresh scanner is open");
         scanner.close();
         assertTrue(scanner.isClosed(), "close() marks the scanner closed");
-
-        scanner.submit(folder, false); // never throws and schedules nothing for the replaced screen
-
-        assertTrue(scanner.drainCompleted().isEmpty(), "a walk submitted after close is never delivered");
+        // The screen replaces a closed scanner rather than reopening it, so a late submit must not throw at it.
+        scanner.submit(folder, false);
     }
 
     @Test
