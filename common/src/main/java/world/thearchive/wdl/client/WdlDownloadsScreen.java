@@ -532,7 +532,8 @@ public final class WdlDownloadsScreen extends Screen {
         RestoreSource pinned = source.get();
         if (this.minecraft != null) {
             this.minecraft.setScreen(ResumeConfirm.createRestore("wdl.screen.downloads.confirm_restore",
-                    entry.folderName(), pinned.zip().getFileName().toString(), this.zipOnResume,
+                    entry.folderName(), pinned.zip().getFileName().toString(),
+                    RestoreOperation.nextSnapshotName(this.savesDirectory, entry.folderName()), this.zipOnResume,
                     () -> {
                         Wdl.launchRestore(this.savesDirectory, entry.folderName(), pinned);
                         this.minecraft.setScreen(this);
@@ -597,7 +598,8 @@ public final class WdlDownloadsScreen extends Screen {
                 RestoreSource pinned = source.get();
                 this.minecraft.setScreen(ResumeConfirm.createRestore(
                         "wdl.screen.downloads.confirm_restore_blocked",
-                        folderName, pinned.zip().getFileName().toString(), this.zipOnResume,
+                        folderName, pinned.zip().getFileName().toString(),
+                        RestoreOperation.nextSnapshotName(this.savesDirectory, folderName), this.zipOnResume,
                         () -> {
                             Wdl.launchRestore(this.savesDirectory, folderName, pinned);
                             this.minecraft.setScreen(this);
@@ -993,6 +995,7 @@ public final class WdlDownloadsScreen extends Screen {
             private final String lastPlayed;
             private final Path folder;
             private final @Nullable FaviconTexture icon;
+            private @Nullable String snapshotName;
             private int line2Top;
             private int arrowLeft;
             private int arrowRight;
@@ -1228,10 +1231,15 @@ public final class WdlDownloadsScreen extends Screen {
             /** The restore chip's tooltip: the action, the source zip, and the snapshot fate by zipOnResume. */
             private Component restoreTooltip(Path source) {
                 String sourceName = source.getFileName().toString();
-                return zipOnResume
-                        ? Component.translatable("wdl.screen.downloads.tooltip.restore", sourceName,
-                                ResumeConfirm.snapshotZipName(this.entry.folderName()))
-                        : Component.translatable("wdl.screen.downloads.tooltip.restore_no_backup", sourceName);
+                if (!zipOnResume) {
+                    return Component.translatable("wdl.screen.downloads.tooltip.restore_no_backup", sourceName);
+                }
+                if (this.snapshotName == null) {
+                    // A directory probe, and a row is rebuilt whenever a restore could have taken the next free name.
+                    this.snapshotName = RestoreOperation.nextSnapshotName(savesDirectory, this.entry.folderName());
+                }
+                return Component.translatable("wdl.screen.downloads.tooltip.restore", sourceName,
+                        this.snapshotName);
             }
 
             /** The on-disk total once its walk lands; absent until then. */

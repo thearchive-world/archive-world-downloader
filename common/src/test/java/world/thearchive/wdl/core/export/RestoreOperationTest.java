@@ -113,6 +113,22 @@ class RestoreOperationTest {
     }
 
     @Test
+    void theAdvertisedSnapshotNameIsTheOneTheNextRestoreWrites() throws IOException {
+        taintedWorldWithCleanExport("World");
+        assertEquals(RestoreOperation.Outcome.RESTORED, runOp("World", RestoreSource.find(saves, "World").get()));
+        assertTrue(Files.exists(saves.resolve("World-singleplayer.zip")));
+        write(saves.resolve("World/playerdata/u.dat"), 3); // opened in singleplayer again
+
+        String advertised = RestoreOperation.nextSnapshotName(saves, "World");
+        assertEquals(RestoreOperation.Outcome.RESTORED, runOp("World", RestoreSource.find(saves, "World").get()));
+
+        assertEquals("World-singleplayer_(2).zip", advertised,
+                "the bare stem holds the first restore's snapshot, so the second one is disambiguated");
+        assertTrue(Files.exists(saves.resolve(advertised)),
+                "the name shown before the restore is the file the restore actually wrote");
+    }
+
+    @Test
     void preconditionsRefusePerCause() throws IOException {
         taintedWorldWithCleanExport("World");
         RestoreSource source = RestoreSource.find(saves, "World").get();
