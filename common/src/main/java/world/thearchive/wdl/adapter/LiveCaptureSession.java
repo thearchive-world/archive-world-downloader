@@ -1274,12 +1274,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * resumes this same tick in the new dimension.
      */
     private void rebindDimension(ClientLevel newLevel) {
-        ResourceKey<Level> newTarget = VanillaDimensions
-                .forType(newLevel.dimensionTypeRegistration().unwrapKey().orElse(null));
-        dimensionRebind.rebind(newTarget);
+        rebindDimension(VanillaDimensions.forType(newLevel.dimensionTypeRegistration().unwrapKey().orElse(null)),
+                newLevel.dimension());
         this.level = newLevel;
+    }
+
+    /**
+     * The rebind a headless test can drive: the keys the session takes from its {@link ClientLevel} arrive directly,
+     * and the bound level stays the caller's to advance.
+     */
+    void rebindDimension(ResourceKey<Level> newTarget, ResourceKey<Level> liveDimension) {
+        dimensionRebind.rebind(newTarget);
         this.targetDimension = newTarget;
-        this.liveDimensionId = newLevel.dimension().identifier().toString();
+        this.liveDimensionId = liveDimension.identifier().toString();
     }
 
     /**
