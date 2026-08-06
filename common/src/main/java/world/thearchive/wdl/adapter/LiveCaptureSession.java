@@ -528,7 +528,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Primed entities the sink refused. An unresolvable leash never lands here (the sink strips it and saves the mob
      * unleashed), so a refusal means shouldBeSaved returned false (a live passenger saved nested under its vehicle, a
-     * removed entity, or a player-only vehicle vanilla persists through the player) or save() returned false (a
+     * removed entity, or a player-only vehicle vanilla persists through the player) or {@code save()} returned false (a
      * non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips. Reported so the drop
      * is visible; not a loss, and not part of the packet reconciliation residual (a primed entity has no spawn packet).
      */
@@ -3431,9 +3431,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Open the world for writing once and start the background {@link AsyncSaveWriter} (the writer owns the
      * {@link LevelStorageSource.LevelStorageAccess} session lock from here, and releases it when the save finishes).
-     * Lazy so a never-captured session creates nothing; idempotent so the flush pump and finish() share one writer.
-     * Returns null (and records {@link #startError}) if the world cannot be opened; that failure is logged once where
-     * it is surfaced (reportSaveFailure at finish), not here, so a deferred open error is not dumped to the log twice.
+     * Lazy so a never-captured session creates nothing; idempotent so the flush pump and {@code finish()} share one
+     * writer. Returns null (and records {@link #startError}) if the world cannot be opened; that failure is logged once
+     * where it is surfaced (reportSaveFailure at finish), not here, so a deferred open error is not dumped to the log
+     * twice.
      */
     private @Nullable AsyncSaveWriter ensureWriter() {
         if (writer != null) {

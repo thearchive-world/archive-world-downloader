@@ -64,9 +64,9 @@ class LiveCaptureSessionMapTallyTest {
     /**
      * A session with no bound level, which is all the map paths need. Entity and container capture are off so the
      * constructor publishes no process-wide capture into the static activation slots; a test that turns either on
-     * leaves a session published there for the rest of the suite JVM, since only finish() clears it. The toggles are
-     * asserted rather than assumed: an unrecognized config key falls back to the default, which is on for both, so a
-     * silent key rename would arm every session this fixture builds.
+     * leaves a session published there for the rest of the suite JVM, since only {@code finish()} clears it. The
+     * toggles are asserted rather than assumed: an unrecognized config key falls back to the default, which is on for
+     * both, so a silent key rename would arm every session this fixture builds.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
@@ -248,8 +248,8 @@ class LiveCaptureSessionMapTallyTest {
     }
 
     /**
-     * Close the finish batch, which production does only inside finish(), behind the client singleton the headless
-     * session does without.
+     * Close the finish batch, which production does only inside {@code finish()}, behind the client singleton the
+     * headless session does without.
      */
     private static void closeTheFinishBatch(LiveCaptureSession session) throws Exception {
         Field closed = LiveCaptureSession.class.getDeclaredField("finishBatchClosed");

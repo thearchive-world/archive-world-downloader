@@ -69,10 +69,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * loss, because a path that wrongly runs and succeeds also loses nothing.
  *
  * <p>The release is driven directly, package-private for that, because every production caller runs behind the client
- * singleton; what that leaves unpinned is finish() calling it at all, and calling it in the right place, which only the
- * gametest tier can reach. The prior level.dat is a real compressed file read through the production reader, and the
- * writer is real over real region storages, so the dimension a submit routes to is read back off disk rather than from
- * a recorded call.
+ * singleton; what that leaves unpinned is {@code finish()} calling it at all, and calling it in the right place, which
+ * only the gametest tier can reach. The prior level.dat is a real compressed file read through the production reader,
+ * and the writer is real over real region storages, so the dimension a submit routes to is read back off disk rather
+ * than from a recorded call.
  */
 class LiveCaptureSessionResumedMountReleaseTest {
     private static final UUID MOUNT = UUID.fromString("f4c1a8d2-3b76-4e05-9a1c-8d2e6b70f513");
@@ -393,8 +393,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
     /**
      * A session bound to no level, finishing in {@code finishedIn}. Entity and container capture are off so the
-     * constructor publishes no process-wide capture into the static activation slots, which only finish() clears; the
-     * toggles are asserted rather than assumed, since an unrecognized key falls back to on.
+     * constructor publishes no process-wide capture into the static activation slots, which only {@code finish()}
+     * clears; the toggles are asserted rather than assumed, since an unrecognized key falls back to on.
      */
     private static LiveCaptureSession session(VersionAdapter adapter, Path configDirectory,
             ResourceKey<Level> finishedIn, DownloadMode mode) {

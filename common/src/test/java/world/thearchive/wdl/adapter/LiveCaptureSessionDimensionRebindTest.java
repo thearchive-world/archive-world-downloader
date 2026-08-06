@@ -47,9 +47,9 @@ class LiveCaptureSessionDimensionRebindTest {
 
     /**
      * A session with no bound level, which the rebind under test does not need. Entity and container capture are off so
-     * the constructor publishes no process-wide capture into the static activation slots, which only finish() would
-     * clear; the toggles are asserted rather than assumed, since an unrecognized config key falls back to the default,
-     * which is on for both.
+     * the constructor publishes no process-wide capture into the static activation slots, which only {@code finish()}
+     * would clear; the toggles are asserted rather than assumed, since an unrecognized config key falls back to the
+     * default, which is on for both.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();

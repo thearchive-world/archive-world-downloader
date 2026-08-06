@@ -59,9 +59,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  *
  * <p>The two remap paths are reached reflectively. They are private, and every production caller runs behind the client
  * singleton, so none of them runs headlessly: the flush pump reaches the drained-holder and entity-container paths, and
- * finish() reaches the ridden-mount fold directly, a sibling entry to the pump rather than a descendant of it. The
- * alternative is to pin the two voices only by their field identity, which would not notice a site rewired to the other
- * path's voice.
+ * {@code finish()} reaches the ridden-mount fold directly, a sibling entry to the pump rather than a descendant of it.
+ * The alternative is to pin the two voices only by their field identity, which would not notice a site rewired to the
+ * other path's voice.
  */
 class LiveCaptureSessionLossLogWiringTest {
     private static final String SESSION_LOGGER = LiveCaptureSession.class.getName();
@@ -77,9 +77,9 @@ class LiveCaptureSessionLossLogWiringTest {
     /**
      * A session with no bound level, which is all the map paths need. Entity and container capture are off so the
      * constructor publishes no process-wide capture into the static activation slots; a test that turns either on
-     * leaves a session published there for the rest of the suite JVM, since only finish() clears it. The toggles are
-     * asserted rather than assumed: an unrecognized config key falls back to the default, which is on for both, so a
-     * silent key rename would arm every session this fixture builds.
+     * leaves a session published there for the rest of the suite JVM, since only {@code finish()} clears it. The
+     * toggles are asserted rather than assumed: an unrecognized config key falls back to the default, which is on for
+     * both, so a silent key rename would arm every session this fixture builds.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
@@ -299,8 +299,8 @@ class LiveCaptureSessionLossLogWiringTest {
     }
 
     /**
-     * Close the finish batch, which production does only inside finish(), behind the client singleton the headless
-     * session does without.
+     * Close the finish batch, which production does only inside {@code finish()}, behind the client singleton the
+     * headless session does without.
      */
     private static void closeTheFinishBatch(LiveCaptureSession session) {
         try {

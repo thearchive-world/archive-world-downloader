@@ -104,7 +104,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * <p>Five boundaries. These tests own the writer and hand it in, so nothing here would notice if the production flush
  * pump stopped passing the writer it opened. Driving each entry point directly has the same shape of cost one level up:
  * nothing here would notice a production caller that stopped calling one, and the pair this class hand-sequences (the
- * whole-buffer drain, then the reconciliation that reads what it fed) is ordered by finish() alone. Of the
+ * whole-buffer drain, then the reconciliation that reads what it fed) is ordered by {@code finish()} alone. Of the
  * block-container site's three summed merge tallies, two are pinned here, the container and the lectern; the
  * interaction-holder term stays zero while the fixture leaves the interaction capture off, which it must, since arming
  * one publishes a process-wide capture. The user-visible outcome each message names is read back off disk for one of
@@ -145,9 +145,9 @@ class LiveCaptureSessionLossTallyTest {
     /**
      * A session with no bound level, which is all the drain paths below need. Entity and container capture are off so
      * the constructor publishes no process-wide capture into the static activation slots; a test that turns either on
-     * leaves a session published there for the rest of the suite JVM, since only finish() clears it. The toggles are
-     * asserted rather than assumed: an unrecognized config key falls back to the default, which is on for both, so a
-     * silent key rename would arm every session this fixture builds.
+     * leaves a session published there for the rest of the suite JVM, since only {@code finish()} clears it. The
+     * toggles are asserted rather than assumed: an unrecognized config key falls back to the default, which is on for
+     * both, so a silent key rename would arm every session this fixture builds.
      */
     private static LiveCaptureSession session(VersionAdapter adapter, Path configDirectory) {
         Properties properties = new Properties();
@@ -798,7 +798,8 @@ class LiveCaptureSessionLossTallyTest {
      * entities the accumulator still holds is not void, because the position it would drop is the privacy gate those
      * entities are written through. Emptying the accumulator ahead of the flush would turn this chunk into a void one
      * and lose its terrain as well, which is a terrain loss the entity failure had not itself caused. Nothing pins the
-     * order of those two steps, since finish() alone sequences them, so what this pins is the reason the order matters.
+     * order of those two steps, since {@code finish()} alone sequences them, so what this pins is the reason the order
+     * matters.
      */
     @Test
     void aChunkHoldingOnlyAccumulatedEntitiesSurvivesTheVoidSkip(@TempDir Path temporary) throws Exception {
@@ -958,8 +959,8 @@ class LiveCaptureSessionLossTallyTest {
 
     /**
      * Install the packet capture the reconciliation reads. Set directly rather than by turning captureEntities on: the
-     * constructor publishes a capture it creates into the process-wide activation slot, which only finish() clears, so
-     * an armed fixture would leave this session live for the rest of the suite JVM.
+     * constructor publishes a capture it creates into the process-wide activation slot, which only {@code finish()}
+     * clears, so an armed fixture would leave this session live for the rest of the suite JVM.
      */
     private static EntityPacketCapture installPacketCapture(LiveCaptureSession session) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField("packetCapture");
