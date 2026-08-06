@@ -29,8 +29,10 @@ import org.junit.jupiter.api.Test;
  * The lang-file fidelity gate: every shipped locale mirrors en_us's key set and order, is placeholder-safe, and is
  * written in one canonical byte shape. en_us is the source of truth, verbatim: every locale carries exactly its key set
  * in order. This test is the build-time enforcement that a hand-edit or a bad sync cannot slip a drifted locale into a
- * release. MC-free: pure resource checks, reading the source files from the module tree (the
- * {@link PitestAllowlistEnrollmentTest} pattern).
+ * release. It also enrolls the shipped file set itself, since every other check here iterates whatever is on disk and
+ * so cannot see a locale that stopped shipping, and holds the contributor-facing translation form to that same set.
+ * MC-free: pure resource checks, reading the source files from the module tree (the
+ * {@link PitestAllowlistEnrollmentTest} pattern), plus the one issue form above the module root.
  */
 class LangFidelityTest {
     private static final Path LANG_DIRECTORY = Path.of("src/main/resources/assets/wdl/lang");
@@ -48,6 +50,10 @@ class LangFidelityTest {
     // The only conversion shapes the lang files use: %s, positional %1$s/%2$s, and the %% literal.
     private static final Pattern token = Pattern.compile("%(?:(\\d+)\\$)?([a-zA-Z%])");
 
+    private static final Path TRANSLATION_FORM = Path.of("../.github/ISSUE_TEMPLATE/5-translation.yml");
+    private static final String FREE_TEXT_OPTION = "Other (specify below)";
+    private static final Pattern dropdownOption = Pattern.compile("\\s+- \"(.+)\"");
+
     @Test
     void theShippedLangFilesAreExactlyTheEnrolledSet() {
         Set<String> onDisk = new TreeSet<>();
@@ -57,6 +63,19 @@ class LangFidelityTest {
         assertEquals(new TreeSet<>(SHIPPED_LANG_FILES), onDisk,
                 "the shipped lang set drifted; every other check here iterates whatever is on disk, so a dropped"
                         + " locale is invisible until this one fails");
+    }
+
+    @Test
+    void theTranslationFormOffersExactlyTheShippedLocales() {
+        Set<String> expected = new TreeSet<>();
+        for (String file : SHIPPED_LANG_FILES) {
+            expected.add(file.substring(0, file.length() - ".json".length()));
+        }
+        Set<String> offered = new TreeSet<>(localeDropdownOptions());
+        assertTrue(offered.remove(FREE_TEXT_OPTION),
+                "the form must keep its free-text escape hatch for a language it does not list");
+        assertEquals(expected, offered,
+                "the translation form's locale list drifted from the shipped set a contributor picks against");
     }
 
     @Test
@@ -129,6 +148,36 @@ class LangFidelityTest {
             arguments.add(index != null ? Integer.parseInt(index) : ++auto);
         }
         return arguments;
+    }
+
+    /** The Locale dropdown's options in file order, keyed off its stable id rather than its position. */
+    private static List<String> localeDropdownOptions() {
+        List<String> lines;
+        try {
+            lines = Files.readAllLines(TRANSLATION_FORM, UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("cannot read " + TRANSLATION_FORM.toAbsolutePath(), e);
+        }
+        List<String> options = new ArrayList<>();
+        boolean inLocaleDropdown = false;
+        boolean collecting = false;
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.equals("id: locale")) {
+                inLocaleDropdown = true;
+            } else if (inLocaleDropdown && trimmed.equals("options:")) {
+                collecting = true;
+            } else if (collecting) {
+                Matcher option = dropdownOption.matcher(line);
+                if (!option.matches()) {
+                    break;
+                }
+                options.add(option.group(1));
+            }
+        }
+        // Without this the set comparison below fails on the escape hatch instead of on the layout change.
+        assertFalse(options.isEmpty(), "no locale dropdown found in " + TRANSLATION_FORM.toAbsolutePath());
+        return options;
     }
 
     private static List<Path> langFiles() {
