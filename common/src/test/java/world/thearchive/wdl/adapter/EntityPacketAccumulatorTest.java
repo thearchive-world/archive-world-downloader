@@ -33,6 +33,7 @@ class EntityPacketAccumulatorTest {
     private static final UUID UUID_B = new UUID(0, 2);
     private static final long CHUNK = 100L;
     private static final long FAR = 200L;
+    private static final long ELSEWHERE = 300L;
     private static final String OVERWORLD = "overworld";
     private static final String NETHER = "the_nether";
 
@@ -252,6 +253,67 @@ class EntityPacketAccumulatorTest {
     }
 
     @Test
+    void aRiderTwoLevelsDeepFollowsTheStackToTheVehiclesChunk() {
+        EntityPacketAccumulator<String, String, String> accumulator = accumulator();
+        accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "minecart");
+        accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "mount");
+        accumulator.spawn(3, new UUID(0, 3), FAR, new EntityPos(0, 0, 0, 0f, 0f), "rider");
+        accumulator.recordPassengers(2, new int[] { 3 }); // the inner seat first, or one level would reach it anyway
+
+        accumulator.recordPassengers(1, new int[] { 2 });
+
+        assertEquals(Set.of(CHUNK), accumulator.chunks(OVERWORLD), "the whole stack joined the vehicle's chunk");
+        List<PacketEntity<String, String, String>> drained = accumulator.dropChunk(OVERWORLD, CHUNK);
+        assertEquals(3, drained.size(), "so all three drain in one batch and nest");
+        // Each list is one id long, which is the shape that lets a worklist wrapping the held array rather than
+        // copying it overwrite the vehicle's own passengers in place with its rider's.
+        assertArrayEquals(new int[] { 2 }, passengersOf(drained, 1), "the walk left the vehicle's own list alone");
+        assertArrayEquals(new int[] { 3 }, passengersOf(drained, 2), "and the mount's, which it walked through");
+    }
+
+    @Test
+    void everyRiderOfOneVehicleFollowsIt() {
+        // A vehicle seats more than one (a boat holds two), so a first-rider-only walk strands the rest.
+        EntityPacketAccumulator<String, String, String> accumulator = accumulator();
+        accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "boat");
+        accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "mount");
+        accumulator.spawn(3, new UUID(0, 3), FAR, new EntityPos(0, 0, 0, 0f, 0f), "first rider");
+        accumulator.spawn(4, new UUID(0, 4), FAR, new EntityPos(0, 0, 0, 0f, 0f), "second rider");
+        accumulator.recordPassengers(2, new int[] { 3, 4 });
+
+        accumulator.recordPassengers(1, new int[] { 2 });
+
+        assertEquals(Set.of(CHUNK), accumulator.chunks(OVERWORLD), "both riders joined the vehicle's chunk");
+        assertEquals(4, accumulator.dropChunk(OVERWORLD, CHUNK).size(), "so all four drain in one batch");
+    }
+
+    private static int[] passengersOf(List<PacketEntity<String, String, String>> drained, int id) {
+        return drained.stream().filter(entity -> entity.id() == id).findFirst().orElseThrow().passengers();
+    }
+
+    @Test
+    void aPassengerCycleTerminates() throws Exception {
+        EntityPacketAccumulator<String, String, String> accumulator = accumulator();
+        accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "vehicle");
+        accumulator.spawn(2, UUID_B, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "rider");
+        accumulator.recordPassengers(1, new int[] { 2 });
+
+        // A lost cycle guard spins forever: a same-thread call hangs the gate, a non-daemon thread outlives
+        // the suite, and a JUnit Timeout is same-thread by default so it is not read until the method returns.
+        Thread walk = new Thread(() -> {
+            accumulator.recordPassengers(2, new int[] { 1 }); // the rider names its own vehicle back
+            accumulator.reposition(1, FAR, new EntityPos(300, 64, 305, 0f, 0f));
+        });
+        walk.setDaemon(true);
+        walk.start();
+        walk.join(10_000);
+
+        assertFalse(walk.isAlive(), "each id is re-homed once and the walk ends");
+        assertEquals(Set.of(FAR), accumulator.chunks(OVERWORLD), "and the cycle re-homes to the vehicle's chunk");
+        assertEquals(2, accumulator.dropChunk(OVERWORLD, FAR).size(), "both still drain together");
+    }
+
+    @Test
     void aReusedIdReplacesThePriorEntityAndClearsAllItsState() {
         // The server reuses an int id once the prior entity at it is gone. A fresh spawn for that id is a new
         // identity (new UUID), and all its post-spawn state must start empty: the old entity's item, equipment,
@@ -375,12 +437,18 @@ class EntityPacketAccumulatorTest {
         // the other world's chunk, where it would drain and be written under the wrong dimension.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "vehicle");
+        // This world's entity is seated under the recycled id, so descending past that id would re-home an
+        // entity of this world from a passenger list belonging to another one.
+        accumulator.spawn(3, new UUID(0, 3), ELSEWHERE, new EntityPos(0, 0, 0, 0f, 0f), "this world, seated below");
         accumulator.enterDimension(NETHER);
         accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "recycled id, another world");
+        accumulator.recordPassengers(2, new int[] { 3 });
 
         accumulator.recordPassengers(1, new int[] { 2 });
 
         assertEquals(Set.of(FAR), accumulator.chunks(NETHER), "the entity of the other world kept its own chunk");
-        assertEquals(1, accumulator.dropChunk(OVERWORLD, CHUNK).size(), "and the vehicle drains alone");
+        assertEquals(Set.of(CHUNK, ELSEWHERE), accumulator.chunks(OVERWORLD),
+                "and the walk stopped at it rather than reaching through it");
+        assertEquals(1, accumulator.dropChunk(OVERWORLD, CHUNK).size(), "so the vehicle drains alone");
     }
 }
