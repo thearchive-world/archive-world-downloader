@@ -96,8 +96,9 @@ class SavedChunkIndexTest {
         index.snapshot("minecraft:overworld");
         assertEquals(v1, index.version(), "a read does not bump the version");
         index.addAll("minecraft:overworld", new long[] { 2L });
-        assertTrue(index.version() > v1, "a batch seed bumps the version, invalidating version-keyed snapshots");
+        long v2 = index.version();
+        assertTrue(v2 > v1, "a batch seed bumps the version, invalidating version-keyed snapshots");
         index.clear();
-        assertTrue(index.version() > v1, "clear bumps the version");
+        assertTrue(index.version() > v2, "clear bumps the version");
     }
 }
