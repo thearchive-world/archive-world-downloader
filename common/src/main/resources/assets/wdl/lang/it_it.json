@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Download incompleto",
   "wdl.toast.error.title": "Errore di download",
   "wdl.toast.error.body": "Salvataggio non riuscito: %s",
+  "wdl.toast.settings_error.title": "Errore delle impostazioni",
   "wdl.toast.busy_restoring.title": "Download bloccato",
   "wdl.toast.busy_restoring.body": "Ripristino del download ancora in corso. Riprova quando è finito.",
   "wdl.toast.busy_restoring_sweep.title": "Download bloccato",

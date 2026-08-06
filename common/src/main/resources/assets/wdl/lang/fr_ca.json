@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Téléchargement incomplet",
   "wdl.toast.error.title": "Erreur de téléchargement",
   "wdl.toast.error.body": "Échec de la sauvegarde : %s",
+  "wdl.toast.settings_error.title": "Erreur de paramètres",
   "wdl.toast.busy_restoring.title": "Téléchargement bloqué",
   "wdl.toast.busy_restoring.body": "Rétablissement du téléchargement encore en cours. Réessayez une fois terminé.",
   "wdl.toast.busy_restoring_sweep.title": "Téléchargement bloqué",

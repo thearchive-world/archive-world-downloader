@@ -10,12 +10,12 @@ import java.util.OptionalInt;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The composed copy of one job-done toast (download complete or download error): a title key plus a two-line body given
- * as a wdl translation key whose en_us pattern is the template, filled by ordered arguments. Each argument is a literal
- * value or a keyed sub-pattern with one insert, and carries its {@link BrandColors} tint or empty to inherit the
- * body's. The completion body tints its inserted values amber over the default text color; the error body is wholly
- * rust. MC-free so every decision is headless-testable, and the {@code showToasts} gate returns null when nothing is to
- * be enqueued.
+ * The composed copy of one job-done toast (download complete, download error, settings error): a title key plus a
+ * two-line body given as a wdl translation key whose en_us pattern is the template, filled by ordered arguments. Each
+ * argument is a literal value or a keyed sub-pattern with one insert, and carries its {@link BrandColors} tint or empty
+ * to inherit the body's. The completion body tints its inserted values amber over the default text color; the error
+ * body is wholly rust. MC-free so every decision is headless-testable, and the {@code showToasts} gate returns null
+ * when nothing is to be enqueued.
  */
 public final class ToastCopy {
     /**
@@ -301,14 +301,24 @@ public final class ToastCopy {
                 new ArrayList<>(), true);
     }
 
-    /** The error toast carrying the failure reason, wholly rust, or null when {@code showToasts} is off. */
-    public static @Nullable ToastCopy error(boolean showToasts, SaveFailureReason reason) {
+    /** The error toast for a download that could not be saved, or null when {@code showToasts} is off. */
+    public static @Nullable ToastCopy downloadError(boolean showToasts, SaveFailureReason reason) {
+        return failure("wdl.toast.error.title", showToasts, reason);
+    }
+
+    /** The error toast for a settings file that could not be written, or null when {@code showToasts} is off. */
+    public static @Nullable ToastCopy settingsError(boolean showToasts, SaveFailureReason reason) {
+        return failure("wdl.toast.settings_error.title", showToasts, reason);
+    }
+
+    /** The shared failure body carrying the reason under {@code titleKey}, wholly rust. */
+    private static @Nullable ToastCopy failure(String titleKey, boolean showToasts, SaveFailureReason reason) {
         if (!showToasts) {
             return null;
         }
         List<Argument> arguments = new ArrayList<>();
         arguments.add(new Argument(reason.translationKey(), reason.text(), OptionalInt.empty()));
-        return new ToastCopy("wdl.toast.error.title", "wdl.toast.error.body", OptionalInt.of(BrandColors.RUST),
+        return new ToastCopy(titleKey, "wdl.toast.error.body", OptionalInt.of(BrandColors.RUST),
                 arguments, false);
     }
 

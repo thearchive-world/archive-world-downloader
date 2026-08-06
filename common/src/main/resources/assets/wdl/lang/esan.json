@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Dêccarga incompleta",
   "wdl.toast.error.title": "Errôh de dêccarga",
   "wdl.toast.error.body": "Errôh ar guardâh: %s",
+  "wdl.toast.settings_error.title": "Errôh d'ahûttê",
   "wdl.toast.busy_restoring.title": "Dêccarga bloqueá",
   "wdl.toast.busy_restoring.body": "Aún çe êttá rêttaurando la dêccarga. Inténtalo de nuebo cuando termine.",
   "wdl.toast.busy_restoring_sweep.title": "Dêccarga bloqueá",

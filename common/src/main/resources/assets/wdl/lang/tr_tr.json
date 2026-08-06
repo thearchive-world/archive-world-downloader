@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "İndirme tamamlanmadı",
   "wdl.toast.error.title": "İndirme hatası",
   "wdl.toast.error.body": "Kayıt başarısız: %s",
+  "wdl.toast.settings_error.title": "Ayar hatası",
   "wdl.toast.busy_restoring.title": "İndirme engellendi",
   "wdl.toast.busy_restoring.body": "İndirme hâlâ geri yükleniyor. Bitince tekrar deneyin.",
   "wdl.toast.busy_restoring_sweep.title": "İndirme engellendi",

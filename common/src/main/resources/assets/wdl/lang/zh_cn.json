@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "下载不完整",
   "wdl.toast.error.title": "下载错误",
   "wdl.toast.error.body": "保存失败：%s",
+  "wdl.toast.settings_error.title": "设置错误",
   "wdl.toast.busy_restoring.title": "无法下载",
   "wdl.toast.busy_restoring.body": "下载仍在还原中。完成后请重试。",
   "wdl.toast.busy_restoring_sweep.title": "无法下载",

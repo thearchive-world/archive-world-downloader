@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Pobieranie niekompletne",
   "wdl.toast.error.title": "Błąd pobierania",
   "wdl.toast.error.body": "Zapis nie powiódł się: %s",
+  "wdl.toast.settings_error.title": "Błąd ustawień",
   "wdl.toast.busy_restoring.title": "Pobieranie zablokowane",
   "wdl.toast.busy_restoring.body": "Przywracanie pobrania wciąż trwa. Spróbuj ponownie, gdy się zakończy.",
   "wdl.toast.busy_restoring_sweep.title": "Pobieranie zablokowane",

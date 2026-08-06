@@ -96,7 +96,7 @@ class ToastCopyTest {
 
     @Test
     void errorBodyIsTheReasonRecoloredRustWhole() {
-        ToastCopy toast = ToastCopy.error(true, SaveFailureReason.literal("disk full"));
+        ToastCopy toast = ToastCopy.downloadError(true, SaveFailureReason.literal("disk full"));
 
         assertNotNull(toast);
         assertEquals("Download error", requireKey(toast.titleKey()));
@@ -108,10 +108,21 @@ class ToastCopyTest {
 
     @Test
     void errorBodyKeysTheFilesystemCategoryReason() {
-        ToastCopy toast = ToastCopy.error(true, SaveFailureReason.keyed("wdl.reason.access_denied"));
+        ToastCopy toast = ToastCopy.downloadError(true, SaveFailureReason.keyed("wdl.reason.access_denied"));
 
         assertNotNull(toast);
         assertEquals("Save failed: access denied", resolve(toast));
+    }
+
+    @Test
+    void settingsErrorWearsTheSettingsTitleNotTheDownloadOne() {
+        ToastCopy toast = ToastCopy.settingsError(true, SaveFailureReason.keyed("wdl.reason.access_denied"));
+
+        assertNotNull(toast);
+        assertEquals("Settings error", requireKey(toast.titleKey()));
+        assertEquals("Save failed: access denied", resolve(toast));
+        assertEquals(OptionalInt.of(BrandColors.RUST), toast.bodyColor());
+        assertFalse(toast.refusal());
     }
 
     @Test
@@ -302,7 +313,7 @@ class ToastCopyTest {
     void showToastsOffYieldsNothingToEnqueue() {
         assertNull(ToastCopy.completion(false, 1, 7_000, "w"));
         assertNull(ToastCopy.completionZip(false, 1, 7_000, "w.zip"));
-        assertNull(ToastCopy.error(false, SaveFailureReason.literal("disk full")));
+        assertNull(ToastCopy.downloadError(false, SaveFailureReason.literal("disk full")));
     }
 
     private static ToastCopy requireCompletion(int chunks, long elapsedMillis) {

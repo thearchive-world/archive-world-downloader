@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Download incompleet",
   "wdl.toast.error.title": "Downloadfout",
   "wdl.toast.error.body": "Opslaan mislukt: %s",
+  "wdl.toast.settings_error.title": "Instellingenfout",
   "wdl.toast.busy_restoring.title": "Download geblokkeerd",
   "wdl.toast.busy_restoring.body": "De download wordt nog teruggezet. Probeer het opnieuw zodra dat klaar is.",
   "wdl.toast.busy_restoring_sweep.title": "Download geblokkeerd",

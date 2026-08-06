@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Stahování nedokončeno",
   "wdl.toast.error.title": "Chyba stahování",
   "wdl.toast.error.body": "Uložení selhalo: %s",
+  "wdl.toast.settings_error.title": "Chyba nastavení",
   "wdl.toast.busy_restoring.title": "Stahování blokováno",
   "wdl.toast.busy_restoring.body": "Stažení se stále obnovuje. Zkus to znovu, až bude hotovo.",
   "wdl.toast.busy_restoring_sweep.title": "Stahování blokováno",

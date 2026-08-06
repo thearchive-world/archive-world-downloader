@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Nedladdning ofullständig",
   "wdl.toast.error.title": "Nedladdningsfel",
   "wdl.toast.error.body": "Sparandet misslyckades: %s",
+  "wdl.toast.settings_error.title": "Inställningsfel",
   "wdl.toast.busy_restoring.title": "Nedladdning blockerad",
   "wdl.toast.busy_restoring.body": "Återställer fortfarande nedladdningen. Försök igen när det är klart.",
   "wdl.toast.busy_restoring_sweep.title": "Nedladdning blockerad",

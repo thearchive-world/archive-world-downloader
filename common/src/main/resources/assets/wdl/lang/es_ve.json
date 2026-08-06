@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Descarga incompleta",
   "wdl.toast.error.title": "Error de descarga",
   "wdl.toast.error.body": "Falló el guardado: %s",
+  "wdl.toast.settings_error.title": "Error de configuración",
   "wdl.toast.busy_restoring.title": "Descarga bloqueada",
   "wdl.toast.busy_restoring.body": "Aún se está restaurando la descarga. Inténtalo de nuevo cuando termine.",
   "wdl.toast.busy_restoring_sweep.title": "Descarga bloqueada",

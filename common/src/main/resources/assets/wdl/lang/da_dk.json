@@ -110,6 +110,7 @@
   "wdl.toast.partial.title": "Download ufuldstændig",
   "wdl.toast.error.title": "Downloadfejl",
   "wdl.toast.error.body": "Kunne ikke gemme: %s",
+  "wdl.toast.settings_error.title": "Indstillingsfejl",
   "wdl.toast.busy_restoring.title": "Download blokeret",
   "wdl.toast.busy_restoring.body": "Genopretter stadig downloaden. Prøv igen, når den er færdig.",
   "wdl.toast.busy_restoring_sweep.title": "Download blokeret",
