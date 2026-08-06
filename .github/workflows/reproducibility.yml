@@ -11,17 +11,28 @@ on:
       - dev
       - "[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+"
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - '.gitattributes'
+    # The job builds one tree twice and diffs the jars, so a source change moves both halves identically and
+    # only the build definition can break the property. An include list is therefore honest here in a way it is
+    # not for the mutation tier: this job runs no tests, so nothing it reads is hidden behind a test glob.
+    paths:
+      - 'gradle/**'          # the wrapper's pinned Gradle version as much as the catalog
+      - 'gradlew'            # sets DEFAULT_JVM_OPTS and picks the JVM; gradle/** and **/*.gradle.kts miss it
+      - 'build-logic/**'
+      - '**/*.gradle.kts'    # root, settings, build-logic and the three subprojects
+      - 'gradle.properties'
+      # This file too: the exact JDK patch is pinned below and is itself a determinism input, so a bump has to
+      # re-baseline here rather than wait for someone to touch build-logic.
+      - '.github/workflows/reproducibility.yml'
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - '.gitattributes'
+    paths:
+      - 'gradle/**'
+      - 'gradlew'
+      - 'build-logic/**'
+      - '**/*.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/reproducibility.yml'
+  # On demand: re-baselining after a Temurin patch bump or re-checking a tag needs no commit to carry it.
+  workflow_dispatch:
 
 permissions:
   contents: read
