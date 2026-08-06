@@ -27,11 +27,6 @@ import world.thearchive.wdl.core.BrandColors;
 public final class ResumeConfirm {
     private ResumeConfirm() {}
 
-    /** The bare-stem snapshot zip a restore writes for {@code folderName} (disambiguation aside). */
-    static String snapshotZipName(String folderName) {
-        return folderName + "-singleplayer.zip";
-    }
-
     /**
      * Build a resume-confirm screen for {@code folderName} keyed under {@code keyPrefix}; the caller shows it and
      * supplies both actions. The backup reassurance is shown only when {@code zipOnResume} is on, since that is what
@@ -71,16 +66,17 @@ public final class ResumeConfirm {
 
     /**
      * The restore confirm and the blocked-offer screen, differing only by {@code keyPrefix}: the body names the folder,
-     * the clean source zip, and the snapshot fate ({@code zipOnResume} picks the kept-snapshot line naming the
-     * bare-stem {@code <folder>-singleplayer.zip} over the discarded-permanently line), and the yes verb is Restore
-     * rather than Continue. Restore runs {@code onRestore}, Cancel runs {@code onCancel}.
+     * the clean source zip, and the snapshot fate ({@code zipOnResume} picks the kept-snapshot line naming
+     * {@code snapshotZipName} over the discarded-permanently line), and the yes verb is Restore rather than Continue.
+     * The caller resolves {@code snapshotZipName} against the saves directory, counter and all. Restore runs
+     * {@code onRestore}, Cancel runs {@code onCancel}.
      */
     public static Screen createRestore(String keyPrefix, String folderName, String sourceZipName,
-            boolean zipOnResume, Runnable onRestore, Runnable onCancel) {
+            String snapshotZipName, boolean zipOnResume, Runnable onRestore, Runnable onCancel) {
         Component message;
         if (zipOnResume) {
             message = Component.translatable(keyPrefix + ".message", amber(folderName), amber(sourceZipName),
-                    amber(snapshotZipName(folderName)));
+                    amber(snapshotZipName));
         } else {
             message = Component.translatable(keyPrefix + ".message_no_backup", amber(folderName),
                     amber(sourceZipName));

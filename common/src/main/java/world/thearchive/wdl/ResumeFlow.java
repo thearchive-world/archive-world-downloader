@@ -22,6 +22,7 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
 import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 import world.thearchive.wdl.core.browse.TargetClassification;
 import world.thearchive.wdl.core.browse.TargetResolver;
+import world.thearchive.wdl.core.export.RestoreOperation;
 import world.thearchive.wdl.core.export.RestoreSource;
 import world.thearchive.wdl.platform.PlatformBridge;
 
@@ -201,7 +202,8 @@ final class ResumeFlow {
                         Minecraft minecraft = Minecraft.getInstance();
                         minecraft.setScreen(ResumeConfirm.createRestore(
                                 "wdl.screen.downloads.confirm_restore_blocked",
-                                folderName, sourceZipName(pinned), config.zipOnResume(),
+                                folderName, sourceZipName(pinned),
+                                RestoreOperation.nextSnapshotName(savesDirectory, folderName), config.zipOnResume(),
                                 () -> {
                                     minecraft.setScreen(null);
                                     Wdl.launchRestore(savesDirectory, folderName, pinned);

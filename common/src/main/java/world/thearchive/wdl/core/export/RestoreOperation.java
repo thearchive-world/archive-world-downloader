@@ -188,6 +188,11 @@ public final class RestoreOperation {
         this.phaseHook = phaseHook;
     }
 
+    /** The file name the pre-replace snapshot of {@code folderName} would take right now, counter and all. */
+    public static String nextSnapshotName(Path savesDirectory, String folderName) {
+        return ZipName.nextFreeSinglePlayer(savesDirectory, folderName).getFileName().toString();
+    }
+
     /** Immutable inputs pinned at confirm time. */
     public static RestoreOperation create(Path savesDirectory, String folderName,
             RestoreSource pinnedSource, boolean snapshotFirst) {
