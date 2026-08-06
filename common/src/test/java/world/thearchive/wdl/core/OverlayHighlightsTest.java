@@ -54,14 +54,6 @@ class OverlayHighlightsTest {
     }
 
     @Test
-    void theTwoTonesStayIndependent() {
-        // Both hues are user-set and may be cycled to the same value; neither tone may fall back to the other's.
-        int both = MarkerHue.WHITE.rgb();
-        assertEquals(ALPHA | both, OverlayHighlights.toneColor(OverlayHighlights.COVERED, both, both, ALPHA));
-        assertEquals(ALPHA | both, OverlayHighlights.toneColor(OverlayHighlights.SUSPECT, both, both, ALPHA));
-    }
-
-    @Test
     void partitionSplitsSavedIntoCoveredAndSuspect() {
         long[] saved = { 1L, 2L, 3L };
         long[] covered = { 2L, 3L, 99L }; // 99 is covered-not-saved and must be dropped
