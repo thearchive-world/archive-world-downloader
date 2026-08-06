@@ -319,7 +319,14 @@ class ChunkMergeTest {
         onDiskSections.add(onDiskSection);
         onDisk.put("sections", onDiskSections);
 
+        // The fresh chunk carries its own section at the same Y with no light layers on it. Without a section
+        // there the light assertion below iterates nothing and holds for any merge at all.
         CompoundTag fresh = chunkTagWith(chest(10, 70, 20)); // re-walked, gate-false: no light tags
+        ListTag freshSections = new ListTag();
+        CompoundTag freshSection = new CompoundTag();
+        freshSection.putByte("Y", (byte) 0);
+        freshSections.add(freshSection);
+        fresh.put("sections", freshSections);
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 

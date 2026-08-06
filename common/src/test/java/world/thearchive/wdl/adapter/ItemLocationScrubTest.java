@@ -8,8 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Method;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.NonNullList;
@@ -34,10 +37,20 @@ import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
+import world.thearchive.wdl.core.CoveredChunkIndex;
+import world.thearchive.wdl.core.DownloadMode;
+import world.thearchive.wdl.core.DownloadTarget;
+import world.thearchive.wdl.core.SavedChunkIndex;
+import world.thearchive.wdl.core.SendRangeEstimator;
+import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.BlockEntityFixtures;
 import world.thearchive.wdl.testsupport.EntityFixtures;
+import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
@@ -113,6 +126,39 @@ class ItemLocationScrubTest {
         return back;
     }
 
+    /**
+     * A session with no bound level, which is all the scrub gate needs. Entity and container capture are off so the
+     * constructor publishes no process-wide capture into the static activation slots, which only finish() clears; the
+     * toggles are asserted rather than assumed, since an unrecognized key falls back to a default that is on.
+     */
+    private static LiveCaptureSession session(Path configDirectory, boolean saveItemCoordinates) {
+        Properties properties = new Properties();
+        properties.setProperty("captureEntities", "false");
+        properties.setProperty("captureContainers", "false");
+        properties.setProperty("saveItemCoordinates", Boolean.toString(saveItemCoordinates));
+        WdlConfig config = WdlConfig.parse(properties);
+        assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
+        assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
+        assertEquals(saveItemCoordinates, config.saveItemCoordinates(), "the fixture must set the opt-out it names");
+        return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
+                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
+                new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
+                () -> {});
+    }
+
+    /** The gate is private and its production callers run behind the client singleton a headless test lacks. */
+    private static void scrubAndRemapItems(LiveCaptureSession session, CompoundTag holder) {
+        try {
+            Method method = LiveCaptureSession.class
+                    .getDeclaredMethod("scrubAndRemapItems", CompoundTag.class, Object.class);
+            method.setAccessible(true);
+            method.invoke(session, holder, "holder");
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("could not drive scrubAndRemapItems", e);
+        }
+    }
+
     private static Optional<GlobalPos> targetOf(ItemStack stack) {
         LodestoneTracker tracker = stack.get(DataComponents.LODESTONE_TRACKER);
         return tracker == null ? Optional.empty() : tracker.target();
@@ -184,11 +230,23 @@ class ItemLocationScrubTest {
     }
 
     @Test
-    void anUnscrubbedHolderKeepsTheTarget() {
-        // The other direction: the saveItemCoordinates=true (keep) path never calls scrub, so the target
-        // survives. The scrub itself is whether-to-call decided at the call site; here it is not called.
+    void theHolderCallSiteScrubsByDefault(@TempDir Path configDirectory) {
         CompoundTag holder = holderOf(lodestoneCompass());
-        assertTrue(targetOf(readBack(holder, 1).get(0)).isPresent(), "with scrub not run, the target survives");
+        assertTrue(targetOf(readBack(holder, 1).get(0)).isPresent(), "precondition: the fixture compass has a target");
+
+        scrubAndRemapItems(session(configDirectory, false), holder);
+
+        assertTrue(targetOf(readBack(holder, 1).get(0)).isEmpty(), "the default blanks the target at the call site");
+    }
+
+    @Test
+    void theHolderCallSiteKeepsTheTargetWhenTheUserOptsIn(@TempDir Path configDirectory) {
+        CompoundTag holder = holderOf(lodestoneCompass());
+        assertTrue(targetOf(readBack(holder, 1).get(0)).isPresent(), "precondition: the fixture compass has a target");
+
+        scrubAndRemapItems(session(configDirectory, true), holder);
+
+        assertTrue(targetOf(readBack(holder, 1).get(0)).isPresent(), "the opt-in keeps the target at the call site");
     }
 
     @Test
@@ -286,12 +344,6 @@ class ItemLocationScrubTest {
         CompoundTag before = holder.copy();
         ItemLocationScrub.scrub(holder, "Items");
         assertEquals(before, holder, "an empty beehive round-trips unchanged");
-    }
-
-    @Test
-    void anUnscrubbedBlockEntityKeepsTheTarget() {
-        CompoundTag pot = blockEntityWithItem(lodestoneCompass());
-        assertTrue(targetOf(itemOf(pot)).isPresent(), "with the block-entity scrub not run, the target survives");
     }
 
     @Test

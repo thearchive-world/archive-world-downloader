@@ -452,12 +452,18 @@ class AsyncSaveWriterTest {
         // writer thread and a direct on-thread encode. The disk results must be identical.
         ChunkSnapshotSource snapshot = SyntheticChunks.full(registries, true);
         CompoundTag onThread = codec.encode(snapshot, registries, false);
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> codec.encode(snapshot, registries, false),
-                ChunkMerge::merge);
+        AtomicReference<Thread> encodedOn = new AtomicReference<>();
+        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+            encodedOn.set(Thread.currentThread());
+            return codec.encode(snapshot, registries, false);
+        }, ChunkMerge::merge);
         writer.submitChunk(Level.NETHER, new ChunkPos(0, 0), () -> onThread, ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
+        assertNotNull(encodedOn.get(), "the encode thunk was never resolved");
+        assertEquals("wdl-save-writer", encodedOn.get().getName(),
+                "the chunk encode must be deferred to the writer thread, not run at submit on the caller's");
         CompoundTag offThreadOnDisk;
         CompoundTag onThreadOnDisk;
         try (SimpleRegionStorage in = storage(overworldRegion, "chunk")) {
