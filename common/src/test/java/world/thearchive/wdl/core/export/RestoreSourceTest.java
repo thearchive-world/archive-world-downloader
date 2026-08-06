@@ -208,12 +208,24 @@ class RestoreSourceTest {
     }
 
     @Test
-    void stillIdenticalPinsPathSizeMtime() throws IOException {
+    void stillIdenticalRejectsSizeOnlyChange() throws IOException {
         cleanZip("World.zip", "World", "2026-03-01T10:00:00Z");
         RestoreSource pinned = RestoreSource.find(saves, "World").get();
         assertTrue(RestoreSource.stillIdentical(pinned));
-        Files.write(pinned.zip(), new byte[] { 9, 9, 9, 9, 9, 9, 9, 9, 9 }); // size change
-        assertFalse(RestoreSource.stillIdentical(pinned));
+        // The pinned mtime goes back on after the rewrite, so only the size conjunct can see this.
+        Files.write(pinned.zip(), new byte[] { 9, 9, 9, 9, 9, 9, 9, 9, 9 });
+        Files.setLastModifiedTime(pinned.zip(), pinned.mtime());
+        assertFalse(RestoreSource.stillIdentical(pinned), "a size change alone is not still identical");
+    }
+
+    @Test
+    void stillIdenticalRejectsMtimeOnlyChange() throws IOException {
+        cleanZip("World.zip", "World", "2026-03-01T10:00:00Z");
+        RestoreSource pinned = RestoreSource.find(saves, "World").get();
+        assertTrue(RestoreSource.stillIdentical(pinned));
+        // The bytes are untouched, so only the mtime conjunct can see this.
+        Files.setLastModifiedTime(pinned.zip(), FileTime.from(pinned.mtime().toInstant().plusSeconds(60)));
+        assertFalse(RestoreSource.stillIdentical(pinned), "an mtime change alone is not still identical");
     }
 
     @Test
