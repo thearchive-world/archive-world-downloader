@@ -45,7 +45,7 @@ package world.thearchive.wdl.adapter;
  * @param unboundDimensionDrops entities received for a dimension other than the one the download was bound to when it
  *                              ended, whose own dimension had captured the terrain under them, so the gate would have
  *                              allowed the write and nothing performed it
- * @param primedEncodeFailures  primed entities lost to a throwing or malformed encode; outside the packet arithmetic
+ * @param primedEncodeFailures  primed entities the encode or the re-offer destroyed; outside the packet arithmetic
  * @param primedFlushDrops      primed entities lost to a flush failure; likewise outside the packet arithmetic
  */
 record EntityReconciliation(long received, int reconstructedWritten, int nestedPassengers,
