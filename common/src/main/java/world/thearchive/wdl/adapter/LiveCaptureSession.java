@@ -1214,8 +1214,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * retroactive paint honest. The trail append and the disc add stay gated on the player crossing into a new chunk.
      * Keyed by the live client dimension id so it lines up with the saved record-site and the overlay providers' query.
      * While the range is still uncalibrated the radius is 0 (only the center chunk), which the overlay's cold-start
-     * read hides by mirroring the saved set until the range is measured. The chunk-granular boundary and the
-     * measured-yet-approximate edge are disclosed in the overlay's config tooltip, not engineered around.
+     * read hides by mirroring the saved set until the range is measured.
      */
     private void recordCoveredDisc(ChunkPos hotCenter, int capChunks) {
         String dimensionId = level().dimension().identifier().toString();
