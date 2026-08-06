@@ -191,6 +191,15 @@ artifacts {
 // newer classfiles on the classpath), yet its presence and version vary per band, so it must not creep into
 // core. A new core dependency is a deliberate amendment here, never an accident. It is a line-level import
 // scan, wired into the check task.
+// The lang fidelity check holds the translation issue form to the enrolled locale set, and that form sits
+// above this module where no task consumes it. Without it declared here the test task is UP-TO-DATE on a
+// form-only edit, so the drift the check exists to catch passes locally without the check ever running.
+tasks.test {
+    inputs.file(rootProject.layout.projectDirectory.file(".github/ISSUE_TEMPLATE/5-translation.yml"))
+        .withPropertyName("translationForm")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 val checkCoreImports = tasks.register("checkCoreImports") {
     group = "verification"
     description = "Fails if core/ imports anything outside the allowlisted prefixes"
