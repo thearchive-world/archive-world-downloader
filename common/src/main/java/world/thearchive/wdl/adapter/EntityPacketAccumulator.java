@@ -4,6 +4,9 @@
 package world.thearchive.wdl.adapter;
 
 import com.mojang.logging.LogUtils;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.ArrayList;
@@ -281,12 +284,23 @@ class EntityPacketAccumulator<P, V, E> {
     }
 
     private void reHomePassengers(Held<P, V, E> vehicle) {
-        for (int passengerId : vehicle.passengers) {
-            Held<P, V, E> rider = byId.get(passengerId);
+        if (vehicle.passengers.length == 0) {
+            return; // the loop tolerates an empty list, but the two collections are allocated before it
+        }
+        IntSet visited = new IntOpenHashSet();
+        IntArrayList pending = new IntArrayList(vehicle.passengers);
+        while (!pending.isEmpty()) {
+            int riderId = pending.removeInt(pending.size() - 1);
+            // A malformed stream can seat a vehicle inside its own rider; visiting each id once ends that walk.
+            if (!visited.add(riderId)) {
+                continue;
+            }
+            Held<P, V, E> rider = byId.get(riderId);
             // A rider held for another dimension is a recycled id whose entity the stream has already
             // replaced elsewhere; re-homing it would move an entity of one world into another world's chunk.
             if (rider != null && vehicle.dimension.equals(rider.dimension)) {
                 rider.chunkPos = vehicle.chunkPos;
+                pending.addElements(pending.size(), rider.passengers);
             }
         }
     }
