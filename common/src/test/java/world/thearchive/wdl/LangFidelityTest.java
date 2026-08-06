@@ -36,8 +36,28 @@ class LangFidelityTest {
     private static final Path LANG_DIRECTORY = Path.of("src/main/resources/assets/wdl/lang");
     private static final String SOURCE = "en_us.json";
 
+    // Enrolled because nothing else in the tree reads this directory for anything but en_us: no other test, no
+    // Gradle task, no resource-processing step. Without the enrollment a sync that drops locale files ships green.
+    private static final Set<String> SHIPPED_LANG_FILES = Set.of(
+            "cs_cz.json", "da_dk.json", "de_de.json", "en_pt.json", "en_us.json", "es_ar.json", "es_cl.json",
+            "es_ec.json", "es_es.json", "es_mx.json", "es_uy.json", "es_ve.json", "esan.json", "fi_fi.json",
+            "fr_ca.json", "fr_fr.json", "it_it.json", "ja_jp.json", "ko_kr.json", "nl_be.json", "nl_nl.json",
+            "nn_no.json", "no_no.json", "pl_pl.json", "pt_br.json", "pt_pt.json", "qcb_es.json", "ru_ru.json",
+            "sv_se.json", "tr_tr.json", "uk_ua.json", "zh_cn.json", "zh_tw.json");
+
     // The only conversion shapes the lang files use: %s, positional %1$s/%2$s, and the %% literal.
     private static final Pattern token = Pattern.compile("%(?:(\\d+)\\$)?([a-zA-Z%])");
+
+    @Test
+    void theShippedLangFilesAreExactlyTheEnrolledSet() {
+        Set<String> onDisk = new TreeSet<>();
+        for (Path file : langFiles()) {
+            onDisk.add(file.getFileName().toString());
+        }
+        assertEquals(new TreeSet<>(SHIPPED_LANG_FILES), onDisk,
+                "the shipped lang set drifted; every other check here iterates whatever is on disk, so a dropped"
+                        + " locale is invisible until this one fails");
+    }
 
     @Test
     void everyLocaleMirrorsTheEnUsKeySetInOrder() {
@@ -111,16 +131,16 @@ class LangFidelityTest {
         return arguments;
     }
 
-    private static List<Path> localeFiles() {
+    private static List<Path> langFiles() {
         try (Stream<Path> entries = Files.list(LANG_DIRECTORY)) {
-            return entries
-                    .filter(path -> path.getFileName().toString().endsWith(".json"))
-                    .filter(path -> !path.getFileName().toString().equals(SOURCE))
-                    .sorted()
-                    .toList();
+            return entries.filter(path -> path.getFileName().toString().endsWith(".json")).sorted().toList();
         } catch (IOException e) {
             throw new UncheckedIOException("cannot list " + LANG_DIRECTORY.toAbsolutePath(), e);
         }
+    }
+
+    private static List<Path> localeFiles() {
+        return langFiles().stream().filter(path -> !path.getFileName().toString().equals(SOURCE)).toList();
     }
 
     private static LinkedHashMap<String, String> loadOrdered(Path path) {
