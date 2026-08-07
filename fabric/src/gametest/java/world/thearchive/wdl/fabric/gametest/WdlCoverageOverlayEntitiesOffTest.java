@@ -17,6 +17,11 @@ import world.thearchive.wdl.core.WdlConfig;
  * saved in a mode where none are). The cold-start mirror exists to hide a spurious suspect boundary before the send
  * range is known; that premise does not hold when entity capture itself is off, so the covered set must be empty
  * regardless of how much terrain is saved.
+ *
+ * <p>It then switches the setting back on mid-download, which nothing stops a player doing from the pause menu. The
+ * session latched entity capture off at start and goes on capturing no entity at all, so the covered set must stay
+ * empty: a download that captures zero entities may never report full entity coverage because the settings changed
+ * under it.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlCoverageOverlayEntitiesOffTest implements FabricClientGameTest {
@@ -40,6 +45,19 @@ public class WdlCoverageOverlayEntitiesOffTest implements FabricClientGameTest {
             Check.that(covered.length == 0,
                     "entities-off covered set must be empty; it instead mirrored the saved set as if entity "
                             + "capture were on");
+
+            Properties entitiesOn = new Properties();
+            entitiesOn.setProperty("captureEntities", "true");
+            entitiesOn.setProperty("renderCoverageOverlay", "true");
+            driver.editSettings(WdlConfig.parse(entitiesOn));
+            driver.tick(10);
+
+            Check.that(driver.overlaySavedChunks(dimension).length > 0,
+                    "the saved set emptied after the settings edit, so the covered assertion below would prove "
+                            + "nothing");
+            Check.that(driver.overlayCoveredChunks(dimension).length == 0,
+                    "switching captureEntities on mid-download made the overlay claim entity coverage for a "
+                            + "session that latched entity capture off and is capturing none");
 
             driver.stopAndAwaitSave();
         }

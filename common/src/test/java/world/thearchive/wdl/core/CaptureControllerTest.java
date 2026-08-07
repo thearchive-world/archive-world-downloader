@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.Properties;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +42,7 @@ class CaptureControllerTest {
         CaptureCounts counts = CaptureCounts.EMPTY;
         CapturedContainers capturedContainers = CapturedContainers.EMPTY;
         RecoveredCoverage recoveredCoverage = RecoveredCoverage.EMPTY;
+        CaptureToggles latchedToggles = CaptureToggles.from(WdlConfig.DEFAULTS);
         SaveStage saveStage = SaveStage.NONE;
         float saveProgress;
 
@@ -72,6 +74,11 @@ class CaptureControllerTest {
         @Override
         public RecoveredCoverage recoveredCoverage() {
             return recoveredCoverage;
+        }
+
+        @Override
+        public CaptureToggles latchedToggles() {
+            return latchedToggles;
         }
 
         @Override
@@ -298,6 +305,77 @@ class CaptureControllerTest {
     @Test
     void recoveredCoverageIsEmptyWhenIdle() {
         assertSame(RecoveredCoverage.EMPTY, controller().recoveredCoverage());
+    }
+
+    private static WdlConfig entities(boolean on) {
+        Properties properties = new Properties();
+        properties.setProperty("captureEntities", Boolean.toString(on));
+        properties.setProperty("renderCoverageOverlay", "true");
+        return WdlConfig.parse(properties);
+    }
+
+    @Test
+    void aidTogglesAreTheLiveSettingsWhileNothingIsRecording() {
+        CaptureController controller = controller();
+
+        assertTrue(controller.aidToggles(entities(true)).captureEntities(),
+                "with no download running there is no latched set, so the settings are the whole answer");
+        assertFalse(controller.aidToggles(entities(false)).captureEntities());
+    }
+
+    @Test
+    void switchingAnAxisOnMidDownloadDoesNotDrawForIt() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        session.latchedToggles = CaptureToggles.from(entities(false));
+        controller.start(() -> session);
+
+        assertFalse(controller.aidToggles(entities(true)).captureEntities(),
+                "the session latched the axis off, so no aid may claim it however the settings now read");
+    }
+
+    @Test
+    void switchingAnAxisOffMidDownloadStopsDrawingForIt() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        session.latchedToggles = CaptureToggles.from(entities(true));
+        controller.start(() -> session);
+
+        assertFalse(controller.aidToggles(entities(false)).captureEntities(),
+                "switching an axis off hides its markers at once, whatever the session latched");
+    }
+
+    @Test
+    void aidTogglesReturnToTheLiveSettingsOnceTheSaveCompletes() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        session.latchedToggles = CaptureToggles.from(entities(false));
+        controller.start(() -> session);
+        controller.stop();
+        session.saveDone = true;
+        controller.tick();
+
+        assertTrue(controller.aidToggles(entities(true)).captureEntities(),
+                "the latched set does not outlive the download that latched it");
+    }
+
+    @Test
+    void coveredOverlayStaysEmptyForAnAxisTheRunningDownloadLatchedOff() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        session.latchedToggles = CaptureToggles.from(entities(false));
+        controller.start(() -> session);
+        controller.savedChunks().add("minecraft:overworld", 42L);
+        controller.coveredChunks().recordTrail("minecraft:overworld", 0, 0, 8);
+        controller.coveredChunks().recompute("minecraft:overworld", 1);
+        controller.sendRange().observe("minecraft:overworld", 64);
+
+        // The gated read short-circuits before it reaches savedChunks, so the covered index is the one whose
+        // emptiness would make the assertion below vacuous; guard on it and not on the saved set.
+        assertTrue(controller.coveredChunks().snapshot("minecraft:overworld").length > 0,
+                "the covered index must be populated, or the assertion below would prove nothing");
+        assertEquals(0, controller.overlayCoveredChunks(entities(true), "minecraft:overworld").length,
+                "this download is adding no entity, so switching the settings on must not paint a covered tone");
     }
 
     @Test

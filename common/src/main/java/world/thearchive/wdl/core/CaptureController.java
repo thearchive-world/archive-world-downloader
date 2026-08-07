@@ -82,12 +82,20 @@ public final class CaptureController {
          */
         RecoveredCoverage recoveredCoverage();
 
+        /**
+         * Answered from the config this session was constructed with, never by re-reading the live one. Read once, at
+         * start.
+         */
+        CaptureToggles latchedToggles();
+
         /** The current finalization phase while the background save drains, for the HUD bar. */
         SaveStage saveStage();
 
         /** The current finalization phase's fraction in {@code [0, 1]}; 0 unless a save is draining. */
         float saveProgress();
     }
+
+    private static final long[] NO_OVERLAY_CHUNKS = new long[0];
 
     private final LongSupplier clockMillis;
 
@@ -97,6 +105,10 @@ public final class CaptureController {
     // already drawing; a stale IDLE would hide the overlay for a whole download with nothing to correct it.
     private volatile CaptureState state = CaptureState.IDLE;
     private @Nullable Session session;
+
+    // The running session's latched capture toggles, republished here because the session reference itself is
+    // client-thread-only while the overlay reads run off-thread. Null exactly when no session is set.
+    private volatile @Nullable CaptureToggles latchedToggles;
 
     // The three overlay stores are owned here, on the singleton that outlives individual sessions, so the
     // off-render-thread overlay reads a stably published reference. The live session writes to them.
@@ -155,6 +167,58 @@ public final class CaptureController {
             return session.capturedContainers();
         }
         return CapturedContainers.EMPTY;
+    }
+
+    /**
+     * The capture toggles the on-screen aids may draw under: the per-axis conjunction of {@code live} and what the
+     * running download latched at start, or {@code live} alone when nothing is running, since then no latched set
+     * exists and the settings are the only answer there is. The conjunction is what keeps a mid-download edit from
+     * stranding a marker: switching an axis on cannot draw for an axis this download is not capturing, and switching
+     * one off still hides its markers at once.
+     */
+    public CaptureToggles aidToggles(WdlConfig live) {
+        CaptureToggles liveToggles = CaptureToggles.from(live);
+        CaptureToggles latched = latchedToggles;
+        return latched == null ? liveToggles : liveToggles.and(latched);
+    }
+
+    /**
+     * The saved chunk-position longs for a dimension, snapshotted thread-safely for the coverage overlay, which reads
+     * off the render thread. Holds only the running download's own coverage, emptied once its save completes, and empty
+     * while {@code renderCoverageOverlay} is off: that toggle is read live, on the overlay's own read path, so
+     * switching it off hides the highlight without a restart and switching it back on shows the recorded index at once
+     * (the index keeps filling regardless). The id is the live client key, for instance
+     * {@code level.dimension().identifier().toString()}.
+     */
+    public long[] overlaySavedChunks(WdlConfig live, String dimensionId) {
+        if (!live.renderCoverageOverlay()) {
+            return NO_OVERLAY_CHUNKS;
+        }
+        return savedChunks.snapshot(dimensionId);
+    }
+
+    /**
+     * The covered chunk-position longs for a dimension: the saved chunks the recording path brought within entity send
+     * range, which the two-tone overlay draws in the covered hue while the rest of the saved set draws the suspect hue.
+     * Gated on the same live {@code renderCoverageOverlay} toggle and read the same thread-safe way as
+     * {@link #overlaySavedChunks}; each is its own independent synchronized snapshot, so a chunk may transiently appear
+     * in one and not the other for a single refresh. When {@link #aidToggles} reports entity capture off this download
+     * is adding no entity, so nothing draws covered; this is checked first and short-circuits the cold-start mirror
+     * below, which only applies while entity capture is on. Until the send range has been measured for the dimension
+     * the covered read mirrors the saved set, so the overlay draws single-tone rather than flashing a spurious suspect
+     * boundary at a not-yet-known range.
+     */
+    public long[] overlayCoveredChunks(WdlConfig live, String dimensionId) {
+        if (!live.renderCoverageOverlay()) {
+            return NO_OVERLAY_CHUNKS;
+        }
+        if (!aidToggles(live).captureEntities()) {
+            return NO_OVERLAY_CHUNKS;
+        }
+        if (!sendRange.isCalibrated(dimensionId)) {
+            return savedChunks.snapshot(dimensionId);
+        }
+        return coveredChunks.snapshot(dimensionId);
     }
 
     /** The saved-chunk-position index for the coverage overlay; snapshotted off-thread by the supplier. */
@@ -233,6 +297,7 @@ public final class CaptureController {
             coveredChunks.clear();
             sendRange.clear();
             session = sessionFactory.get();
+            latchedToggles = session.latchedToggles();
             state = CaptureState.RECORDING;
             startMillis = clockMillis.getAsLong();
             frozenCounts = CaptureCounts.EMPTY;
@@ -262,6 +327,7 @@ public final class CaptureController {
             // promoted packet frames), so the done linger must show the written totals, not the stop figures.
             frozenCounts = session.counts();
             session = null;
+            latchedToggles = null;
             state = CaptureState.IDLE;
             saveCompletedMillis = clockMillis.getAsLong();
             hasCompletedSave = true;
