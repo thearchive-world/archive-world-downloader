@@ -26,13 +26,13 @@ import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.Nullable;
 
+import world.thearchive.wdl.adapter.RenderSurface;
+import world.thearchive.wdl.adapter.impl.RenderSurfaceImpl;
 import world.thearchive.wdl.core.BrandColors;
 import world.thearchive.wdl.core.CaptureToggleGuard;
 import world.thearchive.wdl.core.ConfigOption;
@@ -67,7 +67,7 @@ public final class WdlSettingsScreen extends Screen {
     private static final int REVERT_WIDTH = 20;
     private static final int GAP = 4;
     private static final String CAPTURE_WARNING_GLYPH = "⚠";
-    private static final Identifier REVERT_ICON = Identifier.fromNamespaceAndPath("wdl", "revert");
+    private static final String REVERT_ICON = "revert";
     private static final int REVERT_ICON_WIDTH = 10;
     private static final int REVERT_ICON_HEIGHT = 10;
 
@@ -471,8 +471,9 @@ public final class WdlSettingsScreen extends Screen {
         @Override
         public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
                 float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int textY = getContentY() + (ROW_HEIGHT - font.lineHeight) / 2 + 2;
-            guiGraphics.drawString(font, this.label, getContentX(), textY, BrandColors.opaque(BrandColors.AMBER));
+            surface.text(font, this.label, getContentX(), textY, BrandColors.opaque(BrandColors.AMBER));
         }
 
         @Override
@@ -518,6 +519,7 @@ public final class WdlSettingsScreen extends Screen {
         @Override
         public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
                 float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             AbstractWidget control = control();
             boolean enabled = this.masterKey == null || draft.getBoolean(this.masterKey);
             int rowX = getContentX();
@@ -527,7 +529,7 @@ public final class WdlSettingsScreen extends Screen {
             int controlX = revertX - GAP - control.getWidth();
 
             int textY = rowTop + (ROW_HEIGHT - font.lineHeight) / 2;
-            guiGraphics.drawString(font, this.label, rowX, textY, BrandColors.opaque(enabled ? BrandColors.IVORY
+            surface.text(font, this.label, rowX, textY, BrandColors.opaque(enabled ? BrandColors.IVORY
                     : BrandColors.GRAY));
 
             control.active = enabled;
@@ -539,7 +541,7 @@ public final class WdlSettingsScreen extends Screen {
             // defense-in-depth reminder that the download will be missing that data beyond the confirm-at-change.
             if (showsCaptureWarning()) {
                 int glyphY = controlY + (CONTROL_HEIGHT - font.lineHeight) / 2;
-                guiGraphics.drawString(font, CAPTURE_WARNING_GLYPH,
+                surface.text(font, CAPTURE_WARNING_GLYPH,
                         controlX - GAP - font.width(CAPTURE_WARNING_GLYPH), glyphY,
                         BrandColors.opaque(BrandColors.AMBER));
             }
@@ -564,9 +566,9 @@ public final class WdlSettingsScreen extends Screen {
                 // Center on the button face, which excludes the one-pixel bottom shadow row of the widget sprite.
                 int iconX = revertX + (REVERT_WIDTH - REVERT_ICON_WIDTH) / 2;
                 int iconY = controlY + (CONTROL_HEIGHT - 1 - REVERT_ICON_HEIGHT) / 2;
-                guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, REVERT_ICON, iconX + 1, iconY + 1,
+                surface.blitSprite(REVERT_ICON, iconX + 1, iconY + 1,
                         REVERT_ICON_WIDTH, REVERT_ICON_HEIGHT, shadowColor);
-                guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, REVERT_ICON, iconX, iconY,
+                surface.blitSprite(REVERT_ICON, iconX, iconY,
                         REVERT_ICON_WIDTH, REVERT_ICON_HEIGHT, iconColor);
             }
         }
