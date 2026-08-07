@@ -296,8 +296,30 @@ val checkPlugBand = tasks.register("checkPlugBand") {
         }
     }
 }
+// CI installs java_build_version while the Gradle toolchain resolves java_version, and nothing else makes the
+// two agree: bump one without the other and local builds use a different JDK than CI does.
+val checkJavaVersion = tasks.register("checkJavaVersion") {
+    group = "verification"
+    description = "Fails if java_build_version's major disagrees with java_version"
+    val javaVersion = providers.gradleProperty("java_version").get()
+    val buildVersion = providers.gradleProperty("java_build_version").get()
+    inputs.property("javaVersion", javaVersion)
+    inputs.property("buildVersion", buildVersion)
+    doLast {
+        // takeWhile, not substringBefore('.'), because setup-java accepts an early-access value like 25-ea
+        // that has no dot to split on. A legacy 1.8.0_442 still reads as major 1 either way.
+        val buildMajor = buildVersion.takeWhile { it.isDigit() }
+        if (buildMajor != javaVersion) {
+            throw GradleException(
+                "java toolchain mismatch: java_build_version=$buildVersion (major $buildMajor) but " +
+                    "java_version=$javaVersion; CI and Gradle would use different JDKs"
+            )
+        }
+    }
+}
+
 tasks.named("check") {
-    dependsOn(checkCoreImports, checkPlugBand)
+    dependsOn(checkCoreImports, checkPlugBand, checkJavaVersion)
     // The Java-8 floor compile is moot on a band whose toolchain already is Java 8 (see checkCoreJava8).
     if (providers.gradleProperty("java_version").get().toInt() > 8) {
         dependsOn(checkCoreJava8)
