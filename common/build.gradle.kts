@@ -22,12 +22,19 @@ spotless {
     }
 }
 
+// Parchment param-name mappings are layered only on bands that publish them; a band with no Parchment
+// release (26.x) omits both properties and skips the parchment block below.
+val parchmentMinecraft = providers.gradleProperty("parchment_minecraft_version")
+val parchmentMappings = providers.gradleProperty("parchment_mappings_version")
+
 neoForge {
     // Vanilla mode: set a NeoForm version (NOT a NeoForge version)
     neoFormVersion = property("neoform_version") as String
-    parchment {
-        minecraftVersion = property("parchment_minecraft_version") as String
-        mappingsVersion  = property("parchment_mappings_version") as String
+    if (parchmentMinecraft.isPresent && parchmentMappings.isPresent) {
+        parchment {
+            minecraftVersion = parchmentMinecraft.get()
+            mappingsVersion  = parchmentMappings.get()
+        }
     }
     // Vanilla mode supports only client/server/data run types (no loader); common needs none.
 }

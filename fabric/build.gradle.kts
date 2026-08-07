@@ -87,11 +87,18 @@ repositories {
     maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
 }
 
+// Parchment param-name mappings are layered only on bands that publish them; a band with no Parchment
+// release (26.x) omits both properties and skips the parchment layer below.
+val parchmentMinecraft = providers.gradleProperty("parchment_minecraft_version")
+val parchmentMappings = providers.gradleProperty("parchment_mappings_version")
+
 dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
     mappings(loom.layered {
         officialMojangMappings()
-        parchment("org.parchmentmc.data:parchment-${property("parchment_minecraft_version")}:${property("parchment_mappings_version")}@zip")
+        if (parchmentMinecraft.isPresent && parchmentMappings.isPresent) {
+            parchment("org.parchmentmc.data:parchment-${parchmentMinecraft.get()}:${parchmentMappings.get()}@zip")
+        }
     })
     modImplementation("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
