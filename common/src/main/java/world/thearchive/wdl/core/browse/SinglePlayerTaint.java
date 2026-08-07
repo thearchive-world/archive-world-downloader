@@ -19,11 +19,10 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Whether a wdl-managed save folder has ever been opened in singleplayer, a sticky property WDL uses to refuse (or
- * confirm) resuming into it. The integrated server writes a set of server-only artifacts on autosave and exit: the
- * player-data directory, and, from 1.14 onward, the point-of-interest directory for each loaded dimension. WDL never
- * writes any of them (the downloader goes into level.dat's Player tag, progress into advancements/ and stats/, and it
- * opens only the region and entities storages, never point-of-interest), so a non-empty member of the set means
- * singleplayer touched the folder.
+ * confirm) resuming into it. The integrated server writes server-only artifacts a downloaded folder cannot otherwise
+ * hold: the pre-26 player-data directory, and, from 1.14 onward, the point-of-interest directory for each loaded
+ * dimension. WDL opens only the region and entities storages, never point-of-interest, so a non-empty member of the set
+ * means singleplayer touched the folder.
  *
  * <p>Directory names, and for point-of-interest the dimension root itself, are band-dependent, so the check tests the
  * union of the known vanilla layouts, which also covers a folder opened by a different MC version than the one running
@@ -37,11 +36,13 @@ import org.jspecify.annotations.Nullable;
  */
 public final class SinglePlayerTaint {
     /**
-     * Relative player-data directories across bands: {@code playerdata} on 1.21.x and earlier, {@code players/data} on
-     * 26.x.
+     * The relative player-data directory, {@code playerdata} on 1.21.x and earlier. The 26.x layout
+     * {@code players/data} is not a member: {@code PrimaryLevelData.createTag} writes no player compound there, so WDL
+     * writes that file itself. Neither member is redundant, since point-of-interest does not exist before 1.14 and
+     * player data is unusable from 26.x, so dropping either blinds a band.
      */
     private static final List<String> PLAYER_DATA_DIRECTORIES = Collections
-            .unmodifiableList(Arrays.asList("playerdata", "players/data"));
+            .unmodifiableList(Arrays.asList("playerdata"));
 
     /**
      * Dimension-root-relative point-of-interest directories: the save root plus the vanilla nether and end roots.
@@ -50,6 +51,9 @@ public final class SinglePlayerTaint {
      * the server's chunk map and is server-written only, and WDL opens only the region and entities storages, never
      * point-of-interest, so the check is safe to add. On pre-1.14 bands the directory never exists, so the check is
      * inert there with no band branch.
+     *
+     * <p>From 1.21.2 the chunk-load path prefetches this storage, so the directory appears on any singleplayer load
+     * rather than only once a point-of-interest block is stored. That is what lets 26.x carry no player-data member.
      */
     private static final List<String> FIXED_POI_DIRECTORIES = Collections
             .unmodifiableList(Arrays.asList("poi", "DIM-1/poi", "DIM1/poi"));
@@ -72,7 +76,7 @@ public final class SinglePlayerTaint {
         UNKNOWN
     }
 
-    /** The observed state of a candidate player-data directory; the seam that makes the unreadable branch testable. */
+    /** The observed state of a candidate artifact directory; the seam that makes the unreadable branch testable. */
     interface DirectoryProbe {
         Presence presence(Path directory);
     }

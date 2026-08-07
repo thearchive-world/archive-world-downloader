@@ -30,10 +30,19 @@ class SinglePlayerTaintTest {
     }
 
     @Test
-    void nonEmptyPlayersDataDirIsTaintedOn26xLayout(@TempDir Path folder) throws IOException {
+    void playersDataIsTheModsOwnOutputNotTaint(@TempDir Path folder) throws IOException {
+        // The 26.x player file, which WDL writes itself because createTag carries no player compound there.
         Files.createDirectories(folder.resolve("players").resolve("data"));
         Files.createFile(folder.resolve("players").resolve("data").resolve("host.dat"));
-        assertTrue(SinglePlayerTaint.isTainted(folder));
+        assertEquals(SinglePlayerTaint.TaintState.CLEAN, SinglePlayerTaint.classify(folder));
+    }
+
+    @Test
+    void theDeepBandsStillRestOnPlayerData(@TempDir Path folder) throws IOException {
+        // Point-of-interest does not exist before 1.14, so playerdata is the only member covering those bands.
+        Files.createDirectories(folder.resolve("playerdata"));
+        Files.createFile(folder.resolve("playerdata").resolve("host.dat"));
+        assertEquals(SinglePlayerTaint.TaintState.TAINTED, SinglePlayerTaint.classify(folder));
     }
 
     @Test
@@ -132,7 +141,9 @@ class SinglePlayerTaintTest {
         // Save-root player data, both band layouts, case-insensitive.
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("playerdata/uuid.dat"));
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("Playerdata/uuid.dat"));
-        assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("players/data/uuid.dat"));
+        // Every export and pre-resume backup carries the 26.x player file, so matching it would exclude WDL's
+        // own archives from its own restore.
+        assertFalse(SinglePlayerTaint.entryPathIsServerArtifact("players/data/uuid.dat"));
         // POI at each dimension root.
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("poi/r.0.0.mca"));
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("DIM-1/poi/r.0.0.mca"));
