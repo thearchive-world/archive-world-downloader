@@ -40,7 +40,6 @@ import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -49,6 +48,8 @@ import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.Wdl;
+import world.thearchive.wdl.adapter.RenderSurface;
+import world.thearchive.wdl.adapter.impl.RenderSurfaceImpl;
 import world.thearchive.wdl.core.BrandColors;
 import world.thearchive.wdl.core.CaptureState;
 import world.thearchive.wdl.core.DownloadTarget;
@@ -696,10 +697,11 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             String triangle = listCollapsed ? TRIANGLE_COLLAPSED : TRIANGLE_EXPANDED;
             Component header = Component.literal(triangle)
                     .append(Component.translatable("wdl.screen.downloads.existing", entries.size()));
-            guiGraphics.drawString(font, header, getX() + 4, getY() + (getHeight() - font.lineHeight) / 2,
+            surface.text(font, header, getX() + 4, getY() + (getHeight() - font.lineHeight) / 2,
                     HEADER_ARGB);
         }
 
@@ -722,8 +724,9 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
-            guiGraphics.drawString(font, openSavesText(), getX() + 4,
+            surface.text(font, openSavesText(), getX() + 4,
                     getY() + (getHeight() - font.lineHeight) / 2, color);
         }
 
@@ -750,11 +753,12 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-            guiGraphics.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), BANNER_FILL_ARGB);
-            guiGraphics.renderOutline(getX(), getY(), getWidth(), getHeight(), BANNER_OUTLINE_ARGB);
+            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
+            surface.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), BANNER_FILL_ARGB);
+            surface.outline(getX(), getY(), getWidth(), getHeight(), BANNER_OUTLINE_ARGB);
             int textY = getY() + (getHeight() - font.lineHeight) / 2;
-            guiGraphics.drawString(font, WARNING_GLYPH, getX() + BANNER_GAP, textY, BANNER_GLYPH_ARGB);
-            guiGraphics.drawString(font, this.prose, getX() + BANNER_GAP + font.width(WARNING_GLYPH), textY,
+            surface.text(font, WARNING_GLYPH, getX() + BANNER_GAP, textY, BANNER_GLYPH_ARGB);
+            surface.text(font, this.prose, getX() + BANNER_GAP + font.width(WARNING_GLYPH), textY,
                     BANNER_TEXT_ARGB);
         }
 
@@ -776,8 +780,9 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int color = isHovered() ? BANNER_LINK_HOVER_ARGB : BANNER_LINK_ARGB;
-            guiGraphics.drawString(font, this.label, getX(), getY() + (getHeight() - font.lineHeight) / 2, color);
+            surface.text(font, this.label, getX(), getY() + (getHeight() - font.lineHeight) / 2, color);
         }
 
         @Override
@@ -800,10 +805,11 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             // The glyph comes from the fallback font, whose ink sits high in its line box, so the shared
             // centering formula reads a pixel high without the nudge.
-            guiGraphics.drawString(font, DISMISS_GLYPH, getX(),
+            surface.text(font, DISMISS_GLYPH, getX(),
                     getY() + (getHeight() - font.lineHeight) / 2 + 1, color);
         }
 
@@ -832,9 +838,10 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int textY = getY() + (getHeight() - font.lineHeight) / 2;
-            guiGraphics.drawString(font, WARNING_GLYPH, getX(), textY, BANNER_GLYPH_ARGB);
-            guiGraphics.drawString(font, this.text, getX() + font.width(WARNING_GLYPH), textY, NAME_ARGB);
+            surface.text(font, WARNING_GLYPH, getX(), textY, BANNER_GLYPH_ARGB);
+            surface.text(font, this.text, getX() + font.width(WARNING_GLYPH), textY, NAME_ARGB);
         }
 
         @Override
@@ -1035,6 +1042,7 @@ public final class WdlDownloadsScreen extends Screen {
             @Override
             public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
                     float partialTick) {
+                RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
                 // Probe or walk only visible rows, on disjoint domains: a tainted row is availability-probed
                 // for its restore chip and never walked, a complete row is walked for its size.
                 if (this.entry.isTainted()) {
@@ -1047,22 +1055,21 @@ public final class WdlDownloadsScreen extends Screen {
                 int entryWidth = getContentWidth();
                 int rightEdge = rowX + entryWidth - 4;
                 if (this.icon != null) {
-                    guiGraphics.blit(RenderPipelines.GUI_TEXTURED, this.icon.textureLocation(), rowX + 2, rowY + 3,
-                            0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+                    surface.blitFavicon(this.icon, rowX + 2, rowY + 3, ICON_SIZE);
                 }
                 int textX = rowX + 4 + ICON_ADVANCE;
                 int dateX = rightEdge - font.width(this.lastPlayed);
-                guiGraphics.drawString(font, this.lastPlayed, dateX, rowY + 4, GRAY_ARGB);
+                surface.text(font, this.lastPlayed, dateX, rowY + 4, GRAY_ARGB);
                 int labelMax = entryWidth - font.width(this.lastPlayed) - 12 - ICON_ADVANCE;
-                guiGraphics.drawString(font, ClientText.ellipsize(font, this.displayName, labelMax),
+                surface.text(font, ClientText.ellipsize(font, this.displayName, labelMax),
                         textX, rowY + 4, NAME_ARGB);
 
                 this.line2Top = rowY + 14;
-                int slotLeft = renderStatus(guiGraphics, rightEdge, this.line2Top, mouseX, mouseY, hovering);
-                renderSummary(guiGraphics, textX, this.line2Top, slotLeft - 4);
+                int slotLeft = renderStatus(surface, rightEdge, this.line2Top, mouseX, mouseY, hovering);
+                renderSummary(surface, textX, this.line2Top, slotLeft - 4);
             }
 
-            private void renderSummary(GuiGraphics guiGraphics, int textX, int y, int rightLimit) {
+            private void renderSummary(RenderSurface surface, int textX, int y, int rightLimit) {
                 DownloadCounts counts = this.entry.counts();
                 if (counts == null) {
                     return; // a recoverable download has no trustworthy summary
@@ -1070,22 +1077,22 @@ public final class WdlDownloadsScreen extends Screen {
                 int pairX = textX;
                 boolean any = false;
                 if (counts.chunks() != 0) {
-                    pairX = cell(guiGraphics, pairX, y, "wdl.screen.downloads.summary.chunks", counts.chunks(),
+                    pairX = cell(surface, pairX, y, "wdl.screen.downloads.summary.chunks", counts.chunks(),
                             false, rightLimit);
                     any = true;
                 }
                 if (this.entry.isChunksOnly()) {
                     // a resume knows the cumulative chunk total but no cumulative entity or container count;
                     // mark those two not applicable rather than show a session number beside cumulative chunks
-                    pairX = cell(guiGraphics, pairX, y, "wdl.screen.downloads.summary.entities", SUMMARY_ABSENT,
+                    pairX = cell(surface, pairX, y, "wdl.screen.downloads.summary.entities", SUMMARY_ABSENT,
                             any, rightLimit);
-                    cell(guiGraphics, pairX, y, "wdl.screen.downloads.summary.containers", SUMMARY_ABSENT,
+                    cell(surface, pairX, y, "wdl.screen.downloads.summary.containers", SUMMARY_ABSENT,
                             true, rightLimit);
                     return;
                 }
-                pairX = cell(guiGraphics, pairX, y, "wdl.screen.downloads.summary.entities", counts.entities(),
+                pairX = cell(surface, pairX, y, "wdl.screen.downloads.summary.entities", counts.entities(),
                         any, rightLimit);
-                cell(guiGraphics, pairX, y, "wdl.screen.downloads.summary.containers", counts.containers(),
+                cell(surface, pairX, y, "wdl.screen.downloads.summary.containers", counts.containers(),
                         true, rightLimit);
             }
 
@@ -1093,12 +1100,12 @@ public final class WdlDownloadsScreen extends Screen {
              * One summary cell clamped at {@code rightLimit} (the slot's left edge): a piece that crosses the limit is
              * ellipsized and freezes the cursor there, so the cells that follow draw nothing.
              */
-            private int cell(GuiGraphics guiGraphics, int pairX, int y, String labelKey, int value,
+            private int cell(RenderSurface surface, int pairX, int y, String labelKey, int value,
                     boolean separator, int rightLimit) {
-                return cell(guiGraphics, pairX, y, labelKey, Integer.toString(value), separator, rightLimit);
+                return cell(surface, pairX, y, labelKey, Integer.toString(value), separator, rightLimit);
             }
 
-            private int cell(GuiGraphics guiGraphics, int pairX, int y, String labelKey, String text,
+            private int cell(RenderSurface surface, int pairX, int y, String labelKey, String text,
                     boolean separator, int rightLimit) {
                 if (pairX >= rightLimit) {
                     return rightLimit;
@@ -1107,12 +1114,12 @@ public final class WdlDownloadsScreen extends Screen {
                     if (pairX + 6 + font.width(DOT) + 6 >= rightLimit) {
                         return rightLimit;
                     }
-                    guiGraphics.drawString(font, DOT, pairX + 6, y, GRAY_ARGB);
+                    surface.text(font, DOT, pairX + 6, y, GRAY_ARGB);
                     pairX += 6 + font.width(DOT) + 6;
                 }
                 String label = Component.translatable(labelKey).getString();
                 String clampedLabel = ClientText.ellipsize(font, label, rightLimit - pairX);
-                guiGraphics.drawString(font, clampedLabel, pairX, y, GRAY_ARGB);
+                surface.text(font, clampedLabel, pairX, y, GRAY_ARGB);
                 if (!clampedLabel.equals(label)) {
                     return rightLimit;
                 }
@@ -1121,7 +1128,7 @@ public final class WdlDownloadsScreen extends Screen {
                     return rightLimit;
                 }
                 String clampedText = ClientText.ellipsize(font, text, rightLimit - valueX);
-                guiGraphics.drawString(font, clampedText, valueX, y, GRAY_ARGB);
+                surface.text(font, clampedText, valueX, y, GRAY_ARGB);
                 if (!clampedText.equals(text)) {
                     return rightLimit;
                 }
@@ -1132,7 +1139,7 @@ public final class WdlDownloadsScreen extends Screen {
              * Draw the arrow and the slot content, returning the slot content's left edge (the arrow's when the slot is
              * empty) so the summary can clamp against it.
              */
-            private int renderStatus(GuiGraphics guiGraphics, int rightEdge, int y, int mouseX, int mouseY,
+            private int renderStatus(RenderSurface surface, int rightEdge, int y, int mouseX, int mouseY,
                     boolean hovering) {
                 this.arrowLeft = rightEdge - font.width(ARROW);
                 this.arrowRight = rightEdge;
@@ -1141,7 +1148,7 @@ public final class WdlDownloadsScreen extends Screen {
                 this.restoreLeft = -1;
                 this.restoreRight = -1;
                 boolean overArrow = hovering && inLine(mouseX, mouseY, this.arrowLeft, this.arrowRight, y);
-                guiGraphics.drawString(font, ARROW, this.arrowLeft, y, overArrow ? LINK_HOVER_ARGB : LINK_REST_ARGB);
+                surface.text(font, ARROW, this.arrowLeft, y, overArrow ? LINK_HOVER_ARGB : LINK_REST_ARGB);
 
                 // The slot just left of the arrow holds the Singleplayer chip (joined by the Restore action
                 // chip when a clean source is cached and the row is not the loaded world), the Recover chip,
@@ -1159,26 +1166,23 @@ public final class WdlDownloadsScreen extends Screen {
                         this.restoreRight = slotRight;
                         boolean overRestore = hovering
                                 && inLine(mouseX, mouseY, this.restoreLeft, this.restoreRight, y);
-                        drawRestoreChip(guiGraphics, restoreChip, this.restoreLeft, y,
+                        drawRestoreChip(surface, restoreChip, this.restoreLeft, y,
                                 overRestore ? LINK_HOVER_ARGB : RECOVER_ARGB);
                         if (overRestore) {
-                            guiGraphics.setTooltipForNextFrame(font,
-                                    font.split(restoreTooltip(source), TOOLTIP_WRAP_WIDTH), mouseX, mouseY);
+                            surface.tooltip(font, restoreTooltip(source), TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
                         }
                         slotRight = this.restoreLeft - 4;
                     }
                     String chip = Component.translatable("wdl.screen.downloads.tainted").getString();
                     int chipLeft = slotRight - font.width(chip);
-                    guiGraphics.drawString(font, chip, chipLeft, y, TAINTED_ARGB);
+                    surface.text(font, chip, chipLeft, y, TAINTED_ARGB);
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
                         // With the Restore chip present the tooltip drops the fresh-download advice: the
                         // chip beside it is the better way out.
-                        guiGraphics.setTooltipForNextFrame(font, font.split(
-                                Component.translatable(restorable
-                                        ? "wdl.screen.downloads.tooltip.tainted_restorable"
-                                        : "wdl.screen.downloads.tooltip.tainted"),
-                                TOOLTIP_WRAP_WIDTH),
-                                mouseX, mouseY);
+                        surface.tooltip(font, Component.translatable(restorable
+                                ? "wdl.screen.downloads.tooltip.tainted_restorable"
+                                : "wdl.screen.downloads.tooltip.tainted"),
+                                TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
                     }
                     slotLeft = chipLeft;
                 } else if (this.entry.health() == DownloadHealth.RECOVERABLE) {
@@ -1186,16 +1190,15 @@ public final class WdlDownloadsScreen extends Screen {
                     this.recoverLeft = slotRight - font.width(chip);
                     this.recoverRight = slotRight;
                     boolean overRecover = hovering && inLine(mouseX, mouseY, this.recoverLeft, this.recoverRight, y);
-                    guiGraphics.drawString(font, chip, this.recoverLeft, y,
+                    surface.text(font, chip, this.recoverLeft, y,
                             overRecover ? LINK_HOVER_ARGB : RECOVER_ARGB);
                     slotLeft = this.recoverLeft;
                 } else if (this.entry.health() == DownloadHealth.PARTIAL) {
                     String chip = Component.translatable("wdl.screen.downloads.partial").getString();
                     int chipLeft = slotRight - font.width(chip);
-                    guiGraphics.drawString(font, chip, chipLeft, y, PARTIAL_ARGB);
+                    surface.text(font, chip, chipLeft, y, PARTIAL_ARGB);
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
-                        guiGraphics.setTooltipForNextFrame(font, font.split(
-                                Component.translatable("wdl.toast.partial.title"), TOOLTIP_WRAP_WIDTH),
+                        surface.tooltip(font, Component.translatable("wdl.toast.partial.title"), TOOLTIP_WRAP_WIDTH,
                                 mouseX, mouseY);
                     }
                     slotLeft = chipLeft;
@@ -1204,16 +1207,16 @@ public final class WdlDownloadsScreen extends Screen {
                     if (size.isPresent()) {
                         SizeFormatter.Size formatted = SizeFormatter.format(size.getAsLong());
                         Component text = Component.translatable(formatted.unitKey(), formatted.number());
-                        guiGraphics.drawString(font, text, slotRight - font.width(text), y, GRAY_ARGB);
+                        surface.text(font, text, slotRight - font.width(text), y, GRAY_ARGB);
                         slotLeft = slotRight - font.width(text);
                     }
                 }
 
                 if (overArrow) {
-                    guiGraphics.setTooltipForNextFrame(font, List.of(
+                    surface.tooltip(font, List.of(
                             Component.translatable("wdl.screen.downloads.tooltip.folder", entry.folderName()),
                             Component.translatable("wdl.screen.downloads.tooltip.version", modVersion, mcVersion)),
-                            Optional.empty(), mouseX, mouseY);
+                            mouseX, mouseY);
                 }
                 return slotLeft;
             }
@@ -1222,13 +1225,13 @@ public final class WdlDownloadsScreen extends Screen {
              * The restore glyph comes from the fallback font, whose ink sits high in its line box, so the glyph alone
              * is drawn a pixel lower while the label stays on the row baseline.
              */
-            private void drawRestoreChip(GuiGraphics guiGraphics, String chip, int x, int y, int color) {
+            private void drawRestoreChip(RenderSurface surface, String chip, int x, int y, int color) {
                 if (chip.startsWith(RESTORE_GLYPH)) {
-                    guiGraphics.drawString(font, RESTORE_GLYPH, x, y + 1, color);
-                    guiGraphics.drawString(font, chip.substring(RESTORE_GLYPH.length()),
+                    surface.text(font, RESTORE_GLYPH, x, y + 1, color);
+                    surface.text(font, chip.substring(RESTORE_GLYPH.length()),
                             x + font.width(RESTORE_GLYPH), y, color);
                 } else {
-                    guiGraphics.drawString(font, chip, x, y, color);
+                    surface.text(font, chip, x, y, color);
                 }
             }
 
