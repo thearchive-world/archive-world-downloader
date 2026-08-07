@@ -102,7 +102,7 @@ public class WdlStalePlacementCaptureTest implements FabricClientGameTest {
         ContainerDriver.awaitCrosshair(context, client -> ContainerDriver.isLookingAt(client, chest),
                 "chest " + chest);
         context.runOnClient(client -> {
-            client.gameRenderer.pick(1.0f);
+            client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
             Check.that(ContainerDriver.isLookingAt(client, chest),
                     "crosshair drifted off the chest before opening: " + client.hitResult);
             client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);
@@ -123,7 +123,7 @@ public class WdlStalePlacementCaptureTest implements FabricClientGameTest {
         BlockPos floor = chest.below();
         aimAtTopFace(context, floor);
         context.runOnClient(client -> {
-            client.gameRenderer.pick(1.0f);
+            client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
             Check.that(isLookingAtTopFaceOf(client, floor), "crosshair is not on the floor's top face: "
                     + client.hitResult);
             client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);
@@ -145,11 +145,11 @@ public class WdlStalePlacementCaptureTest implements FabricClientGameTest {
         giveMainHand(context, server, FILLED_SHULKER, client -> {
             ItemStack held = client.player.getMainHandItem();
             return held.is(Items.SHULKER_BOX) && held.getOrDefault(DataComponents.CONTAINER,
-                    ItemContainerContents.EMPTY).nonEmptyStream().anyMatch(item -> item.is(Items.DIAMOND));
+                    ItemContainerContents.EMPTY).nonEmptyItemCopyStream().anyMatch(item -> item.is(Items.DIAMOND));
         });
         aimAtTopFace(context, slab);
         context.runOnClient(client -> {
-            client.gameRenderer.pick(1.0f);
+            client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
             Check.that(isLookingAtTopFaceOf(client, slab), "crosshair is not on the slab's top face: "
                     + client.hitResult);
             client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);

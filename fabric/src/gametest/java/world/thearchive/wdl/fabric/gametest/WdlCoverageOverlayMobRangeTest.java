@@ -40,9 +40,9 @@ public class WdlCoverageOverlayMobRangeTest implements FabricClientGameTest {
             String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
             ChunkPos playerChunkPos = context.computeOnClient(client -> client.player.chunkPosition());
             BlockPos playerBlockPos = context.computeOnClient(client -> client.player.blockPosition());
-            long playerChunk = playerChunkPos.toLong();
-            long innerChunk = ChunkPos.asLong(playerChunkPos.x + 2, playerChunkPos.z); // ~32 blocks: covered
-            long outerChunk = ChunkPos.asLong(playerChunkPos.x + 4, playerChunkPos.z); // ~64 blocks: suspect
+            long playerChunk = playerChunkPos.pack();
+            long innerChunk = new ChunkPos(playerChunkPos.x() + 2, playerChunkPos.z()).pack(); // ~32 blocks: covered
+            long outerChunk = new ChunkPos(playerChunkPos.x() + 4, playerChunkPos.z()).pack(); // ~64 blocks: suspect
 
             CaptureDriver driver = CaptureDriver.start(context,
                     new DownloadTarget("wdl-mob-range", "wdl-mob-range", DownloadMode.NEW), WdlConfig.DEFAULTS, true);

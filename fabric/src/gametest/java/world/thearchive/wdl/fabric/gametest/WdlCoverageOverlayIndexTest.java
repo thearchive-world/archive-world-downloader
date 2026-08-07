@@ -30,8 +30,8 @@ public class WdlCoverageOverlayIndexTest implements FabricClientGameTest {
 
             String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
             ChunkPos playerChunkPos = context.computeOnClient(client -> client.player.chunkPosition());
-            long playerChunk = playerChunkPos.toLong();
-            long farChunk = ChunkPos.asLong(playerChunkPos.x + 4, playerChunkPos.z);
+            long playerChunk = playerChunkPos.pack();
+            long farChunk = new ChunkPos(playerChunkPos.x() + 4, playerChunkPos.z()).pack();
             Check.that(ContainerDriver.contains(driver.overlaySavedChunks(dimension), playerChunk),
                     "overlay index lacks the player's chunk during capture (dimension=" + dimension + ")");
             // The two-tone covered axis: the player's own chunk sits at the center of the coverage disc, so it

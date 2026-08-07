@@ -77,7 +77,7 @@ public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
             Path saveRoot = run.tick(20).stopAndAwaitSave();
 
             ChunkPos endChunk = context.computeOnClient(client -> client.player.chunkPosition());
-            Check.that(Math.abs(endChunk.x - startChunk.x) <= 1 && Math.abs(endChunk.z - startChunk.z) <= 1,
+            Check.that(Math.abs(endChunk.x() - startChunk.x()) <= 1 && Math.abs(endChunk.z() - startChunk.z()) <= 1,
                     "the player traveled from " + startChunk + " to " + endChunk + "; this scenario needs a "
                             + "stationary player, or a revisit could re-prime the boat by itself");
             Optional<CompoundTag> entityChunk = CaptureReadback.readEntityChunk(saveRoot, boatChunk);

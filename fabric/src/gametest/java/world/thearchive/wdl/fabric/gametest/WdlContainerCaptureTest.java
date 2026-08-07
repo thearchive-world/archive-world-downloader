@@ -58,7 +58,7 @@ public class WdlContainerCaptureTest implements FabricClientGameTest {
             run.tick(5);
 
             context.runOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(ContainerDriver.isLookingAt(client, openedChest),
                         "crosshair drifted off the chest before opening: " + client.hitResult);
                 client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);
@@ -78,7 +78,7 @@ public class WdlContainerCaptureTest implements FabricClientGameTest {
             ContainerDriver.awaitCrosshair(context, client -> ContainerDriver.isLookingAt(client, emptyChest),
                     "empty chest " + emptyChest);
             context.runOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(ContainerDriver.isLookingAt(client, emptyChest),
                         "crosshair drifted off the empty chest before opening: " + client.hitResult);
                 client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);

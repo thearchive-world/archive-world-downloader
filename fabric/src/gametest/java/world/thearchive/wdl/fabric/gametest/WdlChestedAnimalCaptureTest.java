@@ -73,11 +73,11 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
                     WdlConfig.DEFAULTS);
             run.tick(5);
             context.runOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(isLookingAtAnimal(client),
                         "crosshair drifted off the donkey before opening: " + client.hitResult);
                 EntityHitResult hit = (EntityHitResult) client.hitResult;
-                client.gameMode.interact(client.player, hit.getEntity(), InteractionHand.MAIN_HAND);
+                client.gameMode.interact(client.player, hit.getEntity(), hit, InteractionHand.MAIN_HAND);
             });
             ContainerDriver.awaitMenuReady(context, run,
                     client -> client.player.containerMenu instanceof HorseInventoryMenu menu
@@ -124,10 +124,10 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
         ContainerDriver.aimEyesAt(context, new Vec3(mountX, mountY + 0.75, mountZ));
         ContainerDriver.awaitCrosshair(context, WdlChestedAnimalCaptureTest::isLookingAtAnimal, "the mount");
         context.runOnClient(client -> {
-            client.gameRenderer.pick(1.0f);
+            client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
             EntityHitResult hit = (EntityHitResult) client.hitResult;
             // Not sneaking, so a tamed chested animal rides rather than opening its inventory.
-            client.gameMode.interact(client.player, hit.getEntity(), InteractionHand.MAIN_HAND);
+            client.gameMode.interact(client.player, hit.getEntity(), hit, InteractionHand.MAIN_HAND);
         });
         context.waitFor(client -> client.player.getVehicle() instanceof AbstractChestedHorse);
 

@@ -17,6 +17,7 @@ import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
 
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
@@ -51,7 +52,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                     new DownloadTarget("wdl-ender-chest", "wdl-ender-chest", DownloadMode.NEW), WdlConfig.DEFAULTS);
             run.tick(5);
             context.runOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(ContainerDriver.isLookingAt(client, enderChest),
                         "crosshair drifted off the ender chest before opening: " + client.hitResult);
                 client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);
@@ -106,7 +107,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                 new DownloadTarget("wdl-ender-off", "wdl-ender-off", DownloadMode.NEW), WdlConfig.parse(enderOff));
         run.tick(5);
         context.runOnClient(client -> {
-            client.gameRenderer.pick(1.0f);
+            client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
             Check.that(ContainerDriver.isLookingAt(client, enderChest),
                     "crosshair drifted off the ender chest before opening: " + client.hitResult);
             client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);
@@ -184,7 +185,8 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                 .filter(ContainerEntity.class::isInstance)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("the chest minecart is not loaded on the client")));
-        context.runOnClient(client -> client.gameMode.interact(client.player, cart, InteractionHand.MAIN_HAND));
+        context.runOnClient(client -> client.gameMode.interact(client.player, cart, new EntityHitResult(cart),
+                InteractionHand.MAIN_HAND));
         ContainerDriver.awaitMenuSlotItem(context, run, Items.EMERALD);
         run.tick(5);
 

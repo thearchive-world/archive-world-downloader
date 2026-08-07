@@ -55,7 +55,7 @@ public class WdlLecternCaptureTest implements FabricClientGameTest {
                     new DownloadTarget("wdl-lectern", "wdl-lectern", DownloadMode.NEW), WdlConfig.DEFAULTS);
             run.tick(5);
             context.runOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(ContainerDriver.isLookingAt(client, lectern),
                         "crosshair drifted off the lectern before opening: " + client.hitResult);
                 client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);
@@ -66,7 +66,7 @@ public class WdlLecternCaptureTest implements FabricClientGameTest {
             run.tick(5);
             Path saveRoot = run.stopAndAwaitSave();
 
-            CompoundTag chunk = CaptureReadback.readChunk(saveRoot, new ChunkPos(lectern))
+            CompoundTag chunk = CaptureReadback.readChunk(saveRoot, ChunkPos.containing(lectern))
                     .orElseThrow(() -> new AssertionError("captured chunk for lectern " + lectern + " is missing"));
             CompoundTag blockEntity = CaptureReadback.blockEntityAt(chunk, lectern)
                     .orElseThrow(() -> new AssertionError("no lectern block entity at " + lectern + " in the chunk"));

@@ -50,7 +50,7 @@ public class WdlDoubleChestCaptureTest implements FabricClientGameTest {
                     new DownloadTarget("wdl-double-chest", "wdl-double-chest", DownloadMode.NEW), WdlConfig.DEFAULTS);
             run.tick(5);
             context.runOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(ContainerDriver.isLookingAt(client, leftHalf),
                         "crosshair drifted off the double chest before opening: " + client.hitResult);
                 client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);

@@ -93,7 +93,7 @@ public class WdlCustomLevelKeyRoutingTest implements FabricClientGameTest {
      * for a download that captured nothing at all.
      */
     private static void assertRoutedByType(Path saveRoot, String which) {
-        Check.that(CaptureReadback.readChunk(saveRoot, new ChunkPos(STAND)).isPresent(),
+        Check.that(CaptureReadback.readChunk(saveRoot, ChunkPos.containing(STAND)).isPresent(),
                 "no chunk of " + which + " reached " + saveRoot.resolve("region")
                         + ", so its terrain was not laid out under the folder its dimension type owns");
         Path nested = saveRoot.resolve("dimensions");
@@ -107,7 +107,7 @@ public class WdlCustomLevelKeyRoutingTest implements FabricClientGameTest {
      * drain looked for another, so no pass ever matched it and the finish counted it unwritten.
      */
     private static void assertStandRoutedByType(Path saveRoot) {
-        Optional<CompoundTag> entityChunk = CaptureReadback.readEntityChunk(saveRoot, new ChunkPos(STAND));
+        Optional<CompoundTag> entityChunk = CaptureReadback.readEntityChunk(saveRoot, ChunkPos.containing(STAND));
         Check.that(entityChunk.isPresent(), "no entity chunk of the custom-key world reached "
                 + saveRoot.resolve("entities") + ", so nothing it held was written under its dimension type");
         List<String> ids = CaptureReadback.entities(entityChunk.get()).stream()

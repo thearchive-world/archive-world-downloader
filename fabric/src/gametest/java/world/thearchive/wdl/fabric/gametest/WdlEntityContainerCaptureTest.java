@@ -75,7 +75,7 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
             // resolves from. A direct call opens the same menu but leaves the open unattributed, which binds
             // nothing. The screen is dismissed first, or the keybind press is swallowed.
             context.runOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(isLookingAtVehicle(client),
                         "crosshair drifted off the chest minecart before opening: " + client.hitResult);
                 client.setScreen(null);
@@ -129,7 +129,8 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
         ContainerDriver.awaitCrosshair(context, WdlEntityContainerCaptureTest::isLookingAtVehicle,
                 "chest minecart");
         context.runOnClient(client -> client.gameMode.interact(client.player,
-                ((EntityHitResult) client.hitResult).getEntity(), InteractionHand.MAIN_HAND));
+                ((EntityHitResult) client.hitResult).getEntity(), (EntityHitResult) client.hitResult,
+                InteractionHand.MAIN_HAND));
         ContainerDriver.awaitMenuSlotItem(context, run, Items.DIAMOND);
         run.tick(5);
 
@@ -176,7 +177,8 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
         ContainerDriver.awaitCrosshair(context, client -> isLookingAt(client, boatId), "chest boat " + boatId);
         // Not sneaking, so the interact boards the boat rather than opening its chest.
         context.runOnClient(client -> client.gameMode.interact(client.player,
-                ((EntityHitResult) client.hitResult).getEntity(), InteractionHand.MAIN_HAND));
+                ((EntityHitResult) client.hitResult).getEntity(), (EntityHitResult) client.hitResult,
+                InteractionHand.MAIN_HAND));
         context.waitFor(client -> client.player.getVehicle() instanceof ContainerEntity);
 
         ContainerDriver.aimEyesAt(context, cartCenter);
@@ -186,7 +188,8 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
                 WdlConfig.DEFAULTS);
         run.tick(5);
         context.runOnClient(client -> client.gameMode.interact(client.player,
-                ((EntityHitResult) client.hitResult).getEntity(), InteractionHand.MAIN_HAND));
+                ((EntityHitResult) client.hitResult).getEntity(), (EntityHitResult) client.hitResult,
+                InteractionHand.MAIN_HAND));
         ContainerDriver.awaitMenuSlotItem(context, run, Items.DIAMOND);
         run.tick(5);
 

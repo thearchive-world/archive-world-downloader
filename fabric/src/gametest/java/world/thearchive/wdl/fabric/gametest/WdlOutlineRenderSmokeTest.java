@@ -5,11 +5,9 @@ package world.thearchive.wdl.fabric.gametest;
 
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
-import org.joml.Matrix4f;
 
 import world.thearchive.wdl.adapter.OutlineRenderContext;
 import world.thearchive.wdl.adapter.RimRenderer;
@@ -32,13 +30,13 @@ public class WdlOutlineRenderSmokeTest implements FabricClientGameTest {
     public void runTest(ClientGameTestContext context) {
         RimRenderer rimRenderer = new RimRendererImpl();
         // Registered once, gated by the armed flag, so it draws only during this test and no-ops in every other.
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(worldContext -> {
+        LevelRenderEvents.BEFORE_GIZMOS.register(worldContext -> {
             Minecraft client = Minecraft.getInstance();
             if (!drawTestRim || client.level == null || client.player == null) {
                 return;
             }
-            OutlineRenderContext renderContext = new OutlineRenderContext(worldContext.matrices(),
-                    worldContext.consumers(), new Frustum(new Matrix4f(), new Matrix4f()),
+            OutlineRenderContext renderContext = new OutlineRenderContext(worldContext.poseStack(),
+                    worldContext.bufferSource(), null,
                     client.gameRenderer.getMainCamera().position(), 2.5f);
             double x = client.player.getX();
             double y = client.player.getY();

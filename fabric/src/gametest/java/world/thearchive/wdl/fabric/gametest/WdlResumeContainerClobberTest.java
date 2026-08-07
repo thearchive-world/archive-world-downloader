@@ -47,7 +47,7 @@ public class WdlResumeContainerClobberTest implements FabricClientGameTest {
 
             BlockPos stand = context.computeOnClient(client -> client.player.blockPosition());
             BlockPos chest = new BlockPos(stand.getX(), stand.getY(), stand.getZ() + 2);
-            ChunkPos chestChunk = new ChunkPos(chest);
+            ChunkPos chestChunk = ChunkPos.containing(chest);
             ContainerDriver.placeFilledChest(server, chest);
             context.waitFor(client -> client.level.getBlockEntity(chest) instanceof ChestBlockEntity);
 
@@ -60,7 +60,7 @@ public class WdlResumeContainerClobberTest implements FabricClientGameTest {
                     WdlConfig.DEFAULTS);
             firstRun.tick(5);
             context.runOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(ContainerDriver.isLookingAt(client, chest),
                         "crosshair drifted off the chest before opening: " + client.hitResult);
                 client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);

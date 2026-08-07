@@ -66,7 +66,7 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
 
             for (int dx = -2; dx <= 2; dx++) {
                 for (int dz = -2; dz <= 2; dz++) {
-                    ChunkPos pos = new ChunkPos(playerChunk.x + dx, playerChunk.z + dz);
+                    ChunkPos pos = new ChunkPos(playerChunk.x() + dx, playerChunk.z() + dz);
                     Optional<CompoundTag> nearby = CaptureReadback.readChunk(saveRoot, pos);
                     nearby.ifPresent(tag -> Check.that(
                             !hasLightLayers(tag) || tag.getBooleanOr("isLightOn", false),
@@ -83,7 +83,7 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
                 ChunkCodec codec = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
                         .findFirst().orElseThrow().chunkCodec();
                 client.level.setBlock(lamp2, Blocks.GLOWSTONE.defaultBlockState(), 3);
-                LevelChunk liveChunk = client.level.getChunk(playerChunk.x, playerChunk.z);
+                LevelChunk liveChunk = client.level.getChunk(playerChunk.x(), playerChunk.z());
                 ChunkSnapshotSource snapshot = codec.capture(liveChunk, client.level.registryAccess());
                 return snapshotBlockLight(snapshot, lamp2);
             });
@@ -99,7 +99,7 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
                 LevelLightEngine engine = client.level.getChunkSource().getLightEngine();
                 engine.setLightEnabled(playerChunk, false);
                 try {
-                    LevelChunk liveChunk = client.level.getChunk(playerChunk.x, playerChunk.z);
+                    LevelChunk liveChunk = client.level.getChunk(playerChunk.x(), playerChunk.z());
                     ChunkSnapshotSource snapshot = codec.capture(liveChunk, client.level.registryAccess());
                     return !snapshot.lightCorrect() && snapshot.sections().stream()
                             .allMatch(section -> section.blockLight() == null && section.skyLight() == null);
