@@ -6,6 +6,8 @@ package world.thearchive.wdl.testsupport;
 import java.util.List;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentInitializers;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.LayeredRegistryAccess;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -86,6 +88,12 @@ public final class TestRegistries {
 
         // Keep resources open (as WorldLoader does): the composite is the long-lived result.
         frozen = layered.replaceFrom(RegistryLayer.WORLDGEN, worldgen).compositeAccess();
+
+        // 26.x binds item and block data components during the resource reload, not in Bootstrap.bootStrap, so a
+        // headless new ItemStack reads an unbound registry-holder component and throws. Run the registered
+        // initializers against the composite access, the minimal slice of ReloadableServerResources this suite needs.
+        BuiltInRegistries.DATA_COMPONENT_INITIALIZERS.build(frozen)
+                .forEach(DataComponentInitializers.PendingComponents::apply);
         return frozen;
     }
 }

@@ -5,7 +5,7 @@ package world.thearchive.wdl.fabric;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
@@ -51,7 +51,7 @@ public final class WdlFabricClient implements ClientModInitializer {
             return InteractionResult.PASS;
         });
 
-        KeyMapping peekKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+        KeyMapping peekKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY));
         WdlHudOverlay.bindPeekKey(peekKey);
         // addLast inherits no vanilla render condition. Anchoring relative to a vanilla element would adopt its

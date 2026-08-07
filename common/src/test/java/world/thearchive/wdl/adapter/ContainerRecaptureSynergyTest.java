@@ -73,7 +73,7 @@ class ContainerRecaptureSynergyTest {
         stash.put(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z), stashHolderWith(2, new ItemStack(Items.EMERALD, 7)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, snapshotOnceTag,
-                new ChunkPos(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z)), stash).merged();
+                ChunkPos.containing(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z)), stash).merged();
 
         assertEquals(0, merged, "with no re-captured chest block entity there is nothing to merge onto");
     }
@@ -89,7 +89,7 @@ class ContainerRecaptureSynergyTest {
         stash.put(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z), stashHolderWith(2, new ItemStack(Items.EMERALD, 7)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, recapturedTag,
-                new ChunkPos(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z)), stash).merged();
+                ChunkPos.containing(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z)), stash).merged();
 
         assertEquals(1, merged, "the re-captured chest block entity gives the stash something to merge onto");
         ItemStack landed = mergedItemAt(sink, recapturedTag, 2);
@@ -112,7 +112,7 @@ class ContainerRecaptureSynergyTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z), stashHolderWith(0, new ItemStack(Items.DIAMOND, 3)));
 
-        ChunkPos chunkPos = new ChunkPos(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z));
+        ChunkPos chunkPos = ChunkPos.containing(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z));
         int merged = ContainerMerge.mergeChunkStash(sink, latestRecapture, chunkPos, stash).merged();
         assertEquals(1, merged, "the single flush merges the stash exactly once");
         assertTrue(stash.isEmpty(), "the stash entry is drained at flush, so it cannot merge again");

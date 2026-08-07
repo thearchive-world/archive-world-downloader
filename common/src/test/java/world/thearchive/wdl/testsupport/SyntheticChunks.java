@@ -142,7 +142,7 @@ public final class SyntheticChunks {
         List<SerializableChunkData.SectionData> sections = List
                 .of(new SerializableChunkData.SectionData(worldPos.getY() >> 4, section, null, null));
         return new Snapshot(
-                new ChunkPos(worldPos), heightAccessor().getMinSectionY(), GAME_TIME, 0L, ChunkStatus.FULL,
+                ChunkPos.containing(worldPos), heightAccessor().getMinSectionY(), GAME_TIME, 0L, ChunkStatus.FULL,
                 true, new EnumMap<>(Heightmap.Types.class), sections, List.of());
     }
 
@@ -172,7 +172,7 @@ public final class SyntheticChunks {
         List<SerializableChunkData.SectionData> sections = List
                 .of(new SerializableChunkData.SectionData(worldPos.getY() >> 4, section, null, null));
         return new Snapshot(
-                new ChunkPos(worldPos), heightAccessor().getMinSectionY(), GAME_TIME, 0L, ChunkStatus.FULL,
+                ChunkPos.containing(worldPos), heightAccessor().getMinSectionY(), GAME_TIME, 0L, ChunkStatus.FULL,
                 true, new EnumMap<>(Heightmap.Types.class), sections, saved(List.of(blockEntity), checkShape));
     }
 

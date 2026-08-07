@@ -36,8 +36,8 @@ class EntityPacketCaptureTest {
     void aRotationOnlyMoveLeavesTheRiderHomedOnItsVehiclesChunk() {
         // A rider's held coordinates stay frozen at where it boarded, so a chunk key recomputed from them reverts
         // the re-home onto its vehicle.
-        long boardingChunk = ChunkPos.asLong(0, 0);
-        long farChunk = ChunkPos.asLong(4, 0);
+        long boardingChunk = new ChunkPos(0, 0).pack();
+        long farChunk = new ChunkPos(4, 0).pack();
         EntityPacketCapture capture = capture();
         capture.spawn(1, VEHICLE_UUID, boardingChunk, entityPos(8.0, 64.0, 8.0), addEntity(1, VEHICLE_UUID));
         capture.spawn(2, RIDER_UUID, boardingChunk, entityPos(8.0, 65.0, 9.0), addEntity(2, RIDER_UUID));
@@ -56,7 +56,8 @@ class EntityPacketCaptureTest {
     @Test
     void aPositionCarryingMoveRehomesTheEntityToTheChunkItEndsIn() {
         EntityPacketCapture capture = capture();
-        capture.spawn(1, VEHICLE_UUID, ChunkPos.asLong(0, 0), entityPos(12.0, 64.0, 8.0), addEntity(1, VEHICLE_UUID));
+        capture.spawn(1, VEHICLE_UUID, new ChunkPos(0, 0).pack(), entityPos(12.0, 64.0, 8.0),
+                addEntity(1, VEHICLE_UUID));
 
         // A relative move is a delta in 1/4096 of a block off the held position, so this walks seven blocks east,
         // across the chunk border at x=16.
@@ -64,7 +65,7 @@ class EntityPacketCaptureTest {
                 (byte) 0, (byte) 0, true));
 
         assertEquals(19.0, position(capture, 1).x(), "the delta resolves against the held position");
-        assertEquals(Set.of(ChunkPos.asLong(1, 0)), capture.chunks(OVERWORLD),
+        assertEquals(Set.of(new ChunkPos(1, 0).pack()), capture.chunks(OVERWORLD),
                 "a move that carries a position re-homes the entity to the chunk it ends in");
     }
 

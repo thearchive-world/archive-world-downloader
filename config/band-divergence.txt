@@ -6,49 +6,98 @@
 # mistakes its difference for a lost fix or a bug.
 #
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
-# Every pattern carries a # reason directly above it, naming why the file diverges per band and to what;
-# checkBandDivergence fails the build on a pattern with no reason. Keep each pattern narrow: a directory-wide
-# glob would mask an unintended divergence, which is the drift this register exists to catch.
-#
-# This is the seed of the known, stable members. Each port adds its own per-file band-local divergences as it
-# creates them (the way the 26.x port records the players/ progress path), rather than pre-listing the bulk
-# renames whose files no branch has diverged yet: the Identifier and ResourceKey.identifier() rename set, the
-# band-fragile test assertions, and the keybind lang key. A broad glob for those would mask real drift or
-# guess divergences that do not exist yet.
+# Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
+# a shared reason across several files is repeated per line rather than written once over a group.
 
-# 26.x: RegistryDataLoader.load returns CompletableFuture<RegistryAccess.Frozen>, not the frozen access, so
-# this shared test bootstrap unwraps it there.
+# 26.x RegistryDataLoader.load returns a CompletableFuture, so this bootstrap unwraps it; and 26.x binds item
+# and block components in the resource reload, not Bootstrap.bootStrap, so it runs DATA_COMPONENT_INITIALIZERS.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
-# ClientCommandManager) is Fabric-API-coupled and moves across bands.
+# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons, ClientCommands)
+# is Fabric-API-coupled and moves across bands.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
 # Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
-# 26.x: ChunkPos is a record, so pos.x/pos.z field reads become pos.x()/pos.z(), pos.toLong() becomes
-# pos.pack(), new ChunkPos(long) becomes ChunkPos.unpack, new ChunkPos(BlockPos) becomes ChunkPos.containing,
-# and ChunkPos.asLong(x,z) becomes new ChunkPos(x,z).pack(). These files read or build ChunkPos those ways.
+# 26.x ChunkPos is a record: field reads, pack/unpack and containing forms differ across the session.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
+# 26.x ChunkPos record: new ChunkPos(BlockPos) becomes ChunkPos.containing.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
+# 26.x ChunkPos record: new ChunkPos(BlockPos) becomes ChunkPos.containing.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+# 26.x ChunkPos record: ChunkPos.asLong(x,z) becomes new ChunkPos(x,z).pack().
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
+# 26.x ChunkPos record: new ChunkPos(BlockPos) becomes ChunkPos.containing.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
+# 26.x ChunkPos record: ChunkPos.asLong(x,z) becomes new ChunkPos(x,z).pack().
 common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
 
-# 26.x renamed the map-index SavedDataType from idcounts to maps/last_id, so the idcounts key constant diverges.
+# 26.x renamed the map-index SavedDataType from idcounts to maps/last_id (MapIndex.TYPE).
 common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
 
-# 26.x moved advancements/ and stats/ under players/ (LevelResource PLAYER_ADVANCEMENTS_DIR / PLAYER_STATS_DIR),
-# so the two resolved paths diverge.
+# 26.x moved advancements/ and stats/ under players/ (LevelResource PLAYER_ADVANCEMENTS_DIR / PLAYER_STATS_DIR).
 common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressWriter.java
 
 # 26.x removed Player.displayClientMessage; a client chat line is ChatComponent.addClientSystemMessage.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
-# 26.x GuiGraphics is GuiGraphicsExtractor and the widget/screen/entry paint overrides rename to
-# extractWidgetRenderState / extractRenderState / extractContent (loader-api-bands.md sec 6).
+# 26.x GuiGraphics is GuiGraphicsExtractor and the widget/entry paint overrides rename (loader-api-bands sec 6).
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
+# 26.x GuiGraphics is GuiGraphicsExtractor and the screen/entry paint overrides rename (loader-api-bands sec 6).
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
+# 26.x GuiGraphics is GuiGraphicsExtractor: the HUD callback parameter retypes.
 common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
+
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/BookshelfOccupancyFlushTest.java
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/CarryForwardWiringTest.java
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/ChunkFlushPlanTest.java
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/ContainerRecaptureSynergyTest.java
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/ContainerStashMergeTest.java
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/ContainerTypeGateMergeTest.java
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/LecternRecaptureSynergyTest.java
+# 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
+common/src/test/java/world/thearchive/wdl/adapter/LecternStashMergeTest.java
+# 26.x ChunkPos record forms in the test (new ChunkPos(x,z).pack()).
+common/src/test/java/world/thearchive/wdl/adapter/EntityPacketCaptureTest.java
+# 26.x ChunkPos record forms in the test (pack()).
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
+# 26.x ChunkPos record forms in the test (pack()).
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
+# 26.x ChunkPos record forms in the fixture (ChunkPos.containing).
+common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
+
+# 26.x BundleContents holds ItemStackTemplate; ItemContainerContents.nonEmptyStream is nonEmptyItemCopyStream.
+common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
+# 26.x BundleContents holds ItemStackTemplate (via ItemStackTemplate.fromNonEmptyStack).
+common/src/test/java/world/thearchive/wdl/adapter/MenuChangeTrackerTest.java
+# 26.x BundleContents holds ItemStackTemplate (via ItemStackTemplate.fromNonEmptyStack).
+common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
+
+# 26.x splits world metadata across data/minecraft/*.dat; this reads worldgen, game rules and the clock there.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
+# 26.x moves worldgen into data/minecraft/world_gen_settings.dat; this reads it there.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
+# 26.x moves the player to players/data/<uuid>.dat and difficulty into difficulty_settings; this reads them there.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
+# 26.x moves advancements/stats under players/; this expects the files there.
+common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressWriterTest.java
+# 26.x renamed the map index to maps/last_id; this reads and blocks that path.
+common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.java
+# 26.x map data and index are maps/<id> and maps/last_id; this checks those paths.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionMapTallyTest.java
+# 26.x map key is maps/<id>, so a lost-map log line names it that way.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossLogWiringTest.java
+# 26.x puts every dimension under dimensions/minecraft/<name>, so the overworld region is no longer at the root.
+common/src/test/java/world/thearchive/wdl/adapter/RegionIntegrationTest.java

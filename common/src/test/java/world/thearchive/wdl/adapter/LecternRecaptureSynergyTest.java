@@ -80,7 +80,7 @@ class LecternRecaptureSynergyTest {
         stash.put(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z), stashBook("Placed Late", 0));
 
         int merged = ContainerMerge.mergeLecternChunkStash(sink, snapshotOnceTag,
-                new ChunkPos(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z)), stash).merged();
+                ChunkPos.containing(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z)), stash).merged();
 
         assertEquals(0, merged, "with no re-captured lectern block entity there is nothing to merge onto");
     }
@@ -96,7 +96,7 @@ class LecternRecaptureSynergyTest {
         stash.put(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z), stashBook("Recaptured", 2));
 
         int merged = ContainerMerge.mergeLecternChunkStash(sink, recapturedTag,
-                new ChunkPos(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z)), stash).merged();
+                ChunkPos.containing(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z)), stash).merged();
 
         assertEquals(1, merged, "the re-captured lectern block entity gives the stash something to merge onto");
         assertEquals("Recaptured", mergedTitle(recapturedTag), "the stashed book lands on the re-captured lectern");
@@ -117,7 +117,7 @@ class LecternRecaptureSynergyTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z), stashBook("Stable", 1));
 
-        ChunkPos chunkPos = new ChunkPos(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z));
+        ChunkPos chunkPos = ChunkPos.containing(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z));
         int merged = ContainerMerge.mergeLecternChunkStash(sink, latestRecapture, chunkPos, stash).merged();
         assertEquals(1, merged, "the single flush merges the stash exactly once");
         assertTrue(stash.isEmpty(), "the stash entry is drained at flush, so it cannot merge again");

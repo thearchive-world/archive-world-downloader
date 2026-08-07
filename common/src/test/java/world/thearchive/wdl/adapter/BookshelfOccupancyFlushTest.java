@@ -77,7 +77,7 @@ class BookshelfOccupancyFlushTest {
     void aFlushReGatesPriorBookshelfSlotsEvenWithContainerCaptureOff(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = containersOffSession(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
-        ChunkPos pos = new ChunkPos(shelf);
+        ChunkPos pos = ChunkPos.containing(shelf);
 
         // A prior session wrote two books. Since then slot 0 was emptied, which the block-state records and
         // this session re-captures, while the on-disk Items still names it.

@@ -78,7 +78,7 @@ class InteractionMergeRoundTripTest {
         BlockPos elsewhere = new BlockPos(100, 70, 200); // a jukebox in a different chunk, not being flushed
         stash.put(elsewhere, InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_13), registries));
 
-        int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
+        int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, ChunkPos.containing(jukeboxPos), stash).merged();
 
         assertEquals(1, merged, "only the flushed chunk's jukebox merges");
         assertFalse(stash.containsKey(jukeboxPos), "the flushed chunk's stash entry is drained");
@@ -101,7 +101,7 @@ class InteractionMergeRoundTripTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(jukeboxPos, InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT), registries));
 
-        ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
+        ContainerMerge.mergeHolderChunkStash(chunkTag, ChunkPos.containing(jukeboxPos), stash).merged();
 
         // Vanilla JukeboxBlockEntity.loadAdditional starts the song player (the note particles) only when
         // ticks_since_song_started is present, so the captured holder carries it (the disc just started at the
@@ -123,7 +123,7 @@ class InteractionMergeRoundTripTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(hivePos, InteractionCapture.captureBees(occupants, registries));
 
-        int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(hivePos), stash).merged();
+        int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, ChunkPos.containing(hivePos), stash).merged();
 
         assertEquals(1, merged, "the flushed chunk's beehive merges");
         assertFalse(stash.containsKey(hivePos), "the stash entry is drained as the tag leaves memory");
@@ -147,7 +147,7 @@ class InteractionMergeRoundTripTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(pos, InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_11), registries));
 
-        int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(pos), stash).merged();
+        int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, ChunkPos.containing(pos), stash).merged();
 
         assertEquals(0, merged, "no captured block entity at the stashed pos -> nothing merges");
         assertFalse(stash.containsKey(pos), "the entry is still drained: the chunk is leaving memory");

@@ -149,7 +149,7 @@ class LiveCaptureSessionMapTallyTest {
         MapDataWriter.writeIdCounts(paths.dataDirectory(), MapDataWriter.serializeIdCounts(500));
         // A directory where the staged sibling belongs: only the staged route fails here, so this is what
         // separates it from a direct write.
-        Files.createDirectory(paths.dataDirectory().resolve("idcounts.dat.tmp"));
+        Files.createDirectory(paths.dataDirectory().resolve("maps").resolve("last_id.dat.tmp"));
         MapArchive archive = stubArchive();
         archive.archiveIdFor(42);
         assertFalse(session.isPartialSave(0, 0), "nothing has been written, so the finish reads clean");
@@ -242,7 +242,7 @@ class LiveCaptureSessionMapTallyTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "the drain reached no region storage, so no opener guard fired");
-        assertTrue(Files.exists(paths.dataDirectory().resolve("map_7.dat")),
+        assertTrue(Files.exists(paths.dataDirectory().resolve("maps").resolve("7.dat")),
                 "the bind published the writer, so the streamed map was written rather than counted lost");
         assertFalse(session.isPartialSave(0, 0), "a map that reached disk is no loss, so the finish reads clean");
     }
@@ -419,7 +419,7 @@ class LiveCaptureSessionMapTallyTest {
 
         AsyncSaveWriter writer = session.bindWorldOpen(paths, archive, counted);
 
-        assertTrue(Files.exists(paths.dataDirectory().resolve("idcounts.dat")),
+        assertTrue(Files.exists(paths.dataDirectory().resolve("maps").resolve("last_id.dat")),
                 "the archive was bound before the factory ran, so the write it drove found one");
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
         assertFalse(result.failed(), "the drain reached no region storage, so no opener guard fired");

@@ -4,6 +4,7 @@
 package world.thearchive.wdl.testsupport;
 
 import java.util.List;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
@@ -41,7 +42,8 @@ public final class MapHolderFixtures {
     /** A bundle whose {@code minecraft:bundle_contents} component nests {@code contents}. */
     public static ItemStack bundleHolding(ItemStack... contents) {
         ItemStack bundle = new ItemStack(Items.BUNDLE);
-        bundle.set(DataComponents.BUNDLE_CONTENTS, new BundleContents(List.of(contents)));
+        bundle.set(DataComponents.BUNDLE_CONTENTS,
+                new BundleContents(List.of(contents).stream().map(ItemStackTemplate::fromNonEmptyStack).toList()));
         return bundle;
     }
 

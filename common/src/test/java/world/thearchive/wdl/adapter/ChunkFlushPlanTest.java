@@ -147,7 +147,7 @@ class ChunkFlushPlanTest {
         replaced.add(inside.asLong());
         replaced.add(elsewhere.asLong());
 
-        LongSet forChunk = ChunkFlushPlan.replacedIn(new ChunkPos(inside), replaced);
+        LongSet forChunk = ChunkFlushPlan.replacedIn(ChunkPos.containing(inside), replaced);
 
         assertTrue(forChunk.contains(inside.asLong()), "a placement in this chunk reaches this chunk's merge");
         assertFalse(forChunk.contains(elsewhere.asLong()), "and one in another chunk does not");

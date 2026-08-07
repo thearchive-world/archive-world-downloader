@@ -571,7 +571,7 @@ class InteractionStashMergeTest {
 
         // Vanilla inserts exactly one book and the slot holds one, so the captured book must be a single item even
         // though the hand held a stack of five. Drain against a bookshelf whose slot 0 reads occupied.
-        InteractionCapture.ChunkBundles bundles = capture.drainChunk(new ChunkPos(pos),
+        InteractionCapture.ChunkBundles bundles = capture.drainChunk(ChunkPos.containing(pos),
                 SyntheticChunks.withBlockAt(registries, pos, bookshelf(0)));
         NonNullList<ItemStack> items = readItems(bundles.items().get(pos), 6);
         assertEquals(1, items.get(0).getCount(), "the captured bookshelf book is a single item, not the held stack");

@@ -86,7 +86,7 @@ class ContainerStashMergeTest {
         BlockPos elsewhere = new BlockPos(100, 70, 200); // a container in a different chunk, not being flushed
         stash.put(elsewhere, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
 
-        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(chestPos), stash).merged();
+        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, ChunkPos.containing(chestPos), stash).merged();
 
         assertEquals(1, merged, "only the flushed chunk's container merges");
         assertFalse(stash.containsKey(chestPos), "the flushed chunk's stash entry is drained as the tag leaves memory");
@@ -111,7 +111,7 @@ class ContainerStashMergeTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(pos, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
 
-        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
+        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, ChunkPos.containing(pos), stash).merged();
 
         assertEquals(0, merged, "no captured block entity at the stashed pos -> nothing merges");
         assertFalse(stash.containsKey(pos),
@@ -141,7 +141,7 @@ class ContainerStashMergeTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(chestPos, new CompoundTag()); // an empty holder makes no type claim, so the merge is reached
 
-        MergeTally tally = ContainerMerge.mergeChunkStash(throwingSink, chunkTag, new ChunkPos(chestPos), stash);
+        MergeTally tally = ContainerMerge.mergeChunkStash(throwingSink, chunkTag, ChunkPos.containing(chestPos), stash);
 
         assertEquals(0, tally.merged(), "a throwing merge folds in nothing");
         assertEquals(1, tally.failed(), "and the loss is counted for the honest partial-save report");
@@ -174,7 +174,7 @@ class ContainerStashMergeTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(crafterPos, holder);
 
-        ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(crafterPos), stash);
+        ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, ChunkPos.containing(crafterPos), stash);
 
         CompoundTag mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
         assertArrayEquals(new int[] { 0, 4 }, mergedBlockEntity.getIntArray("disabled_slots").orElseThrow());
@@ -204,7 +204,7 @@ class ContainerStashMergeTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(crafterPos, holder);
 
-        ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(crafterPos), stash);
+        ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, ChunkPos.containing(crafterPos), stash);
 
         CompoundTag mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
         assertArrayEquals(new int[] { 2, 5 }, mergedBlockEntity.getIntArray("disabled_slots").orElseThrow());

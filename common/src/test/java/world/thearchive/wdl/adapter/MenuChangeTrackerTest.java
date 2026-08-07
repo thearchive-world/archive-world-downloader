@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.inventory.Slot;
@@ -89,7 +90,8 @@ class MenuChangeTrackerTest {
         List<Slot> slots = slotsOver(container);
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
 
-        bundle.set(DataComponents.BUNDLE_CONTENTS, new BundleContents(List.of(new ItemStack(Items.DIAMOND))));
+        bundle.set(DataComponents.BUNDLE_CONTENTS,
+                new BundleContents(List.of(ItemStackTemplate.fromNonEmptyStack(new ItemStack(Items.DIAMOND)))));
 
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA),
                 "an in-place bundle contents swap is a change");

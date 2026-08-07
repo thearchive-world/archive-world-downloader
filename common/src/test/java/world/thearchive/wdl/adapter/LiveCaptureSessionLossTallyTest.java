@@ -1031,7 +1031,7 @@ class LiveCaptureSessionLossTallyTest {
 
     /** Feed one held spawn frame, the state the finish drain consumes and an aborted one leaves behind. */
     private static void spawn(EntityPacketCapture capture, int id, UUID uuid, ChunkPos pos) {
-        capture.spawn(id, uuid, pos.toLong(), new EntityPos(pos.getMinBlockX(), 64.0, pos.getMinBlockZ(), 0f, 0f),
+        capture.spawn(id, uuid, pos.pack(), new EntityPos(pos.getMinBlockX(), 64.0, pos.getMinBlockZ(), 0f, 0f),
                 new ClientboundAddEntityPacket(id, uuid, pos.getMinBlockX(), 64.0, pos.getMinBlockZ(), 0f, 0f,
                         EntityType.PIG, 0, Vec3.ZERO, 0.0));
     }
@@ -1042,7 +1042,7 @@ class LiveCaptureSessionLossTallyTest {
      */
     private static void captureTerrain(LiveCaptureSession session, ChunkPos pos) throws Exception {
         LongOpenHashSet allCaptured = state(session, "allCaptured");
-        allCaptured.add(pos.toLong());
+        allCaptured.add(pos.pack());
     }
 
     /**
@@ -1053,7 +1053,7 @@ class LiveCaptureSessionLossTallyTest {
     private static void captureTerrain(LiveCaptureSession session, ResourceKey<Level> dimension, ChunkPos pos)
             throws Exception {
         Map<ResourceKey<Level>, LongOpenHashSet> byDimension = state(session, "capturedByDimension");
-        byDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet()).add(pos.toLong());
+        byDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet()).add(pos.pack());
     }
 
     /**
