@@ -1,4 +1,4 @@
-accessWidener	v2	named
+accessWidener	v2	official
 
 # WDL: the connection packet tee reaches the connection's Netty pipeline through the private,
 # non-final Connection.channel. Non-final, so accessible (read) alone suffices; no mutable. The NeoForge

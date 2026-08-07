@@ -75,8 +75,10 @@ public final class TestRegistries {
                 layered.getLayer(RegistryLayer.STATIC));
         RegistryAccess.Frozen loadingBase = layered.getAccessForLoading(RegistryLayer.WORLDGEN);
         List<HolderLookup.RegistryLookup<?>> lookups = TagLoader.buildUpdatedLookups(loadingBase, pendingTags);
+        // 26.x RegistryDataLoader.load is asynchronous: it takes an Executor and returns a future. Run it on the
+        // calling thread and join, keeping this bootstrap synchronous.
         RegistryAccess.Frozen worldgen = RegistryDataLoader.load(resources, lookups,
-                RegistryDataLoader.WORLDGEN_REGISTRIES);
+                RegistryDataLoader.WORLDGEN_REGISTRIES, Runnable::run).join();
 
         // Bind the loaded tags onto the STATIC registries (the updateStaticRegistryTags step WorldLoader runs
         // last via ReloadableServerResources), so ItemStack.is(tag) resolves against BuiltInRegistries headless.
