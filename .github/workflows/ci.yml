@@ -1,9 +1,9 @@
 name: CI
 
-# Build every era-band branch + PR (Java 21). ./gradlew build continuously guards the
-# source-merge gate (:fabric:build -> remap common to intermediary) plus the core invariants
-# (:common:check -> checkCoreImports, checkPlugBand, checkCoreJava8) and the headless unit suite
-# (:common:test).
+# Build every era-band branch + PR, on the JDK that branch's gradle.properties names. ./gradlew build
+# continuously guards the source-merge gate (:fabric:build -> remap common to intermediary) plus the core
+# invariants (:common:check -> checkCoreImports, checkPlugBand, checkCoreJava8, checkJavaVersion) and the
+# headless unit suite (:common:test).
 on:
   push:
     branches:
@@ -47,11 +47,19 @@ jobs:
           # could read it; nothing in this workflow pushes back to the repo.
           persist-credentials: false
 
-      - name: Set up JDK 21 (Temurin)
+      - name: Resolve the build JDK
+        # setup-java cannot read a .properties file, so this branch's own coordinate is lifted here.
+        id: jdk
+        run: |
+          version="$(sed -n 's/^java_build_version=//p' gradle.properties | tail -n1 | tr -d '[:space:]')"
+          [ -n "$version" ] || { echo "no java_build_version=<jdk> line in gradle.properties" >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up the build JDK (Temurin)
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: ${{ steps.jdk.outputs.version }}
 
       - name: Set up Gradle
         # basic is the MIT caching provider. The v6 default routes caching through the proprietary

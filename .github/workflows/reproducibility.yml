@@ -59,12 +59,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 21 (Temurin)
+      - name: Resolve the build JDK
+        # setup-java cannot read a .properties file, so this branch's own coordinate is lifted here.
+        id: jdk
+        run: |
+          version="$(sed -n 's/^java_build_version=//p' gradle.properties | tail -n1 | tr -d '[:space:]')"
+          [ -n "$version" ] || { echo "no java_build_version=<jdk> line in gradle.properties" >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up the build JDK (Temurin)
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
         with:
           distribution: temurin
-          # Exact patch, must match release.yml so this verifies the release toolchain.
-          java-version: "21.0.11"
+          java-version: ${{ steps.jdk.outputs.version }}
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92  # v6.2.0
