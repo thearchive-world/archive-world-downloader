@@ -143,7 +143,7 @@ class RestoreSourceTest {
     @Test
     void downloadsNamedLikeArtifactsStayClean() throws IOException {
         cleanZip("players.zip", "players", "2026-03-01T10:00:00Z");
-        // Root-stripped, its data/ path reads players-relative, never players/data.
+        // Root-stripped, each entry reads folder-relative, so a folder named for an artifact directory is not one.
         zip("players.zip", "players/level.dat", LEVEL, "players/data/map_0.dat", LEVEL,
                 "players/wdl/download.jsonl", record("2026-03-01T10:00:00Z"));
         assertTrue(RestoreSource.find(saves, "players").isPresent());
