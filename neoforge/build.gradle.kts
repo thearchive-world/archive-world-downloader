@@ -26,14 +26,21 @@ spotless {
     }
 }
 
+// Parchment param-name mappings are layered only on bands that publish them; a band with no Parchment
+// release (26.x) omits both properties and skips the parchment block below.
+val parchmentMinecraft = providers.gradleProperty("parchment_minecraft_version")
+val parchmentMappings = providers.gradleProperty("parchment_mappings_version")
+
 neoForge {
     // NeoForge mode: set a NeoForge version (NOT a NeoForm version like common's Vanilla mode).
     // This puts NeoForge + Minecraft (Mojmap-named, no intermediary remap) on the classpath and
     // gives the client run type. The source-merge convention is provided by wdl.common-merge.
     version = property("neoforge_version") as String
-    parchment {
-        minecraftVersion = property("parchment_minecraft_version") as String
-        mappingsVersion  = property("parchment_mappings_version") as String
+    if (parchmentMinecraft.isPresent && parchmentMappings.isPresent) {
+        parchment {
+            minecraftVersion = parchmentMinecraft.get()
+            mappingsVersion  = parchmentMappings.get()
+        }
     }
 
     // The mod = the main source set, which the source-merge augments with :common's classes.
