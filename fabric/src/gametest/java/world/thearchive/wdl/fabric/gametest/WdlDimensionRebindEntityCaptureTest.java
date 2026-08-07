@@ -44,16 +44,16 @@ public class WdlDimensionRebindEntityCaptureTest implements FabricClientGameTest
     // y is the flat surface; both are safe only because the fixture puts the player in creative.
     private static final BlockPos NETHER_STAND = new BlockPos(200, 100, 200);
     private static final BlockPos OVERWORLD_RETURN = new BlockPos(200, -60, 200);
-    private static final ChunkPos SHARED_CHUNK = new ChunkPos(NETHER_STAND);
+    private static final ChunkPos SHARED_CHUNK = ChunkPos.containing(NETHER_STAND);
 
     @Override
     public void runTest(ClientGameTestContext context) {
         // The whole discrimination rests on the two positions sharing one chunk key, and they share it only
         // because two constants agree by hand; a later edit to either would leave both assertions below green
         // with the wrong-dimension arm dead.
-        Check.that(new ChunkPos(OVERWORLD_RETURN).equals(SHARED_CHUNK),
+        Check.that(ChunkPos.containing(OVERWORLD_RETURN).equals(SHARED_CHUNK),
                 "the overworld return must sit in the same chunk as the nether stand, or this test proves nothing: "
-                        + new ChunkPos(OVERWORLD_RETURN) + " versus " + SHARED_CHUNK);
+                        + ChunkPos.containing(OVERWORLD_RETURN) + " versus " + SHARED_CHUNK);
         try (MultiplayerFixture fixture = MultiplayerFixture.connect(context)) {
             TestServerContext server = fixture.server();
 

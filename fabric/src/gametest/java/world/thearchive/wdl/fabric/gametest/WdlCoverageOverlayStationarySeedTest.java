@@ -39,7 +39,7 @@ public class WdlCoverageOverlayStationarySeedTest implements FabricClientGameTes
             String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
             ChunkPos playerChunkPos = context.computeOnClient(client -> client.player.chunkPosition());
             BlockPos playerBlockPos = context.computeOnClient(client -> client.player.blockPosition());
-            long neighborChunk = ChunkPos.asLong(playerChunkPos.x + 1, playerChunkPos.z);
+            long neighborChunk = new ChunkPos(playerChunkPos.x() + 1, playerChunkPos.z()).pack();
 
             // Both frames go up BEFORE the download starts, so their spawn packets predate the tee and only
             // the chunk-prime seed registration can anchor them. Hung on constructed wall blocks (frames

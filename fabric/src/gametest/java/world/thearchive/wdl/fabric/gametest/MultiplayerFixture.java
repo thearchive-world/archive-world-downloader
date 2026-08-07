@@ -5,7 +5,7 @@ package world.thearchive.wdl.fabric.gametest;
 
 import java.util.Properties;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.fabricmc.fabric.api.client.gametest.v1.context.TestClientWorldContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestClientLevelContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -42,7 +42,7 @@ final class MultiplayerFixture implements AutoCloseable {
     static MultiplayerFixture connect(ClientGameTestContext context) {
         TestDedicatedServerContext server = context.worldBuilder().createServer();
         TestServerConnection connection = server.connect();
-        connection.getClientWorld().waitForChunksDownload();
+        connection.getClientLevel().waitForChunksDownload();
         context.waitFor(client -> client.player != null && client.level != null);
         server.runCommand("gamemode creative @a");
         return new MultiplayerFixture(server, connection);
@@ -57,7 +57,7 @@ final class MultiplayerFixture implements AutoCloseable {
         properties.setProperty("entity-broadcast-range-percentage", Integer.toString(broadcastPercentage));
         TestDedicatedServerContext server = context.worldBuilder().createServer(properties);
         TestServerConnection connection = server.connect();
-        connection.getClientWorld().waitForChunksDownload();
+        connection.getClientLevel().waitForChunksDownload();
         context.waitFor(client -> client.player != null && client.level != null);
         server.runCommand("gamemode creative @a");
         return new MultiplayerFixture(server, connection);
@@ -69,8 +69,8 @@ final class MultiplayerFixture implements AutoCloseable {
     }
 
     /** The client world handle, for re-waiting on chunk download after the player moves to a new area. */
-    TestClientWorldContext clientWorld() {
-        return connection.getClientWorld();
+    TestClientLevelContext clientWorld() {
+        return connection.getClientLevel();
     }
 
     @Override

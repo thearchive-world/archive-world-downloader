@@ -75,7 +75,7 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
             run.tick(5);
 
             context.runOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(ContainerDriver.isLookingAt(client, chest),
                         "crosshair drifted off the chest before opening: " + client.hitResult);
                 client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);
@@ -137,7 +137,8 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
                 WdlConfig.DEFAULTS);
         run.tick(5);
         context.runOnClient(client -> client.gameMode.interact(client.player,
-                ((EntityHitResult) client.hitResult).getEntity(), InteractionHand.MAIN_HAND));
+                ((EntityHitResult) client.hitResult).getEntity(), (EntityHitResult) client.hitResult,
+                InteractionHand.MAIN_HAND));
         ContainerDriver.awaitMenuSlotItem(context, run, Items.DIAMOND);
         run.tick(5);
 
@@ -163,7 +164,7 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
                 WdlConfig.DEFAULTS);
         observed.tick(5);
         context.runOnClient(client -> {
-            client.gameRenderer.pick(1.0f);
+            client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
             Check.that(isLookingAtVehicle(client),
                     "crosshair drifted off the chest minecart before the observed click: " + client.hitResult);
             client.setScreen(null);
@@ -215,7 +216,7 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
                     .filter(entity -> entity.getUUID().equals(cartId))
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("the chest minecart is gone, so nothing would open"));
-            client.gameMode.interact(client.player, cart, InteractionHand.MAIN_HAND);
+            client.gameMode.interact(client.player, cart, new EntityHitResult(cart), InteractionHand.MAIN_HAND);
         });
         ContainerDriver.awaitMenuSlotItem(context, run, Items.DIAMOND);
         run.tick(5);

@@ -105,3 +105,52 @@ common/src/test/java/world/thearchive/wdl/adapter/RegionIntegrationTest.java
 # 26.x fabric-api replaced rendering.v1.world.WorldRenderEvents with rendering.v1.level.LevelRenderEvents and
 # dropped the frustum accessor, so this registrar draws on BEFORE_GIZMOS with a null frustum.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
+
+# --- Fabric capture-tier gametest 26.x drift (ChunkPos records, MultiPlayerGameMode.interact's new
+# EntityHitResult argument, the pick move to a private Minecraft.pick, the fabric-client-gametest World->Level
+# rename, ItemContainerContents.nonEmptyStream to nonEmptyItemCopyStream, and the LevelRenderEvents outline
+# event) ---
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/ContainerDriver.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/MultiplayerFixture.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlChestedAnimalCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlContainerCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayEntityRangeTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayIndexTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayMobRangeTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayResumeTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayStationarySeedTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCustomLevelKeyRoutingTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDimensionRebindEntityCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDoubleChestCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlEnderChestCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlEntityContainerCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlLecternCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlLightCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPreexistingEntityCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlResumeContainerClobberTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSpectateAnchorTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSpectatorContainerCaptureTest.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlStalePlacementCaptureTest.java

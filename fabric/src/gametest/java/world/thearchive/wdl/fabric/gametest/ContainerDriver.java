@@ -50,7 +50,7 @@ final class ContainerDriver {
     static void awaitCrosshair(ClientGameTestContext context, Predicate<Minecraft> onTarget, String target) {
         for (int tick = 0; tick <= ClientGameTestContext.DEFAULT_TIMEOUT; tick++) {
             boolean resolved = context.computeOnClient(client -> {
-                client.gameRenderer.pick(1.0f);
+                client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 return onTarget.test(client);
             });
             if (resolved) {
@@ -110,7 +110,7 @@ final class ContainerDriver {
 
     /** The item ids captured in the chest block entity at {@code pos} on disk (region {@code block_entities}). */
     static List<String> capturedChestItems(Path saveRoot, BlockPos pos) {
-        CompoundTag chunk = CaptureReadback.readChunk(saveRoot, new ChunkPos(pos))
+        CompoundTag chunk = CaptureReadback.readChunk(saveRoot, ChunkPos.containing(pos))
                 .orElseThrow(() -> new AssertionError("captured chunk for chest " + pos + " is missing from the save"));
         return CaptureReadback.blockEntityAt(chunk, pos)
                 .map(CaptureReadback::itemIds)

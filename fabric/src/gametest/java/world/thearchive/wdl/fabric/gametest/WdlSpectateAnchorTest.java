@@ -81,8 +81,8 @@ public class WdlSpectateAnchorTest implements FabricClientGameTest {
                 driver.tick(20); // let the server re-center and stream the step's chunks before the next one
             }
 
-            ChunkPos startChunk = new ChunkPos(start);
-            ChunkPos farChunk = new ChunkPos(new BlockPos(start.getX() + TRAVEL_BLOCKS, start.getY(),
+            ChunkPos startChunk = ChunkPos.containing(start);
+            ChunkPos farChunk = ChunkPos.containing(new BlockPos(start.getX() + TRAVEL_BLOCKS, start.getY(),
                     start.getZ()));
             long[] saved = driver.rawSavedChunks(dimension);
 
@@ -102,6 +102,6 @@ public class WdlSpectateAnchorTest implements FabricClientGameTest {
     }
 
     private static boolean containsChunk(long[] saved, ChunkPos pos) {
-        return Arrays.stream(saved).anyMatch(key -> key == pos.toLong());
+        return Arrays.stream(saved).anyMatch(key -> key == pos.pack());
     }
 }

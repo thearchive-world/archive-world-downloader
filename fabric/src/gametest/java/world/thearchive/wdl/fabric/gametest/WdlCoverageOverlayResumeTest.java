@@ -24,7 +24,7 @@ public class WdlCoverageOverlayResumeTest implements FabricClientGameTest {
     public void runTest(ClientGameTestContext context) {
         try (MultiplayerFixture fixture = MultiplayerFixture.connect(context)) {
             String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
-            long chunkA = context.computeOnClient(client -> client.player.chunkPosition().toLong());
+            long chunkA = context.computeOnClient(client -> client.player.chunkPosition().pack());
 
             // Session 1 (NEW): capture and save area A, so its region files exist on disk.
             CaptureDriver.capture(context,
@@ -35,7 +35,7 @@ public class WdlCoverageOverlayResumeTest implements FabricClientGameTest {
             fixture.server().runCommand("tp @a 3000 100 3000");
             context.waitFor(client -> client.player != null && client.player.getX() > 2900);
             fixture.clientWorld().waitForChunksDownload();
-            long chunkB = context.computeOnClient(client -> client.player.chunkPosition().toLong());
+            long chunkB = context.computeOnClient(client -> client.player.chunkPosition().pack());
             Check.that(chunkA != chunkB, "the tp did not move the player to a new chunk");
 
             // Session 2 (RESUME), with the overlay reported active: the first capture tick's flush submits the seed,
