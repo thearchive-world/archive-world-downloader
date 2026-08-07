@@ -88,6 +88,16 @@ class ResumeFlowTest {
         }
 
         @Override
+        public boolean isBlockingScreenOpen() {
+            return false;
+        }
+
+        @Override
+        public boolean isHudHidden() {
+            return false;
+        }
+
+        @Override
         public String loaderName() {
             return "test";
         }

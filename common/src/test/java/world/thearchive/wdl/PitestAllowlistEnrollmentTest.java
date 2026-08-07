@@ -122,6 +122,7 @@ class PitestAllowlistEnrollmentTest {
             "world.thearchive.wdl.adapter.OutlineTracker",
             "world.thearchive.wdl.adapter.PlayerSink",
             "world.thearchive.wdl.adapter.RegionChunkWriter",
+            "world.thearchive.wdl.adapter.RenderSurface",
             "world.thearchive.wdl.adapter.RimRenderer",
             "world.thearchive.wdl.adapter.StashHolder",
             "world.thearchive.wdl.adapter.WorldPaths");
