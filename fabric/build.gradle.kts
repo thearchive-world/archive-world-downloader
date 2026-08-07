@@ -110,7 +110,7 @@ dependencies {
     // JourneyMap API for the source-merged overlay binding (compat/journeymap) and the journeymap entrypoint
     // (WdlJourneyMapPlugin), compile-only. Loom remaps it to Mojmap for the compile; there is no runtime
     // require, so JourneyMap's absence just means the entrypoint is never queried.
-    modCompileOnly("info.journeymap:journeymap-api-fabric:${property("journeymap_api_version")}-${property("minecraft_version")}")
+    modCompileOnly("info.journeymap:journeymap-api-fabric:${property("journeymap_api_coordinate")}")
 
     // JSpecify on the gametest source set so its package-info @NullMarked resolves; compileOnly is not
     // transitive across source sets. NullAway does not run here (test-scope, disabled above), so the marking

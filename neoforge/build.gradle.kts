@@ -96,7 +96,7 @@ dependencies {
 
     // JourneyMap public API for the source-merged overlay binding (compat/journeymap), compile-only. NeoForge
     // is ModDev (no remap), neoforge flavor, no runtime require.
-    compileOnly("info.journeymap:journeymap-api-neoforge:${property("journeymap_api_version")}-${property("minecraft_version")}")
+    compileOnly("info.journeymap:journeymap-api-neoforge:${property("journeymap_api_coordinate")}")
 }
 
 // Release publishing (mod-publish-plugin): uploads the NeoForge jar to Modrinth, and attaches that same jar to
