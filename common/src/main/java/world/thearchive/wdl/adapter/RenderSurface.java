@@ -3,7 +3,9 @@
 
 package world.thearchive.wdl.adapter;
 
+import java.util.List;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -30,8 +32,20 @@ public interface RenderSurface {
     /** Fill an axis-aligned rectangle with an ARGB color. */
     void fill(int minX, int minY, int maxX, int maxY, int color);
 
+    /** Draw a one-pixel outline around an axis-aligned rectangle in an ARGB color. */
+    void outline(int x, int y, int width, int height, int color);
+
     /** Draw a mod-owned atlas sprite tinted by an ARGB color, named by its {@code wdl}-namespace path. */
     void blitSprite(String sprite, int x, int y, int width, int height, int color);
+
+    /** Draw a square world favicon. */
+    void blitFavicon(FaviconTexture icon, int x, int y, int size);
+
+    /** Show a tooltip that wraps {@code content} at {@code wrapWidth}, anchored at the cursor. */
+    void tooltip(Font font, Component content, int wrapWidth, int mouseX, int mouseY);
+
+    /** Show a tooltip of discrete lines, one per component, anchored at the cursor. */
+    void tooltip(Font font, List<Component> lines, int mouseX, int mouseY);
 
     /** The framebuffer width in GUI-scaled pixels. */
     int guiWidth();
