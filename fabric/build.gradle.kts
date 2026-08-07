@@ -2,7 +2,7 @@ import net.ltgt.gradle.errorprone.errorprone
 import wdl.buildlogic.registerVerifyProductionJar
 
 plugins {
-    id("fabric-loom")     // version comes from the root apply-false declaration
+    id("net.fabricmc.fabric-loom")     // no-remap loom: MC 26.x ships unobfuscated, so nothing is remapped
     alias(libs.plugins.mod.publish.plugin)    // release upload; version from the root apply-false declaration
     id("com.diffplug.spotless")    // applied per-subproject, not via build-logic (see :common)
     id("wdl.java-conventions")
@@ -93,31 +93,25 @@ val parchmentMinecraft = providers.gradleProperty("parchment_minecraft_version")
 val parchmentMappings = providers.gradleProperty("parchment_mappings_version")
 
 dependencies {
-    minecraft("com.mojang:minecraft:${property("minecraft_version")}")
-    mappings(loom.layered {
-        officialMojangMappings()
-        if (parchmentMinecraft.isPresent && parchmentMappings.isPresent) {
-            parchment("org.parchmentmc.data:parchment-${parchmentMinecraft.get()}:${parchmentMappings.get()}@zip")
-        }
-    })
-    modImplementation("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
-    modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
+    "minecraft"("com.mojang:minecraft:${property("minecraft_version")}")
+    implementation("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
+    implementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
 
     // XaeroPlus public API for the source-merged overlay binding (compat/xaeroplus), compile-only. Loom remaps
     // the fabric flavor to Mojmap for the compile; there is no runtime require. XaeroPlus hard-depends on
     // xaeroworldmap, so the whole Xaero family is kept off every run and the headless gametest never hits
     // Xaero's startup update modal; the manual render gate installs the family in a real client.
-    modCompileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+fabric-${property("minecraft_version")}")
+    compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+fabric-${property("minecraft_version")}")
 
     // ModMenu API for the mod-list config-screen entrypoint (WdlModMenu), compile-only. Loom remaps it to
     // Mojmap for the compile; there is no runtime require, so ModMenu's absence just means the entrypoint is
     // never queried. The pinned version supplies only the stable ModMenuApi; the player's own ModMenu runs.
-    modCompileOnly("maven.modrinth:modmenu:${property("modmenu_version")}")
+    compileOnly("maven.modrinth:modmenu:${property("modmenu_version")}")
 
     // JourneyMap API for the source-merged overlay binding (compat/journeymap) and the journeymap entrypoint
     // (WdlJourneyMapPlugin), compile-only. Loom remaps it to Mojmap for the compile; there is no runtime
     // require, so JourneyMap's absence just means the entrypoint is never queried.
-    modCompileOnly("info.journeymap:journeymap-api-fabric:${property("journeymap_api_coordinate")}")
+    compileOnly("info.journeymap:journeymap-api-fabric:${property("journeymap_api_coordinate")}")
 
     // JSpecify on the gametest source set so its package-info @NullMarked resolves; compileOnly is not
     // transitive across source sets. NullAway does not run here (test-scope, disabled above), so the marking
@@ -143,8 +137,8 @@ tasks.named<ProcessResources>("processResources") {
     filesMatching("wdl-publishing.properties") { expand(tokens) }
 }
 
-// Loom's remapJar is the producing task; the guard is shared with the NeoForge sibling (see build-logic).
-registerVerifyProductionJar("remapJar")
+// No-remap loom produces the plain jar (26.x is unobfuscated); the guard is shared with the NeoForge sibling.
+registerVerifyProductionJar("jar")
 
 // Prints this subproject's resolved version (mod_version + the MC build-metadata, set by wdl.java-conventions)
 // so the release workflow can assert the pushed tag equals the version it is about to publish. Registered on a
@@ -161,7 +155,7 @@ tasks.register("printVersion") {
 // the MC build-metadata, set in wdl.java-conventions), and the changelog arrives via the CHANGELOG env the release
 // workflow sets; nothing publishes on an ordinary build. Coordinates live in gradle.properties.
 publishMods {
-    file.set(tasks.remapJar.flatMap { it.archiveFile })
+    file.set(tasks.jar.flatMap { it.archiveFile })
     changelog.set(providers.environmentVariable("CHANGELOG").orElse(""))
     type.set(STABLE)
     version.set(project.version.toString())

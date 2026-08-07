@@ -91,8 +91,10 @@ final class VanillaWorldgenRegistries {
             // id, never generates terrain, so binding block/item tags would be needless work.
             List<HolderLookup.RegistryLookup<?>> loadingBase = layered.getAccessForLoading(RegistryLayer.WORLDGEN)
                     .listRegistries().toList();
+            // 26.x RegistryDataLoader.load is asynchronous: it takes an Executor and returns a future. Run it on
+            // the calling thread and join, so this memoized reconstruction stays synchronous.
             RegistryAccess.Frozen loaded = RegistryDataLoader.load(resources, loadingBase,
-                    RegistryDataLoader.WORLDGEN_REGISTRIES);
+                    RegistryDataLoader.WORLDGEN_REGISTRIES, Runnable::run).join();
             return layered.replaceFrom(RegistryLayer.WORLDGEN, loaded).compositeAccess();
         }
     }
