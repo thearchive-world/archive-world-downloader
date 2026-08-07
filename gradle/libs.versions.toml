@@ -9,7 +9,7 @@
 # (gradle/gradle#15383).
 
 [versions]
-loom = "1.17.16"
+loom = "1.17.19"
 moddev = "2.0.143"
 spotless = "8.9.0"
 errorprone-plugin = "5.1.0"
