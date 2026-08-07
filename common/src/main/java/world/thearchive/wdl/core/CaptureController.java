@@ -92,24 +92,16 @@ public final class CaptureController {
     private final LongSupplier clockMillis;
 
     // Volatile because a map mod's off-thread overlay supplier gates on this through Wdl.state() while the
-    // client thread writes it. A stale RECORDING is harmless, the indexes are cleared on stop so it reads empty
-    // sets, but a stale IDLE would hide the overlay for a whole download with nothing to correct it.
+    // client thread writes it. A stale RECORDING is harmless, the indexes only ever hold the current download's
+    // own coverage and are cleared once its save completes, so the worst it can redraw is what that download was
+    // already drawing; a stale IDLE would hide the overlay for a whole download with nothing to correct it.
     private volatile CaptureState state = CaptureState.IDLE;
     private @Nullable Session session;
 
-    // Saved chunk positions for the coverage overlay: owned here, on the singleton that outlives
-    // individual sessions, so the off-render-thread overlay reads a stably published reference. The live session
-    // writes to it; it is cleared at start and stop so the overlay is empty whenever a capture is not recording.
+    // The three overlay stores are owned here, on the singleton that outlives individual sessions, so the
+    // off-render-thread overlay reads a stably published reference. The live session writes to them.
     private final SavedChunkIndex savedChunks = new SavedChunkIndex();
-
-    // Covered chunk positions for the two-tone overlay: the saved chunks the recording path brought within entity
-    // send range, drawn in the covered hue while the rest of the saved set draws the suspect hue. Owned here beside
-    // savedChunks and cleared with it, so the overlay has no covered tone whenever a capture is not recording.
     private final CoveredChunkIndex coveredChunks = new CoveredChunkIndex();
-
-    // The per-dimension send range learned live from received entities, owned here beside coveredChunks so the
-    // overlay's cold-start read (saved until the range is measured) and the covered disc share one estimate across a
-    // session. Cleared at start and stop with the two indexes, so a new capture recalibrates from scratch.
     private final SendRangeEstimator sendRange = new SendRangeEstimator();
 
     // The backend-transfer stop signal, polled first each recording tick so no tick ever rebinds the re-entered
@@ -176,7 +168,7 @@ public final class CaptureController {
     }
 
     /**
-     * The estimator holds one running max per dimension, fed by the sampler-gated feeds; cleared on start and stop.
+     * The estimator holds one running max per dimension, fed by the sampler-gated feeds.
      */
     public SendRangeEstimator sendRange() {
         return sendRange;
@@ -273,6 +265,12 @@ public final class CaptureController {
             state = CaptureState.IDLE;
             saveCompletedMillis = clockMillis.getAsLong();
             hasCompletedSave = true;
+            // Cleared here rather than at stop, because the finish drain can enqueue the resume overlay seed on
+            // the writer and that task would otherwise land after a stop-time clear and leave the prior
+            // download's on-disk coverage in the indexes for the next stale read to draw.
+            savedChunks.clear();
+            coveredChunks.clear();
+            sendRange.clear();
         }
     }
 
@@ -292,9 +290,6 @@ public final class CaptureController {
             frozenElapsedMillis = Math.max(0L, clockMillis.getAsLong() - startMillis);
             state = CaptureState.SAVING;
             active.finish(); // returns at once, but may already have re-entered tick() and reached IDLE
-            savedChunks.clear();
-            coveredChunks.clear();
-            sendRange.clear();
         }
     }
 

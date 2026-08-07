@@ -56,7 +56,7 @@ public final class SendRangeEstimator {
         return Math.min(max >> 4, capChunks);
     }
 
-    /** Drop every dimension's estimate (capture start and stop, and a backend transfer's stop). */
+    /** Drop every dimension's estimate. */
     public synchronized void clear() {
         maxByDimension.clear();
     }

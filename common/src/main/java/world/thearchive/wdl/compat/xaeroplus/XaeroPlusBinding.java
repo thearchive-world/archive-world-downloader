@@ -64,8 +64,8 @@ final class XaeroPlusBinding {
      *
      * <p>Runs on XaeroPlus's cache-refresh executor, a plain background pool and not the render thread, so everything
      * it touches has to be safe to read from off-thread: the state gate and the config are volatile, both snapshots are
-     * thread-safe, the indexes are cleared on stop so a stale RECORDING read sees empty sets, and the dimension read is
-     * only a suppression predicate, so a stale one draws nothing rather than the wrong dimension.
+     * thread-safe, the indexes carry the guarantee their owner documents, and the dimension read is only a suppression
+     * predicate, so a stale one draws nothing rather than the wrong dimension.
      */
     private static Long2LongMap supplyHighlights(int regionX, int regionZ, int regionSize,
             ResourceKey<Level> dimension) {

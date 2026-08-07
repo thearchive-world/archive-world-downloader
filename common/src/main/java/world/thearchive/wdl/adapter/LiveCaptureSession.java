@@ -3646,8 +3646,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
                             pendingInteractionChunks)) {
                 // Lossless: a VOID world regenerates this position as air identically, so dropping it (and its
                 // allCaptured position) keeps the count and resume honest. The live overlay keeps the position
-                // (the indexes have no per-position remove); presence-only, cleared at stop, and a resume
-                // re-seeds from disk, so the overstatement never survives the session.
+                // (the indexes have no per-position remove); presence-only, cleared once the save completes,
+                // and a resume re-seeds from disk, so the overstatement never survives the session.
                 allCaptured.remove(pos.toLong());
                 entries.remove();
                 continue;
