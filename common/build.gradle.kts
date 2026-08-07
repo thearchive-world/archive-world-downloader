@@ -340,5 +340,5 @@ dependencies {
     // JourneyMap public API for the overlay binding (compat/journeymap), compile-only (never a runtime require).
     // The -common flavor carries no Mojmap/loader flavor split, so it is the correct pick here as well as in
     // the loader subprojects' source-merged compile.
-    compileOnly("info.journeymap:journeymap-api-common:${property("journeymap_api_version")}-${property("minecraft_version")}")
+    compileOnly("info.journeymap:journeymap-api-common:${property("journeymap_api_coordinate")}")
 }
