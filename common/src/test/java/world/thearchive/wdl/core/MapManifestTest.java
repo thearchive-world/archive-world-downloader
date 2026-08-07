@@ -135,6 +135,17 @@ class MapManifestTest {
     }
 
     @Test
+    void highestDataFileIdScansThe26xNamespacedMapsSubfolder(@TempDir Path directory) throws IOException {
+        // The 26.x layout puts map data in a maps/ subfolder as bare <n>.dat, alongside the maps/last_id.dat index.
+        Path maps = directory.resolve("maps");
+        Files.createDirectories(maps);
+        Files.write(maps.resolve("5.dat"), new byte[0]);
+        Files.write(maps.resolve("12.dat"), new byte[0]);
+        Files.write(maps.resolve("last_id.dat"), new byte[0]); // the index, not a map-data file
+        assertEquals(12, MapManifest.highestDataFileId(directory));
+    }
+
+    @Test
     void theCrashFloorTakesTheHigherOfTheManifestAndTheOnDiskData(@TempDir Path directory) throws IOException {
         Path data = directory.resolve("data");
         Files.createDirectories(data);
