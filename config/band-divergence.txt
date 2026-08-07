@@ -1,0 +1,28 @@
+# Band-divergence allowlist.
+#
+# The propagation gate diffs every shared path between a band branch and dev, excluding the per-band plug
+# (adapter/impl/**) and the per-band coordinate files, and expects no difference except the patterns below. A
+# shared file that legitimately carries band-local code is listed here so neither the gate nor a future reader
+# mistakes its difference for a lost fix or a bug.
+#
+# Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
+# Every pattern carries a # reason directly above it, naming why the file diverges per band and to what;
+# checkBandDivergence fails the build on a pattern with no reason. Keep each pattern narrow: a directory-wide
+# glob would mask an unintended divergence, which is the drift this register exists to catch.
+#
+# This is the seed of the known, stable members. Each port adds its own per-file band-local divergences as it
+# creates them (the way the 26.x port records the players/ progress path), rather than pre-listing the bulk
+# renames whose files no branch has diverged yet: the Identifier and ResourceKey.identifier() rename set, the
+# band-fragile test assertions, and the keybind lang key. A broad glob for those would mask real drift or
+# guess divergences that do not exist yet.
+
+# 26.x: RegistryDataLoader.load returns CompletableFuture<RegistryAccess.Frozen>, not the frozen access, so
+# this shared test bootstrap unwraps it there.
+common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
+
+# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
+# ClientCommandManager) is Fabric-API-coupled and moves across bands.
+fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
+
+# Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
+fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java

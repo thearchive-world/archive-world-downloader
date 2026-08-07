@@ -318,8 +318,38 @@ val checkJavaVersion = tasks.register("checkJavaVersion") {
     }
 }
 
+// The band-divergence allowlist names the shared files that legitimately carry band-local code, checked by
+// the branch-versus-dev propagation diff. That diff needs band branches to run, so this task enforces the one
+// rule a path-pattern file cannot: every pattern carries a # reason, with text, on the line directly above it.
+val checkBandDivergence = tasks.register("checkBandDivergence") {
+    group = "verification"
+    description = "Fails if a config/band-divergence.txt path pattern carries no reason comment above it"
+    // Resolved at configuration time to a plain File, as the spotless config path above is, so doLast reads no
+    // project accessor the configuration cache would reject.
+    val registryFile = rootProject.file("config/band-divergence.txt")
+    inputs.file(registryFile)
+    doLast {
+        val lines = registryFile.readLines()
+        val offenders = lines.mapIndexedNotNull { index, raw ->
+            val line = raw.trim()
+            if (line.isEmpty() || line.startsWith("#")) {
+                return@mapIndexedNotNull null
+            }
+            val above = if (index > 0) lines[index - 1].trim() else ""
+            // The reason must carry text, not a bare # that names nothing.
+            if (above.startsWith("#") && above.drop(1).isNotBlank()) null else "  - line ${index + 1}: $line"
+        }
+        if (offenders.isNotEmpty()) {
+            throw GradleException(
+                "config/band-divergence.txt requires a # reason directly above every path pattern; missing for:\n" +
+                    offenders.joinToString("\n")
+            )
+        }
+    }
+}
+
 tasks.named("check") {
-    dependsOn(checkCoreImports, checkPlugBand, checkJavaVersion)
+    dependsOn(checkCoreImports, checkPlugBand, checkJavaVersion, checkBandDivergence)
     // The Java-8 floor compile is moot on a band whose toolchain already is Java 8 (see checkCoreJava8).
     if (providers.gradleProperty("java_version").get().toInt() > 8) {
         dependsOn(checkCoreJava8)
