@@ -4,7 +4,6 @@
 package world.thearchive.wdl.adapter.impl;
 
 import com.mojang.logging.LogUtils;
-import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.Lifecycle;
 import java.io.IOException;
@@ -18,20 +17,26 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Stream;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.Difficulty;
+import net.minecraft.world.clock.ClockState;
+import net.minecraft.world.clock.PackedClockStates;
+import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.clock.WorldClocks;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
@@ -53,6 +58,7 @@ import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.storage.LevelData.RespawnData;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
+import net.minecraft.world.level.storage.WorldData;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -65,11 +71,15 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.21.11 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
+ * 26.1.2 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
  * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
  * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
  * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
  * server's actual land (the server's seed is not recoverable from a client).
+ *
+ * <p>At 26.x the world metadata no longer lives in one {@code level.dat}: worldgen, the game rules and the world clocks
+ * are their own namespaced {@code data/minecraft/*.dat} SavedData files, and the captured player is a
+ * {@code players/data/<uuid>.dat} rather than a {@code level.dat "Player"} compound.
  */
 public final class LevelDataWriterImpl implements LevelDataWriter {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -92,6 +102,12 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
     /** One curated rule: its stable WDL name, the running band's id for it, and the curated raw value. */
     private record CuratedSpec(String wdlId, String bandId, String curatedValue) {}
+
+    // buildLevelData -> save bridge: the worldgen and game-rule values the save-side SavedData writes need, which the
+    // 26.x WorldData no longer carries (worldGenOptions() and getGameRules() are both gone). Set by buildLevelData,
+    // consumed and cleared by the paired save; never spans two downloads.
+    private @Nullable WorldGenSettings pendingWorldGenSettings;
+    private @Nullable GameRules pendingGameRules;
 
     // SpecialWorldProperty is vanilla-deprecated, but the only public PrimaryLevelData ctor still
     // requires it; we take it from the baked dimensions (FLAT, for this superflat void world).
@@ -117,28 +133,21 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
         String levelName = worldName == null || worldName.isEmpty() ? LEVEL_NAME : worldName;
         // Cheats and game mode are the world-defaults master's to impose; with it off the world opens vanilla,
-        // so cheats fall back to off here. Noon is a fixed invariant, applied unconditionally below.
+        // so cheats fall back to off here. Noon is a fixed invariant, written into world_clocks.dat by save().
         boolean allowCommands = worldOutput.overrideWorldDefaults() && worldOutput.allowCommands();
         LevelSettings settings = new LevelSettings(
-                levelName, GameType.SURVIVAL, false, Difficulty.NORMAL, allowCommands,
-                gameRules, WorldDataConfiguration.DEFAULT);
+                levelName, GameType.SURVIVAL, LevelSettings.DifficultySettings.DEFAULT, allowCommands,
+                WorldDataConfiguration.DEFAULT);
         WorldOptions worldOptions = worldOptions(worldType, worldOutput);
+        WorldGenSettings worldGenSettings = new WorldGenSettings(
+                worldOptions, new WorldDimensions(registries.lookupOrThrow(Registries.LEVEL_STEM)));
 
-        // Fail loud: PrimaryLevelData.setTagData silently omits WorldGenSettings if its encode errors,
-        // yielding an unopenable world. Pre-encode and reject any error/partial result first.
-        DynamicOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
-        DataResult<Tag> worldGen = WorldGenSettings.encode(ops, worldOptions, registries);
-        if (worldGen.error().isPresent()) {
-            throw new IllegalStateException(
-                    "level.dat WorldGenSettings encode failed (world would be unopenable): "
-                            + worldGen.error().get().message());
-        }
-
+        // A fresh PrimaryLevelData opens clear (raining, thundering and their timers default off), so weather needs no
+        // write; noon is world_clocks.dat written by save(), not a setDayTime call, since that method is gone at 26.x.
         PrimaryLevelData worldData = new PrimaryLevelData(
-                settings, worldOptions, dimensions.specialWorldProperty(), dimensions.lifecycle());
-        // Downloaded worlds always open at noon, a fixed world-open invariant. A fresh PrimaryLevelData already
-        // opens clear (raining, thundering, and their timers default off), so weather needs no write here.
-        worldData.setDayTime(NOON);
+                settings, dimensions.specialWorldProperty(), dimensions.lifecycle());
+        this.pendingWorldGenSettings = worldGenSettings;
+        this.pendingGameRules = gameRules;
         return new LevelData(worldData, registries, gameRuleResolution);
     }
 
@@ -247,21 +256,92 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     @Override
     public void save(LevelStorageSource.LevelStorageAccess access, LevelData data,
             @Nullable CapturedPlayer player) {
-        // Do not port to 26.x by picking the nearest saveDataTag overload: no overload there carries a player
-        // compound, so that band must write players/data/<uuid>.dat itself.
-        if (player == null) {
-            access.saveDataTag(data.registries(), data.worldData());
-            return;
+        Path saveRoot = access.getLevelDirectory().path();
+        WorldData worldData = data.worldData();
+        RegistryAccess registries = data.registries();
+
+        // The save-side files (worldgen, game rules, clocks) and the player file are all written BEFORE level.dat,
+        // so any IO failure aborts before level.dat exists: an aborted save with no level.dat is invisible in
+        // vanilla's world list, whereas a level.dat with a missing world_gen_settings.dat opens as a random-seed
+        // world around the captured chunks, claiming success.
+        UUID singleplayerUuid = null;
+        if (player != null) {
+            // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
+            PrimaryLevelData levelData = (PrimaryLevelData) worldData;
+            levelData.setGameType(player.gameType());
+            levelData.setSpawn(RespawnData.of(player.dimension(), player.spawnPos(), player.yaw(), player.pitch()));
+            levelData.setDifficulty(player.difficulty());
+            singleplayerUuid = writePlayerData(saveRoot, player.playerTag());
         }
-        // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
-        PrimaryLevelData levelData = (PrimaryLevelData) data.worldData();
-        levelData.setGameType(player.gameType());
-        levelData.setSpawn(RespawnData.of(player.dimension(), player.spawnPos(), player.yaw(), player.pitch()));
-        levelData.setDifficulty(player.difficulty());
-        // The 3-argument saveDataTag routes the captured tag into createTag's "Player" slot.
-        access.saveDataTag(data.registries(), data.worldData(), player.playerTag());
+        writeMetadata(saveRoot, registries, worldData);
+        access.saveDataTag(worldData, singleplayerUuid);
     }
 
+    /**
+     * Write the player's captured entity tag to {@code players/data/<uuid>.dat}, the 26.x home for the local player
+     * (level.dat carries no {@code "Player"} compound). Returns the uuid so the caller can stamp it as level.dat's
+     * {@code singleplayer_uuid}; a client's {@code saveWithoutId} always carries {@code UUID}, so a missing one is a
+     * corrupt capture the save must fail on rather than silently drop the whole player axis.
+     */
+    private static UUID writePlayerData(Path saveRoot, CompoundTag playerTag) {
+        UUID uuid = playerTag.read("UUID", UUIDUtil.CODEC).orElseThrow(
+                () -> new IllegalStateException("captured player tag carries no UUID; cannot place players/data"));
+        Path file = saveRoot.resolve("players").resolve("data").resolve(uuid + ".dat");
+        try {
+            Files.createDirectories(file.getParent());
+            NbtIo.writeCompressed(playerTag, file);
+        } catch (IOException e) {
+            throw new UncheckedIOException("aborting the save: failed to write the player data " + file, e);
+        }
+        return uuid;
+    }
+
+    /**
+     * Write the three namespaced save-side SavedData files under {@code data/minecraft/}: worldgen, game rules and the
+     * world clocks. Any {@code IOException} aborts the save unchecked rather than catch-and-degrade: a swallowed
+     * worldgen write regenerates a random-seed world, and a missing clocks file freezes the world at tick 0.
+     */
+    private void writeMetadata(Path saveRoot, RegistryAccess registries, WorldData worldData) {
+        WorldGenSettings worldGenSettings = this.pendingWorldGenSettings;
+        GameRules gameRules = this.pendingGameRules;
+        if (worldGenSettings == null || gameRules == null) {
+            throw new IllegalStateException("save() called before buildLevelData");
+        }
+        this.pendingWorldGenSettings = null;
+        this.pendingGameRules = null;
+        try {
+            LevelStorageSource.writeWorldGenSettings(registries, saveRoot, worldGenSettings);
+            LevelStorageSource.writeGameRules(worldData, saveRoot, gameRules);
+            writeWorldClocks(saveRoot, registries);
+        } catch (IOException e) {
+            throw new UncheckedIOException("aborting the save: level metadata write failed", e);
+        }
+    }
+
+    /**
+     * Hand-write {@code data/minecraft/world_clocks.dat}: vanilla exports no writer (the {@code ServerClockManager}
+     * constructor and its {@code writeSavedData} are both private). The WORLD_CLOCK registry is client-synced, so the
+     * overworld holder comes straight from the composed registries with no worldgen reconstruction.
+     */
+    private static void writeWorldClocks(Path saveRoot, RegistryAccess registries) throws IOException {
+        Holder<WorldClock> overworld = registries.lookupOrThrow(Registries.WORLD_CLOCK)
+                .getOrThrow(WorldClocks.OVERWORLD);
+        PackedClockStates clocks = new PackedClockStates(Map.of(overworld, new ClockState(NOON, 0.0F, 1.0F, false)));
+        DynamicOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
+        Tag encoded = PackedClockStates.CODEC.encodeStart(ops, clocks).getOrThrow();
+        CompoundTag envelope = new CompoundTag();
+        envelope.put("data", encoded);
+        NbtUtils.addCurrentDataVersion(envelope);
+        Path file = saveRoot.resolve("data").resolve("minecraft").resolve("world_clocks.dat");
+        Files.createDirectories(file.getParent());
+        NbtIo.writeCompressed(envelope, file);
+    }
+
+    /**
+     * The read mirror of {@link #writePlayerData}: level.dat carries no {@code "Player"} compound at 26.x, so the prior
+     * player is found by reading level.dat's {@code singleplayer_uuid} and then {@code players/data/<uuid>.dat}. Null
+     * when the folder is fresh, the level.dat stamps no uuid, or that player file is absent (fail-soft).
+     */
     @Override
     public @Nullable CompoundTag readPriorPlayer(Path levelDatFile) {
         if (!Files.exists(levelDatFile)) {
@@ -269,9 +349,16 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         }
         try {
             CompoundTag root = NbtIo.readCompressed(levelDatFile, NbtAccounter.uncompressedQuota());
-            return root.get("Data") instanceof CompoundTag data && data.get("Player") instanceof CompoundTag player
-                    ? player
-                    : null;
+            if (!(root.get("Data") instanceof CompoundTag data)) {
+                return null;
+            }
+            UUID uuid = data.read("singleplayer_uuid", UUIDUtil.CODEC).orElse(null);
+            Path saveRoot = levelDatFile.getParent();
+            if (uuid == null || saveRoot == null) {
+                return null;
+            }
+            Path playerFile = saveRoot.resolve("players").resolve("data").resolve(uuid + ".dat");
+            return Files.exists(playerFile) ? NbtIo.readCompressed(playerFile, NbtAccounter.uncompressedQuota()) : null;
         } catch (IOException e) {
             throw new UncheckedIOException("failed to read the prior player data " + levelDatFile, e);
         }

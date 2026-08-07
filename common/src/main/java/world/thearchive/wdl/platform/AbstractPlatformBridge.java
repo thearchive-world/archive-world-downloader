@@ -117,7 +117,9 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         LOGGER.info(rendered.getString() + linkTargets);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            mc.player.displayClientMessage(rendered, false);
+            // 26.x removed Player.displayClientMessage; a client-originated chat line is ChatComponent
+            // .addClientSystemMessage (band-local, config/band-divergence.txt).
+            mc.gui.getChat().addClientSystemMessage(rendered);
         }
     }
 

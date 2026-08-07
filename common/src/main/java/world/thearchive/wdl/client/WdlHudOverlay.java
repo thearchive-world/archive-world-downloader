@@ -9,7 +9,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.Mth;
@@ -86,7 +86,7 @@ public final class WdlHudOverlay {
     }
 
     /** Draw one frame; called per render from each loader's registered HUD element/layer. */
-    public static void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
+    public static void render(GuiGraphicsExtractor guiGraphics, DeltaTracker deltaTracker) {
         try {
             Minecraft minecraft = Minecraft.getInstance();
             HudConfig config = Wdl.config().hud();

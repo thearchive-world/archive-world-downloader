@@ -388,7 +388,7 @@ final class EntityPacketCapture
     }
 
     private static long chunkKey(double x, double z) {
-        return ChunkPos.asLong(Mth.floor(x) >> 4, Mth.floor(z) >> 4);
+        return new ChunkPos(Mth.floor(x) >> 4, Mth.floor(z) >> 4).pack();
     }
 
     private static double decodeAxis(double base, short delta) {

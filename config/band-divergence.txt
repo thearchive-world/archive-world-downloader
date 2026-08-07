@@ -26,3 +26,29 @@ fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
 # Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
+
+# 26.x: ChunkPos is a record, so pos.x/pos.z field reads become pos.x()/pos.z(), pos.toLong() becomes
+# pos.pack(), new ChunkPos(long) becomes ChunkPos.unpack, new ChunkPos(BlockPos) becomes ChunkPos.containing,
+# and ChunkPos.asLong(x,z) becomes new ChunkPos(x,z).pack(). These files read or build ChunkPos those ways.
+common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
+common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
+common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
+common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
+common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
+
+# 26.x renamed the map-index SavedDataType from idcounts to maps/last_id, so the idcounts key constant diverges.
+common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
+
+# 26.x moved advancements/ and stats/ under players/ (LevelResource PLAYER_ADVANCEMENTS_DIR / PLAYER_STATS_DIR),
+# so the two resolved paths diverge.
+common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressWriter.java
+
+# 26.x removed Player.displayClientMessage; a client chat line is ChatComponent.addClientSystemMessage.
+common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
+
+# 26.x GuiGraphics is GuiGraphicsExtractor and the widget/screen/entry paint overrides rename to
+# extractWidgetRenderState / extractRenderState / extractContent (loader-api-bands.md sec 6).
+common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
+common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
+common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java

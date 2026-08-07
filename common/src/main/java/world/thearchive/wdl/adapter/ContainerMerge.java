@@ -140,7 +140,7 @@ final class ContainerMerge {
         Iterator<Map.Entry<BlockPos, CompoundTag>> entries = stash.entrySet().iterator();
         while (entries.hasNext()) {
             Map.Entry<BlockPos, CompoundTag> entry = entries.next();
-            if (!new ChunkPos(entry.getKey()).equals(pos)) {
+            if (!ChunkPos.containing(entry.getKey()).equals(pos)) {
                 continue; // a block entity in some other chunk; leave it for that chunk's flush
             }
             entries.remove();

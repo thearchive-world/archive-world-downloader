@@ -208,7 +208,7 @@ public final class OutlineTracker {
         int rescans = 0;
         for (int cx = cameraChunkX - chunkRadius; cx <= cameraChunkX + chunkRadius; cx++) {
             for (int cz = cameraChunkZ - chunkRadius; cz <= cameraChunkZ + chunkRadius; cz++) {
-                long key = ChunkPos.asLong(cx, cz);
+                long key = new ChunkPos(cx, cz).pack();
                 ChunkContainers entry = chunkCache.get(key);
                 boolean dueForScan;
                 if (entry == null) {

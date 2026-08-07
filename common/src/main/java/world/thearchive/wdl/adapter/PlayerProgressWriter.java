@@ -31,11 +31,14 @@ final class PlayerProgressWriter {
             return;
         }
         String fileName = progress.playerUuid() + ".json";
+        // 26.x moved the player-adjacent directories under players/ (LevelResource PLAYER_ADVANCEMENTS_DIR /
+        // PLAYER_STATS_DIR); vanilla reads them nowhere else. Band-local path in a shared file
+        // (config/band-divergence.txt).
         if (progress.advancementsJson() != null) {
-            writeFile(saveRoot.resolve("advancements"), fileName, progress.advancementsJson());
+            writeFile(saveRoot.resolve("players").resolve("advancements"), fileName, progress.advancementsJson());
         }
         if (progress.statsJson() != null) {
-            writeFile(saveRoot.resolve("stats"), fileName, progress.statsJson());
+            writeFile(saveRoot.resolve("players").resolve("stats"), fileName, progress.statsJson());
         }
     }
 
