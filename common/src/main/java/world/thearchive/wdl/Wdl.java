@@ -81,8 +81,6 @@ import world.thearchive.wdl.update.UpdateCheck;
 public final class Wdl {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    private static final long[] NO_OVERLAY_CHUNKS = new long[0];
-
     // Set once by initialize() from the loader entrypoint before any hook can fire; never null in operation,
     // a lifecycle NullAway cannot model, so its uninitialized-field check is suppressed on these two.
     @SuppressWarnings("NullAway.Init")
@@ -715,9 +713,8 @@ public final class Wdl {
             return;
         }
         outlineTracker.tick(level, minecraft.gameRenderer.getMainCamera().position(), currentConfig.outline(),
-                currentConfig.captureContainers(), currentConfig.captureEntities(),
-                currentConfig.recaptureChunks().refreshesHotChunks(),
-                controller.capturedContainers(), controller.recoveredCoverage());
+                controller.aidToggles(currentConfig), controller.capturedContainers(),
+                controller.recoveredCoverage());
     }
 
     /** Stash a screen open to run on the next client tick; see {@link #onClientTick} for why. */
@@ -928,42 +925,14 @@ public final class Wdl {
         return currentConfig;
     }
 
-    /**
-     * The saved chunk-position longs for a dimension, snapshotted thread-safely for the coverage overlay, which reads
-     * off the render thread. Empty whenever no capture is recording (the index is cleared on stop), and empty while
-     * {@code renderCoverageOverlay} is off: the toggle is read live here, on the overlay's own read path, so turning it
-     * off hides the highlight without a restart and turning it back on shows the recorded index at once (the index
-     * keeps filling regardless). The id is the live client key, e.g. {@code level.dimension().identifier().toString()}.
-     */
+    /** The saved chunk-position longs for a dimension; see {@link CaptureController#overlaySavedChunks}. */
     public static long[] overlaySavedChunks(String dimensionId) {
-        if (!currentConfig.renderCoverageOverlay()) {
-            return NO_OVERLAY_CHUNKS;
-        }
-        return controller.savedChunks().snapshot(dimensionId);
+        return controller.overlaySavedChunks(currentConfig, dimensionId);
     }
 
-    /**
-     * The covered chunk-position longs for a dimension: the saved chunks the recording path brought within entity send
-     * range, which the two-tone overlay draws in the covered hue while the rest of the saved set draws the suspect hue.
-     * Gated on the same {@code renderCoverageOverlay} toggle and read the same thread-safe way as
-     * {@link #overlaySavedChunks}; each is its own independent synchronized snapshot, so a chunk may transiently appear
-     * in one and not the other for a single refresh. While {@code captureEntities} is off, no entity is being captured
-     * at all, so every saved chunk draws the suspect hue; this is checked first and short-circuits the cold-start
-     * mirror below, which only applies while entity capture is on. Until the send range has been measured for the
-     * dimension the covered read mirrors the saved set, so the overlay draws single-tone (every saved chunk in the
-     * covered hue) rather than flashing a spurious suspect boundary at a not-yet-known range.
-     */
+    /** The covered chunk-position longs for a dimension; see {@link CaptureController#overlayCoveredChunks}. */
     public static long[] overlayCoveredChunks(String dimensionId) {
-        if (!currentConfig.renderCoverageOverlay()) {
-            return NO_OVERLAY_CHUNKS;
-        }
-        if (!currentConfig.captureEntities()) {
-            return NO_OVERLAY_CHUNKS; // no entity is captured in this mode, so no saved chunk is entity-covered
-        }
-        if (!controller.sendRange().isCalibrated(dimensionId)) {
-            return controller.savedChunks().snapshot(dimensionId); // single-tone until the range is measured
-        }
-        return controller.coveredChunks().snapshot(dimensionId);
+        return controller.overlayCoveredChunks(currentConfig, dimensionId);
     }
 
     /** A monotonic overlay-data generation, bumped whenever any saved/covered set changes; poll to detect edits. */

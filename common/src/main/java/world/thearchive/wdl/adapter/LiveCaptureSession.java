@@ -106,6 +106,7 @@ import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CaptureController;
 import world.thearchive.wdl.core.CaptureCounts;
 import world.thearchive.wdl.core.CaptureOrder;
+import world.thearchive.wdl.core.CaptureToggles;
 import world.thearchive.wdl.core.CapturedContainers;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ContainerAssociation;
@@ -1769,6 +1770,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     @Override
+    public CaptureToggles latchedToggles() {
+        return CaptureToggles.latchedBy(config, target.mode() == DownloadMode.RESUME);
+    }
+
+    @Override
     public SaveStage saveStage() {
         return progress.stage();
     }
@@ -1846,7 +1852,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (menu instanceof LecternMenu) {
                 bindOpenedLectern(menu, player, block);
             } else if (menu instanceof ChestMenu && containerCapture.isEnderChestAt(level(), block)) {
-                bindOpenedEnderChest(menu, player, block);
+                if (config.savePlayerEnderChest()) {
+                    bindOpenedEnderChest(menu, player, block);
+                } else {
+                    // The finish strips EnderItems under this toggle, so binding would count a container the
+                    // download never writes. Every other arm decides the binding through an association leg,
+                    // which clears it on refusal; skipping the leg would leave the prior menu's binding live
+                    // and stash these ender slots onto that container's position.
+                    association.close();
+                }
             } else if (containerCapture.isDoubleChestOpen(level(), menu, block)) {
                 bindOpenedDoubleChest(menu, player, block);
             } else if (chestedAnimal != null) {

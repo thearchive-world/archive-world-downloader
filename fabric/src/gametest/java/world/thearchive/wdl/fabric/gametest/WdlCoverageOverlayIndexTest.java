@@ -46,6 +46,15 @@ public class WdlCoverageOverlayIndexTest implements FabricClientGameTest {
             Check.that(ContainerDriver.contains(driver.overlayCoveredChunks(dimension), farChunk),
                     "cold-start mirror did not cover a saved chunk far from the player while uncalibrated");
 
+            Properties entitiesOff = new Properties();
+            entitiesOff.setProperty("captureEntities", "false");
+            driver.editSettings(WdlConfig.parse(entitiesOff));
+            Check.that(driver.overlayCoveredChunks(dimension).length == 0,
+                    "switching captureEntities off mid-download left the covered tone drawn");
+            Check.that(driver.overlaySavedChunks(dimension).length > 0,
+                    "only the covered tone follows captureEntities; the saved highlight has its own toggle");
+            driver.editSettings(WdlConfig.DEFAULTS);
+
             driver.stopAndAwaitSave();
             Check.that(driver.overlaySavedChunks(dimension).length == 0,
                     "overlay index was not cleared once the save completed");

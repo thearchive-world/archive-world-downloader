@@ -53,15 +53,18 @@ final class CaptureDriver {
     private final ClientGameTestContext context;
     private final CaptureController controller;
     private final DownloadTarget target;
-    private final WdlConfig config;
     private final AtomicReference<@Nullable Thread> pokeThread;
+
+    // What the settings currently say, which production keeps in Wdl.currentConfig and refreshes when the settings
+    // screen closes; the session went on capturing under whatever it was handed at start.
+    private volatile WdlConfig liveConfig;
 
     private CaptureDriver(ClientGameTestContext context, CaptureController controller, DownloadTarget target,
             WdlConfig config, AtomicReference<@Nullable Thread> pokeThread) {
         this.context = context;
         this.controller = controller;
         this.target = target;
-        this.config = config;
+        this.liveConfig = config;
         this.pokeThread = pokeThread;
     }
 
@@ -122,16 +125,16 @@ final class CaptureDriver {
     }
 
     /**
-     * The saved-chunk overlay snapshot for the driven capture's controller, mirroring the gate {@code
-     * Wdl.overlaySavedChunks} applies in production: the raw index when {@code renderCoverageOverlay} is on, an empty
-     * set when it is off, read live from this run's config. Read off the client thread on purpose: the index is
-     * thread-safe, mirroring an overlay provider's off-thread read.
+     * Commit a settings edit the way closing the settings screen does mid-download: the running session keeps the
+     * config it started with, and only the aid reads see the new one.
      */
+    void editSettings(WdlConfig edited) {
+        liveConfig = edited;
+    }
+
+    /** The saved-chunk overlay snapshot, read off the client thread on purpose as an overlay provider does. */
     long[] overlaySavedChunks(String dimensionId) {
-        if (!config.renderCoverageOverlay()) {
-            return new long[0];
-        }
-        return controller.savedChunks().snapshot(dimensionId);
+        return controller.overlaySavedChunks(liveConfig, dimensionId);
     }
 
     /**
@@ -143,26 +146,9 @@ final class CaptureDriver {
         return controller.savedChunks().snapshot(dimensionId);
     }
 
-    /**
-     * The covered-chunk overlay snapshot for the driven capture, mirroring every gate {@link Wdl#overlayCoveredChunks}
-     * applies: the {@code renderCoverageOverlay} toggle, the {@code captureEntities} short-circuit (off means no entity
-     * is captured at all, so every saved chunk stays suspect), and the cold-start mirror that, only while entity
-     * capture is on, returns the saved set until the send range is measured for the dimension. Once calibrated it
-     * returns the real covered set, the chunks the recording path brought within entity range (drawn in the covered hue
-     * while the rest of the saved set draws the suspect hue). Read off the client thread on purpose, the same as the
-     * saved snapshot, since the index is thread-safe.
-     */
+    /** The covered-chunk overlay snapshot, through every gate {@link Wdl#overlayCoveredChunks} applies. */
     long[] overlayCoveredChunks(String dimensionId) {
-        if (!config.renderCoverageOverlay()) {
-            return new long[0];
-        }
-        if (!config.captureEntities()) {
-            return new long[0]; // no entity is captured in this mode, so no saved chunk is entity-covered
-        }
-        if (!controller.sendRange().isCalibrated(dimensionId)) {
-            return controller.savedChunks().snapshot(dimensionId); // single-tone until the range is measured
-        }
-        return controller.coveredChunks().snapshot(dimensionId);
+        return controller.overlayCoveredChunks(liveConfig, dimensionId);
     }
 
     /** The estimator's covered radius for the dimension, chunk units, clamped by capChunks. */

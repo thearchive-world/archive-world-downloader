@@ -41,6 +41,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
+import world.thearchive.wdl.core.CaptureToggles;
 import world.thearchive.wdl.core.CapturedContainers;
 import world.thearchive.wdl.core.OutlineClamp;
 import world.thearchive.wdl.core.OutlineClass;
@@ -155,12 +156,15 @@ public final class OutlineTracker {
     /**
      * Rebuild the draw-set for the current camera position. Clears it first, so an off toggle or a zero distance leaves
      * an empty query (no rim drawn). Runs on the client tick, the same thread the render reads on.
+     *
+     * <p>{@code config} carries the display treatment only, live from the settings; every gate on whether a rim may be
+     * drawn at all comes from {@code toggles}, which the caller has already reconciled against what the running
+     * download latched, so no rim is drawn for an axis this download is not capturing.
      */
-    public void tick(ClientLevel level, Vec3 cameraPos, OutlineConfig config, boolean captureContainers,
-            boolean captureEntities, boolean recaptureChunks, CapturedContainers captured,
-            RecoveredCoverage recovered) {
+    public void tick(ClientLevel level, Vec3 cameraPos, OutlineConfig config, CaptureToggles toggles,
+            CapturedContainers captured, RecoveredCoverage recovered) {
         try {
-            if (!config.renderUnsavedOutline()) {
+            if (!toggles.renderUnsavedOutline()) {
                 clear();
                 return;
             }
@@ -174,12 +178,12 @@ public final class OutlineTracker {
             double clamp = config.outlineDistance();
             // Gate each enumeration on its capture axis: a container the player cannot capture (its axis off) must
             // not draw a to-do rim that opening it can never clear.
-            if (captureContainers) {
-                buildBlockContainers(level, cameraPos, clamp, config, recaptureChunks, captured, recovered);
+            if (toggles.captureContainers()) {
+                buildBlockContainers(level, cameraPos, clamp, config, toggles, captured, recovered);
             } else {
                 chunkCache.clear();
             }
-            if (captureEntities) {
+            if (toggles.captureEntities()) {
                 enumerateEntityContainers(level, cameraPos, clamp, config, captured, recovered);
             }
             tickCounter++;
@@ -196,7 +200,7 @@ public final class OutlineTracker {
     }
 
     private void buildBlockContainers(ClientLevel level, Vec3 cameraPos, double clamp, OutlineConfig config,
-            boolean recaptureChunks, CapturedContainers captured, RecoveredCoverage recovered) {
+            CaptureToggles toggles, CapturedContainers captured, RecoveredCoverage recovered) {
         int chunkRadius = Mth.ceil(clamp / 16.0);
         int cameraChunkX = SectionPos.blockToSectionCoord(Mth.floor(cameraPos.x));
         int cameraChunkZ = SectionPos.blockToSectionCoord(Mth.floor(cameraPos.z));
@@ -223,7 +227,7 @@ public final class OutlineTracker {
                     }
                 }
                 entry.lastTouchedTick = tickCounter;
-                emit(level, entry, cameraPos, clamp, config, recaptureChunks, captured, recovered);
+                emit(level, entry, cameraPos, clamp, config, toggles, captured, recovered);
             }
         }
         evictUntouched();
@@ -267,11 +271,13 @@ public final class OutlineTracker {
         // Invariant, kept in sync by hand: every type outlined here (and in isContainerEntity) must have an
         // enabled capture path, or its rim is a to-do the player can never clear. Contents arrive either on
         // open, bound in LiveCaptureSession.captureOpenContainer, or on interaction, recorded in
-        // InteractionCapture. The invariant is one-way; a capturable type need not be outlined. Two deliberate
+        // InteractionCapture. The invariant is one-way; a capturable type need not be outlined. Three deliberate
         // asymmetries: a chiseled bookshelf is outlined here but captured on interaction (it opens no menu and
         // is not a BaseContainerBlockEntity), and its rim is suppressed in emit when interaction capture is off
-        // so it never becomes a stuck to-do; a jukebox is captured on interaction but deliberately not outlined
-        // (not a BaseContainerBlockEntity, it falls through to the else return below).
+        // so it never becomes a stuck to-do; an ender chest reaches the save through the player tag rather than
+        // this position, so its rim is suppressed in emit on the toggle that write is gated on; a jukebox is
+        // captured on interaction but deliberately not outlined (not a BaseContainerBlockEntity, it falls
+        // through to the else return below).
         if (blockEntity instanceof ChestBlockEntity) {
             BlockState state = level.getBlockState(pos);
             BlockPos partner = doubleChestPartner(level, pos, state);
@@ -327,12 +333,15 @@ public final class OutlineTracker {
     }
 
     private void emit(ClientLevel level, ChunkContainers entry, Vec3 cameraPos, double clamp, OutlineConfig config,
-            boolean recaptureChunks, CapturedContainers captured, RecoveredCoverage recovered) {
+            CaptureToggles toggles, CapturedContainers captured, RecoveredCoverage recovered) {
         for (int i = 0; i < entry.containers.size(); i++) {
             CachedContainer container = entry.containers.get(i);
             if (!OutlineClamp.isWithin(cameraPos.x, cameraPos.y, cameraPos.z, container.centerX, container.centerY,
                     container.centerZ, clamp)) {
                 continue;
+            }
+            if (container.ender && !toggles.savePlayerEnderChest()) {
+                continue; // the finish strips EnderItems, so this rim would be a to-do no open can clear
             }
             OutlineClass classification;
             if (container.bookshelf) {
@@ -343,7 +352,7 @@ public final class OutlineTracker {
                 }
                 classification = OutlineClassifier.classifyBookshelf(occupiedMask,
                         captured.bookshelfCapturedSlots(posKey), recovered.bookshelfSavedSlots(posKey));
-                if (classification == OutlineClass.UNSAVED && !recaptureChunks) {
+                if (classification == OutlineClass.UNSAVED && !toggles.refreshesHotChunks()) {
                     continue; // with the interaction-capture axis off the red rim is an unclearable to-do
                 }
             } else {

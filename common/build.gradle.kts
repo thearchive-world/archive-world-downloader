@@ -64,6 +64,7 @@ pitest {
     targetClasses.set(listOf(
         "world.thearchive.wdl.core.CaptureController",
         "world.thearchive.wdl.core.CaptureOrder",
+        "world.thearchive.wdl.core.CaptureToggles",
         "world.thearchive.wdl.core.ContainerAssociation",
         "world.thearchive.wdl.core.CrafterSlots",
         "world.thearchive.wdl.core.MapManifest",

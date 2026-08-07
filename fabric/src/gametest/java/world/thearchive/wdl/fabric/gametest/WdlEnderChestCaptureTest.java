@@ -5,6 +5,7 @@ package world.thearchive.wdl.fabric.gametest;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Properties;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -73,7 +74,57 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                     "the planted item is absent from the captured Player.EnderItems: " + enderItems);
 
             obstructedEnderChestSeedsNothing(context, server, stand);
+            enderChestOffBindsNothing(context, server, stand);
         }
+    }
+
+    /**
+     * Third scenario: with savePlayerEnderChest off the finish strips EnderItems, so the open must bind nothing. A bind
+     * would clear the captured-set ender flag and tally a container the save does not hold, which is the report
+     * claiming content the archive deliberately drops. The menu still syncs the contents, so the empty EnderItems below
+     * is the strip and not an unsynced client.
+     */
+    private static void enderChestOffBindsNothing(ClientGameTestContext context, TestServerContext server,
+            BlockPos stand) {
+        context.runOnClient(client -> {
+            client.player.closeContainer();
+            client.setScreen(null);
+        });
+        BlockPos enderChest = new BlockPos(stand.getX() - 2, stand.getY(), stand.getZ() + 2);
+        String at = enderChest.getX() + " " + enderChest.getY() + " " + enderChest.getZ();
+        server.runCommand("setblock " + at + " minecraft:ender_chest[facing=north]");
+        server.runCommand("item replace entity @a enderchest.0 with minecraft:diamond 7");
+        context.waitFor(client -> client.level.getBlockEntity(enderChest) instanceof EnderChestBlockEntity);
+
+        ContainerDriver.aimEyesAt(context, ContainerDriver.center(enderChest));
+        ContainerDriver.awaitCrosshair(context, client -> ContainerDriver.isLookingAt(client, enderChest),
+                "ender chest " + enderChest);
+
+        Properties enderOff = new Properties();
+        enderOff.setProperty("savePlayerEnderChest", "false");
+        CaptureDriver run = CaptureDriver.start(context,
+                new DownloadTarget("wdl-ender-off", "wdl-ender-off", DownloadMode.NEW), WdlConfig.parse(enderOff));
+        run.tick(5);
+        context.runOnClient(client -> {
+            client.gameRenderer.pick(1.0f);
+            Check.that(ContainerDriver.isLookingAt(client, enderChest),
+                    "crosshair drifted off the ender chest before opening: " + client.hitResult);
+            client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, (BlockHitResult) client.hitResult);
+        });
+        ContainerDriver.awaitMenuSlotItem(context, run, Items.DIAMOND);
+        run.tick(5);
+
+        Check.that(!run.isCaptured(captured -> captured.enderCaptured()),
+                "the open bound the ender inventory although the toggle strips it at finish, so the outline "
+                        + "cleared its rim and the report counted a container the save does not hold");
+
+        Path saveRoot = run.stopAndAwaitSave();
+        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player")
+                .getListOrEmpty("EnderItems").compoundStream()
+                .map(item -> item.getString("id").orElse("?"))
+                .toList();
+        Check.that(enderItems.isEmpty(),
+                "savePlayerEnderChest off must leave no EnderItems in the save: " + enderItems);
     }
 
     /**
