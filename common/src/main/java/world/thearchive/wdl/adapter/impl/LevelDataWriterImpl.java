@@ -226,8 +226,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     @Override
     public void save(LevelStorageSource.LevelStorageAccess access, LevelData data,
             @Nullable CapturedPlayer player) {
-        // 1.21.x form: saveDataTag(RegistryAccess, WorldData[, Player]). The 26.x band's implementation uses the
-        // single-argument saveDataTag(WorldData) form (the RegistryAccess argument was dropped at 26.1.2).
+        // Do not port to 26.x by picking the nearest saveDataTag overload: no overload there carries a player
+        // compound, so that band must write players/data/<uuid>.dat itself.
         if (player == null) {
             access.saveDataTag(data.registries(), data.worldData());
             return;
