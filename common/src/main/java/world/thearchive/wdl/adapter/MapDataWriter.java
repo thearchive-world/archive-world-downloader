@@ -27,7 +27,9 @@ import world.thearchive.wdl.core.AtomicFileWrite;
  * both bands (fixture-confirmed), so it is hand-built here rather than routed through a per-band sink.
  */
 final class MapDataWriter {
-    private static final String ID_COUNTS_KEY = "idcounts";
+    // 26.x renamed the map-index SavedDataType from "idcounts" to "maps/last_id" (MapIndex.TYPE), and namespacing
+    // puts it at data/minecraft/maps/last_id.dat. Band-local value in a shared file (config/band-divergence.txt).
+    private static final String ID_COUNTS_KEY = "maps/last_id";
 
     private MapDataWriter() {}
 
@@ -55,7 +57,7 @@ final class MapDataWriter {
     }
 
     /**
-     * Write {@code dataTag} to {@code dataDirectory/idcounts.dat} through {@link AtomicFileWrite} rather than
+     * Write {@code dataTag} to {@code dataDirectory/maps/last_id.dat} through {@link AtomicFileWrite} rather than
      * {@link #write}: losing this file restarts the reopened world's map allocator at id 0, which overwrites archived
      * map data, and {@code NbtIo.writeCompressed} truncates its destination at open.
      */
@@ -73,10 +75,10 @@ final class MapDataWriter {
     }
 
     /**
-     * The {@code map} high-water recorded in an existing {@code data/idcounts.dat}, or -1 when there is none. Off-mode
-     * has no manifest to persist the id floor across a resume, so it reconstructs the floor from this file (the only
-     * durable record of an imageless id that sits above the highest imaged {@code map_<n>.dat}). Reads the same
-     * {@code {data:{map:int}}} envelope {@link #serializeIdCounts} writes, band-stable across bands.
+     * The {@code map} high-water recorded in an existing {@code data/minecraft/maps/last_id.dat}, or -1 when there is
+     * none. Off-mode has no manifest to persist the id floor across a resume, so it reconstructs the floor from this
+     * file (the only durable record of an imageless id that sits above the highest imaged {@code maps/<n>.dat}). Reads
+     * the same {@code {data:{map:int}}} envelope {@link #serializeIdCounts} writes, band-stable across bands.
      */
     public static int readIdCounts(Path dataDirectory) throws IOException {
         Path file = dataDirectory.resolve(ID_COUNTS_KEY + ".dat");

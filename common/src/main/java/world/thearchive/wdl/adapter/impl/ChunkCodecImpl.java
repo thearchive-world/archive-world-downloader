@@ -82,7 +82,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
         if (lightEngine.hasLightWork()) {
             lightEngine.runLightUpdates();
         }
-        boolean lightCorrect = lightEngine.lightOnInColumn(SectionPos.getZeroNode(pos.x, pos.z));
+        boolean lightCorrect = lightEngine.lightOnInColumn(SectionPos.getZeroNode(pos.x(), pos.z()));
 
         LevelChunkSection[] sections = chunk.getSections();
         int minSectionY = chunk.getMinSectionY();

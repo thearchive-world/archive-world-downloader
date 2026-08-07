@@ -173,7 +173,7 @@ public final class InteractionCapture {
 
     /** Whether an interaction at {@code pos} can still reach disk (both halves of the capturability rule). */
     private boolean isCapturable(BlockPos pos) {
-        return recaptureEnabled && chunkCaptureGate.isCapturable(new ChunkPos(pos));
+        return recaptureEnabled && chunkCaptureGate.isCapturable(ChunkPos.containing(pos));
     }
 
     static void activate(InteractionCapture capture) {
@@ -410,10 +410,10 @@ public final class InteractionCapture {
     Set<ChunkPos> pendingCandidateChunks() {
         Set<ChunkPos> chunks = new HashSet<>();
         for (BlockPos pos : insertStash.keySet()) {
-            chunks.add(new ChunkPos(pos));
+            chunks.add(ChunkPos.containing(pos));
         }
         for (BlockPos pos : placeStash.keySet()) {
-            chunks.add(new ChunkPos(pos));
+            chunks.add(ChunkPos.containing(pos));
         }
         return chunks;
     }
@@ -452,7 +452,7 @@ public final class InteractionCapture {
         Iterator<Map.Entry<BlockPos, Candidate>> entries = stash.entrySet().iterator();
         while (entries.hasNext()) {
             Map.Entry<BlockPos, Candidate> entry = entries.next();
-            if (new ChunkPos(entry.getKey()).equals(chunk)) {
+            if (ChunkPos.containing(entry.getKey()).equals(chunk)) {
                 out.put(entry.getKey(), entry.getValue());
                 entries.remove();
             }

@@ -14,7 +14,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
@@ -169,7 +169,7 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         // The Defaults button would only revert to a state the draft is already in, so it grays out (never
         // hides, keeping the footer stable and the feature discoverable) while the draft equals defaults, and
         // a tooltip on the gray state says why. Kept current with live edits by resolving before the widgets
@@ -183,7 +183,7 @@ public final class WdlSettingsScreen extends Screen {
                         : null);
             }
         }
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
+        super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     private void selectTab(int index) {
@@ -469,7 +469,7 @@ public final class WdlSettingsScreen extends Screen {
         }
 
         @Override
-        public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
+        public void extractContent(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, boolean hovering,
                 float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int textY = getContentY() + (ROW_HEIGHT - font.lineHeight) / 2 + 2;
@@ -517,7 +517,7 @@ public final class WdlSettingsScreen extends Screen {
         }
 
         @Override
-        public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
+        public void extractContent(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, boolean hovering,
                 float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             AbstractWidget control = control();
@@ -535,7 +535,7 @@ public final class WdlSettingsScreen extends Screen {
             control.active = enabled;
             control.setX(controlX);
             control.setY(controlY);
-            control.render(guiGraphics, mouseX, mouseY, partialTick);
+            control.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
 
             // Passive indicator: an amber caution mark sits just left of an off core-capture toggle, a
             // defense-in-depth reminder that the download will be missing that data beyond the confirm-at-change.
@@ -553,7 +553,7 @@ public final class WdlSettingsScreen extends Screen {
             this.revert.active = enabled && modified;
             this.revert.setX(revertX);
             this.revert.setY(controlY);
-            this.revert.render(guiGraphics, mouseX, mouseY, partialTick);
+            this.revert.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
 
             // The revert icon is a bundled sprite, not a font glyph: the revert codepoint resolves only through
             // the tiny unifont fallback, which no scale renders crisply. The button carries a blank label so

@@ -66,9 +66,10 @@ public final class WorldPathsImpl implements WorldPaths {
 
     @Override
     public Path dataDirectory() {
-        // Global: maps are stored under the overworld save root (= this saveRoot, the overworld dimension
-        // path), not under a per-dimension folder. Resolve-only; the first writer to reach it creates it.
-        return saveRoot.resolve("data");
+        // 26.x namespaces every SavedData under data/minecraft, so maps land at data/minecraft/maps/<id>.dat
+        // (vanilla MapId.key() supplies the maps/ leg). Global: the overworld save root, not a per-dimension
+        // folder. Resolve-only; the first writer to reach it creates it.
+        return saveRoot.resolve("data").resolve("minecraft");
     }
 
     @Override

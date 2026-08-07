@@ -65,7 +65,7 @@ final class ChunkFlushPlan {
     static LongSet replacedIn(ChunkPos pos, LongSet replacedBlockKeys) {
         LongOpenHashSet inChunk = new LongOpenHashSet();
         for (long posKey : replacedBlockKeys) {
-            if (new ChunkPos(BlockPos.of(posKey)).equals(pos)) {
+            if (ChunkPos.containing(BlockPos.of(posKey)).equals(pos)) {
                 inChunk.add(posKey);
             }
         }
@@ -171,10 +171,10 @@ final class ChunkFlushPlan {
             Set<BlockPos> lecternPositions) {
         Set<ChunkPos> chunks = new LinkedHashSet<>();
         for (BlockPos pos : containerPositions) {
-            chunks.add(new ChunkPos(pos));
+            chunks.add(ChunkPos.containing(pos));
         }
         for (BlockPos pos : lecternPositions) {
-            chunks.add(new ChunkPos(pos));
+            chunks.add(ChunkPos.containing(pos));
         }
         return chunks;
     }

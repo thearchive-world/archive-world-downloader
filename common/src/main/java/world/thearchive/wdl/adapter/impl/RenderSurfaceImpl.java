@@ -6,7 +6,7 @@ package world.thearchive.wdl.adapter.impl;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
@@ -14,32 +14,32 @@ import net.minecraft.resources.Identifier;
 
 import world.thearchive.wdl.adapter.RenderSurface;
 
-/** The {@link RenderSurface} plug for this branch, wrapping {@link GuiGraphics}. */
+/** The {@link RenderSurface} plug for this branch, wrapping {@link GuiGraphicsExtractor}. */
 public final class RenderSurfaceImpl implements RenderSurface {
-    private final GuiGraphics graphics;
+    private final GuiGraphicsExtractor graphics;
 
-    public RenderSurfaceImpl(GuiGraphics graphics) {
+    public RenderSurfaceImpl(GuiGraphicsExtractor graphics) {
         this.graphics = graphics;
     }
 
     @Override
     public void text(Font font, String text, int x, int y, int color) {
-        graphics.drawString(font, text, x, y, color);
+        graphics.text(font, text, x, y, color);
     }
 
     @Override
     public void text(Font font, String text, int x, int y, int color, boolean shadow) {
-        graphics.drawString(font, text, x, y, color, shadow);
+        graphics.text(font, text, x, y, color, shadow);
     }
 
     @Override
     public void text(Font font, Component text, int x, int y, int color) {
-        graphics.drawString(font, text, x, y, color);
+        graphics.text(font, text, x, y, color);
     }
 
     @Override
     public void text(Font font, Component text, int x, int y, int color, boolean shadow) {
-        graphics.drawString(font, text, x, y, color, shadow);
+        graphics.text(font, text, x, y, color, shadow);
     }
 
     @Override
@@ -49,7 +49,7 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void outline(int x, int y, int width, int height, int color) {
-        graphics.renderOutline(x, y, width, height, color);
+        graphics.outline(x, y, width, height, color);
     }
 
     @Override
