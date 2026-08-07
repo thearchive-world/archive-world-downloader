@@ -14,6 +14,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.phys.AABB;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.Wdl;
@@ -66,7 +67,9 @@ public final class WdlOutlineRenderer {
             ObjectIterator<Long2ObjectMap.Entry<List<OutlineRim>>> entries = Long2ObjectMaps.fastIterator(sections);
             while (entries.hasNext()) {
                 Long2ObjectMap.Entry<List<OutlineRim>> entry = entries.next();
-                if (!frustum.isVisible(sectionBox(entry.getLongKey()))) {
+                // A null frustum is a band whose loader render event exposes none (26.x fabric-api): draw every
+                // section and let the GPU clip, rather than skip the off-screen build.
+                if (frustum != null && !frustum.isVisible(sectionBox(entry.getLongKey()))) {
                     continue;
                 }
                 sectionsVisible++;
@@ -93,9 +96,11 @@ public final class WdlOutlineRenderer {
 
     /**
      * Build the per-frame render context from the loader's pose, buffers, and frustum, resolving the effective rim line
-     * width from the config scale and the band's appropriate width, then cull and draw the live set.
+     * width from the config scale and the band's appropriate width, then cull and draw the live set. A null frustum (a
+     * band whose loader render event no longer exposes one) draws every section, the GPU clipping off-screen.
      */
-    public static void render(PoseStack pose, MultiBufferSource consumers, Frustum frustum, RimRenderer rimRenderer) {
+    public static void render(PoseStack pose, MultiBufferSource consumers, @Nullable Frustum frustum,
+            RimRenderer rimRenderer) {
         float lineWidth = Wdl.config().outline().lineWidthScale()
                 * Minecraft.getInstance().getWindow().getAppropriateLineWidth();
         OutlineRenderContext context = new OutlineRenderContext(pose, consumers, frustum,
