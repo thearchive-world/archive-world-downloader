@@ -169,7 +169,7 @@ class LiveCaptureSessionLossLogWiringTest {
             assertFalse(result.failed(), "the drain reached no region storage, so no opener guard fired");
             assertEquals(2, captured.count(), "every lost map keeps its own line, so none becomes invisible");
             assertEquals("INFO", captured.level(1), "a lost map is a soft failure and logs at INFO");
-            assertTrue(captured.rendered(1).contains("map_8"), "the second line names the map it lost");
+            assertTrue(captured.rendered(1).contains("maps/8"), "the second line names the map it lost");
             assertNotNull(captured.thrown(0), "the first map lost this download carries the cause's stack");
             assertNull(captured.thrown(1),
                     "one voice spans the whole download, so a second map lost the same way adds no second stack");
@@ -251,7 +251,7 @@ class LiveCaptureSessionLossLogWiringTest {
             assertEquals(1, captured.count(), "a map with nowhere to go still leaves a record of the loss");
             assertEquals("INFO", captured.level(0),
                     "a lost map is a per-item capture loss, and field reports read those at INFO");
-            assertTrue(captured.rendered(0).contains("map_7"), "the line names the map that never reached the save");
+            assertTrue(captured.rendered(0).contains("maps/7"), "the line names the map that never reached the save");
         }
     }
 
@@ -271,7 +271,7 @@ class LiveCaptureSessionLossLogWiringTest {
             assertEquals(1, captured.count(), "a map imaged too late still leaves a record of the loss");
             assertEquals("INFO", captured.level(0),
                     "a lost map is a per-item capture loss, and field reports read those at INFO");
-            assertTrue(captured.rendered(0).contains("map_7"), "the line names the map that never reached the save");
+            assertTrue(captured.rendered(0).contains("maps/7"), "the line names the map that never reached the save");
         }
     }
 

@@ -68,10 +68,10 @@ class MapDataWriterRoundTripTest {
 
         MapDataWriter.writeIdCounts(dataDirectory, MapDataWriter.serializeIdCounts(7));
 
-        CompoundTag envelope = NbtIo.readCompressed(dataDirectory.resolve("idcounts.dat"),
+        CompoundTag envelope = NbtIo.readCompressed(dataDirectory.resolve("maps").resolve("last_id.dat"),
                 NbtAccounter.unlimitedHeap());
         assertEquals(7, envelope.getCompoundOrEmpty("data").getIntOr("map", -1),
-                "data/idcounts.dat is {data:{map:7}, DataVersion}");
+                "data/minecraft/maps/last_id.dat is {data:{map:7}, DataVersion}");
     }
 
     @Test
@@ -80,7 +80,7 @@ class MapDataWriterRoundTripTest {
         MapDataWriter.writeIdCounts(dataDirectory, MapDataWriter.serializeIdCounts(500));
         // A directory where the staged sibling belongs: only the staged route fails here, so this is what
         // separates it from a direct write.
-        Files.createDirectory(dataDirectory.resolve("idcounts.dat.tmp"));
+        Files.createDirectory(dataDirectory.resolve("maps").resolve("last_id.dat.tmp"));
 
         assertThrows(IOException.class,
                 () -> MapDataWriter.writeIdCounts(dataDirectory, MapDataWriter.serializeIdCounts(900)));
@@ -101,11 +101,11 @@ class MapDataWriterRoundTripTest {
 
     @Test
     void readIdCountsRejectsAnOversizedFileInsteadOfAllocatingIt(@TempDir Path directory) throws IOException {
-        Path dataDirectory = Files.createDirectories(directory.resolve("data"));
+        Path dataDirectory = Files.createDirectories(directory.resolve("data").resolve("maps")).getParent();
         // A byte array whose declared length is past the on-disk quota: the accounter trips on the declared
         // size before the array is allocated, so the tampered file itself is only a handful of bytes.
         try (DataOutputStream nbt = new DataOutputStream(new GZIPOutputStream(
-                Files.newOutputStream(dataDirectory.resolve("idcounts.dat"))))) {
+                Files.newOutputStream(dataDirectory.resolve("maps").resolve("last_id.dat"))))) {
             nbt.writeByte(10); // root compound
             nbt.writeUTF("");
             nbt.writeByte(7); // a byte-array entry
@@ -114,6 +114,6 @@ class MapDataWriterRoundTripTest {
         }
 
         assertThrows(NbtAccounterException.class, () -> MapDataWriter.readIdCounts(dataDirectory),
-                "a resume read of a tampered idcounts.dat is bounded, not an unbounded allocation");
+                "a resume read of a tampered maps/last_id.dat is bounded, not an unbounded allocation");
     }
 }

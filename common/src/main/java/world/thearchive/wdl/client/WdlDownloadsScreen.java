@@ -696,7 +696,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY,
+                float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             String triangle = listCollapsed ? TRIANGLE_COLLAPSED : TRIANGLE_EXPANDED;
             Component header = Component.literal(triangle)
@@ -723,7 +724,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY,
+                float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             surface.text(font, openSavesText(), getX() + 4,
@@ -752,7 +754,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY,
+                float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             surface.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), BANNER_FILL_ARGB);
             surface.outline(getX(), getY(), getWidth(), getHeight(), BANNER_OUTLINE_ARGB);
@@ -779,7 +782,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY,
+                float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int color = isHovered() ? BANNER_LINK_HOVER_ARGB : BANNER_LINK_ARGB;
             surface.text(font, this.label, getX(), getY() + (getHeight() - font.lineHeight) / 2, color);
@@ -804,7 +808,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY,
+                float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             // The glyph comes from the fallback font, whose ink sits high in its line box, so the shared
@@ -837,7 +842,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY,
+                float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
             int textY = getY() + (getHeight() - font.lineHeight) / 2;
             surface.text(font, WARNING_GLYPH, getX(), textY, BANNER_GLYPH_ARGB);

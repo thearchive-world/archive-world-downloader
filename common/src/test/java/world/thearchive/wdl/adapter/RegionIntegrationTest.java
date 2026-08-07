@@ -70,7 +70,8 @@ class RegionIntegrationTest {
 
         assertTrue(Files.isDirectory(region), "region/ must be pre-created before any write");
         assertTrue(Files.isDirectory(entities), "entities/ must be pre-created");
-        assertEquals(save.resolve("region"), region, "overworld region/ is at the save root");
+        assertEquals(save.resolve("dimensions").resolve("minecraft").resolve("overworld").resolve("region"), region,
+                "overworld region/ is under dimensions/minecraft/overworld at 26.x");
         assertEquals(Level.OVERWORLD, paths.regionStorageInfo(Level.OVERWORLD).dimension());
     }
 

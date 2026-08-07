@@ -86,7 +86,7 @@ class LiveCaptureSessionDimensionRebindTest {
 
         session.rebindDimension(Level.NETHER, Level.NETHER);
 
-        assertFalse(capturedPositions(session).contains(shared.toLong()),
+        assertFalse(capturedPositions(session).contains(shared.pack()),
                 "the entered dimension starts from its own set, or its first chunk reads as already captured and "
                         + "the capture skips a chunk that has never been written");
         capture(session, shared);
@@ -113,7 +113,7 @@ class LiveCaptureSessionDimensionRebindTest {
     private static void capture(LiveCaptureSession session, ChunkPos... positions) throws Exception {
         LongOpenHashSet captured = capturedPositions(session);
         for (ChunkPos pos : positions) {
-            captured.add(pos.toLong());
+            captured.add(pos.pack());
         }
     }
 

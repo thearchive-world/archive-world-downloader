@@ -40,30 +40,30 @@ class LevelDatRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
     @Test
-    void levelDatRoundTripsVoidDimensionsSeedAndDataVersion(@TempDir Path directory) throws IOException {
+    void levelDatRoundTripsVoidDimensionsSeedAndDataVersion(@TempDir Path saves) throws IOException {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
         DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
 
-        CompoundTag dataTag = built.worldData().createTag(built.registries(), null);
-        CompoundTag worldGenTag = dataTag.getCompoundOrEmpty("WorldGenSettings");
-        assertFalse(worldGenTag.isEmpty(), "WorldGenSettings must be present in the level.dat Data tag");
-        long originalSeed = WorldGenSettings.CODEC.parse(ops, worldGenTag).getOrThrow().options().seed();
+        LevelStorageSource source = LevelStorageSource.createDefault(saves);
+        try (LevelStorageSource.LevelStorageAccess access = source.createAccess("wdltest")) {
+            writer.save(access, built, null);
+        }
+        Path saveRoot = saves.resolve("wdltest");
 
-        Path levelDat = directory.resolve("level.dat");
-        CompoundTag root = new CompoundTag();
-        root.put("Data", dataTag);
-        NbtIo.writeCompressed(root, levelDat);
-        CompoundTag back = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("Data");
+        // 26.x splits worldgen out of level.dat into its own namespaced SavedData; the void seed and the three
+        // superflat dimensions have to survive that file rather than the level.dat Data tag.
+        CompoundTag levelData = NbtIo.readCompressed(saveRoot.resolve("level.dat"), NbtAccounter.unlimitedHeap())
+                .getCompoundOrEmpty("Data");
+        assertTrue(levelData.getIntOr("DataVersion", -1) > 0, "DataVersion survives");
+        assertTrue(levelData.contains("spawn"), "spawn survives");
 
-        assertTrue(back.getIntOr("DataVersion", -1) > 0, "DataVersion survives");
-        assertTrue(back.contains("spawn"), "spawn survives");
-
-        WorldGenSettings worldGen = WorldGenSettings.CODEC
-                .parse(ops, back.getCompoundOrEmpty("WorldGenSettings"))
-                .getOrThrow();
+        CompoundTag worldGenTag = NbtIo.readCompressed(
+                saveRoot.resolve("data").resolve("minecraft").resolve("world_gen_settings.dat"),
+                NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("data");
+        WorldGenSettings worldGen = WorldGenSettings.CODEC.parse(ops, worldGenTag).getOrThrow();
         assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
-        assertEquals(originalSeed, worldGen.options().seed(), "seed survives the round-trip");
+        assertEquals(0L, worldGen.options().seed(), "the void world's seed 0 survives to disk");
         assertInstanceOf(FlatLevelSource.class,
                 worldGen.dimensions().dimensions().get(LevelStem.OVERWORLD).generator(),
                 "overworld is a (void) superflat generator");
@@ -98,8 +98,10 @@ class LevelDatRoundTripTest {
         CompoundTag data = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("Data");
         DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
         assertTrue(data.getIntOr("DataVersion", -1) > 0, "DataVersion survives the production save");
-        WorldGenSettings worldGen = WorldGenSettings.CODEC.parse(ops, data.getCompoundOrEmpty("WorldGenSettings"))
-                .getOrThrow();
+        CompoundTag worldGenTag = NbtIo.readCompressed(
+                saves.resolve("wdltest").resolve("data").resolve("minecraft").resolve("world_gen_settings.dat"),
+                NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("data");
+        WorldGenSettings worldGen = WorldGenSettings.CODEC.parse(ops, worldGenTag).getOrThrow();
         assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
         assertInstanceOf(FlatLevelSource.class,
                 worldGen.dimensions().dimensions().get(LevelStem.OVERWORLD).generator(),

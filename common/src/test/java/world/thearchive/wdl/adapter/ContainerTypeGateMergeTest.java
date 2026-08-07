@@ -61,7 +61,7 @@ class ContainerTypeGateMergeTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(pos, holder("minecraft:barrel", 2, new ItemStack(Items.EMERALD, 7)));
 
-        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
+        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, ChunkPos.containing(pos), stash).merged();
 
         assertEquals(0, merged, "a barrel's items must not merge onto a chest at the same pos");
         assertFalse(stash.containsKey(pos), "the stale entry is still drained as the chunk leaves memory");
@@ -77,7 +77,7 @@ class ContainerTypeGateMergeTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(pos, holder("minecraft:barrel", 2, new ItemStack(Items.EMERALD, 7)));
 
-        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
+        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, ChunkPos.containing(pos), stash).merged();
 
         assertEquals(1, merged, "a barrel holder merges onto a barrel at the same pos");
         CompoundTag barrel = findByPos(chunkTag.getListOrEmpty("block_entities"), 10, 70, 20);
@@ -94,7 +94,7 @@ class ContainerTypeGateMergeTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(pos, holder(null, 2, new ItemStack(Items.EMERALD, 7))); // the interaction path carries no type
 
-        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
+        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, ChunkPos.containing(pos), stash).merged();
 
         assertEquals(1, merged, "a holder that makes no type claim overlays as before the gate");
         assertFalse(findByPos(chunkTag.getListOrEmpty("block_entities"), 10, 70, 20)
@@ -110,7 +110,7 @@ class ContainerTypeGateMergeTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(pos, holder("minecraft:barrel", 0, new ItemStack(Items.DIAMOND, 1)));
 
-        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
+        int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, ChunkPos.containing(pos), stash).merged();
 
         assertEquals(0, merged, "no block entity at the pos (broken to air) -> nothing merges");
         assertFalse(stash.containsKey(pos), "still drained as the chunk leaves memory");

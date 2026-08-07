@@ -70,7 +70,7 @@ class CarryForwardWiringTest {
     /** An ordinary revisit must still keep what this download captured at that position. */
     @Test
     void aPriorOnDiskIsCarriedForward(@TempDir Path temporary) throws Exception {
-        ChunkPos pos = new ChunkPos(chest);
+        ChunkPos pos = ChunkPos.containing(chest);
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
 
@@ -93,7 +93,7 @@ class CarryForwardWiringTest {
      */
     @Test
     void aReplacedPositionSuppressesOnceAndNotForever(@TempDir Path temporary) throws Exception {
-        ChunkPos pos = new ChunkPos(chest);
+        ChunkPos pos = ChunkPos.containing(chest);
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
         placeBlockAt(session, chest);
@@ -123,7 +123,7 @@ class CarryForwardWiringTest {
      */
     @Test
     void aContainerThisFlushCapturedEmptyIsLeftEmptyOnDisk(@TempDir Path temporary) throws Exception {
-        ChunkPos pos = new ChunkPos(chest);
+        ChunkPos pos = ChunkPos.containing(chest);
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
 

@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.NonNullList;
@@ -91,7 +92,8 @@ class ItemLocationScrubTest {
 
     private static ItemStack bundleHoldingLodestone() {
         ItemStack bundle = new ItemStack(Items.BUNDLE);
-        bundle.set(DataComponents.BUNDLE_CONTENTS, new BundleContents(List.of(lodestoneCompass())));
+        bundle.set(DataComponents.BUNDLE_CONTENTS,
+                new BundleContents(List.of(ItemStackTemplate.fromNonEmptyStack(lodestoneCompass()))));
         return bundle;
     }
 
@@ -220,7 +222,7 @@ class ItemLocationScrubTest {
         NonNullList<ItemStack> back = readBack(holder, 2);
         ItemContainerContents container = back.get(0).get(DataComponents.CONTAINER);
         assertNotNull(container, "the shulker keeps its container component");
-        ItemStack nestedInShulker = container.nonEmptyStream().toList().get(0);
+        ItemStack nestedInShulker = container.nonEmptyItemCopyStream().toList().get(0);
         assertTrue(targetOf(nestedInShulker).isEmpty(), "a lodestone nested in a shulker box is blanked");
 
         BundleContents bundle = back.get(1).get(DataComponents.BUNDLE_CONTENTS);
@@ -281,7 +283,7 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrubBlockEntity(potWithShulker);
         ItemContainerContents container = itemOf(potWithShulker).get(DataComponents.CONTAINER);
         assertNotNull(container, "the shulker keeps its container component");
-        assertTrue(targetOf(container.nonEmptyStream().toList().get(0)).isEmpty(),
+        assertTrue(targetOf(container.nonEmptyItemCopyStream().toList().get(0)).isEmpty(),
                 "a lodestone nested in a shulker stored as the block entity's item is blanked");
 
         CompoundTag potWithBundle = blockEntityWithItem(bundleHoldingLodestone());
@@ -334,7 +336,7 @@ class ItemLocationScrubTest {
 
         ItemContainerContents container = readBack(holder, 1).get(0).get(DataComponents.CONTAINER);
         assertNotNull(container, "the shulker keeps its container component");
-        assertFalse(beeFlowerPresent(container.nonEmptyStream().toList().get(0)),
+        assertFalse(beeFlowerPresent(container.nonEmptyItemCopyStream().toList().get(0)),
                 "a beehive nested in a shulker box has its bee flower_pos blanked");
     }
 
@@ -407,7 +409,7 @@ class ItemLocationScrubTest {
         ItemContainerContents offhandShulker = itemFrom(((ListTag) zombie.get("HandItems")).get(1))
                 .get(DataComponents.CONTAINER);
         assertNotNull(offhandShulker, "the offhand shulker keeps its container component");
-        assertTrue(targetOf(offhandShulker.nonEmptyStream().toList().get(0)).isEmpty(),
+        assertTrue(targetOf(offhandShulker.nonEmptyItemCopyStream().toList().get(0)).isEmpty(),
                 "a lodestone nested in a shulker in a pre-1.21.5 HandItems slot is blanked");
         assertTrue(targetOf(itemFrom(((ListTag) zombie.get("ArmorItems")).get(3))).isEmpty(),
                 "a lodestone in a pre-1.21.5 ArmorItems slot is blanked");

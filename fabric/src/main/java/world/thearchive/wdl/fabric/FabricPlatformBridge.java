@@ -8,10 +8,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
@@ -34,7 +34,7 @@ import world.thearchive.wdl.platform.WdlCommands;
 public final class FabricPlatformBridge extends AbstractPlatformBridge {
     @Override
     protected void registerKeybind(String keyId, Runnable onPress) {
-        KeyMapping key = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+        KeyMapping key = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, WdlKeyBinds.CATEGORY));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (key.consumeClick()) {
@@ -127,6 +127,6 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
     @Override
     public void registerCommands(WdlCommands commands) {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
-                wdlCommandTree(commands, ClientCommandManager::literal, ClientCommandManager::argument)));
+                wdlCommandTree(commands, ClientCommands::literal, ClientCommands::argument)));
     }
 }

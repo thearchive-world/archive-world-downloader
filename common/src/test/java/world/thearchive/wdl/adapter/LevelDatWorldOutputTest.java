@@ -5,48 +5,107 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.Lifecycle;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Properties;
+import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.clock.ClockState;
+import net.minecraft.world.clock.PackedClockStates;
+import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.clock.WorldClocks;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
+import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The 1.21.11 world-output writes: the curated safe game rules and the world-open state land in the level.dat Data tag.
- * Noon and clear weather are fixed invariants applied regardless of the world-defaults master, the game-rule master
- * gates the curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it
- * against the real {@code GameRules}.
+ * The 26.1.2 world-output writes, verified through the production save to disk. The 26.x world metadata is split across
+ * namespaced save-side files rather than one level.dat: worldgen is {@code data/minecraft/world_gen_settings.dat}, the
+ * curated game rules are {@code data/minecraft/game_rules.dat}, and noon is a {@code data/minecraft/world_clocks.dat}
+ * payload (setDayTime is gone). Weather is left unwritten so vanilla opens clear. The game-rule master gates the
+ * curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it.
  */
 class LevelDatWorldOutputTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
+
+    @TempDir
+    private Path saves;
+
+    private int worldCounter;
+
+    /** A built and paired save root: everything worldgen, game rules and clocks land in is on disk under saveRoot. */
+    private record Saved(LevelDataWriter.LevelData built, Path saveRoot) {}
 
     private LevelDataWriter.LevelData build(WorldOutputConfig worldOutput) {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         return writer.buildLevelData(registries, worldOutput, null);
     }
 
-    private CompoundTag dataTag(LevelDataWriter.LevelData built) {
-        return built.worldData().createTag(built.registries(), null);
+    /** Build the metadata and run the real production save to disk, returning it paired with its save root. */
+    private Saved save(WorldOutputConfig worldOutput) throws IOException {
+        LevelDataWriter.LevelData built = build(worldOutput);
+        String name = "world" + worldCounter++;
+        LevelStorageSource source = LevelStorageSource.createDefault(saves);
+        try (LevelStorageSource.LevelStorageAccess access = source.createAccess(name)) {
+            writer.save(access, built, null);
+        }
+        return new Saved(built, saves.resolve(name));
     }
 
-    private GameRules gameRules(LevelDataWriter.LevelData built) {
-        DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
+    private CompoundTag dataTag(LevelDataWriter.LevelData built) {
+        return built.worldData().createTag(null);
+    }
+
+    /** The inner {@code data} tag of a namespaced {@code data/minecraft/<name>.dat} SavedData envelope. */
+    private static CompoundTag savedData(Path saveRoot, String name) throws IOException {
+        Path file = saveRoot.resolve("data").resolve("minecraft").resolve(name + ".dat");
+        return NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("data");
+    }
+
+    private WorldGenSettings worldGen(Saved saved) throws IOException {
+        DynamicOps<Tag> ops = saved.built().registries().createSerializationContext(NbtOps.INSTANCE);
+        return WorldGenSettings.CODEC.parse(ops, savedData(saved.saveRoot(), "world_gen_settings")).getOrThrow();
+    }
+
+    private static GameRules gameRules(Saved saved) throws IOException {
         return GameRules.codec(FeatureFlags.DEFAULT_FLAGS)
-                .parse(ops, dataTag(built).getCompoundOrEmpty("game_rules"))
+                .parse(NbtOps.INSTANCE, savedData(saved.saveRoot(), "game_rules")).getOrThrow();
+    }
+
+    private long dayTime(Saved saved) throws IOException {
+        DynamicOps<Tag> ops = saved.built().registries().createSerializationContext(NbtOps.INSTANCE);
+        PackedClockStates clocks = PackedClockStates.CODEC.parse(ops, savedData(saved.saveRoot(), "world_clocks"))
                 .getOrThrow();
+        Holder<WorldClock> overworld = saved.built().registries().lookupOrThrow(Registries.WORLD_CLOCK)
+                .getOrThrow(WorldClocks.OVERWORLD);
+        ClockState state = clocks.clocks().get(overworld);
+        assertNotNull(state, "the overworld clock is present in world_clocks.dat");
+        return state.totalTicks();
+    }
+
+    /** Whether a weather SavedData was written; the mod writes none so vanilla opens the world clear. */
+    private static boolean weatherWritten(Path saveRoot) {
+        return Files.exists(saveRoot.resolve("data").resolve("minecraft").resolve("weather.dat"));
     }
 
     private static WorldOutputConfig with(String key, String value) {
@@ -62,39 +121,33 @@ class LevelDatWorldOutputTest {
         return WorldOutputConfig.parse(properties);
     }
 
-    private WorldGenSettings worldGen(LevelDataWriter.LevelData built) {
-        DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
-        return WorldGenSettings.CODEC.parse(ops, dataTag(built).getCompoundOrEmpty("WorldGenSettings")).getOrThrow();
+    @Test
+    void defaultGeneratorWritesTheFullLongSeed() throws IOException {
+        Saved saved = save(with("worldType", "DEFAULT", "worldSeed", Long.toString(Long.MIN_VALUE)));
+
+        assertEquals(Long.MIN_VALUE, worldGen(saved).options().seed(),
+                "the full signed-long seed lands in world_gen_settings.dat, not an int-capped value");
     }
 
     @Test
-    void defaultGeneratorWritesTheFullLongSeed() {
-        LevelDataWriter.LevelData built = build(
-                with("worldType", "DEFAULT", "worldSeed", Long.toString(Long.MIN_VALUE)));
+    void defaultGeneratorWritesHashedStringSeed() throws IOException {
+        Saved saved = save(with("worldType", "DEFAULT", "worldSeed", "hello"));
 
-        assertEquals(Long.MIN_VALUE, worldGen(built).options().seed(),
-                "the full signed-long seed lands in level.dat, not an int-capped value");
-    }
-
-    @Test
-    void defaultGeneratorWritesHashedStringSeed() {
-        LevelDataWriter.LevelData built = build(with("worldType", "DEFAULT", "worldSeed", "hello"));
-
-        assertEquals("hello".hashCode(), worldGen(built).options().seed(),
+        assertEquals("hello".hashCode(), worldGen(saved).options().seed(),
                 "a non-numeric seed lands as the same long vanilla would hash it to");
     }
 
     @Test
-    void generateFeaturesTogglesStructureGeneration() {
-        assertTrue(worldGen(build(with("worldType", "DEFAULT", "generateFeatures", "true"))).options()
+    void generateFeaturesTogglesStructureGeneration() throws IOException {
+        assertTrue(worldGen(save(with("worldType", "DEFAULT", "generateFeatures", "true"))).options()
                 .generateStructures());
-        assertFalse(worldGen(build(with("worldType", "DEFAULT"))).options().generateStructures(),
+        assertFalse(worldGen(save(with("worldType", "DEFAULT"))).options().generateStructures(),
                 "structures default off");
     }
 
     @Test
-    void voidGeneratorKeepsSeedZeroAndStaysStructureless() {
-        WorldGenSettings voidSettings = worldGen(build(WorldOutputConfig.DEFAULTS));
+    void voidGeneratorKeepsSeedZeroAndStaysStructureless() throws IOException {
+        WorldGenSettings voidSettings = worldGen(save(WorldOutputConfig.DEFAULTS));
 
         assertEquals(0L, voidSettings.options().seed(), "the default void world keeps seed 0 (byte-unchanged)");
         assertFalse(voidSettings.options().generateStructures(), "the void world generates no structures");
@@ -111,10 +164,10 @@ class LevelDatWorldOutputTest {
     }
 
     @Test
-    void flatGeneratorBuildsAndRoundTripsItsSeed() {
-        WorldGenSettings flat = worldGen(build(with("worldType", "FLAT", "worldSeed", "777")));
+    void flatGeneratorBuildsAndRoundTripsItsSeed() throws IOException {
+        WorldGenSettings flat = worldGen(save(with("worldType", "FLAT", "worldSeed", "777")));
 
-        assertEquals(777L, flat.options().seed(), "the FLAT generator builds and its seed lands in level.dat");
+        assertEquals(777L, flat.options().seed(), "the FLAT generator builds and its seed lands on disk");
     }
 
     private static Lifecycle lifecycle(LevelDataWriter.LevelData built) {
@@ -122,8 +175,8 @@ class LevelDatWorldOutputTest {
     }
 
     @Test
-    void defaultsWriteTheCuratedSafeGameRules() {
-        GameRules rules = gameRules(build(WorldOutputConfig.DEFAULTS));
+    void defaultsWriteTheCuratedSafeGameRules() throws IOException {
+        GameRules rules = gameRules(save(WorldOutputConfig.DEFAULTS));
 
         assertFalse(rules.get(GameRules.SPAWN_MOBS), "no mob spawning");
         assertTrue(rules.get(GameRules.KEEP_INVENTORY), "keep inventory");
@@ -134,37 +187,33 @@ class LevelDatWorldOutputTest {
     }
 
     @Test
-    void gameRuleMasterOffLeavesVanillaDefaults() {
-        GameRules rules = gameRules(build(with("overrideGamerules", "false")));
+    void gameRuleMasterOffLeavesVanillaDefaults() throws IOException {
+        GameRules rules = gameRules(save(with("overrideGamerules", "false")));
 
         assertTrue(rules.get(GameRules.SPAWN_MOBS), "master off: the vanilla default (mobs spawn) stands");
         assertFalse(rules.get(GameRules.KEEP_INVENTORY), "master off: keep-inventory stays at its vanilla default");
     }
 
     @Test
-    void defaultsOpenTheWorldAtNoon() {
-        assertEquals(6000L, dataTag(build(WorldOutputConfig.DEFAULTS)).getLongOr("DayTime", -1L));
+    void defaultsOpenTheWorldAtNoon() throws IOException {
+        assertEquals(6000L, dayTime(save(WorldOutputConfig.DEFAULTS)),
+                "the overworld clock opens at noon through world_clocks.dat");
     }
 
     @Test
-    void defaultsOpenTheWorldWithClearWeather() {
-        CompoundTag data = dataTag(build(WorldOutputConfig.DEFAULTS));
-
-        assertFalse(data.getBooleanOr("raining", true), "not raining");
-        assertFalse(data.getBooleanOr("thundering", true), "not thundering");
-        assertEquals(0, data.getIntOr("clearWeatherTime", -1),
-                "weather opens clear, not force-held; the curated advance_weather=false is what holds it");
+    void defaultsOpenTheWorldWithClearWeather() throws IOException {
+        assertFalse(weatherWritten(save(WorldOutputConfig.DEFAULTS).saveRoot()),
+                "no weather SavedData is written, so vanilla opens the world clear; advance_weather=false holds it");
     }
 
     @Test
-    void worldDefaultsMasterOffStillOpensAtNoonAndClear() {
-        CompoundTag data = dataTag(build(with("overrideWorldDefaults", "false")));
+    void worldDefaultsMasterOffStillOpensAtNoonAndClear() throws IOException {
+        Saved saved = save(with("overrideWorldDefaults", "false"));
 
-        assertEquals(6000L, data.getLongOr("DayTime", -1L),
+        assertEquals(6000L, dayTime(saved),
                 "noon is a fixed invariant, applied even with the world-defaults master off");
-        assertFalse(data.getBooleanOr("raining", true), "the fresh world opens clear regardless of the master");
-        assertEquals(0, data.getIntOr("clearWeatherTime", -1),
-                "weather opens clear, not force-held, regardless of the master");
+        assertFalse(weatherWritten(saved.saveRoot()),
+                "the fresh world opens clear regardless of the master; no weather SavedData is written");
     }
 
     @Test
@@ -186,25 +235,28 @@ class LevelDatWorldOutputTest {
     }
 
     @Test
-    void anInvalidOverrideValueIsDroppedAndTheCuratedValueStands() {
-        LevelDataWriter.LevelData built = build(with("gamerule.keep_inventory", "banana"));
+    void anInvalidOverrideValueIsDroppedAndTheCuratedValueStands() throws IOException {
+        Saved saved = save(with("gamerule.keep_inventory", "banana"));
 
-        assertTrue(built.gameRules().droppedInvalidValues().contains("keep_inventory"), "the typo is surfaced");
-        assertTrue(gameRules(built).get(GameRules.KEEP_INVENTORY), "the curated value stands; the typo is not written");
+        assertTrue(saved.built().gameRules().droppedInvalidValues().contains("keep_inventory"),
+                "the typo is surfaced");
+        assertTrue(gameRules(saved).get(GameRules.KEEP_INVENTORY),
+                "the curated value stands; the typo is not written");
     }
 
     @Test
-    void anUnknownOverrideIdIsSurfacedNotWritten() {
-        LevelDataWriter.LevelData built = build(with("gamerule.doMobSpawning", "false")); // a 1.21.4 id
+    void anUnknownOverrideIdIsSurfacedNotWritten() throws IOException {
+        Saved saved = save(with("gamerule.doMobSpawning", "false")); // a 1.21.4 id
 
-        assertTrue(built.gameRules().unknownIds().contains("doMobSpawning"), "the cross-band loss is surfaced");
-        assertFalse(gameRules(built).get(GameRules.SPAWN_MOBS), "the curated safe set still applies");
+        assertTrue(saved.built().gameRules().unknownIds().contains("doMobSpawning"),
+                "the cross-band loss is surfaced");
+        assertFalse(gameRules(saved).get(GameRules.SPAWN_MOBS), "the curated safe set still applies");
     }
 
     @Test
-    void aValidOverrideIsWritten() {
+    void aValidOverrideIsWritten() throws IOException {
         // immediate_respawn is not in the curated set; a valid override of it passes through.
-        GameRules rules = gameRules(build(with("gamerule.immediate_respawn", "true")));
+        GameRules rules = gameRules(save(with("gamerule.immediate_respawn", "true")));
 
         assertTrue(rules.get(GameRules.IMMEDIATE_RESPAWN), "an arbitrary valid rule passes through");
     }

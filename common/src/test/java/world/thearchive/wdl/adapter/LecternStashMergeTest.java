@@ -77,7 +77,8 @@ class LecternStashMergeTest {
         BlockPos elsewhere = new BlockPos(100, 70, 200); // a lectern in a different chunk, not being flushed
         stash.put(elsewhere, bookHolder("Other Chunk", 0));
 
-        int merged = ContainerMerge.mergeLecternChunkStash(sink, chunkTag, new ChunkPos(lecternPos), stash).merged();
+        int merged = ContainerMerge.mergeLecternChunkStash(sink, chunkTag, ChunkPos.containing(lecternPos), stash)
+                .merged();
 
         assertEquals(1, merged, "only the flushed chunk's lectern merges");
         assertFalse(stash.containsKey(lecternPos),
@@ -99,7 +100,7 @@ class LecternStashMergeTest {
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(pos, bookHolder("Lost", 0));
 
-        int merged = ContainerMerge.mergeLecternChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
+        int merged = ContainerMerge.mergeLecternChunkStash(sink, chunkTag, ChunkPos.containing(pos), stash).merged();
 
         assertEquals(0, merged, "no captured block entity at the stashed pos -> nothing merges");
         assertFalse(stash.containsKey(pos),
