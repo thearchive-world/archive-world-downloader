@@ -55,6 +55,15 @@ public interface PlatformBridge {
      */
     boolean isRemoteWorld();
 
+    /**
+     * Whether a screen that replaces the world view is open. The chat screen does not count: it leaves the world and
+     * HUD visible, so drawing over the world stays valid while it is up.
+     */
+    boolean isBlockingScreenOpen();
+
+    /** Whether the vanilla HUD is hidden by the F1 hide-GUI toggle. */
+    boolean isHudHidden();
+
     /** The mod loader's name (for example "Fabric" or "NeoForge"), so a download records which loader ran it. */
     String loaderName();
 

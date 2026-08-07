@@ -24,6 +24,8 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -95,6 +97,17 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             replayProbe = FlashbackReplayProbe.resolve(isModLoaded(FlashbackReplayProbe.MOD_ID));
         }
         return replayProbe.isReplayServer(Minecraft.getInstance().getSingleplayerServer());
+    }
+
+    @Override
+    public boolean isBlockingScreenOpen() {
+        Screen screen = Minecraft.getInstance().screen;
+        return screen != null && !(screen instanceof ChatScreen);
+    }
+
+    @Override
+    public boolean isHudHidden() {
+        return Minecraft.getInstance().options.hideGui;
     }
 
     @Override

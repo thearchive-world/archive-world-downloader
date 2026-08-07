@@ -10,7 +10,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.Mth;
@@ -18,6 +17,8 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.Wdl;
+import world.thearchive.wdl.adapter.RenderSurface;
+import world.thearchive.wdl.adapter.impl.RenderSurfaceImpl;
 import world.thearchive.wdl.core.BrandColors;
 import world.thearchive.wdl.core.CaptureCounts;
 import world.thearchive.wdl.core.CaptureState;
@@ -26,6 +27,7 @@ import world.thearchive.wdl.core.HudAnchor;
 import world.thearchive.wdl.core.HudConfig;
 import world.thearchive.wdl.core.HudPeekMode;
 import world.thearchive.wdl.core.SaveStage;
+import world.thearchive.wdl.platform.PlatformBridge;
 
 /**
  * The shared, state-driven HUD overlay drawn while a download records and saves: the primary live status surface (the
@@ -97,7 +99,7 @@ public final class WdlHudOverlay {
                 return; // idle, or past the done linger: the overlay draws nothing
             }
             boolean detailed = config.detailed() || isPeeking(config);
-            draw(guiGraphics, minecraft.font, config, frame, detailed);
+            draw(new RenderSurfaceImpl(guiGraphics), minecraft.font, config, frame, detailed);
         } catch (RuntimeException e) {
             // A per-frame draw must never crash the HUD pass or spam the log; surface the first failure only.
             if (!errorLogged) {
@@ -108,13 +110,11 @@ public final class WdlHudOverlay {
     }
 
     private static boolean isHidden(Minecraft minecraft) {
-        // The chat screen leaves the world and HUD visible, so the overlay stays up while typing; other screens
-        // (inventory, menus) replace the view, so it hides behind them.
-        boolean blockingScreen = minecraft.screen != null && !(minecraft.screen instanceof ChatScreen);
+        PlatformBridge platform = Wdl.platformBridge();
         return minecraft.player == null
                 || minecraft.level == null
-                || blockingScreen
-                || minecraft.options.hideGui;
+                || platform.isBlockingScreenOpen()
+                || platform.isHudHidden();
     }
 
     private static @Nullable Frame resolveFrame(HudConfig config) {
@@ -168,12 +168,12 @@ public final class WdlHudOverlay {
         return config.peekMode() == HudPeekMode.HOLD ? key.isDown() : peekToggled;
     }
 
-    private static void draw(GuiGraphics guiGraphics, Font font, HudConfig config, Frame frame, boolean detailed) {
+    private static void draw(RenderSurface surface, Font font, HudConfig config, Frame frame, boolean detailed) {
         int boxWidth = detailed ? DETAILED_WIDTH : COMPACT_WIDTH;
         int boxHeight = 2 * PADDING + contentHeight(frame.phase(), detailed);
 
-        int screenWidth = guiGraphics.guiWidth();
-        int screenHeight = guiGraphics.guiHeight();
+        int screenWidth = surface.guiWidth();
+        int screenHeight = surface.guiHeight();
         int boxX = Mth.clamp(anchorX(config.anchor(), screenWidth, boxWidth) + config.offsetX(),
                 0, Math.max(0, screenWidth - boxWidth));
         int boxY = Mth.clamp(anchorY(config.anchor(), screenHeight, boxHeight) + config.offsetY(),
@@ -183,7 +183,7 @@ public final class WdlHudOverlay {
         boolean shadow = !config.background();
         if (config.background()) {
             int panelAlpha = Mth.clamp(Math.round(config.panelOpacity() / 100.0f * 255.0f * alpha), 0, 255);
-            guiGraphics.fill(boxX, boxY, boxX + boxWidth, boxY + boxHeight,
+            surface.fill(boxX, boxY, boxX + boxWidth, boxY + boxHeight,
                     (panelAlpha << 24) | (BrandColors.PANEL & 0xFFFFFF));
         }
 
@@ -191,9 +191,9 @@ public final class WdlHudOverlay {
         int contentY = boxY + PADDING;
         int contentWidth = boxWidth - 2 * PADDING;
         if (detailed) {
-            drawDetailed(guiGraphics, font, frame, contentX, contentY, contentWidth, alpha, shadow);
+            drawDetailed(surface, font, frame, contentX, contentY, contentWidth, alpha, shadow);
         } else {
-            drawCompact(guiGraphics, font, frame, contentX, contentY, contentWidth, alpha, shadow);
+            drawCompact(surface, font, frame, contentX, contentY, contentWidth, alpha, shadow);
         }
     }
 
@@ -208,15 +208,15 @@ public final class WdlHudOverlay {
         return LINE_HEIGHT;
     }
 
-    private static void drawCompact(GuiGraphics guiGraphics, Font font, Frame frame,
+    private static void drawCompact(RenderSurface surface, Font font, Frame frame,
             int contentX, int contentY, int contentWidth, float alpha, boolean shadow) {
         String glyph = glyph(frame.phase());
         int textColor = withAlpha(BrandColors.IVORY, alpha);
-        guiGraphics.drawString(font, glyph, contentX, contentY, withAlpha(glyphColor(frame.phase()), alpha), shadow);
+        surface.text(font, glyph, contentX, contentY, withAlpha(glyphColor(frame.phase()), alpha), shadow);
 
         int afterGlyph = contentX + font.width(glyph) + GLYPH_GAP;
         String timer = CaptureStatus.elapsed(frame.elapsedMillis());
-        guiGraphics.drawString(font, timer, afterGlyph, contentY, textColor, shadow);
+        surface.text(font, timer, afterGlyph, contentY, textColor, shadow);
 
         // Anchor the chunk label at a fixed x so a growing count extends to its right rather than shoving the
         // word left; right-aligning the whole label-and-count phrase would drift the word as digits are added.
@@ -227,13 +227,13 @@ public final class WdlHudOverlay {
         int labelAdvance = font.width(label + " ");
         int afterTimer = afterGlyph + font.width(timer) + GLYPH_GAP;
         int labelX = Math.max(afterTimer, rightEdge - labelAdvance - font.width(COMPACT_COUNT_TEMPLATE));
-        guiGraphics.drawString(font, label, labelX, contentY, textColor, shadow);
+        surface.text(font, label, labelX, contentY, textColor, shadow);
         int countX = labelX + labelAdvance;
         String shownCount = ClientText.ellipsize(font, count, Math.max(0, rightEdge - countX));
-        guiGraphics.drawString(font, shownCount, countX, contentY, textColor, shadow);
+        surface.text(font, shownCount, countX, contentY, textColor, shadow);
 
         if (frame.phase() == Phase.SAVING) {
-            drawLabeledBar(guiGraphics, font, contentX, contentY + LINE_HEIGHT, contentWidth,
+            drawLabeledBar(surface, font, contentX, contentY + LINE_HEIGHT, contentWidth,
                     frame.stage(), frame.progress(), alpha);
         }
     }
@@ -242,18 +242,18 @@ public final class WdlHudOverlay {
      * The compact finalization bar: a full-width track filled to the fraction, with the phase label drawn over the left
      * and the percent over the right. The over-bar text is always shadowed for contrast.
      */
-    private static void drawLabeledBar(GuiGraphics guiGraphics, Font font, int x, int y, int width,
+    private static void drawLabeledBar(RenderSurface surface, Font font, int x, int y, int width,
             SaveStage stage, float fraction, float alpha) {
-        fillBar(guiGraphics, x, y, width, SAVING_BAR_HEIGHT, fraction, alpha);
+        fillBar(surface, x, y, width, SAVING_BAR_HEIGHT, fraction, alpha);
         int textColor = withAlpha(BrandColors.IVORY, alpha);
         int textY = y + (SAVING_BAR_HEIGHT - font.lineHeight) / 2 + 1;
-        guiGraphics.drawString(font, phaseLabel(stage), x + 2, textY, textColor, true);
+        surface.text(font, phaseLabel(stage), x + 2, textY, textColor, true);
         int percent = Math.round(Mth.clamp(fraction, 0.0f, 1.0f) * 100.0f);
         Component percentText = Component.translatable("wdl.hud.percent", percent);
-        guiGraphics.drawString(font, percentText, x + width - font.width(percentText) - 1, textY, textColor, true);
+        surface.text(font, percentText, x + width - font.width(percentText) - 1, textY, textColor, true);
     }
 
-    private static void drawDetailed(GuiGraphics guiGraphics, Font font, Frame frame,
+    private static void drawDetailed(RenderSurface surface, Font font, Frame frame,
             int contentX, int contentY, int contentWidth, float alpha, boolean shadow) {
         String glyph = glyph(frame.phase());
         int glyphAdvance = font.width(glyph) + GLYPH_GAP;
@@ -263,42 +263,42 @@ public final class WdlHudOverlay {
         int textColor = withAlpha(BrandColors.IVORY, alpha);
         int rowY = contentY;
         // The phase glyph sits to the left of the first row, not on a line of its own.
-        guiGraphics.drawString(font, glyph, contentX, rowY, withAlpha(glyphColor(frame.phase()), alpha), shadow);
-        drawRow(guiGraphics, font, "wdl.hud.label.chunks", Integer.toString(counts.chunks()),
+        surface.text(font, glyph, contentX, rowY, withAlpha(glyphColor(frame.phase()), alpha), shadow);
+        drawRow(surface, font, "wdl.hud.label.chunks", Integer.toString(counts.chunks()),
                 rowX, rowY, rowWidth, textColor, shadow);
         rowY += LINE_HEIGHT;
-        drawRow(guiGraphics, font, "wdl.hud.label.entities", Integer.toString(counts.entities()),
+        drawRow(surface, font, "wdl.hud.label.entities", Integer.toString(counts.entities()),
                 rowX, rowY, rowWidth, textColor, shadow);
         rowY += LINE_HEIGHT;
-        drawRow(guiGraphics, font, "wdl.hud.label.containers", Integer.toString(counts.containers()),
+        drawRow(surface, font, "wdl.hud.label.containers", Integer.toString(counts.containers()),
                 rowX, rowY, rowWidth, textColor, shadow);
         rowY += LINE_HEIGHT;
-        drawRow(guiGraphics, font, "wdl.hud.label.time", CaptureStatus.elapsed(frame.elapsedMillis()),
+        drawRow(surface, font, "wdl.hud.label.time", CaptureStatus.elapsed(frame.elapsedMillis()),
                 rowX, rowY, rowWidth, textColor, shadow);
 
         if (frame.phase() == Phase.SAVING) {
             rowY += LINE_HEIGHT;
             int percent = Math.round(Mth.clamp(frame.progress(), 0.0f, 1.0f) * 100.0f);
-            guiGraphics.drawString(font, Component.translatable("wdl.hud.label.stage"), rowX, rowY, textColor, shadow);
+            surface.text(font, Component.translatable("wdl.hud.label.stage"), rowX, rowY, textColor, shadow);
             Component stageValue = Component.translatable("wdl.hud.stage_percent", phaseLabel(frame.stage()), percent);
-            guiGraphics.drawString(font, stageValue, rowX + rowWidth - font.width(stageValue), rowY,
+            surface.text(font, stageValue, rowX + rowWidth - font.width(stageValue), rowY,
                     withAlpha(BrandColors.SAVING_GRAY, alpha), shadow);
-            fillBar(guiGraphics, rowX, rowY + LINE_HEIGHT - 1, rowWidth, BAR_HEIGHT, frame.progress(), alpha);
+            fillBar(surface, rowX, rowY + LINE_HEIGHT - 1, rowWidth, BAR_HEIGHT, frame.progress(), alpha);
         }
     }
 
-    private static void drawRow(GuiGraphics guiGraphics, Font font, String labelKey, String value, int x, int y,
+    private static void drawRow(RenderSurface surface, Font font, String labelKey, String value, int x, int y,
             int width, int color, boolean shadow) {
-        guiGraphics.drawString(font, Component.translatable(labelKey), x, y, color, shadow);
-        guiGraphics.drawString(font, value, x + width - font.width(value), y, color, shadow);
+        surface.text(font, Component.translatable(labelKey), x, y, color, shadow);
+        surface.text(font, value, x + width - font.width(value), y, color, shadow);
     }
 
-    private static void fillBar(GuiGraphics guiGraphics, int x, int y, int width, int height, float fraction,
+    private static void fillBar(RenderSurface surface, int x, int y, int width, int height, float fraction,
             float alpha) {
-        guiGraphics.fill(x, y, x + width, y + height, withAlpha(lighten(BrandColors.PANEL, TRACK_LIGHTEN), alpha));
+        surface.fill(x, y, x + width, y + height, withAlpha(lighten(BrandColors.PANEL, TRACK_LIGHTEN), alpha));
         int filled = Math.round(width * Mth.clamp(fraction, 0.0f, 1.0f));
         if (filled > 0) {
-            guiGraphics.fill(x, y, x + filled, y + height, withAlpha(BrandColors.AMBER, alpha));
+            surface.fill(x, y, x + filled, y + height, withAlpha(BrandColors.AMBER, alpha));
         }
     }
 
