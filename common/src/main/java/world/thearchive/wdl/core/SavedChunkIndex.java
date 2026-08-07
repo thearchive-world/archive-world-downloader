@@ -48,7 +48,7 @@ public final class SavedChunkIndex {
         return set == null ? EMPTY : set.toLongArray();
     }
 
-    /** Drop every dimension's set (called at capture start and stop, so the overlay is empty when idle). */
+    /** Drop every dimension's set. */
     public synchronized void clear() {
         version++;
         byDimension.clear();

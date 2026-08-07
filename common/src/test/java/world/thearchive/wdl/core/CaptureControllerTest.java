@@ -320,15 +320,61 @@ class CaptureControllerTest {
     }
 
     @Test
-    void stopClearsTheSavedChunkOverlay() {
+    void savedChunkOverlayIsClearedWhenTheSaveCompletes() {
         CaptureController controller = controller();
-        controller.start(FakeSession::new);
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
         controller.savedChunks().add("minecraft:overworld", 42L);
 
         controller.stop();
+        session.saveDone = true;
+        controller.tick();
 
         assertEquals(0, controller.savedChunks().snapshot("minecraft:overworld").length,
-                "the overlay is emptied when the capture stops, so nothing draws while idle");
+                "the overlay is emptied once the save completes, so nothing draws while idle");
+    }
+
+    @Test
+    void aWriterSideSeedLandingAfterStopDoesNotSurviveIntoIdle() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+
+        controller.stop();
+        // The finish drain can be the first flush for the dimension, so the resume overlay seed is queued behind
+        // it and repopulates the indexes on the writer thread at some point after stop returns.
+        controller.savedChunks().add("minecraft:overworld", 42L);
+        controller.coveredChunks().recordTrail("minecraft:overworld", 4, 4, 8);
+        controller.coveredChunks().recompute("minecraft:overworld", 1);
+        controller.sendRange().observe("minecraft:overworld", 64);
+        session.saveDone = true;
+        controller.tick();
+
+        assertEquals(0, controller.savedChunks().snapshot("minecraft:overworld").length,
+                "the seeded prior coverage outlived the download that seeded it");
+        assertEquals(0, controller.coveredChunks().snapshot("minecraft:overworld").length,
+                "the seeded prior covered tone outlived the download that seeded it");
+        assertFalse(controller.sendRange().isCalibrated("minecraft:overworld"),
+                "the seeded prior calibration outlived the download that seeded it");
+    }
+
+    @Test
+    void theOverlayStoresStayPopulatedWhileTheSaveDrains() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+        controller.savedChunks().add("minecraft:overworld", 42L);
+        controller.coveredChunks().recordTrail("minecraft:overworld", 4, 4, 8);
+        controller.coveredChunks().recompute("minecraft:overworld", 1);
+        controller.sendRange().observe("minecraft:overworld", 64);
+
+        controller.stop();
+
+        assertEquals(CaptureState.SAVING, controller.state());
+        assertTrue(controller.savedChunks().snapshot("minecraft:overworld").length > 0,
+                "clearing at stop is what lets a queued writer-side seed land after the clear");
+        assertTrue(controller.coveredChunks().snapshot("minecraft:overworld").length > 0);
+        assertTrue(controller.sendRange().isCalibrated("minecraft:overworld"));
     }
 
     @Test
@@ -347,17 +393,20 @@ class CaptureControllerTest {
     }
 
     @Test
-    void stopClearsTheCoveredOverlayAndTheSendRangeEstimate() {
+    void coveredOverlayAndSendRangeEstimateAreClearedWhenTheSaveCompletes() {
         CaptureController controller = controller();
-        controller.start(FakeSession::new);
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
         controller.coveredChunks().recordTrail("minecraft:overworld", 4, 4, 8);
         controller.coveredChunks().recompute("minecraft:overworld", 1);
         controller.sendRange().observe("minecraft:overworld", 64);
 
         controller.stop();
+        session.saveDone = true;
+        controller.tick();
 
         assertEquals(0, controller.coveredChunks().snapshot("minecraft:overworld").length,
-                "the covered tone is emptied when the capture stops, so nothing draws while idle");
+                "the covered tone is emptied once the save completes, so nothing draws while idle");
         assertFalse(controller.sendRange().isCalibrated("minecraft:overworld"),
                 "the estimate does not carry into the next capture");
     }
