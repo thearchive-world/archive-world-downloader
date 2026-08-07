@@ -101,3 +101,7 @@ common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionMapTallyTest
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossLogWiringTest.java
 # 26.x puts every dimension under dimensions/minecraft/<name>, so the overworld region is no longer at the root.
 common/src/test/java/world/thearchive/wdl/adapter/RegionIntegrationTest.java
+
+# 26.x fabric-api replaced rendering.v1.world.WorldRenderEvents with rendering.v1.level.LevelRenderEvents and
+# dropped the frustum accessor, so this registrar draws on BEFORE_GIZMOS with a null frustum.
+fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java

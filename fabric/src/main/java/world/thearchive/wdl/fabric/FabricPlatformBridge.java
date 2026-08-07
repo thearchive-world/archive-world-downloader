@@ -50,7 +50,7 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
             if (!(screen instanceof PauseScreen)) {
                 return;
             }
-            List<AbstractWidget> buttons = Screens.getButtons(screen);
+            List<AbstractWidget> buttons = Screens.getWidgets(screen);
             AbstractWidget anchor = lowest(buttons);
             if (anchor == null) {
                 return;
