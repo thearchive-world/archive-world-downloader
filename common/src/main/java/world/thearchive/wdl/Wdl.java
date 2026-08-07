@@ -399,7 +399,9 @@ public final class Wdl {
                 }
                 return;
             }
-            if (SinglePlayerTaint.isTainted(saveFolder) && config.blockTaintedResume()) {
+            // Only REFUSE stops here: the resume paths all ran this cascade, and there is no prompt left to show.
+            if (SinglePlayerTaint.decide(SinglePlayerTaint.classify(saveFolder),
+                    config.blockTaintedResume()) == SinglePlayerTaint.Decision.REFUSE) {
                 sendRefusal(target.origin(), ToastCopy.refuseTainted(), ChatCopy.refuseTainted());
                 return;
             }
