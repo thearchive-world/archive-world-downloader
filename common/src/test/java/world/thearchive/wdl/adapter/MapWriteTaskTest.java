@@ -101,17 +101,19 @@ class MapWriteTaskTest {
 
     @Test
     void countsAnUnexpectedRuntimeFailure(@TempDir Path save) throws Exception {
-        // A NUL byte is rejected by the Unix path parser the suite runs on, so resolving the file name throws
-        // InvalidPathException after the directory has already been created. That is the RuntimeException half
-        // of the catch, reached deterministically.
+        // A NUL byte is rejected by the Unix path parser the suite runs on, so resolving the target file name
+        // throws InvalidPathException before any directory is created. That is the RuntimeException half of the
+        // catch, reached deterministically.
         Path dataDirectory = save.resolve("data");
         AtomicInteger failures = new AtomicInteger();
 
         LiveCaptureSession.mapWriteTask(dataDirectory, "map_\u0000", mapData(), failures, lossLog()).run();
 
         assertEquals(1, failures.get(), "a runtime failure is counted, not merely logged");
-        try (Stream<Path> written = Files.list(dataDirectory)) {
-            assertFalse(written.findAny().isPresent(), "nothing was written");
+        if (Files.isDirectory(dataDirectory)) {
+            try (Stream<Path> written = Files.list(dataDirectory)) {
+                assertFalse(written.findAny().isPresent(), "nothing was written");
+            }
         }
     }
 }

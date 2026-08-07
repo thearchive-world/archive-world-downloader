@@ -35,6 +35,12 @@ public final class MapManifest {
     private static final String WDL_SUBFOLDER = "wdl";
     private static final String MANIFEST_FILE = "map-ids";
     private static final String DATA_SUBFOLDER = "data";
+    // Two on-disk map-data layouts the resume floor must recognize band-independently: the 1.21.x flat form names
+    // files map_<n>.dat directly in the data directory, and the 26.x namespaced form puts them in a maps/ subfolder
+    // as <n>.dat, one level under the data/minecraft namespace directory.
+    private static final String FLAT_MAP_PREFIX = "map_";
+    private static final String MAPS_SUBFOLDER = "maps";
+    private static final String NAMESPACE_SUBFOLDER = "minecraft";
 
     private final Map<String, Integer> idByHash;
     private int nextArchiveId;
@@ -129,30 +135,42 @@ public final class MapManifest {
     }
 
     /**
-     * The highest {@code n} among the {@code data/map_<n>.dat} files in {@code dataDirectory}, or -1 if there are none.
+     * The highest map-data file id under {@code dataDirectory}, across both on-disk layouts, or -1 if there are none:
+     * the 1.21.x flat {@code map_<n>.dat} directly in the directory, and the 26.x {@code maps/<n>.dat} subfolder form.
+     * A band passes its own data directory (26.x includes the namespace segment), and recognizing both keeps the resume
+     * id floor band-independent.
      */
     public static int highestDataFileId(Path dataDirectory) throws IOException {
-        if (!Files.isDirectory(dataDirectory)) {
+        int flat = highestMatching(dataDirectory, FLAT_MAP_PREFIX);
+        int namespaced = highestMatching(dataDirectory.resolve(MAPS_SUBFOLDER), "");
+        return Math.max(flat, namespaced);
+    }
+
+    private static int highestMatching(Path directory, String prefix) throws IOException {
+        if (!Files.isDirectory(directory)) {
             return -1;
         }
-        try (Stream<Path> entries = Files.list(dataDirectory)) {
+        try (Stream<Path> entries = Files.list(directory)) {
             int highest = -1;
             for (Path path : (Iterable<Path>) entries::iterator) {
-                highest = Math.max(highest, dataFileId(path.getFileName().toString()));
+                highest = Math.max(highest, dataFileId(path.getFileName().toString(), prefix));
             }
             return highest;
         }
     }
 
     /**
-     * Whether resuming into {@code saveFolder} would mix map-id schemes: it holds imaged map data
-     * ({@code data/map_<n>.dat}) whose scheme (archive ids when a manifest is present, original ids otherwise) differs
-     * from {@code remapMapIds}. A folder with no imaged map data never mismatches. An IO failure reads as no mismatch,
-     * so a bad disk read never fires a spurious warn.
+     * Whether resuming into {@code saveFolder} would mix map-id schemes: it holds imaged map data whose scheme (archive
+     * ids when a manifest is present, original ids otherwise) differs from {@code remapMapIds}. Map data is looked up
+     * in both the 1.21.x {@code data/} root and the 26.x {@code data/minecraft/} namespace root. A folder with no
+     * imaged map data never mismatches. An IO failure reads as no mismatch, so a bad disk read never fires a spurious
+     * warn.
      */
     public static boolean schemeMismatch(Path saveFolder, boolean remapMapIds) {
         try {
-            boolean hasMapData = highestDataFileId(saveFolder.resolve(DATA_SUBFOLDER)) >= 0;
+            Path data = saveFolder.resolve(DATA_SUBFOLDER);
+            boolean hasMapData = highestDataFileId(data) >= 0
+                    || highestDataFileId(data.resolve(NAMESPACE_SUBFOLDER)) >= 0;
             return hasMapData && existsIn(saveFolder) != remapMapIds;
         } catch (IOException | RuntimeException e) {
             return false;
@@ -203,15 +221,15 @@ public final class MapManifest {
         }
     }
 
-    private static int dataFileId(String fileName) {
-        if (!fileName.startsWith("map_") || !fileName.endsWith(".dat")) {
+    private static int dataFileId(String fileName, String prefix) {
+        if (!fileName.startsWith(prefix) || !fileName.endsWith(".dat")) {
             return -1;
         }
-        String digits = fileName.substring("map_".length(), fileName.length() - ".dat".length());
+        String digits = fileName.substring(prefix.length(), fileName.length() - ".dat".length());
         try {
             return Integer.parseInt(digits);
         } catch (NumberFormatException e) {
-            return -1;
+            return -1; // a non-numeric stem, such as the 26.x maps/last_id.dat index, is not a map-data file
         }
     }
 }
