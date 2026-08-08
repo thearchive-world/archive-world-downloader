@@ -10,15 +10,17 @@ import net.minecraft.nbt.ListTag;
 /**
  * The band-stable walk over a serialized item tree: apply a leaf action to each item's {@code components} compound,
  * then recurse into the items nested inside a shulker box (the {@code minecraft:container} component, whose elements
- * are {@code {slot, item}}) and a bundle (the {@code minecraft:bundle_contents} component, whose elements are bare item
- * NBT). Operates only on already-serialized NBT, never a live ItemStack, and uses only the post-1.20.5 component shape
- * and band-stable get/instanceof ops, so one definition stays byte-identical across the era bands. Each caller supplies
- * its own per-item leaf action.
+ * are {@code {slot, item}}), a bundle (the {@code minecraft:bundle_contents} component, whose elements are bare item
+ * NBT) and a sulfur cube (the {@code minecraft:sulfur_cube_content} component, whose value is a single bare item NBT;
+ * the component does not exist before 26.2, so the branch is inert there). Operates only on already-serialized NBT,
+ * never a live ItemStack, and uses only the post-1.20.5 component shape and band-stable get/instanceof ops, so one
+ * definition stays byte-identical across the era bands. Each caller supplies its own per-item leaf action.
  */
 final class ItemTreeWalk {
     private static final String COMPONENTS = "components";
     private static final String CONTAINER = "minecraft:container";
     private static final String BUNDLE_CONTENTS = "minecraft:bundle_contents";
+    private static final String SULFUR_CUBE_CONTENT = "minecraft:sulfur_cube_content";
     private static final String ITEM = "item";
 
     private ItemTreeWalk() {}
@@ -53,6 +55,9 @@ final class ItemTreeWalk {
         }
         if (components.get(BUNDLE_CONTENTS) instanceof ListTag bundle) {
             walkList(bundle, onComponents);
+        }
+        if (components.get(SULFUR_CUBE_CONTENT) instanceof CompoundTag sulfur) {
+            walkItem(sulfur, onComponents);
         }
     }
 }
