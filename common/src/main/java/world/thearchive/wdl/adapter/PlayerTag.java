@@ -134,8 +134,8 @@ final class PlayerTag {
      * ender chest reaches the client only through its open menu, so a resume that never opens it produces a fresh
      * player tag with empty {@code "EnderItems"} that would wipe the previously-downloaded one. Prefer non-empty, the
      * {@link ChunkMerge} discipline: if the fresh tag already has a non-empty ender chest (re-opened this session) it
-     * wins and nothing carries; otherwise the prior {@code "EnderItems"}, read from the prior level.dat's
-     * {@code Data.Player}, is copied in. Returns whether a carry-forward happened.
+     * wins and nothing carries; otherwise the prior {@code "EnderItems"}, read from the prior download's player tag, is
+     * copied in. Returns whether a carry-forward happened.
      */
     static boolean carryForwardEnderItems(CompoundTag priorPlayer, CompoundTag freshRaw) {
         if (freshRaw.get("EnderItems") instanceof ListTag fresh && !fresh.isEmpty()) {
