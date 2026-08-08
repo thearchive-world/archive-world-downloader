@@ -36,7 +36,7 @@ final class ScreenDriver {
 
     /** The named row's live restore-chip rectangle on the active download screen, or null when it is absent. */
     static @Nullable ScreenRectangle chipBox(ClientGameTestContext context, String folderName) {
-        return context.computeOnClient(client -> client.screen instanceof WdlDownloadsScreen screen
+        return context.computeOnClient(client -> client.gui.screen() instanceof WdlDownloadsScreen screen
                 ? screen.restoreChipBox(folderName)
                 : null);
     }

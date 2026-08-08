@@ -5,9 +5,8 @@ package world.thearchive.wdl.fabric.gametest;
 
 import java.util.Properties;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.fabricmc.fabric.api.client.gametest.v1.context.TestClientLevelContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
-import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 
 /**
@@ -26,9 +25,9 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 @SuppressWarnings("UnstableApiUsage")
 final class MultiplayerFixture implements AutoCloseable {
     private final TestDedicatedServerContext server;
-    private final TestServerConnection connection;
+    private final TestDedicatedServerConnection connection;
 
-    private MultiplayerFixture(TestDedicatedServerContext server, TestServerConnection connection) {
+    private MultiplayerFixture(TestDedicatedServerContext server, TestDedicatedServerConnection connection) {
         this.server = server;
         this.connection = connection;
     }
@@ -41,8 +40,8 @@ final class MultiplayerFixture implements AutoCloseable {
      */
     static MultiplayerFixture connect(ClientGameTestContext context) {
         TestDedicatedServerContext server = context.worldBuilder().createServer();
-        TestServerConnection connection = server.connect();
-        connection.getClientLevel().waitForChunksDownload();
+        TestDedicatedServerConnection connection = server.connect();
+        connection.waitForChunksDownload();
         context.waitFor(client -> client.player != null && client.level != null);
         server.runCommand("gamemode creative @a");
         return new MultiplayerFixture(server, connection);
@@ -56,8 +55,8 @@ final class MultiplayerFixture implements AutoCloseable {
         Properties properties = new Properties();
         properties.setProperty("entity-broadcast-range-percentage", Integer.toString(broadcastPercentage));
         TestDedicatedServerContext server = context.worldBuilder().createServer(properties);
-        TestServerConnection connection = server.connect();
-        connection.getClientLevel().waitForChunksDownload();
+        TestDedicatedServerConnection connection = server.connect();
+        connection.waitForChunksDownload();
         context.waitFor(client -> client.player != null && client.level != null);
         server.runCommand("gamemode creative @a");
         return new MultiplayerFixture(server, connection);
@@ -68,9 +67,9 @@ final class MultiplayerFixture implements AutoCloseable {
         return server;
     }
 
-    /** The client world handle, for re-waiting on chunk download after the player moves to a new area. */
-    TestClientLevelContext clientWorld() {
-        return connection.getClientLevel();
+    /** Re-wait on chunk download after the player moves to a new area. */
+    void waitForChunksDownload() {
+        connection.waitForChunksDownload();
     }
 
     @Override

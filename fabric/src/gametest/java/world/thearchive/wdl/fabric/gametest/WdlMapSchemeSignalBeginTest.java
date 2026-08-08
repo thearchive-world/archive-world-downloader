@@ -65,7 +65,7 @@ public class WdlMapSchemeSignalBeginTest implements FabricClientGameTest {
             int x, BlockPos home) {
         server.runCommand("tp @a " + x + " " + home.getY() + " " + home.getZ());
         context.waitFor(client -> client.player != null && Math.abs(client.player.getBlockX() - x) <= 2);
-        fixture.clientWorld().waitForChunksDownload();
+        fixture.waitForChunksDownload();
         context.waitFor(client -> client.player != null && client.level != null);
     }
 }

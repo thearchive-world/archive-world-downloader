@@ -117,7 +117,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
         fireJoin(context);
         Check.that(chatContains(chat, resolved("wdl.refuse.tainted.body")),
                 "an auto-origin join on a blocked tainted folder must keep the shipped tainted notice");
-        Check.that(context.computeOnClient(client -> !(client.screen instanceof ConfirmScreen)),
+        Check.that(context.computeOnClient(client -> !(client.gui.screen() instanceof ConfirmScreen)),
                 "an auto-origin join must not open the blocked-offer screen");
 
         chat.clear();
@@ -127,7 +127,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
                 "a deliberate resume on a blocked tainted folder must open the blocked-offer screen");
         context.clickScreenButton("wdl.screen.downloads.restore_action");
         waitIdle(context);
-        Check.that(context.computeOnClient(client -> client.screen == null),
+        Check.that(context.computeOnClient(client -> client.gui.screen() == null),
                 "the restore must run with no second prompt");
         Check.that(!tainted(context, root), "the deliberate restore must clean the tainted folder");
         Check.that(Files.exists(saves.resolve(folder + "-singleplayer.zip")),
@@ -358,7 +358,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
                 context.waitTick();
             }
             Check.that(context.computeOnClient(client -> Wdl.state()) == CaptureState.RESTORING
-                    && context.computeOnClient(client -> client.screen instanceof WdlDownloadsScreen)
+                    && context.computeOnClient(client -> client.gui.screen() instanceof WdlDownloadsScreen)
                     && nameFieldValue(context) == null,
                     "the open screen never rebuilt into the restoring view");
         }
@@ -382,7 +382,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
      */
     private static void focusNameField(ClientGameTestContext context) {
         context.runOnClient(client -> {
-            if (client.screen instanceof WdlDownloadsScreen screen) {
+            if (client.gui.screen() instanceof WdlDownloadsScreen screen) {
                 for (GuiEventListener child : screen.children()) {
                     if (child instanceof EditBox box) {
                         screen.setFocused(box);
@@ -396,7 +396,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
     /** The value in the open download screen's name field, or null when no name field is on screen. */
     private static @Nullable String nameFieldValue(ClientGameTestContext context) {
         return context.computeOnClient(client -> {
-            if (!(client.screen instanceof WdlDownloadsScreen screen)) {
+            if (!(client.gui.screen() instanceof WdlDownloadsScreen screen)) {
                 return null;
             }
             for (GuiEventListener child : screen.children()) {
@@ -415,7 +415,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
         Check.that(toast != null && toast.contains(resolved(expectedTitleKey)), message + ", saw: " + toast);
         Check.that(toast != null && !toast.contains(resolved("wdl.refuse.tainted.title")),
                 "the junction refusal must never be a taint line, saw: " + toast);
-        Check.that(context.computeOnClient(client -> client.screen instanceof WdlDownloadsScreen),
+        Check.that(context.computeOnClient(client -> client.gui.screen() instanceof WdlDownloadsScreen),
                 "the junction refusal must dispatch no merge confirm");
         Check.that(context.computeOnClient(client -> Wdl.state()) == CaptureState.IDLE,
                 "the junction refusal must start no capture");
@@ -460,16 +460,16 @@ public class RestoreFlowTest implements FabricClientGameTest {
 
     private static boolean screenTitleIs(ClientGameTestContext context, String titleKey) {
         String expected = resolved(titleKey);
-        return context.computeOnClient(client -> client.screen != null
-                && client.screen.getTitle().getString().equals(expected));
+        return context.computeOnClient(client -> client.gui.screen() != null
+                && client.gui.screen().getTitle().getString().equals(expected));
     }
 
     private static boolean hasWidgetText(ClientGameTestContext context, String expected) {
         return context.computeOnClient(client -> {
-            if (client.screen == null) {
+            if (client.gui.screen() == null) {
                 return false;
             }
-            for (GuiEventListener child : client.screen.children()) {
+            for (GuiEventListener child : client.gui.screen().children()) {
                 if (child instanceof AbstractWidget widget
                         && widget.getMessage().getString().equals(expected)) {
                     return true;
@@ -496,7 +496,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
     }
 
     private static void closeScreen(ClientGameTestContext context) {
-        context.runOnClient(client -> client.setScreen(null));
+        context.runOnClient(client -> client.gui.setScreen(null));
         context.waitForScreen(null);
     }
 

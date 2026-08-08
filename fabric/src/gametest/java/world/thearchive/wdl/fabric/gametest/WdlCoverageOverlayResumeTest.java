@@ -34,7 +34,7 @@ public class WdlCoverageOverlayResumeTest implements FabricClientGameTest {
             // Move far enough that area A unloads, so the resume run never re-captures chunk A.
             fixture.server().runCommand("tp @a 3000 100 3000");
             context.waitFor(client -> client.player != null && client.player.getX() > 2900);
-            fixture.clientWorld().waitForChunksDownload();
+            fixture.waitForChunksDownload();
             long chunkB = context.computeOnClient(client -> client.player.chunkPosition().pack());
             Check.that(chunkA != chunkB, "the tp did not move the player to a new chunk");
 

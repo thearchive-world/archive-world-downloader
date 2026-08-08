@@ -89,7 +89,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
             BlockPos stand) {
         context.runOnClient(client -> {
             client.player.closeContainer();
-            client.setScreen(null);
+            client.gui.setScreen(null);
         });
         BlockPos enderChest = new BlockPos(stand.getX() - 2, stand.getY(), stand.getZ() + 2);
         String at = enderChest.getX() + " " + enderChest.getY() + " " + enderChest.getZ();
@@ -144,7 +144,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
             BlockPos stand) {
         context.runOnClient(client -> {
             client.player.closeContainer();
-            client.setScreen(null);
+            client.gui.setScreen(null);
         });
         BlockPos blocked = new BlockPos(stand.getX() + 2, stand.getY(), stand.getZ() + 2);
         String at = blocked.getX() + " " + blocked.getY() + " " + blocked.getZ();
@@ -172,7 +172,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
         ContainerDriver.aimEyesAt(context, ContainerDriver.center(blocked));
         ContainerDriver.awaitCrosshair(context, client -> ContainerDriver.isLookingAt(client, blocked),
                 "obstructed ender chest " + blocked);
-        context.runOnClient(client -> client.setScreen(null));
+        context.runOnClient(client -> client.gui.setScreen(null));
         context.getInput().holdKey(options -> options.keyUse);
         run.tick(5);
         context.getInput().releaseKey(options -> options.keyUse);

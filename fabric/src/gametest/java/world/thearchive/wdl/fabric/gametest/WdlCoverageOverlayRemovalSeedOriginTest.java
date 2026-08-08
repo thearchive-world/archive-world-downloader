@@ -97,7 +97,7 @@ public class WdlCoverageOverlayRemovalSeedOriginTest implements FabricClientGame
         });
         // A reconnect earlier in a multi-scenario run can leave a confirm screen focused, and an open screen
         // suppresses movement input, so dismiss it before driving the forward key or the walk never starts.
-        context.runOnClient(client -> client.setScreen(null));
+        context.runOnClient(client -> client.gui.setScreen(null));
         context.getInput().holdKey(options -> options.keyUp);
         boolean pastRange = false;
         for (int walkTick = 0; walkTick < WALK_TIMEOUT_TICKS && !pastRange; walkTick++) {
