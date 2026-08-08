@@ -225,7 +225,7 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
                 "an open a spectator's ender chest could not have caused was bound to the ender inventory");
 
         Path saveRoot = run.stopAndAwaitSave();
-        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player")
+        List<String> enderItems = CaptureReadback.capturedPlayer(saveRoot)
                 .getListOrEmpty("EnderItems").compoundStream()
                 .map(item -> item.getString("id").orElse("?"))
                 .toList();

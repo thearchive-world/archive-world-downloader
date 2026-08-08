@@ -128,9 +128,11 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlay
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayResumeTest.java
 # 26.x gametest API drift (see the section header above).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayStationarySeedTest.java
-# 26.x gametest API drift (see the section header above).
+# 26.x gametest API drift (see the section header above), plus the save-layout re-point below: the overworld type's
+# folder is dimensions/minecraft/overworld, so the key-routed folder to forbid is dimensions/wdltest/second_overworld.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCustomLevelKeyRoutingTest.java
-# 26.x gametest API drift (see the section header above).
+# 26.x gametest API drift (see the section header above), plus the save-layout re-point below: nether entities moved
+# to dimensions/minecraft/the_nether/entities.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDimensionRebindEntityCaptureTest.java
 # 26.x gametest API drift (see the section header above).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDoubleChestCaptureTest.java
@@ -154,3 +156,16 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSpectateAnchorT
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSpectatorContainerCaptureTest.java
 # 26.x gametest API drift (see the section header above).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlStalePlacementCaptureTest.java
+
+# --- Fabric capture-tier gametest 26.x save-layout re-point: the overworld region and entities moved under
+# dimensions/minecraft/overworld, non-overworld dimensions under dimensions/<namespace>/<path>, captured maps to
+# data/minecraft/maps/<id>.dat with the index at maps/last_id.dat, world metadata to data/minecraft/*.dat, the
+# player to players/data/<uuid>.dat, and advancements/stats under players/ ---
+# 26.x save-layout re-point (see the section header above): the readback helper spells the 26.x on-disk locations.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureReadback.java
+# 26.x save-layout re-point (see the section header above): the overworld region is dimensions/minecraft/overworld/region.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPausedSaveCompletionTest.java
+# 26.x save-layout re-point (see the section header above): the captured player is at players/data/<uuid>.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPlayerDataCaptureTest.java
+# 26.x save-layout re-point (see the section header above): day-time and game rules moved to data/minecraft/*.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlWorldOutputConfigTest.java

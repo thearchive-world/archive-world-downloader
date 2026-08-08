@@ -5,6 +5,7 @@ package world.thearchive.wdl.fabric.gametest;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mojang.serialization.DynamicOps;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,17 +19,27 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
+import net.minecraft.world.clock.ClockState;
+import net.minecraft.world.clock.PackedClockStates;
+import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.clock.WorldClocks;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.gamerules.GameRules;
 
 /**
  * Reads a produced WDL save back off disk, the on-disk side of the capture-verification suite. The suite drives a real
@@ -45,23 +56,35 @@ final class CaptureReadback {
                 DataFixers.getDataFixer(), false, type);
     }
 
-    /** The stored chunk tag at {@code pos} under {@code <save>/region}, or empty if no chunk was written there. */
-    static Optional<CompoundTag> readChunk(Path saveRoot, ChunkPos pos) {
-        return readTag(saveRoot.resolve("region"), pos, DataFixTypes.CHUNK);
+    /** A dimension's 26.x storage folder, {@code <save>/dimensions/<namespace>/<path>}. */
+    static Path dimensionDir(Path saveRoot, String namespace, String path) {
+        return saveRoot.resolve("dimensions").resolve(namespace).resolve(path);
     }
 
-    /** The stored entity-chunk tag at {@code pos} under {@code <save>/entities}, or empty if none was written. */
+    /** The overworld region folder, {@code <save>/dimensions/minecraft/overworld/region} at 26.x. */
+    static Path overworldRegionDir(Path saveRoot) {
+        return dimensionDir(saveRoot, "minecraft", "overworld").resolve("region");
+    }
+
+    /** The stored chunk tag at {@code pos} under the overworld region folder, or empty if no chunk was written. */
+    static Optional<CompoundTag> readChunk(Path saveRoot, ChunkPos pos) {
+        return readTag(overworldRegionDir(saveRoot), pos, DataFixTypes.CHUNK);
+    }
+
+    /** The stored entity-chunk tag at {@code pos} under the overworld entities folder, or empty if none. */
     static Optional<CompoundTag> readEntityChunk(Path saveRoot, ChunkPos pos) {
-        return readTag(saveRoot.resolve("entities"), pos, DataFixTypes.ENTITY_CHUNK);
+        return readTag(dimensionDir(saveRoot, "minecraft", "overworld").resolve("entities"), pos,
+                DataFixTypes.ENTITY_CHUNK);
     }
 
     /**
-     * The stored entity-chunk tag at {@code pos} under a non-overworld dimension's folder ({@code DIM-1} for the
-     * nether, {@code DIM1} for the end), or empty if none was written. The position space is shared between dimensions,
-     * so which folder a chunk is read from is the whole of what distinguishes them on disk.
+     * The stored entity-chunk tag at {@code pos} under a dimension's entities folder
+     * ({@code <save>/dimensions/<namespace>/<path>/entities} at 26.x), or empty if none was written. The position space
+     * is shared between dimensions, so which folder a chunk is read from is the whole of what distinguishes them on
+     * disk.
      */
-    static Optional<CompoundTag> readEntityChunkIn(Path saveRoot, String dimensionDirectory, ChunkPos pos) {
-        return readTag(saveRoot.resolve(dimensionDirectory).resolve("entities"), pos, DataFixTypes.ENTITY_CHUNK);
+    static Optional<CompoundTag> readEntityChunkIn(Path saveRoot, String namespace, String path, ChunkPos pos) {
+        return readTag(dimensionDir(saveRoot, namespace, path).resolve("entities"), pos, DataFixTypes.ENTITY_CHUNK);
     }
 
     private static Optional<CompoundTag> readTag(Path regionDirectory, ChunkPos pos, DataFixTypes type) {
@@ -116,7 +139,7 @@ final class CaptureReadback {
                 .toList();
     }
 
-    /** The {@code Data} compound of {@code <save>/level.dat} (player, game rules, world settings live under it). */
+    /** The {@code Data} compound of {@code <save>/level.dat} (world game type, cheats, singleplayer_uuid). */
     static CompoundTag levelData(Path saveRoot) {
         try {
             CompoundTag root = NbtIo.readCompressed(saveRoot.resolve("level.dat"), NbtAccounter.unlimitedHeap());
@@ -126,28 +149,67 @@ final class CaptureReadback {
         }
     }
 
-    /** The captured map-image files ({@code <save>/data/map_*.dat}) present, sorted; empty if none were written. */
-    static List<Path> mapDataFiles(Path saveRoot) {
-        Path dataDirectory = saveRoot.resolve("data");
-        if (!Files.isDirectory(dataDirectory)) {
-            return List.of();
-        }
+    /**
+     * The captured local player's tag at {@code <save>/players/data/<uuid>.dat} (the raw tag, no {@code Data} wrap).
+     */
+    static CompoundTag capturedPlayer(Path saveRoot) {
+        Path dataDirectory = saveRoot.resolve("players").resolve("data");
         try (Stream<Path> files = Files.list(dataDirectory)) {
-            return files.filter(file -> {
-                String name = file.getFileName().toString();
-                return name.startsWith("map_") && name.endsWith(".dat");
-            }).sorted().toList();
+            Path player = files.filter(file -> file.getFileName().toString().endsWith(".dat")).findFirst()
+                    .orElseThrow(() -> new AssertionError("no players/data/<uuid>.dat was written under " + saveRoot));
+            return NbtIo.readCompressed(player, NbtAccounter.unlimitedHeap());
         } catch (IOException e) {
-            throw new RuntimeException("failed listing data/ under " + saveRoot, e);
+            throw new RuntimeException("failed reading players/data under " + saveRoot, e);
         }
     }
 
-    /** The archive ids of the {@code data/map_*.dat} files present, parsed from their {@code map_<id>.dat} names. */
+    /** The overworld clock's total ticks from {@code <save>/data/minecraft/world_clocks.dat} (6000 at noon). */
+    static long overworldDayTime(Path saveRoot, RegistryAccess registries) {
+        DynamicOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
+        PackedClockStates clocks = PackedClockStates.CODEC.parse(ops, savedDataInner(saveRoot, "world_clocks"))
+                .getOrThrow();
+        Holder<WorldClock> overworld = registries.lookupOrThrow(Registries.WORLD_CLOCK)
+                .getOrThrow(WorldClocks.OVERWORLD);
+        ClockState state = clocks.clocks().get(overworld);
+        if (state == null) {
+            throw new AssertionError("the overworld clock is absent from world_clocks.dat under " + saveRoot);
+        }
+        return state.totalTicks();
+    }
+
+    /** The curated game rules parsed from {@code <save>/data/minecraft/game_rules.dat}. */
+    static GameRules gameRules(Path saveRoot) {
+        return GameRules.codec(FeatureFlags.DEFAULT_FLAGS)
+                .parse(NbtOps.INSTANCE, savedDataInner(saveRoot, "game_rules")).getOrThrow();
+    }
+
+    /** The inner {@code data} tag of a namespaced {@code <save>/data/minecraft/<name>.dat} SavedData envelope. */
+    static CompoundTag savedDataInner(Path saveRoot, String name) {
+        return readDataInner(saveRoot.resolve("data").resolve("minecraft").resolve(name + ".dat"));
+    }
+
+    /** The captured map-image files ({@code <save>/data/minecraft/maps/<id>.dat}) present, sorted; empty if none. */
+    static List<Path> mapDataFiles(Path saveRoot) {
+        Path mapsDirectory = saveRoot.resolve("data").resolve("minecraft").resolve("maps");
+        if (!Files.isDirectory(mapsDirectory)) {
+            return List.of();
+        }
+        try (Stream<Path> files = Files.list(mapsDirectory)) {
+            return files.filter(file -> {
+                String name = file.getFileName().toString();
+                return name.endsWith(".dat") && !name.equals("last_id.dat");
+            }).sorted().toList();
+        } catch (IOException e) {
+            throw new RuntimeException("failed listing data/minecraft/maps/ under " + saveRoot, e);
+        }
+    }
+
+    /** The archive ids of the {@code maps/<id>.dat} files present, parsed from their {@code <id>.dat} names. */
     static List<Integer> mapDataIds(Path saveRoot) {
         List<Integer> ids = new ArrayList<>();
         for (Path file : mapDataFiles(saveRoot)) {
             String name = file.getFileName().toString();
-            ids.add(Integer.parseInt(name.substring("map_".length(), name.length() - ".dat".length())));
+            ids.add(Integer.parseInt(name.substring(0, name.length() - ".dat".length())));
         }
         return ids;
     }
@@ -179,9 +241,11 @@ final class CaptureReadback {
         }).orElse(0L);
     }
 
-    /** The {@code map} high-water id in {@code <save>/data/idcounts.dat}, or empty if no idcounts file was written. */
+    /**
+     * The {@code map} high-water id in {@code <save>/data/minecraft/maps/last_id.dat}, or empty if none was written.
+     */
     static OptionalInt idCountsMax(Path saveRoot) {
-        Path file = saveRoot.resolve("data").resolve("idcounts.dat");
+        Path file = saveRoot.resolve("data").resolve("minecraft").resolve("maps").resolve("last_id.dat");
         if (!Files.isRegularFile(file)) {
             return OptionalInt.empty();
         }
@@ -189,19 +253,19 @@ final class CaptureReadback {
         return map == Integer.MIN_VALUE ? OptionalInt.empty() : OptionalInt.of(map);
     }
 
-    /** The parsed {@code <save>/advancements/<uuid>.json}; fails the run if absent. */
+    /** The parsed {@code <save>/players/advancements/<uuid>.json}; fails the run if absent. */
     static JsonObject advancementsJson(Path saveRoot, UUID uuid) {
-        return readJson(saveRoot.resolve("advancements").resolve(uuid + ".json"));
+        return readJson(saveRoot.resolve("players").resolve("advancements").resolve(uuid + ".json"));
     }
 
-    /** The parsed {@code <save>/stats/<uuid>.json}; fails the run if absent. */
+    /** The parsed {@code <save>/players/stats/<uuid>.json}; fails the run if absent. */
     static JsonObject statsJson(Path saveRoot, UUID uuid) {
-        return readJson(saveRoot.resolve("stats").resolve(uuid + ".json"));
+        return readJson(saveRoot.resolve("players").resolve("stats").resolve(uuid + ".json"));
     }
 
-    /** Whether a progress file exists under {@code <save>/<directory>/<uuid>.json} (for the config-off assertion). */
+    /** Whether a progress file exists under {@code <save>/players/<directory>/<uuid>.json} (config-off assertion). */
     static boolean progressFileExists(Path saveRoot, String directory, UUID uuid) {
-        return Files.isRegularFile(saveRoot.resolve(directory).resolve(uuid + ".json"));
+        return Files.isRegularFile(saveRoot.resolve("players").resolve(directory).resolve(uuid + ".json"));
     }
 
     private static JsonObject readJson(Path file) {

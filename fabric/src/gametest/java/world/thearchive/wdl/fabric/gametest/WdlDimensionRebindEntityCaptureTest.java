@@ -78,9 +78,10 @@ public class WdlDimensionRebindEntityCaptureTest implements FabricClientGameTest
             run.tick(45); // long enough for the overworld to capture the shared chunk's terrain as well
             Path saveRoot = run.stopAndAwaitSave();
 
-            Optional<CompoundTag> nether = CaptureReadback.readEntityChunkIn(saveRoot, "DIM-1", SHARED_CHUNK);
+            Optional<CompoundTag> nether = CaptureReadback.readEntityChunkIn(saveRoot, "minecraft", "the_nether",
+                    SHARED_CHUNK);
             Check.that(nether.isPresent(), "the nether's entity chunk " + SHARED_CHUNK + " is missing from "
-                    + saveRoot.resolve("DIM-1").resolve("entities")
+                    + CaptureReadback.dimensionDir(saveRoot, "minecraft", "the_nether").resolve("entities")
                     + ": nothing the player left behind in the nether was written under it");
             Check.that(hasArmorStand(nether.get()), "the armor stand standing beside the player when they left "
                     + "the nether is absent from the nether's entities region: " + ids(nether.get()));

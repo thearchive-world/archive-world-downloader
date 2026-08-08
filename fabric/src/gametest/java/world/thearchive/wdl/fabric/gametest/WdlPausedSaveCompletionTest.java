@@ -38,8 +38,9 @@ public class WdlPausedSaveCompletionTest implements FabricClientGameTest {
         CaptureDriver driver = CaptureDriver.start(context, target, WdlConfig.DEFAULTS);
         driver.tick(40); // record real chunks so finish() takes the async writer path, not an inline outcome
         Path saveRoot = driver.stopAndAwaitSaveWithoutTick();
-        Check.that(Files.isDirectory(saveRoot.resolve("region")),
-                "the paused-save capture did not write a region folder at " + saveRoot);
+        Check.that(Files.isDirectory(CaptureReadback.overworldRegionDir(saveRoot)),
+                "the paused-save capture did not write a region folder at "
+                        + CaptureReadback.overworldRegionDir(saveRoot));
         assertPokeRanOnTheClientThread(context, driver, "the async save completion poke");
     }
 
@@ -52,9 +53,9 @@ public class WdlPausedSaveCompletionTest implements FabricClientGameTest {
         DownloadTarget target = new DownloadTarget("wdl-paused-nothing", "wdl-paused-nothing", DownloadMode.NEW);
         CaptureDriver driver = CaptureDriver.start(context, target, WdlConfig.DEFAULTS);
         Path saveRoot = driver.stopAndAwaitSaveWithoutTick();
-        Check.that(!Files.isDirectory(saveRoot.resolve("region")),
+        Check.that(!Files.isDirectory(CaptureReadback.overworldRegionDir(saveRoot)),
                 "the zero-tick capture wrote a region folder, so it took the writer path instead of the "
-                        + "nothing-captured finish this case covers: " + saveRoot);
+                        + "nothing-captured finish this case covers: " + CaptureReadback.overworldRegionDir(saveRoot));
         assertPokeRanOnTheClientThread(context, driver, "the nothing-captured completion poke");
     }
 

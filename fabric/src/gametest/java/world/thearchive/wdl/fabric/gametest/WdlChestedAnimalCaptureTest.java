@@ -146,8 +146,8 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
         run.tick(5);
         Path saveRoot = run.stopAndAwaitSave();
 
-        List<String> mountItems = CaptureReadback.itemIds(CaptureReadback.levelData(saveRoot)
-                .getCompoundOrEmpty("Player").getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity"));
+        List<String> mountItems = CaptureReadback.itemIds(CaptureReadback.capturedPlayer(saveRoot)
+                .getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity"));
         Check.that(mountItems.contains("minecraft:diamond"),
                 "the ridden donkey's chest is absent from the saved RootVehicle: " + mountItems);
     }

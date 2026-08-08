@@ -23,9 +23,9 @@ import world.thearchive.wdl.core.WdlConfig;
 /**
  * A server world whose level KEY is non-standard is laid out under the folder its vanilla dimension TYPE owns. This is
  * the supported shape the by-type routing exists for: the capture derives its save target from the dimension type, so a
- * world the server calls {@code wdltest:second_overworld} writes to {@code region/} and a singleplayer open finds its
- * terrain, rather than to a {@code dimensions/wdltest/second_overworld/} folder vanilla would only read back with the
- * same datapack installed.
+ * world the server calls {@code wdltest:second_overworld} writes to the overworld type's folder
+ * ({@code dimensions/minecraft/overworld/} at 26.x) and a singleplayer open finds its terrain, rather than to a
+ * {@code dimensions/wdltest/second_overworld/} folder vanilla would only read back with the same datapack installed.
  *
  * <p>No headless fixture can reach it. Every vanilla dimension answers its level key and its type-routed key with the
  * same string ({@code Level.NETHER} IS {@code minecraft:the_nether}), so only a world whose key differs from its type
@@ -86,30 +86,33 @@ public class WdlCustomLevelKeyRoutingTest implements FabricClientGameTest {
     }
 
     /**
-     * The chunk the player stood in is under {@code <save>/region}, and no {@code dimensions/} folder exists. The two
-     * halves are one assertion: deriving the target from the level key instead of the type sends that chunk to
+     * The chunk the player stood in is under the overworld type's folder ({@code dimensions/minecraft/overworld/region}
+     * at 26.x), and no key-routed {@code dimensions/wdltest/second_overworld/} folder exists. The two halves are one
+     * assertion: deriving the target from the level key instead of the type sends that chunk to
      * {@code dimensions/wdltest/second_overworld/region}, which empties the first half and creates the folder the
      * second half forbids. Reading the chunk back is also the positive control, without which the folder check passes
      * for a download that captured nothing at all.
      */
     private static void assertRoutedByType(Path saveRoot, String which) {
         Check.that(CaptureReadback.readChunk(saveRoot, ChunkPos.containing(STAND)).isPresent(),
-                "no chunk of " + which + " reached " + saveRoot.resolve("region")
+                "no chunk of " + which + " reached " + CaptureReadback.overworldRegionDir(saveRoot)
                         + ", so its terrain was not laid out under the folder its dimension type owns");
-        Path nested = saveRoot.resolve("dimensions");
-        Check.that(!Files.exists(nested),
-                which + " was laid out by its level key rather than its dimension type: " + nested);
+        Path keyRouted = saveRoot.resolve("dimensions").resolve("wdltest").resolve("second_overworld");
+        Check.that(!Files.exists(keyRouted),
+                which + " was laid out by its level key rather than its dimension type: " + keyRouted);
     }
 
     /**
-     * The stand the custom-key world holds is in {@code <save>/entities}, the folder its dimension TYPE owns. Absent
-     * means the entity axis lost the world's identity: its held frame carries the server's own level key while the
-     * drain looked for another, so no pass ever matched it and the finish counted it unwritten.
+     * The stand the custom-key world holds is in the overworld type's entities folder
+     * ({@code dimensions/minecraft/overworld/entities} at 26.x), the folder its dimension TYPE owns. Absent means the
+     * entity axis lost the world's identity: its held frame carries the server's own level key while the drain looked
+     * for another, so no pass ever matched it and the finish counted it unwritten.
      */
     private static void assertStandRoutedByType(Path saveRoot) {
         Optional<CompoundTag> entityChunk = CaptureReadback.readEntityChunk(saveRoot, ChunkPos.containing(STAND));
         Check.that(entityChunk.isPresent(), "no entity chunk of the custom-key world reached "
-                + saveRoot.resolve("entities") + ", so nothing it held was written under its dimension type");
+                + CaptureReadback.dimensionDir(saveRoot, "minecraft", "overworld").resolve("entities")
+                + ", so nothing it held was written under its dimension type");
         List<String> ids = CaptureReadback.entities(entityChunk.get()).stream()
                 .map(entity -> entity.getString("id").orElse("?"))
                 .toList();
