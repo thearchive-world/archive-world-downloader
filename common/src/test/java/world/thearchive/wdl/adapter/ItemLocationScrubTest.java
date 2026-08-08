@@ -382,6 +382,38 @@ class ItemLocationScrubTest {
     }
 
     @Test
+    void scrubEntityBlanksPre1215HandAndArmorItems() {
+        // 1.21.4-shape mob equipment: HandItems/ArmorItems ListTags of item NBT (empty slots are {}), the
+        // pre-1.21.5 home, before equipment moved to the slot-map "equipment" compound. The generic
+        // name-agnostic ListTag walk must reach them, or a captured 1.21.4 mob's held lodestone leaks its target.
+        CompoundTag zombie = entity("minecraft:zombie");
+        ListTag handItems = new ListTag();
+        handItems.add(itemNbt(lodestoneCompass())); // mainhand
+        handItems.add(itemNbt(shulkerHoldingLodestone())); // offhand: nested lodestone must also be reached
+        zombie.put("HandItems", handItems);
+        ListTag armorItems = new ListTag();
+        armorItems.add(new CompoundTag()); // feet, empty as vanilla writes empty slots
+        armorItems.add(new CompoundTag()); // legs
+        armorItems.add(new CompoundTag()); // chest
+        armorItems.add(itemNbt(lodestoneCompass())); // head slot holding a lodestone compass
+        zombie.put("ArmorItems", armorItems);
+        assertTrue(targetOf(itemFrom(handItems.get(0))).isPresent(), "precondition: the mainhand compass has a target");
+        assertTrue(targetOf(itemFrom(armorItems.get(3))).isPresent(), "precondition: the armor compass has a target");
+
+        ItemLocationScrub.scrubEntity(zombie);
+
+        assertTrue(targetOf(itemFrom(((ListTag) zombie.get("HandItems")).get(0))).isEmpty(),
+                "a lodestone in a pre-1.21.5 HandItems mainhand slot is blanked");
+        ItemContainerContents offhandShulker = itemFrom(((ListTag) zombie.get("HandItems")).get(1))
+                .get(DataComponents.CONTAINER);
+        assertNotNull(offhandShulker, "the offhand shulker keeps its container component");
+        assertTrue(targetOf(offhandShulker.nonEmptyStream().toList().get(0)).isEmpty(),
+                "a lodestone nested in a shulker in a pre-1.21.5 HandItems slot is blanked");
+        assertTrue(targetOf(itemFrom(((ListTag) zombie.get("ArmorItems")).get(3))).isEmpty(),
+                "a lodestone in a pre-1.21.5 ArmorItems slot is blanked");
+    }
+
+    @Test
     void scrubEntityBlanksBeehiveHeldByAnEntity() {
         CompoundTag frame = entity("minecraft:item_frame");
         frame.put("Item", itemNbt(beehiveWithBeeFlowerPos()));
