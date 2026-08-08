@@ -101,10 +101,11 @@ public final class WdlOutlineRenderer {
      */
     public static void render(PoseStack pose, MultiBufferSource consumers, @Nullable Frustum frustum,
             RimRenderer rimRenderer) {
-        float lineWidth = Wdl.config().outline().lineWidthScale()
-                * Minecraft.getInstance().getWindow().getAppropriateLineWidth();
+        // getAppropriateLineWidth and per-vertex line width do not exist below 1.21.5, so the line-width scale is a
+        // no-op at this band: lines draw at the fixed GL width regardless of the shipped knob.
+        float lineWidth = (float) Wdl.config().outline().lineWidthScale();
         OutlineRenderContext context = new OutlineRenderContext(pose, consumers, frustum,
-                Minecraft.getInstance().gameRenderer.getMainCamera().position(), lineWidth);
+                Minecraft.getInstance().gameRenderer.getMainCamera().getPosition(), lineWidth);
         render(context, Wdl.outlineDrawSet(), rimRenderer);
     }
 

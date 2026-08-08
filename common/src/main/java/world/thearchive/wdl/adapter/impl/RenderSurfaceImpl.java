@@ -8,9 +8,9 @@ import java.util.Optional;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.FaviconTexture;
-import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import world.thearchive.wdl.adapter.RenderSurface;
 
@@ -54,24 +54,24 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void blitSprite(String sprite, int x, int y, int width, int height, int color) {
-        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.fromNamespaceAndPath("wdl", sprite),
+        graphics.blitSprite(RenderType::guiTextured, ResourceLocation.fromNamespaceAndPath("wdl", sprite),
                 x, y, width, height, color);
     }
 
     @Override
     public void blitFavicon(FaviconTexture icon, int x, int y, int size) {
-        graphics.blit(RenderPipelines.GUI_TEXTURED, icon.textureLocation(), x, y, 0.0F, 0.0F,
+        graphics.blit(RenderType::guiTextured, icon.textureLocation(), x, y, 0.0F, 0.0F,
                 size, size, size, size);
     }
 
     @Override
     public void tooltip(Font font, Component content, int wrapWidth, int mouseX, int mouseY) {
-        graphics.setTooltipForNextFrame(font, font.split(content, wrapWidth), mouseX, mouseY);
+        graphics.renderTooltip(font, font.split(content, wrapWidth), mouseX, mouseY);
     }
 
     @Override
     public void tooltip(Font font, List<Component> lines, int mouseX, int mouseY) {
-        graphics.setTooltipForNextFrame(font, lines, Optional.empty(), mouseX, mouseY);
+        graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
     }
 
     @Override

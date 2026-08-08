@@ -85,7 +85,7 @@ final class NbtMerge {
      * not read as a distinct slot from the same number written as a byte.
      */
     private static int slotOf(CompoundTag entry) {
-        return entry.get("Slot") instanceof NumericTag slot ? slot.byteValue() & 0xFF : 0;
+        return entry.get("Slot") instanceof NumericTag slot ? slot.getAsByte() & 0xFF : 0;
     }
 
     /**

@@ -28,7 +28,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.TreeSet;
@@ -67,7 +66,7 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.animal.equine.AbstractChestedHorse;
+import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -857,7 +856,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         this.saveName = target.folderName();
         this.level = level;
         this.targetDimension = targetDimension;
-        this.liveDimensionId = liveDimension.identifier().toString();
+        this.liveDimensionId = liveDimension.location().toString();
         this.registries = registries;
         registerDimensionScopedStores();
         dimensionRebind.bind(targetDimension);
@@ -1130,7 +1129,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     // The start-window (and every re-arm's) one-shot seed sweep: window-suppressed primes
                     // registered without sampling; replay the book against the current player position.
                     // Ids gone from the live level are Respawn-race orphans and never sample.
-                    String dimensionId = level().dimension().identifier().toString();
+                    String dimensionId = level().dimension().location().toString();
                     int boundBlocks = capChunks * 16;
                     boolean aborted = false;
                     for (int id : sampler.sweepIds()) {
@@ -1218,7 +1217,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * read hides by mirroring the saved set until the range is measured.
      */
     private void recordCoveredDisc(ChunkPos hotCenter, int capChunks) {
-        String dimensionId = level().dimension().identifier().toString();
+        String dimensionId = level().dimension().location().toString();
         int radius = sendRange.radiusChunks(dimensionId, capChunks);
         if (radius != lastCoveredRadius) {
             coveredIndex.recompute(dimensionId, radius); // the range changed: rebuild covered over the whole trail
@@ -1286,7 +1285,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     void rebindDimension(ResourceKey<Level> newTarget, ResourceKey<Level> liveDimension) {
         dimensionRebind.rebind(newTarget);
         this.targetDimension = newTarget;
-        this.liveDimensionId = liveDimension.identifier().toString();
+        this.liveDimensionId = liveDimension.location().toString();
     }
 
     /**
@@ -1372,7 +1371,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // The live client dimension id: on a Multiverse/Paper server this is the server's custom id
         // (e.g. minecraft:worlds/2b2t/2b2t_1), which is what the overlay providers query the overlay under, so
         // the overlay index keys by this rather than the vanilla-mapped disk key. Same for every chunk this call.
-        String overlayDimension = level().dimension().identifier().toString();
+        String overlayDimension = level().dimension().location().toString();
 
         // Nearest-to-player first (by Chebyshev ring), so when the encode budget spills the square across ticks
         // the visible area fills first and the lag never concentrates on one side.
@@ -1534,6 +1533,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
      *
      * <p>Package-private so the loss its own catch counts stays testable.
      */
+    /** The client entity with this uuid, or null when none is loaded. The client has no by-uuid index at this band. */
+    private @Nullable Entity entityByUuid(UUID uuid) {
+        for (Entity entity : level().entitiesForRendering()) {
+            if (entity.getUUID().equals(uuid)) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
     void retryRefusedPrimes() {
         EntityPacketCapture capture = this.packetCapture;
         if (capture == null) {
@@ -1543,7 +1552,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // Per entity, matching the encode's own isolation: a modded shouldBeSaved can throw, and one that does
             // must not cost every refusal behind it in the iteration.
             try {
-                Entity entity = level().getEntity(uuid);
+                Entity entity = entityByUuid(uuid);
                 if (entity == null || !entity.shouldBeSaved() || capture.tracks(entity.getId())
                         || savedEntities.contains(uuid)) {
                     // Asked again here: one prime pass can reach a passenger before the vehicle whose tag nests it.
@@ -2039,7 +2048,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 atBlock = true;
                 atRightHalf = state.getValue(ChestBlock.TYPE) == ChestType.RIGHT; // the only left/right line
                 targetPosKey = target.asLong();
-                BlockPos partner = ChestBlock.getConnectedBlockPos(target, state);
+                BlockPos partner = target.relative(ChestBlock.getConnectedDirection(state));
                 partnerPosKey = partner.asLong();
                 menuSlotCount = ContainerCapture.countBlockSlots(menu, player); // 54 for a real double open
                 combinedContainerSize = targetHalf.getContainerSize(); // 27
@@ -2832,7 +2841,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         try {
             // The sink returns a merged copy and sets only "Items", so a node that lives inside the record takes
             // that one list back rather than replacing itself.
-            entityTag.put("Items", adapter.containerSink().merge(entityTag, holder).getListOrEmpty("Items"));
+            entityTag.put("Items", adapter.containerSink().merge(entityTag, holder).getList("Items", Tag.TAG_COMPOUND));
             if (!fromRetention) {
                 mergedEntityContainers++; // a retained holder was already counted at the write it came from
             }
@@ -2866,7 +2875,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (archive != null) {
             archive.remap(raw, "Inventory");
             if (raw.get("equipment") instanceof CompoundTag equipment) {
-                for (String slot : equipment.keySet()) {
+                for (String slot : equipment.getAllKeys()) {
                     if (equipment.get(slot) instanceof CompoundTag item) {
                         archive.remapItem(item);
                     }
@@ -2970,7 +2979,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private static int currentDataVersion() {
         CompoundTag probe = new CompoundTag();
         NbtUtils.addCurrentDataVersion(probe);
-        return probe.getIntOr("DataVersion", 0);
+        return probe.getInt("DataVersion");
     }
 
     /**
@@ -3093,17 +3102,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * {@code "Pos"} is missing or malformed.
      */
     private @Nullable ChunkPos mountEntityChunk(CompoundTag entity) {
-        ListTag pos = entity.getList("Pos").orElse(null);
-        if (pos == null) {
+        ListTag pos = entity.getList("Pos", Tag.TAG_DOUBLE);
+        if (pos.size() < 3) {
             return null;
         }
-        Optional<Double> x = pos.getDouble(0);
-        Optional<Double> y = pos.getDouble(1);
-        Optional<Double> z = pos.getDouble(2);
-        if (x.isEmpty() || y.isEmpty() || z.isEmpty()) {
-            return null;
-        }
-        return new ChunkPos(new BlockPos(Mth.floor(x.get()), Mth.floor(y.get()), Mth.floor(z.get())));
+        double x = pos.getDouble(0);
+        double y = pos.getDouble(1);
+        double z = pos.getDouble(2);
+        return new ChunkPos(new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z)));
     }
 
     /**
@@ -3132,7 +3138,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (file == null || !Files.exists(file)) {
             return null;
         }
-        CompoundTag root = NbtIo.readCompressed(file, NbtAccounter.uncompressedQuota());
+        CompoundTag root = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap());
         return root.get("Data") instanceof CompoundTag data ? data : null;
     }
 
@@ -3172,7 +3178,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         try {
             CompoundTag data = readPriorData();
             if (data != null) {
-                return data.getString("LevelName").orElse(null);
+                return data.contains("LevelName") ? data.getString("LevelName") : null;
             }
         } catch (IOException | RuntimeException e) {
             // The level.dat is present but unreadable, so the resume cannot preserve the world's name and falls
@@ -3601,7 +3607,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (!overlayActive || target.mode() != DownloadMode.RESUME || paths == null) {
             return;
         }
-        String dimensionId = level().dimension().identifier().toString();
+        String dimensionId = level().dimension().location().toString();
         if (!overlaySeededDimensions.add(dimensionId)) {
             return;
         }
@@ -4219,7 +4225,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             for (int riderId : promoted.frame().passengers()) {
                 Entity rider = byId.get(riderId);
                 if (rider != null) {
-                    rider.startRiding(promoted.entity(), true, false); // the vehicle's save then nests the rider
+                    rider.startRiding(promoted.entity(), true); // the vehicle's save then nests the rider
                 }
             }
             if (promoted.frame().leashHolderId() != 0 && promoted.entity() instanceof Leashable leashable) {
@@ -4273,7 +4279,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         entity.recreateFromPacket(frame.spawn());
         EntityPos pos = frame.pos();
-        entity.snapTo(pos.x(), pos.y(), pos.z(), pos.yRot(), pos.xRot());
+        entity.moveTo(pos.x(), pos.y(), pos.z(), pos.yRot(), pos.xRot());
         List<SynchedEntityData.DataValue<?>> synced = frame.synced();
         if (!synced.isEmpty()) {
             entity.getEntityData().assignValues(synced);
@@ -4481,7 +4487,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             brand = player.connection.serverBrand();
         }
         return new ReportEnvironment(brand, level().getServerSimulationDistance(),
-                targetDimension.identifier().toString(), Wdl.mcVersion(), bridge.modVersion());
+                targetDimension.location().toString(), Wdl.mcVersion(), bridge.modVersion());
     }
 
     /** Read the few MC-side identity facts (downloader, source, loader) into the MC-free report identity. */
@@ -4490,8 +4496,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         String downloaderUuid = "";
         LocalPlayer player = minecraft.player;
         if (player != null) {
-            downloaderName = player.getGameProfile().name();
-            downloaderUuid = player.getGameProfile().id().toString();
+            downloaderName = player.getGameProfile().getName();
+            downloaderUuid = player.getGameProfile().getId().toString();
         }
         String address = "";
         String sourceName = "";
@@ -4530,7 +4536,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         int chunkTotal = 0;
         for (Map.Entry<ResourceKey<Level>, LongOpenHashSet> dimension : capturedByDimension.entrySet()) {
             int chunks = dimension.getValue().size();
-            dimensions.add(new DimensionChunks(dimension.getKey().identifier().toString(), chunks));
+            dimensions.add(new DimensionChunks(dimension.getKey().location().toString(), chunks));
             chunkTotal += chunks;
         }
         this.pendingReport = new PendingReport(root, identity, environment,

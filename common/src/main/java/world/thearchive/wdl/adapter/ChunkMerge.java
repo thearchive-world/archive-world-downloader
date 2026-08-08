@@ -170,7 +170,7 @@ final class ChunkMerge {
                 || !(blockEntity.get("z") instanceof IntTag z)) {
             return OptionalLong.empty();
         }
-        return OptionalLong.of(BlockPos.asLong(x.intValue(), y.intValue(), z.intValue()));
+        return OptionalLong.of(BlockPos.asLong(x.getAsInt(), y.getAsInt(), z.getAsInt()));
     }
 
     /** The occupancy mask recorded for {@code pos}, or every slot when none was recorded. */

@@ -151,13 +151,13 @@ final class ChunkFlushPlan {
             // Filter on the saved id before resolving a block state: that resolve walks the snapshot's sections
             // to find the one covering the position, so doing it for every block entity of every flushed chunk
             // would put a scan per block entity on the main thread to answer a question only a bookshelf asks.
-            if (!ChunkMerge.CHISELED_BOOKSHELF_ID.equals(blockEntity.getStringOr("id", ""))
+            if (!ChunkMerge.CHISELED_BOOKSHELF_ID.equals(blockEntity.getString("id"))
                     || !(blockEntity.get("x") instanceof IntTag x)
                     || !(blockEntity.get("y") instanceof IntTag y)
                     || !(blockEntity.get("z") instanceof IntTag z)) {
                 continue;
             }
-            BlockPos pos = new BlockPos(x.intValue(), y.intValue(), z.intValue());
+            BlockPos pos = new BlockPos(x.getAsInt(), y.getAsInt(), z.getAsInt());
             BlockState state = InteractionCapture.blockStateAt(snapshot, pos);
             if (state != null && state.getBlock() instanceof ChiseledBookShelfBlock) {
                 occupancy.put(pos.asLong(), BookshelfSlots.occupiedSlotMask(state));

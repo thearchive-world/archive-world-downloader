@@ -23,6 +23,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.ChatFormatting;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -38,12 +39,9 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.minecraft.util.Util;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
@@ -706,7 +704,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        public void onClick(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
+        public void onClick(double mouseX, double mouseY) {
             toggleCollapsed();
         }
 
@@ -731,7 +729,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        public void onClick(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
+        public void onClick(double mouseX, double mouseY) {
             Util.getPlatform().openPath(savesDirectory);
         }
 
@@ -786,7 +784,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        public void onClick(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
+        public void onClick(double mouseX, double mouseY) {
             Util.getPlatform().openUri(this.url);
         }
 
@@ -814,7 +812,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        public void onClick(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
+        public void onClick(double mouseX, double mouseY) {
             Wdl.updateCheck().dismissBanner();
             rebuildWidgets();
         }
@@ -942,14 +940,14 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        public boolean keyPressed(KeyEvent keyEvent) {
-            if (keyEvent.key() == GLFW.GLFW_KEY_ENTER || keyEvent.key() == GLFW.GLFW_KEY_KP_ENTER) {
+        public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
                 if (primaryButton != null && primaryButton.active) {
                     onPrimary();
                     return true;
                 }
             }
-            return super.keyPressed(keyEvent);
+            return super.keyPressed(keyCode, scanCode, modifiers);
         }
     }
 
@@ -973,16 +971,16 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
+        public boolean mouseClicked(double mouseX, double mouseY, int button) {
             // An arrow / Recover click highlights the row like a body click, but does not prefill the field.
-            Row row = getEntryAtPosition(mouseButtonEvent.x(), mouseButtonEvent.y());
-            if (row != null && row.handleEdgeClick((int) mouseButtonEvent.x(), (int) mouseButtonEvent.y())) {
+            Row row = getEntryAtPosition(mouseX, mouseY);
+            if (row != null && row.handleEdgeClick((int) mouseX, (int) mouseY)) {
                 this.suppressPrefill = true;
                 setSelected(row);
                 this.suppressPrefill = false;
                 return true;
             }
-            return super.mouseClicked(mouseButtonEvent, doubleClick);
+            return super.mouseClicked(mouseX, mouseY, button);
         }
 
         @Override
@@ -1014,6 +1012,10 @@ public final class WdlDownloadsScreen extends Screen {
             private int recoverRight = -1;
             private int restoreLeft = -1;
             private int restoreRight = -1;
+            private int contentX;
+            private int contentY;
+            private int contentWidth;
+            private boolean iconClosed;
 
             Row(DownloadEntry entry) {
                 this.entry = entry;
@@ -1040,7 +1042,27 @@ public final class WdlDownloadsScreen extends Screen {
             }
 
             @Override
-            public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
+            public void render(GuiGraphics guiGraphics, int index, int top, int left, int width, int height,
+                    int mouseX, int mouseY, boolean hovering, float partialTick) {
+                this.contentX = left;
+                this.contentY = top;
+                this.contentWidth = width;
+                renderContent(guiGraphics, mouseX, mouseY, hovering, partialTick);
+            }
+
+            private int getContentX() {
+                return contentX;
+            }
+
+            private int getContentY() {
+                return contentY;
+            }
+
+            private int getContentWidth() {
+                return contentWidth;
+            }
+
+            private void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
                     float partialTick) {
                 RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
                 // Probe or walk only visible rows, on disjoint domains: a tainted row is availability-probed
@@ -1294,8 +1316,9 @@ public final class WdlDownloadsScreen extends Screen {
             void close() {
                 // removed() closes the icons when a confirm screen is pushed on top, then init() closes them again
                 // on the way back; FaviconTexture.close throws if already closed, so skip a second close.
-                if (this.icon != null && !this.icon.isClosed()) {
+                if (this.icon != null && !this.iconClosed) {
                     this.icon.close();
+                    this.iconClosed = true;
                 }
             }
 

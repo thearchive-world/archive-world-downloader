@@ -7,8 +7,7 @@
  * {@code gradle.properties}; this branch targets 1.21.4). The package is role-named, not version-named, because a
  * branch only ever carries one plug, so the band it serves is recorded here rather than in the path.
  *
- * <p>This plug serves the pre-1.21.5 save shape (floor {@link VersionAdapterImpl#BAND_FLOOR}, validated at
- * 1.21.4).
+ * <p>This plug serves the pre-1.21.5 save shape (floor {@link VersionAdapterImpl#BAND_FLOOR}, validated at 1.21.4).
  */
 @NullMarked
 package world.thearchive.wdl.adapter.impl;

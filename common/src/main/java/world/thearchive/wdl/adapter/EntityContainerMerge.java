@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import org.slf4j.Logger;
 
 /**
@@ -119,6 +120,6 @@ final class EntityContainerMerge {
     }
 
     private static void foldItems(ContainerSink sink, CompoundTag entityTag, CompoundTag holder) {
-        entityTag.put("Items", sink.merge(entityTag, holder).getListOrEmpty("Items"));
+        entityTag.put("Items", sink.merge(entityTag, holder).getList("Items", Tag.TAG_COMPOUND));
     }
 }

@@ -119,7 +119,7 @@ final class ContainerMerge {
      */
     private static CompoundTag mergeHolderFields(CompoundTag blockEntityTag, CompoundTag holder) {
         CompoundTag merged = blockEntityTag.copy();
-        for (String key : holder.keySet()) {
+        for (String key : holder.getAllKeys()) {
             Tag value = holder.get(key);
             if (value != null) {
                 merged.put(key, value);

@@ -67,7 +67,7 @@ final class ItemLocationScrub {
      * coordinates, its type id) are a no-op. Works for every block-entity type without a per-type key list.
      */
     public static void scrubBlockEntity(CompoundTag blockEntity) {
-        for (String key : blockEntity.keySet()) {
+        for (String key : blockEntity.getAllKeys()) {
             Tag value = blockEntity.get(key);
             if (value instanceof ListTag list) {
                 ItemTreeWalk.walkList(list, ItemLocationScrub::scrubComponents);
@@ -86,7 +86,7 @@ final class ItemLocationScrub {
      * Works only on already-serialized entity NBT.
      */
     public static void scrubEntity(CompoundTag entity) {
-        for (String key : entity.keySet()) {
+        for (String key : entity.getAllKeys()) {
             Tag value = entity.get(key);
             if (value instanceof ListTag list) {
                 ItemTreeWalk.walkList(list, ItemLocationScrub::scrubComponents);
@@ -95,7 +95,7 @@ final class ItemLocationScrub {
             }
         }
         if (entity.get(EQUIPMENT) instanceof CompoundTag equipment) {
-            for (String slot : equipment.keySet()) {
+            for (String slot : equipment.getAllKeys()) {
                 if (equipment.get(slot) instanceof CompoundTag item) {
                     ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubComponents);
                 }

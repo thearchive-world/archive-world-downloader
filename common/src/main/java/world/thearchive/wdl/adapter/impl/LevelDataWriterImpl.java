@@ -33,6 +33,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
@@ -41,8 +42,6 @@ import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.dimension.LevelStem;
-import net.minecraft.world.level.gamerules.GameRule;
-import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.levelgen.FlatLevelSource;
 import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
@@ -50,7 +49,6 @@ import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
-import net.minecraft.world.level.storage.LevelData.RespawnData;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.jspecify.annotations.Nullable;
@@ -65,7 +63,7 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.21.11 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
+ * 1.21.4 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
  * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
  * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
  * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
@@ -85,8 +83,9 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /**
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Fire is the integer fire_spread_radius_around_player=0 here; the rest are booleans. The user's gamerule.*
-     * overrides, keyed by band id, are validated and applied on top of this (see {@link WorldOutputConfig}).
+     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.21.4 id and carries no spec.
+     * The user's gamerule.* overrides, keyed by band id, are validated and applied on top of this (see
+     * {@link WorldOutputConfig}).
      */
     private static final List<CuratedSpec> CURATED_GAME_RULES = buildCuratedGameRules();
 
@@ -153,7 +152,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
      * the resolution.
      */
     private static GameRuleResolution applyGameRules(GameRules gameRules, WorldOutputConfig worldOutput) {
-        Map<String, GameRule<?>> available = availableRulesById(gameRules);
+        Map<String, GameRules.Value<?>> available = availableRulesById(gameRules);
         GameRuleSchema schema = new GameRuleSchema() {
             @Override
             public boolean hasRule(String id) {
@@ -162,15 +161,15 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
             @Override
             public boolean acceptsValue(String id, String rawValue) {
-                GameRule<?> rule = available.get(id);
-                return rule != null && rule.deserialize(rawValue).result().isPresent();
+                GameRules.Value<?> rule = available.get(id);
+                return rule != null && valueParses(rule, rawValue);
             }
         };
         GameRuleResolution resolution = worldOutput.resolveGameRules(curatedByBandId(), schema);
         for (Map.Entry<String, String> rule : resolution.effective().entrySet()) {
-            GameRule<?> gameRule = available.get(rule.getKey());
-            if (gameRule != null) {
-                setRule(gameRules, gameRule, rule.getValue());
+            GameRules.Value<?> value = available.get(rule.getKey());
+            if (value != null) {
+                setRule(value, rule.getValue());
             }
         }
         for (String id : resolution.droppedInvalidValues()) {
@@ -191,56 +190,75 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return byBandId;
     }
 
-    /** Set one validated rule on the offline GameRules (no server, so the change-callback is skipped). */
-    private static <T> void setRule(GameRules gameRules, GameRule<T> rule, String rawValue) {
-        rule.deserialize(rawValue).result().ifPresent(value -> gameRules.set(rule, value, null));
+    /** Whether the raw string is a valid value for this rule: true or false for a boolean, an int for an integer. */
+    private static boolean valueParses(GameRules.Value<?> rule, String rawValue) {
+        if (rule instanceof GameRules.BooleanValue) {
+            return "true".equals(rawValue) || "false".equals(rawValue);
+        }
+        if (rule instanceof GameRules.IntegerValue) {
+            try {
+                Integer.parseInt(rawValue);
+                return true;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /** Set one validated rule on its offline GameRules value (no server, so the change-callback is skipped). */
+    private static void setRule(GameRules.Value<?> rule, String rawValue) {
+        if (rule instanceof GameRules.BooleanValue booleanValue) {
+            booleanValue.set(Boolean.parseBoolean(rawValue), null);
+        } else if (rule instanceof GameRules.IntegerValue integerValue) {
+            integerValue.tryDeserialize(rawValue);
+        }
     }
 
     /** Index the rules available at this band (feature-filtered) by their short id, for lookup and validation. */
-    private static Map<String, GameRule<?>> availableRulesById(GameRules gameRules) {
-        Map<String, GameRule<?>> byId = new HashMap<>();
-        gameRules.availableRules().forEach(rule -> byId.put(rule.id(), rule));
+    private static Map<String, GameRules.Value<?>> availableRulesById(GameRules gameRules) {
+        Map<String, GameRules.Value<?>> byId = new HashMap<>();
+        gameRules.visitGameRuleTypes(new GameRules.GameRuleTypeVisitor() {
+            @Override
+            public <T extends GameRules.Value<T>> void visit(GameRules.Key<T> key, GameRules.Type<T> type) {
+                byId.put(key.getId(), gameRules.getRule(key));
+            }
+        });
         return byId;
     }
 
     @Override
     public List<CuratedGameRule> curatedGameRules() {
-        Map<String, GameRule<?>> byId = availableRulesById(new GameRules(FeatureFlags.DEFAULT_FLAGS));
+        Map<String, GameRules.Value<?>> byId = availableRulesById(new GameRules(FeatureFlags.DEFAULT_FLAGS));
         List<CuratedGameRule> rules = new ArrayList<>();
         for (CuratedSpec spec : CURATED_GAME_RULES) {
-            GameRule<?> rule = byId.get(spec.bandId());
+            GameRules.Value<?> rule = byId.get(spec.bandId());
             if (rule == null) {
                 continue; // a curated rule with no rule at this band is omitted, and the menu skips its order slot
             }
-            if (rule.valueClass() == Boolean.class) {
+            if (rule instanceof GameRules.BooleanValue) {
                 rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(), "true", "false"));
             } else {
-                rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(),
-                        defaultRuleValue(rule), "0"));
+                // An integer rule's enabled position is its band default (serialized), and disabled is 0.
+                rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(), rule.serialize(), "0"));
             }
         }
         return Collections.unmodifiableList(rules);
     }
 
-    /** The rule's band default rendered to its raw string, for an integer rule's enabled (on) toggle position. */
-    private static <T> String defaultRuleValue(GameRule<T> rule) {
-        return rule.serialize(rule.defaultValue());
-    }
-
-    // At this band the WDL name and the band's rule id coincide; a band whose vanilla ids differ maps them here, and
-    // drops a WDL rule with no band equivalent by omitting its spec.
+    // The WDL names are dev's band-neutral keys; each maps to its 1.21.4 vanilla rule id here, and the newer bands'
+    // fire rule is dropped by omitting its spec, since 1.21.4 has no equivalent.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
-        curated.add(new CuratedSpec("spawn_mobs", "spawn_mobs", "false"));
-        curated.add(new CuratedSpec("fire_spread_radius_around_player", "fire_spread_radius_around_player", "0"));
-        curated.add(new CuratedSpec("spread_vines", "spread_vines", "false"));
-        curated.add(new CuratedSpec("advance_time", "advance_time", "false"));
-        curated.add(new CuratedSpec("advance_weather", "advance_weather", "false"));
-        curated.add(new CuratedSpec("keep_inventory", "keep_inventory", "true"));
-        curated.add(new CuratedSpec("mob_griefing", "mob_griefing", "false"));
-        curated.add(new CuratedSpec("spawn_wardens", "spawn_wardens", "false"));
-        curated.add(new CuratedSpec("spawn_wandering_traders", "spawn_wandering_traders", "false"));
-        curated.add(new CuratedSpec("spawn_patrols", "spawn_patrols", "false"));
+        curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
+        curated.add(new CuratedSpec("spread_vines", "doVinesSpread", "false"));
+        curated.add(new CuratedSpec("advance_time", "doDaylightCycle", "false"));
+        curated.add(new CuratedSpec("advance_weather", "doWeatherCycle", "false"));
+        curated.add(new CuratedSpec("keep_inventory", "keepInventory", "true"));
+        curated.add(new CuratedSpec("mob_griefing", "mobGriefing", "false"));
+        curated.add(new CuratedSpec("spawn_wardens", "doWardenSpawning", "false"));
+        curated.add(new CuratedSpec("spawn_wandering_traders", "doTraderSpawning", "false"));
+        curated.add(new CuratedSpec("spawn_patrols", "doPatrolSpawning", "false"));
         return Collections.unmodifiableList(curated);
     }
 
@@ -256,7 +274,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
         PrimaryLevelData levelData = (PrimaryLevelData) data.worldData();
         levelData.setGameType(player.gameType());
-        levelData.setSpawn(RespawnData.of(player.dimension(), player.spawnPos(), player.yaw(), player.pitch()));
+        levelData.setSpawn(player.spawnPos(), player.yaw());
         levelData.setDifficulty(player.difficulty());
         // The 3-argument saveDataTag routes the captured tag into createTag's "Player" slot.
         access.saveDataTag(data.registries(), data.worldData(), player.playerTag());
@@ -268,7 +286,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
             return null;
         }
         try {
-            CompoundTag root = NbtIo.readCompressed(levelDatFile, NbtAccounter.uncompressedQuota());
+            CompoundTag root = NbtIo.readCompressed(levelDatFile, NbtAccounter.unlimitedHeap());
             return root.get("Data") instanceof CompoundTag data && data.get("Player") instanceof CompoundTag player
                     ? player
                     : null;

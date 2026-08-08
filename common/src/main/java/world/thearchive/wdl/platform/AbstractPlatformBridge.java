@@ -11,7 +11,6 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -136,10 +135,11 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             ChatCopy.Click click = argument.click();
             if (click != null) {
                 ClickEvent clickEvent = click.kind() == ChatCopy.Click.Kind.OPEN_URL
-                        ? new ClickEvent.OpenUrl(URI.create(click.target()))
-                        : new ClickEvent.OpenFile(click.target());
+                        ? new ClickEvent(ClickEvent.Action.OPEN_URL, click.target())
+                        : new ClickEvent(ClickEvent.Action.OPEN_FILE, click.target());
                 rendered = rendered.withStyle(style -> style.withClickEvent(clickEvent)
-                        .withHoverEvent(new HoverEvent.ShowText(Component.literal(click.target()))));
+                        .withHoverEvent(
+                                new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(click.target()))));
                 linkTargets.append(" <").append(click.target()).append('>');
             }
             renderedArguments[slot++] = rendered;

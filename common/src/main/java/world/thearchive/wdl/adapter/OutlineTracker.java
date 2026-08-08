@@ -19,7 +19,7 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.animal.equine.AbstractChestedHorse;
+import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.ChestBlock;
@@ -421,7 +421,7 @@ public final class OutlineTracker {
         if (!state.hasProperty(ChestBlock.TYPE) || state.getValue(ChestBlock.TYPE) == ChestType.SINGLE) {
             return null;
         }
-        BlockPos partner = ChestBlock.getConnectedBlockPos(pos, state);
+        BlockPos partner = pos.relative(ChestBlock.getConnectedDirection(state));
         return level.getBlockEntity(partner) instanceof ChestBlockEntity ? partner : null;
     }
 

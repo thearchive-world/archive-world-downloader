@@ -86,9 +86,9 @@ final class RecoveredScan {
             if (!(blockEntities.get(i) instanceof CompoundTag blockEntity) || !hasCoordinates(blockEntity)) {
                 continue;
             }
-            long pos = BlockPos.asLong(blockEntity.getIntOr("x", 0), blockEntity.getIntOr("y", 0),
-                    blockEntity.getIntOr("z", 0));
-            if (CHISELED_BOOKSHELF_ID.equals(blockEntity.getStringOr("id", ""))) {
+            long pos = BlockPos.asLong(blockEntity.getInt("x"), blockEntity.getInt("y"),
+                    blockEntity.getInt("z"));
+            if (CHISELED_BOOKSHELF_ID.equals(blockEntity.getString("id"))) {
                 int mask = bookshelfSavedSlotMask(blockEntity);
                 if (mask != 0 && bookshelves.put(pos, mask) != mask) {
                     grew = true;
@@ -148,7 +148,7 @@ final class RecoveredScan {
             if (items.get(i) instanceof CompoundTag entry) {
                 // 0xFF default, not 0: a malformed entry with no Slot must drop on the range check below, not
                 // phantom-mark slot 0. The range check also blocks a corrupt out-of-range Slot from 1 << 31.
-                int slot = entry.getByteOr("Slot", (byte) 0xFF) & 0xFF;
+                int slot = (entry.contains("Slot") ? entry.getByte("Slot") : (byte) 0xFF) & 0xFF;
                 if (slot < BOOKSHELF_SLOTS) {
                     mask |= 1 << slot;
                 }

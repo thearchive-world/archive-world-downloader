@@ -11,6 +11,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.FloatTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import org.jspecify.annotations.Nullable;
@@ -73,7 +74,7 @@ final class PlayerTag {
      * {@code ServerPlayer.addAdditionalSaveData}, which writes the plain id string.
      */
     static void setDimension(CompoundTag raw, ResourceKey<Level> dimension) {
-        raw.putString("Dimension", dimension.identifier().toString());
+        raw.putString("Dimension", dimension.location().toString());
     }
 
     /**
@@ -82,7 +83,7 @@ final class PlayerTag {
      * which folder a prior download parked something in.
      */
     static @Nullable ResourceKey<Level> dimensionOf(CompoundTag raw) {
-        return VanillaDimensions.forId(raw.getStringOr("Dimension", ""));
+        return VanillaDimensions.forId(raw.getString("Dimension"));
     }
 
     /**
@@ -123,7 +124,7 @@ final class PlayerTag {
      */
     static void setRootVehicle(CompoundTag raw, UUID attach, CompoundTag entityTag) {
         CompoundTag rootVehicle = new CompoundTag();
-        rootVehicle.store("Attach", UUIDUtil.CODEC, attach);
+        rootVehicle.put("Attach", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, attach).getOrThrow());
         rootVehicle.put("Entity", entityTag);
         raw.put("RootVehicle", rootVehicle);
     }
