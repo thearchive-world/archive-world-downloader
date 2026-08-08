@@ -40,7 +40,7 @@ public class WdlResumeCaptureTest implements FabricClientGameTest {
 
             server.runCommand("tp @a 2000 100 2000");
             context.waitFor(client -> client.player != null && client.player.getX() > 1900);
-            fixture.clientWorld().waitForChunksDownload();
+            fixture.waitForChunksDownload();
             context.waitFor(client -> client.player != null && client.level != null);
             ChunkPos chunkB = context.computeOnClient(client -> client.player.chunkPosition());
             BlockPos markerB = new BlockPos(chunkB.getMinBlockX() + 8, 80, chunkB.getMinBlockZ() + 8);

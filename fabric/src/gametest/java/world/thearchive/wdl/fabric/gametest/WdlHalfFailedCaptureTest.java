@@ -13,7 +13,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.gamerules.GameRules;
@@ -180,7 +180,7 @@ public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
     /** The cow near the player, matched by its synced {@link EntityType} (scoreboard tags never reach the client). */
     private static Optional<Entity> findCow(Minecraft client) {
         return client.level.getEntities((Entity) null, client.player.getBoundingBox().inflate(16.0)).stream()
-                .filter(entity -> entity.getType() == EntityType.COW)
+                .filter(entity -> entity.getType() == EntityTypes.COW)
                 .findFirst();
     }
 

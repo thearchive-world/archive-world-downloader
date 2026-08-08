@@ -113,7 +113,7 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
             TestServerContext server, BlockPos stand) {
         context.runOnClient(client -> {
             client.player.closeContainer();
-            client.setScreen(null);
+            client.gui.setScreen(null);
         });
         double cartX = stand.getX() + 2.5;
         double cartZ = stand.getZ() + 0.5;
@@ -167,7 +167,7 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
             client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
             Check.that(isLookingAtVehicle(client),
                     "crosshair drifted off the chest minecart before the observed click: " + client.hitResult);
-            client.setScreen(null);
+            client.gui.setScreen(null);
         });
         context.getInput().holdKey(options -> options.keyUse);
         ContainerDriver.awaitMenuSlotItem(context, observed, Items.DIAMOND);
@@ -195,7 +195,7 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
             TestServerContext server, BlockPos stand, UUID cartId) {
         context.runOnClient(client -> {
             client.player.closeContainer();
-            client.setScreen(null);
+            client.gui.setScreen(null);
         });
         BlockPos enderChest = new BlockPos(stand.getX(), stand.getY(), stand.getZ() - 2);
         server.runCommand("setblock " + enderChest.getX() + " " + enderChest.getY() + " " + enderChest.getZ()

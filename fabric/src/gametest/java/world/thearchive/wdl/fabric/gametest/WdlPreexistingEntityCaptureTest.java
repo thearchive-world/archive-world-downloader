@@ -13,7 +13,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
@@ -140,14 +140,14 @@ public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
         AABB column = new AABB(client.player.getX() - 32, maxY - 8, client.player.getZ() - 32,
                 client.player.getX() + 32, maxY + 8, client.player.getZ() + 32);
         return client.level.getEntities((Entity) null, column).stream()
-                .filter(entity -> entity.getType() == EntityType.ARMOR_STAND)
+                .filter(entity -> entity.getType() == EntityTypes.ARMOR_STAND)
                 .findFirst()
                 .orElse(null);
     }
 
     private static @Nullable Entity boat(Minecraft client) {
         return client.level.getEntities((Entity) null, client.player.getBoundingBox().inflate(16)).stream()
-                .filter(entity -> entity.getType() == EntityType.OAK_BOAT)
+                .filter(entity -> entity.getType() == EntityTypes.OAK_BOAT)
                 .findFirst()
                 .orElse(null);
     }

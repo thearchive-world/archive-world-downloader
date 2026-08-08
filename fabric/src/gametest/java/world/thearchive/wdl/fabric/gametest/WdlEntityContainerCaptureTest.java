@@ -15,7 +15,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
@@ -78,7 +78,7 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
                 client.hitResult = client.player.raycastHitResult(1.0f, client.getCameraEntity());
                 Check.that(isLookingAtVehicle(client),
                         "crosshair drifted off the chest minecart before opening: " + client.hitResult);
-                client.setScreen(null);
+                client.gui.setScreen(null);
             });
             context.getInput().holdKey(options -> options.keyUse);
             ContainerDriver.awaitMenuSlotItem(context, run, Items.DIAMOND);
@@ -120,7 +120,7 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
             ChunkPos cartChunk) {
         context.runOnClient(client -> {
             client.player.closeContainer();
-            client.setScreen(null);
+            client.gui.setScreen(null);
         });
         CaptureDriver run = CaptureDriver.start(context,
                 new DownloadTarget("wdl-unattributed-open", "wdl-unattributed-open", DownloadMode.NEW),
@@ -161,7 +161,7 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
             TestServerContext server, BlockPos stand, Vec3 cartCenter, UUID cartId) {
         context.runOnClient(client -> {
             client.player.closeContainer();
-            client.setScreen(null);
+            client.gui.setScreen(null);
         });
         double boatX = stand.getX() + 0.5;
         double boatZ = stand.getZ() + 0.5;
@@ -223,7 +223,7 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
             TestServerContext server, UUID boatId) {
         context.runOnClient(client -> {
             client.player.closeContainer();
-            client.setScreen(null);
+            client.gui.setScreen(null);
         });
         server.runCommand("item replace entity @e[type=minecraft:oak_chest_boat,limit=1] container.0 "
                 + "with minecraft:emerald 3");
@@ -257,7 +257,7 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
     /** The chest boat summoned at the player's feet, absent until it reaches the client. */
     private static Optional<Entity> nearbyChestBoat(Minecraft client) {
         return client.level.getEntities((Entity) null, client.player.getBoundingBox().inflate(4)).stream()
-                .filter(entity -> entity.getType() == EntityType.OAK_CHEST_BOAT)
+                .filter(entity -> entity.getType() == EntityTypes.OAK_CHEST_BOAT)
                 .findFirst();
     }
 

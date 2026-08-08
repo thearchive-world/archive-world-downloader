@@ -36,7 +36,7 @@ final class ToastReadback {
      * is present. Read on the client thread; the toast lists are not thread-safe.
      */
     static @Nullable String latestText(Minecraft minecraft) {
-        SystemToast toast = newestSystemToast(minecraft.getToastManager());
+        SystemToast toast = newestSystemToast(minecraft.gui.toastManager());
         if (toast == null) {
             return null;
         }
@@ -51,7 +51,7 @@ final class ToastReadback {
      * Empty the queued and visible toast lists, so a following refusal is neither deduped nor mistaken for a prior one.
      */
     static void clear(Minecraft minecraft) {
-        ToastManager manager = minecraft.getToastManager();
+        ToastManager manager = minecraft.gui.toastManager();
         queued(manager).clear();
         visibleInstances(manager).clear();
     }

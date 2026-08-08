@@ -78,7 +78,7 @@ public class WdlCoverageOverlayRespawnFloodTest implements FabricClientGameTest 
             context.waitForScreen(DeathScreen.class);
             context.clickScreenButton("deathScreen.respawn");
             // Read only after the respawn completes: the new player is alive and the death screen has closed.
-            context.waitFor(client -> client.player != null && client.player.isAlive() && client.screen == null);
+            context.waitFor(client -> client.player != null && client.player.isAlive() && client.gui.screen() == null);
             driver.tick(20); // let the client settle after the respawn before the radius read
 
             Check.that(driver.rangeRadiusChunks(dimension, 5) == 3,
@@ -105,7 +105,7 @@ public class WdlCoverageOverlayRespawnFloodTest implements FabricClientGameTest 
         });
         // A reconnect earlier in a multi-scenario run can leave a confirm screen focused, and an open screen
         // suppresses movement input, so dismiss it before driving the forward key or the walk never starts.
-        context.runOnClient(client -> client.setScreen(null));
+        context.runOnClient(client -> client.gui.setScreen(null));
         context.getInput().holdKey(options -> options.keyUp);
         boolean inWindow = false;
         for (int walkTick = 0; walkTick < WALK_TIMEOUT_TICKS && !inWindow; walkTick++) {

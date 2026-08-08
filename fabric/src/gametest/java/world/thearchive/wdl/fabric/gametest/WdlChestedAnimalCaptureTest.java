@@ -59,7 +59,7 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
 
             // A reconnect earlier in a multi-scenario run can leave a confirm screen focused, and an open screen
             // suppresses keybind input, so dismiss it before holding sneak or the interact never registers as one.
-            context.runOnClient(client -> client.setScreen(null));
+            context.runOnClient(client -> client.gui.setScreen(null));
             context.getInput().holdKey(options -> options.keyShift);
             context.waitTicks(3); // let the sneak state reach the server before the interact (secondary-use gate)
             Vec3 animalCenter = new Vec3(animalX, animalY + 0.75, animalZ);
@@ -119,7 +119,7 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
             double mountZ) {
         context.runOnClient(client -> {
             client.player.closeContainer();
-            client.setScreen(null);
+            client.gui.setScreen(null);
         });
         ContainerDriver.aimEyesAt(context, new Vec3(mountX, mountY + 0.75, mountZ));
         ContainerDriver.awaitCrosshair(context, WdlChestedAnimalCaptureTest::isLookingAtAnimal, "the mount");

@@ -69,7 +69,7 @@ public class WdlPausedSaveCompletionTest implements FabricClientGameTest {
         context.setScreen(() -> new PauseScreen(true));
         context.waitForScreen(PauseScreen.class);
         context.clickScreenButton("wdl.screen.downloads.open");
-        Check.that(context.computeOnClient(client -> client.screen instanceof WdlDownloadsScreen),
+        Check.that(context.computeOnClient(client -> client.gui.screen() instanceof WdlDownloadsScreen),
                 "the pause-menu button must open the download screen on the click, with no client tick in "
                         + "between, so a suspended game tick cannot strand it");
         context.setScreen(() -> null);
