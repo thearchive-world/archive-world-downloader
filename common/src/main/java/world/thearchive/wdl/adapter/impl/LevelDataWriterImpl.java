@@ -7,6 +7,10 @@ import com.mojang.logging.LogUtils;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.Lifecycle;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,6 +25,9 @@ import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
@@ -239,6 +246,21 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         levelData.setDifficulty(player.difficulty());
         // The 3-argument saveDataTag routes the captured tag into createTag's "Player" slot.
         access.saveDataTag(data.registries(), data.worldData(), player.playerTag());
+    }
+
+    @Override
+    public @Nullable CompoundTag readPriorPlayer(Path levelDatFile) {
+        if (!Files.exists(levelDatFile)) {
+            return null;
+        }
+        try {
+            CompoundTag root = NbtIo.readCompressed(levelDatFile, NbtAccounter.uncompressedQuota());
+            return root.get("Data") instanceof CompoundTag data && data.get("Player") instanceof CompoundTag player
+                    ? player
+                    : null;
+        } catch (IOException e) {
+            throw new UncheckedIOException("failed to read the prior player data " + levelDatFile, e);
+        }
     }
 
     /**

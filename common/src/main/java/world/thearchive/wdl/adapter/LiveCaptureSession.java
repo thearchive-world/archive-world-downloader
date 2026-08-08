@@ -3107,19 +3107,21 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The prior level.dat's {@code Data.Player} compound, or null when the folder is fresh, the file is unreadable, or
-     * the level.dat carries no player (fail-soft). A plain main-thread {@link NbtIo} file read, not MC-state-coupled,
-     * so the cross-queue immutability invariant holds.
+     * The prior download's captured player tag read through this band's own save layout via
+     * {@link LevelDataWriter#readPriorPlayer}, or null when the folder is fresh or no player was written (fail-soft).
+     * The read mirror of the player write: where the player lives on disk drifts across bands, so the plug that wrote
+     * it reads it back. A plain main-thread file read, not MC-state-coupled, so the cross-queue immutability invariant
+     * holds.
      */
     private @Nullable CompoundTag readPriorPlayerTag() {
-        try {
-            CompoundTag data = readPriorData();
-            if (data != null && data.get("Player") instanceof CompoundTag player) {
-                return player;
-            }
+        Path file = levelDatFile;
+        if (file == null) {
             return null;
-        } catch (IOException | RuntimeException e) {
-            LOGGER.warn("failed to read the prior level.dat player data on resume", e);
+        }
+        try {
+            return adapter.levelDataWriter().readPriorPlayer(file);
+        } catch (RuntimeException e) {
+            LOGGER.warn("failed to read the prior player data on resume", e);
             return null;
         }
     }

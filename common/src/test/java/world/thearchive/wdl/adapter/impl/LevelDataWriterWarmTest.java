@@ -7,9 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -78,6 +80,11 @@ class LevelDataWriterWarmTest {
             @Override
             public void save(LevelStorageSource.LevelStorageAccess access, LevelData data,
                     @Nullable CapturedPlayer player) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public @Nullable CompoundTag readPriorPlayer(Path levelDatFile) {
                 throw new UnsupportedOperationException();
             }
 

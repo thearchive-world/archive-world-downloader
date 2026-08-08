@@ -3,8 +3,10 @@
 
 package world.thearchive.wdl.adapter;
 
+import java.nio.file.Path;
 import java.util.List;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.WorldData;
 import org.jspecify.annotations.Nullable;
@@ -68,6 +70,18 @@ public interface LevelDataWriter {
      * survival default.
      */
     void save(LevelStorageSource.LevelStorageAccess access, LevelData data, @Nullable CapturedPlayer player);
+
+    /**
+     * The prior download's captured player tag, read from this band's own on-disk home given the prior
+     * {@code levelDatFile}, or null when the folder is fresh or no player was written. This is the read mirror of
+     * {@link #save}'s player write and lives here for the same reason: the player's location drifts across bands (a
+     * {@code level.dat "Player"} compound pre-26.x, a {@code players/data/<uuid>.dat} keyed by level.dat's
+     * {@code singleplayer_uuid} at 26.x), so each band reads it from wherever its own {@code save} wrote it. A resume
+     * consumes this to carry the prior ender chest and mount contents forward without the player reopening them. A
+     * present but unreadable file throws (the caller degrades it to a skipped carry-forward, fail-soft).
+     */
+    @Nullable
+    CompoundTag readPriorPlayer(Path levelDatFile);
 
     /**
      * This band's curated safe game-rule set as the settings menu binds it: one {@link CuratedGameRule} per curated

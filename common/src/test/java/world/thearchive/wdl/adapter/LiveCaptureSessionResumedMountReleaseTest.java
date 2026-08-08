@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -20,9 +19,9 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtIo;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
@@ -32,11 +31,13 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
 import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CoveredChunkIndex;
@@ -46,6 +47,7 @@ import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SavedChunkIndex;
 import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.WdlConfig;
+import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
@@ -77,6 +79,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class LiveCaptureSessionResumedMountReleaseTest {
     private static final UUID MOUNT = UUID.fromString("f4c1a8d2-3b76-4e05-9a1c-8d2e6b70f513");
     private static final UUID OTHER_MOUNT = UUID.fromString("0a7e2c95-641b-4d38-8f02-b3d54e18a7c6");
+    private static final UUID PRIOR_PLAYER = UUID.fromString("2b9d6f10-84c3-4a57-9e21-7c0f5a3b8d64");
     private static final String MOUNT_LOOT = "minecraft:diamond";
     // x is negative and just below a chunk boundary, so flooring and truncating land in DIFFERENT chunks and a
     // locator that casts instead of flooring misses. x and z also differ, so an axis swap misses too.
@@ -345,6 +348,9 @@ class LiveCaptureSessionResumedMountReleaseTest {
     /** A prior level.dat player tag: the dimension it finished in, and the mount it was riding if any. */
     private static CompoundTag priorPlayerTag(ResourceKey<Level> dimension, @Nullable CompoundTag mount) {
         CompoundTag player = new CompoundTag();
+        // The band's save keys the player file on its UUID (players/data/<uuid>.dat at 26.x), so a prior written
+        // through it must carry one; a client saveWithoutId always does.
+        player.store("UUID", UUIDUtil.CODEC, PRIOR_PLAYER);
         PlayerTag.setDimension(player, dimension);
         if (mount != null) {
             CompoundTag root = new CompoundTag();
@@ -360,19 +366,22 @@ class LiveCaptureSessionResumedMountReleaseTest {
     }
 
     /**
-     * Write a real compressed level.dat and point the session at it, the way the world-open path does, so the
-     * production reader parses it rather than a stub standing in for the file.
+     * Seed a prior download through the band's own save so the production reader finds the player wherever this band
+     * writes it (a level.dat Player compound pre-26.x, {@code players/data/<uuid>.dat} at 26.x), then point the session
+     * at the level.dat the way world-open does. Hand-writing the level.dat here would encode one band's layout and
+     * diverge from the read under test.
      */
     private static void writePriorPlayerTag(LiveCaptureSession session, Path save, CompoundTag player)
             throws Exception {
-        Files.createDirectories(save);
-        CompoundTag data = new CompoundTag();
-        data.put("Player", player);
-        CompoundTag root = new CompoundTag();
-        root.put("Data", data);
-        Path levelDat = save.resolve("level.dat");
-        NbtIo.writeCompressed(root, levelDat);
-        set(session, "levelDatFile", levelDat);
+        LevelDataWriter writer = new LevelDataWriterImpl();
+        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
+        CapturedPlayer captured = new CapturedPlayer(player, BlockPos.ZERO, 0.0F, 0.0F, Level.OVERWORLD,
+                GameType.SURVIVAL, Difficulty.NORMAL);
+        LevelStorageSource source = LevelStorageSource.createDefault(save.getParent());
+        try (LevelStorageSource.LevelStorageAccess access = source.createAccess(save.getFileName().toString())) {
+            writer.save(access, built, captured);
+        }
+        set(session, "levelDatFile", save.resolve("level.dat"));
     }
 
     /**
