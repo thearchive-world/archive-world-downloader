@@ -4,13 +4,13 @@
 package world.thearchive.wdl.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.phys.AABB;
@@ -95,16 +95,17 @@ public final class WdlOutlineRenderer {
     }
 
     /**
-     * Build the per-frame render context from the loader's pose, buffers, and frustum, resolving the effective rim line
-     * width from the config scale and the band's appropriate width, then cull and draw the live set. A null frustum (a
-     * band whose loader render event no longer exposes one) draws every section, the GPU clipping off-screen.
+     * Build the per-frame render context from the loader's pose, vertex buffer, and frustum, resolving the effective
+     * rim line width from the config scale and the band's appropriate width, then cull and draw the live set. A null
+     * frustum (a band whose loader render event no longer exposes one) draws every section, the GPU clipping
+     * off-screen.
      */
-    public static void render(PoseStack pose, MultiBufferSource consumers, @Nullable Frustum frustum,
+    public static void render(PoseStack.Pose pose, VertexConsumer buffer, @Nullable Frustum frustum,
             RimRenderer rimRenderer) {
         float lineWidth = Wdl.config().outline().lineWidthScale()
                 * Minecraft.getInstance().getWindow().getAppropriateLineWidth();
-        OutlineRenderContext context = new OutlineRenderContext(pose, consumers, frustum,
-                Minecraft.getInstance().gameRenderer.getMainCamera().position(), lineWidth);
+        OutlineRenderContext context = new OutlineRenderContext(pose, buffer, frustum,
+                Minecraft.getInstance().gameRenderer.mainCamera().position(), lineWidth);
         render(context, Wdl.outlineDrawSet(), rimRenderer);
     }
 

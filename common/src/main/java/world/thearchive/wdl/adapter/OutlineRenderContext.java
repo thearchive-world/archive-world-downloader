@@ -4,15 +4,15 @@
 package world.thearchive.wdl.adapter;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.renderer.MultiBufferSource;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The per-frame inputs the per-loader registrar hands the outline renderer: the pose stack and vertex sink to draw
- * into, the live view frustum for the section cull, the camera position so the draw can be camera-relative, and the
- * effective rim line width. The width is resolved here rather than in the band-agnostic cull because its base
+ * The per-frame inputs the per-loader registrar hands the outline renderer: the transformed pose and the vertex buffer
+ * to draw into, the live view frustum for the section cull, the camera position so the draw can be camera-relative, and
+ * the effective rim line width. The width is resolved here rather than in the band-agnostic cull because its base
  * ({@code Window.getAppropriateLineWidth}) is band-specific and absent on some bands, while the config scale that
  * multiplies it is band-agnostic. The registrar builds it from its loader's render event; the band-agnostic cull reads
  * only the band-stable members and passes the whole context to the injected {@link RimRenderer}, which owns the
@@ -23,6 +23,6 @@ import org.jspecify.annotations.Nullable;
  *                  the GPU rather than skipped before build
  * @param lineWidth the effective rim line width in pixels: the config scale times the band's appropriate width
  */
-public record OutlineRenderContext(PoseStack pose, MultiBufferSource consumers, @Nullable Frustum frustum,
+public record OutlineRenderContext(PoseStack.Pose pose, VertexConsumer buffer, @Nullable Frustum frustum,
         Vec3 cameraPos,
         float lineWidth) {}

@@ -5,7 +5,6 @@ package world.thearchive.wdl.adapter.impl;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -41,8 +40,8 @@ public final class RimRendererImpl implements RimRenderer {
         if (face == RimFace.NONE) {
             return;
         }
-        VertexConsumer lines = context.consumers().getBuffer(RenderTypes.lines());
-        PoseStack.Pose pose = context.pose().last();
+        VertexConsumer lines = context.buffer();
+        PoseStack.Pose pose = context.pose();
         float width = context.lineWidth();
         Vec3 camera = context.cameraPos();
         // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, lifted
