@@ -44,12 +44,33 @@ class EntityMergeTest {
         ListTag list = (ListTag) chunk.get("Entities");
         for (int i = 0; i < list.size(); i++) {
             CompoundTag tag = (CompoundTag) list.get(i);
-            if (UUIDUtil.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, tag.get("UUID")).result()
-                    .map(uuid::equals).orElse(false)) {
+            if (matches(tag, uuid)) {
                 return tag.get("Items") instanceof ListTag items ? items.size() : 0;
             }
         }
         throw new AssertionError("no entity " + uuid);
+    }
+
+    private static int nestedItemCount(CompoundTag chunk, UUID rootUuid, UUID nestedUuid) {
+        ListTag list = (ListTag) chunk.get("Entities");
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag root = (CompoundTag) list.get(i);
+            if (!matches(root, rootUuid) || !(root.get("Passengers") instanceof ListTag passengers)) {
+                continue;
+            }
+            for (int j = 0; j < passengers.size(); j++) {
+                CompoundTag passenger = (CompoundTag) passengers.get(j);
+                if (matches(passenger, nestedUuid)) {
+                    return passenger.get("Items") instanceof ListTag items ? items.size() : 0;
+                }
+            }
+        }
+        throw new AssertionError("no entity " + nestedUuid + " nested under " + rootUuid);
+    }
+
+    private static boolean matches(CompoundTag tag, UUID uuid) {
+        return UUIDUtil.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, tag.get("UUID")).result()
+                .map(uuid::equals).orElse(false);
     }
 
     @Test
@@ -71,6 +92,22 @@ class EntityMergeTest {
 
         assertEquals(1, mergeBacks);
         assertEquals(2, itemCount(fresh, UUID_A), "the prior contents survive");
+    }
+
+    @Test
+    void aNestedChestedAnimalCarriesForwardItsItems() {
+        // A chested mule pushed into a minecart saves nested under the minecart's Passengers, and on a resume
+        // the re-captured mule spawns with an empty chest, so its prior contents must carry from the nested node.
+        CompoundTag onDisk = entities(EntityFixtures.entityCarrying(vehicle(UUID_A),
+                EntityFixtures.containerVehicle("minecraft:mule", UUID_B, "minecraft:diamond",
+                        "minecraft:gold_ingot")));
+        CompoundTag fresh = entities(EntityFixtures.entityCarrying(vehicle(UUID_A),
+                EntityFixtures.containerVehicle("minecraft:mule", UUID_B)));
+
+        int mergeBacks = EntityMerge.merge(onDisk, fresh);
+
+        assertEquals(1, mergeBacks, "the nested mule's contents carry forward");
+        assertEquals(2, nestedItemCount(fresh, UUID_A, UUID_B), "the nested mule keeps the prior contents");
     }
 
     @Test
