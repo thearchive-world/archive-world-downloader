@@ -12,7 +12,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.components.toasts.Toast;
 import net.minecraft.client.gui.components.toasts.ToastManager;
-import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import org.jspecify.annotations.Nullable;
 
@@ -74,13 +73,16 @@ final class ToastReadback {
     }
 
     private static String titleOf(SystemToast toast) {
-        Object title = readField(toast, SystemToast.class, "title");
-        return title instanceof Component component ? component.getString() : "";
+        return String.join(" ", linesOf(toast, "titleLines"));
     }
 
     private static List<String> bodyLinesOf(SystemToast toast) {
+        return linesOf(toast, "messageLines");
+    }
+
+    private static List<String> linesOf(SystemToast toast, String field) {
         List<String> rendered = new ArrayList<>();
-        Object lines = readField(toast, SystemToast.class, "messageLines");
+        Object lines = readField(toast, SystemToast.class, field);
         if (!(lines instanceof Collection<?> collection)) {
             return rendered;
         }
