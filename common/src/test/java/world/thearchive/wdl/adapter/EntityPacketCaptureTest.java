@@ -9,7 +9,7 @@ import java.util.Set;
 import java.util.UUID;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 import org.junit.jupiter.api.BeforeAll;
@@ -87,6 +87,6 @@ class EntityPacketCaptureTest {
     }
 
     private static ClientboundAddEntityPacket addEntity(int id, UUID uuid) {
-        return new ClientboundAddEntityPacket(id, uuid, 0.0, 64.0, 0.0, 0f, 0f, EntityType.PIG, 0, Vec3.ZERO, 0.0);
+        return new ClientboundAddEntityPacket(id, uuid, 0.0, 64.0, 0.0, 0f, 0f, EntityTypes.PIG, 0, Vec3.ZERO, 0.0);
     }
 }
