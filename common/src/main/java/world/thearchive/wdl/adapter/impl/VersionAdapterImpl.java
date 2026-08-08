@@ -28,7 +28,7 @@ public final class VersionAdapterImpl implements VersionAdapter {
      * that a plug never lands on a branch whose MC version predates its band. A version newer than the band is caught
      * instead by compile failure against the divergent vanilla save types.
      */
-    static final String BAND_FLOOR = "26.1";
+    static final String BAND_FLOOR = "26.2";
 
     private static final ChunkCodec chunkCodec = new ChunkCodecImpl();
 
