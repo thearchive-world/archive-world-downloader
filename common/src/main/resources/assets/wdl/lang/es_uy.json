@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Descargá el mundo multijugador que explorás como una partida de un jugador.",
   "modmenu.descriptionTranslation.wdl": "Conservá los mundos multijugador que visitás. Mientras explorás, el mod guarda el terreno, los contenedores, las criaturas y los mapas a tu alrededor en un mundo de un jugador que podés abrir sin conexión. Todo proviene de tu propio juego, así que nada se ejecuta en el servidor.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Activar/Desactivar descarga del mundo",
   "key.wdl.open_downloads": "Abrir pantalla de descargas",
   "key.wdl.peek_hud": "Vistazo al HUD detallado",

@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Téléchargez le monde multijoueur que vous explorez sous forme de sauvegarde solo.",
   "modmenu.descriptionTranslation.wdl": "Conservez les mondes multijoueur que vous visitez. À mesure que vous explorez, le mod sauvegarde le terrain, les conteneurs, les créatures et les cartes autour de vous dans un monde solo que vous pouvez ouvrir hors ligne. Tout provient de votre propre jeu, donc rien ne s'exécute sur le serveur.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Démarrer/arrêter le téléchargement",
   "key.wdl.open_downloads": "Ouvrir le téléchargement",
   "key.wdl.peek_hud": "Aperçu du HUD détaillé",

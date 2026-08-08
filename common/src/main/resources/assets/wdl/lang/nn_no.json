@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Last ned fleirspelarverda du utforskar, som ei lagra einspelarverd.",
   "modmenu.descriptionTranslation.wdl": "Ta vare på fleirspelarverdene du vitjar. Medan du utforskar, lagrar modden terrenget, behaldarane, skapningane og karta rundt deg i ei einspelarverd du kan opna fråkopla. Alt kjem frå ditt eige spel, so ingenting køyrer på tenaren.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Start/stans nedlasting",
   "key.wdl.open_downloads": "Opna nedlasting",
   "key.wdl.peek_hud": "Kikk på detaljert HUD",
