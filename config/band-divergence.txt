@@ -26,9 +26,11 @@ common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
 # 26.x ChunkPos record: new ChunkPos(BlockPos) becomes ChunkPos.containing.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
-# 26.x ChunkPos record: ChunkPos.asLong(x,z) becomes new ChunkPos(x,z).pack().
+# 26.x ChunkPos record: ChunkPos.asLong(x,z) becomes new ChunkPos(x,z).pack(); and 26.2 moved EntityType constants
+# to EntityTypes.
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
-# 26.x ChunkPos record: new ChunkPos(BlockPos) becomes ChunkPos.containing.
+# 26.x ChunkPos record: new ChunkPos(BlockPos) becomes ChunkPos.containing; and 26.2 moved BlockEntityType constants
+# to BlockEntityTypes.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 # 26.x ChunkPos record: ChunkPos.asLong(x,z) becomes new ChunkPos(x,z).pack().
 common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
@@ -39,12 +41,18 @@ common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
 # 26.x moved advancements/ and stats/ under players/ (LevelResource PLAYER_ADVANCEMENTS_DIR / PLAYER_STATS_DIR).
 common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressWriter.java
 
-# 26.x removed Player.displayClientMessage; a client chat line is ChatComponent.addClientSystemMessage.
+# 26.x removed Player.displayClientMessage; a client chat line is ChatComponent.addClientSystemMessage. And 26.2
+# relocated Gui accessors: the chat line is Minecraft.gui.hud.getChat(), the HUD gate is Minecraft.gui.hud.isHidden(),
+# the open-screen read is Minecraft.gui.screen(), the toast manager is Minecraft.gui.toastManager(), and
+# SystemToast.multiline was replaced by the SystemToast constructor.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
-# 26.x GuiGraphics is GuiGraphicsExtractor and the widget/entry paint overrides rename (loader-api-bands sec 6).
+# 26.x GuiGraphics is GuiGraphicsExtractor and the widget/entry paint overrides rename (loader-api-bands sec 6); and
+# 26.2 relocated Minecraft.setScreen into Minecraft.gui.
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
-# 26.x GuiGraphics is GuiGraphicsExtractor and the screen/entry paint overrides rename (loader-api-bands sec 6).
+# 26.x GuiGraphics is GuiGraphicsExtractor and the screen/entry paint overrides rename (loader-api-bands sec 6); and
+# 26.2 relocated Minecraft.setScreen into Minecraft.gui and removed I18n.exists, so key existence is
+# Language.getInstance().has.
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 # 26.x GuiGraphics is GuiGraphicsExtractor: the HUD callback parameter retypes.
 common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
@@ -69,16 +77,17 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
 common/src/test/java/world/thearchive/wdl/adapter/LecternRecaptureSynergyTest.java
 # 26.x ChunkPos record forms in the test (ChunkPos.containing / pack).
 common/src/test/java/world/thearchive/wdl/adapter/LecternStashMergeTest.java
-# 26.x ChunkPos record forms in the test (new ChunkPos(x,z).pack()).
+# 26.x ChunkPos record forms in the test (new ChunkPos(x,z).pack()); and 26.2 moved EntityType constants to EntityTypes.
 common/src/test/java/world/thearchive/wdl/adapter/EntityPacketCaptureTest.java
 # 26.x ChunkPos record forms in the test (pack()).
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
-# 26.x ChunkPos record forms in the test (pack()).
+# 26.x ChunkPos record forms in the test (pack()); and 26.2 moved EntityType constants to EntityTypes.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
 # 26.x ChunkPos record forms in the fixture (ChunkPos.containing).
 common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
 
-# 26.x BundleContents holds ItemStackTemplate; ItemContainerContents.nonEmptyStream is nonEmptyItemCopyStream.
+# 26.x BundleContents holds ItemStackTemplate; ItemContainerContents.nonEmptyStream is nonEmptyItemCopyStream. And
+# 26.2 moved EntityType constants to EntityTypes.
 common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
 # 26.x BundleContents holds ItemStackTemplate (via ItemStackTemplate.fromNonEmptyStack).
 common/src/test/java/world/thearchive/wdl/adapter/MenuChangeTrackerTest.java
@@ -102,16 +111,22 @@ common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossLogWirin
 # 26.x puts every dimension under dimensions/minecraft/<name>, so the overworld region is no longer at the root.
 common/src/test/java/world/thearchive/wdl/adapter/RegionIntegrationTest.java
 
-# 26.x fabric-api replaced rendering.v1.world.WorldRenderEvents with rendering.v1.level.LevelRenderEvents and
-# dropped the frustum accessor, so this registrar draws on BEFORE_GIZMOS with a null frustum.
+# 26.x fabric-api replaced rendering.v1.world.WorldRenderEvents with rendering.v1.level.LevelRenderEvents and dropped
+# the frustum accessor (null frustum); 26.2 removed MultiBufferSource, so this records the outline on COLLECT_SUBMITS
+# via the submit-node collector rather than drawing into a buffer source.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
 
 # --- Fabric capture-tier gametest 26.x drift (ChunkPos records, MultiPlayerGameMode.interact's new
 # EntityHitResult argument, the pick move to a private Minecraft.pick, the fabric-client-gametest World->Level
 # rename, ItemContainerContents.nonEmptyStream to nonEmptyItemCopyStream, and the LevelRenderEvents outline
-# event) ---
+# event), plus 26.2 drift: Minecraft.screen/setScreen relocated into Minecraft.gui, EntityType/BlockEntityType
+# constants moved to EntityTypes/BlockEntityTypes, and the outline draw records on COLLECT_SUBMITS via the
+# submit-node collector, GameRenderer.getMainCamera renamed to mainCamera, and Minecraft.getToastManager relocated
+# to Minecraft.gui.toastManager ---
 # 26.x gametest API drift (see the section header above).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/ContainerDriver.java
+# 26.x gametest API drift (see the section header above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/ToastReadback.java
 # 26.x gametest API drift (see the section header above).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/MultiplayerFixture.java
 # 26.x gametest API drift (see the section header above).
@@ -163,9 +178,57 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlStalePlacementC
 # player to players/data/<uuid>.dat, and advancements/stats under players/ ---
 # 26.x save-layout re-point (see the section header above): the readback helper spells the 26.x on-disk locations.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureReadback.java
-# 26.x save-layout re-point (see the section header above): the overworld region is dimensions/minecraft/overworld/region.
+# 26.x save-layout re-point (see the section header above): the overworld region is dimensions/minecraft/overworld/region;
+# and 26.2 relocated Minecraft.screen into Minecraft.gui.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPausedSaveCompletionTest.java
 # 26.x save-layout re-point (see the section header above): the captured player is at players/data/<uuid>.dat.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPlayerDataCaptureTest.java
 # 26.x save-layout re-point (see the section header above): day-time and game rules moved to data/minecraft/*.dat.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlWorldOutputConfigTest.java
+
+# --- 26.2 band deltas (this branch only; specs/2026-08-07-band-fanout-design.md sec 6) ---
+
+# 26.2 removed MultiBufferSource: the outline render context carries the VertexConsumer the submit-node collector
+# hands the draw callback, not a buffer source, and its pose is the collector's captured PoseStack.Pose.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineRenderContext.java
+# 26.2 removed MultiBufferSource: the band-agnostic cull builds the render context inside the submit-node draw
+# callback from the captured pose and the handed vertex buffer; and GameRenderer.getMainCamera was renamed to
+# mainCamera.
+common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
+# 26.2 forces the NeoForge submit-node draw: records the outline on SubmitCustomGeometryEvent instead of an
+# immediate-mode draw on RenderLevelStageEvent.AfterTranslucentBlocks into a shared buffer source.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeOutlineRegistrar.java
+# 26.2 relocated Minecraft.screen/setScreen into Minecraft.gui, so screen open and close go through Minecraft.gui.
+common/src/main/java/world/thearchive/wdl/ResumeFlow.java
+# 26.2 relocated Minecraft.screen/setScreen into Minecraft.gui, so the screen open and the prior-screen read go
+# through Minecraft.gui; and GameRenderer.getMainCamera was renamed to mainCamera.
+common/src/main/java/world/thearchive/wdl/Wdl.java
+# 26.2 moved EntityType constants to EntityTypes.
+common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
+# 26.2 moved BlockEntityType constants to BlockEntityTypes.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
+# 26.2 relocated Minecraft.screen/setScreen into Minecraft.gui, so the client-thread screen reads and setScreen(null)
+# go through Minecraft.gui.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/RestoreFlowTest.java
+# 26.2 relocated Minecraft.screen into Minecraft.gui, so the client-thread screen read goes through Minecraft.gui.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/ScreenDriver.java
+# 26.2 relocated Minecraft.setScreen into Minecraft.gui.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRemovalArrivalOriginTest.java
+# 26.2 relocated Minecraft.setScreen into Minecraft.gui.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRemovalSeedOriginTest.java
+# 26.2 relocated Minecraft.screen/setScreen into Minecraft.gui.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRespawnFloodTest.java
+# 26.2 moved EntityType constants to EntityTypes.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlHalfFailedCaptureTest.java
+# 26.2 fabric-client-gametest moved waitForChunksDownload from the removed TestClientLevelContext onto the server
+# connection, so the fixture's re-wait helper is called directly.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlFramedMapRevisitUnionTest.java
+# 26.2 fabric-client-gametest moved waitForChunksDownload onto the server connection (see above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapSchemeSignalBeginTest.java
+# 26.2 fabric-client-gametest moved waitForChunksDownload onto the server connection (see above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapStreamCrashStateTest.java
+# 26.2 fabric-client-gametest moved waitForChunksDownload onto the server connection (see above).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlResumeCaptureTest.java
+
+# 26.2 moved the entity id counter onto Level, so headless entity construction in unit tests needs a real Level.
+common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
