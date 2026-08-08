@@ -24,7 +24,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.Items;
@@ -103,7 +103,7 @@ class ItemLocationScrubTest {
         beeNbt.put("flower_pos",
                 BlockPos.CODEC.encodeStart(NbtOps.INSTANCE, new BlockPos(128, 64, -512)).getOrThrow());
         BeehiveBlockEntity.Occupant occupant = new BeehiveBlockEntity.Occupant(
-                TypedEntityData.of(EntityType.BEE, beeNbt), 0, 600);
+                TypedEntityData.of(EntityTypes.BEE, beeNbt), 0, 600);
         hive.set(DataComponents.BEES, new Bees(List.of(occupant)));
         return hive;
     }

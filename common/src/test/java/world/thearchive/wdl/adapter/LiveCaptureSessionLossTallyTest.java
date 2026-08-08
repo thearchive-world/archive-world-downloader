@@ -39,7 +39,7 @@ import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
@@ -66,6 +66,7 @@ import world.thearchive.wdl.core.SavedChunkIndex;
 import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.SendRangeSampler;
 import world.thearchive.wdl.core.WdlConfig;
+import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
@@ -402,7 +403,7 @@ class LiveCaptureSessionLossTallyTest {
      */
     private static final class BareEntity extends Entity {
         private BareEntity() {
-            super(EntityType.PIG, null);
+            super(EntityTypes.PIG, HeadlessLevel.get());
         }
 
         @Override
@@ -1033,7 +1034,7 @@ class LiveCaptureSessionLossTallyTest {
     private static void spawn(EntityPacketCapture capture, int id, UUID uuid, ChunkPos pos) {
         capture.spawn(id, uuid, pos.pack(), new EntityPos(pos.getMinBlockX(), 64.0, pos.getMinBlockZ(), 0f, 0f),
                 new ClientboundAddEntityPacket(id, uuid, pos.getMinBlockX(), 64.0, pos.getMinBlockZ(), 0f, 0f,
-                        EntityType.PIG, 0, Vec3.ZERO, 0.0));
+                        EntityTypes.PIG, 0, Vec3.ZERO, 0.0));
     }
 
     /**

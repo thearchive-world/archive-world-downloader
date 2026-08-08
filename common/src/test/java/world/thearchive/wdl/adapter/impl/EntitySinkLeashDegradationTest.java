@@ -21,7 +21,7 @@ import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ItemStackWithSlot;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -34,6 +34,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.EntitySink;
+import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -171,7 +172,7 @@ class EntitySinkLeashDegradationTest {
         private Leashable.@Nullable LeashData leashData;
 
         private ContainerLeashableEntity() {
-            super(EntityType.PIG, null);
+            super(EntityTypes.PIG, HeadlessLevel.get());
         }
 
         @Override

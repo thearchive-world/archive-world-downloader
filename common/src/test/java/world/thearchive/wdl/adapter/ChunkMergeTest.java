@@ -23,7 +23,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChiseledBookShelfBlock;
-import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.entity.BlockEntityTypes;
 import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.Test;
 
@@ -412,7 +412,7 @@ class ChunkMergeTest {
         // rule for the one container the rule is wrong for, and every other test here would still pass.
         TestRegistries.frozen();
         assertEquals(ChunkMerge.CHISELED_BOOKSHELF_ID,
-                BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(BlockEntityType.CHISELED_BOOKSHELF).toString(),
+                BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(BlockEntityTypes.CHISELED_BOOKSHELF).toString(),
                 "the production literal itself, not a copy of it in this test");
     }
 

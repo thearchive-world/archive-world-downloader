@@ -20,7 +20,7 @@ import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 import world.thearchive.wdl.adapter.EntitySink;
+import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -137,7 +138,7 @@ class EntitySinkRootVehicleTest {
     /** A headless vehicle double the entities region refuses, standing in for a boat carrying one player. */
     private static final class RiddenVehicleEntity extends Entity {
         private RiddenVehicleEntity() {
-            super(EntityType.PIG, null);
+            super(EntityTypes.PIG, HeadlessLevel.get());
         }
 
         @Override
@@ -165,7 +166,7 @@ class EntitySinkRootVehicleTest {
     /** A headless mount double on the {@link Mob} branch, where the persistence restoration applies. */
     private static final class RiddenMountMob extends Mob {
         private RiddenMountMob() {
-            super(EntityType.PIG, null);
+            super(EntityTypes.PIG, HeadlessLevel.get());
         }
 
         @Override
