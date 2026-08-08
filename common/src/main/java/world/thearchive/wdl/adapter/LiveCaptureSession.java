@@ -552,7 +552,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private @Nullable UUID boundEntityUuid;
 
     /**
-     * The seated player's mount, captured at finish before the entity drain and attached to the level.dat player tag as
+     * The seated player's mount, captured at finish before the entity drain and attached to the saved player tag as
      * vanilla's {@code RootVehicle} record ({@link #rootVehicleAttach} is the direct vehicle UUID,
      * {@link #rootVehicleTag} the root vehicle NBT). Both null unless the player finished riding a vehicle carrying
      * only itself. Main-thread-only scratch, deliberately not volatile: the RootVehicle NBT crosses to the writer
@@ -753,7 +753,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * A prior download's parked mount the resumed release could not place (main thread). At most one per download,
-     * since the prior level.dat records at most one RootVehicle, and the whole mount rather than a part of it: this
+     * since the prior player records at most one RootVehicle, and the whole mount rather than a part of it: this
      * session's own player tag overwrites the only copy it had.
      */
     private int resumedMountsLost;
@@ -2353,7 +2353,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Everything a finish that opened a world still owes the writer: the last packet-entity drain, the whole-buffer
-     * flush, the reconciliation and its loss counts, the level.dat player and progress snapshots, the resumed mount
+     * flush, the reconciliation and its loss counts, the saved player and progress snapshots, the resumed mount
      * release, and the frozen report counts, each one submitted or published before end-of-stream. Runs inside
      * {@link #completeThroughWriter}, whose guarantee is that the marker follows this however it ends.
      */
@@ -2419,7 +2419,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         + "from the save", vehicle);
             }
         }
-        // Snapshot and assemble the local player for level.dat (skipped on a disconnect-flush). Fail-soft:
+        // Snapshot and assemble the local player for the save (skipped on a disconnect-flush). Fail-soft:
         // a serialize or scrub throw here, after chunks have committed, must not abort before
         // activeWriter.finish() and leave a chunks-without-level.dat unopenable world plus a leaked lock, so
         // any throw degrades to a null capturedPlayer (the openable void-world level.dat) and the save runs on.
@@ -2431,9 +2431,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (this.capturedPlayer == null && salvageMount != null && salvageAttach != null) {
                 // The full player assembly threw (the void-world fail-soft), but a seated mount was already
                 // excluded from the standalone write and its loot drained from the stash, so a bare void-world
-                // level.dat would drop the mount and its capture-once contents from both the entities region and
-                // level.dat. Salvage a minimal player carrying just the RootVehicle. Its own fail-soft: if even
-                // this throws, the void-world level.dat stands and the mount is lost (the accepted worst case).
+                // save would drop the mount and its capture-once contents from both the entities region and the
+                // player record. Salvage a minimal player carrying just the RootVehicle. Its own fail-soft: if even
+                // this throws, the void-world save stands and the mount is lost (the accepted worst case).
                 this.capturedPlayer = failSoft("salvaged mount",
                         () -> assembleSalvageMountPlayer(player, minecraft, salvageAttach, salvageMount));
             }
@@ -2978,7 +2978,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * tag's empty {@code "EnderItems"} would wipe a previously-downloaded ender chest. Carries the prior items when the
      * fresh ones are empty, then applies the item-coordinate scrub per the current knob; the carried items are already
      * archive-remapped from the prior session, so they are not re-remapped. Fail-soft: a missing or unreadable prior
-     * level.dat leaves the (empty) fresh ender chest rather than aborting the player assembly.
+     * player leaves the (empty) fresh ender chest rather than aborting the player assembly.
      */
     private void carryForwardPriorEnderChest(CompoundTag raw) {
         CompoundTag priorPlayer = readPriorPlayerTag();
@@ -2992,12 +2992,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Restore a prior download's captured mount contents on a resume that finished seated in the same mount without
-     * reopening its container: the fresh serialize carries empty menu-only contents, and the wholesale rewrite of
-     * level.dat's Player slot would drop the prior download's folded loot. A resume that finished un-seated carries
-     * nothing (see {@link PlayerTag#restorePriorMountContents}): a dismounted mount is a normal world entity, captured
-     * by the standalone entity path, so writing it into the Player slot would wrongly re-seat the player and collide
-     * same-UUID with the standalone copy. Runs as its own RESUME block, ungated by {@link WdlConfig} toggles (the mount
-     * is player-state, independent of the ender, inventory, and capture-entities knobs) and after the fresh
+     * reopening its container: the fresh serialize carries empty menu-only contents, and the wholesale rewrite of the
+     * saved player would drop the prior download's folded loot. A resume that finished un-seated carries nothing (see
+     * {@link PlayerTag#restorePriorMountContents}): a dismounted mount is a normal world entity, captured by the
+     * standalone entity path, so writing it into the Player slot would wrongly re-seat the player and collide same-UUID
+     * with the standalone copy. Runs as its own RESUME block, ungated by {@link WdlConfig} toggles (the mount is
+     * player-state, independent of the ender, inventory, and capture-entities knobs) and after the fresh
      * {@code setRootVehicle}. Scrubs the restored mount's own coordinates per the current knob on the {@code Entity}
      * child (not {@code scrub(raw, key)}, a no-op on a compound, and not {@code scrubEntity(raw)}, which does not
      * descend a RootVehicle child); the prior session already map-remapped it, so it is not re-remapped. Fail-soft on a
@@ -3018,8 +3018,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Release a prior download's parked mount as a standalone entity on a resume, so a mount the player rode in an
      * earlier download and has since left is preserved as a world entity rather than lost. A mount ridden at a finish
-     * is a one-player vehicle the entity capture refuses, so that finish saved it only as its level.dat RootVehicle,
-     * and this resume's own player tag replaces that record wholesale. Nothing else carries it forward.
+     * is a one-player vehicle the entity capture refuses, so that finish saved it only as the RootVehicle in its saved
+     * player, and this resume's own player tag replaces that record wholesale. Nothing else carries it forward.
      *
      * <p>Skipped when this finish already preserved that mount itself, either by writing it as a standalone entity or
      * by capturing it into the player's own RootVehicle, the latter matched by UUID against the whole captured mount
