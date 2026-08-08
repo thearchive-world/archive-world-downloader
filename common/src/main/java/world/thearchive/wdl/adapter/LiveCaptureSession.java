@@ -3490,7 +3490,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // call lives behind LevelDataWriter.save() (its vanilla signature drifts across bands: it drops
             // RegistryAccess at 26.1.2), so this shared session stays cherry-pickable. Built here on the main
             // thread; the writer thread only writes the finished data.
-            Path saveRoot = access.getDimensionPath(Level.OVERWORLD);
+            // The save root is the level directory, not the overworld storage folder. They are the same path only
+            // where the overworld sits at the save root (1.21.11 and earlier); at 26.x DimensionType
+            // .getStorageFolder puts every dimension under dimensions/minecraft/<name>, so getDimensionPath here
+            // would root WorldPaths, the map manifest and the export zip one dimension too deep.
+            Path saveRoot = access.getLevelDirectory().path();
             WorldPaths paths = adapter.worldPaths(saveRoot);
             this.worldPaths = paths;
             this.mapIdsFile = MapManifest.pathIn(saveRoot);
