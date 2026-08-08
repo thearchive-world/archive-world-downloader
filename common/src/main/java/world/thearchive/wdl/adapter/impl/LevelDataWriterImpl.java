@@ -373,7 +373,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     private static WorldDimensions.Complete bakedDimensions(WorldType worldType, RegistryAccess registries) {
         return switch (worldType) {
             case DEFAULT -> WorldPresets.createNormalWorldDimensions(registries).bake(emptyLevelStems());
-            case FLAT -> WorldPresets.createFlatWorldDimensions(registries).bake(emptyLevelStems());
+            case FLAT -> registries.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(WorldPresets.FLAT).value()
+                    .createWorldDimensions().bake(emptyLevelStems());
             case VOID -> voidDimensions(registries);
         };
     }

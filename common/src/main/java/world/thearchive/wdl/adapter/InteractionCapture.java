@@ -41,7 +41,7 @@ import net.minecraft.world.level.block.ChiseledBookShelfBlock;
 import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.entity.BlockEntityTypes;
 import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunkSection;
@@ -403,7 +403,7 @@ public final class InteractionCapture {
 
     @SuppressWarnings("NullAway") // getKey is non-null for a registered vanilla block-entity type
     private static String shulkerBlockEntityId() {
-        return BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(BlockEntityType.SHULKER_BOX).toString();
+        return BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(BlockEntityTypes.SHULKER_BOX).toString();
     }
 
     /** The chunks holding a pending candidate, so the session can re-encode the loaded ones before the gate. */

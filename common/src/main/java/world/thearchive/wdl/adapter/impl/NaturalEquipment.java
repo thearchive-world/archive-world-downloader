@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.Item;
@@ -46,7 +47,7 @@ final class NaturalEquipment {
      * invisible-ambiguous case.
      */
     private static final Set<Item> NATURAL_HEAD_EXTRAS = Set.of(
-            Items.CARVED_PUMPKIN, Items.JACK_O_LANTERN, Items.WHITE_BANNER);
+            Items.CARVED_PUMPKIN, Items.JACK_O_LANTERN, Items.BANNER.white());
 
     private static final Map<EquipmentSlot, Set<Item>> BASE_ARMOR = Map.of(
             EquipmentSlot.HEAD, Set.of(Items.LEATHER_HELMET, Items.COPPER_HELMET, Items.GOLDEN_HELMET,
@@ -65,27 +66,27 @@ final class NaturalEquipment {
             EquipmentSlot.FEET, Set.of(Items.GOLDEN_BOOTS));
 
     private static final Map<EntityType<?>, Profile> PROFILES = Map.ofEntries(
-            Map.entry(EntityType.ZOMBIE,
+            Map.entry(EntityTypes.ZOMBIE,
                     new Profile(Set.of(Items.IRON_SWORD, Items.IRON_SPEAR, Items.IRON_SHOVEL), ArmorKind.BASE)),
-            Map.entry(EntityType.HUSK,
+            Map.entry(EntityTypes.HUSK,
                     new Profile(Set.of(Items.IRON_SWORD, Items.IRON_SPEAR, Items.IRON_SHOVEL), ArmorKind.BASE)),
-            Map.entry(EntityType.ZOMBIE_VILLAGER,
+            Map.entry(EntityTypes.ZOMBIE_VILLAGER,
                     new Profile(Set.of(Items.IRON_SWORD, Items.IRON_SPEAR, Items.IRON_SHOVEL), ArmorKind.BASE)),
-            Map.entry(EntityType.DROWNED,
+            Map.entry(EntityTypes.DROWNED,
                     new Profile(Set.of(Items.TRIDENT, Items.FISHING_ROD), ArmorKind.NONE)),
-            Map.entry(EntityType.SKELETON, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
-            Map.entry(EntityType.STRAY, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
-            Map.entry(EntityType.BOGGED, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
-            Map.entry(EntityType.PARCHED, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
-            Map.entry(EntityType.WITHER_SKELETON, new Profile(Set.of(Items.STONE_SWORD), ArmorKind.NONE)),
-            Map.entry(EntityType.PIGLIN,
+            Map.entry(EntityTypes.SKELETON, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
+            Map.entry(EntityTypes.STRAY, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
+            Map.entry(EntityTypes.BOGGED, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
+            Map.entry(EntityTypes.PARCHED, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
+            Map.entry(EntityTypes.WITHER_SKELETON, new Profile(Set.of(Items.STONE_SWORD), ArmorKind.NONE)),
+            Map.entry(EntityTypes.PIGLIN,
                     new Profile(Set.of(Items.CROSSBOW, Items.GOLDEN_SWORD, Items.GOLDEN_SPEAR), ArmorKind.GOLDEN)),
-            Map.entry(EntityType.ZOMBIFIED_PIGLIN,
+            Map.entry(EntityTypes.ZOMBIFIED_PIGLIN,
                     new Profile(Set.of(Items.GOLDEN_SWORD, Items.GOLDEN_SPEAR), ArmorKind.NONE)),
-            Map.entry(EntityType.PIGLIN_BRUTE, new Profile(Set.of(Items.GOLDEN_AXE), ArmorKind.NONE)),
-            Map.entry(EntityType.PILLAGER, new Profile(Set.of(Items.CROSSBOW), ArmorKind.NONE)),
-            Map.entry(EntityType.VINDICATOR, new Profile(Set.of(Items.IRON_AXE), ArmorKind.NONE)),
-            Map.entry(EntityType.VEX, new Profile(Set.of(Items.IRON_SWORD), ArmorKind.NONE)));
+            Map.entry(EntityTypes.PIGLIN_BRUTE, new Profile(Set.of(Items.GOLDEN_AXE), ArmorKind.NONE)),
+            Map.entry(EntityTypes.PILLAGER, new Profile(Set.of(Items.CROSSBOW), ArmorKind.NONE)),
+            Map.entry(EntityTypes.VINDICATOR, new Profile(Set.of(Items.IRON_AXE), ArmorKind.NONE)),
+            Map.entry(EntityTypes.VEX, new Profile(Set.of(Items.IRON_SWORD), ArmorKind.NONE)));
 
     static boolean isGearedType(EntityType<?> type) {
         return PROFILES.containsKey(type);

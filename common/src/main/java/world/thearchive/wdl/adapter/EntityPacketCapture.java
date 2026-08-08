@@ -29,6 +29,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.item.ItemStack;
@@ -77,7 +78,7 @@ final class EntityPacketCapture
      * sampling, independent of the range-10 rule and the exclusion list.
      */
     private static final Set<EntityType<?>> DECORATION_TYPES = Set.of(
-            EntityType.ITEM_FRAME, EntityType.GLOW_ITEM_FRAME, EntityType.PAINTING, EntityType.ARMOR_STAND);
+            EntityTypes.ITEM_FRAME, EntityTypes.GLOW_ITEM_FRAME, EntityTypes.PAINTING, EntityTypes.ARMOR_STAND);
 
     /**
      * Range-10 types excluded from range sampling, for two reasons. The player-mountables: a riding player raises their
@@ -94,19 +95,19 @@ final class EntityPacketCapture
      * Displays.
      */
     private static final Set<EntityType<?>> RANGE_SAMPLING_EXCLUSIONS = Set.of(
-            EntityType.OAK_BOAT, EntityType.SPRUCE_BOAT, EntityType.BIRCH_BOAT, EntityType.JUNGLE_BOAT,
-            EntityType.ACACIA_BOAT, EntityType.DARK_OAK_BOAT, EntityType.MANGROVE_BOAT, EntityType.CHERRY_BOAT,
-            EntityType.PALE_OAK_BOAT, EntityType.BAMBOO_RAFT,
-            EntityType.OAK_CHEST_BOAT, EntityType.SPRUCE_CHEST_BOAT, EntityType.BIRCH_CHEST_BOAT,
-            EntityType.JUNGLE_CHEST_BOAT, EntityType.ACACIA_CHEST_BOAT, EntityType.DARK_OAK_CHEST_BOAT,
-            EntityType.MANGROVE_CHEST_BOAT, EntityType.CHERRY_CHEST_BOAT, EntityType.PALE_OAK_CHEST_BOAT,
-            EntityType.BAMBOO_CHEST_RAFT,
-            EntityType.HORSE, EntityType.DONKEY, EntityType.SKELETON_HORSE, EntityType.ZOMBIE_HORSE,
-            EntityType.CAMEL, EntityType.CAMEL_HUSK, EntityType.LLAMA, EntityType.TRADER_LLAMA,
-            EntityType.PIG, EntityType.STRIDER, EntityType.HAPPY_GHAST,
-            EntityType.NAUTILUS, EntityType.ZOMBIE_NAUTILUS,
-            EntityType.BLOCK_DISPLAY, EntityType.ITEM_DISPLAY, EntityType.TEXT_DISPLAY,
-            EntityType.INTERACTION);
+            EntityTypes.OAK_BOAT, EntityTypes.SPRUCE_BOAT, EntityTypes.BIRCH_BOAT, EntityTypes.JUNGLE_BOAT,
+            EntityTypes.ACACIA_BOAT, EntityTypes.DARK_OAK_BOAT, EntityTypes.MANGROVE_BOAT, EntityTypes.CHERRY_BOAT,
+            EntityTypes.PALE_OAK_BOAT, EntityTypes.BAMBOO_RAFT,
+            EntityTypes.OAK_CHEST_BOAT, EntityTypes.SPRUCE_CHEST_BOAT, EntityTypes.BIRCH_CHEST_BOAT,
+            EntityTypes.JUNGLE_CHEST_BOAT, EntityTypes.ACACIA_CHEST_BOAT, EntityTypes.DARK_OAK_CHEST_BOAT,
+            EntityTypes.MANGROVE_CHEST_BOAT, EntityTypes.CHERRY_CHEST_BOAT, EntityTypes.PALE_OAK_CHEST_BOAT,
+            EntityTypes.BAMBOO_CHEST_RAFT,
+            EntityTypes.HORSE, EntityTypes.DONKEY, EntityTypes.SKELETON_HORSE, EntityTypes.ZOMBIE_HORSE,
+            EntityTypes.CAMEL, EntityTypes.CAMEL_HUSK, EntityTypes.LLAMA, EntityTypes.TRADER_LLAMA,
+            EntityTypes.PIG, EntityTypes.STRIDER, EntityTypes.HAPPY_GHAST,
+            EntityTypes.NAUTILUS, EntityTypes.ZOMBIE_NAUTILUS,
+            EntityTypes.BLOCK_DISPLAY, EntityTypes.ITEM_DISPLAY, EntityTypes.TEXT_DISPLAY,
+            EntityTypes.INTERACTION);
 
     /**
      * Diagnostic only (gated by {@code dumpReceivedFrames}, default off): the {@code (blockX blockY blockZ facing)} key
@@ -191,13 +192,13 @@ final class EntityPacketCapture
 
     private void onAdd(ClientboundAddEntityPacket add, IntSet bundleNamedIds) {
         observeSendRange(add, bundleNamedIds);
-        if (add.getType() == EntityType.PLAYER) {
+        if (add.getType() == EntityTypes.PLAYER) {
             return; // the client builds a RemotePlayer for PLAYER, and players are not saved as entities
         }
         EntityPos pos = new EntityPos(add.getX(), add.getY(), add.getZ(), add.getYRot(), add.getXRot());
         spawn(add.getId(), add.getUUID(), chunkKey(add.getX(), add.getZ()), pos, add);
         if (dumpReceivedFrames
-                && (add.getType() == EntityType.ITEM_FRAME || add.getType() == EntityType.GLOW_ITEM_FRAME)) {
+                && (add.getType() == EntityTypes.ITEM_FRAME || add.getType() == EntityTypes.GLOW_ITEM_FRAME)) {
             // Diagnostic key for the received-frame diff: block_pos = floor(spawn pos), Facing = the data int
             // (the frame's get3DDataValue, which is also what it saves). floor recovers the block whether the
             // packet carries the block pos or the entity pos (the offset is in [0,1)).
