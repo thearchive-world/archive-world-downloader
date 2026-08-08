@@ -15,15 +15,16 @@ import org.slf4j.Logger;
  * {@link UUID}, with per-entry failure isolation that mirrors {@link ContainerMerge}: a merge that throws is logged and
  * skipped so one bad entity can never abort the whole save. It is the {@code entities/}-region sibling of
  * {@link ContainerMerge}: that class locates a block entity by its {@code x/y/z} in the {@code "block_entities"} list,
- * this one locates a container vehicle by its {@code "UUID"} in the {@code "Entities"} list. The {@code "Items"} write
- * itself is reused verbatim from {@link ContainerSink#merge} (a chest minecart / boat persists its contents under
- * {@code "Items"} via the exact call the sink makes), so the two classes share the serialize and differ only in the
- * locator.
+ * this one locates a container holder by its {@code "UUID"} across the {@code "Entities"} tree, each record and every
+ * node beneath its {@code "Passengers"} ({@link EntityTreeWalk}). The {@code "Items"} write itself is reused verbatim
+ * from {@link ContainerSink#merge} (a chest minecart / boat persists its contents under {@code "Items"} via the exact
+ * call the sink makes), so the two classes share the serialize and differ only in the locator.
  *
- * <p>Portable across the entities-region format: the top-level {@code "Entities"} list and a per-entity {@code "UUID"}
- * 4-int array ({@code UUIDUtil.CODEC}) are vanilla-stable post-1.16, so only the per-band {@code "Items"} serialization
- * (behind {@link ContainerSink#merge}) differs. The matched entity tag is replaced in place inside the captured chunk
- * tag, so the merged contents are written by the regular entity write that follows.
+ * <p>Portable across the entities-region format: the {@code "Entities"} list, the recursive {@code "Passengers"} list
+ * and a per-entity {@code "UUID"} 4-int array ({@code UUIDUtil.CODEC}) are vanilla-stable post-1.16, so only the
+ * per-band {@code "Items"} serialization (behind {@link ContainerSink#merge}) differs. The matched node's
+ * {@code "Items"} is set in place inside the captured chunk tag, so the merged contents are written by the regular
+ * entity write that follows.
  */
 final class EntityContainerMerge {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -61,36 +62,33 @@ final class EntityContainerMerge {
             if (!(entities.get(i) instanceof CompoundTag entityTag)) {
                 continue;
             }
-            UUID uuid = EntityMerge.readUuid(entityTag);
-            if (uuid == null) {
-                continue;
-            }
-            CompoundTag holder = stash.containsKey(uuid) ? null : folded.get(uuid);
-            if (holder == null) {
-                continue; // no earlier fold to repeat, or a reopened menu whose own fold runs next and wins
-            }
-            try {
-                // A copy, because the sink aliases the list it is handed: the retained holder is folded into
-                // several envelopes over a session and one of them may already be across the thread boundary.
-                entities.set(i, sink.merge(entityTag, holder.copy()));
-                merged++;
-            } catch (RuntimeException e) {
-                failed++; // this copy saves without its contents beside one that has them
-                LOGGER.warn("skipping entity {}: container re-fold failed", uuid, e);
+            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
+                UUID uuid = node.getKey();
+                CompoundTag holder = stash.containsKey(uuid) ? null : folded.get(uuid);
+                if (holder == null) {
+                    continue; // no earlier fold to repeat, or a reopened menu whose own fold runs next and wins
+                }
+                try {
+                    // A copy, because the sink aliases the list it is handed: the retained holder is folded into
+                    // several envelopes over a session and one of them may already be across the thread boundary.
+                    foldItems(sink, node.getValue(), holder.copy());
+                    merged++;
+                } catch (RuntimeException e) {
+                    failed++; // this copy saves without its contents beside one that has them
+                    LOGGER.warn("skipping entity {}: container re-fold failed", uuid, e);
+                }
             }
         }
         return new MergeTally(merged, failed);
     }
 
     /**
-     * Fold (and drain) the UUID-keyed {@code stash} into {@code entitiesChunkTag}: for each entity in the top-level
-     * {@code "Entities"} list whose {@code "UUID"} is stashed, replace it with {@code sink.merge(entityTag, holder)}
-     * (which sets {@code "Items"}) and remove the drained entry. A throwing merge is logged and skipped (one bad entity
-     * never aborts the save). Unmatched stash entries are left for another chunk; whatever remains after all chunks is
-     * the accepted revisit edge (an entity that unloaded, despawned, or whose terrain was not captured). Walks only the
-     * top-level list, not nested {@code "Passengers"} children: a container vehicle that is itself a passenger is the
-     * accepted edge that fails soft and is logged by the caller. Returns how many entities actually gained their
-     * captured items.
+     * Fold (and drain) the UUID-keyed {@code stash} into {@code entitiesChunkTag}: walk each top-level
+     * {@code "Entities"} record and every node beneath its {@code "Passengers"}, and for each node whose {@code "UUID"}
+     * is stashed, set its {@code "Items"} from {@code sink.merge(node, holder)} in place and remove the drained entry.
+     * A throwing merge is logged and skipped (one bad entity never aborts the save). Unmatched stash entries are left
+     * for another chunk; whatever remains after all chunks is the accepted revisit edge (an entity that unloaded,
+     * despawned, or whose terrain was not captured). Returns how many nodes actually gained their captured items.
      */
     static MergeTally mergeEntityStash(ContainerSink sink, CompoundTag entitiesChunkTag,
             Map<UUID, CompoundTag> stash) {
@@ -103,22 +101,24 @@ final class EntityContainerMerge {
             if (!(entities.get(i) instanceof CompoundTag entityTag)) {
                 continue;
             }
-            UUID uuid = EntityMerge.readUuid(entityTag);
-            if (uuid == null) {
-                continue; // an entity with no readable UUID; never our captured vehicle
-            }
-            CompoundTag holder = stash.remove(uuid);
-            if (holder == null) {
-                continue; // an entity we did not capture a container for
-            }
-            try {
-                entities.set(i, sink.merge(entityTag, holder));
-                merged++;
-            } catch (RuntimeException e) {
-                failed++; // a thrown merge loses this vehicle's captured contents
-                LOGGER.warn("skipping entity {}: container merge failed", uuid, e);
+            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
+                CompoundTag holder = stash.remove(node.getKey());
+                if (holder == null) {
+                    continue;
+                }
+                try {
+                    foldItems(sink, node.getValue(), holder);
+                    merged++;
+                } catch (RuntimeException e) {
+                    failed++; // a thrown merge loses this vehicle's captured contents
+                    LOGGER.warn("skipping entity {}: container merge failed", node.getKey(), e);
+                }
             }
         }
         return new MergeTally(merged, failed);
+    }
+
+    private static void foldItems(ContainerSink sink, CompoundTag entityTag, CompoundTag holder) {
+        entityTag.put("Items", sink.merge(entityTag, holder).getListOrEmpty("Items"));
     }
 }
