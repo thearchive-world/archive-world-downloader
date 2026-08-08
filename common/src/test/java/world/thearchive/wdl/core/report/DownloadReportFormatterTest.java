@@ -51,16 +51,16 @@ class DownloadReportFormatterTest {
         assertTrue(md.startsWith("# Download report: Survival"), "title is the server name");
         assertTrue(md.contains("<img src=\"../icon.png\""), "the icon img is emitted when present");
         assertTrue(md.contains("epoch 1782112445"), "epoch seconds of the finish instant");
-        assertTrue(md.contains("- Duration: 0m 4s"));
-        assertTrue(md.contains("- Status: Completed cleanly"));
+        assertTrue(md.contains("- **Duration**: 0m 4s"));
+        assertTrue(md.contains("- **Status**: Completed cleanly"));
         assertTrue(md.contains("## Server"));
-        assertTrue(md.contains("- Server software: Paper"));
-        assertTrue(md.contains("- Simulation distance: 8 chunks"));
+        assertTrue(md.contains("- **Server software**: Paper"));
+        assertTrue(md.contains("- **Simulation distance**: 8 chunks"));
         assertTrue(md.contains("`overworld` (421 chunks)"));
-        assertTrue(md.contains("- Chunks: 421"));
-        assertTrue(md.contains("- Entities: 367"), "the entity count lands on its own summary line");
-        assertTrue(md.contains("- Containers: 0"), "the container count lands on its own summary line");
-        assertTrue(md.contains("- Minecraft: 1.21.11"));
+        assertTrue(md.contains("- **Chunks**: 421"));
+        assertTrue(md.contains("- **Entities**: 367"), "the entity count lands on its own summary line");
+        assertTrue(md.contains("- **Containers**: 0"), "the container count lands on its own summary line");
+        assertTrue(md.contains("- **Minecraft**: 1.21.11"));
         assertTrue(md.contains("- `debug.log_saved_chunks`: true"));
         assertFalse(md.contains("Players"), "the Players line is never rendered");
         assertTrue(md.contains("github.com/thearchive-world/archive-world-downloader"));
@@ -91,14 +91,14 @@ class DownloadReportFormatterTest {
 
         String md = DownloadReportFormatter.render(Collections.singletonList(pending), false, UTC, Locale.ROOT);
 
-        assertTrue(md.contains("- Status: Interrupted"));
-        assertTrue(md.contains("- Finished: Unknown"));
-        assertTrue(md.contains("- Duration: Unknown"));
-        assertTrue(md.contains("- Dimensions: 1"), "an interrupted session still reports its begin-time dimension");
+        assertTrue(md.contains("- **Status**: Interrupted"));
+        assertTrue(md.contains("- **Finished**: Unknown"));
+        assertTrue(md.contains("- **Duration**: Unknown"));
+        assertTrue(md.contains("- **Dimensions**: 1"), "an interrupted session still reports its begin-time dimension");
         assertTrue(md.contains("  - `overworld`"), "the pending record's dimension is named");
-        assertTrue(md.contains("- Chunks: Unknown"));
-        assertTrue(md.contains("- Entities: Unknown"));
-        assertTrue(md.contains("- Containers: Unknown"));
+        assertTrue(md.contains("- **Chunks**: Unknown"));
+        assertTrue(md.contains("- **Entities**: Unknown"));
+        assertTrue(md.contains("- **Containers**: Unknown"));
     }
 
     @Test
@@ -111,7 +111,7 @@ class DownloadReportFormatterTest {
         String md = DownloadReportFormatter.render(
                 Collections.singletonList(session), false, UTC, Locale.ROOT);
 
-        assertTrue(md.contains("- Duration: 1h 02m 03s"),
+        assertTrue(md.contains("- **Duration**: 1h 02m 03s"),
                 "past an hour the duration carries padded minutes and seconds");
     }
 
@@ -139,10 +139,10 @@ class DownloadReportFormatterTest {
         String md = DownloadReportFormatter.render(
                 Collections.singletonList(session), false, UTC, Locale.ROOT);
 
-        assertTrue(md.contains("- Dimensions: 2"), "the true dimension count is rendered");
+        assertTrue(md.contains("- **Dimensions**: 2"), "the true dimension count is rendered");
         assertTrue(md.contains("`overworld` (400 chunks)"));
         assertTrue(md.contains("`the_nether` (30 chunks)"));
-        assertTrue(md.contains("- Chunks: 430"), "the total sums the per-dimension counts");
+        assertTrue(md.contains("- **Chunks**: 430"), "the total sums the per-dimension counts");
     }
 
     @Test
@@ -155,7 +155,7 @@ class DownloadReportFormatterTest {
         String md = DownloadReportFormatter.render(
                 Collections.singletonList(session), false, UTC, Locale.ROOT);
 
-        assertTrue(md.contains("- Status: Completed with errors (partial)"));
+        assertTrue(md.contains("- **Status**: Completed with errors (partial)"));
     }
 
     @Test
@@ -211,7 +211,7 @@ class DownloadReportFormatterTest {
         assertFalse(md.contains("### This download"), "matching totals render no tiers");
         assertFalse(md.contains("### In the save"));
         assertFalse(md.contains("## Downloads"), "one completed record renders no history table");
-        assertTrue(md.contains("- Chunks: 421"));
+        assertTrue(md.contains("- **Chunks**: 421"));
     }
 
     @Test
@@ -245,12 +245,12 @@ class DownloadReportFormatterTest {
         int thisDownload = md.indexOf("### This download");
         int inSave = md.indexOf("### In the save");
         assertTrue(thisDownload > 0 && inSave > thisDownload, "both tiers render, session first");
-        int sessionChunks = md.indexOf("- Chunks: 421");
-        int saveChunks = md.indexOf("- Chunks: 1000");
+        int sessionChunks = md.indexOf("- **Chunks**: 421");
+        int saveChunks = md.indexOf("- **Chunks**: 1000");
         assertTrue(sessionChunks > thisDownload && sessionChunks < inSave, "session chunks in the session tier");
         assertTrue(saveChunks > inSave, "save total inside the in-save tier");
         assertTrue(md.indexOf("`the_nether` (200 chunks)") > inSave, "in-save breakdown inside its tier");
-        assertTrue(md.indexOf("- Entities: 367") < inSave, "entities stay session-scoped");
+        assertTrue(md.indexOf("- **Entities**: 367") < inSave, "entities stay session-scoped");
     }
 
     @Test
@@ -312,7 +312,7 @@ class DownloadReportFormatterTest {
                 new SaveChunks(100, Collections.<DimensionChunks>emptyList()));
         String md = DownloadReportFormatter.render(List.of(pending, resumed(STARTED, "a"), older), false,
                 UTC, Locale.ROOT);
-        assertTrue(md.contains("- Chunks: Unknown"), "the interrupted latest renders the Unknown summary");
+        assertTrue(md.contains("- **Chunks**: Unknown"), "the interrupted latest renders the Unknown summary");
         assertFalse(md.contains("### In the save"), "no in-save tier while the latest is interrupted");
         assertTrue(md.contains("## Downloads"), "the two prior completed rows still tell the story");
         assertTrue(md.contains("| 421 | 367 | 0 | Clean |"));

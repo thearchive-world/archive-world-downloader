@@ -70,34 +70,34 @@ final class DownloadReportFormatter {
         }
         Instant finishedAt = session.finishedAt();
         if (session.isComplete() && finishedAt != null) {
-            out.append("- Finished: ").append(localTime.format(finishedAt)).append(" | ")
+            out.append("- **Finished**: ").append(localTime.format(finishedAt)).append(" | ")
                     .append(utcTime.format(finishedAt)).append(" | epoch ")
                     .append(finishedAt.getEpochSecond()).append('\n');
         } else {
-            out.append("- Finished: Unknown\n");
+            out.append("- **Finished**: Unknown\n");
         }
-        out.append("- Downloaded by: ").append(ReportText.escapeServerText(identity.downloaderName()))
+        out.append("- **Downloaded by**: ").append(ReportText.escapeServerText(identity.downloaderName()))
                 .append('\n');
         if (session.isComplete() && finishedAt != null) {
-            out.append("- Duration: ").append(formatDuration(identity.startedAt(), finishedAt)).append('\n');
+            out.append("- **Duration**: ").append(formatDuration(identity.startedAt(), finishedAt)).append('\n');
         } else {
-            out.append("- Duration: Unknown\n");
+            out.append("- **Duration**: Unknown\n");
         }
-        out.append("- Status: ").append(statusText(session)).append('\n');
+        out.append("- **Status**: ").append(statusText(session)).append('\n');
     }
 
     private static void appendServer(StringBuilder out, DownloadSession session) {
         DownloadIdentity identity = session.identity();
         out.append("\n## Server\n");
-        out.append("- Address: ").append(ReportText.escapeServerText(identity.sourceAddress())).append('\n');
-        out.append("- MOTD: ").append(ReportText.escapeServerText(identity.sourceMotd())).append('\n');
+        out.append("- **Address**: ").append(ReportText.escapeServerText(identity.sourceAddress())).append('\n');
+        out.append("- **MOTD**: ").append(ReportText.escapeServerText(identity.sourceMotd())).append('\n');
         ReportEnvironment environment = session.environment();
         if (environment != null) {
             String brand = ReportText.escapeServerText(environment.serverBrand());
             if (!brand.isEmpty()) {
-                out.append("- Server software: ").append(brand).append('\n');
+                out.append("- **Server software**: ").append(brand).append('\n');
             }
-            out.append("- Simulation distance: ").append(environment.simulationDistance())
+            out.append("- **Simulation distance**: ").append(environment.simulationDistance())
                     .append(" chunks\n");
         }
     }
@@ -116,29 +116,29 @@ final class DownloadReportFormatter {
                 out.append("\n### This download\n");
             }
             appendDimensionBreakdown(out, counts.dimensions());
-            out.append("- Chunks: ").append(counts.chunks()).append('\n');
-            out.append("- Entities: ").append(counts.entities()).append('\n');
-            out.append("- Containers: ").append(counts.containers()).append('\n');
+            out.append("- **Chunks**: ").append(counts.chunks()).append('\n');
+            out.append("- **Entities**: ").append(counts.entities()).append('\n');
+            out.append("- **Containers**: ").append(counts.containers()).append('\n');
             if (tieredSave != null) {
                 out.append("\n### In the save\n");
                 appendDimensionBreakdown(out, tieredSave.dimensions());
-                out.append("- Chunks: ").append(tieredSave.total()).append('\n');
+                out.append("- **Chunks**: ").append(tieredSave.total()).append('\n');
             }
         } else {
             // Interrupted: no completion counts, only the begin-time dimension the pending record holds.
             ReportEnvironment environment = session.environment();
-            out.append("- Dimensions: 1\n");
+            out.append("- **Dimensions**: 1\n");
             if (environment != null) {
                 out.append("  - `").append(environment.dimensionName()).append("`\n");
             }
-            out.append("- Chunks: Unknown\n");
-            out.append("- Entities: Unknown\n");
-            out.append("- Containers: Unknown\n");
+            out.append("- **Chunks**: Unknown\n");
+            out.append("- **Entities**: Unknown\n");
+            out.append("- **Containers**: Unknown\n");
         }
     }
 
     private static void appendDimensionBreakdown(StringBuilder out, List<DimensionChunks> dimensions) {
-        out.append("- Dimensions: ").append(dimensions.size()).append('\n');
+        out.append("- **Dimensions**: ").append(dimensions.size()).append('\n');
         for (DimensionChunks dimension : dimensions) {
             out.append("  - `").append(dimension.dimensionName()).append("` (")
                     .append(dimension.chunks()).append(" chunks)\n");
@@ -180,10 +180,10 @@ final class DownloadReportFormatter {
         ReportEnvironment environment = session.environment();
         out.append("\n## Software\n");
         if (environment != null) {
-            out.append("- Archive World Downloader: ").append(environment.modVersion()).append('\n');
-            out.append("- Minecraft: ").append(environment.minecraftVersion()).append('\n');
+            out.append("- **Archive World Downloader**: ").append(environment.modVersion()).append('\n');
+            out.append("- **Minecraft**: ").append(environment.minecraftVersion()).append('\n');
         }
-        out.append("- Loader: ").append(identity.loaderName()).append(' ')
+        out.append("- **Loader**: ").append(identity.loaderName()).append(' ')
                 .append(identity.loaderVersion()).append('\n');
     }
 
