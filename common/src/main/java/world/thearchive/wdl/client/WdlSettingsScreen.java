@@ -26,7 +26,7 @@ import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.resources.language.I18n;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
@@ -331,14 +331,14 @@ public final class WdlSettingsScreen extends Screen {
             if (confirmed) {
                 this.draft.set(key, value.name());
             }
-            minecraft.setScreen(this);
+            minecraft.gui.setScreen(this);
         };
         // The lost capability differs by target: switching to OFF freezes every area after its first capture,
         // while switching to NEARBY only drops the revisit overwrite (the area around you stays current).
         String messageKey = value == RecaptureMode.OFF
                 ? "wdl.settings.confirm.recapture.to_off.message"
                 : "wdl.settings.confirm.recapture.to_nearby.message";
-        minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
+        minecraft.gui.setScreen(new WdlCaptureDisableConfirmScreen(choice,
                 Component.translatable("wdl.settings.confirm.recapture.title",
                         Component.translatable(valueLabelKey(value)).withColor(BrandColors.AMBER)),
                 Component.translatable(messageKey),
@@ -367,7 +367,7 @@ public final class WdlSettingsScreen extends Screen {
     /** Attach the option's help tooltip to its control, only when the language file carries the key (helpKey). */
     private static void applyTooltip(AbstractWidget widget, String key) {
         String tooltipKey = SettingsLayout.optionTooltipKey(key);
-        if (I18n.exists(tooltipKey)) {
+        if (Language.getInstance().has(tooltipKey)) {
             widget.setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
         }
     }
@@ -393,9 +393,9 @@ public final class WdlSettingsScreen extends Screen {
             if (confirmed) {
                 this.draft.set(key, "false");
             }
-            minecraft.setScreen(this);
+            minecraft.gui.setScreen(this);
         };
-        minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
+        minecraft.gui.setScreen(new WdlCaptureDisableConfirmScreen(choice,
                 Component.translatable(base + ".title",
                         Component.translatable(SettingsLayout.optionLabelKey(key)).withColor(BrandColors.AMBER)),
                 Component.translatable(SettingsLayout.confirmMessageKey(key)),
@@ -409,9 +409,9 @@ public final class WdlSettingsScreen extends Screen {
             if (confirmed) {
                 this.draft.revertAllToDefaults();
             }
-            minecraft.setScreen(this);
+            minecraft.gui.setScreen(this);
         };
-        minecraft.setScreen(new ConfirmScreen(choice,
+        minecraft.gui.setScreen(new ConfirmScreen(choice,
                 Component.translatable("wdl.settings.defaults.title").withColor(BrandColors.AMBER),
                 Component.translatable("wdl.settings.defaults.message"),
                 Component.translatable("wdl.settings.defaults.confirm"),
@@ -420,8 +420,8 @@ public final class WdlSettingsScreen extends Screen {
 
     private void onDiscard() {
         Minecraft minecraft = Minecraft.getInstance();
-        BooleanConsumer choice = confirmed -> minecraft.setScreen(confirmed ? this.parent : this);
-        minecraft.setScreen(new ConfirmScreen(choice,
+        BooleanConsumer choice = confirmed -> minecraft.gui.setScreen(confirmed ? this.parent : this);
+        minecraft.gui.setScreen(new ConfirmScreen(choice,
                 Component.translatable("wdl.settings.discard.title").withColor(BrandColors.AMBER),
                 Component.translatable("wdl.settings.discard.message"),
                 Component.translatable("wdl.settings.discard.confirm"),
@@ -436,7 +436,7 @@ public final class WdlSettingsScreen extends Screen {
         if (this.draft.isDirty()) {
             this.onSave.accept(this.draft.toConfig());
         }
-        Minecraft.getInstance().setScreen(this.parent);
+        Minecraft.getInstance().gui.setScreen(this.parent);
     }
 
     private record Control(AbstractWidget widget, Runnable refresh) {}

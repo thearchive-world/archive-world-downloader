@@ -533,14 +533,14 @@ public final class WdlDownloadsScreen extends Screen {
         }
         RestoreSource pinned = source.get();
         if (this.minecraft != null) {
-            this.minecraft.setScreen(ResumeConfirm.createRestore("wdl.screen.downloads.confirm_restore",
+            this.minecraft.gui.setScreen(ResumeConfirm.createRestore("wdl.screen.downloads.confirm_restore",
                     entry.folderName(), pinned.zip().getFileName().toString(),
                     RestoreOperation.nextSnapshotName(this.savesDirectory, entry.folderName()), this.zipOnResume,
                     () -> {
                         Wdl.launchRestore(this.savesDirectory, entry.folderName(), pinned);
-                        this.minecraft.setScreen(this);
+                        this.minecraft.gui.setScreen(this);
                     },
-                    () -> this.minecraft.setScreen(this)));
+                    () -> this.minecraft.gui.setScreen(this)));
         }
     }
 
@@ -598,15 +598,15 @@ public final class WdlDownloadsScreen extends Screen {
             Optional<RestoreSource> source = RestoreSource.find(this.savesDirectory, folderName);
             if (source.isPresent() && this.minecraft != null) {
                 RestoreSource pinned = source.get();
-                this.minecraft.setScreen(ResumeConfirm.createRestore(
+                this.minecraft.gui.setScreen(ResumeConfirm.createRestore(
                         "wdl.screen.downloads.confirm_restore_blocked",
                         folderName, pinned.zip().getFileName().toString(),
                         RestoreOperation.nextSnapshotName(this.savesDirectory, folderName), this.zipOnResume,
                         () -> {
                             Wdl.launchRestore(this.savesDirectory, folderName, pinned);
-                            this.minecraft.setScreen(this);
+                            this.minecraft.gui.setScreen(this);
                         },
-                        () -> this.minecraft.setScreen(this)));
+                        () -> this.minecraft.gui.setScreen(this)));
                 return;
             }
             refuseTainted();
@@ -621,11 +621,11 @@ public final class WdlDownloadsScreen extends Screen {
             boolean backupHere = this.zipOnResume && !mismatch;
             Runnable onContinue = () -> gateMapIdMismatch(folderName, mismatch, this.zipOnResume,
                     () -> start(target));
-            Runnable onCancel = () -> this.minecraft.setScreen(this);
+            Runnable onCancel = () -> this.minecraft.gui.setScreen(this);
             Optional<RestoreSource> source = taint == SinglePlayerTaint.TaintState.TAINTED
                     ? RestoreSource.find(this.savesDirectory, folderName)
                     : Optional.empty();
-            this.minecraft.setScreen(source.isPresent()
+            this.minecraft.gui.setScreen(source.isPresent()
                     ? ResumeConfirm.createTaintedRestorable(folderName,
                             source.get().zip().getFileName().toString(),
                             FinalizeOutputs.nextBackupName(this.savesDirectory, folderName), backupHere,
@@ -651,10 +651,10 @@ public final class WdlDownloadsScreen extends Screen {
             return;
         }
         if (this.minecraft != null) {
-            this.minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
+            this.minecraft.gui.setScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
                     folderName, FinalizeOutputs.nextBackupName(this.savesDirectory, folderName), backupHere,
                     proceed,
-                    () -> this.minecraft.setScreen(this)));
+                    () -> this.minecraft.gui.setScreen(this)));
         }
     }
 
@@ -670,16 +670,16 @@ public final class WdlDownloadsScreen extends Screen {
             start(target); // continue silently; the backup is separate, still governed by zipOnResume
             return;
         }
-        this.minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
+        this.minecraft.gui.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
                 folderName, FinalizeOutputs.nextBackupName(this.savesDirectory, folderName), this.zipOnResume,
                 () -> start(target),
-                () -> this.minecraft.setScreen(this))); // cancel returns here, typed name preserved, no backup
+                () -> this.minecraft.gui.setScreen(this))); // cancel returns here, typed name preserved, no backup
     }
 
     private void start(DownloadTarget target) {
         this.onStart.accept(target);
         if (this.minecraft != null) {
-            this.minecraft.setScreen(null); // back to the game; the capture runs
+            this.minecraft.gui.setScreen(null); // back to the game; the capture runs
         }
     }
 
@@ -869,7 +869,7 @@ public final class WdlDownloadsScreen extends Screen {
     @Override
     public void onClose() {
         if (this.minecraft != null) {
-            this.minecraft.setScreen(this.parent);
+            this.minecraft.gui.setScreen(this.parent);
         }
     }
 

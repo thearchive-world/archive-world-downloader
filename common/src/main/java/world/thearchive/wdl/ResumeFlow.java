@@ -201,16 +201,16 @@ final class ResumeFlow {
                     RestoreSource pinned = source.get();
                     deferScreen.accept(() -> {
                         Minecraft minecraft = Minecraft.getInstance();
-                        minecraft.setScreen(ResumeConfirm.createRestore(
+                        minecraft.gui.setScreen(ResumeConfirm.createRestore(
                                 "wdl.screen.downloads.confirm_restore_blocked",
                                 folderName, sourceZipName(pinned),
                                 RestoreOperation.nextSnapshotName(savesDirectory, folderName), config.zipOnResume(),
                                 () -> {
-                                    minecraft.setScreen(null);
+                                    minecraft.gui.setScreen(null);
                                     Wdl.launchRestore(savesDirectory, folderName, pinned);
                                 },
                                 () -> {
-                                    minecraft.setScreen(null);
+                                    minecraft.gui.setScreen(null);
                                     bridge.sendChat(ChatCopy.resumeCancelled());
                                 }));
                     });
@@ -230,13 +230,13 @@ final class ResumeFlow {
                 boolean backupHere = config.zipOnResume() && !mismatch;
                 Runnable onContinue = () -> gateMapIdMismatch(folderName, mismatch, config.zipOnResume(), () -> {
                     startDownload.accept(target);
-                    Minecraft.getInstance().setScreen(null);
+                    Minecraft.getInstance().gui.setScreen(null);
                 });
                 Runnable onCancel = () -> {
-                    minecraft.setScreen(null);
+                    minecraft.gui.setScreen(null);
                     bridge.sendChat(ChatCopy.resumeCancelled());
                 };
-                minecraft.setScreen(source.isPresent()
+                minecraft.gui.setScreen(source.isPresent()
                         ? ResumeConfirm.createTaintedRestorable(folderName, sourceZipName(source.get()),
                                 FinalizeOutputs.nextBackupName(savesDirectory, folderName), backupHere,
                                 onContinue, onCancel)
@@ -268,16 +268,16 @@ final class ResumeFlow {
         }
         deferScreen.accept(() -> {
             Minecraft minecraft = Minecraft.getInstance();
-            minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
+            minecraft.gui.setScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
                     folderName,
                     FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getBaseDir(), folderName),
                     backupHere,
                     () -> {
-                        minecraft.setScreen(null);
+                        minecraft.gui.setScreen(null);
                         proceed.run();
                     },
                     () -> {
-                        minecraft.setScreen(null);
+                        minecraft.gui.setScreen(null);
                         bridge.sendChat(ChatCopy.resumeCancelled());
                     }));
         });
@@ -296,16 +296,16 @@ final class ResumeFlow {
         }
         deferScreen.accept(() -> {
             Minecraft minecraft = Minecraft.getInstance();
-            minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
+            minecraft.gui.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
                     folderName,
                     FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getBaseDir(), folderName),
                     config.zipOnResume(),
                     () -> {
                         startDownload.accept(target);
-                        minecraft.setScreen(null);
+                        minecraft.gui.setScreen(null);
                     },
                     () -> {
-                        minecraft.setScreen(null);
+                        minecraft.gui.setScreen(null);
                         bridge.sendChat(ChatCopy.resumeCancelled());
                     }));
         });

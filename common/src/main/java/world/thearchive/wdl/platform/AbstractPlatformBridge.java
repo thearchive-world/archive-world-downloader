@@ -101,13 +101,13 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
 
     @Override
     public boolean isBlockingScreenOpen() {
-        Screen screen = Minecraft.getInstance().screen;
+        Screen screen = Minecraft.getInstance().gui.screen();
         return screen != null && !(screen instanceof ChatScreen);
     }
 
     @Override
     public boolean isHudHidden() {
-        return Minecraft.getInstance().options.hideGui;
+        return Minecraft.getInstance().gui.hud.isHidden();
     }
 
     @Override
@@ -119,7 +119,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (mc.player != null) {
             // 26.x removed Player.displayClientMessage; a client-originated chat line is ChatComponent
             // .addClientSystemMessage (band-local, config/band-divergence.txt).
-            mc.gui.getChat().addClientSystemMessage(rendered);
+            mc.gui.hud.getChat().addClientSystemMessage(rendered);
         }
     }
 
@@ -174,10 +174,10 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         }
         Minecraft mc = Minecraft.getInstance();
         SystemToast.SystemToastId id = toast.refusal() ? REFUSAL_TOAST_ID : TOAST_ID;
-        if (toast.refusal() && mc.getToastManager().getToast(SystemToast.class, id) != null) {
+        if (toast.refusal() && mc.gui.toastManager().getToast(SystemToast.class, id) != null) {
             return;
         }
-        mc.getToastManager().addToast(SystemToast.multiline(mc, id,
+        mc.gui.toastManager().addToast(new SystemToast(id,
                 Component.translatable(toast.titleKey()), body));
     }
 
