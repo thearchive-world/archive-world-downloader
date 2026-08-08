@@ -242,7 +242,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private @Nullable ClientLevel level;
     // The vanilla single-player dimension this capture is laid out under, chosen by the captured
     // dimension's TYPE so non-standard server level keys (e.g. Multiverse's minecraft:worlds/2b2t/2b2t_1)
-    // still write to the vanilla ./region / DIM-1 / DIM1 folders, not a nested dimensions/ns/path one.
+    // still write to the vanilla dimension's own folder, not one derived from the custom level key.
     // Non-final: rebound on a dimension change to lay the new dimension out under its own folder.
     private ResourceKey<Level> targetDimension;
     // The server's OWN key for the dimension being captured, as the id string the packet-side per-dimension
