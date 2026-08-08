@@ -634,7 +634,7 @@ public final class WdlSettingsScreen extends Screen {
             this.rule = rule;
             this.toggle = CycleButton.onOffBuilder(isOn()).displayOnlyValue()
                     .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty(),
-                            (button, value) -> draft.setGameRule(rule.id(),
+                            (button, value) -> draft.setGameRule(rule.bandId(),
                                     value ? rule.enabledValue() : rule.disabledValue(), rule.curatedValue()));
         }
 
@@ -644,12 +644,12 @@ public final class WdlSettingsScreen extends Screen {
         }
 
         private boolean isOn() {
-            return draft.gameRuleValue(this.rule.id(), this.rule.curatedValue()).equals(this.rule.enabledValue());
+            return draft.gameRuleValue(this.rule.bandId(), this.rule.curatedValue()).equals(this.rule.enabledValue());
         }
 
         @Override
         boolean isModified() {
-            return draft.isGameRuleModified(this.rule.id(), this.rule.curatedValue());
+            return draft.isGameRuleModified(this.rule.bandId(), this.rule.curatedValue());
         }
 
         @Override

@@ -83,11 +83,15 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     private static final long NOON = 6000L;
 
     /**
-     * The curated safe set for the 1.21.11 band, by snake_case rule id to raw value. Fire is the integer
-     * fire_spread_radius_around_player=0 here (the boolean doFireTick); the rest are booleans. The user's gamerule.*
-     * overrides are validated and applied on top of this (see {@link WorldOutputConfig}).
+     * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
+     * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
+     * Fire is the integer fire_spread_radius_around_player=0 here; the rest are booleans. The user's gamerule.*
+     * overrides, keyed by band id, are validated and applied on top of this (see {@link WorldOutputConfig}).
      */
-    private static final Map<String, String> CURATED_GAME_RULES = buildCuratedGameRules();
+    private static final List<CuratedSpec> CURATED_GAME_RULES = buildCuratedGameRules();
+
+    /** One curated rule: its stable WDL name, the running band's id for it, and the curated raw value. */
+    private record CuratedSpec(String wdlId, String bandId, String curatedValue) {}
 
     // SpecialWorldProperty is vanilla-deprecated, but the only public PrimaryLevelData ctor still
     // requires it; we take it from the baked dimensions (FLAT, for this superflat void world).
@@ -162,7 +166,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
                 return rule != null && rule.deserialize(rawValue).result().isPresent();
             }
         };
-        GameRuleResolution resolution = worldOutput.resolveGameRules(CURATED_GAME_RULES, schema);
+        GameRuleResolution resolution = worldOutput.resolveGameRules(curatedByBandId(), schema);
         for (Map.Entry<String, String> rule : resolution.effective().entrySet()) {
             GameRule<?> gameRule = available.get(rule.getKey());
             if (gameRule != null) {
@@ -176,6 +180,15 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
             LOGGER.warn("ignoring game-rule override gamerule.{}: no such game rule on this Minecraft version", id);
         }
         return resolution;
+    }
+
+    /** The curated set keyed by the band's own rule id, the shape {@link WorldOutputConfig#resolveGameRules} merges. */
+    private static Map<String, String> curatedByBandId() {
+        Map<String, String> byBandId = new LinkedHashMap<>();
+        for (CuratedSpec spec : CURATED_GAME_RULES) {
+            byBandId.put(spec.bandId(), spec.curatedValue());
+        }
+        return byBandId;
     }
 
     /** Set one validated rule on the offline GameRules (no server, so the change-callback is skipped). */
@@ -194,17 +207,16 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     public List<CuratedGameRule> curatedGameRules() {
         Map<String, GameRule<?>> byId = availableRulesById(new GameRules(FeatureFlags.DEFAULT_FLAGS));
         List<CuratedGameRule> rules = new ArrayList<>();
-        for (Map.Entry<String, String> entry : CURATED_GAME_RULES.entrySet()) {
-            String id = entry.getKey();
-            String curated = entry.getValue();
-            GameRule<?> rule = byId.get(id);
-            if (rule != null && rule.valueClass() == Boolean.class) {
-                rules.add(new CuratedGameRule(id, curated, "true", "false"));
-            } else if (rule != null) {
-                rules.add(new CuratedGameRule(id, curated, defaultRuleValue(rule), "0"));
+        for (CuratedSpec spec : CURATED_GAME_RULES) {
+            GameRule<?> rule = byId.get(spec.bandId());
+            if (rule == null) {
+                continue; // a curated rule with no rule at this band is omitted, and the menu skips its order slot
+            }
+            if (rule.valueClass() == Boolean.class) {
+                rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(), "true", "false"));
             } else {
-                // A curated id absent at this band cannot toggle; degrade to a fixed row rather than a null cell.
-                rules.add(new CuratedGameRule(id, curated, curated, curated));
+                rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(),
+                        defaultRuleValue(rule), "0"));
             }
         }
         return Collections.unmodifiableList(rules);
@@ -215,19 +227,21 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return rule.serialize(rule.defaultValue());
     }
 
-    private static Map<String, String> buildCuratedGameRules() {
-        Map<String, String> curated = new LinkedHashMap<>();
-        curated.put("spawn_mobs", "false");
-        curated.put("fire_spread_radius_around_player", "0");
-        curated.put("spread_vines", "false");
-        curated.put("advance_time", "false");
-        curated.put("advance_weather", "false");
-        curated.put("keep_inventory", "true");
-        curated.put("mob_griefing", "false");
-        curated.put("spawn_wardens", "false");
-        curated.put("spawn_wandering_traders", "false");
-        curated.put("spawn_patrols", "false");
-        return Collections.unmodifiableMap(curated);
+    // At this band the WDL name and the band's rule id coincide; a band whose vanilla ids differ maps them here, and
+    // drops a WDL rule with no band equivalent by omitting its spec.
+    private static List<CuratedSpec> buildCuratedGameRules() {
+        List<CuratedSpec> curated = new ArrayList<>();
+        curated.add(new CuratedSpec("spawn_mobs", "spawn_mobs", "false"));
+        curated.add(new CuratedSpec("fire_spread_radius_around_player", "fire_spread_radius_around_player", "0"));
+        curated.add(new CuratedSpec("spread_vines", "spread_vines", "false"));
+        curated.add(new CuratedSpec("advance_time", "advance_time", "false"));
+        curated.add(new CuratedSpec("advance_weather", "advance_weather", "false"));
+        curated.add(new CuratedSpec("keep_inventory", "keep_inventory", "true"));
+        curated.add(new CuratedSpec("mob_griefing", "mob_griefing", "false"));
+        curated.add(new CuratedSpec("spawn_wardens", "spawn_wardens", "false"));
+        curated.add(new CuratedSpec("spawn_wandering_traders", "spawn_wandering_traders", "false"));
+        curated.add(new CuratedSpec("spawn_patrols", "spawn_patrols", "false"));
+        return Collections.unmodifiableList(curated);
     }
 
     @Override
