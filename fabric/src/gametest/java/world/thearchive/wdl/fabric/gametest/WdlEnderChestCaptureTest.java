@@ -67,7 +67,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
 
             Path saveRoot = run.stopAndAwaitSave();
 
-            CompoundTag player = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player");
+            CompoundTag player = CaptureReadback.capturedPlayer(saveRoot);
             List<String> enderItems = player.getListOrEmpty("EnderItems").compoundStream()
                     .map(item -> item.getString("id").orElse("?"))
                     .toList();
@@ -120,7 +120,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                         + "cleared its rim and the report counted a container the save does not hold");
 
         Path saveRoot = run.stopAndAwaitSave();
-        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player")
+        List<String> enderItems = CaptureReadback.capturedPlayer(saveRoot)
                 .getListOrEmpty("EnderItems").compoundStream()
                 .map(item -> item.getString("id").orElse("?"))
                 .toList();
@@ -194,7 +194,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                 "a click on an ender chest that opens nothing seeded a later open onto the ender inventory");
 
         Path saveRoot = run.stopAndAwaitSave();
-        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player")
+        List<String> enderItems = CaptureReadback.capturedPlayer(saveRoot)
                 .getListOrEmpty("EnderItems").compoundStream()
                 .map(item -> item.getString("id").orElse("?"))
                 .toList();

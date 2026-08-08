@@ -197,8 +197,8 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
                 "an unattributed open was claimed by the ridden chest boat: " + boatId);
 
         Path saveRoot = run.stopAndAwaitSave();
-        CompoundTag boat = CaptureReadback.levelData(saveRoot)
-                .getCompoundOrEmpty("Player").getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity");
+        CompoundTag boat = CaptureReadback.capturedPlayer(saveRoot)
+                .getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity");
         Check.that(boat.getString("id").orElse("").equals("minecraft:oak_chest_boat"),
                 "the ridden chest boat is absent from the saved player, so the guard would assert nothing: "
                         + boat.getString("id").orElse("none"));
@@ -244,8 +244,8 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
                 "the ridden chest boat's own open was not attributed to it: " + boatId);
 
         Path saveRoot = run.stopAndAwaitSave();
-        CompoundTag boat = CaptureReadback.levelData(saveRoot)
-                .getCompoundOrEmpty("Player").getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity");
+        CompoundTag boat = CaptureReadback.capturedPlayer(saveRoot)
+                .getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity");
         Check.that(boat.getString("id").orElse("").equals("minecraft:oak_chest_boat"),
                 "the ridden chest boat is absent from the saved player, so the assertion below proves nothing: "
                         + boat.getString("id").orElse("none"));

@@ -6,17 +6,19 @@ package world.thearchive.wdl.fabric.gametest;
 import java.nio.file.Path;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.world.level.gamerules.GameRules;
 
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
 /**
- * World-output axis: the configured world-open state and game rules reach level.dat. The downloaded world opens at noon
- * ({@code DayTime} 6000) as a fixed world-open invariant, and the default config has the game-rule master on, so the
- * curated safe rule set is written. Both are observable in level.dat's {@code Data}, proving the world-output config is
- * applied to the assembled save, not just the chunks.
+ * World-output axis: the configured world-open state and game rules reach the 26.x sibling SavedData files. The
+ * downloaded world opens at noon (overworld clock 6000 in {@code data/minecraft/world_clocks.dat}) as a fixed
+ * world-open invariant, and the default config has the game-rule master on, so the curated safe rule set is written to
+ * {@code data/minecraft/game_rules.dat}. Both prove the world-output config is applied to the assembled save, not just
+ * the chunks.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlWorldOutputConfigTest implements FabricClientGameTest {
@@ -26,12 +28,13 @@ public class WdlWorldOutputConfigTest implements FabricClientGameTest {
             Path saveRoot = CaptureDriver.capture(context,
                     new DownloadTarget("wdl-worldout", "wdl-worldout", DownloadMode.NEW), WdlConfig.DEFAULTS, 20);
 
-            CompoundTag data = CaptureReadback.levelData(saveRoot);
-            Check.that(data.getLongOr("DayTime", -1) == 6000L,
-                    "world-output did not open the world at noon (level.dat DayTime 6000): "
-                            + data.getLongOr("DayTime", -1));
-            Check.that(!data.getCompoundOrEmpty("game_rules").isEmpty(),
-                    "world-output did not write the curated game rules to level.dat");
+            RegistryAccess registries = context.computeOnClient(client -> client.level.registryAccess());
+            long dayTime = CaptureReadback.overworldDayTime(saveRoot, registries);
+            Check.that(dayTime == 6000L, "world-output did not open the world at noon "
+                    + "(world_clocks.dat overworld clock 6000): " + dayTime);
+            GameRules rules = CaptureReadback.gameRules(saveRoot);
+            Check.that(rules.get(GameRules.KEEP_INVENTORY) && !rules.get(GameRules.SPAWN_MOBS),
+                    "world-output did not write the curated safe game rules to game_rules.dat");
         }
     }
 }
