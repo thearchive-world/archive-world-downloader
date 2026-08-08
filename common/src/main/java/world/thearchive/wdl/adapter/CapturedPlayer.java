@@ -12,12 +12,13 @@ import net.minecraft.world.level.Level;
 
 /**
  * The immutable finish-snapshot of the local player, assembled on the client main thread in {@code finish()} and read
- * by the writer thread when it writes level.dat. Everything here is already finished, an already-serialized
+ * by the writer thread when it writes the save. Everything here is already finished, an already-serialized
  * {@code playerTag} plus primitives and band-stable value types, so it crosses the thread boundary safely, the same
  * render-thread-snapshot discipline as the entity and container captures.
  *
- * @param playerTag  the processed {@code saveWithoutId} tag (strips, scrub, dimension, ender remap applied) destined
- *                   for the level.dat {@code "Player"} slot
+ * @param playerTag  the processed {@code saveWithoutId} tag (strips, scrub, dimension, ender remap applied) written as
+ *                   the band's saved player (a level.dat {@code "Player"} compound pre-26.x, a
+ *                   {@code players/data/<uuid>.dat} entry at 26.x)
  * @param spawnPos   the capture block position, written as the world spawn so a non-inheriting opener still lands at
  *                   the base
  * @param yaw        the capture yaw, for the world spawn

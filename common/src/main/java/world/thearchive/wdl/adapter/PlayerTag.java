@@ -118,9 +118,8 @@ final class PlayerTag {
      * Write the seated player's mount as vanilla's {@code "RootVehicle"} record: {@code "Attach"} is the direct
      * vehicle's {@code UUID} (the {@code UUIDUtil.CODEC} four-int array) and {@code "Entity"} is the root vehicle
      * serialized standalone. Mirrors {@code ServerPlayer.saveParentVehicle}, which
-     * {@code ServerPlayer.loadAndSpawnParentVehicle} reads on a vanilla open (a singleplayer level.dat Player slot
-     * included) to respawn the vehicle and re-seat the player; an absent record is a clean load that leaves the player
-     * standing.
+     * {@code ServerPlayer.loadAndSpawnParentVehicle} reads on a vanilla open (a singleplayer saved player included) to
+     * respawn the vehicle and re-seat the player; an absent record is a clean load that leaves the player standing.
      */
     static void setRootVehicle(CompoundTag raw, UUID attach, CompoundTag entityTag) {
         CompoundTag rootVehicle = new CompoundTag();
@@ -151,11 +150,11 @@ final class PlayerTag {
     /**
      * Restore a prior download's captured mount contents into a resumed player's fresh {@code RootVehicle} on a resume
      * that finished SEATED in the same mount without reopening its container: that fresh serialize carries empty
-     * menu-only contents, and the wholesale rewrite of level.dat's Player slot would drop the prior download's loot.
-     * Matched per node on each entity's own {@code UUID}, so a mount switch never grafts contents. A resume that
-     * finished un-seated carries nothing: a dismounted mount is a normal world entity, captured by the standalone
-     * entity path, and writing it into the Player slot would wrongly re-seat the player and collide same-UUID with the
-     * standalone copy. Returns whether it restored.
+     * menu-only contents, and the wholesale rewrite of the saved player would drop the prior download's loot. Matched
+     * per node on each entity's own {@code UUID}, so a mount switch never grafts contents. A resume that finished
+     * un-seated carries nothing: a dismounted mount is a normal world entity, captured by the standalone entity path,
+     * and writing it into the Player slot would wrongly re-seat the player and collide same-UUID with the standalone
+     * copy. Returns whether it restored.
      */
     static boolean restorePriorMountContents(CompoundTag priorPlayer, CompoundTag freshRaw) {
         if (!(priorPlayer.get("RootVehicle") instanceof CompoundTag prior)

@@ -17,7 +17,7 @@ import net.minecraft.world.entity.player.Player;
  * layer), while the &le;1.21.8 sub-band takes the older {@code CompoundTag} save form. Mirrors {@link EntitySink}'s
  * lift (a DISCARDING problem reporter replaces the world-scoped collector). The single step is client-coupled (a live
  * {@code Player}), exactly as {@link EntitySink}'s live {@code entity.save} step is; the headless guard is the pure
- * downstream ({@link PlayerTag}, {@link ItemLocationScrub}, the level.dat apply).
+ * downstream ({@link PlayerTag}, {@link ItemLocationScrub}, the save apply).
  */
 public interface PlayerSink {
     /**
