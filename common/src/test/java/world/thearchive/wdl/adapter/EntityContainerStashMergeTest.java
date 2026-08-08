@@ -124,6 +124,32 @@ class EntityContainerStashMergeTest {
     }
 
     @Test
+    void mergeEntityStashReachesTheHolderNestedUnderTheVehiclesPassengers() {
+        // A chested mule pushed into a plain minecart saves nested under the minecart's Passengers, never as a
+        // top-level entity, and the open-time fold must still reach it or the contents the player opened are lost.
+        CompoundTag chunkTag = entitiesChunkTag(
+                EntityFixtures.entityCarrying(entityTag("minecraft:minecart", UUID_A),
+                        entityTag("minecraft:mule", UUID_B)));
+
+        Map<UUID, CompoundTag> stash = new LinkedHashMap<>();
+        stash.put(UUID_B, holderWith(2, new ItemStack(Items.EMERALD, 7)));
+
+        MergeTally tally = EntityContainerMerge.mergeEntityStash(containerSink, chunkTag, stash);
+
+        assertEquals(1, tally.merged(), "the nested chested mule gains its captured contents");
+        assertFalse(stash.containsKey(UUID_B), "and its stash entry is drained");
+
+        ListTag entities = chunkTag.getListOrEmpty("Entities");
+        CompoundTag minecart = findByUuid(entities, UUID_A);
+        assertFalse(minecart.contains("Items"), "the plain minecart it was pushed under carries no contents");
+        CompoundTag nestedMule = minecart.getListOrEmpty("Passengers").getCompoundOrEmpty(0);
+        NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
+        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, nestedMule), back);
+        assertEquals(Items.EMERALD, back.get(2).getItem(), "the nested mule carries exactly the captured stack");
+        assertEquals(7, back.get(2).getCount());
+    }
+
+    @Test
     void mergeEntityStashIsTotalOnMissingUuid() {
         CompoundTag entity = EntityFixtures.entityWithoutUuid("minecraft:chest_minecart");
         CompoundTag chunkTag = entitiesChunkTag(entity);
