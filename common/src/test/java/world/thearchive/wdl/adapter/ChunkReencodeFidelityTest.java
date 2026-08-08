@@ -47,7 +47,7 @@ class ChunkReencodeFidelityTest {
 
         CompoundTag blockEntity = findByPosOrNull(tag, 2, 64, 2);
         assertNotNull(blockEntity, "the captured sign block entity is present in the encoded tag");
-        assertEquals("hello", blockEntity.getStringOr("wdl_test_text", ""),
+        assertEquals("hello", blockEntity.getString("wdl_test_text"),
                 "its client-held data survives the re-encode (no regression to empty)");
     }
 
@@ -64,8 +64,8 @@ class ChunkReencodeFidelityTest {
                 registries,
                 false);
 
-        assertEquals("hello", findByPosOrNull(before, 2, 64, 2).getStringOr("wdl_test_text", ""));
-        assertEquals("world", findByPosOrNull(after, 2, 64, 2).getStringOr("wdl_test_text", ""),
+        assertEquals("hello", findByPosOrNull(before, 2, 64, 2).getString("wdl_test_text"));
+        assertEquals("world", findByPosOrNull(after, 2, 64, 2).getString("wdl_test_text"),
                 "re-encoding the changed chunk reflects the edited block-entity data");
     }
 

@@ -32,8 +32,8 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.ContainerHelper;
@@ -43,7 +43,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -627,7 +626,7 @@ class AsyncSaveWriterTest {
             CompoundTag chest = findByPosOrNull(back, 2, 64, 2);
             assertNotNull(chest, "the chest block entity is on disk");
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, chest), decoded);
+            ContainerHelper.loadAllItems(chest, decoded, registries);
             assertEquals(Items.DIAMOND, decoded.get(0).getItem(), "the writer-thread fold merged the captured Items");
             assertEquals(5, decoded.get(0).getCount());
         }
@@ -666,8 +665,8 @@ class AsyncSaveWriterTest {
             CompoundTag back = in.read(new ChunkPos(0, 0)).join().orElseThrow();
             CompoundTag lectern = findByPosOrNull(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
-            assertTrue(lectern.getCompoundOrEmpty("Book").contains("id"), "the writer-thread fold merged the Book");
-            assertEquals(4, lectern.getIntOr("Page", -1), "and its Page");
+            assertTrue(lectern.getCompound("Book").contains("id"), "the writer-thread fold merged the Book");
+            assertEquals(4, (lectern.contains("Page") ? lectern.getInt("Page") : -1), "and its Page");
         }
     }
 
@@ -889,7 +888,7 @@ class AsyncSaveWriterTest {
         assertNotNull(onDisk, "the scan handed the prior on-disk chunk to the observer");
         CompoundTag chest = findByPosOrNull(onDisk, 2, 64, 2);
         assertNotNull(chest, "the observer saw the prior chest block entity");
-        assertFalse(chest.getListOrEmpty("Items").isEmpty(), "the prior chest carries the captured Items");
+        assertFalse(chest.getList("Items", Tag.TAG_COMPOUND).isEmpty(), "the prior chest carries the captured Items");
     }
 
     @Test
@@ -927,9 +926,10 @@ class AsyncSaveWriterTest {
         assertEquals(Level.OVERWORLD, observedDimension.get(), "the scan reported the entity chunk's dimension");
         CompoundTag onDisk = observed.get();
         assertNotNull(onDisk, "the scan handed the prior on-disk entity chunk to the observer");
-        CompoundTag vehicle = onDisk.getListOrEmpty("Entities").getCompoundOrEmpty(0);
+        CompoundTag vehicle = onDisk.getList("Entities", Tag.TAG_COMPOUND).getCompound(0);
         assertNotNull(vehicle.get("UUID"), "the prior container entity kept its UUID");
-        assertFalse(vehicle.getListOrEmpty("Items").isEmpty(), "the prior container entity carries the captured Items");
+        assertFalse(vehicle.getList("Items", Tag.TAG_COMPOUND).isEmpty(),
+                "the prior container entity carries the captured Items");
     }
 
     /**
@@ -1046,9 +1046,9 @@ class AsyncSaveWriterTest {
         assertEquals(2, result.mergedContainers(), "the fold count reached the merged-containers tally");
         try (SimpleRegionStorage in = storage(region, "chunk")) {
             CompoundTag onDisk = in.read(new ChunkPos(0, 0)).join().orElseThrow();
-            assertEquals("contents", onDisk.getStringOr("wdl_test_folded", ""),
+            assertEquals("contents", onDisk.getString("wdl_test_folded"),
                     "the folded chunk was written back to region/");
-            assertFalse(onDisk.getListOrEmpty("sections").isEmpty(),
+            assertFalse(onDisk.getList("sections", Tag.TAG_COMPOUND).isEmpty(),
                     "the prior terrain survived the read-modify-write");
         }
     }
@@ -1089,11 +1089,11 @@ class AsyncSaveWriterTest {
 
     private static ListTag vehicleItems(SimpleRegionStorage storage, ChunkPos pos, UUID uuid) {
         CompoundTag chunk = storage.read(pos).join().orElseThrow();
-        ListTag list = chunk.getListOrEmpty("Entities");
+        ListTag list = chunk.getList("Entities", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
-            CompoundTag entity = list.getCompoundOrEmpty(i);
+            CompoundTag entity = list.getCompound(i);
             if (uuid.equals(EntityMerge.readUuid(entity))) {
-                return entity.getListOrEmpty("Items");
+                return entity.getList("Items", Tag.TAG_COMPOUND);
             }
         }
         throw new AssertionError("no entity " + uuid + " in " + pos);
@@ -1271,7 +1271,7 @@ class AsyncSaveWriterTest {
                     merged.set(true);
                     findByPos(fresh, carried.getX(), carried.getY(), carried.getZ()).put("Items",
                             findByPos(onDisk, carried.getX(), carried.getY(), carried.getZ())
-                                    .getListOrEmpty("Items").copy());
+                                    .getList("Items", Tag.TAG_COMPOUND).copy());
                     throw new IllegalStateException("a carry-forward that throws part-way through the chunk");
                 });
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
@@ -1327,7 +1327,7 @@ class AsyncSaveWriterTest {
                         chest.getY(), chest.getZ()).getItem(),
                         "the prior session's stack reached the region file at " + chest);
                 assertTrue(findByPos(revisit, chest.getX(), chest.getY(), chest.getZ())
-                        .getListOrEmpty("Items").isEmpty(),
+                        .getList("Items", Tag.TAG_COMPOUND).isEmpty(),
                         "the fold must not write back into the snapshot at " + chest + ", or a revisit would "
                                 + "re-capture the prior's contents and every on-disk assertion here is vacuous");
             }
@@ -1341,8 +1341,7 @@ class AsyncSaveWriterTest {
         CompoundTag blockEntity = findByPosOrNull(chunk, x, y, z);
         assertNotNull(blockEntity, "no block entity at " + x + "/" + y + "/" + z + " in " + pos);
         NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntity),
-                decoded);
+        ContainerHelper.loadAllItems(blockEntity, decoded, registries);
         return decoded.get(0);
     }
 

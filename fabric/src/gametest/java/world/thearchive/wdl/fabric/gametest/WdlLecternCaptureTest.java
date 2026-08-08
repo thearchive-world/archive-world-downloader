@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.inventory.LecternMenu;
 import net.minecraft.world.level.ChunkPos;
@@ -70,16 +71,14 @@ public class WdlLecternCaptureTest implements FabricClientGameTest {
                     .orElseThrow(() -> new AssertionError("captured chunk for lectern " + lectern + " is missing"));
             CompoundTag blockEntity = CaptureReadback.blockEntityAt(chunk, lectern)
                     .orElseThrow(() -> new AssertionError("no lectern block entity at " + lectern + " in the chunk"));
-            CompoundTag book = blockEntity.getCompound("Book")
-                    .orElseThrow(() -> new AssertionError("the lectern's book is absent from its captured block "
-                            + "entity: " + blockEntity));
-            Check.that(book.getString("id").orElse("").equals("minecraft:writable_book"),
+            CompoundTag book = blockEntity.getCompound("Book");
+            Check.that(book.getString("id").equals("minecraft:writable_book"),
                     "the lectern's book is not a writable_book in its captured block entity: " + book);
             String page = book.getCompound("components")
-                    .flatMap(components -> components.getCompound("minecraft:writable_book_content"))
-                    .stream()
-                    .flatMap(content -> content.getListOrEmpty("pages").compoundStream())
-                    .map(pageTag -> pageTag.getString("raw").orElse(""))
+                    .getCompound("minecraft:writable_book_content")
+                    .getList("pages", Tag.TAG_COMPOUND).stream()
+                    .map(t -> (CompoundTag) t)
+                    .map(pageTag -> pageTag.getString("raw"))
                     .findFirst()
                     .orElse("");
             Check.that(page.equals(PAGE_TEXT),

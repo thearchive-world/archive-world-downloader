@@ -13,10 +13,10 @@ import java.util.List;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -26,9 +26,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -69,7 +66,7 @@ class EntitySinkRootVehicleTest {
 
         CompoundTag tag = sink.captureRootVehicle(vehicle, registries, false);
         assertNotNull(tag, "captureRootVehicle serializes it regardless, the RootVehicle way vanilla persists a mount");
-        assertEquals("minecraft:pig", tag.getStringOr("id", ""),
+        assertEquals("minecraft:pig", tag.getString("id"),
                 "the vehicle NBT carries its type id so loadAndSpawnParentVehicle can respawn it");
     }
 
@@ -80,7 +77,7 @@ class EntitySinkRootVehicleTest {
 
         CompoundTag tag = sink.captureRootVehicle(vehicle, registries, false);
         assertNotNull(tag);
-        assertEquals(0, tag.getListOrEmpty("Items").size(),
+        assertEquals(0, tag.getList("Items", Tag.TAG_COMPOUND).size(),
                 "the captured mount serializes no Items of its own, so the fold is required");
 
         NonNullList<ItemStack> contents = NonNullList.withSize(27, ItemStack.EMPTY);
@@ -91,8 +88,8 @@ class EntitySinkRootVehicleTest {
 
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         CompoundTag probe = new CompoundTag();
-        probe.put("Items", folded.getListOrEmpty("Items"));
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, probe), back);
+        probe.put("Items", folded.getList("Items", Tag.TAG_COMPOUND));
+        ContainerHelper.loadAllItems(probe, back, registries);
         assertEquals(Items.DIAMOND, back.get(3).getItem(),
                 "the captured chest-boat loot lands at its slot in the mount");
         assertEquals(9, back.get(3).getCount());
@@ -106,7 +103,7 @@ class EntitySinkRootVehicleTest {
 
         CompoundTag tag = sink.captureRootVehicle(mount, registries, false);
         assertNotNull(tag);
-        assertTrue(tag.getBoolean("PersistenceRequired").orElse(false),
+        assertTrue(tag.getBoolean("PersistenceRequired"),
                 "a name-tagged mount is persistence-required server-side, a flag the client entity arrives without, "
                         + "so the capture must restore it or the mount despawns once the player dismounts");
     }
@@ -118,7 +115,7 @@ class EntitySinkRootVehicleTest {
 
         CompoundTag tag = sink.captureRootVehicle(mount, registries, false);
         assertNotNull(tag);
-        assertFalse(tag.getBoolean("PersistenceRequired").orElse(false),
+        assertFalse(tag.getBoolean("PersistenceRequired"),
                 "an un-named mount has nothing proving server persistence, so it keeps vanilla despawn behavior");
     }
 
@@ -129,7 +126,7 @@ class EntitySinkRootVehicleTest {
 
         CompoundTag tag = sink.captureRootVehicle(mount, registries, true);
         assertNotNull(tag);
-        assertTrue(tag.getBoolean("PersistenceRequired").orElse(false),
+        assertTrue(tag.getBoolean("PersistenceRequired"),
                 "with forceMobPersistence set every captured mob keeps PersistenceRequired, named or not, so the "
                         + "un-named mount threads the knob through the same seam the standalone entity path uses");
     }
@@ -146,7 +143,7 @@ class EntitySinkRootVehicleTest {
         }
 
         @Override
-        protected void addAdditionalSaveData(ValueOutput output) {
+        protected void addAdditionalSaveData(CompoundTag tag) {
             // writes no save data, mirroring a live chest mount whose menu-only contents are absent from its serialize
         }
 
@@ -154,7 +151,7 @@ class EntitySinkRootVehicleTest {
         protected void defineSynchedData(SynchedEntityData.Builder builder) {}
 
         @Override
-        protected void readAdditionalSaveData(ValueInput input) {}
+        protected void readAdditionalSaveData(CompoundTag tag) {}
 
         @Override
         public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
@@ -166,6 +163,12 @@ class EntitySinkRootVehicleTest {
     private static final class RiddenMountMob extends Mob {
         private RiddenMountMob() {
             super(EntityType.PIG, null);
+        }
+
+        // The custom-name save reads registryAccess off the level, which is null on this headless entity.
+        @Override
+        public RegistryAccess registryAccess() {
+            return TestRegistries.frozen();
         }
 
         @Override

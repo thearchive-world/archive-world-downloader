@@ -46,7 +46,6 @@ class NaturalEquipmentTest {
     @Test
     void zombieArmorSixMaterialsNaturalExoticArmorNot() {
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.IRON_HELMET)));
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.COPPER_HELMET)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.FEET, of(Items.DIAMOND_BOOTS)));
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.TURTLE_HELMET)));
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.NETHERITE_HELMET)));
@@ -70,8 +69,6 @@ class NaturalEquipmentTest {
                 of(Items.STONE_SWORD)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.MAINHAND, of(Items.GOLDEN_SWORD)));
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.MAINHAND, of(Items.IRON_SWORD)));
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.PARCHED, EquipmentSlot.MAINHAND, of(Items.BOW)));
-        assertFalse(NaturalEquipment.isNaturalFor(EntityType.PARCHED, EquipmentSlot.MAINHAND, of(Items.IRON_SWORD)));
     }
 
     @Test
@@ -92,7 +89,6 @@ class NaturalEquipmentTest {
     @Test
     void gearedTypeMembership() {
         assertTrue(NaturalEquipment.isGearedType(EntityType.ZOMBIE));
-        assertTrue(NaturalEquipment.isGearedType(EntityType.PARCHED));
         assertFalse(NaturalEquipment.isGearedType(EntityType.CREEPER));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.CREEPER, EquipmentSlot.MAINHAND, of(Items.DIAMOND_SWORD)));
     }

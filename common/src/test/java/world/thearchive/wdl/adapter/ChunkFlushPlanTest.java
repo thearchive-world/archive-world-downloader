@@ -22,6 +22,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
@@ -70,8 +71,8 @@ class ChunkFlushPlanTest {
     }
 
     private static List<Integer> slotsOf(CompoundTag blockEntityTag) {
-        return blockEntityTag.getListOrEmpty("Items").compoundStream()
-                .map(entry -> (int) entry.getByteOr("Slot", (byte) -1))
+        return blockEntityTag.getList("Items", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .map(entry -> (int) (entry.contains("Slot") ? entry.getByte("Slot") : (byte) -1))
                 .sorted()
                 .toList();
     }
@@ -169,11 +170,11 @@ class ChunkFlushPlanTest {
 
         assertEquals(0, withPosition, "a crafter re-opened this session captured its own state, nothing carries back");
         assertArrayEquals(new int[0],
-                findByPos(freshReopened, 6, 64, 6).getIntArray("disabled_slots").orElseThrow(),
+                findByPos(freshReopened, 6, 64, 6).getIntArray("disabled_slots"),
                 "so the state the re-open captured survives");
         assertEquals(1, withoutPosition, "and without the position the prior state does carry forward");
         assertArrayEquals(new int[] { 2, 5 },
-                findByPos(freshRewalked, 6, 64, 6).getIntArray("disabled_slots").orElseThrow(),
+                findByPos(freshRewalked, 6, 64, 6).getIntArray("disabled_slots"),
                 "which is what proves the set is read rather than ignored");
     }
 
@@ -212,7 +213,7 @@ class ChunkFlushPlanTest {
         assertEquals(0, landed, "a position named as landing captured its own state, so nothing carries back");
         assertEquals(1, none, "and one not named carries the prior state forward");
         assertArrayEquals(new int[] { 2, 5 },
-                findByPos(freshRewalked, 6, 64, 6).getIntArray("disabled_slots").orElseThrow(),
+                findByPos(freshRewalked, 6, 64, 6).getIntArray("disabled_slots"),
                 "which is what proves the landing list reaches the merge rather than being dropped");
     }
 
@@ -257,7 +258,8 @@ class ChunkFlushPlanTest {
 
         assertEquals(3, tally.merged(), "each of the three stashes folded its own block entity");
         assertEquals(0, tally.failed());
-        assertFalse(findByPos(chunkTag, 1, 64, 1).getListOrEmpty("Items").isEmpty(), "the chest gained its items");
+        assertFalse(findByPos(chunkTag, 1, 64, 1).getList("Items", Tag.TAG_COMPOUND).isEmpty(),
+                "the chest gained its items");
         assertTrue(findByPos(chunkTag, 2, 64, 2).contains("Book"), "the lectern gained its book");
         assertTrue(findByPos(chunkTag, 3, 64, 3).contains("RecordItem"), "the jukebox gained its disc");
         assertTrue(containers.isEmpty() && lecterns.isEmpty() && holders.isEmpty(),
@@ -307,7 +309,7 @@ class ChunkFlushPlanTest {
 
         assertEquals(2, tally.merged(), "both the container and the lectern rewrite land");
         assertEquals(0, tally.failed());
-        assertFalse(findByPos(onDisk, 1, 64, 1).getListOrEmpty("Items").isEmpty());
+        assertFalse(findByPos(onDisk, 1, 64, 1).getList("Items", Tag.TAG_COMPOUND).isEmpty());
         assertTrue(findByPos(onDisk, 2, 64, 2).contains("Book"));
     }
 

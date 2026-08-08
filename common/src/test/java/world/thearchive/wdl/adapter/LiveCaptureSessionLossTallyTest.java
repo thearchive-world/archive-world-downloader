@@ -31,6 +31,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
@@ -46,8 +47,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -409,10 +408,10 @@ class LiveCaptureSessionLossTallyTest {
         protected void defineSynchedData(SynchedEntityData.Builder builder) {}
 
         @Override
-        protected void readAdditionalSaveData(ValueInput input) {}
+        protected void readAdditionalSaveData(CompoundTag tag) {}
 
         @Override
-        protected void addAdditionalSaveData(ValueOutput output) {}
+        protected void addAdditionalSaveData(CompoundTag tag) {}
 
         @Override
         public boolean hurtServer(ServerLevel serverLevel, DamageSource source, float amount) {
@@ -447,7 +446,7 @@ class LiveCaptureSessionLossTallyTest {
     /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
     private static CompoundTag entity(UUID uuid) {
         CompoundTag entity = new CompoundTag();
-        entity.store("UUID", UUIDUtil.CODEC, uuid);
+        entity.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow());
         return entity;
     }
 
@@ -923,7 +922,7 @@ class LiveCaptureSessionLossTallyTest {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
         captureTerrain(session, Level.NETHER, chunk); // captured THERE, deliberately not in the bound dimension
-        capture.enterDimension(Level.NETHER.identifier().toString());
+        capture.enterDimension(Level.NETHER.location().toString());
         spawn(capture, 1, VEHICLE, chunk);
         spawn(capture, 2, FRAME, chunk);
         assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
@@ -953,7 +952,7 @@ class LiveCaptureSessionLossTallyTest {
     void aFrameHeldForAnotherDimensionOnUncapturedTerrainStaysBenign(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
-        capture.enterDimension(Level.NETHER.identifier().toString());
+        capture.enterDimension(Level.NETHER.location().toString());
         spawn(capture, 1, VEHICLE, chunk);
         spawn(capture, 2, FRAME, chunk);
 
@@ -979,7 +978,7 @@ class LiveCaptureSessionLossTallyTest {
             throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
-        String bound = Level.OVERWORLD.identifier().toString();
+        String bound = Level.OVERWORLD.location().toString();
         // Terrain deliberately NOT captured for this chunk, which is the whole subject: the gate refuses it.
         spawn(capture, 1, VEHICLE, chunk);
 
@@ -1015,7 +1014,7 @@ class LiveCaptureSessionLossTallyTest {
         Field field = LiveCaptureSession.class.getDeclaredField("packetCapture");
         field.setAccessible(true);
         EntityPacketCapture capture = new EntityPacketCapture(false, new SendRangeEstimator(),
-                new SendRangeSampler(System::nanoTime, false), Level.OVERWORLD.identifier().toString());
+                new SendRangeSampler(System::nanoTime, false), Level.OVERWORLD.location().toString());
         field.set(session, capture);
         return capture;
     }

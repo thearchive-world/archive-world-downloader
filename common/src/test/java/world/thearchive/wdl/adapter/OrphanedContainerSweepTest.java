@@ -23,7 +23,7 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.util.ProblemReporter;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.ContainerHelper;
@@ -33,7 +33,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -85,11 +84,11 @@ class OrphanedContainerSweepTest {
     }
 
     private static @Nullable CompoundTag blockEntityAt(CompoundTag chunkTag, int x, int y, int z) {
-        ListTag list = chunkTag.getListOrEmpty("block_entities");
+        ListTag list = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
-            CompoundTag blockEntity = list.getCompoundOrEmpty(i);
-            if (blockEntity.getIntOr("x", 0) == x && blockEntity.getIntOr("y", 0) == y
-                    && blockEntity.getIntOr("z", 0) == z) {
+            CompoundTag blockEntity = list.getCompound(i);
+            if (blockEntity.getInt("x") == x && blockEntity.getInt("y") == y
+                    && blockEntity.getInt("z") == z) {
                 return blockEntity;
             }
         }
@@ -105,8 +104,7 @@ class OrphanedContainerSweepTest {
             CompoundTag blockEntity = blockEntityAt(back, x, y, z);
             assertNotNull(blockEntity, "block entity present on disk at " + x + "," + y + "," + z);
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntity),
-                    decoded);
+            ContainerHelper.loadAllItems(blockEntity, decoded, registries);
             return decoded;
         }
     }
@@ -177,9 +175,9 @@ class OrphanedContainerSweepTest {
             CompoundTag back = in.read(chunk).join().orElseThrow(() -> new AssertionError("chunk missing on disk"));
             CompoundTag lectern = blockEntityAt(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
-            assertEquals("minecraft:writable_book", lectern.getCompoundOrEmpty("Book").getStringOr("id", ""),
+            assertEquals("minecraft:writable_book", lectern.getCompound("Book").getString("id"),
                     "the orphaned lectern book reached the on-disk lectern with its item identity");
-            assertEquals(7, lectern.getIntOr("Page", -1), "and its reading page");
+            assertEquals(7, (lectern.contains("Page") ? lectern.getInt("Page") : -1), "and its reading page");
         }
     }
 

@@ -13,6 +13,8 @@ import java.nio.file.Path;
 import java.util.List;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.level.ChunkPos;
@@ -88,14 +90,15 @@ class EntityRoundTripTest {
 
         CompoundTag tag = sink.encodeChunk(List.of(entityTag("minecraft:pig", 1), entityTag("minecraft:cow", 2)), pos);
 
-        assertTrue(tag.getIntOr("DataVersion", -1) > 0, "must stamp a current DataVersion");
-        assertEquals(pos, tag.read("Position", ChunkPos.CODEC).orElseThrow(),
+        assertTrue((tag.contains("DataVersion") ? tag.getInt("DataVersion") : -1) > 0,
+                "must stamp a current DataVersion");
+        assertEquals(pos, ChunkPos.CODEC.parse(NbtOps.INSTANCE, tag.get("Position")).result().orElseThrow(),
                 "Position must encode the chunk pos via ChunkPos.CODEC");
 
-        ListTag entities = tag.getListOrEmpty("Entities");
+        ListTag entities = tag.getList("Entities", Tag.TAG_COMPOUND);
         assertEquals(2, entities.size(), "both entity tags must be retained in the Entities list");
-        assertEquals("minecraft:pig", entities.getCompoundOrEmpty(0).getStringOr("id", ""));
-        assertEquals("minecraft:cow", entities.getCompoundOrEmpty(1).getStringOr("id", ""));
+        assertEquals("minecraft:pig", entities.getCompound(0).getString("id"));
+        assertEquals("minecraft:cow", entities.getCompound(1).getString("id"));
     }
 
     @Test
@@ -128,13 +131,16 @@ class EntityRoundTripTest {
             for (int i = 0; i < positions.size(); i++) {
                 CompoundTag back = in.read(positions.get(i)).join()
                         .orElseThrow(() -> new AssertionError("missing entity-chunk"));
-                assertEquals(positions.get(i), back.read("Position", ChunkPos.CODEC).orElseThrow(),
+                assertEquals(positions.get(i),
+                        ChunkPos.CODEC.parse(NbtOps.INSTANCE, back.get("Position")).result().orElseThrow(),
                         "Position must survive the region round-trip");
-                ListTag entities = back.getListOrEmpty("Entities");
+                ListTag entities = back.getList("Entities", Tag.TAG_COMPOUND);
                 assertEquals(1, entities.size());
-                assertEquals(i, entities.getCompoundOrEmpty(0).getIntOr("wdlMarker", -1),
+                assertEquals(i,
+                        entities.getCompound(0).contains("wdlMarker") ? entities.getCompound(0).getInt("wdlMarker")
+                                : -1,
                         "the right entity-chunk must land at " + positions.get(i));
-                assertEquals("minecraft:item", entities.getCompoundOrEmpty(0).getStringOr("id", ""));
+                assertEquals("minecraft:item", entities.getCompound(0).getString("id"));
             }
         }
 

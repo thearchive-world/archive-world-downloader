@@ -85,20 +85,21 @@ public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
                     + " holds no entities at all, so the boat the player was sitting in was never written");
             List<CompoundTag> entities = CaptureReadback.entities(entityChunk.get());
             boolean foundBoat = entities.stream()
-                    .anyMatch(entity -> entity.getString("id").orElse("").equals("minecraft:oak_boat"));
+                    .anyMatch(entity -> entity.getString("id").equals("minecraft:oak_boat"));
             Check.that(foundBoat, "the boat the player was sitting in when the download started is absent from "
                     + "the entities region: "
-                    + entities.stream().map(entity -> entity.getString("id").orElse("?")).toList());
+                    + entities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?")).toList());
 
             Optional<CompoundTag> standEntityChunk = CaptureReadback.readEntityChunk(saveRoot, standChunk);
             Check.that(standEntityChunk.isPresent(), "entity chunk " + standChunk
                     + " holds no entities at all, so the armor stand on the build cap was never written");
             List<CompoundTag> standEntities = CaptureReadback.entities(standEntityChunk.get());
             boolean foundStand = standEntities.stream()
-                    .anyMatch(entity -> entity.getString("id").orElse("").equals("minecraft:armor_stand"));
+                    .anyMatch(entity -> entity.getString("id").equals("minecraft:armor_stand"));
             Check.that(foundStand, "the armor stand resting on the topmost placeable block is absent from the "
                     + "entities region: "
-                    + standEntities.stream().map(entity -> entity.getString("id").orElse("?")).toList());
+                    + standEntities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
+                            .toList());
         }
     }
 

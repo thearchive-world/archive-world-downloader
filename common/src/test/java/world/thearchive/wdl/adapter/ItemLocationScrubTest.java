@@ -22,19 +22,15 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.Bees;
 import net.minecraft.world.item.component.BundleContents;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.component.LodestoneTracker;
-import net.minecraft.world.item.component.TypedEntityData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -101,15 +97,15 @@ class ItemLocationScrubTest {
         beeNbt.put("flower_pos",
                 BlockPos.CODEC.encodeStart(NbtOps.INSTANCE, new BlockPos(128, 64, -512)).getOrThrow());
         BeehiveBlockEntity.Occupant occupant = new BeehiveBlockEntity.Occupant(
-                TypedEntityData.of(EntityType.BEE, beeNbt), 0, 600);
-        hive.set(DataComponents.BEES, new Bees(List.of(occupant)));
+                CustomData.of(beeNbt), 0, 600);
+        hive.set(DataComponents.BEES, List.of(occupant));
         return hive;
     }
 
     private static boolean beeFlowerPresent(ItemStack hive) {
-        Bees bees = hive.get(DataComponents.BEES);
-        return bees != null && !bees.bees().isEmpty()
-                && bees.bees().get(0).entityData().contains("flower_pos");
+        List<BeehiveBlockEntity.Occupant> bees = hive.get(DataComponents.BEES);
+        return bees != null && !bees.isEmpty()
+                && bees.get(0).entityData().contains("flower_pos");
     }
 
     private CompoundTag holderOf(ItemStack... stacks) {
@@ -122,7 +118,7 @@ class ItemLocationScrubTest {
 
     private NonNullList<ItemStack> readBack(CompoundTag holder, int size) {
         NonNullList<ItemStack> back = NonNullList.withSize(size, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, holder), back);
+        ContainerHelper.loadAllItems(holder, back, registries);
         return back;
     }
 
@@ -171,8 +167,9 @@ class ItemLocationScrubTest {
     }
 
     private ItemStack itemOf(CompoundTag blockEntity) {
-        return TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntity)
-                .read("item", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        return ItemStack.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), blockEntity.get("item"))
+                .result().orElse(ItemStack.EMPTY);
     }
 
     private CompoundTag itemNbt(ItemStack stack) {
@@ -191,7 +188,7 @@ class ItemLocationScrubTest {
 
     private CompoundTag blockEntityWithItems(ItemStack... stacks) {
         CompoundTag blockEntity = BlockEntityFixtures.blockEntity("minecraft:campfire", 0, 64, 0);
-        blockEntity.put("Items", holderOf(stacks).getListOrEmpty("Items"));
+        blockEntity.put("Items", holderOf(stacks).getList("Items", Tag.TAG_COMPOUND));
         return blockEntity;
     }
 
@@ -315,10 +312,10 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrub(holder, "Items");
 
         NonNullList<ItemStack> back = readBack(holder, 2);
-        Bees bees = back.get(0).get(DataComponents.BEES);
+        List<BeehiveBlockEntity.Occupant> bees = back.get(0).get(DataComponents.BEES);
         assertNotNull(bees, "the bees component is kept");
-        assertEquals(1, bees.bees().size(), "the occupant is kept");
-        assertFalse(bees.bees().get(0).entityData().contains("flower_pos"),
+        assertEquals(1, bees.size(), "the occupant is kept");
+        assertFalse(bees.get(0).entityData().contains("flower_pos"),
                 "the bee flower_pos is blanked");
         assertEquals(Items.BEEHIVE, back.get(0).getItem(), "still a beehive");
         assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-beehive item is untouched");

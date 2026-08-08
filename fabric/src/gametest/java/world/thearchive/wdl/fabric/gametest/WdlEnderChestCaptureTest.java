@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
@@ -66,9 +67,9 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
 
             Path saveRoot = run.stopAndAwaitSave();
 
-            CompoundTag player = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player");
-            List<String> enderItems = player.getListOrEmpty("EnderItems").compoundStream()
-                    .map(item -> item.getString("id").orElse("?"))
+            CompoundTag player = CaptureReadback.levelData(saveRoot).getCompound("Player");
+            List<String> enderItems = player.getList("EnderItems", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                    .map(item -> (item.contains("id") ? item.getString("id") : "?"))
                     .toList();
             Check.that(enderItems.contains("minecraft:diamond"),
                     "the planted item is absent from the captured Player.EnderItems: " + enderItems);
@@ -119,9 +120,9 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                         + "cleared its rim and the report counted a container the save does not hold");
 
         Path saveRoot = run.stopAndAwaitSave();
-        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player")
-                .getListOrEmpty("EnderItems").compoundStream()
-                .map(item -> item.getString("id").orElse("?"))
+        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompound("Player")
+                .getList("EnderItems", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .map(item -> (item.contains("id") ? item.getString("id") : "?"))
                 .toList();
         Check.that(enderItems.isEmpty(),
                 "savePlayerEnderChest off must leave no EnderItems in the save: " + enderItems);
@@ -192,9 +193,9 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                 "a click on an ender chest that opens nothing seeded a later open onto the ender inventory");
 
         Path saveRoot = run.stopAndAwaitSave();
-        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player")
-                .getListOrEmpty("EnderItems").compoundStream()
-                .map(item -> item.getString("id").orElse("?"))
+        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompound("Player")
+                .getList("EnderItems", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .map(item -> (item.contains("id") ? item.getString("id") : "?"))
                 .toList();
         // Not an emptiness check: the raw player tag carries the live client's own ender inventory whatever
         // the bind does, so the diamond the first scenario planted is legitimately still here. What must be

@@ -14,15 +14,13 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.network.Filterable;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.WrittenBookContent;
-import net.minecraft.world.level.storage.TagValueOutput;
 
 /**
  * Item NBT built by the vanilla writers rather than by hand: {@link ContainerHelper#saveAllItems} for an
@@ -34,7 +32,7 @@ import net.minecraft.world.level.storage.TagValueOutput;
  * every entry collapsed onto one slot.
  */
 public final class ItemFixtures {
-    private static final Identifier AIR_ID = Identifier.parse("minecraft:air");
+    private static final ResourceLocation AIR_ID = ResourceLocation.parse("minecraft:air");
 
     private ItemFixtures() {}
 
@@ -47,7 +45,7 @@ public final class ItemFixtures {
      * degenerate fixture the gate exists to reject, arriving through the builder.
      */
     public static ItemStack stack(String itemId) {
-        Identifier id = Identifier.parse(itemId);
+        ResourceLocation id = ResourceLocation.parse(itemId);
         Item item = BuiltInRegistries.ITEM.getValue(id);
         if (item == Items.AIR && !AIR_ID.equals(id)) {
             throw new AssertionError(
@@ -80,7 +78,7 @@ public final class ItemFixtures {
 
     /** The {@code "Items"} list vanilla writes for one stack per named slot. */
     public static ListTag itemsAtSlots(int[] slots, ItemStack... stacks) {
-        return holder(slots, stacks).getListOrEmpty("Items");
+        return holder(slots, stacks).getList("Items", Tag.TAG_COMPOUND);
     }
 
     /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code itemIds} at ascending slots from 0. */
@@ -95,7 +93,7 @@ public final class ItemFixtures {
 
     /** The single {@code "Items"} entry vanilla writes for {@code itemId} at {@code slot}. */
     public static CompoundTag entryAtSlot(int slot, String itemId) {
-        return itemsAtSlots(new int[] { slot }, itemId).getCompoundOrEmpty(0);
+        return itemsAtSlots(new int[] { slot }, itemId).getCompound(0);
     }
 
     /**
@@ -168,8 +166,6 @@ public final class ItemFixtures {
         for (int i = 0; i < slots.length; i++) {
             stacks.set(slots[i], contents[i]);
         }
-        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, registries);
-        ContainerHelper.saveAllItems(output, stacks);
-        return output.buildResult();
+        return ContainerHelper.saveAllItems(new CompoundTag(), stacks, registries);
     }
 }

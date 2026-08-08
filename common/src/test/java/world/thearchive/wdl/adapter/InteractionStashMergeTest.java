@@ -21,11 +21,9 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.Bees;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
@@ -34,7 +32,6 @@ import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.junit.jupiter.api.BeforeAll;
@@ -119,7 +116,7 @@ class InteractionStashMergeTest {
 
     private static NonNullList<ItemStack> readItems(CompoundTag holder, int size) {
         NonNullList<ItemStack> back = NonNullList.withSize(size, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, holder), back);
+        ContainerHelper.loadAllItems(holder, back, registries);
         return back;
     }
 
@@ -497,7 +494,7 @@ class InteractionStashMergeTest {
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> sinkPos[0] = posKey, posKey -> {});
         BlockPos pos = new BlockPos(3, 70, 5);
         ItemStack hive = new ItemStack(Items.BEEHIVE);
-        hive.set(DataComponents.BEES, new Bees(List.of(BeehiveBlockEntity.Occupant.create(120))));
+        hive.set(DataComponents.BEES, List.of(BeehiveBlockEntity.Occupant.create(120)));
 
         capture.recordPlaceAt(pos, hive);
 
@@ -547,7 +544,7 @@ class InteractionStashMergeTest {
         InteractionCapture capture = plainCapture(sink, registries, true);
         BlockPos pos = new BlockPos(3, 70, 5);
         ItemStack filled = new ItemStack(Items.BEEHIVE);
-        filled.set(DataComponents.BEES, new Bees(List.of(BeehiveBlockEntity.Occupant.create(120))));
+        filled.set(DataComponents.BEES, List.of(BeehiveBlockEntity.Occupant.create(120)));
 
         capture.recordPlaceAt(pos, filled);
         assertFalse(capture.pendingCandidateChunks().isEmpty(), "the occupied beehive placement is predicted");

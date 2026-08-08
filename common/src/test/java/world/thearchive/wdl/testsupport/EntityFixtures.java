@@ -10,6 +10,7 @@ import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 
@@ -36,7 +37,7 @@ public final class EntityFixtures {
     /** An entity tag carrying the {@code id} and {@code "UUID"} a merge matches on, and nothing else. */
     public static CompoundTag entity(String id, UUID uuid) {
         CompoundTag tag = entityTag(id);
-        tag.store("UUID", UUIDUtil.CODEC, uuid);
+        tag.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow());
         return tag;
     }
 
@@ -47,7 +48,7 @@ public final class EntityFixtures {
      */
     public static CompoundTag entityAt(String id, UUID uuid, double x, double y, double z) {
         CompoundTag tag = entity(id, uuid);
-        tag.store("Pos", Vec3.CODEC, new Vec3(x, y, z));
+        tag.put("Pos", Vec3.CODEC.encodeStart(NbtOps.INSTANCE, new Vec3(x, y, z)).getOrThrow());
         return tag;
     }
 

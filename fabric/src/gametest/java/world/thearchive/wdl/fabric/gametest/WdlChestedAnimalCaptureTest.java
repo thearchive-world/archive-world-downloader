@@ -13,7 +13,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.animal.equine.AbstractChestedHorse;
+import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
 import net.minecraft.world.inventory.HorseInventoryMenu;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
@@ -90,12 +90,12 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
             CompoundTag entityChunk = CaptureReadback.readEntityChunk(saveRoot, animalChunk)
                     .orElseThrow(() -> new AssertionError("entity chunk " + animalChunk + " is missing from the save"));
             List<String> animalItems = CaptureReadback.entities(entityChunk).stream()
-                    .filter(entity -> entity.getString("id").orElse("").equals("minecraft:donkey"))
+                    .filter(entity -> entity.getString("id").equals("minecraft:donkey"))
                     .findFirst()
                     .map(CaptureReadback::itemIds)
                     .orElseThrow(() -> new AssertionError("the donkey is absent from the entities region: "
                             + CaptureReadback.entities(entityChunk).stream()
-                                    .map(entity -> entity.getString("id").orElse("?")).toList()));
+                                    .map(entity -> (entity.contains("id") ? entity.getString("id") : "?")).toList()));
             Check.that(animalItems.contains("minecraft:diamond"),
                     "the chested donkey's planted item is absent from its captured Items: " + animalItems);
 
@@ -147,7 +147,7 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
         Path saveRoot = run.stopAndAwaitSave();
 
         List<String> mountItems = CaptureReadback.itemIds(CaptureReadback.levelData(saveRoot)
-                .getCompoundOrEmpty("Player").getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity"));
+                .getCompound("Player").getCompound("RootVehicle").getCompound("Entity"));
         Check.that(mountItems.contains("minecraft:diamond"),
                 "the ridden donkey's chest is absent from the saved RootVehicle: " + mountItems);
     }

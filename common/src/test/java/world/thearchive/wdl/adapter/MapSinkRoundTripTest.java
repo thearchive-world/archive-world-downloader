@@ -9,9 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import org.junit.jupiter.api.BeforeAll;
@@ -47,9 +46,8 @@ class MapSinkRoundTripTest {
     }
 
     private MapItemSavedData roundTrip(MapItemSavedData map) {
-        RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
         Tag data = sink.serializeMap(map, registries);
-        return MapItemSavedData.CODEC.parse(ops, data).getOrThrow();
+        return MapItemSavedData.load((CompoundTag) data, registries);
     }
 
     @Test

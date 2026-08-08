@@ -46,7 +46,7 @@ class LevelDatRoundTripTest {
         DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
 
         CompoundTag dataTag = built.worldData().createTag(built.registries(), null);
-        CompoundTag worldGenTag = dataTag.getCompoundOrEmpty("WorldGenSettings");
+        CompoundTag worldGenTag = dataTag.getCompound("WorldGenSettings");
         assertFalse(worldGenTag.isEmpty(), "WorldGenSettings must be present in the level.dat Data tag");
         long originalSeed = WorldGenSettings.CODEC.parse(ops, worldGenTag).getOrThrow().options().seed();
 
@@ -54,13 +54,13 @@ class LevelDatRoundTripTest {
         CompoundTag root = new CompoundTag();
         root.put("Data", dataTag);
         NbtIo.writeCompressed(root, levelDat);
-        CompoundTag back = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("Data");
+        CompoundTag back = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompound("Data");
 
-        assertTrue(back.getIntOr("DataVersion", -1) > 0, "DataVersion survives");
-        assertTrue(back.contains("spawn"), "spawn survives");
+        assertTrue((back.contains("DataVersion") ? back.getInt("DataVersion") : -1) > 0, "DataVersion survives");
+        assertTrue(back.contains("SpawnX"), "spawn survives");
 
         WorldGenSettings worldGen = WorldGenSettings.CODEC
-                .parse(ops, back.getCompoundOrEmpty("WorldGenSettings"))
+                .parse(ops, back.getCompound("WorldGenSettings"))
                 .getOrThrow();
         assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
         assertEquals(originalSeed, worldGen.options().seed(), "seed survives the round-trip");
@@ -95,10 +95,11 @@ class LevelDatRoundTripTest {
         Path levelDat = saves.resolve("wdltest").resolve("level.dat");
         assertTrue(Files.exists(levelDat), "save() must write level.dat via the vanilla LevelStorageAccess envelope");
 
-        CompoundTag data = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("Data");
+        CompoundTag data = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompound("Data");
         DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
-        assertTrue(data.getIntOr("DataVersion", -1) > 0, "DataVersion survives the production save");
-        WorldGenSettings worldGen = WorldGenSettings.CODEC.parse(ops, data.getCompoundOrEmpty("WorldGenSettings"))
+        assertTrue((data.contains("DataVersion") ? data.getInt("DataVersion") : -1) > 0,
+                "DataVersion survives the production save");
+        WorldGenSettings worldGen = WorldGenSettings.CODEC.parse(ops, data.getCompound("WorldGenSettings"))
                 .getOrThrow();
         assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
         assertInstanceOf(FlatLevelSource.class,
@@ -129,7 +130,7 @@ class LevelDatRoundTripTest {
 
     private static String levelName(Path worldFolder) throws IOException {
         CompoundTag data = NbtIo.readCompressed(worldFolder.resolve("level.dat"), NbtAccounter.unlimitedHeap())
-                .getCompoundOrEmpty("Data");
-        return data.getString("LevelName").orElse("");
+                .getCompound("Data");
+        return data.getString("LevelName");
     }
 }

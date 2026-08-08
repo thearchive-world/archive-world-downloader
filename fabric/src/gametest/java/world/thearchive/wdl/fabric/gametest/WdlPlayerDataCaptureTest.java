@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.Items;
 
 import world.thearchive.wdl.core.DownloadMode;
@@ -34,14 +35,15 @@ public class WdlPlayerDataCaptureTest implements FabricClientGameTest {
             Path saveRoot = CaptureDriver.capture(context,
                     new DownloadTarget("wdl-player", "wdl-player", DownloadMode.NEW), WdlConfig.DEFAULTS, 30);
 
-            CompoundTag player = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player");
+            CompoundTag player = CaptureReadback.levelData(saveRoot).getCompound("Player");
             Check.that(!player.isEmpty(), "level.dat has no Player data");
-            Check.that(player.getList("Pos").isPresent(), "the captured Player has no Pos in level.dat");
-            List<CompoundTag> inventory = player.getListOrEmpty("Inventory").compoundStream().toList();
+            Check.that(player.contains("Pos", Tag.TAG_LIST), "the captured Player has no Pos in level.dat");
+            List<CompoundTag> inventory = player.getList("Inventory", Tag.TAG_COMPOUND).stream()
+                    .map(t -> (CompoundTag) t).toList();
             boolean hasDiamond = inventory.stream()
-                    .anyMatch(item -> item.getString("id").orElse("").equals("minecraft:diamond"));
+                    .anyMatch(item -> item.getString("id").equals("minecraft:diamond"));
             Check.that(hasDiamond, "the given diamond is absent from the captured Player Inventory: "
-                    + inventory.stream().map(item -> item.getString("id").orElse("?")).toList());
+                    + inventory.stream().map(item -> (item.contains("id") ? item.getString("id") : "?")).toList());
         }
     }
 }

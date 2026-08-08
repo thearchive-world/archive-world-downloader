@@ -27,10 +27,10 @@ public class WdlWorldOutputConfigTest implements FabricClientGameTest {
                     new DownloadTarget("wdl-worldout", "wdl-worldout", DownloadMode.NEW), WdlConfig.DEFAULTS, 20);
 
             CompoundTag data = CaptureReadback.levelData(saveRoot);
-            Check.that(data.getLongOr("DayTime", -1) == 6000L,
+            Check.that((data.contains("DayTime") ? data.getLong("DayTime") : -1) == 6000L,
                     "world-output did not open the world at noon (level.dat DayTime 6000): "
-                            + data.getLongOr("DayTime", -1));
-            Check.that(!data.getCompoundOrEmpty("game_rules").isEmpty(),
+                            + (data.contains("DayTime") ? data.getLong("DayTime") : -1));
+            Check.that(!data.getCompound("GameRules").isEmpty(),
                     "world-output did not write the curated game rules to level.dat");
         }
     }

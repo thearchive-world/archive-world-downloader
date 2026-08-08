@@ -102,11 +102,11 @@ public class WdlOffModeMapIdCaptureTest implements FabricClientGameTest {
             CompoundTag entityChunk = CaptureReadback.readEntityChunk(saveRoot, chunk)
                     .orElseThrow(() -> new AssertionError("the captured entity chunk holding the framed map is gone"));
             int framedId = CaptureReadback.entities(entityChunk).stream()
-                    .filter(entity -> entity.getString("id").orElse("").equals("minecraft:item_frame"))
+                    .filter(entity -> entity.getString("id").equals("minecraft:item_frame"))
                     .findFirst()
-                    .flatMap(itemFrame -> itemFrame.getCompound("Item"))
-                    .flatMap(item -> item.getCompound("components"))
-                    .flatMap(components -> components.getInt("minecraft:map_id"))
+                    .map(itemFrame -> itemFrame.getCompound("Item").getCompound("components"))
+                    .filter(components -> components.contains("minecraft:map_id"))
+                    .map(components -> components.getInt("minecraft:map_id"))
                     .orElseThrow(() -> new AssertionError("the captured item frame carries no minecraft:map_id"));
             Check.that(framedId == ORIGINAL_MAP_ID,
                     "off-mode must leave the framed map's minecraft:map_id at the original " + ORIGINAL_MAP_ID

@@ -3,6 +3,8 @@
 
 package world.thearchive.wdl.fabric.gametest;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -11,6 +13,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
 
 import world.thearchive.wdl.core.DownloadMode;
@@ -45,13 +49,13 @@ public class WdlDerivedMobPersistenceTest implements FabricClientGameTest {
             run.tick(5);
             // Proven pickup: a diamond sword is impossible for a natural zombie mainhand.
             server.runCommand("summon minecraft:zombie " + at
-                    + " {NoAI:1b,equipment:{mainhand:{id:\"minecraft:diamond_sword\",count:1}}}");
+                    + " {NoAI:1b,HandItems:[{id:\"minecraft:diamond_sword\",count:1},{}]}");
             // Control: an iron sword is inside the zombie mainhand pool, so ambiguous, and must not be stamped.
             server.runCommand("summon minecraft:zombie " + at
-                    + " {NoAI:1b,equipment:{mainhand:{id:\"minecraft:iron_sword\",count:1}}}");
+                    + " {NoAI:1b,HandItems:[{id:\"minecraft:iron_sword\",count:1},{}]}");
             // Armor-slot pickup: a netherite helmet is impossible for a natural zombie head, so it must be stamped.
             server.runCommand("summon minecraft:zombie " + at
-                    + " {NoAI:1b,equipment:{head:{id:\"minecraft:netherite_helmet\",count:1}}}");
+                    + " {NoAI:1b,ArmorItems:[{},{},{},{id:\"minecraft:netherite_helmet\",count:1}]}");
             // Named-mob path: a custom name (the effect of a name tag) makes hasCustomName() true, so this
             // flagship case of a name-tagged pet must be stamped. Empty hands keep it off the pickup path.
             server.runCommand("summon minecraft:zombie " + at + " {NoAI:1b,CustomName:\"Rex\"}");
@@ -80,40 +84,59 @@ public class WdlDerivedMobPersistenceTest implements FabricClientGameTest {
     }
 
     private static boolean persistent(CompoundTag entity) {
-        return entity.getBoolean("PersistenceRequired").orElse(false);
+        return entity.getBoolean("PersistenceRequired");
     }
 
     private static CompoundTag findZombieBySlot(List<CompoundTag> entities, String slot, String itemId) {
         return entities.stream()
-                .filter(entity -> entity.getString("id").orElse("").equals("minecraft:zombie"))
+                .filter(entity -> entity.getString("id").equals("minecraft:zombie"))
                 .filter(entity -> itemId.equals(slotItemId(entity, slot)))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no captured zombie with " + slot + "=" + itemId + " in: "
-                        + entities.stream().map(entity -> entity.getString("id").orElse("?")).toList()));
+                        + entities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
+                                .toList()));
     }
 
     private static CompoundTag findZombieByName(List<CompoundTag> entities, String customName) {
         return entities.stream()
-                .filter(entity -> entity.getString("id").orElse("").equals("minecraft:zombie"))
+                .filter(entity -> entity.getString("id").equals("minecraft:zombie"))
                 .filter(entity -> customName.equals(customNameOf(entity)))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no captured zombie named " + customName + " in: "
-                        + entities.stream().map(entity -> entity.getString("id").orElse("?")).toList()));
+                        + entities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
+                                .toList()));
     }
 
-    /**
-     * The custom name a mob was captured with: {@code Entity} writes it under {@code CustomName}, and a plain literal
-     * component collapses to a bare string through {@code ComponentSerialization.CODEC}.
-     */
+    /** The custom name of a captured entity: pre-1.21.5 writes CustomName as a serialized JSON text component. */
     private static String customNameOf(CompoundTag entity) {
-        return entity.getString("CustomName").orElse("");
+        String json = entity.getString("CustomName");
+        if (json.isEmpty()) {
+            return "";
+        }
+        JsonElement name = JsonParser.parseString(json);
+        if (name.isJsonPrimitive()) {
+            return name.getAsString();
+        }
+        return name.isJsonObject() && name.getAsJsonObject().has("text")
+                ? name.getAsJsonObject().get("text").getAsString()
+                : "";
     }
 
-    /** The serialized item id worn in a slot: entities/ writes equipment as a slot-name map (EntityEquipment.CODEC). */
+    /** The serialized item id in a slot: pre-1.21.5 entities write HandItems and ArmorItems lists, not a slot map. */
     private static String slotItemId(CompoundTag entity, String slot) {
-        return entity.getCompound("equipment")
-                .flatMap(equipment -> equipment.getCompound(slot))
-                .flatMap(item -> item.getString("id"))
-                .orElse("");
+        return switch (slot) {
+            case "mainhand" -> listItemId(entity, "HandItems", 0);
+            case "offhand" -> listItemId(entity, "HandItems", 1);
+            case "feet" -> listItemId(entity, "ArmorItems", 0);
+            case "legs" -> listItemId(entity, "ArmorItems", 1);
+            case "chest" -> listItemId(entity, "ArmorItems", 2);
+            case "head" -> listItemId(entity, "ArmorItems", 3);
+            default -> "";
+        };
+    }
+
+    private static String listItemId(CompoundTag entity, String key, int index) {
+        ListTag items = entity.getList(key, Tag.TAG_COMPOUND);
+        return index < items.size() ? items.getCompound(index).getString("id") : "";
     }
 }

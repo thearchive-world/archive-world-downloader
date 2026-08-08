@@ -24,6 +24,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.level.ChunkPos;
@@ -101,7 +102,8 @@ class RegionIntegrationTest {
             for (int i = 0; i < positions.size(); i++) {
                 CompoundTag back = in.read(positions.get(i)).join()
                         .orElseThrow(() -> new AssertionError("missing chunk"));
-                assertEquals(i, back.getIntOr("wdlTestId", -1), "wrong chunk read back at " + positions.get(i));
+                assertEquals(i, (back.contains("wdlTestId") ? back.getInt("wdlTestId") : -1),
+                        "wrong chunk read back at " + positions.get(i));
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -138,7 +140,7 @@ class RegionIntegrationTest {
         }
         try (SimpleRegionStorage in = storage(paths, region)) {
             CompoundTag back = in.read(pos).join().orElseThrow(() -> new AssertionError("oversize chunk lost"));
-            assertEquals(2 * 1024 * 1024, back.getByteArray("pad").orElseThrow().length);
+            assertEquals(2 * 1024 * 1024, back.getByteArray("pad").length);
         }
     }
 
@@ -224,7 +226,7 @@ class RegionIntegrationTest {
 
         try (SimpleRegionStorage in = storage(paths, region)) {
             CompoundTag back = in.read(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
-            assertEquals(1, findByPos(back, 4, 64, 9).getListOrEmpty("Items").size(),
+            assertEquals(1, findByPos(back, 4, 64, 9).getList("Items", Tag.TAG_COMPOUND).size(),
                     "a chunk the player walked past again must not lose the chest an earlier flush archived");
         }
     }
@@ -291,7 +293,7 @@ class RegionIntegrationTest {
         String[] books = new String[slots.length];
         Arrays.fill(books, "minecraft:written_book");
         shelf.put("Items", ItemFixtures.itemsAtSlots(slots, books));
-        tag.put("block_entities", BlockEntityFixtures.chunkTagWith(shelf).getListOrEmpty("block_entities"));
+        tag.put("block_entities", BlockEntityFixtures.chunkTagWith(shelf).getList("block_entities", Tag.TAG_COMPOUND));
         return tag;
     }
 
@@ -299,7 +301,9 @@ class RegionIntegrationTest {
         Set<Integer> slots = new TreeSet<>();
         ListTag items = (ListTag) blockEntity.get("Items");
         for (int i = 0; i < items.size(); i++) {
-            slots.add((int) ((CompoundTag) items.get(i)).getByteOr("Slot", (byte) -1));
+            slots.add(
+                    (int) (((CompoundTag) items.get(i)).contains("Slot") ? ((CompoundTag) items.get(i)).getByte("Slot")
+                            : (byte) -1));
         }
         return slots;
     }

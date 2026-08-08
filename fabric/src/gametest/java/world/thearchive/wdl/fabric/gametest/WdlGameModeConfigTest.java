@@ -36,9 +36,11 @@ public class WdlGameModeConfigTest implements FabricClientGameTest {
             Path masterOnRoot = CaptureDriver.capture(context,
                     new DownloadTarget("wdl-gamemode-on", "wdl-gamemode-on", DownloadMode.NEW), WdlConfig.DEFAULTS, 20);
             CompoundTag masterOnData = CaptureReadback.levelData(masterOnRoot);
-            Check.that(masterOnData.getIntOr("GameType", -1) == GameType.CREATIVE.getId(),
+            Check.that(
+                    (masterOnData.contains("GameType") ? masterOnData.getInt("GameType") : -1) == GameType.CREATIVE
+                            .getId(),
                     "world-defaults master on did not force creative over the survival player: "
-                            + masterOnData.getIntOr("GameType", -1));
+                            + (masterOnData.contains("GameType") ? masterOnData.getInt("GameType") : -1));
 
             Properties masterOff = new Properties();
             masterOff.setProperty("overrideWorldDefaults", "false");
@@ -46,9 +48,11 @@ public class WdlGameModeConfigTest implements FabricClientGameTest {
                     new DownloadTarget("wdl-gamemode-off", "wdl-gamemode-off", DownloadMode.NEW),
                     WdlConfig.parse(masterOff), 20);
             CompoundTag masterOffData = CaptureReadback.levelData(masterOffRoot);
-            Check.that(masterOffData.getIntOr("GameType", -1) == GameType.SURVIVAL.getId(),
+            Check.that(
+                    (masterOffData.contains("GameType") ? masterOffData.getInt("GameType") : -1) == GameType.SURVIVAL
+                            .getId(),
                     "world-defaults master off did not save the player's real survival mode: "
-                            + masterOffData.getIntOr("GameType", -1));
+                            + (masterOffData.contains("GameType") ? masterOffData.getInt("GameType") : -1));
 
             Properties creativeOff = new Properties();
             creativeOff.setProperty("openInCreative", "false");
@@ -56,9 +60,11 @@ public class WdlGameModeConfigTest implements FabricClientGameTest {
                     new DownloadTarget("wdl-gamemode-creative-off", "wdl-gamemode-creative-off", DownloadMode.NEW),
                     WdlConfig.parse(creativeOff), 20);
             CompoundTag creativeOffData = CaptureReadback.levelData(creativeOffRoot);
-            Check.that(creativeOffData.getIntOr("GameType", -1) == GameType.SURVIVAL.getId(),
+            Check.that(
+                    (creativeOffData.contains("GameType") ? creativeOffData.getInt("GameType")
+                            : -1) == GameType.SURVIVAL.getId(),
                     "master on with openInCreative off did not save the player's real survival mode: "
-                            + creativeOffData.getIntOr("GameType", -1));
+                            + (creativeOffData.contains("GameType") ? creativeOffData.getInt("GameType") : -1));
         }
     }
 }

@@ -21,6 +21,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChiseledBookShelfBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -95,7 +96,7 @@ class ChunkMergeTest {
     }
 
     private static String discId(CompoundTag blockEntity) {
-        return blockEntity.get("RecordItem") instanceof CompoundTag record ? record.getStringOr("id", "") : "";
+        return blockEntity.get("RecordItem") instanceof CompoundTag record ? record.getString("id") : "";
     }
 
     private static int beeCount(CompoundTag blockEntity) {
@@ -176,7 +177,7 @@ class ChunkMergeTest {
         assertEquals(1, mergeBacks);
         CompoundTag merged = findByPos(fresh, 5, 64, 5);
         assertTrue(merged.get("Book") instanceof CompoundTag, "the prior book survives");
-        assertEquals(7, merged.getIntOr("Page", -1), "and its page");
+        assertEquals(7, (merged.contains("Page") ? merged.getInt("Page") : -1), "and its page");
     }
 
     @Test
@@ -189,7 +190,9 @@ class ChunkMergeTest {
         assertEquals(1, mergeBacks, "one jukebox disc carried forward");
         CompoundTag merged = findByPos(fresh, 3, 65, 4);
         assertEquals("minecraft:music_disc_cat", discId(merged), "the prior disc survives the re-walk");
-        assertEquals(40L, merged.getLongOr("ticks_since_song_started", -1L), "and its song-start tick sidecar");
+        assertEquals(40L,
+                (merged.contains("ticks_since_song_started") ? merged.getLong("ticks_since_song_started") : -1L),
+                "and its song-start tick sidecar");
     }
 
     @Test
@@ -331,11 +334,11 @@ class ChunkMergeTest {
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
         assertEquals(1, mergeBacks, "the chest must carry forward, proving merge ran its real path");
-        assertFalse(fresh.getBooleanOr("isLightOn", false),
+        assertFalse(fresh.getBoolean("isLightOn"),
                 "on-disk isLightOn must not carry onto a gate-false fresh chunk");
-        assertTrue(fresh.getListOrEmpty("sections").compoundStream()
-                .noneMatch(section -> section.getByteArray("BlockLight").isPresent()
-                        || section.getByteArray("SkyLight").isPresent()),
+        assertTrue(fresh.getList("sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .noneMatch(section -> section.contains("BlockLight", Tag.TAG_BYTE_ARRAY)
+                        || section.contains("SkyLight", Tag.TAG_BYTE_ARRAY)),
                 "on-disk light layers must not carry onto fresh sections");
     }
 
@@ -364,7 +367,9 @@ class ChunkMergeTest {
         List<Integer> slots = new ArrayList<>();
         if (blockEntity.get("Items") instanceof ListTag items) {
             for (int i = 0; i < items.size(); i++) {
-                slots.add((int) ((CompoundTag) items.get(i)).getByteOr("Slot", (byte) -1));
+                slots.add((int) (((CompoundTag) items.get(i)).contains("Slot")
+                        ? ((CompoundTag) items.get(i)).getByte("Slot")
+                        : (byte) -1));
             }
         }
         return slots;
@@ -444,8 +449,10 @@ class ChunkMergeTest {
                 "both slots present, and exactly once each: a duplicated slot would let the stale disk book "
                         + "overwrite the fresher one, since vanilla's load is a last-write-wins set");
         ListTag merged = (ListTag) findByPos(fresh, 4, 64, 9).get("Items");
-        assertTrue(merged.compoundStream().anyMatch(entry -> entry.getByteOr("Slot", (byte) -1) == 1
-                && "minecraft:enchanted_book".equals(entry.getStringOr("id", ""))),
+        assertTrue(
+                merged.stream().map(t -> (CompoundTag) t)
+                        .anyMatch(entry -> (entry.contains("Slot") ? entry.getByte("Slot") : (byte) -1) == 1
+                                && "minecraft:enchanted_book".equals(entry.getString("id"))),
                 "the slot captured this session keeps the fresher book");
     }
 
@@ -495,7 +502,7 @@ class ChunkMergeTest {
         CompoundTag fresh = BlockEntityFixtures.malformedChunkTagWith(positionless);
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh), "no position, no carry-forward");
-        assertEquals(0, itemCount(((ListTag) fresh.get("block_entities")).getCompoundOrEmpty(0)),
+        assertEquals(0, itemCount(((ListTag) fresh.get("block_entities")).getCompound(0)),
                 "and the on-disk contents are not written onto it");
     }
 
@@ -554,9 +561,9 @@ class ChunkMergeTest {
 
         assertEquals(1, mergeBacks, "the crafter carried forward");
         CompoundTag merged = findByPos(fresh, 6, 64, 6);
-        assertArrayEquals(new int[] { 2, 5 }, merged.getIntArray("disabled_slots").orElseThrow(),
+        assertArrayEquals(new int[] { 2, 5 }, merged.getIntArray("disabled_slots"),
                 "the disabled slots survive the re-write");
-        assertEquals(1, merged.getIntOr("triggered", -1), "and the powered flag");
+        assertEquals(1, (merged.contains("triggered") ? merged.getInt("triggered") : -1), "and the powered flag");
     }
 
     @Test
@@ -571,8 +578,8 @@ class ChunkMergeTest {
         assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), reopened, LongSet.of()),
                 "the fresh open is authoritative");
         CompoundTag merged = findByPos(fresh, 6, 64, 6);
-        assertArrayEquals(new int[] { 7 }, merged.getIntArray("disabled_slots").orElseThrow());
-        assertEquals(0, merged.getIntOr("triggered", -1),
+        assertArrayEquals(new int[] { 7 }, merged.getIntArray("disabled_slots"));
+        assertEquals(0, (merged.contains("triggered") ? merged.getInt("triggered") : -1),
                 "a re-open that saw the crafter unpowered keeps that, rather than inheriting the stale flag");
     }
 
@@ -583,8 +590,10 @@ class ChunkMergeTest {
 
         assertEquals(1, ChunkMerge.merge(onDisk, fresh));
         CompoundTag merged = findByPos(fresh, 7, 64, 7);
-        assertEquals((short) 220, merged.getShortOr("BrewTime", (short) -1), "a mid-brew stand does not restart");
-        assertEquals((byte) 12, merged.getByteOr("Fuel", (byte) -1), "and keeps its blaze powder");
+        assertEquals((short) 220, (merged.contains("BrewTime") ? merged.getShort("BrewTime") : (short) -1),
+                "a mid-brew stand does not restart");
+        assertEquals((byte) 12, (merged.contains("Fuel") ? merged.getByte("Fuel") : (byte) -1),
+                "and keeps its blaze powder");
     }
 
     @Test
@@ -640,9 +649,10 @@ class ChunkMergeTest {
                 "a block entity whose every field is its own capture is not a carry-forward");
 
         CompoundTag merged = findByPos(fresh, 6, 64, 6);
-        assertArrayEquals(new int[] { 8 }, merged.getIntArray("disabled_slots").orElseThrow(),
+        assertArrayEquals(new int[] { 8 }, merged.getIntArray("disabled_slots"),
                 "the fresh non-default capture stands");
-        assertEquals(1, merged.getIntOr("triggered", -1), "and so does the flag it captured beside it");
+        assertEquals(1, (merged.contains("triggered") ? merged.getInt("triggered") : -1),
+                "and so does the flag it captured beside it");
     }
 
     @Test

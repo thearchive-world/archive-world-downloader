@@ -23,6 +23,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.level.ChunkPos;
@@ -75,32 +76,37 @@ final class CaptureReadback {
     /** Every block id present in any section palette of a stored chunk tag (the terrain assertion target). */
     static List<String> paletteBlockNames(CompoundTag chunkTag) {
         List<String> names = new ArrayList<>();
-        chunkTag.getListOrEmpty("sections").compoundStream()
-                .forEach(section -> section.getCompound("block_states")
-                        .ifPresent(blockStates -> blockStates.getList("palette").ifPresent(palette -> palette
-                                .compoundStream().forEach(entry -> entry.getString("Name").ifPresent(names::add)))));
+        chunkTag.getList("sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .forEach(section -> section.getCompound("block_states").getList("palette", Tag.TAG_COMPOUND)
+                        .stream().map(t -> (CompoundTag) t).forEach(entry -> {
+                            if (entry.contains("Name", Tag.TAG_STRING)) {
+                                names.add(entry.getString("Name"));
+                            }
+                        }));
         return names;
     }
 
     /** The stored light nibbles of {@code layerKey} ("BlockLight"/"SkyLight") at section Y, or empty. */
     static Optional<byte[]> sectionLightLayer(CompoundTag chunkTag, int sectionY, String layerKey) {
-        return chunkTag.getListOrEmpty("sections").compoundStream()
-                .filter(section -> section.getByteOr("Y", Byte.MIN_VALUE) == sectionY)
+        return chunkTag.getList("sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .filter(section -> (section.contains("Y") ? section.getByte("Y") : Byte.MIN_VALUE) == sectionY)
                 .findFirst()
-                .flatMap(section -> section.getByteArray(layerKey));
+                .map(section -> section.getByteArray(layerKey))
+                .filter(layer -> layer.length > 0);
     }
 
     /** The entity tags stored in an entity-chunk tag (the packet-derived entity assertion target). */
     static List<CompoundTag> entities(CompoundTag entityChunkTag) {
-        return entityChunkTag.getListOrEmpty("Entities").compoundStream().toList();
+        return entityChunkTag.getList("Entities", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t).toList();
     }
 
     /** The block-entity tag stored at {@code pos} in a chunk tag's {@code block_entities}, or empty if none. */
     static Optional<CompoundTag> blockEntityAt(CompoundTag chunkTag, BlockPos pos) {
-        return chunkTag.getListOrEmpty("block_entities").compoundStream()
-                .filter(blockEntity -> blockEntity.getIntOr("x", Integer.MIN_VALUE) == pos.getX()
-                        && blockEntity.getIntOr("y", Integer.MIN_VALUE) == pos.getY()
-                        && blockEntity.getIntOr("z", Integer.MIN_VALUE) == pos.getZ())
+        return chunkTag.getList("block_entities", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .filter(blockEntity -> (blockEntity.contains("x") ? blockEntity.getInt("x") : Integer.MIN_VALUE) == pos
+                        .getX()
+                        && (blockEntity.contains("y") ? blockEntity.getInt("y") : Integer.MIN_VALUE) == pos.getY()
+                        && (blockEntity.contains("z") ? blockEntity.getInt("z") : Integer.MIN_VALUE) == pos.getZ())
                 .findFirst();
     }
 
@@ -111,8 +117,8 @@ final class CaptureReadback {
 
     /** The item ids in a container tag's {@code Items} list (a block entity's or an entity's), in stored order. */
     static List<String> itemIds(CompoundTag containerTag) {
-        return containerTag.getListOrEmpty("Items").compoundStream()
-                .map(item -> item.getString("id").orElse("?"))
+        return containerTag.getList("Items", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .map(item -> (item.contains("id") ? item.getString("id") : "?"))
                 .toList();
     }
 
@@ -120,7 +126,7 @@ final class CaptureReadback {
     static CompoundTag levelData(Path saveRoot) {
         try {
             CompoundTag root = NbtIo.readCompressed(saveRoot.resolve("level.dat"), NbtAccounter.unlimitedHeap());
-            return root.getCompoundOrEmpty("Data");
+            return root.getCompound("Data");
         } catch (IOException e) {
             throw new RuntimeException("failed reading level.dat under " + saveRoot, e);
         }
@@ -155,7 +161,7 @@ final class CaptureReadback {
     /** The inner {@code data} compound of a {@code data/<key>.dat} envelope (the {@code {data, DataVersion}} wrap). */
     static CompoundTag readDataInner(Path dataFile) {
         try {
-            return NbtIo.readCompressed(dataFile, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("data");
+            return NbtIo.readCompressed(dataFile, NbtAccounter.unlimitedHeap()).getCompound("data");
         } catch (IOException e) {
             throw new RuntimeException("failed reading data file " + dataFile, e);
         }
@@ -163,20 +169,19 @@ final class CaptureReadback {
 
     /** Whether a map-image inner tag carries a full 128x128 color array (the well-formedness gate). */
     static boolean isWellFormedMapImage(CompoundTag mapDataInner) {
-        return mapDataInner.getByteArray("colors").map(colors -> colors.length == 16384).orElse(false);
+        return mapDataInner.getByteArray("colors").length == 16384;
     }
 
     /** Distinct non-zero color bytes in a map-image inner tag, the proof its color data round-tripped (not shape). */
     static long distinctNonZeroColors(CompoundTag mapDataInner) {
-        return mapDataInner.getByteArray("colors").map(colors -> {
-            Set<Byte> distinct = new HashSet<>();
-            for (byte color : colors) {
-                if (color != 0) {
-                    distinct.add(color);
-                }
+        byte[] colors = mapDataInner.getByteArray("colors");
+        Set<Byte> distinct = new HashSet<>();
+        for (byte color : colors) {
+            if (color != 0) {
+                distinct.add(color);
             }
-            return (long) distinct.size();
-        }).orElse(0L);
+        }
+        return (long) distinct.size();
     }
 
     /** The {@code map} high-water id in {@code <save>/data/idcounts.dat}, or empty if no idcounts file was written. */
@@ -185,7 +190,8 @@ final class CaptureReadback {
         if (!Files.isRegularFile(file)) {
             return OptionalInt.empty();
         }
-        int map = readDataInner(file).getIntOr("map", Integer.MIN_VALUE);
+        CompoundTag inner = readDataInner(file);
+        int map = inner.contains("map") ? inner.getInt("map") : Integer.MIN_VALUE;
         return map == Integer.MIN_VALUE ? OptionalInt.empty() : OptionalInt.of(map);
     }
 

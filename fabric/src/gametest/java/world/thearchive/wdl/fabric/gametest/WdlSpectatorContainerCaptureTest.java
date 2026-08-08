@@ -11,6 +11,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
@@ -224,9 +226,9 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
                 "an open a spectator's ender chest could not have caused was bound to the ender inventory");
 
         Path saveRoot = run.stopAndAwaitSave();
-        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompoundOrEmpty("Player")
-                .getListOrEmpty("EnderItems").compoundStream()
-                .map(item -> item.getString("id").orElse("?"))
+        List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompound("Player")
+                .getList("EnderItems", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .map(item -> (item.contains("id") ? item.getString("id") : "?"))
                 .toList();
         Check.that(!enderItems.contains("minecraft:diamond"),
                 "the minecart's contents were written into the player's ender inventory: " + enderItems);

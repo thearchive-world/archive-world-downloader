@@ -17,12 +17,11 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.util.ProblemReporter;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -81,7 +80,7 @@ class EntityContainerStashMergeTest {
 
     private static CompoundTag findByUuid(ListTag entities, UUID uuid) {
         for (int i = 0; i < entities.size(); i++) {
-            CompoundTag tag = entities.getCompoundOrEmpty(i);
+            CompoundTag tag = entities.getCompound(i);
             if (uuid.equals(EntityMerge.readUuid(tag))) {
                 return tag;
             }
@@ -111,12 +110,12 @@ class EntityContainerStashMergeTest {
         assertFalse(stash.containsKey(UUID_A), "the merged entry is drained");
         assertTrue(stash.containsKey(UUID_C), "an unmatched stash entry is left undrained (the lost-items edge)");
 
-        ListTag entities = chunkTag.getListOrEmpty("Entities");
+        ListTag entities = chunkTag.getList("Entities", Tag.TAG_COMPOUND);
         CompoundTag mergedEntity = findByUuid(entities, UUID_A);
-        assertEquals("minecraft:chest_minecart", mergedEntity.getStringOr("id", ""),
+        assertEquals("minecraft:chest_minecart", mergedEntity.getString("id"),
                 "the id is preserved (no clobber)");
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, mergedEntity), back);
+        ContainerHelper.loadAllItems(mergedEntity, back, registries);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest minecart gains exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
 
@@ -139,12 +138,12 @@ class EntityContainerStashMergeTest {
         assertEquals(1, tally.merged(), "the nested chested mule gains its captured contents");
         assertFalse(stash.containsKey(UUID_B), "and its stash entry is drained");
 
-        ListTag entities = chunkTag.getListOrEmpty("Entities");
+        ListTag entities = chunkTag.getList("Entities", Tag.TAG_COMPOUND);
         CompoundTag minecart = findByUuid(entities, UUID_A);
         assertFalse(minecart.contains("Items"), "the plain minecart it was pushed under carries no contents");
-        CompoundTag nestedMule = minecart.getListOrEmpty("Passengers").getCompoundOrEmpty(0);
+        CompoundTag nestedMule = minecart.getList("Passengers", Tag.TAG_COMPOUND).getCompound(0);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, nestedMule), back);
+        ContainerHelper.loadAllItems(nestedMule, back, registries);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the nested mule carries exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
     }
@@ -231,10 +230,9 @@ class EntityContainerStashMergeTest {
         assertTrue(folded.containsKey(UUID_A), "the holder stays for any later chunk the vehicle reaches");
         assertTrue(folded.containsKey(UUID_B));
 
-        ListTag entities = chunkTag.getListOrEmpty("Entities");
+        ListTag entities = chunkTag.getList("Entities", Tag.TAG_COMPOUND);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(
-                TagValueInput.create(ProblemReporter.DISCARDING, registries, findByUuid(entities, UUID_A)), back);
+        ContainerHelper.loadAllItems(findByUuid(entities, UUID_A), back, registries);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "this copy carries the loot rather than being empty");
         assertFalse(findByUuid(entities, UUID_C).contains("Items"), "the unfolded neighbor is untouched");
     }

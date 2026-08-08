@@ -22,6 +22,8 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
@@ -350,7 +352,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         CompoundTag player = new CompoundTag();
         // The band's save keys the player file on its UUID (players/data/<uuid>.dat at 26.x), so a prior written
         // through it must carry one; a client saveWithoutId always does.
-        player.store("UUID", UUIDUtil.CODEC, PRIOR_PLAYER);
+        player.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, PRIOR_PLAYER).getOrThrow());
         PlayerTag.setDimension(player, dimension);
         if (mount != null) {
             CompoundTag root = new CompoundTag();
@@ -456,31 +458,25 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
     /** The one entity an entities-region chunk holds, so both its identity and its contents can be read. */
     private static CompoundTag soleEntity(CompoundTag entityChunk) {
-        ListTag entities = entityChunk.getList("Entities").orElseThrow(
-                () -> new AssertionError("the envelope carries no Entities list"));
+        ListTag entities = entityChunk.getList("Entities", Tag.TAG_COMPOUND);
         assertEquals(1, entities.size(), "the release writes exactly the one mount");
-        return entities.getCompound(0).orElseThrow(
-                () -> new AssertionError("the Entities list holds no compound"));
+        return entities.getCompound(0);
     }
 
     /** The UUID of the one entity an entities-region chunk holds, which is how a mount is told from a stray. */
     private static String soleEntityUuid(CompoundTag entityChunk) {
-        ListTag entities = entityChunk.getList("Entities").orElseThrow(
-                () -> new AssertionError("the envelope carries no Entities list"));
+        ListTag entities = entityChunk.getList("Entities", Tag.TAG_COMPOUND);
         assertEquals(1, entities.size(), "the release writes exactly the one mount");
-        UUID uuid = EntityMerge.readUuid(entities.getCompound(0).orElseThrow(
-                () -> new AssertionError("the Entities list holds no compound")));
+        UUID uuid = EntityMerge.readUuid(entities.getCompound(0));
         assertNotNull(uuid, "the written mount keeps the identity the prior tag recorded");
         return uuid.toString();
     }
 
     /** The item id of the one stack an entity's container holds. */
     private static String soleItemId(CompoundTag entity) {
-        ListTag items = entity.getList("Items").orElseThrow(
-                () -> new AssertionError("the released mount carries no Items list"));
+        ListTag items = entity.getList("Items", Tag.TAG_COMPOUND);
         assertEquals(1, items.size(), "the fixture archives exactly one stack");
-        return items.getCompound(0).orElseThrow(
-                () -> new AssertionError("the Items list holds no compound")).getStringOr("id", "");
+        return items.getCompound(0).getString("id");
     }
 
     private static int losses(LiveCaptureSession session) throws Exception {

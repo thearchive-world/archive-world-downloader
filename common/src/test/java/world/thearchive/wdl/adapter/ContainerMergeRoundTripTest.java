@@ -11,12 +11,10 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.namedBlockEnt
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.util.ProblemReporter;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.ValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -71,16 +69,15 @@ class ContainerMergeRoundTripTest {
         CompoundTag merged = sink.merge(chestTag(10, 64, -7), holder);
 
         // No field clobber: id / pos / unrelated fields survive.
-        assertEquals("minecraft:chest", merged.getStringOr("id", ""));
-        assertEquals(10, merged.getIntOr("x", 0));
-        assertEquals(64, merged.getIntOr("y", 0));
-        assertEquals(-7, merged.getIntOr("z", 0));
+        assertEquals("minecraft:chest", merged.getString("id"));
+        assertEquals(10, merged.getInt("x"));
+        assertEquals(64, merged.getInt("y"));
+        assertEquals(-7, merged.getInt("z"));
         assertEquals("keep-me", customNameOf(merged));
 
         // The merged "Items" decode via vanilla loadAllItems back to the same stacks at the same slots.
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ValueInput in = TagValueInput.create(ProblemReporter.DISCARDING, registries, merged);
-        ContainerHelper.loadAllItems(in, back);
+        ContainerHelper.loadAllItems(merged, back, registries);
 
         assertEquals(3, countNonEmpty(back), "exactly the three captured stacks come back");
         assertEquals(Items.DIAMOND, back.get(0).getItem());
@@ -100,7 +97,7 @@ class ContainerMergeRoundTripTest {
         CompoundTag blockEntity = chestTag(0, 0, 0);
         sink.merge(blockEntity, holder);
 
-        assertTrue(blockEntity.getListOrEmpty("Items").isEmpty(),
+        assertTrue(blockEntity.getList("Items", Tag.TAG_COMPOUND).isEmpty(),
                 "merge must write a copy, never mutate the input BE tag");
     }
 
@@ -111,8 +108,7 @@ class ContainerMergeRoundTripTest {
         CompoundTag merged = sink.merge(chestTag(1, 1, 1), sink.captureItems(items, registries));
 
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(
-                TagValueInput.create(ProblemReporter.DISCARDING, registries, merged), back);
+        ContainerHelper.loadAllItems(merged, back, registries);
         assertEquals(0, countNonEmpty(back), "an opened-but-empty container stays empty and uncorrupted");
     }
 }

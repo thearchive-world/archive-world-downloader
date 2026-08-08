@@ -15,15 +15,13 @@ import java.util.Optional;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.network.Filterable;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.WritableBookContent;
 import net.minecraft.world.item.component.WrittenBookContent;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.ValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -74,8 +72,10 @@ class LecternSinkRoundTripTest {
     }
 
     private static ItemStack readBackBook(CompoundTag merged) {
-        ValueInput in = TagValueInput.create(ProblemReporter.DISCARDING, registries, merged);
-        Optional<ItemStack> back = in.read("Book", ItemStack.CODEC); // vanilla loadAdditional's exact read
+        // vanilla loadAdditional's exact read
+        Optional<ItemStack> back = ItemStack.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), merged.get("Book"))
+                .result();
         assertTrue(back.isPresent(), "the merged Book must decode via vanilla ItemStack.CODEC");
         return back.get();
     }
@@ -86,7 +86,8 @@ class LecternSinkRoundTripTest {
 
         assertInstanceOf(CompoundTag.class, holder.get("Book"),
                 "ItemStack.CODEC serializes a stack to a compound under Book");
-        assertEquals(1, holder.getIntOr("Page", -1), "the reading page is stored as a plain int under Page");
+        assertEquals(1, (holder.contains("Page") ? holder.getInt("Page") : -1),
+                "the reading page is stored as a plain int under Page");
     }
 
     @Test
@@ -95,12 +96,12 @@ class LecternSinkRoundTripTest {
         CompoundTag merged = sink.merge(lecternTag(10, 64, -7), holder);
 
         // No field clobber: id / pos / unrelated fields survive.
-        assertEquals("minecraft:lectern", merged.getStringOr("id", ""));
-        assertEquals(10, merged.getIntOr("x", 0));
-        assertEquals(64, merged.getIntOr("y", 0));
-        assertEquals(-7, merged.getIntOr("z", 0));
+        assertEquals("minecraft:lectern", merged.getString("id"));
+        assertEquals(10, merged.getInt("x"));
+        assertEquals(64, merged.getInt("y"));
+        assertEquals(-7, merged.getInt("z"));
         assertEquals("keep-me", customNameOf(merged));
-        assertEquals(1, merged.getIntOr("Page", -1), "the reading page survives the merge");
+        assertEquals(1, (merged.contains("Page") ? merged.getInt("Page") : -1), "the reading page survives the merge");
 
         ItemStack back = readBackBook(merged);
         assertEquals(Items.WRITTEN_BOOK, back.getItem());
@@ -117,7 +118,7 @@ class LecternSinkRoundTripTest {
         CompoundTag holder = sink.captureBook(writableBook(), 0, registries);
         CompoundTag merged = sink.merge(lecternTag(1, 1, 1), holder);
 
-        assertEquals(0, merged.getIntOr("Page", -1));
+        assertEquals(0, (merged.contains("Page") ? merged.getInt("Page") : -1));
         ItemStack back = readBackBook(merged);
         assertEquals(Items.WRITABLE_BOOK, back.getItem(), "an unsigned writable book is a valid lectern content");
         WritableBookContent content = back.get(DataComponents.WRITABLE_BOOK_CONTENT);

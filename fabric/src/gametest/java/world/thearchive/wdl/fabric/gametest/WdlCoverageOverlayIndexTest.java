@@ -28,7 +28,7 @@ public class WdlCoverageOverlayIndexTest implements FabricClientGameTest {
                     new DownloadTarget("wdl-overlay", "wdl-overlay", DownloadMode.NEW), WdlConfig.DEFAULTS);
             driver.tick(10); // load + capture the render-distance square (the player's own chunk is captured first)
 
-            String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
+            String dimension = context.computeOnClient(client -> client.level.dimension().location().toString());
             ChunkPos playerChunkPos = context.computeOnClient(client -> client.player.chunkPosition());
             long playerChunk = playerChunkPos.toLong();
             long farChunk = ChunkPos.asLong(playerChunkPos.x + 4, playerChunkPos.z);

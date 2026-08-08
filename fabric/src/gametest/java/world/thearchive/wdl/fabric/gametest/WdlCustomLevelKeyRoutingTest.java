@@ -111,7 +111,7 @@ public class WdlCustomLevelKeyRoutingTest implements FabricClientGameTest {
         Check.that(entityChunk.isPresent(), "no entity chunk of the custom-key world reached "
                 + saveRoot.resolve("entities") + ", so nothing it held was written under its dimension type");
         List<String> ids = CaptureReadback.entities(entityChunk.get()).stream()
-                .map(entity -> entity.getString("id").orElse("?"))
+                .map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
                 .toList();
         Check.that(ids.contains("minecraft:armor_stand"),
                 "the stand summoned in the custom-key world is absent from its entities region: " + ids);
@@ -135,6 +135,6 @@ public class WdlCustomLevelKeyRoutingTest implements FabricClientGameTest {
     }
 
     private static String levelKeyOf(ResourceKey<Level> dimension) {
-        return dimension.identifier().toString();
+        return dimension.location().toString();
     }
 }

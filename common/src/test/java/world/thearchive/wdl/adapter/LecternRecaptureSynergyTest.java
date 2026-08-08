@@ -16,14 +16,14 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.network.Filterable;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -63,10 +63,11 @@ class LecternRecaptureSynergyTest {
     }
 
     private static String mergedTitle(CompoundTag chunkTag) {
-        ListTag blockEntities = chunkTag.getListOrEmpty("block_entities");
-        CompoundTag lectern = blockEntities.getCompoundOrEmpty(0);
-        Optional<ItemStack> back = TagValueInput.create(ProblemReporter.DISCARDING, registries, lectern)
-                .read("Book", ItemStack.CODEC);
+        ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
+        CompoundTag lectern = blockEntities.getCompound(0);
+        Optional<ItemStack> back = ItemStack.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), lectern.get("Book"))
+                .result();
         assertTrue(back.isPresent(), "the re-captured lectern carries a decodable Book");
         return back.get().get(DataComponents.WRITTEN_BOOK_CONTENT).title().raw();
     }

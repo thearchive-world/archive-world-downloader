@@ -34,8 +34,8 @@ class ContainerCaptureTest {
     void brewingStateRidesTheHolderWithVanillaTypes() {
         CompoundTag holder = new CompoundTag();
         ContainerCapture.putBrewingState(holder, 123, 7);
-        assertEquals((short) 123, holder.getShortOr("BrewTime", (short) 0));
-        assertEquals((byte) 7, holder.getByteOr("Fuel", (byte) 0));
+        assertEquals((short) 123, holder.getShort("BrewTime"));
+        assertEquals((byte) 7, holder.getByte("Fuel"));
         // The coercing getShortOr/getByteOr above would pass on a swapped short/byte too, so pin the on-disk
         // tag type directly: vanilla persists BrewTime as a short and Fuel as a byte, and the archive must match.
         assertInstanceOf(ShortTag.class, holder.get("BrewTime"), "BrewTime must be a short tag");
@@ -46,7 +46,7 @@ class ContainerCaptureTest {
     void zeroStateStillWritesBothKeys() {
         CompoundTag holder = new CompoundTag();
         ContainerCapture.putBrewingState(holder, 0, 0);
-        assertEquals(2, holder.keySet().size());
+        assertEquals(2, holder.getAllKeys().size());
     }
 
     @Test

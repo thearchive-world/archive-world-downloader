@@ -93,12 +93,12 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
             CompoundTag entityChunk = CaptureReadback.readEntityChunk(saveRoot, cartChunk)
                     .orElseThrow(() -> new AssertionError("entity chunk " + cartChunk + " is missing from the save"));
             List<String> cartItems = CaptureReadback.entities(entityChunk).stream()
-                    .filter(entity -> entity.getString("id").orElse("").equals("minecraft:chest_minecart"))
+                    .filter(entity -> entity.getString("id").equals("minecraft:chest_minecart"))
                     .findFirst()
                     .map(CaptureReadback::itemIds)
                     .orElseThrow(() -> new AssertionError("the chest minecart is absent from the entities region: "
                             + CaptureReadback.entities(entityChunk).stream()
-                                    .map(entity -> entity.getString("id").orElse("?")).toList()));
+                                    .map(entity -> (entity.contains("id") ? entity.getString("id") : "?")).toList()));
             Check.that(cartItems.contains("minecraft:diamond"),
                     "the opened chest minecart's planted item is absent from its captured Items: " + cartItems);
 
@@ -195,10 +195,10 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
 
         Path saveRoot = run.stopAndAwaitSave();
         CompoundTag boat = CaptureReadback.levelData(saveRoot)
-                .getCompoundOrEmpty("Player").getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity");
-        Check.that(boat.getString("id").orElse("").equals("minecraft:oak_chest_boat"),
+                .getCompound("Player").getCompound("RootVehicle").getCompound("Entity");
+        Check.that(boat.getString("id").equals("minecraft:oak_chest_boat"),
                 "the ridden chest boat is absent from the saved player, so the guard would assert nothing: "
-                        + boat.getString("id").orElse("none"));
+                        + (boat.contains("id") ? boat.getString("id") : "none"));
         List<String> boatItems = CaptureReadback.itemIds(boat);
         Check.that(!boatItems.contains("minecraft:diamond"),
                 "the minecart's contents were written into the ridden chest boat: " + boatItems);
@@ -242,10 +242,10 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
 
         Path saveRoot = run.stopAndAwaitSave();
         CompoundTag boat = CaptureReadback.levelData(saveRoot)
-                .getCompoundOrEmpty("Player").getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity");
-        Check.that(boat.getString("id").orElse("").equals("minecraft:oak_chest_boat"),
+                .getCompound("Player").getCompound("RootVehicle").getCompound("Entity");
+        Check.that(boat.getString("id").equals("minecraft:oak_chest_boat"),
                 "the ridden chest boat is absent from the saved player, so the assertion below proves nothing: "
-                        + boat.getString("id").orElse("none"));
+                        + (boat.contains("id") ? boat.getString("id") : "none"));
         List<String> boatItems = CaptureReadback.itemIds(boat);
         Check.that(boatItems.contains("minecraft:emerald"),
                 "the ridden chest boat's planted item is absent from its captured Items: " + boatItems);

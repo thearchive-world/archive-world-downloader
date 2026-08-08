@@ -12,13 +12,15 @@ import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.ItemStackWithSlot;
+import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -26,9 +28,6 @@ import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -74,11 +73,11 @@ class EntitySinkLeashDegradationTest {
         CompoundTag chunk = sink.encodeChunk(List.of(mob), pos, registries, false);
 
         assertNotNull(chunk, "the leashed container entity must not be dropped");
-        ListTag entities = chunk.getListOrEmpty("Entities");
+        ListTag entities = chunk.getList("Entities", Tag.TAG_COMPOUND);
         assertEquals(1, entities.size(), "the leashed container entity must still be written");
 
-        CompoundTag saved = entities.getCompoundOrEmpty(0);
-        ListTag items = saved.getListOrEmpty("Items");
+        CompoundTag saved = entities.getCompound(0);
+        ListTag items = saved.getList("Items", Tag.TAG_COMPOUND);
         assertEquals(1, items.size(), "the container contents must survive the leash degradation");
         assertFalse(saved.contains("leash"), "the unresolvable leash link is dropped by design, not saved");
 
@@ -98,12 +97,12 @@ class EntitySinkLeashDegradationTest {
         CompoundTag chunk = sink.encodeChunk(List.of(vehicle), pos, registries, false);
 
         assertNotNull(chunk, "the vehicle group must not be dropped by the passenger's unsavable leash");
-        CompoundTag savedVehicle = chunk.getListOrEmpty("Entities").getCompoundOrEmpty(0);
-        ListTag passengers = savedVehicle.getListOrEmpty("Passengers");
+        CompoundTag savedVehicle = chunk.getList("Entities", Tag.TAG_COMPOUND).getCompound(0);
+        ListTag passengers = savedVehicle.getList("Passengers", Tag.TAG_COMPOUND);
         assertEquals(1, passengers.size(), "the passenger must be nested under the vehicle");
 
-        CompoundTag savedRider = passengers.getCompoundOrEmpty(0);
-        assertEquals(1, savedRider.getListOrEmpty("Items").size(), "the passenger's container must survive");
+        CompoundTag savedRider = passengers.getCompound(0);
+        assertEquals(1, savedRider.getList("Items", Tag.TAG_COMPOUND).size(), "the passenger's container must survive");
         assertFalse(savedRider.contains("leash"), "the passenger's unsavable leash is stripped, not dropped whole");
 
         assertTrue(rider.mayBeLeashed(), "the live passenger's leash is restored: no lingering mutation");
@@ -122,9 +121,9 @@ class EntitySinkLeashDegradationTest {
         CompoundTag chunk = sink.encodeChunk(List.of(mob), pos, registries, false);
 
         assertNotNull(chunk, "a resolvably leashed entity must still be written");
-        CompoundTag saved = chunk.getListOrEmpty("Entities").getCompoundOrEmpty(0);
+        CompoundTag saved = chunk.getList("Entities", Tag.TAG_COMPOUND).getCompound(0);
         assertTrue(saved.contains("leash"), "a resolvable leash is kept, only the unsavable one is stripped");
-        assertEquals(1, saved.getListOrEmpty("Items").size(), "its container is written as well");
+        assertEquals(1, saved.getList("Items", Tag.TAG_COMPOUND).size(), "its container is written as well");
     }
 
     @Test
@@ -134,14 +133,15 @@ class EntitySinkLeashDegradationTest {
 
         ContainerLeashableEntity mob = new ContainerLeashableEntity();
         CompoundTag leashInput = new CompoundTag();
-        leashInput.store("leash", BlockPos.CODEC, new BlockPos(1, 2, 3)); // a delayed attachment the codec can encode
-        mob.readLeashData(TagValueInput.create(ProblemReporter.DISCARDING, registries, leashInput));
+        // a delayed attachment the codec can encode, unlike the null-holder leash the unsavable cases carry
+        leashInput.put("leash", NbtUtils.writeBlockPos(new BlockPos(1, 2, 3)));
+        mob.readLeashData(leashInput);
         assertTrue(mob.mayBeLeashed() && !mob.isLeashed(), "precondition: holder null, but a savable attachment");
 
         CompoundTag chunk = sink.encodeChunk(List.of(mob), pos, registries, false);
 
         assertNotNull(chunk, "a delayed-attachment leash still saves the entity");
-        CompoundTag saved = chunk.getListOrEmpty("Entities").getCompoundOrEmpty(0);
+        CompoundTag saved = chunk.getList("Entities", Tag.TAG_COMPOUND).getCompound(0);
         assertTrue(saved.contains("leash"), "only the throwing state is stripped; a savable attachment is kept");
     }
 
@@ -185,17 +185,18 @@ class EntitySinkLeashDegradationTest {
         }
 
         @Override
-        protected void addAdditionalSaveData(ValueOutput output) {
-            this.writeLeashData(output, this.leashData); // vanilla default: throws on the unresolved holder
-            ValueOutput.TypedOutputList<ItemStackWithSlot> items = output.list("Items", ItemStackWithSlot.CODEC);
-            items.add(new ItemStackWithSlot(0, new ItemStack(Items.DIAMOND, 3)));
+        protected void addAdditionalSaveData(CompoundTag tag) {
+            this.writeLeashData(tag, this.leashData); // vanilla default: throws on the unresolved holder
+            NonNullList<ItemStack> items = NonNullList.withSize(1, ItemStack.EMPTY);
+            items.set(0, new ItemStack(Items.DIAMOND, 3));
+            ContainerHelper.saveAllItems(tag, items, TestRegistries.frozen());
         }
 
         @Override
         protected void defineSynchedData(SynchedEntityData.Builder builder) {}
 
         @Override
-        protected void readAdditionalSaveData(ValueInput input) {}
+        protected void readAdditionalSaveData(CompoundTag tag) {}
 
         @Override
         public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {

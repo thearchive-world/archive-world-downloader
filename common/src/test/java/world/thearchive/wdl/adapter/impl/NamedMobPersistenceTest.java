@@ -29,12 +29,12 @@ class NamedMobPersistenceTest {
     void namedMobGetsPersistenceRequiredTrueRegardlessOfKnob() {
         CompoundTag knobOff = new CompoundTag();
         EntitySinkImpl.applyMobPersistence(knobOff, true, true, false, false);
-        assertTrue(knobOff.getBoolean("PersistenceRequired").orElse(false),
+        assertTrue(knobOff.getBoolean("PersistenceRequired"),
                 "a captured named mob must persist even with forceMobPersistence off (the unconditional fix)");
 
         CompoundTag knobOn = new CompoundTag();
         EntitySinkImpl.applyMobPersistence(knobOn, true, true, false, true);
-        assertTrue(knobOn.getBoolean("PersistenceRequired").orElse(false),
+        assertTrue(knobOn.getBoolean("PersistenceRequired"),
                 "a captured named mob must persist with forceMobPersistence on as well");
     }
 
@@ -42,12 +42,12 @@ class NamedMobPersistenceTest {
     void lootEquippedMobGetsPersistenceRequiredTrueRegardlessOfKnob() {
         CompoundTag knobOff = new CompoundTag();
         EntitySinkImpl.applyMobPersistence(knobOff, true, false, true, false);
-        assertTrue(knobOff.getBoolean("PersistenceRequired").orElse(false),
+        assertTrue(knobOff.getBoolean("PersistenceRequired"),
                 "a mob that picked up an impossible item must persist even with forceMobPersistence off");
 
         CompoundTag knobOn = new CompoundTag();
         EntitySinkImpl.applyMobPersistence(knobOn, true, false, true, true);
-        assertTrue(knobOn.getBoolean("PersistenceRequired").orElse(false),
+        assertTrue(knobOn.getBoolean("PersistenceRequired"),
                 "a loot-equipped mob persists with the force knob on too");
     }
 
@@ -60,7 +60,7 @@ class NamedMobPersistenceTest {
 
         CompoundTag knobOn = new CompoundTag();
         EntitySinkImpl.applyMobPersistence(knobOn, true, false, false, true);
-        assertTrue(knobOn.getBoolean("PersistenceRequired").orElse(false),
+        assertTrue(knobOn.getBoolean("PersistenceRequired"),
                 "an un-named mob must persist once forceMobPersistence is on");
     }
 

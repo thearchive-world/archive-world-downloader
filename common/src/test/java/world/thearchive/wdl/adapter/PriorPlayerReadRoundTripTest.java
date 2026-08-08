@@ -18,6 +18,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -52,7 +53,7 @@ class PriorPlayerReadRoundTripTest {
 
     private static CompoundTag capturedPlayerTag(ListTag enderItems) {
         CompoundTag tag = new CompoundTag();
-        tag.store("UUID", UUIDUtil.CODEC, PLAYER_UUID);
+        tag.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, PLAYER_UUID).getOrThrow());
         tag.put("Inventory", new ListTag());
         tag.put("EnderItems", enderItems);
         return tag;
@@ -107,7 +108,7 @@ class PriorPlayerReadRoundTripTest {
         List<String> ids = new ArrayList<>();
         if (player.get("EnderItems") instanceof ListTag items) {
             for (int i = 0; i < items.size(); i++) {
-                ids.add(((CompoundTag) items.get(i)).getStringOr("id", ""));
+                ids.add(((CompoundTag) items.get(i)).getString("id"));
             }
         }
         return ids;

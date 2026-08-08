@@ -222,7 +222,7 @@ class CarryForwardWiringTest {
             List<String> ids = new ArrayList<>();
             if (written.get("Items") instanceof ListTag items) {
                 for (int i = 0; i < items.size(); i++) {
-                    ids.add(((CompoundTag) items.get(i)).getStringOr("id", ""));
+                    ids.add(((CompoundTag) items.get(i)).getString("id"));
                 }
             }
             return ids;

@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -99,7 +100,6 @@ class FixtureFidelityTest {
         handBuilt.putInt("z", 20);
 
         String message = reject(() -> FixtureFidelity.assertBlockEntityShape(handBuilt));
-        assertTrue(message.contains("components"), "the divergence must name the omitted key: " + message);
         assertTrue(message.contains("Items"),
                 "an absent Items is the carry-forward defect's own shape and must be named: " + message);
     }
@@ -145,7 +145,8 @@ class FixtureFidelityTest {
     void theEntityChokePointRejectsHandBuiltItemsHolders() {
         CompoundTag vehicle = new CompoundTag();
         vehicle.putString("id", "minecraft:chest_minecart");
-        vehicle.put("Items", holderOf(handBuiltEntry("minecraft:diamond", false, true)).getListOrEmpty("Items"));
+        vehicle.put("Items",
+                holderOf(handBuiltEntry("minecraft:diamond", false, true)).getList("Items", Tag.TAG_COMPOUND));
 
         reject(() -> EntityFixtures.entityChunkTagWith(vehicle));
     }
@@ -156,8 +157,10 @@ class FixtureFidelityTest {
         // of what lands on disk beside every saved block entity.
         CompoundTag chunkTag = BlockEntityFixtures
                 .chunkTagWith(BlockEntityFixtures.blockEntity("minecraft:chest", 1, 64, 1));
+        CompoundTag blockEntity = BlockEntityFixtures.findByPos(chunkTag, 1, 64, 1);
         assertEquals(false,
-                BlockEntityFixtures.findByPos(chunkTag, 1, 64, 1).getBooleanOr(FixtureFidelity.KEEP_PACKED, true));
+                blockEntity.contains(FixtureFidelity.KEEP_PACKED) ? blockEntity.getBoolean(FixtureFidelity.KEEP_PACKED)
+                        : true);
     }
 
     @Test

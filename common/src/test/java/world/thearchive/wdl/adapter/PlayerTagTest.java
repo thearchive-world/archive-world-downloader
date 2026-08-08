@@ -15,15 +15,15 @@ import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.resources.Identifier;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.ProblemReporter;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -114,16 +114,16 @@ class PlayerTagTest {
     void setDimensionWritesCanonicalVanillaIdForCanonicalKey() {
         CompoundTag tag = playerTag();
         PlayerTag.setDimension(tag, VanillaDimensions.forType(BuiltinDimensionTypes.NETHER));
-        assertEquals("minecraft:the_nether", tag.getStringOr("Dimension", ""));
+        assertEquals("minecraft:the_nether", tag.getString("Dimension"));
     }
 
     @Test
     void setDimensionWritesGivenIdVerbatim() {
         CompoundTag tag = playerTag();
         ResourceKey<Level> datapackDimension = ResourceKey.create(Registries.DIMENSION,
-                Identifier.fromNamespaceAndPath("examplepack", "skylands"));
+                ResourceLocation.fromNamespaceAndPath("examplepack", "skylands"));
         PlayerTag.setDimension(tag, datapackDimension);
-        assertEquals("examplepack:skylands", tag.getStringOr("Dimension", ""),
+        assertEquals("examplepack:skylands", tag.getString("Dimension"),
                 "setDimension writes the id it is handed verbatim; the by-type canonicalization is VanillaDimensions");
     }
 
@@ -141,7 +141,7 @@ class PlayerTagTest {
         CompoundTag tag = playerTag();
         assertNull(PlayerTag.dimensionOf(tag), "a player tag with no Dimension key names no dimension");
         ResourceKey<Level> datapackDimension = ResourceKey.create(Registries.DIMENSION,
-                Identifier.fromNamespaceAndPath("examplepack", "skylands"));
+                ResourceLocation.fromNamespaceAndPath("examplepack", "skylands"));
         PlayerTag.setDimension(tag, datapackDimension);
         assertNull(PlayerTag.dimensionOf(tag), "nor does one naming a dimension the capture never routes to");
     }
@@ -157,9 +157,9 @@ class PlayerTagTest {
 
         assertTrue(tag.get("EnderItems") instanceof ListTag, "EnderItems is now the captured list");
         CompoundTag probe = new CompoundTag();
-        probe.put("Items", tag.getListOrEmpty("EnderItems")); // read the remapped list via the same codec
+        probe.put("Items", tag.getList("EnderItems", Tag.TAG_COMPOUND)); // read the remapped list via the same codec
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, probe), back);
+        ContainerHelper.loadAllItems(probe, back, registries);
         assertEquals(Items.ENDER_PEARL, back.get(5).getItem(), "the captured ender item lands at its EnderItems slot");
         assertEquals(9, back.get(5).getCount());
     }
@@ -172,10 +172,11 @@ class PlayerTagTest {
 
         PlayerTag.setRootVehicle(tag, directVehicle, vehicleTag);
 
-        CompoundTag rootVehicle = tag.getCompoundOrEmpty("RootVehicle");
-        assertEquals(directVehicle, rootVehicle.read("Attach", UUIDUtil.CODEC).orElse(null),
+        CompoundTag rootVehicle = tag.getCompound("RootVehicle");
+        assertEquals(directVehicle,
+                UUIDUtil.CODEC.parse(NbtOps.INSTANCE, rootVehicle.get("Attach")).result().orElse(null),
                 "Attach is the direct vehicle UUID in the UUIDUtil.CODEC four-int form ServerPlayer reads");
-        assertEquals("minecraft:chest_boat", rootVehicle.getCompoundOrEmpty("Entity").getStringOr("id", ""),
+        assertEquals("minecraft:chest_boat", rootVehicle.getCompound("Entity").getString("id"),
                 "the vehicle NBT nests under Entity, the shape loadAndSpawnParentVehicle spawns from");
         assertTrue(tag.contains("Air"), "the rest of the player tag is untouched");
     }
@@ -210,7 +211,7 @@ class PlayerTagTest {
         boolean restored = PlayerTag.restorePriorMountContents(prior, fresh);
 
         assertFalse(restored, "with no fresh Entity compound there is nothing to match or fold into");
-        assertFalse(fresh.getCompoundOrEmpty("RootVehicle").contains("Entity"),
+        assertFalse(fresh.getCompound("RootVehicle").contains("Entity"),
                 "nothing is grafted onto the entity-less RootVehicle");
     }
 
@@ -225,7 +226,7 @@ class PlayerTagTest {
 
         assertFalse(carried, "the fresh mount is authoritative, nothing carries back");
         assertEquals("minecraft:oak_boat",
-                fresh.getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity").getStringOr("id", ""),
+                fresh.getCompound("RootVehicle").getCompound("Entity").getString("id"),
                 "the fresh mount wins");
     }
 
@@ -254,7 +255,7 @@ class PlayerTagTest {
     }
 
     private static ListTag mountItems(CompoundTag player) {
-        return player.getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity").getListOrEmpty("Items");
+        return player.getCompound("RootVehicle").getCompound("Entity").getList("Items", Tag.TAG_COMPOUND);
     }
 
     @Test
@@ -268,8 +269,9 @@ class PlayerTagTest {
 
         assertTrue(carried, "the prior download's contents restore onto the same seated mount");
         assertEquals(2, mountItems(fresh).size(), "the empty seated capture is refilled from the prior download");
-        assertEquals(mount, fresh.getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity")
-                .read("UUID", UUIDUtil.CODEC).orElse(null), "the fresh mount identity is untouched");
+        assertEquals(mount, UUIDUtil.CODEC.parse(NbtOps.INSTANCE,
+                fresh.getCompound("RootVehicle").getCompound("Entity").get("UUID")).result().orElse(null),
+                "the fresh mount identity is untouched");
     }
 
     @Test
@@ -316,15 +318,15 @@ class PlayerTagTest {
      */
     private static CompoundTag nestedMountRootVehicle(UUID carrierUuid, UUID mountUuid, ListTag items) {
         CompoundTag rootVehicle = new CompoundTag();
-        CompoundTag mount = mountRootVehicle(mountUuid, items).getCompoundOrEmpty("Entity");
+        CompoundTag mount = mountRootVehicle(mountUuid, items).getCompound("Entity");
         rootVehicle.put("Entity",
                 EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:minecart", carrierUuid), mount));
         return rootVehicle;
     }
 
     private static ListTag nestedMountItems(CompoundTag player) {
-        return player.getCompoundOrEmpty("RootVehicle").getCompoundOrEmpty("Entity")
-                .getListOrEmpty("Passengers").getCompoundOrEmpty(0).getListOrEmpty("Items");
+        return player.getCompound("RootVehicle").getCompound("Entity")
+                .getList("Passengers", Tag.TAG_COMPOUND).getCompound(0).getList("Items", Tag.TAG_COMPOUND);
     }
 
     @Test
@@ -375,7 +377,7 @@ class PlayerTagTest {
         boolean carried = PlayerTag.carryForwardEnderItems(prior, fresh);
 
         assertTrue(carried, "the prior ender chest carried forward on the resume");
-        assertEquals(2, fresh.getListOrEmpty("EnderItems").size(), "the prior contents survive the resume");
+        assertEquals(2, fresh.getList("EnderItems", Tag.TAG_COMPOUND).size(), "the prior contents survive the resume");
     }
 
     @Test
@@ -386,7 +388,7 @@ class PlayerTagTest {
         boolean carried = PlayerTag.carryForwardEnderItems(prior, fresh);
 
         assertFalse(carried, "the re-captured ender chest is authoritative, nothing carried back");
-        assertEquals(2, fresh.getListOrEmpty("EnderItems").size(), "the fresh contents win");
+        assertEquals(2, fresh.getList("EnderItems", Tag.TAG_COMPOUND).size(), "the fresh contents win");
     }
 
     @Test

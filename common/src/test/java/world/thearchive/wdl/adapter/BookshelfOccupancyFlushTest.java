@@ -137,7 +137,9 @@ class BookshelfOccupancyFlushTest {
             List<Integer> slots = new ArrayList<>();
             if (written.get("Items") instanceof ListTag items) {
                 for (int i = 0; i < items.size(); i++) {
-                    slots.add((int) ((CompoundTag) items.get(i)).getByteOr("Slot", (byte) -1));
+                    slots.add((int) (((CompoundTag) items.get(i)).contains("Slot")
+                            ? ((CompoundTag) items.get(i)).getByte("Slot")
+                            : (byte) -1));
                 }
             }
             slots.sort(null);

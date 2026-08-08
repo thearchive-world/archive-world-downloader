@@ -15,12 +15,11 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.util.ProblemReporter;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -57,10 +56,10 @@ class ContainerRecaptureSynergyTest {
     }
 
     private static ItemStack mergedItemAt(ContainerSink sink, CompoundTag chunkTag, int slot) {
-        ListTag blockEntities = chunkTag.getListOrEmpty("block_entities");
-        CompoundTag chest = blockEntities.getCompoundOrEmpty(0);
+        ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
+        CompoundTag chest = blockEntities.getCompound(0);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, chest), back);
+        ContainerHelper.loadAllItems(chest, back, registries);
         return back.get(slot);
     }
 

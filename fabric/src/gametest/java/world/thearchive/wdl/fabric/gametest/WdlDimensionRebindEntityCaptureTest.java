@@ -101,12 +101,12 @@ public class WdlDimensionRebindEntityCaptureTest implements FabricClientGameTest
 
     private static boolean hasArmorStand(CompoundTag entityChunkTag) {
         return CaptureReadback.entities(entityChunkTag).stream()
-                .anyMatch(entity -> entity.getString("id").orElse("").equals("minecraft:armor_stand"));
+                .anyMatch(entity -> entity.getString("id").equals("minecraft:armor_stand"));
     }
 
     private static List<String> ids(CompoundTag entityChunkTag) {
         return CaptureReadback.entities(entityChunkTag).stream()
-                .map(entity -> entity.getString("id").orElse("?"))
+                .map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
                 .toList();
     }
 
@@ -130,6 +130,6 @@ public class WdlDimensionRebindEntityCaptureTest implements FabricClientGameTest
     }
 
     private static String levelKeyOf(ResourceKey<Level> dimension) {
-        return dimension.identifier().toString();
+        return dimension.location().toString();
     }
 }

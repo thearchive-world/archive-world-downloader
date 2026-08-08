@@ -7,7 +7,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.animal.cow.Cow;
+import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.level.ChunkPos;
 
 import world.thearchive.wdl.core.DownloadMode;
@@ -37,7 +37,7 @@ public class WdlCoverageOverlayMobRangeTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         try (MultiplayerFixture fixture = MultiplayerFixture.connectWithEntityRange(context, 30)) {
-            String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
+            String dimension = context.computeOnClient(client -> client.level.dimension().location().toString());
             ChunkPos playerChunkPos = context.computeOnClient(client -> client.player.chunkPosition());
             BlockPos playerBlockPos = context.computeOnClient(client -> client.player.blockPosition());
             long playerChunk = playerChunkPos.toLong();

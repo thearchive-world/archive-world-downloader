@@ -59,7 +59,7 @@ class MapWriteTaskTest {
         assertEquals(0, failures.get(), "a successful write counts no failure");
         CompoundTag envelope = NbtIo.readCompressed(dataDirectory.resolve("map_7.dat"),
                 NbtAccounter.unlimitedHeap());
-        assertEquals("minecraft:overworld", envelope.getCompoundOrEmpty("data").getStringOr("dimension", ""),
+        assertEquals("minecraft:overworld", envelope.getCompound("data").getString("dimension"),
                 "the map reached disk under its key carrying the caller's own tag");
     }
 

@@ -48,7 +48,7 @@ class EntityBufferTest {
     private static List<String> markersOf(List<CompoundTag> tags) {
         List<String> markers = new ArrayList<>();
         for (CompoundTag tag : tags) {
-            markers.add(tag.getStringOr("id", ""));
+            markers.add(tag.getString("id"));
         }
         return markers;
     }
@@ -74,7 +74,7 @@ class EntityBufferTest {
         assertTrue(buffer.drainChunk(new ChunkPos(0, 0)).isEmpty(), "the stale copy is gone from the old chunk");
         List<CompoundTag> current = buffer.drainChunk(new ChunkPos(5, 5));
         assertEquals(1, current.size(), "exactly one copy, in the newest chunk");
-        assertEquals("new", current.get(0).getStringOr("id", ""));
+        assertEquals("new", current.get(0).getString("id"));
     }
 
     @Test
@@ -218,7 +218,7 @@ class EntityBufferTest {
         buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
 
         List<CompoundTag> drained = buffer.drainChunk(new ChunkPos(0, 0));
-        drained.removeIf(tag -> "a".equals(tag.getStringOr("id", ""))); // the caller filters the drain in place
+        drained.removeIf(tag -> "a".equals(tag.getString("id"))); // the caller filters the drain in place
 
         assertEquals(List.of("b"), markersOf(drained));
     }

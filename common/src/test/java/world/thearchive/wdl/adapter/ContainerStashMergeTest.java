@@ -19,12 +19,10 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -92,14 +90,12 @@ class ContainerStashMergeTest {
         assertFalse(stash.containsKey(chestPos), "the flushed chunk's stash entry is drained as the tag leaves memory");
         assertTrue(stash.containsKey(elsewhere), "another chunk's stash entry is left until its own flush");
 
-        ListTag blockEntities = chunkTag.getListOrEmpty("block_entities");
+        ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(
-                TagValueInput.create(ProblemReporter.DISCARDING, registries, findByPos(blockEntities, 10, 70, 20)),
-                back);
+        ContainerHelper.loadAllItems(findByPos(blockEntities, 10, 70, 20), back, registries);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest gains exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
-        assertTrue(findByPos(blockEntities, 11, 70, 20).getListOrEmpty("Items").isEmpty(),
+        assertTrue(findByPos(blockEntities, 11, 70, 20).getList("Items", Tag.TAG_COMPOUND).isEmpty(),
                 "the neighbor block entity is untouched");
     }
 
@@ -116,7 +112,9 @@ class ContainerStashMergeTest {
         assertEquals(0, merged, "no captured block entity at the stashed pos -> nothing merges");
         assertFalse(stash.containsKey(pos),
                 "the entry is still drained: the chunk is leaving memory, so it cannot wait");
-        assertTrue(findByPos(chunkTag.getListOrEmpty("block_entities"), 2, 64, 1).getListOrEmpty("Items").isEmpty(),
+        assertTrue(
+                findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 2, 64, 1)
+                        .getList("Items", Tag.TAG_COMPOUND).isEmpty(),
                 "the unrelated chest is left alone");
     }
 
@@ -177,10 +175,10 @@ class ContainerStashMergeTest {
         ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(crafterPos), stash);
 
         CompoundTag mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
-        assertArrayEquals(new int[] { 0, 4 }, mergedBlockEntity.getIntArray("disabled_slots").orElseThrow());
-        assertEquals(1, mergedBlockEntity.getIntOr("triggered", 0));
-        assertEquals((short) 123, mergedBlockEntity.getShortOr("BrewTime", (short) 0));
-        assertEquals((byte) 7, mergedBlockEntity.getByteOr("Fuel", (byte) 0));
+        assertArrayEquals(new int[] { 0, 4 }, mergedBlockEntity.getIntArray("disabled_slots"));
+        assertEquals(1, mergedBlockEntity.getInt("triggered"));
+        assertEquals((short) 123, mergedBlockEntity.getShort("BrewTime"));
+        assertEquals((byte) 7, mergedBlockEntity.getByte("Fuel"));
         assertFalse(mergedBlockEntity.contains("wdl_block_entity_id"), "the internal holder key never reaches disk");
         assertFalse(mergedBlockEntity.contains("junk"), "a non-whitelisted holder key never reaches disk");
         assertFalse(mergedBlockEntity.contains("Book"), "a lectern book is content, not open-time state");
@@ -207,8 +205,8 @@ class ContainerStashMergeTest {
         ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(crafterPos), stash);
 
         CompoundTag mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
-        assertArrayEquals(new int[] { 2, 5 }, mergedBlockEntity.getIntArray("disabled_slots").orElseThrow());
-        assertEquals(1, mergedBlockEntity.getIntOr("triggered", -1));
+        assertArrayEquals(new int[] { 2, 5 }, mergedBlockEntity.getIntArray("disabled_slots"));
+        assertEquals(1, (mergedBlockEntity.contains("triggered") ? mergedBlockEntity.getInt("triggered") : -1));
         assertFalse(mergedBlockEntity.contains("BrewTime"));
         assertFalse(mergedBlockEntity.contains("Fuel"));
     }

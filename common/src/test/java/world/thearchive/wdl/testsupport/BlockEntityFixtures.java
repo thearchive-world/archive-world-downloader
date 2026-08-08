@@ -12,13 +12,11 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.ValueInput;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
@@ -59,8 +57,9 @@ public final class BlockEntityFixtures {
     /** The custom name a {@link #namedBlockEntity} tag carries, or {@code ""} when it carries none. */
     public static String customNameOf(CompoundTag blockEntityTag) {
         RegistryAccess registries = TestRegistries.frozen();
-        ValueInput input = TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntityTag);
-        Component name = input.read("components", DataComponentMap.CODEC)
+        Component name = DataComponentMap.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), blockEntityTag.get("components"))
+                .result()
                 .map(components -> components.get(DataComponents.CUSTOM_NAME))
                 .orElse(null);
         return name == null ? "" : name.getString();
@@ -158,8 +157,8 @@ public final class BlockEntityFixtures {
     /** The block-entity tag in {@code list} at {@code x/y/z}, or an {@link AssertionError} when none matches. */
     public static CompoundTag findByPos(ListTag list, int x, int y, int z) {
         for (int i = 0; i < list.size(); i++) {
-            CompoundTag tag = list.getCompoundOrEmpty(i);
-            if (tag.getIntOr("x", 0) == x && tag.getIntOr("y", 0) == y && tag.getIntOr("z", 0) == z) {
+            CompoundTag tag = list.getCompound(i);
+            if (tag.getInt("x") == x && tag.getInt("y") == y && tag.getInt("z") == z) {
                 return tag;
             }
         }
@@ -168,15 +167,15 @@ public final class BlockEntityFixtures {
 
     /** The block-entity tag in {@code chunkTag} at {@code x/y/z}, or an {@link AssertionError} when none matches. */
     public static CompoundTag findByPos(CompoundTag chunkTag, int x, int y, int z) {
-        return findByPos(chunkTag.getListOrEmpty("block_entities"), x, y, z);
+        return findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), x, y, z);
     }
 
     /** The block-entity tag in {@code chunkTag} at {@code x/y/z}, or {@code null} when none matches. */
     public static @Nullable CompoundTag findByPosOrNull(CompoundTag chunkTag, int x, int y, int z) {
-        ListTag list = chunkTag.getListOrEmpty("block_entities");
+        ListTag list = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
-            CompoundTag tag = list.getCompoundOrEmpty(i);
-            if (tag.getIntOr("x", 0) == x && tag.getIntOr("y", 0) == y && tag.getIntOr("z", 0) == z) {
+            CompoundTag tag = list.getCompound(i);
+            if (tag.getInt("x") == x && tag.getInt("y") == y && tag.getInt("z") == z) {
                 return tag;
             }
         }

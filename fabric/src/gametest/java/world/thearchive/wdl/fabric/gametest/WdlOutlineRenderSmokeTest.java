@@ -5,7 +5,7 @@ package world.thearchive.wdl.fabric.gametest;
 
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
@@ -37,9 +37,9 @@ public class WdlOutlineRenderSmokeTest implements FabricClientGameTest {
             if (!drawTestRim || client.level == null || client.player == null) {
                 return;
             }
-            OutlineRenderContext renderContext = new OutlineRenderContext(worldContext.matrices(),
+            OutlineRenderContext renderContext = new OutlineRenderContext(worldContext.matrixStack(),
                     worldContext.consumers(), new Frustum(new Matrix4f(), new Matrix4f()),
-                    client.gameRenderer.getMainCamera().position(), 2.5f);
+                    client.gameRenderer.getMainCamera().getPosition(), 2.5f);
             double x = client.player.getX();
             double y = client.player.getY();
             double z = client.player.getZ();

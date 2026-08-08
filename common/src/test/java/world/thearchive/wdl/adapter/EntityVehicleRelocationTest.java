@@ -24,6 +24,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.item.ItemStack;
@@ -120,7 +121,7 @@ class EntityVehicleRelocationTest {
         assertFalse(result.failed(), "the drain hit no hard error");
         List<CompoundTag> written = entitiesOnDisk(paths, VEHICLE, opened, drifted);
         assertEquals(1, written.size(), "one chunk file, one copy");
-        assertEquals((short) 42, written.get(0).getShortOr("Air", (short) -1),
+        assertEquals((short) 42, written.get(0).contains("Air") ? written.get(0).getShort("Air") : (short) -1,
                 "the re-flush of the same chunk is written, since the read-merge makes it lossless");
         assertTrue(EntityMerge.hasCapturedContent(written.get(0)),
                 "and the entity read-merge carries the contents into that re-written copy");
@@ -202,7 +203,7 @@ class EntityVehicleRelocationTest {
     private static int mapIdOf(CompoundTag tag) {
         ListTag items = (ListTag) tag.get("Items");
         CompoundTag components = (CompoundTag) ((CompoundTag) items.get(0)).get("components");
-        return ((net.minecraft.nbt.NumericTag) components.get("minecraft:map_id")).intValue();
+        return ((net.minecraft.nbt.NumericTag) components.get("minecraft:map_id")).getAsInt();
     }
 
     @SuppressWarnings("unchecked")
@@ -223,7 +224,7 @@ class EntityVehicleRelocationTest {
         Set<String> ids = new HashSet<>();
         if (entity.get("Items") instanceof ListTag items) {
             for (int i = 0; i < items.size(); i++) {
-                ids.add(((CompoundTag) items.get(i)).getStringOr("id", ""));
+                ids.add(((CompoundTag) items.get(i)).getString("id"));
             }
         }
         return ids;
@@ -295,7 +296,7 @@ class EntityVehicleRelocationTest {
     /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
     private static CompoundTag entity(UUID uuid) {
         CompoundTag entity = new CompoundTag();
-        entity.store("UUID", UUIDUtil.CODEC, uuid);
+        entity.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow());
         return entity;
     }
 

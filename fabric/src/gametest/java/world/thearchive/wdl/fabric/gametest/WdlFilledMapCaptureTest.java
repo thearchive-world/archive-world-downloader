@@ -86,7 +86,7 @@ public class WdlFilledMapCaptureTest implements FabricClientGameTest {
 
             long capturedFrames = CaptureReadback.readEntityChunk(saveRoot, chunk)
                     .map(tag -> CaptureReadback.entities(tag).stream()
-                            .filter(entity -> entity.getString("id").orElse("").equals("minecraft:item_frame"))
+                            .filter(entity -> entity.getString("id").equals("minecraft:item_frame"))
                             .count())
                     .orElse(0L);
             Check.that(capturedFrames == 2,

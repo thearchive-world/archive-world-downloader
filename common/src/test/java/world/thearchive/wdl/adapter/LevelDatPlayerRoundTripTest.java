@@ -11,17 +11,16 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.GlobalPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -59,7 +58,7 @@ class LevelDatPlayerRoundTripTest {
             writer.save(access, built, player);
         }
         Path levelDat = saves.resolve(name).resolve("level.dat");
-        return NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("Data");
+        return NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompound("Data");
     }
 
     @Test
@@ -70,14 +69,15 @@ class LevelDatPlayerRoundTripTest {
         CompoundTag data = saveAndReadBack(saves, "withplayer", captured);
 
         assertTrue(data.contains("Player"), "the captured player is routed into the Player slot");
-        assertEquals("captured-player", data.getCompoundOrEmpty("Player").getStringOr("wdlMarker", ""),
+        assertEquals("captured-player", data.getCompound("Player").getString("wdlMarker"),
                 "the Player slot is exactly the captured tag");
-        assertEquals(GameType.CREATIVE.getId(), data.getIntOr("GameType", -99), "GameType flips to creative");
-        assertEquals((byte) Difficulty.HARD.getId(), data.getByteOr("Difficulty", (byte) -1), "captured difficulty");
+        assertEquals(GameType.CREATIVE.getId(), (data.contains("GameType") ? data.getInt("GameType") : -99),
+                "GameType flips to creative");
+        assertEquals((byte) Difficulty.HARD.getId(),
+                (data.contains("Difficulty") ? data.getByte("Difficulty") : (byte) -1), "captured difficulty");
 
-        GlobalPos spawn = data.read("spawn", LevelData.RespawnData.CODEC).orElseThrow().globalPos();
-        assertEquals(Level.NETHER, spawn.dimension(), "the world spawn carries the capture dimension");
-        assertEquals(new BlockPos(120, 72, -340), spawn.pos(), "the world spawn is the capture position");
+        BlockPos spawn = new BlockPos(data.getInt("SpawnX"), data.getInt("SpawnY"), data.getInt("SpawnZ"));
+        assertEquals(new BlockPos(120, 72, -340), spawn, "the world spawn is the capture position");
     }
 
     @Test
@@ -87,7 +87,7 @@ class LevelDatPlayerRoundTripTest {
 
         CompoundTag data = saveAndReadBack(saves, "survival", captured);
 
-        assertEquals(GameType.SURVIVAL.getId(), data.getIntOr("GameType", -99),
+        assertEquals(GameType.SURVIVAL.getId(), (data.contains("GameType") ? data.getInt("GameType") : -99),
                 "the survival opt-out writes the captured (survival) mode, not creative");
     }
 
@@ -96,9 +96,9 @@ class LevelDatPlayerRoundTripTest {
         CompoundTag data = saveAndReadBack(saves, "noplayer", null);
 
         assertFalse(data.contains("Player"), "no captured player -> no Player slot");
-        assertEquals(GameType.SURVIVAL.getId(), data.getIntOr("GameType", -99),
+        assertEquals(GameType.SURVIVAL.getId(), (data.contains("GameType") ? data.getInt("GameType") : -99),
                 "the void world stays the default survival");
-        assertTrue(data.contains("spawn"), "the default spawn is still written");
+        assertTrue(data.contains("SpawnX"), "the default spawn is still written");
     }
 
     @Test
@@ -113,10 +113,10 @@ class LevelDatPlayerRoundTripTest {
 
         CompoundTag data = saveAndReadBack(saves, "rootvehicle", captured);
 
-        CompoundTag rootVehicle = data.getCompoundOrEmpty("Player").getCompoundOrEmpty("RootVehicle");
-        assertEquals("minecraft:chest_boat", rootVehicle.getCompoundOrEmpty("Entity").getStringOr("id", ""),
+        CompoundTag rootVehicle = data.getCompound("Player").getCompound("RootVehicle");
+        assertEquals("minecraft:chest_boat", rootVehicle.getCompound("Entity").getString("id"),
                 "the Entity child keeps its id, or loadEntityRecursive silently skips it (no re-seat)");
-        assertEquals(boat, rootVehicle.read("Attach", UUIDUtil.CODEC).orElse(null),
+        assertEquals(boat, UUIDUtil.CODEC.parse(NbtOps.INSTANCE, rootVehicle.get("Attach")).result().orElse(null),
                 "Attach round-trips through UUIDUtil.CODEC as the direct vehicle UUID the re-seat matches");
     }
 }

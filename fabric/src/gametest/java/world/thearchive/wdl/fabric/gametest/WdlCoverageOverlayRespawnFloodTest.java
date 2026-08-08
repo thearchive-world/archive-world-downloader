@@ -44,7 +44,7 @@ public class WdlCoverageOverlayRespawnFloodTest implements FabricClientGameTest 
     @Override
     public void runTest(ClientGameTestContext context) {
         try (MultiplayerFixture fixture = MultiplayerFixture.connect(context)) {
-            String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
+            String dimension = context.computeOnClient(client -> client.level.dimension().location().toString());
             BlockPos playerBlockPos = context.computeOnClient(client -> client.player.blockPosition());
 
             CaptureDriver driver = CaptureDriver.start(context,

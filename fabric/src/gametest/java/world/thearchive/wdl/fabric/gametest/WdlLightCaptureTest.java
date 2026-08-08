@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.DataLayer;
@@ -51,7 +52,7 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
 
             CompoundTag chunk = CaptureReadback.readChunk(saveRoot, playerChunk)
                     .orElseThrow(() -> new AssertionError("captured chunk " + playerChunk + " missing"));
-            Check.that(chunk.getBooleanOr("isLightOn", false),
+            Check.that(chunk.getBoolean("isLightOn"),
                     "captured chunk must write isLightOn=true");
 
             int lampSectionY = lamp.getY() >> 4;
@@ -69,7 +70,7 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
                     ChunkPos pos = new ChunkPos(playerChunk.x + dx, playerChunk.z + dz);
                     Optional<CompoundTag> nearby = CaptureReadback.readChunk(saveRoot, pos);
                     nearby.ifPresent(tag -> Check.that(
-                            !hasLightLayers(tag) || tag.getBooleanOr("isLightOn", false),
+                            !hasLightLayers(tag) || tag.getBoolean("isLightOn"),
                             "chunk " + pos + " stores light layers without isLightOn"));
                 }
             }
@@ -113,9 +114,9 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
     }
 
     private static boolean hasLightLayers(CompoundTag chunkTag) {
-        return chunkTag.getListOrEmpty("sections").compoundStream()
-                .anyMatch(section -> section.getByteArray("BlockLight").isPresent()
-                        || section.getByteArray("SkyLight").isPresent());
+        return chunkTag.getList("sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .anyMatch(section -> section.contains("BlockLight", Tag.TAG_BYTE_ARRAY)
+                        || section.contains("SkyLight", Tag.TAG_BYTE_ARRAY));
     }
 
     /** The snapshot's stored block light at {@code pos}, or -1 when its section carries no layer. */

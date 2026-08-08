@@ -41,11 +41,12 @@ class ChunkCodecImplTest {
 
         CompoundTag tag = codec.encode(emptyOverworldChunk(), registries, true);
 
-        CompoundTag blending = tag.getCompoundOrEmpty("blending_data");
-        assertEquals(-4, blending.getIntOr("min_section", Integer.MIN_VALUE), "the fix's -64 block floor as a section");
-        assertEquals(20, blending.getIntOr("max_section", Integer.MIN_VALUE),
+        CompoundTag blending = tag.getCompound("blending_data");
+        assertEquals(-4, (blending.contains("min_section") ? blending.getInt("min_section") : Integer.MIN_VALUE),
+                "the fix's -64 block floor as a section");
+        assertEquals(20, (blending.contains("max_section") ? blending.getInt("max_section") : Integer.MIN_VALUE),
                 "the fix's 320 block ceiling as a section");
-        assertFalse(blending.keySet().contains("heights"), "heights are left empty for MC to fill lazily");
+        assertFalse(blending.getAllKeys().contains("heights"), "heights are left empty for MC to fill lazily");
     }
 
     @Test

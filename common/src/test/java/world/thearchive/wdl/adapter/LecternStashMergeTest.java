@@ -19,14 +19,14 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.network.Filterable;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -59,8 +59,9 @@ class LecternStashMergeTest {
     }
 
     private static String titleAt(RegistryAccess registries, CompoundTag lecternTag) {
-        Optional<ItemStack> back = TagValueInput.create(ProblemReporter.DISCARDING, registries, lecternTag)
-                .read("Book", ItemStack.CODEC);
+        Optional<ItemStack> back = ItemStack.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), lecternTag.get("Book"))
+                .result();
         assertTrue(back.isPresent(), "the merged lectern carries a decodable Book");
         return back.get().get(DataComponents.WRITTEN_BOOK_CONTENT).title().raw();
     }
@@ -84,10 +85,10 @@ class LecternStashMergeTest {
                 "the flushed chunk's stash entry is drained as the tag leaves memory");
         assertTrue(stash.containsKey(elsewhere), "another chunk's stash entry is left until its own flush");
 
-        ListTag blockEntities = chunkTag.getListOrEmpty("block_entities");
+        ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
         CompoundTag lectern = findByPos(blockEntities, 10, 70, 20);
         assertEquals("Bound Here", titleAt(registries, lectern), "the lectern gains exactly the captured book");
-        assertEquals(2, lectern.getIntOr("Page", -1), "the reading page lands too");
+        assertEquals(2, (lectern.contains("Page") ? lectern.getInt("Page") : -1), "the reading page lands too");
         assertFalse(findByPos(blockEntities, 11, 70, 20).contains("Book"), "the neighbor block entity is untouched");
     }
 
@@ -104,7 +105,7 @@ class LecternStashMergeTest {
         assertEquals(0, merged, "no captured block entity at the stashed pos -> nothing merges");
         assertFalse(stash.containsKey(pos),
                 "the entry is still drained: the chunk is leaving memory, so it cannot wait");
-        assertFalse(findByPos(chunkTag.getListOrEmpty("block_entities"), 2, 64, 1).contains("Book"),
+        assertFalse(findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 2, 64, 1).contains("Book"),
                 "the unrelated lectern is left alone");
     }
 }

@@ -16,6 +16,7 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -79,7 +80,7 @@ class RiddenMountContentsFoldTest {
         CompoundTag folded = session.foldRidingVehicleContents(EntityFixtures.entity("minecraft:mule", MOUNT));
 
         CompoundTag expected = EntityFixtures.entity("minecraft:mule", MOUNT);
-        expected.put("Items", capturedItems(new ItemStack(Items.DIAMOND, 5)).getListOrEmpty("Items"));
+        expected.put("Items", capturedItems(new ItemStack(Items.DIAMOND, 5)).getList("Items", Tag.TAG_COMPOUND));
         assertEquals(expected, folded,
                 "a mount standing on its own folds to the tag it always did, key for key");
     }
@@ -105,11 +106,11 @@ class RiddenMountContentsFoldTest {
     }
 
     private static CompoundTag passengerOf(CompoundTag entity) {
-        return entity.getListOrEmpty("Passengers").getCompoundOrEmpty(0);
+        return entity.getList("Passengers", Tag.TAG_COMPOUND).getCompound(0);
     }
 
     private static ListTag items(CompoundTag entity) {
-        return entity.getListOrEmpty("Items");
+        return entity.getList("Items", Tag.TAG_COMPOUND);
     }
 
     private CompoundTag capturedItems(ItemStack stack) {
