@@ -209,6 +209,18 @@ class RecoveredScanTest {
     }
 
     @Test
+    void recordsTheNestedPassengerContainerAsCoverage() {
+        // A chested mule pushed into a minecart saves nested under the minecart's Passengers, so the resume
+        // outline must mark it recovered from the nested node or it re-outlines and re-captures it empty.
+        RecoveredScan scan = new RecoveredScan();
+        scan.recordEntities(Level.OVERWORLD,
+                entityChunkWith(EntityFixtures.entityCarrying(emptyVehicle(CART_A), filledVehicle(CART_B))));
+
+        assertTrue(scan.coverage(Level.OVERWORLD).containsEntity(CART_B),
+                "the filled mule nested under the minecart is recovered coverage");
+    }
+
+    @Test
     void entityCoverageCoexistsWithBlockCoverageInOneSnapshot() {
         RecoveredScan scan = new RecoveredScan();
         scan.record(Level.OVERWORLD, chunkWith(filledChest(10, 70, 20)));

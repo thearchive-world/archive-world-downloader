@@ -113,12 +113,13 @@ final class RecoveredScan {
         }
         boolean grew = false;
         for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag entity) || !EntityMerge.hasCapturedContent(entity)) {
+            if (!(entities.get(i) instanceof CompoundTag entity)) {
                 continue;
             }
-            UUID uuid = EntityMerge.readUuid(entity);
-            if (uuid != null) {
-                grew |= recoveredEntities.add(uuid);
+            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entity).entrySet()) {
+                if (EntityMerge.hasCapturedContent(node.getValue())) {
+                    grew |= recoveredEntities.add(node.getKey());
+                }
             }
         }
         if (grew) {

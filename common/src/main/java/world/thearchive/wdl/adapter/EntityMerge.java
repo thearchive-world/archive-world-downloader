@@ -4,6 +4,8 @@
 package world.thearchive.wdl.adapter;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.UUIDUtil;
@@ -18,7 +20,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <ul>
  * <li>Container contents: a container vehicle's or chested animal's on-disk {@code "Items"} is carried into the
- * matching fresh entity (preferring the non-empty side), so a parked storage minecart opened in a prior flush is not
+ * matching fresh entity, at any depth of the {@code "Passengers"} tree ({@link EntityTreeWalk}), preferring the
+ * non-empty side, so a parked storage minecart or a chested animal pushed into one, opened in a prior flush, is not
  * wiped by a re-capture that never re-opened it.</li>
  * <li>Absent entities (union): every on-disk entity the fresh capture does not contain is carried forward, so a partial
  * re-flush of a chunk (the entity packet path drains and flushes a chunk repeatedly as frames stream in over time or on
@@ -46,27 +49,32 @@ final class EntityMerge {
                 || !(onDisk.get("Entities") instanceof ListTag diskEntities)) {
             return 0;
         }
+        Map<UUID, CompoundTag> diskNodes = new LinkedHashMap<>();
+        for (int i = 0; i < diskEntities.size(); i++) {
+            if (diskEntities.get(i) instanceof CompoundTag diskEntity) {
+                diskNodes.putAll(EntityTreeWalk.byUuid(diskEntity));
+            }
+        }
         Set<UUID> freshUuids = new HashSet<>();
         int merged = 0;
         for (int i = 0; i < freshEntities.size(); i++) {
             if (!(freshEntities.get(i) instanceof CompoundTag freshEntity)) {
                 continue;
             }
-            UUID uuid = readUuid(freshEntity);
-            if (uuid == null) {
-                continue;
-            }
-            freshUuids.add(uuid);
-            CompoundTag diskEntity = matching(diskEntities, uuid);
-            if (diskEntity != null && NbtMerge.carryList(diskEntity, freshEntity, "Items")) {
-                merged++;
+            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(freshEntity).entrySet()) {
+                freshUuids.add(node.getKey());
+                CompoundTag diskNode = diskNodes.get(node.getKey());
+                if (diskNode != null && NbtMerge.carryList(diskNode, node.getValue(), "Items")) {
+                    merged++;
+                }
             }
         }
         // Union: an on-disk entity the fresh capture does not have is carried forward, so a partial re-flush
         // adds to rather than overwrites the prior on-disk set (the entity-loss fix). A null-UUID on-disk entity
         // (corrupt or foreign-written; we always write a valid one) cannot be deduped, so it is carried forward
         // unconditionally rather than dropped: the contract is over-capture over under-capture, and dropping it
-        // would silently lose existing world data. A keyed one is carried only when the fresh set lacks it.
+        // would silently lose existing world data. A keyed one is carried only when the fresh set lacks it, matched
+        // against the whole fresh tree so an entity that moved into or out of a vehicle is deduped, not duplicated.
         for (int i = 0; i < diskEntities.size(); i++) {
             if (!(diskEntities.get(i) instanceof CompoundTag diskEntity)) {
                 continue;
@@ -89,16 +97,6 @@ final class EntityMerge {
      */
     static boolean hasCapturedContent(CompoundTag entity) {
         return NbtMerge.isNonEmptyList(entity, "Items");
-    }
-
-    /** The on-disk entity whose {@code "UUID"} matches {@code uuid}, or null. */
-    private static @Nullable CompoundTag matching(ListTag diskEntities, UUID uuid) {
-        for (int i = 0; i < diskEntities.size(); i++) {
-            if (diskEntities.get(i) instanceof CompoundTag diskEntity && uuid.equals(readUuid(diskEntity))) {
-                return diskEntity;
-            }
-        }
-        return null;
     }
 
     /** Decode an entity tag's {@code "UUID"} (the {@code UUIDUtil.CODEC} 4-int array), or null if absent/malformed. */
