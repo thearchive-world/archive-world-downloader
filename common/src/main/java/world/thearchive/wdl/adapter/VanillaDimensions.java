@@ -14,9 +14,9 @@ import world.thearchive.wdl.core.WorldType;
 /**
  * Maps a captured dimension to the vanilla single-player dimension it is written under, keyed by its dimension TYPE
  * rather than its level key. A server with non-standard level keys (e.g. Multiverse's
- * {@code minecraft:worlds/2b2t/2b2t_1}) still uses a vanilla dimension type, so routing by type keeps the save in
- * {@code ./region} / {@code DIM-1} / {@code DIM1} instead of a nested {@code dimensions/<ns>/<path>} folder.
- * Band-agnostic: only stable vanilla constants, so it is byte-identical across the era bands.
+ * {@code minecraft:worlds/2b2t/2b2t_1}) still uses a vanilla dimension type, so routing by type lays the save out under
+ * the vanilla dimension's own folder rather than one derived from the custom level key. Band-agnostic: only stable
+ * vanilla constants, so it is byte-identical across the era bands.
  *
  * <p>The consequence for two server worlds is ACCEPTED rather than guarded, and it is stated here because this method
  * is where it comes from: worlds routing to one folder share it, so their terrain interleaves and their captured

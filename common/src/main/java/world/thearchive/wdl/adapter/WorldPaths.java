@@ -27,9 +27,9 @@ public interface WorldPaths {
     RegionStorageInfo entitiesStorageInfo(ResourceKey<Level> dimension);
 
     /**
-     * The global {@code data/} directory (the SavedData surface: {@code map_<id>.dat}, {@code idcounts.dat}), which
-     * lives under the save root regardless of dimension. Resolve-only, not pre-created: whichever writer reaches it
-     * first {@code createDirectories} it, so a session that captures no maps leaves no empty {@code data/} directory.
+     * The global {@code data/} directory (the SavedData surface: the map files and the map-id index), which lives under
+     * the save root regardless of dimension. Resolve-only, not pre-created: whichever writer reaches it first
+     * {@code createDirectories} it, so a session that captures no maps leaves no empty {@code data/} directory.
      */
     Path dataDirectory();
 
