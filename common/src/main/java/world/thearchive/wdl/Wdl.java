@@ -567,7 +567,7 @@ public final class Wdl {
         // by seconds, so warm the worldgen reconstruction now when the chosen generator needs it.
         WorldgenWarmup.dispatchForScreenOpen(config.worldOutput().worldType(),
                 adapter.levelDataWriter()::warmWorldgen, warmupWorker);
-        minecraft.setScreen(new WdlDownloadsScreen(minecraft.screen, savesDirectory, loadedWorld, entries,
+        minecraft.gui.setScreen(new WdlDownloadsScreen(minecraft.gui.screen(), savesDirectory, loadedWorld, entries,
                 expandExistingList, defaultDownloadName(minecraft), config.appendDateSuffix(), config.confirmResume(),
                 config.blockTaintedResume(), config.zipOnResume(), config.remapMapIds(),
                 CaptureToggleGuard.isCapturePartiallyDisabled(config), bridge.modVersion(), mcVersion(),
@@ -714,7 +714,7 @@ public final class Wdl {
             outlineTracker.clear();
             return;
         }
-        outlineTracker.tick(level, minecraft.gameRenderer.getMainCamera().position(), currentConfig.outline(),
+        outlineTracker.tick(level, minecraft.gameRenderer.mainCamera().position(), currentConfig.outline(),
                 controller.aidToggles(currentConfig), controller.capturedContainers(),
                 controller.recoveredCoverage());
     }
@@ -727,7 +727,7 @@ public final class Wdl {
     /** Open the in-mod settings screen from the pause-menu config button; edits commit on close. */
     private static void openSettingsScreen() {
         Minecraft minecraft = Minecraft.getInstance();
-        minecraft.setScreen(createSettingsScreen(minecraft.screen));
+        minecraft.gui.setScreen(createSettingsScreen(minecraft.gui.screen()));
     }
 
     /**
@@ -797,7 +797,7 @@ public final class Wdl {
                     bridge.sendChat(ChatCopy.saving());
                 }
                 controller.stop();
-                Minecraft.getInstance().setScreen(null);
+                Minecraft.getInstance().gui.setScreen(null);
             }
             case SAVING -> {} // active == false makes this unreachable by click; the branch is defense in depth
             case RESTORING -> openDownloadsScreenNow();
