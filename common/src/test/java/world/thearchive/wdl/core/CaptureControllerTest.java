@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.core;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -10,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -314,6 +316,13 @@ class CaptureControllerTest {
         return WdlConfig.parse(properties);
     }
 
+    private static WdlConfig overlayOff() {
+        Properties properties = new Properties();
+        properties.setProperty("captureEntities", "true");
+        properties.setProperty("renderCoverageOverlay", "false");
+        return WdlConfig.parse(properties);
+    }
+
     @Test
     void aidTogglesAreTheLiveSettingsWhileNothingIsRecording() {
         CaptureController controller = controller();
@@ -376,6 +385,61 @@ class CaptureControllerTest {
                 "the covered index must be populated, or the assertion below would prove nothing");
         assertEquals(0, controller.overlayCoveredChunks(entities(true), "minecraft:overworld").length,
                 "this download is adding no entity, so switching the settings on must not paint a covered tone");
+    }
+
+    @Test
+    void savedOverlayIsEmptyWhileTheToggleIsOffAndTheSavedSetOnceOn() {
+        CaptureController controller = controller();
+        controller.savedChunks().add("minecraft:overworld", 42L);
+
+        assertArrayEquals(new long[0], controller.overlaySavedChunks(overlayOff(), "minecraft:overworld"),
+                "renderCoverageOverlay off hides the saved highlight");
+        assertArrayEquals(new long[] { 42L }, controller.overlaySavedChunks(entities(true), "minecraft:overworld"),
+                "on, the saved overlay reads back the recorded index");
+    }
+
+    @Test
+    void coveredOverlayIsEmptyWhileTheToggleIsOff() {
+        CaptureController controller = controller();
+        controller.savedChunks().add("minecraft:overworld", 42L);
+        controller.coveredChunks().recordTrail("minecraft:overworld", 0, 0, 8);
+        controller.coveredChunks().recompute("minecraft:overworld", 1);
+        controller.sendRange().observe("minecraft:overworld", 64);
+
+        assertArrayEquals(new long[0], controller.overlayCoveredChunks(overlayOff(), "minecraft:overworld"),
+                "renderCoverageOverlay off hides the covered highlight even with a calibrated range mid-capture");
+    }
+
+    @Test
+    void coveredOverlayMirrorsTheSavedSetUntilTheSendRangeCalibrates() {
+        CaptureController controller = controller();
+        controller.savedChunks().add("minecraft:overworld", 42L);
+        controller.coveredChunks().recordTrail("minecraft:overworld", 0, 0, 8);
+        controller.coveredChunks().recompute("minecraft:overworld", 1);
+
+        assertFalse(controller.sendRange().isCalibrated("minecraft:overworld"),
+                "no sample has been observed, so the range is not yet calibrated");
+        assertTrue(controller.coveredChunks().snapshot("minecraft:overworld").length > 0,
+                "the covered index must be populated, or the mirror assertion below proves nothing");
+        assertArrayEquals(new long[] { 42L }, controller.overlayCoveredChunks(entities(true), "minecraft:overworld"),
+                "before the range is known the covered read mirrors the saved set, not the covered index");
+    }
+
+    @Test
+    void coveredOverlayDrawsTheCoveredSetOnceTheSendRangeCalibrates() {
+        CaptureController controller = controller();
+        controller.savedChunks().add("minecraft:overworld", 42L);
+        controller.coveredChunks().recordTrail("minecraft:overworld", 0, 0, 8);
+        controller.coveredChunks().recompute("minecraft:overworld", 1);
+        controller.sendRange().observe("minecraft:overworld", 64);
+
+        long[] covered = controller.coveredChunks().snapshot("minecraft:overworld");
+        assertTrue(covered.length > 0, "the covered index must be populated for this branch to be observable");
+        long[] painted = controller.overlayCoveredChunks(entities(true), "minecraft:overworld");
+        Arrays.sort(covered);
+        Arrays.sort(painted);
+        assertArrayEquals(covered, painted,
+                "once the range is calibrated the covered set draws, not the saved mirror");
     }
 
     @Test
