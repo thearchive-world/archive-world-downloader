@@ -193,7 +193,7 @@ publishMods {
         // target_commitish must be a branch or commit SHA, not the tag name, or GitHub 422s. GITHUB_SHA is the
         // tag's commit; GITHUB_REF_NAME would pass the tag.
         commitish.set(providers.environmentVariable("GITHUB_SHA"))
-        displayName.set("wdl-${project.version}")
+        displayName.set("Archive World Downloader ${property("mod_version")} (Minecraft ${property("minecraft_version")})")
         // This block creates the single GitHub release and carries the Fabric jar (the top-level file above).
         // The NeoForge jar rides on this same release: :neoforge's own github block attaches it via the plugin's
         // parent mechanism (parent(publishGithub)), which uploads to this task's release instead of creating a
