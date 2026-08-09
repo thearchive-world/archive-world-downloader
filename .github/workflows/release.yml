@@ -1,4 +1,4 @@
-name: Release (Modrinth + GitHub)
+name: Release (CurseForge, Modrinth, GitHub)
 
 # Publishes a tagged release. The tag is the version core plus the MC build-metadata, e.g. 1.0.0+1.21.11
 # or 1.0.0+26.2 (mirrors the jar name archive-wdl-<loader>-<mod_version>+<minecraft_version>.jar). The
@@ -8,14 +8,15 @@ name: Release (Modrinth + GitHub)
 # equals that built version, so a stale -SNAPSHOT can't be published and createRelease (tagName defaults to
 # the version) can't mint a tag that differs from the one you pushed.
 #
-# publishMods uploads the Fabric and NeoForge jars to Modrinth and creates one GitHub release carrying
-# both. It is not atomic across the three publish tasks (:fabric:publishModrinth, :fabric:publishGithub,
-# :neoforge:publishModrinth): if one fails after another has already succeeded, a naive re-run re-creates a
-# duplicate Modrinth version and createRelease 422s on the now-existing tag. To retry cleanly, first delete
-# the partial Modrinth version(s) and the GitHub release, then re-push. A first-run dry run (PUBLISH_DRY_RUN=1
-# passed to publishMods) validates coordinates without uploading. Requires MODRINTH_TOKEN in the release
-# environment (the built-in GITHUB_TOKEN covers the GitHub release). CurseForge is pinned but off (see the
-# loader scripts).
+# publishMods uploads the Fabric and NeoForge jars to CurseForge and Modrinth and creates one GitHub release
+# carrying both. It is not atomic across its publish tasks (:fabric:publishCurseforge, :fabric:publishModrinth,
+# :fabric:publishGithub, :neoforge:publishCurseforge, :neoforge:publishModrinth): if one fails after another
+# has already succeeded, a naive re-run re-creates a duplicate version and createRelease 422s on the
+# now-existing tag. To retry cleanly, first delete the partial CurseForge/Modrinth version(s) and the GitHub
+# release, then re-push. A first-run dry run (PUBLISH_DRY_RUN=1 passed to publishMods) validates coordinates
+# without uploading. Requires MODRINTH_TOKEN and CURSEFORGE_TOKEN in the release environment (the built-in
+# GITHUB_TOKEN covers the GitHub release). Modrinth's versions publish but stay non-public until the project
+# clears review.
 on:
   push:
     tags:
@@ -165,12 +166,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # publishMods uploads both loader jars to Modrinth and creates the single GitHub release that carries
-      # them, so no separate upload-artifact step is needed (the release is the durable artifact store).
-      - name: Publish to Modrinth and GitHub
+      # publishMods uploads both loader jars to CurseForge and Modrinth and creates the single GitHub release
+      # that carries them, so no separate upload-artifact step is needed (the release is the durable store).
+      - name: Publish to CurseForge, Modrinth and GitHub
         run: ./gradlew publishMods
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHANGELOG: ${{ steps.changelog.outputs.changelog }}${{ steps.repro.outputs.record }}
           GITHUB_REF_NAME: ${{ github.ref_name }}

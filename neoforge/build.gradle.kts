@@ -127,6 +127,15 @@ publishMods {
         // Java mod: no Kotlin-for-Forge (or any other) hard runtime dependency to declare.
     }
 
+    curseforge {
+        projectId.set(providers.gradleProperty("curseforge_id"))
+        accessToken.set(providers.environmentVariable("CURSEFORGE_TOKEN"))
+        minecraftVersions.add(providers.gradleProperty("minecraft_version"))
+        // Client-only mod: CurseForge requires at least one declared environment.
+        client.set(true)
+        server.set(false)
+    }
+
     // Attach the NeoForge jar (the top-level file above) to the single GitHub release that :fabric creates,
     // rather than :fabric pulling it in as an additionalFile(Project) (a Gradle-10 deprecation). parent points
     // at :fabric's publishGithub task: the plugin then uploads this jar to that task's release instead of
