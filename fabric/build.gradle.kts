@@ -181,9 +181,17 @@ publishMods {
         requires { id.set("P7dR8mSH") } // fabric-api
     }
 
-    // CurseForge upload stays off until the project enters the moderation queue. The project ID is pinned
-    // (curseforge_id in gradle.properties); adding a curseforge { } block with a CURSEFORGE_TOKEN publishes
-    // the next tag, where the first file is held for moderator review and later files auto-publish.
+    // CurseForge publish; projectId is curseforge_id in gradle.properties. requires() takes the CurseForge
+    // slug (fabric-api), the same hard dependency the Modrinth block declares by id.
+    curseforge {
+        projectId.set(providers.gradleProperty("curseforge_id"))
+        accessToken.set(providers.environmentVariable("CURSEFORGE_TOKEN"))
+        minecraftVersions.add(providers.gradleProperty("minecraft_version"))
+        // Client-only mod: CurseForge requires at least one declared environment.
+        client.set(true)
+        server.set(false)
+        requires("fabric-api")
+    }
 
     github {
         repository.set("thearchive-world/archive-world-downloader")
