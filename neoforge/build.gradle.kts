@@ -114,7 +114,7 @@ publishMods {
     changelog.set(providers.environmentVariable("CHANGELOG").orElse(""))
     type.set(STABLE)
     version.set(project.version.toString())
-    displayName.set("Archive World Downloader ${project.version} (NeoForge)")
+    displayName.set("${project.version} (NeoForge)")
     modLoaders.add("neoforge")
     dryRun.set(
         providers.environmentVariable("PUBLISH_DRY_RUN").map { it.toBooleanStrict() }.orElse(false),
