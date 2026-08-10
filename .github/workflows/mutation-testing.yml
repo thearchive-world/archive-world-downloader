@@ -20,7 +20,7 @@ on:
     # score, and an exclusion also fails in the safe direction: a new top-level directory starts running this
     # tier rather than silently ceasing to.
     paths-ignore:
-      - '**.md'
+      - '**/*.md'
       - '.github/**'
       - 'art/**'
       - 'config/**'
@@ -31,7 +31,7 @@ on:
       - 'GPL-3.0.txt'
   pull_request:
     paths-ignore:
-      - '**.md'
+      - '**/*.md'
       - '.github/**'
       - 'art/**'
       - 'config/**'
