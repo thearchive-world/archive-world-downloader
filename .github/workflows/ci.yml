@@ -13,7 +13,17 @@ on:
       # two-part (26.2). A "1.21.*" style filter would skip the 26.x bands entirely.
       - "[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+"
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.gitignore'
+      - '.gitattributes'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.gitignore'
+      - '.gitattributes'
 
 permissions:
   contents: read
