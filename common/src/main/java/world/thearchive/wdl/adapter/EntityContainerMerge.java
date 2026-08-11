@@ -21,6 +21,10 @@ import org.slf4j.Logger;
  * from {@link ContainerSink#merge} (a chest minecart / boat persists its contents under {@code "Items"} via the exact
  * call the sink makes), so the two classes share the serialize and differ only in the locator.
  *
+ * <p>The same UUID locator also folds a villager's captured trades ({@link #mergeMerchantStash} and its refold): those
+ * set {@code "Offers"} and {@code "Xp"} from a holder the tick already serialized, a plain tag copy with no sink and no
+ * per-entry failure isolation, so unlike the item fold they cannot throw and always report zero failed.
+ *
  * <p>Portable across the entities-region format: the {@code "Entities"} list, the recursive {@code "Passengers"} list
  * and a per-entity {@code "UUID"} 4-int array ({@code UUIDUtil.CODEC}) are vanilla-stable post-1.16, so only the
  * per-band {@code "Items"} serialization (behind {@link ContainerSink#merge}) differs. The matched node's
@@ -121,5 +125,78 @@ final class EntityContainerMerge {
 
     private static void foldItems(ContainerSink sink, CompoundTag entityTag, CompoundTag holder) {
         entityTag.put("Items", sink.merge(entityTag, holder).getList("Items", Tag.TAG_COMPOUND));
+    }
+
+    /**
+     * Fold (and drain) the UUID-keyed merchant {@code stash} into {@code entitiesChunkTag}: for each node whose
+     * {@code "UUID"} is stashed, set its {@code "Offers"} and (if the holder carries one) {@code "Xp"} from the holder,
+     * then remove the drained entry. The merchant sibling of {@link #mergeEntityStash}: it walks the same
+     * {@code "Passengers"} tree by UUID, but sets the trade payload rather than {@code "Items"}. It carries no per-node
+     * failure isolation and always reports zero failed, because the fold is a plain tag copy and not a codec run: the
+     * offers were serialized when the tick stashed them and scrubbed once at flush, so by here nothing can throw and a
+     * malformed holder merely skips a key. Returns how many nodes gained their trades.
+     */
+    static MergeTally mergeMerchantStash(CompoundTag entitiesChunkTag, Map<UUID, CompoundTag> stash) {
+        if (stash.isEmpty() || !(entitiesChunkTag.get("Entities") instanceof ListTag entities)) {
+            return new MergeTally(0, 0);
+        }
+        int merged = 0;
+        for (int i = 0; i < entities.size(); i++) {
+            if (!(entities.get(i) instanceof CompoundTag entityTag)) {
+                continue;
+            }
+            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
+                CompoundTag holder = stash.remove(node.getKey());
+                if (holder == null) {
+                    continue;
+                }
+                foldOffers(node.getValue(), holder);
+                merged++;
+            }
+        }
+        return new MergeTally(merged, 0);
+    }
+
+    /**
+     * Re-fold trades already folded into an earlier write, without draining: for each node in this chunk whose UUID is
+     * in {@code folded} and not awaiting a fresher capture in {@code stash}, re-apply the folded holder. The merchant
+     * sibling of {@link #refoldFlushedContainers}, so a wandering trader that crossed entity-chunks carries its trades
+     * to each copy. A node whose menu was reopened is skipped, since {@link #mergeMerchantStash} is about to fold its
+     * fresher capture. Like the merge above it cannot fail and reports zero failed.
+     */
+    static MergeTally refoldFlushedMerchants(CompoundTag entitiesChunkTag, Map<UUID, CompoundTag> folded,
+            Map<UUID, CompoundTag> stash) {
+        if (folded.isEmpty() || !(entitiesChunkTag.get("Entities") instanceof ListTag entities)) {
+            return new MergeTally(0, 0);
+        }
+        int merged = 0;
+        for (int i = 0; i < entities.size(); i++) {
+            if (!(entities.get(i) instanceof CompoundTag entityTag)) {
+                continue;
+            }
+            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
+                UUID uuid = node.getKey();
+                CompoundTag holder = stash.containsKey(uuid) ? null : folded.get(uuid);
+                if (holder == null) {
+                    continue; // no earlier fold to repeat, or a reopened menu whose own fold runs next and wins
+                }
+                foldOffers(node.getValue(), holder);
+                merged++;
+            }
+        }
+        return new MergeTally(merged, 0);
+    }
+
+    /**
+     * Copy the holder's {@code "Offers"} onto the node, and its {@code "Xp"} when present (a wandering trader has
+     * none).
+     */
+    private static void foldOffers(CompoundTag entityTag, CompoundTag holder) {
+        if (holder.get("Offers") instanceof CompoundTag offers) {
+            entityTag.put("Offers", offers.copy());
+        }
+        if (holder.get("Xp") instanceof Tag experience) {
+            entityTag.put("Xp", experience.copy());
+        }
     }
 }
