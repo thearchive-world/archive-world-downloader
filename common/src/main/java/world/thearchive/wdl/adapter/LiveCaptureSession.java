@@ -68,6 +68,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.equine.AbstractChestedHorse;
+import net.minecraft.world.entity.npc.villager.AbstractVillager;
+import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -75,7 +77,9 @@ import net.minecraft.world.inventory.BrewingStandMenu;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.CrafterMenu;
 import net.minecraft.world.inventory.LecternMenu;
+import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -361,6 +365,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * incidentally again at {@link #finish()}), not into a chunk block entity.
      */
     private final Map<UUID, CompoundTag> entityContainerStash = new LinkedHashMap<>();
+    // Captured villager trades by villager UUID, last-seen-wins, mirroring entityContainerStash so the flush's
+    // map-id remap allocates archive ids in a deterministic order. A villager whose offers encode threw is
+    // remembered in merchantEncodeFailed so it is not retried every tick the screen is open.
+    private final Map<UUID, CompoundTag> merchantStash = new LinkedHashMap<>();
+    private final Set<UUID> merchantEncodeFailed = new HashSet<>();
 
     /**
      * Positions a block placement landed in this session, held per dimension and swapped on a portal like
@@ -550,6 +559,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** The UUID of the container vehicle the live menu is bound to, set once at bind time; read by the stash. */
     private @Nullable UUID boundEntityUuid;
+    private boolean boundMerchantIsVillager; // a villager gets Xp, a wandering trader does not
 
     /**
      * The seated player's mount, captured at finish before the entity drain and attached to the saved player tag as
@@ -1851,6 +1861,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // animal (no vehicle opens one), so peeling it off first cannot starve a vehicle capture.
             if (menu instanceof LecternMenu) {
                 bindOpenedLectern(menu, player, block);
+            } else if (menu instanceof MerchantMenu) {
+                // Villager-exclusive, so this early arm steals no non-merchant open; placed above the
+                // menu-type-blind vehicle arm so a villager opened while riding a chest vehicle is not pre-empted.
+                if (config.captureEntities()) {
+                    bindOpenedMerchant(entity);
+                } else {
+                    // The trade axis rides captureEntities, so with it off bind nothing and clear any prior bind,
+                    // as the ender-chest toggle arm does, or the offers stash onto a stale container's position.
+                    association.close();
+                }
             } else if (menu instanceof ChestMenu && containerCapture.isEnderChestAt(level(), block)) {
                 if (config.savePlayerEnderChest()) {
                     bindOpenedEnderChest(menu, player, block);
@@ -1876,6 +1896,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // Dispatch the stash by the remembered bind KIND, not the menu type: an ender chest, a chest minecart,
         // and a normal chest are all a ChestMenu, so only the kind set at bind time tells them apart.
         association.boundPos().ifPresent(posKey -> {
+            if (association.boundKind() == ContainerAssociation.BindKind.MERCHANT
+                    && menu instanceof MerchantMenu merchant) {
+                // The offers and trade experience are disjoint from the three trade slots the change gate keys on,
+                // so re-stash every tick on its own path: a switch case behind the gate would drop a mid-open
+                // offers change and lose a whole villager whose offers packet lands a tick after the open.
+                stashMerchantOffers(merchant);
+                return;
+            }
             int page = menu instanceof LecternMenu lectern ? lectern.getPage() : 0;
             int[] data = menuDataVector(menu);
             if (!stashChangeTracker.changedSince(menu.slots, page, data)) {
@@ -2110,6 +2138,23 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
+     * Bind a freshly-opened merchant menu to the click-tracked villager, or drop it. Unlike the block and vehicle binds
+     * this is identity-only: a merchant menu's offers come from a list with no slotted container to size-match, so the
+     * confidence is the menu type (villager-exclusive) plus the villager the open resolved to. The instanceof narrowing
+     * sits inside the guard so openMerchant records the drop for a non-villager target either way; a null or
+     * non-villager target binds nothing, per the drop-on-uncertainty rule. The trade count is added at real capture in
+     * {@link #stashMerchantOffers}, not here, since the offers can land a tick after the open.
+     */
+    private void bindOpenedMerchant(@Nullable Entity target) {
+        if (association.openMerchant(target instanceof AbstractVillager, true)
+                && target instanceof AbstractVillager villager) {
+            boundEntityUuid = villager.getUUID();
+            boundMerchantIsVillager = villager instanceof Villager;
+            LOGGER.debug("bound open merchant to {}", villager.getUUID());
+        }
+    }
+
+    /**
      * Record the captured block-entity type at {@code pos} for both staleness gates: stamp it on the drained
      * {@code holder} as {@code wdl_block_entity_id} for the writer-thread merge gate (Gate 1) and into the
      * per-dimension type map the outline reads for the rim gate (Gate 2). A missing block entity (the open menu's block
@@ -2251,6 +2296,38 @@ public final class LiveCaptureSession implements CaptureController.Session {
             entityContainerStash.put(uuid, holder);
             capturedEntityIds.add(uuid);
         }
+    }
+
+    /**
+     * Re-serialize the open merchant's offers (and a villager's trade experience) every tick into
+     * {@link #merchantStash} keyed by the bound villager UUID, last-seen-wins, skipping an empty offers so a re-open
+     * before the offers packet lands never wipes a captured set. Runs outside the slot-keyed change gate (see the
+     * caller). The encode is isolated per villager, the discipline every vanilla-serializer encode over client-held
+     * state needs: a sell item whose codec rejects would otherwise throw out of the client tick every tick the screen
+     * is open, so it is skipped, logged once, and remembered so it is not retried. The captured-set add clears the
+     * outline rim and runs only on a successful encode, so a failed encode is never falsely reported as captured.
+     */
+    private void stashMerchantOffers(MerchantMenu merchant) {
+        UUID uuid = boundEntityUuid;
+        if (uuid == null || merchantEncodeFailed.contains(uuid)) {
+            return; // no uuid, or this villager already threw once: do not retry every tick
+        }
+        MerchantOffers offers = merchant.getOffers();
+        if (offers.isEmpty()) {
+            return; // never overwrite a captured non-empty set with an empty tick
+        }
+        CompoundTag holder;
+        try {
+            holder = MerchantOfferCapture.serialize(offers, merchant.getTraderXp(), boundMerchantIsVillager,
+                    registries);
+        } catch (RuntimeException e) {
+            merchantEncodeFailed.add(uuid);
+            LOGGER.warn("skipping villager {} trades: offers encode failed", uuid, e);
+            return;
+        }
+        merchantStash.put(uuid, holder);
+        capturedEntityIds.add(uuid); // clears the outline rim, only on a successful encode
+        reportCounts.addContainer("m:" + uuid); // count at real capture, not at bind
     }
 
     /**
