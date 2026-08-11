@@ -5,6 +5,7 @@ package world.thearchive.wdl.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.OptionalLong;
@@ -625,6 +626,9 @@ class ContainerAssociationTest {
 
         assoc.openChestedAnimal(true, true, DONKEY_CHEST, DONKEY_CHEST);
         assertEquals(OptionalLong.empty(), assoc.boundSecondaryPos(), "a CHESTED_ANIMAL bind has no secondary pos");
+
+        assoc.openMerchant(true, true);
+        assertEquals(OptionalLong.empty(), assoc.boundSecondaryPos(), "a MERCHANT bind has no secondary pos");
     }
 
     // --- openCrafter: the crafter sibling. A CrafterMenu is exclusive to crafter blocks, so menu-plus-block
@@ -686,5 +690,57 @@ class ContainerAssociationTest {
         association.openCrafter(true, 42L, true, true, CRAFTER, CRAFTER);
         association.openCrafter(true, 43L, true, false, CRAFTER, CRAFTER);
         assertTrue(association.boundPos().isEmpty());
+    }
+
+    // --- openMerchant: the merchant sibling. A MerchantMenu is villager-exclusive in vanilla, and its offers
+    // come from a list rather than a slotted container, so unlike every other leg there is no size to match: the
+    // confidence is the menu type plus the clicked-villager identity the adapter resolves. Like the entity legs
+    // there is no block pos (the bind target, the villager UUID, lives in the adapter), so boundPos() carries only
+    // the "a menu is bound" signal. Owner-ruled identity-only leg with no size guard.
+
+    /** A normal merchant open: at a villager whose open menu is a merchant menu -> BIND. */
+    @Test
+    void merchantBindsOnVillagerAndMerchantMenu() {
+        ContainerAssociation association = new ContainerAssociation();
+
+        boolean bound = association.openMerchant(true, true);
+
+        assertTrue(bound, "a villager whose menu is a merchant menu must BIND");
+        assertTrue(association.boundPos().isPresent(), "the binding must persist for later stashing");
+        assertEquals(ContainerAssociation.BindKind.MERCHANT, association.boundKind(), "the bind kind is MERCHANT");
+    }
+
+    /** The open target is not a villager (a non-villager, drift, or a superseded intent) -> DROP. */
+    @Test
+    void merchantDropsWhenTargetIsNotVillager() {
+        ContainerAssociation association = new ContainerAssociation();
+
+        assertFalse(association.openMerchant(false, true),
+                "a merchant menu the click tracker did not attribute to a villager is uncertain -> DROP");
+        assertNotEquals(ContainerAssociation.BindKind.MERCHANT, association.boundKind());
+        assertFalse(association.boundPos().isPresent());
+    }
+
+    /** The open menu is not a merchant menu -> DROP. */
+    @Test
+    void merchantDropsWhenMenuIsNotMerchant() {
+        ContainerAssociation association = new ContainerAssociation();
+
+        assertFalse(association.openMerchant(true, false),
+                "a non-merchant menu must not bind via the merchant path -> DROP");
+        assertFalse(association.boundPos().isPresent());
+    }
+
+    /** A dropped merchant open must not leave a prior binding live. */
+    @Test
+    void merchantDropAfterBindClearsPriorBinding() {
+        ContainerAssociation association = new ContainerAssociation();
+        association.openMerchant(true, true);
+
+        boolean bound = association.openMerchant(false, true); // a new open the tracker cannot attribute
+
+        assertFalse(bound);
+        assertFalse(association.boundPos().isPresent(),
+                "a dropped merchant open must not leave the previous binding live");
     }
 }
