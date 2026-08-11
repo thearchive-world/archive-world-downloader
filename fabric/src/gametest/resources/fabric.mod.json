@@ -21,6 +21,7 @@
       "world.thearchive.wdl.fabric.gametest.WdlGameModeConfigTest",
       "world.thearchive.wdl.fabric.gametest.WdlHalfFailedCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlLecternCaptureTest",
+      "world.thearchive.wdl.fabric.gametest.WdlMerchantCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlMapSchemeSignalBeginTest",
       "world.thearchive.wdl.fabric.gametest.WdlMapStreamCrashStateTest",
       "world.thearchive.wdl.fabric.gametest.WdlOffModeMapIdCaptureTest",
