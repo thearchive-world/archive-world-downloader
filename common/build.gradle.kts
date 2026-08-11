@@ -109,6 +109,7 @@ pitest {
         "world.thearchive.wdl.adapter.MapIdRemap",
         "world.thearchive.wdl.adapter.MapIdCollector",
         "world.thearchive.wdl.adapter.ItemLocationScrub",
+        "world.thearchive.wdl.adapter.MerchantOfferCapture",
         "world.thearchive.wdl.adapter.BookshelfSlots",
         "world.thearchive.wdl.adapter.ItemTreeWalk",
         "world.thearchive.wdl.adapter.NbtMerge",

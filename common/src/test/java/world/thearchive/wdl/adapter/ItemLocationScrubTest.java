@@ -209,6 +209,16 @@ class ItemLocationScrubTest {
     }
 
     @Test
+    void scrubItemBlanksLodestoneTargetOnOneItem() {
+        CompoundTag item = itemNbt(lodestoneCompass());
+        assertTrue(targetOf(itemFrom(item)).isPresent(), "precondition: the single item has a target");
+
+        ItemLocationScrub.scrubItem(item);
+
+        assertTrue(targetOf(itemFrom(item)).isEmpty(), "the single-item scrub blanks the lodestone target");
+    }
+
+    @Test
     void scrubReachesLodestonesNestedInShulkerAndBundle() {
         CompoundTag holder = holderOf(shulkerHoldingLodestone(), bundleHoldingLodestone());
 
