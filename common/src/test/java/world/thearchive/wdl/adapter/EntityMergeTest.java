@@ -11,10 +11,18 @@ import java.util.UUID;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.resources.RegistryOps;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.trading.ItemCost;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.EntityFixtures;
+import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -69,8 +77,77 @@ class EntityMergeTest {
     }
 
     private static boolean matches(CompoundTag tag, UUID uuid) {
-        return UUIDUtil.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, tag.get("UUID")).result()
+        return UUIDUtil.CODEC.parse(NbtOps.INSTANCE, tag.get("UUID")).result()
                 .map(uuid::equals).orElse(false);
+    }
+
+    /**
+     * A villager entity node carrying the trade experience vanilla writes unconditionally (so a client-reconstructed
+     * node carries the client zero here), and the offers holder only when {@code offers} is present.
+     */
+    private static CompoundTag villager(UUID uuid, @Nullable CompoundTag offers, int xp) {
+        CompoundTag tag = EntityFixtures.entity("minecraft:villager", uuid);
+        tag.putInt("Xp", xp);
+        if (offers != null) {
+            tag.put("Offers", offers);
+        }
+        return tag;
+    }
+
+    /** The Recipes offers holder vanilla's own MerchantOffers codec writes, one offer selling the given item. */
+    private static CompoundTag offersWith(String sellId) {
+        MerchantOffers offers = new MerchantOffers();
+        offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, 1), ItemFixtures.stack(sellId), 1, 0, 0.0f));
+        return (CompoundTag) MerchantOffers.CODEC
+                .encodeStart(RegistryOps.create(NbtOps.INSTANCE, TestRegistries.frozen()), offers).getOrThrow();
+    }
+
+    private static CompoundTag entitiesChunk(CompoundTag... villagers) {
+        return EntityFixtures.entityChunkTagWith(villagers);
+    }
+
+    private static CompoundTag firstEntity(CompoundTag chunk) {
+        return chunk.getList("Entities", 10).getCompound(0);
+    }
+
+    private static String firstSellId(CompoundTag entity) {
+        return entity.getCompound("Offers").getList("Recipes", 10).getCompound(0)
+                .getCompound("sell").getString("id");
+    }
+
+    @Test
+    void mergeCarriesOffersForwardWhenFreshVillagerHasNone() {
+        CompoundTag disk = entitiesChunk(villager(UUID_A, offersWith("minecraft:emerald"), 27));
+        CompoundTag fresh = entitiesChunk(villager(UUID_A, null, 0)); // reconstructed: no Offers, Xp:0
+
+        int carried = EntityMerge.merge(disk, fresh);
+
+        CompoundTag merged = firstEntity(fresh);
+        assertEquals(1, carried, "the villager received a carry-forward");
+        assertTrue(merged.get("Offers") instanceof CompoundTag, "the trades carried, not lost");
+        assertEquals("minecraft:emerald", firstSellId(merged), "the sold item carried");
+        assertEquals(27, merged.getInt("Xp"), "the experience carried, not the fresh zero");
+    }
+
+    @Test
+    void mergeFreshNonEmptyOffersWins() {
+        CompoundTag disk = entitiesChunk(villager(UUID_A, offersWith("minecraft:emerald"), 5));
+        CompoundTag fresh = entitiesChunk(villager(UUID_A, offersWith("minecraft:diamond"), 9));
+
+        EntityMerge.merge(disk, fresh);
+
+        assertEquals("minecraft:diamond", firstSellId(firstEntity(fresh)), "the re-opened capture stands");
+        assertEquals(9, firstEntity(fresh).getInt("Xp"), "the fresher experience stands");
+    }
+
+    @Test
+    void hasCapturedContentTrueForNonEmptyOffers() {
+        assertTrue(EntityMerge.hasCapturedContent(villager(UUID_A, offersWith("minecraft:emerald"), 1)),
+                "a villager with trades is captured content");
+        assertFalse(EntityMerge.hasCapturedContent(villager(UUID_A, null, 0)),
+                "a reconstructed villager with no trades is not");
+        assertFalse(EntityMerge.hasCapturedContent(villager(UUID_A, new CompoundTag(), 0)),
+                "an offers holder with no recipes is not content");
     }
 
     @Test
