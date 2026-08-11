@@ -556,6 +556,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * holder stays harmlessly.
      */
     private final Set<CompoundTag> preparedEntityContainers = Collections.newSetFromMap(new IdentityHashMap<>());
+    // The merchant analog of preparedEntityContainers: an offer holder is scrubbed and map-remapped exactly once,
+    // tracked by identity, since the map remap is not idempotent.
+    private final Set<CompoundTag> preparedMerchantHolders = Collections.newSetFromMap(new IdentityHashMap<>());
 
     /** The UUID of the container vehicle the live menu is bound to, set once at bind time; read by the stash. */
     private @Nullable UUID boundEntityUuid;
@@ -594,6 +597,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * it is a far smaller retention than the block container stash that precedes it.
      */
     private final Map<UUID, CompoundTag> foldedContainerVehicles = new HashMap<>();
+    private final Map<UUID, CompoundTag> foldedMerchants = new LinkedHashMap<>();
 
     /**
      * The finish-snapshot of the local player, assembled on the main thread in {@link #finish()} and read by the writer
@@ -656,6 +660,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** How many stashed container vehicles were merged into their captured entity tags (for the saved message). */
     private int mergedEntityContainers;
+    private int mergedVillagerTrades;
 
     /**
      * Captured maps lost to a failed write: the map's own data file, or a map with no writer to stream to, or one
@@ -750,6 +755,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** Opened container vehicles whose captured contents were never folded into a saved entity (main thread). */
     private int containerVehiclesLost;
+    private int villagerTradesLost;
 
     /**
      * Predicted interactions (a bookshelf book, a jukebox disc, a placed shulker or beehive) that no chunk flush ever
@@ -2434,6 +2440,25 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * release, and the frozen report counts, each one submitted or published before end-of-stream. Runs inside
      * {@link #completeThroughWriter}, whose guarantee is that the marker follows this however it ends.
      */
+    // Package-private so the orphan loss is unit-testable: it sits in the Minecraft-coupled finish drain, which no
+    // headless test can reach. mergeMerchantStash drains only villagers written as a top-level entity, so a captured
+    // villager whose node was never written survives here, and its rim was already cleared at capture, so without
+    // this it would read as captured yet write nothing.
+    void countOrphanedMerchantTrades() {
+        if (merchantStash.isEmpty()) {
+            return;
+        }
+        villagerTradesLost = merchantStash.size();
+        LOGGER.warn("{} opened villagers' captured trades were not saved: the villager was not written as a "
+                + "top-level entity we could fold them onto (its terrain was never captured, it saved nested as "
+                + "a passenger, or its reconstruct or flush failed), so the trades the player opened are lost",
+                merchantStash.size());
+        for (UUID villager : merchantStash.keySet()) {
+            LOGGER.info("villager {} saved without the trades the player opened; they are missing from the save",
+                    villager);
+        }
+    }
+
     private void drainToWriter(AsyncSaveWriter activeWriter, Minecraft minecraft, @Nullable LocalPlayer player) {
         // From here every newly imaged map batches instead of streaming alone, so the writer can report the map
         // phase over a known total. Armed before the first finish-time remap below and handed over after the last
@@ -2496,6 +2521,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         + "from the save", vehicle);
             }
         }
+        countOrphanedMerchantTrades();
         // Snapshot and assemble the local player for the save (skipped on a disconnect-flush). Fail-soft:
         // a serialize or scrub throw here, after chunks have committed, must not abort before
         // activeWriter.finish() and leave a chunks-without-level.dat unopenable world plus a leaked lock, so
@@ -3989,6 +4015,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         prepareEntityContainers(); // scrub + map-remap any new vehicle holders once, before the merge drains them
+        prepareMerchantHolders(); // and the merchant offer holders, on the same once-per-holder discipline
         for (ChunkPos pos : entityBuffer.bufferedChunks()) {
             if (all || FlushPolicy.shouldFlush(pos.x, pos.z, centerX, centerZ, keepHot)) {
                 flushEntityChunk(activeWriter, pos);
@@ -4024,6 +4051,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     envelope, entityContainerStash);
             mergedEntityContainers += entityTally.merged();
             entityContainersFailed += entityTally.failed();
+            // The merchant siblings, same refold-then-record-then-merge order. The refold re-writes trades onto a
+            // second chunk copy for its side effect only, so its count is not summed; the fold cannot fail, so
+            // there is no failed term to add.
+            EntityContainerMerge.refoldFlushedMerchants(envelope, foldedMerchants, merchantStash);
+            recordStandaloneFoldedMerchants(tags);
+            mergedVillagerTrades += EntityContainerMerge.mergeMerchantStash(envelope, merchantStash).merged();
             if (!config.saveItemCoordinates()) {
                 scrubEntityItems(envelope);
             }
@@ -4059,6 +4092,28 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 CompoundTag retained = holder.copy();
                 preparedEntityContainers.add(retained);
                 foldedContainerVehicles.put(uuid, retained);
+            }
+        }
+    }
+
+    /**
+     * The merchant analog of {@link #recordStandaloneFoldedContainers}: retain a copy of each about-to-drain offer
+     * holder for a villager written standalone in this chunk, so {@link EntityContainerMerge#refoldFlushedMerchants}
+     * can re-apply it to another chunk copy (a wandering trader that crossed entity-chunks). The copy is marked
+     * prepared, since it is a copy of an already-scrubbed, already-remapped holder the non-idempotent remap must not
+     * re-run.
+     */
+    private void recordStandaloneFoldedMerchants(List<CompoundTag> tags) {
+        for (CompoundTag tag : tags) {
+            UUID uuid = EntityMerge.readUuid(tag);
+            if (uuid == null) {
+                continue;
+            }
+            CompoundTag holder = merchantStash.get(uuid);
+            if (holder != null) {
+                CompoundTag retained = holder.copy();
+                preparedMerchantHolders.add(retained);
+                foldedMerchants.put(uuid, retained);
             }
         }
     }
@@ -4127,6 +4182,28 @@ public final class LiveCaptureSession implements CaptureController.Session {
         for (Map.Entry<UUID, CompoundTag> entry : entityContainerStash.entrySet()) {
             if (preparedEntityContainers.add(entry.getValue())) {
                 scrubAndRemapItems(entry.getValue(), entry.getKey());
+            }
+        }
+    }
+
+    /**
+     * Scrub the sell items' coordinates and on-sight map-remap each captured merchant offer holder, exactly once per
+     * holder (tracked by identity), before {@link EntityContainerMerge} folds it onto its villager tag. The scrub and
+     * remap can throw (the map archive's on-sight image stream is a live IO path), so a throwing holder is isolated the
+     * same way the item path isolates a framed map: the villager's trades save without the sanitize this holder needed,
+     * the loss is tallied, and the download reads partial.
+     */
+    private void prepareMerchantHolders() {
+        MapArchive archive = this.mapArchive;
+        for (Map.Entry<UUID, CompoundTag> entry : merchantStash.entrySet()) {
+            if (!preparedMerchantHolders.add(entry.getValue())) {
+                continue; // already scrubbed and remapped once; the map remap is not idempotent
+            }
+            try {
+                MerchantOfferCapture.scrubAndRemapOffers(entry.getValue(), !config.saveItemCoordinates(), archive);
+            } catch (RuntimeException e) {
+                mapsRemapFailed++;
+                mapEntityRemapLoss.lost(entry.getKey(), e);
             }
         }
     }
@@ -4485,19 +4562,21 @@ public final class LiveCaptureSession implements CaptureController.Session {
             bridge.sendChat(ChatCopy.savedTo(saveName, saveFolder.toString()));
         }
         LOGGER.info("saved {} chunks ({} new, {} re-captured, {} failed), {} entity-chunks ({} failed, "
-                + "{} carried forward on re-flush), {} containers, {} lecterns to {}", result.chunksWritten(),
-                result.chunksNew(), result.chunksRecaptured(), result.chunksFailed(),
+                + "{} carried forward on re-flush), {} containers, {} lecterns, {} villager trades to {}",
+                result.chunksWritten(), result.chunksNew(), result.chunksRecaptured(), result.chunksFailed(),
                 result.entityChunksWritten(), result.entityChunksFailed(), result.entitiesCarriedForward(),
-                containers, mergedLecterns, saveName);
+                containers, mergedLecterns, mergedVillagerTrades, saveName);
         // The terms of the partial-finish sum the line above does not name, so that adding the two it does name
         // reproduces the count the chat reports. Logged even when every term is zero: a reader who cannot tell
         // "nothing else was lost" from "this build had no such line" cannot check the clean verdict at all.
         LOGGER.info("counted capture losses for {}: {} chunk captures, {} maps, {} map remaps, {} idcounts, "
                 + "{} map manifest, {} block containers, {} entity containers, {} container vehicles, "
-                + "{} predicted interactions, {} structural entities, {} resumed mounts, {} finish steps",
+                + "{} villager trades, {} predicted interactions, {} structural entities, {} resumed mounts, "
+                + "{} finish steps",
                 saveName, chunksCaptureFailed, mapsFailed.get(), mapsRemapFailed, idCountsFailed,
                 mapManifestLosses(), blockContainersFailed, entityContainersFailed, containerVehiclesLost,
-                interactionCapturesLost, structuralEntitiesLost, resumedMountsLost, finishStepsFailed);
+                villagerTradesLost, interactionCapturesLost, structuralEntitiesLost, resumedMountsLost,
+                finishStepsFailed);
         // The destination the toast names is the export zip when one was actually written (the shareable copy),
         // else the openable folder; zipFileName is null on a zip failure, so the toast never names a missing zip.
         String zipFileName = result.zipFileName();
@@ -4683,8 +4762,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int failedWriteCount(int chunksFailed, int entityChunksFailed) {
         return chunksFailed + entityChunksFailed + chunksCaptureFailed + mapsFailed.get() + mapsRemapFailed
                 + idCountsFailed + mapManifestLosses() + blockContainersFailed + entityContainersFailed
-                + containerVehiclesLost + interactionCapturesLost + structuralEntitiesLost + resumedMountsLost
-                + finishStepsFailed;
+                + containerVehiclesLost + villagerTradesLost + interactionCapturesLost + structuralEntitiesLost
+                + resumedMountsLost + finishStepsFailed;
     }
 
     /** The completion inputs frozen at end-of-capture, immutable so they cross to the writer thread safely. */
