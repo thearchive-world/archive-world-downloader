@@ -110,6 +110,15 @@ final class ItemLocationScrub {
         }
     }
 
+    /**
+     * Blank every item-borne coordinate on a single serialized item compound ({@code {id, count, components}}),
+     * recursing into nested containers and bundles. The single-item entry, for an offer's {@code sell} item, which sits
+     * under no list holder.
+     */
+    public static void scrubItem(CompoundTag item) {
+        ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubComponents);
+    }
+
     /** Blank the lodestone target and the bee flower positions on {@code components}. */
     private static void scrubComponents(CompoundTag components) {
         if (components.get(LODESTONE_TRACKER) instanceof CompoundTag tracker) {
