@@ -29,12 +29,12 @@ import world.thearchive.wdl.testsupport.LogCapture;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The finish line naming what a download lost, term by term. Its twelve counts arrive as twelve consecutive arguments
- * against twelve labels the compiler never compares them to, so two of them swapped still compiles, still renders, and
- * still reads as a plausible report while attributing a loss to the wrong axis. Only the rendered text tells the
- * pairing apart, so every counter is given a distinct value and the whole line is asserted. It is the line a user is
- * asked for when a download reports partial, and the tally it explains is the same one the completion record stamps
- * clean or partial from, so a term reading against the wrong label sends the reader after the wrong axis of the
+ * The finish line naming what a download lost, term by term. Its thirteen counts arrive as thirteen consecutive
+ * arguments against thirteen labels the compiler never compares them to, so two of them swapped still compiles,
+ * renders, and still reads as a plausible report while attributing a loss to the wrong axis. Only the rendered text
+ * tells the pairing apart, so every counter is given a distinct value and the whole line is asserted. It is the line a
+ * user is asked for when a download reports partial, and the tally it explains is the same one the completion record
+ * stamps clean or partial from, so a term reading against the wrong label sends the reader after the wrong axis of the
  * capture.
  *
  * <p>The reporting step is private and driven reflectively. It runs headlessly only with chat messages and toasts both
@@ -45,7 +45,7 @@ class LiveCaptureSessionFinishLossLineTest {
     private static final String SESSION_LOGGER = LiveCaptureSession.class.getName();
 
     /**
-     * One distinct value per counter, so any two of the twelve exchanged renders a line that differs from this one;
+     * One distinct value per counter, so any two of the thirteen exchanged renders a line that differs from this one;
      * equal values would let the swap they are meant to catch pass.
      */
     private static final int CHUNKS = 1;
@@ -60,6 +60,7 @@ class LiveCaptureSessionFinishLossLineTest {
     private static final int STRUCTURAL_ENTITIES = 10;
     private static final int RESUMED_MOUNTS = 11;
     private static final int FINISH_STEPS = 12;
+    private static final int VILLAGER_TRADES = 13;
 
     @BeforeAll
     static void bootstrapVanilla() {
@@ -106,14 +107,15 @@ class LiveCaptureSessionFinishLossLineTest {
                     "the finish says what landed and then what was lost, so the loss line is the second");
             assertEquals("counted capture losses for headless: 1 chunk captures, 2 maps, 3 map remaps, 4 idcounts, "
                     + "5 map manifest, 6 block containers, 7 entity containers, 8 container vehicles, "
-                    + "9 predicted interactions, 10 structural entities, 11 resumed mounts, 12 finish steps",
+                    + "13 villager trades, 9 predicted interactions, 10 structural entities, 11 resumed mounts, "
+                    + "12 finish steps",
                     captured.rendered(1),
                     "each count reads against the axis it was counted on, so a reader sent to this line by a "
                             + "partial finish looks for the right thing");
         }
     }
 
-    /** Give each of the twelve tallies its own value; production accrues them across two threads and a session. */
+    /** Give each of the thirteen tallies its own value; production accrues them across two threads and a session. */
     private static void recordLosses(LiveCaptureSession session) {
         setCount(session, "chunksCaptureFailed", CHUNKS);
         counter(session, "mapsFailed").set(MAPS);
@@ -125,6 +127,7 @@ class LiveCaptureSessionFinishLossLineTest {
         setCount(session, "blockContainersFailed", BLOCK_CONTAINERS);
         setCount(session, "entityContainersFailed", ENTITY_CONTAINERS);
         setCount(session, "containerVehiclesLost", CONTAINER_VEHICLES);
+        setCount(session, "villagerTradesLost", VILLAGER_TRADES);
         setCount(session, "interactionCapturesLost", INTERACTION_CAPTURES);
         setCount(session, "structuralEntitiesLost", STRUCTURAL_ENTITIES);
         setCount(session, "resumedMountsLost", RESUMED_MOUNTS);
