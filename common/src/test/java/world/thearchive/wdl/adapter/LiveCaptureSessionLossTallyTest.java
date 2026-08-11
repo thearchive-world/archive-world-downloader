@@ -42,6 +42,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.trading.ItemCost;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -535,6 +538,54 @@ class LiveCaptureSessionLossTallyTest {
         assertEquals(1, losses(session, "mapsRemapFailed"),
                 "the entity path's remap failed, so the map that frame renders blank is counted as one");
         assertTrue(session.isPartialSave(0, 0), "and one blank map is enough to make the finish partial");
+    }
+
+    /** A serialized offer holder whose one offer sells a filled map, so its flush-time remap reaches the archive. */
+    private CompoundTag merchantHolderSellingMap(int mapId) {
+        MerchantOffers offers = new MerchantOffers();
+        offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, 1), filledMap(mapId), 1, 0, 0.0f));
+        return MerchantOfferCapture.serialize(offers, 0, false, registries);
+    }
+
+    @Test
+    void aVillagerTradeMapRemapLostInThePrepareLandsInTheRemapTally(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
+        WorldPaths paths = paths(temporary.resolve("save"));
+        assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
+        AsyncSaveWriter writer = session.bindWorldOpen(paths, throwingArchive(), () -> saveWriter(paths));
+        // A villager whose sell item is a filled map, so the flush prepare's remap reaches the throwing archive; the
+        // villager also sits in the entity buffer so its node is written and the fold drains its stash rather than
+        // leaving an orphan, isolating the remap failure as the one loss.
+        Map<UUID, CompoundTag> merchantStash = state(session, "merchantStash");
+        merchantStash.put(VEHICLE, merchantHolderSellingMap(9));
+        bufferEntity(session, VEHICLE, chunk, entity(VEHICLE));
+
+        session.flushBuffer(writer, true, 0, 0, 0);
+        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
+
+        assertFalse(result.failed(), "the drain hit no hard error, so the save was not aborted");
+        assertEquals(1, result.entityChunksWritten(),
+                "an unremappable trade map is a per-holder loss, so the villager still reached disk");
+        assertEquals(1, losses(session, "mapsRemapFailed"),
+                "the prepare's offer remap failed, so the trade map that renders blank is counted as one");
+        assertEquals(0, losses(session, "villagerTradesLost"),
+                "the villager was written and its trades folded, so nothing is an orphan");
+        assertTrue(session.isPartialSave(0, 0), "and one blank trade map is enough to make the finish partial");
+    }
+
+    @Test
+    void anUnwrittenVillagersStashedTradesLandInTheOrphanTally(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
+        Map<UUID, CompoundTag> merchantStash = state(session, "merchantStash");
+        merchantStash.put(VEHICLE, merchantHolderSellingMap(9));
+        assertEquals(0, losses(session, "villagerTradesLost"), "nothing has been counted before the orphan report");
+
+        // A villager whose trades were stashed but whose node the fold never wrote leaves the stash full at finish,
+        // a captured-but-unwritten villager the orphan report must surface as a loss.
+        session.countOrphanedMerchantTrades();
+
+        assertEquals(1, losses(session, "villagerTradesLost"),
+                "the villager was stashed but never written as a top-level entity, so its trades are an orphan loss");
     }
 
     @Test
