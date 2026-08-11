@@ -2450,6 +2450,27 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * {@link #completeThroughWriter}, whose guarantee is that the marker follows this however it ends.
      */
     // Package-private so the orphan loss is unit-testable: it sits in the Minecraft-coupled finish drain, which no
+    // headless test can reach. An opened vehicle re-approached after its chunk flushed drains its stash entry before
+    // this check, so whatever survives was never folded into a saved top-level entity; the user interacted with this
+    // storage and its items are absent, so surface it as a loss.
+    void countOrphanedContainerVehicles() {
+        if (entityContainerStash.isEmpty()) {
+            return;
+        }
+        containerVehiclesLost = entityContainerStash.size();
+        LOGGER.warn("{} opened container vehicles' captured contents were not saved: the vehicle was not "
+                + "written as a top-level entity we could fold them into (its terrain was never captured, it "
+                + "saved nested as a passenger, or its reconstruct or flush failed), so the items the player "
+                + "opened are lost", entityContainerStash.size());
+        // Logged directly rather than through a loss voice because no throwable exists to key a stack
+        // budget on; the aggregate count above gives no way to learn which mount saved empty.
+        for (UUID vehicle : entityContainerStash.keySet()) {
+            LOGGER.info("container vehicle {} saved without the contents the player opened; they are missing "
+                    + "from the save", vehicle);
+        }
+    }
+
+    // Package-private so the orphan loss is unit-testable: it sits in the Minecraft-coupled finish drain, which no
     // headless test can reach. mergeMerchantStash drains only villagers written as a top-level entity, so a captured
     // villager whose node was never written survives here, and its rim was already cleared at capture, so without
     // this it would read as captured yet write nothing.
@@ -2513,23 +2534,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         countUnboundDimensionFrames();
         reportEntityReconciliation(); // after the flush, so the at-submit write tally is complete
         countDroppedInteractionCaptures(); // likewise: only what the whole-buffer drain could not reach
-        if (!entityContainerStash.isEmpty()) {
-            // Only the unrecoverable remainder reaches here: an opened vehicle re-approached after its
-            // chunk flushed re-accumulates and re-flushes with its contents folded in, draining its stash
-            // entry before this check, so whatever survives was never folded into a saved top-level entity.
-            // The user interacted with this storage and its items are absent, so surface it as a loss.
-            containerVehiclesLost = entityContainerStash.size();
-            LOGGER.warn("{} opened container vehicles' captured contents were not saved: the vehicle was not "
-                    + "written as a top-level entity we could fold them into (its terrain was never captured, it "
-                    + "saved nested as a passenger, or its reconstruct or flush failed), so the items the player "
-                    + "opened are lost", entityContainerStash.size());
-            // Logged directly rather than through a loss voice because no throwable exists to key a stack
-            // budget on; the aggregate count above gives no way to learn which mount saved empty.
-            for (UUID vehicle : entityContainerStash.keySet()) {
-                LOGGER.info("container vehicle {} saved without the contents the player opened; they are missing "
-                        + "from the save", vehicle);
-            }
-        }
+        countOrphanedContainerVehicles();
         countOrphanedMerchantTrades();
         // Snapshot and assemble the local player for the save (skipped on a disconnect-flush). Fail-soft:
         // a serialize or scrub throw here, after chunks have committed, must not abort before
