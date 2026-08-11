@@ -10,8 +10,9 @@ import net.minecraft.world.phys.AABB;
 import org.junit.jupiter.api.Test;
 
 /**
- * The chested-animal rim geometry: a chested animal's rim box is lowered from its full standing box to the chest,
- * growing from the feet so the footprint and ground line are untouched while only the top drops.
+ * The entity rim geometry: a chested animal's rim box is lowered from its full standing box to the chest, and a
+ * tradeable villager's below its head, each growing from the feet so the footprint and ground line are untouched while
+ * only the top drops.
  */
 class OutlineTrackerTest {
     @Test
@@ -36,5 +37,20 @@ class OutlineTrackerTest {
 
         assertTrue(rim.maxY < donkeyBox.maxY);
         assertTrue(rim.maxY > donkeyBox.minY);
+    }
+
+    @Test
+    void merchantRimBoxDropsTopBelowTheHeadKeepingFootprint() {
+        AABB villagerBox = new AABB(0.0, 64.0, 0.0, 0.6, 65.95, 0.6);
+
+        AABB rim = OutlineTracker.merchantRimBox(villagerBox);
+
+        assertEquals(0.0, rim.minX, 1.0e-9);
+        assertEquals(0.6, rim.maxX, 1.0e-9);
+        assertEquals(0.0, rim.minZ, 1.0e-9);
+        assertEquals(0.6, rim.maxZ, 1.0e-9);
+        assertEquals(64.0, rim.minY, 1.0e-9);
+        assertTrue(rim.maxY < villagerBox.maxY);
+        assertTrue(rim.maxY > villagerBox.minY);
     }
 }
