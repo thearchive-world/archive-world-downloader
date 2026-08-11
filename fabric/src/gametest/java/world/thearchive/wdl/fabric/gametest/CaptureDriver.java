@@ -4,15 +4,20 @@
 package world.thearchive.wdl.fabric.gametest;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.phys.AABB;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.LiveCaptureSession;
+import world.thearchive.wdl.adapter.OutlineRim;
+import world.thearchive.wdl.adapter.OutlineTracker;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CaptureController;
@@ -53,6 +58,7 @@ final class CaptureDriver {
     private final ClientGameTestContext context;
     private final CaptureController controller;
     private final DownloadTarget target;
+    private final PlatformBridge bridge;
     private final AtomicReference<@Nullable Thread> pokeThread;
 
     // What the settings currently say, which production keeps in Wdl.currentConfig and refreshes when the settings
@@ -60,10 +66,11 @@ final class CaptureDriver {
     private volatile WdlConfig liveConfig;
 
     private CaptureDriver(ClientGameTestContext context, CaptureController controller, DownloadTarget target,
-            WdlConfig config, AtomicReference<@Nullable Thread> pokeThread) {
+            PlatformBridge bridge, WdlConfig config, AtomicReference<@Nullable Thread> pokeThread) {
         this.context = context;
         this.controller = controller;
         this.target = target;
+        this.bridge = bridge;
         this.liveConfig = config;
         this.pokeThread = pokeThread;
     }
@@ -101,7 +108,7 @@ final class CaptureDriver {
                     controller.savedChunks(), controller.coveredChunks(), controller.sendRange(), overlayActive,
                     client.getCameraEntity() != client.player, BobbyChunkFilter.resolve(bridge), poke));
         });
-        return new CaptureDriver(context, controller, target, config, pokeThread);
+        return new CaptureDriver(context, controller, target, bridge, config, pokeThread);
     }
 
     /**
@@ -122,6 +129,31 @@ final class CaptureDriver {
      */
     boolean isCaptured(Predicate<CapturedContainers> query) {
         return context.computeOnClient(client -> query.test(controller.capturedContainers()));
+    }
+
+    /**
+     * The entity-rim boxes a fresh, driver-local {@link OutlineTracker} builds against this instant's live state, run
+     * on the client thread. Not {@code Wdl.outlineDrawSet()}: that static draw-set is rebuilt only while the static
+     * {@code Wdl.controller} is recording, and this driver records on its own controller, so the static tracker stays
+     * cleared for a driver-run test's whole life. This local tracker runs the same production {@code tick} against this
+     * driver's own controller state, so a caller exercises the real entity enumeration and classification.
+     */
+    List<AABB> entityRimBoxes() {
+        return context.computeOnClient(client -> {
+            OutlineTracker tracker = new OutlineTracker();
+            tracker.useBobbyFilter(BobbyChunkFilter.resolve(bridge));
+            tracker.tick(client.level, client.gameRenderer.mainCamera().position(), liveConfig.outline(),
+                    controller.aidToggles(liveConfig), controller.capturedContainers(), controller.recoveredCoverage());
+            List<AABB> boxes = new ArrayList<>();
+            for (List<OutlineRim> sectionRims : tracker.drawSet().sections().values()) {
+                for (OutlineRim rim : sectionRims) {
+                    if (rim.isEntityRim()) {
+                        boxes.add(rim.box());
+                    }
+                }
+            }
+            return List.copyOf(boxes);
+        });
     }
 
     /**
