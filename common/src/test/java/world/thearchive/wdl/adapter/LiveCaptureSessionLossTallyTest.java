@@ -589,6 +589,20 @@ class LiveCaptureSessionLossTallyTest {
     }
 
     @Test
+    void anUnwrittenVehiclesStashedContentsLandInTheOrphanTally(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
+        stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
+        assertEquals(0, losses(session, "containerVehiclesLost"), "nothing has been counted before the orphan report");
+
+        // A vehicle whose contents were stashed but whose node the fold never wrote leaves the stash full at finish,
+        // an opened container vehicle the orphan report must surface as a loss.
+        session.countOrphanedContainerVehicles();
+
+        assertEquals(1, losses(session, "containerVehiclesLost"),
+                "the vehicle was stashed but never written as a top-level entity, so its contents are an orphan loss");
+    }
+
+    @Test
     void aRiddenMountsLostContainerFoldLandsInTheEntityContainerTally(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(new ThrowingMergeAdapter(), temporary);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
