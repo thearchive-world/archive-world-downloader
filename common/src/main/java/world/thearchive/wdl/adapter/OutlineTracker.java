@@ -20,6 +20,9 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerProfession;
+import net.minecraft.world.entity.npc.WanderingTrader;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.ChestBlock;
@@ -92,6 +95,7 @@ public final class OutlineTracker {
     // capped there. A container vehicle keeps its true box: a boat or minecart is short enough that its top
     // already meets the chest it carries.
     private static final double CHESTED_RIM_HEIGHT_FRACTION = 0.74;
+    private static final double MERCHANT_RIM_HEIGHT_FRACTION = 0.45;
 
     private final OutlineDrawSet drawSet = new OutlineDrawSet();
     private final Long2ObjectMap<ChunkContainers> chunkCache = new Long2ObjectOpenHashMap<>();
@@ -268,13 +272,14 @@ public final class OutlineTracker {
         AABB box;
         boolean ender = false;
         boolean bookshelf = false;
-        // Invariant, kept in sync by hand: every type outlined here (and in isContainerEntity) must have an
-        // enabled capture path, or its rim is a to-do the player can never clear. Contents arrive either on
-        // open, bound in LiveCaptureSession.captureOpenContainer, or on interaction, recorded in
-        // InteractionCapture. The invariant is one-way; a capturable type need not be outlined. Three deliberate
-        // asymmetries: a chiseled bookshelf is outlined here but captured on interaction (it opens no menu and
-        // is not a BaseContainerBlockEntity), and its rim is suppressed in emit when interaction capture is off
-        // so it never becomes a stuck to-do; an ender chest reaches the save through the player tag rather than
+        // Invariant, kept in sync by hand: every type outlined here (and in isContainerEntity and
+        // isTradeableMerchant) must have an enabled capture path, or its rim is a to-do the player can never
+        // clear. Contents arrive either on open, bound in LiveCaptureSession.captureOpenContainer (a container
+        // menu, or a merchant menu whose non-empty offers clear a tradeable villager's rim), or on interaction,
+        // recorded in InteractionCapture. The invariant is one-way; a capturable type need not be outlined.
+        // Three deliberate asymmetries: a chiseled bookshelf is outlined here but captured on interaction (it opens
+        // no menu and is not a BaseContainerBlockEntity), and its rim is suppressed in emit when interaction capture
+        // is off so it never becomes a stuck to-do; an ender chest reaches the save through the player tag rather than
         // this position, so its rim is suppressed in emit on the toggle that write is gated on; a jukebox is
         // captured on interaction but deliberately not outlined (not a BaseContainerBlockEntity, it falls
         // through to the else return below).
@@ -377,7 +382,8 @@ public final class OutlineTracker {
             CapturedContainers captured, RecoveredCoverage recovered) {
         AABB clampBox = new AABB(cameraPos.x - clamp, cameraPos.y - clamp, cameraPos.z - clamp, cameraPos.x + clamp,
                 cameraPos.y + clamp, cameraPos.z + clamp);
-        for (Entity entity : level.getEntitiesOfClass(Entity.class, clampBox, OutlineTracker::isContainerEntity)) {
+        for (Entity entity : level.getEntitiesOfClass(Entity.class, clampBox,
+                candidate -> isContainerEntity(candidate) || isTradeableMerchant(candidate))) {
             Vec3 center = entity.position();
             if (!OutlineClamp.isWithin(cameraPos.x, cameraPos.y, cameraPos.z, center.x, center.y, center.z, clamp)) {
                 continue;
@@ -396,17 +402,38 @@ public final class OutlineTracker {
         }
     }
 
-    /** The rim box for a container entity: a chested animal's box is lowered to its chest, a vehicle keeps its own. */
+    /**
+     * The rim box for a container entity: a chested animal's box drops to its chest and a tradeable villager's below
+     * its head, so a trading-hall roof or a trapdoor at head height does not hide the rim; a vehicle keeps its own box.
+     */
     private static AABB rimBox(Entity entity) {
         AABB box = entity.getBoundingBox();
-        return entity instanceof AbstractChestedHorse ? chestedRimBox(box) : box;
+        if (entity instanceof AbstractChestedHorse) {
+            return chestedRimBox(box);
+        }
+        if (entity instanceof Villager || entity instanceof WanderingTrader) {
+            return merchantRimBox(box);
+        }
+        return box;
     }
 
     /**
      * {@code box} with its top capped to the chest height (see {@link #CHESTED_RIM_HEIGHT_FRACTION}), footprint kept.
      */
     static AABB chestedRimBox(AABB box) {
-        double top = box.minY + (box.maxY - box.minY) * CHESTED_RIM_HEIGHT_FRACTION;
+        return cappedRimBox(box, CHESTED_RIM_HEIGHT_FRACTION);
+    }
+
+    /**
+     * {@code box} with its top dropped below the villager's head (see {@link #MERCHANT_RIM_HEIGHT_FRACTION}), footprint
+     * kept, so a trading-hall roof or a trapdoor at head height does not hide the rim.
+     */
+    static AABB merchantRimBox(AABB box) {
+        return cappedRimBox(box, MERCHANT_RIM_HEIGHT_FRACTION);
+    }
+
+    private static AABB cappedRimBox(AABB box, double heightFraction) {
+        double top = box.minY + (box.maxY - box.minY) * heightFraction;
         return new AABB(box.minX, box.minY, box.minZ, box.maxX, top, box.maxZ);
     }
 
@@ -414,6 +441,23 @@ public final class OutlineTracker {
     private static boolean isContainerEntity(Entity entity) {
         return entity instanceof ContainerEntity
                 || (entity instanceof AbstractChestedHorse animal && animal.getInventoryColumns() > 0);
+    }
+
+    /**
+     * Whether {@code entity} is a merchant worth rimming: a wandering trader, or an adult villager whose synced
+     * profession is a real trading one. A nitwit, unemployed, or baby villager has no trades, so its rim could never
+     * clear. The profession and baby state ride the synced data, so this is client-derivable; the check is the exact
+     * idiom vanilla Villager uses.
+     */
+    private static boolean isTradeableMerchant(Entity entity) {
+        if (entity instanceof WanderingTrader) {
+            return true;
+        }
+        if (entity instanceof Villager villager && !villager.isBaby()) {
+            VillagerProfession profession = villager.getVillagerData().getProfession();
+            return profession != VillagerProfession.NONE && profession != VillagerProfession.NITWIT;
+        }
+        return false;
     }
 
     /** The connected half of a double chest at {@code pos}, or {@code null} if it is single or not loaded. */
