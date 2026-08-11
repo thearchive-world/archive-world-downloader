@@ -32,7 +32,10 @@ import java.util.OptionalLong;
  * menu's chest slots, the crafter leg takes the crafting grid and excludes the menu's result slot, and the ender leg
  * takes the player's global ender inventory, since an ender chest has no container of its own. Where the size is not
  * readable from the live world at all, the caller passes the invariant the vanilla menu itself checks on construction,
- * which is a fact about that menu type rather than a sentinel; the lectern leg is the only one that does so.
+ * which is a fact about that menu type rather than a sentinel; the lectern leg is the only one that does so. The
+ * merchant leg is the sole exception to the size-count rule, owner-ruled: {@link #openMerchant} has no size to match,
+ * since a merchant's offers come from a list rather than a slotted container, so it discriminates on the menu type and
+ * the clicked-villager identity alone.
  */
 public final class ContainerAssociation {
     /** Which recognition axis bound the live menu, so the stash-time dispatch need not re-derive it. */
@@ -43,7 +46,8 @@ public final class ContainerAssociation {
         ENTITY,
         CHESTED_ANIMAL,
         DOUBLE_CHEST,
-        CRAFTER
+        CRAFTER,
+        MERCHANT
     }
 
     private boolean bound;
@@ -259,6 +263,29 @@ public final class ContainerAssociation {
             bound = true;
             boundPosKey = 0L; // unused for CHESTED_ANIMAL; the bind target (UUID) is the adapter's
             boundKind = BindKind.CHESTED_ANIMAL;
+            return true;
+        }
+        bound = false;
+        return false;
+    }
+
+    /**
+     * Decide the binding for a freshly-opened merchant menu and remember it. An identity-discriminated leg with no size
+     * guard: a merchant menu's offers come from a list, not a slotted container, so unlike every other leg there is no
+     * size to match. The confidence comes instead from the menu type ({@code MerchantMenu} is villager-exclusive in
+     * vanilla) plus the click-tracked villager the adapter resolves. Both flags are true at the one call site; they are
+     * parameters so the negatives stay unit-testable here. Like the entity legs there is no block pos: the bind target
+     * (the villager UUID) lives in the adapter, so {@link #boundPos} carries only the "a menu is bound" signal.
+     *
+     * @param atVillager     the open resolved to an {@code AbstractVillager} target
+     * @param menuIsMerchant the open menu is a {@code MerchantMenu}
+     * @return whether the open bound to the villager; {@code false} when it is dropped
+     */
+    public boolean openMerchant(boolean atVillager, boolean menuIsMerchant) {
+        if (atVillager && menuIsMerchant) {
+            bound = true;
+            boundPosKey = 0L; // unused for MERCHANT; the bind target (UUID) is the adapter's
+            boundKind = BindKind.MERCHANT;
             return true;
         }
         bound = false;
