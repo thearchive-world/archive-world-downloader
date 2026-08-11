@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import org.jspecify.annotations.Nullable;
@@ -19,10 +20,11 @@ import org.jspecify.annotations.Nullable;
  * carry-forwards, both so a re-write of an entity-chunk adds to, never overwrites, what is already on disk:
  *
  * <ul>
- * <li>Container contents: a container vehicle's or chested animal's on-disk {@code "Items"} is carried into the
- * matching fresh entity, at any depth of the {@code "Passengers"} tree ({@link EntityTreeWalk}), preferring the
- * non-empty side, so a parked storage minecart or a chested animal pushed into one, opened in a prior flush, is not
- * wiped by a re-capture that never re-opened it.</li>
+ * <li>Container contents: a container vehicle's or chested animal's on-disk {@code "Items"}, and a villager's trade
+ * {@code "Offers"} and experience {@code "Xp"}, are carried into the matching fresh entity, at any depth of the
+ * {@code "Passengers"} tree ({@link EntityTreeWalk}), preferring the non-empty side, so a parked storage minecart, a
+ * chested animal pushed into one, or a villager captured through its trade menu, opened in a prior flush, is not wiped
+ * by a re-capture that never re-opened it.</li>
  * <li>Absent entities (union): every on-disk entity the fresh capture does not contain is carried forward, so a partial
  * re-flush of a chunk (the entity packet path drains and flushes a chunk repeatedly as frames stream in over time or on
  * a revisit) does not drop the entities a prior flush already saved. UUID-deduped, so an entity present on both sides
@@ -64,8 +66,19 @@ final class EntityMerge {
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(freshEntity).entrySet()) {
                 freshUuids.add(node.getKey());
                 CompoundTag diskNode = diskNodes.get(node.getKey());
-                if (diskNode != null && NbtMerge.carryList(diskNode, node.getValue(), "Items")) {
-                    merged++;
+                if (diskNode != null) {
+                    // The Offers and Xp carries run for every node but are inert for non-villagers under client
+                    // capture: only AbstractVillager writes Offers, and only server-side, so a client-reconstructed
+                    // disk node never holds it; and villagerXp is never synced, so a client entity always serializes
+                    // Xp at the client zero. The carry therefore fires only for the villager the merchant fold
+                    // injected, matched by UUID. A band that synced villagerXp, or a modded entity carrying these
+                    // keys, would change that.
+                    boolean carried = NbtMerge.carryList(diskNode, node.getValue(), "Items");
+                    carried |= NbtMerge.carryCompound(diskNode, node.getValue(), "Offers", null);
+                    carried |= NbtMerge.carryValue(diskNode, node.getValue(), "Xp", IntTag.valueOf(0));
+                    if (carried) {
+                        merged++;
+                    }
                 }
             }
         }
@@ -89,14 +102,18 @@ final class EntityMerge {
     }
 
     /**
-     * Whether {@code entity}'s on-disk tag holds interaction-captured container content: a non-empty {@code "Items"}
-     * list. The single definition of prior-captured entity content, shared with {@link RecoveredScan} so the outline's
-     * recovered-entity set tracks exactly what {@link NbtMerge#carryList} preserves, the UUID-keyed sibling of
-     * {@link ChunkMerge#hasCapturedContent}. A future band's added content key (the pre-1.21.5 saddle slot) extends
-     * this and the carry-forward together.
+     * Whether {@code entity}'s on-disk tag holds interaction-captured content: a non-empty {@code "Items"} list, or a
+     * villager's non-empty trade {@code "Offers"}. The single definition of prior-captured entity content, shared with
+     * {@link RecoveredScan} so the outline's recovered-entity set tracks exactly what the carry-forward preserves, the
+     * UUID-keyed sibling of {@link ChunkMerge#hasCapturedContent}. A future band's added content key (the pre-1.21.5
+     * saddle slot) extends this and the carry-forward together.
      */
     static boolean hasCapturedContent(CompoundTag entity) {
-        return NbtMerge.isNonEmptyList(entity, "Items");
+        return NbtMerge.isNonEmptyList(entity, "Items") || hasCapturedOffers(entity);
+    }
+
+    private static boolean hasCapturedOffers(CompoundTag entity) {
+        return entity.get("Offers") instanceof CompoundTag offers && NbtMerge.isNonEmptyList(offers, "Recipes");
     }
 
     /** Decode an entity tag's {@code "UUID"} (the {@code UUIDUtil.CODEC} 4-int array), or null if absent/malformed. */
