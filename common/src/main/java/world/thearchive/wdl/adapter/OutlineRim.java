@@ -95,4 +95,9 @@ public final class OutlineRim {
     long[] cells() {
         return cells;
     }
+
+    /** Whether this rim is entity-borne (an empty cells array) rather than a block container's. */
+    public boolean isEntityRim() {
+        return cells.length == 0;
+    }
 }

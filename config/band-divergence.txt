@@ -26,3 +26,13 @@ fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
 # Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
+
+# The villager-trade capture gametest carries the deep-band client forms: villager types are the flat npc package,
+# EntityType is not yet EntityTypes, Minecraft.setScreen is not relocated into Minecraft.gui, the crosshair pick is
+# GameRenderer.pick rather than LocalPlayer.raycastHitResult, an entity is resolved by UUID over entitiesForRendering
+# rather than Level.getEntity(UUID), and the pre-1.21.5 CompoundTag/ListTag accessors (getCompound/getInt/getList)
+# replace the Optional-returning family.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
+# The shared capture driver reads the camera through GameRenderer.getMainCamera().getPosition(), the pre-26.2,
+# pre-1.21.11 forms.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
