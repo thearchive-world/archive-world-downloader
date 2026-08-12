@@ -74,6 +74,7 @@ pitest {
         "world.thearchive.wdl.core.CaptureToggles",
         "world.thearchive.wdl.core.ContainerAssociation",
         "world.thearchive.wdl.core.CrafterSlots",
+        "world.thearchive.wdl.core.EntityMenuCapability",
         "world.thearchive.wdl.core.MapManifest",
         "world.thearchive.wdl.core.MapHash",
         "world.thearchive.wdl.core.RecapturePolicy",
