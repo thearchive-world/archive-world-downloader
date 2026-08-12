@@ -84,9 +84,20 @@ public final class OpenClickTracker {
     public static void dispatchUseBlock(Player player, Level level, BlockHitResult hit) {
         OpenClickTracker tracker = active;
         if (tracker != null && level.isClientSide() && player == Minecraft.getInstance().player
+                && !suppressesBlockUse(player)
                 && opensMenuFor(level, hit.getBlockPos(), player.isSpectator())) {
             tracker.intent.recordBlockClick(hit.getBlockPos().asLong(), tracker.currentTick);
         }
+    }
+
+    /**
+     * Vanilla's own gate: sneaking with a non-empty hand skips the block's use entirely and places the item, so no menu
+     * can open. Identical predicate on both sides (MultiPlayerGameMode / ServerPlayerGameMode), so a click in this
+     * state owes no open and must not be latched.
+     */
+    private static boolean suppressesBlockUse(Player player) {
+        boolean haveSomethingInOurHands = !player.getMainHandItem().isEmpty() || !player.getOffhandItem().isEmpty();
+        return player.isSecondaryUseActive() && haveSomethingInOurHands;
     }
 
     /**
