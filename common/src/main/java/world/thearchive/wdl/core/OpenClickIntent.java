@@ -26,6 +26,11 @@ import java.util.ArrayDeque;
  * bind the first menu's contents to the second target (a corrupt archive). Each marker poisons exactly one later open
  * into {@link Target#SUPERSEDED}, which must bind nothing, not even the crosshair; markers age out with the same
  * window. Re-recording the same target only refreshes the latch.
+ *
+ * <p>An entity click also carries whether the clicked entity can open a menu at all. Overwriting a pending
+ * {@link Target#ENTITY} intent that is flagged menu-incapable mints no superseded marker: an entity that cannot open a
+ * menu owed no open to begin with, so there is nothing to poison. A menu-capable entity click, and every other target
+ * kind, still mints its marker on overwrite.
  */
 public final class OpenClickIntent {
     /**
@@ -48,6 +53,7 @@ public final class OpenClickIntent {
     private Target pending = Target.NONE;
     private long blockPosKey;
     private int entityId;
+    private boolean pendingEntityMenuIncapable;
     private int vehicleId;
     private long clickTick;
 
@@ -65,12 +71,14 @@ public final class OpenClickIntent {
 
     /**
      * Record a right-click on the entity with network id {@code entityId} on {@code tick}, overwriting any earlier
-     * click; the clicked entity itself is the adapter's.
+     * click; the clicked entity itself is the adapter's. {@code menuIncapable} marks an entity that cannot open a menu
+     * at all (see the class doc).
      */
-    public void recordEntityClick(int entityId, long tick) {
+    public void recordEntityClick(int entityId, long tick, boolean menuIncapable) {
         markSupersededUnless(pending == Target.ENTITY && this.entityId == entityId);
         this.pending = Target.ENTITY;
         this.entityId = entityId;
+        this.pendingEntityMenuIncapable = menuIncapable;
         this.clickTick = tick;
     }
 
@@ -108,7 +116,8 @@ public final class OpenClickIntent {
     }
 
     private void markSupersededUnless(boolean sameTarget) {
-        if (pending != Target.NONE && !sameTarget) {
+        if (pending != Target.NONE && !sameTarget
+                && !(pending == Target.ENTITY && pendingEntityMenuIncapable)) {
             supersededClickTicks.addLast(clickTick);
         }
     }
