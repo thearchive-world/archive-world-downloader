@@ -16,6 +16,7 @@
       "world.thearchive.wdl.fabric.gametest.WdlEnderChestCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlEntityCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlEntityContainerCaptureTest",
+      "world.thearchive.wdl.fabric.gametest.WdlIncapableEntityClickCascadeTest",
       "world.thearchive.wdl.fabric.gametest.WdlFilledMapCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlFramedMapRevisitUnionTest",
       "world.thearchive.wdl.fabric.gametest.WdlGameModeConfigTest",

@@ -49,7 +49,7 @@ class OpenClickIntentTest {
     void resolvesFreshEntityClick() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
 
-        intent.recordEntityClick(ENTITY_ID, 5L);
+        intent.recordEntityClick(ENTITY_ID, 5L, false);
 
         assertEquals(OpenClickIntent.Target.ENTITY, intent.resolve(5L), "a fresh entity click resolves to ENTITY");
     }
@@ -60,7 +60,7 @@ class OpenClickIntentTest {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
 
         intent.recordBlockClick(POS, 0L);
-        intent.recordEntityClick(ENTITY_ID, 0L); // a different target supersedes the block click
+        intent.recordEntityClick(ENTITY_ID, 0L, false); // a different target supersedes the block click
 
         assertEquals(OpenClickIntent.Target.SUPERSEDED, intent.resolve(WINDOW),
                 "a marker exactly WINDOW ticks old is still fresh and poisons this open");
@@ -72,7 +72,7 @@ class OpenClickIntentTest {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
 
         intent.recordBlockClick(POS, 1000L);
-        intent.recordEntityClick(ENTITY_ID, 1000L);
+        intent.recordEntityClick(ENTITY_ID, 1000L, false);
 
         assertEquals(OpenClickIntent.Target.SUPERSEDED, intent.resolve(1001L),
                 "a one-tick-old marker poisons the open regardless of how large the tick counter has grown");
@@ -127,7 +127,7 @@ class OpenClickIntentTest {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
 
         intent.recordBlockClick(POS, 0L);
-        intent.recordEntityClick(ENTITY_ID, 1L);
+        intent.recordEntityClick(ENTITY_ID, 1L, false);
 
         assertEquals(OpenClickIntent.Target.SUPERSEDED, intent.resolve(1L),
                 "the overwritten click's open binds nothing");
@@ -139,7 +139,7 @@ class OpenClickIntentTest {
     void laterBlockClickOverwritesEarlierEntityClick() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
 
-        intent.recordEntityClick(ENTITY_ID, 0L);
+        intent.recordEntityClick(ENTITY_ID, 0L, false);
         intent.recordBlockClick(POS, 1L);
 
         assertEquals(OpenClickIntent.Target.SUPERSEDED, intent.resolve(1L),
@@ -194,8 +194,8 @@ class OpenClickIntentTest {
     void sameEntityReclickDoesNotSupersede() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
 
-        intent.recordEntityClick(ENTITY_ID, 0L);
-        intent.recordEntityClick(ENTITY_ID, 5L);
+        intent.recordEntityClick(ENTITY_ID, 0L, false);
+        intent.recordEntityClick(ENTITY_ID, 5L, false);
 
         assertEquals(OpenClickIntent.Target.ENTITY, intent.resolve(5L), "the refreshed click binds its open");
     }
@@ -205,8 +205,8 @@ class OpenClickIntentTest {
     void differentEntityClickSupersedes() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
 
-        intent.recordEntityClick(ENTITY_ID, 0L);
-        intent.recordEntityClick(OTHER_ENTITY_ID, 1L);
+        intent.recordEntityClick(ENTITY_ID, 0L, false);
+        intent.recordEntityClick(OTHER_ENTITY_ID, 1L, false);
 
         assertEquals(OpenClickIntent.Target.SUPERSEDED, intent.resolve(1L),
                 "the first entity's open must not bind the second entity");
@@ -376,7 +376,7 @@ class OpenClickIntentTest {
     @Test
     void dismissDropsPendingClickOnTheMountedEntity() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
-        intent.recordEntityClick(ENTITY_ID, 5L);
+        intent.recordEntityClick(ENTITY_ID, 5L, false);
 
         intent.dismissEntityClick(ENTITY_ID);
 
@@ -388,7 +388,7 @@ class OpenClickIntentTest {
     @Test
     void dismissKeepsPendingClickOnAnotherEntity() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
-        intent.recordEntityClick(ENTITY_ID, 5L);
+        intent.recordEntityClick(ENTITY_ID, 5L, false);
 
         intent.dismissEntityClick(OTHER_ENTITY_ID);
 
@@ -416,7 +416,7 @@ class OpenClickIntentTest {
     @Test
     void dismissKeepsBlockClickRecordedAfterEntityClick() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
-        intent.recordEntityClick(ENTITY_ID, 0L); // leaves the entity id set
+        intent.recordEntityClick(ENTITY_ID, 0L, false); // leaves the entity id set
         intent.recordBlockClick(POS, 1L); // overwrites the pending to BLOCK
 
         intent.dismissEntityClick(ENTITY_ID);
@@ -433,7 +433,7 @@ class OpenClickIntentTest {
     void dismissLeavesSupersededMarkers() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
         intent.recordBlockClick(POS, 0L);
-        intent.recordEntityClick(ENTITY_ID, 1L); // supersedes the block click -> one marker
+        intent.recordEntityClick(ENTITY_ID, 1L, false); // supersedes the block click -> one marker
 
         intent.dismissEntityClick(ENTITY_ID);
 
@@ -447,7 +447,7 @@ class OpenClickIntentTest {
     @Test
     void dismissThenVehicleIntentDoesNotSupersede() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
-        intent.recordEntityClick(ENTITY_ID, 0L); // the boat-entry click
+        intent.recordEntityClick(ENTITY_ID, 0L, false); // the boat-entry click
         intent.dismissEntityClick(ENTITY_ID); // the boat became the vehicle
 
         intent.recordVehicleOpenIntent(VEHICLE_ID, 5L); // the open-inventory request goes out
@@ -491,5 +491,38 @@ class OpenClickIntentTest {
 
         assertEquals(OpenClickIntent.Target.BLOCK, intent.resolve(2L),
                 "a cleared marker must not poison a fresh open after the reset");
+    }
+
+    /** A menu-incapable entity click, overwritten by a block click, mints NO marker: the block open binds. */
+    @Test
+    void incapableEntityLeavesNoMarker() {
+        OpenClickIntent intent = new OpenClickIntent(WINDOW);
+        intent.recordEntityClick(ENTITY_ID, 0L, true); // menu-incapable (a pig / nitwit)
+        intent.recordBlockClick(POS, 1L);
+        assertEquals(OpenClickIntent.Target.BLOCK, intent.resolve(1L),
+                "an incapable entity owes no open, so the next container must bind");
+        assertEquals(POS, intent.blockPosKey());
+    }
+
+    /** A menu-CAPABLE entity click still mints its marker on overwrite (over-suppression guard). */
+    @Test
+    void capableEntityStillMintsMarker() {
+        OpenClickIntent intent = new OpenClickIntent(WINDOW);
+        intent.recordEntityClick(ENTITY_ID, 0L, false); // a chest minecart / employed villager
+        intent.recordBlockClick(POS, 1L);
+        assertEquals(OpenClickIntent.Target.SUPERSEDED, intent.resolve(1L),
+                "a capable entity's in-flight open must still be dropped");
+        assertEquals(OpenClickIntent.Target.BLOCK, intent.resolve(1L));
+    }
+
+    /** Suppression keys on the OVERWRITTEN pending: an incapable entity over a vehicle intent still marks it. */
+    @Test
+    void incapableEntityOverVehicleStillMintsVehicleMarker() {
+        OpenClickIntent intent = new OpenClickIntent(WINDOW);
+        intent.recordVehicleOpenIntent(VEHICLE_ID, 0L);
+        intent.recordEntityClick(ENTITY_ID, 1L, true); // incapable, overwrites the vehicle intent
+        assertEquals(OpenClickIntent.Target.SUPERSEDED, intent.resolve(1L),
+                "the overwritten vehicle intent's open must still be dropped");
+        assertEquals(OpenClickIntent.Target.ENTITY, intent.resolve(1L));
     }
 }
