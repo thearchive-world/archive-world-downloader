@@ -5,7 +5,12 @@ package world.thearchive.wdl.adapter;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.HasCustomInventoryScreen;
+import net.minecraft.world.entity.npc.AbstractVillager;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.level.Level;
@@ -13,6 +18,7 @@ import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jspecify.annotations.Nullable;
 
+import world.thearchive.wdl.core.EntityMenuCapability;
 import world.thearchive.wdl.core.OpenClickIntent;
 
 /**
@@ -126,8 +132,25 @@ public final class OpenClickTracker {
         if (tracker != null && level.isClientSide() && player == Minecraft.getInstance().player
                 && anyEntityMayOpenMenu(entity)) {
             tracker.clickedEntity = entity;
-            tracker.intent.recordEntityClick(entity.getId(), tracker.currentTick);
+            tracker.intent.recordEntityClick(entity.getId(), tracker.currentTick, menuIncapable(entity));
         }
+    }
+
+    /**
+     * Whether this entity provably opens no server-driven container menu in vanilla, so its superseded marker may be
+     * suppressed. Extraction only; the decision is {@link EntityMenuCapability}. Baby/nitwit are the sole tradeless
+     * villager states robust to profession-sync staleness; NONE is deliberately excluded.
+     */
+    private static boolean menuIncapable(Entity entity) {
+        boolean vanilla = "minecraft".equals(
+                BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).getNamespace());
+        boolean villager = entity instanceof Villager;
+        boolean baby = villager && ((Villager) entity).isBaby();
+        boolean nitwit = villager
+                && ((Villager) entity).getVillagerData().getProfession() == VillagerProfession.NITWIT;
+        return EntityMenuCapability.isMenuIncapable(vanilla, entity instanceof ContainerEntity,
+                entity instanceof HasCustomInventoryScreen, entity instanceof AbstractVillager,
+                villager, baby, nitwit);
     }
 
     /**
