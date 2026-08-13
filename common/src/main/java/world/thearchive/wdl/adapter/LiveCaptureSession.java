@@ -67,9 +67,9 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.animal.equine.AbstractChestedHorse;
-import net.minecraft.world.entity.npc.villager.AbstractVillager;
-import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
+import net.minecraft.world.entity.npc.AbstractVillager;
+import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -873,7 +873,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         this.saveName = target.folderName();
         this.level = level;
         this.targetDimension = targetDimension;
-        this.liveDimensionId = liveDimension.identifier().toString();
+        this.liveDimensionId = liveDimension.location().toString();
         this.registries = registries;
         registerDimensionScopedStores();
         dimensionRebind.bind(targetDimension);
@@ -1146,7 +1146,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     // The start-window (and every re-arm's) one-shot seed sweep: window-suppressed primes
                     // registered without sampling; replay the book against the current player position.
                     // Ids gone from the live level are Respawn-race orphans and never sample.
-                    String dimensionId = level().dimension().identifier().toString();
+                    String dimensionId = level().dimension().location().toString();
                     int boundBlocks = capChunks * 16;
                     boolean aborted = false;
                     for (int id : sampler.sweepIds()) {
@@ -1234,7 +1234,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * read hides by mirroring the saved set until the range is measured.
      */
     private void recordCoveredDisc(ChunkPos hotCenter, int capChunks) {
-        String dimensionId = level().dimension().identifier().toString();
+        String dimensionId = level().dimension().location().toString();
         int radius = sendRange.radiusChunks(dimensionId, capChunks);
         if (radius != lastCoveredRadius) {
             coveredIndex.recompute(dimensionId, radius); // the range changed: rebuild covered over the whole trail
@@ -1302,7 +1302,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     void rebindDimension(ResourceKey<Level> newTarget, ResourceKey<Level> liveDimension) {
         dimensionRebind.rebind(newTarget);
         this.targetDimension = newTarget;
-        this.liveDimensionId = liveDimension.identifier().toString();
+        this.liveDimensionId = liveDimension.location().toString();
     }
 
     /**
@@ -1388,7 +1388,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // The live client dimension id: on a Multiverse/Paper server this is the server's custom id
         // (e.g. minecraft:worlds/2b2t/2b2t_1), which is what the overlay providers query the overlay under, so
         // the overlay index keys by this rather than the vanilla-mapped disk key. Same for every chunk this call.
-        String overlayDimension = level().dimension().identifier().toString();
+        String overlayDimension = level().dimension().location().toString();
 
         // Nearest-to-player first (by Chebyshev ring), so when the encode budget spills the square across ticks
         // the visible area fills first and the lag never concentrates on one side.
@@ -3240,7 +3240,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (file == null || !Files.exists(file)) {
             return null;
         }
-        CompoundTag root = NbtIo.readCompressed(file, NbtAccounter.uncompressedQuota());
+        CompoundTag root = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap());
         return root.get("Data") instanceof CompoundTag data ? data : null;
     }
 
@@ -3709,7 +3709,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (!overlayActive || target.mode() != DownloadMode.RESUME || paths == null) {
             return;
         }
-        String dimensionId = level().dimension().identifier().toString();
+        String dimensionId = level().dimension().location().toString();
         if (!overlaySeededDimensions.add(dimensionId)) {
             return;
         }
@@ -4642,7 +4642,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             brand = player.connection.serverBrand();
         }
         return new ReportEnvironment(brand, level().getServerSimulationDistance(),
-                targetDimension.identifier().toString(), Wdl.mcVersion(), bridge.modVersion());
+                targetDimension.location().toString(), Wdl.mcVersion(), bridge.modVersion());
     }
 
     /** Read the few MC-side identity facts (downloader, source, loader) into the MC-free report identity. */
@@ -4691,7 +4691,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         int chunkTotal = 0;
         for (Map.Entry<ResourceKey<Level>, LongOpenHashSet> dimension : capturedByDimension.entrySet()) {
             int chunks = dimension.getValue().size();
-            dimensions.add(new DimensionChunks(dimension.getKey().identifier().toString(), chunks));
+            dimensions.add(new DimensionChunks(dimension.getKey().location().toString(), chunks));
             chunkTotal += chunks;
         }
         this.pendingReport = new PendingReport(root, identity, environment,

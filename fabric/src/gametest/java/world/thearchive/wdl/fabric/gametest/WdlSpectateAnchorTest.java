@@ -9,7 +9,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.animal.pig.Pig;
+import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.level.ChunkPos;
 
 import world.thearchive.wdl.core.DownloadMode;
@@ -47,7 +47,7 @@ public class WdlSpectateAnchorTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         try (MultiplayerFixture fixture = MultiplayerFixture.connect(context)) {
-            String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
+            String dimension = context.computeOnClient(client -> client.level.dimension().location().toString());
             BlockPos start = context.computeOnClient(client -> client.player.blockPosition());
 
             // A pig at the player's own position, so the camera begins where the capture window already is and

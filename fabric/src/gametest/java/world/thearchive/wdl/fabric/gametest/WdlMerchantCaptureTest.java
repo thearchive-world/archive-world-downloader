@@ -17,7 +17,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -118,7 +118,7 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         // MC's own use-key handling, and that hook is what latches the clicked villager the bind resolves from. The
         // screen is dismissed first, or the keybind press is swallowed.
         context.runOnClient(client -> {
-            client.hitResult = client.player.raycastHitResult(4.0f, client.getCameraEntity());
+            client.gameRenderer.pick(1.0f);
             Check.that(isLookingAtVillager(client),
                     "crosshair drifted off the villager before opening: " + client.hitResult);
             client.setScreen(null);
@@ -185,7 +185,7 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                 WdlConfig.DEFAULTS);
         run.tick(5);
         context.runOnClient(client -> {
-            client.hitResult = client.player.raycastHitResult(4.0f, client.getCameraEntity());
+            client.gameRenderer.pick(1.0f);
             Check.that(isLookingAtVillager(client), "crosshair drifted off the villager before re-opening it");
             client.setScreen(null);
         });
@@ -257,7 +257,7 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         Check.that(!rimmed(context, run, nitwitId), "the nitwit was rimmed even though it has no trades");
 
         context.runOnClient(client -> {
-            client.hitResult = client.player.raycastHitResult(4.0f, client.getCameraEntity());
+            client.gameRenderer.pick(1.0f);
             Check.that(isLookingAtVillager(client),
                     "crosshair drifted off the cartographer before re-opening it: " + client.hitResult);
             client.setScreen(null);
@@ -308,7 +308,7 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                 WdlConfig.DEFAULTS);
         newRun.tick(5);
         context.runOnClient(client -> {
-            client.hitResult = client.player.raycastHitResult(4.0f, client.getCameraEntity());
+            client.gameRenderer.pick(1.0f);
             Check.that(isLookingAtVillager(client),
                     "crosshair drifted off the cartographer before opening it: " + client.hitResult);
             client.setScreen(null);
@@ -385,7 +385,7 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                 "captureEntities off still rimmed the un-captured cartographer");
 
         context.runOnClient(client -> {
-            client.hitResult = client.player.raycastHitResult(4.0f, client.getCameraEntity());
+            client.gameRenderer.pick(1.0f);
             Check.that(isLookingAtVillager(client),
                     "crosshair drifted off the cartographer before opening it: " + client.hitResult);
             client.setScreen(null);
