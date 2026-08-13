@@ -22,6 +22,7 @@ common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
 # Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
 # ClientCommandManager) is Fabric-API-coupled and moves across bands.
+# On the down-ported bands the file also carries a 1.21.11-baseline revert: the Identifier rename back to ResourceLocation.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
 # Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
@@ -30,6 +31,7 @@ fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 # The villager-trade capture gametest carries the pre-26.2 client forms: EntityType constants are not yet under
 # EntityTypes, and Minecraft.setScreen is not yet relocated into Minecraft.gui, so the screen dismissals and the
 # villager-type reads spell those the 1.21.x way.
+# On the down-ported bands the file also carries 1.21.11-baseline reverts: the npc.villager package to flat npc, and LocalPlayer.raycastHitResult to GameRenderer.pick.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
 # The shared capture driver's new entity-rim readback reads the camera through GameRenderer.getMainCamera, not the
 # 26.2 mainCamera rename.
