@@ -74,7 +74,8 @@ common/src/main/java/world/thearchive/wdl/compat/xaeroplus/XaeroPlusBinding.java
 # NbtAccounter revert: uncompressedQuota() -> unlimitedHeap() for the map data read.
 common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
 
-# Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation for the keybind category id.
+# Keybind-category form revert: the branded controls category is a plain String translation key
+# (key.categories.wdl.downloader), not the KeyMapping.Category record built from a ResourceLocation.
 common/src/main/java/world/thearchive/wdl/client/WdlKeyBinds.java
 
 # Util rename revert: net.minecraft.util.Util -> top-level net.minecraft.Util at this band.
@@ -176,7 +177,8 @@ fabric/src/main/resources/wdl.accesswidener
 # Mount-menu revert: AbstractMountInventoryMenu.mount -> HorseInventoryMenu.horse.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeMountMenuReader.java
 
-# Rendertype revert: renderer.rendertype.RenderTypes -> renderer.RenderType.
+# Rendertype revert (renderer.rendertype.RenderTypes -> renderer.RenderType) plus, at 1.21.8, an outline-event
+# revert: the frustum is read off RenderLevelStageEvent.AfterTranslucentBlocks directly, since ExtractLevelRenderStateEvent (its 1.21.9+ source) is absent at this band.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeOutlineRegistrar.java
 
 # Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation for the HUD element id.
@@ -187,3 +189,141 @@ neoforge/src/main/resources/META-INF/accesstransformer.cfg
 
 # Game-rule test revert: reads the curated rules from level.dat's GameRules compound, the 1.21.10 key (1.21.11 writes game_rules).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlWorldOutputConfigTest.java
+
+# ---------------------------------------------------------------------------
+# 1.21.8 band: two further down-port reverts beyond the 1.21.10 set above -- the 1.21.9 chunk-ctor cut and the
+# 1.21.9->1.21.10 keybind-category cut. The chunk-ctor cut is mostly plug-local (adapter/impl/**, excluded by the
+# gate), but its SerializableChunkData/LevelChunkSection shape also reaches the three shared test files below. The
+# keybind cut moves the branded controls-category lang key from key.category.wdl.downloader back to
+# key.categories.wdl.downloader, so every lang catalog and the test that names the key diverge from the mint parent.
+# Listed per file per the narrow-pattern rule above.
+# ---------------------------------------------------------------------------
+
+# Chunk-ctor revert: SerializableChunkData.parse takes RegistryAccess directly, not the 1.21.9 PalettedContainerFactory.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
+
+# Chunk-ctor revert: sections built via LevelChunkSection(Registry<Biome>), not the 1.21.9 PalettedContainerFactory.
+common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
+
+# Chunk-ctor revert: the harness smoke test builds LevelChunkSection(Registry<Biome>), not PalettedContainerFactory.create.
+common/src/test/java/world/thearchive/wdl/testsupport/RegistriesSmokeTest.java
+
+# Keybind lang rekey: the EXTERNAL_CONSUMERS literal names the branded controls-category key, key.categories.wdl.downloader at this band.
+common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/cs_cz.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/da_dk.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/de_de.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/en_pt.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/en_us.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_ar.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_cl.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_ec.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_es.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_mx.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_uy.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_ve.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/esan.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/fi_fi.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/fr_ca.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/fr_fr.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/it_it.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/ja_jp.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/ko_kr.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/nl_be.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/nl_nl.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/nn_no.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/no_no.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/pl_pl.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/pt_br.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/pt_pt.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/qcb_es.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/ru_ru.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/sv_se.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/tr_tr.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/uk_ua.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/zh_cn.json
+
+# Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/zh_tw.json
+
+# Bookshelf hit-slot reimplemented: vanilla ChiseledBookShelfBlock.getHitSlot is private and takes the block state below 1.21.11, so the slot math is inlined.
+common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
+
+# Fabric-API render package: WorldRenderContext/Events resolve under rendering.v1, not rendering.v1.world, on this band's fabric-api.
+fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
+
+# Beehive-occupant entity-data revert: the occupant carries CustomData, not the 1.21.9 TypedEntityData.
+common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
+
+# World-spawn revert: level.dat spawn is the flat SpawnX/SpawnY/SpawnZ + SpawnAngle, not the 1.21.9 LevelData.RespawnData compound, so the spawn assertions read the ints (no dimension).
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
+
+# World-spawn revert: the round-trip asserts the flat SpawnX key, not the 1.21.9 spawn (RespawnData) compound.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
+
+# Fabric-API render package (same axis as FabricOutlineRegistrar): the smoke test's WorldRenderEvents resolves under rendering.v1, not rendering.v1.world, and WorldRenderContext exposes matrixStack(), not matrices().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
