@@ -70,7 +70,7 @@ class LangKeyCoverageTest {
     // The controls heading MC derives from the wdl:downloader category identifier, and the two entries
     // ModMenu reads off the mod id.
     private static final Set<String> EXTERNAL_CONSUMERS = Set.of(
-            "key.category.wdl.downloader",
+            "key.categories.wdl.downloader",
             "modmenu.descriptionTranslation.wdl",
             "modmenu.summaryTranslation.wdl");
 

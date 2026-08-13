@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "將你探索的多人遊戲世界下載為單人遊戲存檔。",
   "modmenu.descriptionTranslation.wdl": "保留你造訪過的多人遊戲世界。隨著你探索，模組會將你周圍的地形、容器、生物與地圖儲存到一個可離線開啟的單人遊戲世界中。所有內容都來自你自己的遊戲，因此不會在伺服器上執行任何程式。",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "開始/停止下載",
   "key.wdl.open_downloads": "開啟下載",
   "key.wdl.peek_hud": "檢視詳細 HUD",

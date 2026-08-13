@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Scarica il mondo multigiocatore che esplori come un salvataggio per giocatore singolo.",
   "modmenu.descriptionTranslation.wdl": "Conserva i mondi multigiocatore che visiti. Mentre esplori, la mod salva il terreno, i contenitori, le creature e le mappe intorno a te in un mondo per giocatore singolo che puoi aprire offline. Tutto proviene dal tuo gioco, quindi niente viene eseguito sul server.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Attiva/disattiva il download del mondo",
   "key.wdl.open_downloads": "Apri la schermata dei download",
   "key.wdl.peek_hud": "Sbircia l'HUD dettagliato",

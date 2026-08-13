@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Download the multiplayer world you explore as a singleplayer save.",
   "modmenu.descriptionTranslation.wdl": "Keep the multiplayer worlds you visit. As you explore, the mod saves the terrain, mobs, and Maps around you into a singleplayer world you can open offline, and containers save their contents when you open them. Everything comes from your own game, so nothing runs on the server.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Toggle World Download",
   "key.wdl.open_downloads": "Open Downloads Screen",
   "key.wdl.peek_hud": "Peek Detailed HUD",

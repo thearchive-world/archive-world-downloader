@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Transfere o mundo multijogador que exploras como um mundo guardado de um jogador.",
   "modmenu.descriptionTranslation.wdl": "Fica com os mundos multijogador que visitas. À medida que exploras, o mod guarda o terreno, os contentores, as criaturas e os Mapas à tua volta num mundo de um jogador que podes abrir offline. Tudo vem do teu próprio jogo, por isso nada corre no servidor.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Iniciar/parar transferência",
   "key.wdl.open_downloads": "Abrir transferência",
   "key.wdl.peek_hud": "Espreitar HUD detalhado",

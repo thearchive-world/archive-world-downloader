@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Ladda ned flerspelarvärlden du utforskar som en sparad enspelarvärld.",
   "modmenu.descriptionTranslation.wdl": "Behåll flerspelarvärldarna du besöker. Medan du utforskar sparar modden terrängen, behållarna, varelserna och kartorna runt omkring dig i en enspelarvärld som du kan öppna offline. Allt kommer från ditt eget spel, så ingenting körs på servern.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Växla världsnedladdning",
   "key.wdl.open_downloads": "Öppna nedladdningsskärmen",
   "key.wdl.peek_hud": "Kika på detaljerad HUD",

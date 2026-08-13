@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Plunder the sea ye sail with yer mates an' stow it as a lonely sea ye can sail alone.",
   "modmenu.descriptionTranslation.wdl": "Keep the seas ye sail with yer mates. As ye roam, the mod stows the land, coffers, beasties, an' treasure maps around ye into a lonely sea ye can sail alone. Everythin' comes from yer own game, so naught runs on the server.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Toggle th' plunder",
   "key.wdl.open_downloads": "Open th' plunder",
   "key.wdl.peek_hud": "Peek at th' detailed HUD",

@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Descarga'l mundu multijubaor qu'esploras cumu una partía pa un jubaor.",
   "modmenu.descriptionTranslation.wdl": "Caltén los mundos multijubaor que visitas. Mientras esploras, el mod guarda'l terrenu, los conteneoris, las criaturas y los mapas a tu alrededor nun mundu pa un jubaor que puéis abrir ensín conexión. Tóu vien del tu propiu juegu, así que naa se ejecuta nel sirvior.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Ativar/desativar descarga del mundu",
   "key.wdl.open_downloads": "Abrir pantalla de descargas",
   "key.wdl.peek_hud": "Ojear HUD detalláu",
