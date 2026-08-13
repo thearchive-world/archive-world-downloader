@@ -80,7 +80,7 @@ public class WdlIncapableEntityClickCascadeTest implements FabricClientGameTest 
         ContainerDriver.aimEyesAt(context, new Vec3(pigX, pigY + 0.5, pigZ));
         ContainerDriver.awaitCrosshair(context, WdlIncapableEntityClickCascadeTest::isLookingAtPig, "pig");
         context.runOnClient(client -> {
-            client.hitResult = client.player.raycastHitResult(4.0f, client.getCameraEntity());
+            client.gameRenderer.pick(1.0f);
             Check.that(isLookingAtPig(client),
                     "crosshair drifted off the pig before clicking: " + client.hitResult);
             client.setScreen(null);
@@ -130,7 +130,7 @@ public class WdlIncapableEntityClickCascadeTest implements FabricClientGameTest 
         ContainerDriver.awaitCrosshair(context, WdlIncapableEntityClickCascadeTest::isLookingAtVillager,
                 "nitwit villager");
         context.runOnClient(client -> {
-            client.hitResult = client.player.raycastHitResult(4.0f, client.getCameraEntity());
+            client.gameRenderer.pick(1.0f);
             Check.that(isLookingAtVillager(client),
                     "crosshair drifted off the nitwit before clicking: " + client.hitResult);
             client.setScreen(null);
