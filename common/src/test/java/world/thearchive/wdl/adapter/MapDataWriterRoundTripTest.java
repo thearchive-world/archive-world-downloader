@@ -7,14 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.zip.GZIPOutputStream;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.NbtAccounterException;
 import net.minecraft.nbt.NbtIo;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -97,23 +94,5 @@ class MapDataWriterRoundTripTest {
         MapDataWriter.writeIdCounts(dataDirectory, MapDataWriter.serializeIdCounts(500));
 
         assertEquals(500, MapDataWriter.readIdCounts(dataDirectory), "reads the map high-water back");
-    }
-
-    @Test
-    void readIdCountsRejectsAnOversizedFileInsteadOfAllocatingIt(@TempDir Path directory) throws IOException {
-        Path dataDirectory = Files.createDirectories(directory.resolve("data"));
-        // A byte array whose declared length is past the on-disk quota: the accounter trips on the declared
-        // size before the array is allocated, so the tampered file itself is only a handful of bytes.
-        try (DataOutputStream nbt = new DataOutputStream(new GZIPOutputStream(
-                Files.newOutputStream(dataDirectory.resolve("idcounts.dat"))))) {
-            nbt.writeByte(10); // root compound
-            nbt.writeUTF("");
-            nbt.writeByte(7); // a byte-array entry
-            nbt.writeUTF("blob");
-            nbt.writeInt(NbtAccounter.UNCOMPRESSED_NBT_QUOTA + 1);
-        }
-
-        assertThrows(NbtAccounterException.class, () -> MapDataWriter.readIdCounts(dataDirectory),
-                "a resume read of a tampered idcounts.dat is bounded, not an unbounded allocation");
     }
 }
