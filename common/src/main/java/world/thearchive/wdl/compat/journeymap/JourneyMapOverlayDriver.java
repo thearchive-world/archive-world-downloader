@@ -259,7 +259,7 @@ public final class JourneyMapOverlayDriver {
     }
 
     private void dispatch(long generation, ResourceKey<Level> dimension) {
-        String dimensionId = dimension.identifier().toString();
+        String dimensionId = dimension.location().toString();
         // Snapshot saved strictly before covered: the facade mirrors the covered read onto the saved set until
         // the send range is calibrated, and this order is what lets that mirror yield an empty suspect set rather
         // than a persistent cold-start suspect ring.

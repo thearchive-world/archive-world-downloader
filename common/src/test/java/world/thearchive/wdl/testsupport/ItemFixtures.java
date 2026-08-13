@@ -14,7 +14,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.network.Filterable;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
@@ -34,7 +34,7 @@ import net.minecraft.world.level.storage.TagValueOutput;
  * every entry collapsed onto one slot.
  */
 public final class ItemFixtures {
-    private static final Identifier AIR_ID = Identifier.parse("minecraft:air");
+    private static final ResourceLocation AIR_ID = ResourceLocation.parse("minecraft:air");
 
     private ItemFixtures() {}
 
@@ -47,7 +47,7 @@ public final class ItemFixtures {
      * degenerate fixture the gate exists to reject, arriving through the builder.
      */
     public static ItemStack stack(String itemId) {
-        Identifier id = Identifier.parse(itemId);
+        ResourceLocation id = ResourceLocation.parse(itemId);
         Item item = BuiltInRegistries.ITEM.getValue(id);
         if (item == Items.AIR && !AIR_ID.equals(id)) {
             throw new AssertionError(

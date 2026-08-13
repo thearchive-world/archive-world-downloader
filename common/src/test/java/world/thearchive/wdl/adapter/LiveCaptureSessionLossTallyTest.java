@@ -988,7 +988,7 @@ class LiveCaptureSessionLossTallyTest {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
         captureTerrain(session, Level.NETHER, chunk); // captured THERE, deliberately not in the bound dimension
-        capture.enterDimension(Level.NETHER.identifier().toString());
+        capture.enterDimension(Level.NETHER.location().toString());
         spawn(capture, 1, VEHICLE, chunk);
         spawn(capture, 2, FRAME, chunk);
         assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
@@ -1018,7 +1018,7 @@ class LiveCaptureSessionLossTallyTest {
     void aFrameHeldForAnotherDimensionOnUncapturedTerrainStaysBenign(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
-        capture.enterDimension(Level.NETHER.identifier().toString());
+        capture.enterDimension(Level.NETHER.location().toString());
         spawn(capture, 1, VEHICLE, chunk);
         spawn(capture, 2, FRAME, chunk);
 
@@ -1044,7 +1044,7 @@ class LiveCaptureSessionLossTallyTest {
             throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
-        String bound = Level.OVERWORLD.identifier().toString();
+        String bound = Level.OVERWORLD.location().toString();
         // Terrain deliberately NOT captured for this chunk, which is the whole subject: the gate refuses it.
         spawn(capture, 1, VEHICLE, chunk);
 
@@ -1080,7 +1080,7 @@ class LiveCaptureSessionLossTallyTest {
         Field field = LiveCaptureSession.class.getDeclaredField("packetCapture");
         field.setAccessible(true);
         EntityPacketCapture capture = new EntityPacketCapture(false, new SendRangeEstimator(),
-                new SendRangeSampler(System::nanoTime, false), Level.OVERWORLD.identifier().toString());
+                new SendRangeSampler(System::nanoTime, false), Level.OVERWORLD.location().toString());
         field.set(session, capture);
         return capture;
     }

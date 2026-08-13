@@ -11,7 +11,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionResult;
 import org.lwjgl.glfw.GLFW;
 
@@ -58,7 +58,7 @@ public final class WdlFabricClient implements ClientModInitializer {
         // condition, and those are gamemode-gated (the experience bar is hidden in creative, the hotbar in
         // spectator), so the overlay would vanish there. Drawing last keeps it visible in every gamemode; the
         // overlay self-gates F1 and blocking screens itself.
-        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("wdl", "hud"), WdlHudOverlay::render);
+        HudElementRegistry.addLast(ResourceLocation.fromNamespaceAndPath("wdl", "hud"), WdlHudOverlay::render);
         new FabricOutlineRegistrar().register();
     }
 }

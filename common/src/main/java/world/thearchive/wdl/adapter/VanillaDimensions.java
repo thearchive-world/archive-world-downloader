@@ -49,13 +49,13 @@ final class VanillaDimensions {
      * ours wrote and a caller reading one has no dimension to route into.
      */
     static @Nullable ResourceKey<Level> forId(String id) {
-        if (Level.NETHER.identifier().toString().equals(id)) {
+        if (Level.NETHER.location().toString().equals(id)) {
             return Level.NETHER;
         }
-        if (Level.END.identifier().toString().equals(id)) {
+        if (Level.END.location().toString().equals(id)) {
             return Level.END;
         }
-        return Level.OVERWORLD.identifier().toString().equals(id) ? Level.OVERWORLD : null;
+        return Level.OVERWORLD.location().toString().equals(id) ? Level.OVERWORLD : null;
     }
 
     /**

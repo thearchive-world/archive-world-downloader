@@ -5,7 +5,7 @@ package world.thearchive.wdl.neoforge;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -73,7 +73,7 @@ public final class WdlNeoForge {
         // hidden in creative, the hotbar in spectator), so the overlay draws in every gamemode; it self-gates F1
         // and blocking screens itself.
         modEventBus.addListener(RegisterGuiLayersEvent.class, event -> event.registerAboveAll(
-                Identifier.fromNamespaceAndPath("wdl", "hud"), WdlHudOverlay::render));
+                ResourceLocation.fromNamespaceAndPath("wdl", "hud"), WdlHudOverlay::render));
         new NeoForgeOutlineRegistrar().register();
     }
 }
