@@ -22,10 +22,14 @@ final class NeoForgeOutlineRegistrar {
     private final RimRenderer rimRenderer = new RimRendererImpl();
 
     void register() {
-        NeoForge.EVENT_BUS.addListener((RenderLevelStageEvent.AfterTranslucentBlocks event) -> draw(event));
+        NeoForge.EVENT_BUS.addListener((RenderLevelStageEvent event) -> {
+            if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
+                draw(event);
+            }
+        });
     }
 
-    private void draw(RenderLevelStageEvent.AfterTranslucentBlocks event) {
+    private void draw(RenderLevelStageEvent event) {
         MultiBufferSource.BufferSource consumers = Minecraft.getInstance().renderBuffers().bufferSource();
         WdlOutlineRenderer.render(event.getPoseStack(), consumers, event.getFrustum(), rimRenderer);
         consumers.endBatch(RenderType.lines());
