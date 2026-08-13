@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Download den multiplayer-verden, du udforsker, som en gemt singleplayer-verden.",
   "modmenu.descriptionTranslation.wdl": "Behold de multiplayer-verdener, du besøger. Mens du udforsker, gemmer modden terrænet, beholderne, væsenerne og kortene omkring dig i en singleplayer-verden, du kan åbne offline. Alt kommer fra dit eget spil, så intet kører på serveren.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Slå verdensdownload til/fra",
   "key.wdl.open_downloads": "Åbn downloadskærmen",
   "key.wdl.peek_hud": "Kig på detaljeret HUD",

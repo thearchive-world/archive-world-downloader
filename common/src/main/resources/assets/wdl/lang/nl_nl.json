@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Download de multiplayerwereld die je verkent als een opgeslagen singleplayerwereld.",
   "modmenu.descriptionTranslation.wdl": "Behoud de multiplayerwerelden die je bezoekt. Terwijl je verkent, slaat de mod het terrein, de containers, wezens en kaarten om je heen op in een singleplayerwereld die je offline kunt openen. Alles komt uit je eigen spel, dus er draait niets op de server.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Download starten/stoppen",
   "key.wdl.open_downloads": "Downloadscherm openen",
   "key.wdl.peek_hud": "Gedetailleerde HUD bekijken",

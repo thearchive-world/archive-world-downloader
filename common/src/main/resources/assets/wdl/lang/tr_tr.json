@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Keşfettiğiniz çok oyunculu dünyayı tek oyunculu bir kayıt olarak indirin.",
   "modmenu.descriptionTranslation.wdl": "Ziyaret ettiğiniz çok oyunculu dünyaları saklayın. Siz keşfederken mod; çevrenizdeki araziyi, kapları, canlıları ve haritaları çevrim dışı açabileceğiniz tek oyunculu bir dünyaya kaydeder. Her şey kendi oyununuzdan gelir, bu yüzden sunucuda hiçbir şey çalışmaz.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Dünya İndirmeyi Aç/Kapa",
   "key.wdl.open_downloads": "İndirmeler Ekranını Aç",
   "key.wdl.peek_hud": "Ayrıntılı HUD'a Göz At",

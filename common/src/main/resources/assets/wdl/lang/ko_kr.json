@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "탐험하는 멀티플레이 세계를 싱글플레이 저장 파일로 다운로드합니다.",
   "modmenu.descriptionTranslation.wdl": "방문하는 멀티플레이 세계를 간직하세요. 탐험하는 동안 이 모드는 주변의 지형, 컨테이너, 몹, 지도를 오프라인에서 열 수 있는 싱글플레이 세계에 저장합니다. 모든 것은 직접 플레이하는 게임에서 나오므로 서버에서는 아무것도 실행되지 않습니다.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "세계 다운로드 전환",
   "key.wdl.open_downloads": "다운로드 화면 열기",
   "key.wdl.peek_hud": "상세 HUD 잠깐 보기",

@@ -1,7 +1,7 @@
 {
   "modmenu.summaryTranslation.wdl": "Last ned flerspillerverdenen du utforsker som en lagret enkeltspillerverden.",
   "modmenu.descriptionTranslation.wdl": "Behold flerspillerverdenene du besøker. Mens du utforsker, lagres terrenget, beholderne, skapningene og kartene rundt deg i en enkeltspillerverden du kan åpne frakoblet. Alt kommer fra ditt eget spill, så ingenting kjører på serveren.",
-  "key.category.wdl.downloader": "Archive World Downloader",
+  "key.categories.wdl.downloader": "Archive World Downloader",
   "key.wdl.toggle": "Start/stopp nedlasting",
   "key.wdl.open_downloads": "Åpne nedlasting",
   "key.wdl.peek_hud": "Kikk på detaljert HUD",
