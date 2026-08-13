@@ -460,7 +460,35 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     /** A list row: a section header, an option, or a game rule. */
-    private abstract class SettingsEntry extends ContainerObjectSelectionList.Entry<SettingsEntry> {}
+    private abstract class SettingsEntry extends ContainerObjectSelectionList.Entry<SettingsEntry> {
+        private int contentX;
+        private int contentY;
+        private int contentWidth;
+
+        @Override
+        public void render(GuiGraphics guiGraphics, int index, int top, int left, int width, int height, int mouseX,
+                int mouseY, boolean hovering, float partialTick) {
+            this.contentX = left;
+            this.contentY = top;
+            this.contentWidth = width;
+            renderContent(guiGraphics, mouseX, mouseY, hovering, partialTick);
+        }
+
+        abstract void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
+                float partialTick);
+
+        int getContentX() {
+            return contentX;
+        }
+
+        int getContentY() {
+            return contentY;
+        }
+
+        int getContentWidth() {
+            return contentWidth;
+        }
+    }
 
     /** A non-interactive section caption drawn in the brand accent. */
     private final class HeaderRow extends SettingsEntry {
