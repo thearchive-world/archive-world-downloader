@@ -5,18 +5,18 @@ package world.thearchive.wdl.fabric;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.AbstractMountInventoryMenu;
+import net.minecraft.world.inventory.HorseInventoryMenu;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.MountMenuReader;
 
 /**
  * The Fabric mount-menu read: {@link MountMenuReader}'s seam plus the one non-public read it needs, made reachable by
- * the Fabric access widener (the mount-inventory menu's mount).
+ * the Fabric access widener (the horse-inventory menu's horse).
  */
 final class FabricMountMenuReader extends MountMenuReader {
     @Override
     protected @Nullable Entity mount(AbstractContainerMenu menu) {
-        return menu instanceof AbstractMountInventoryMenu mountMenu ? mountMenu.mount : null; // widened
+        return menu instanceof HorseInventoryMenu mountMenu ? mountMenu.horse : null; // widened
     }
 }
