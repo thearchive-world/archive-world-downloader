@@ -16,10 +16,10 @@ import world.thearchive.wdl.core.SettingsLayout;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The curated game-rule set surfaced across the SPI for the settings menu: the ten reference-band rules, each with its
- * curated (safe) value and the two toggle-position values, computed from the live {@code GameRules} so the menu never
- * re-hardcodes a band-specific set. The lone integer rule (fire spread) carries the band's real default as its enabled
- * value rather than a boolean.
+ * The curated game-rule set surfaced across the SPI for the settings menu: the curated safe rules (nine at 1.21.10),
+ * each with its curated (safe) value and the two toggle-position values, computed from the live {@code GameRules} so
+ * the menu never re-hardcodes a band-specific set. The band-neutral fire-spread row has no 1.21.10 rule, so the menu
+ * skips its order slot.
  */
 class LevelDatCuratedGameRulesTest {
     private Map<String, CuratedGameRule> curated() {
@@ -32,12 +32,11 @@ class LevelDatCuratedGameRulesTest {
     }
 
     @Test
-    void surfacesTheTenCuratedRulesById() {
+    void surfacesTheNineCuratedRulesById() {
         Map<String, CuratedGameRule> byId = curated();
-        assertEquals(10, byId.size());
+        assertEquals(9, byId.size());
         assertTrue(byId.containsKey("keep_inventory"));
         assertTrue(byId.containsKey("spawn_mobs"));
-        assertTrue(byId.containsKey("fire_spread_radius_around_player"));
     }
 
     @Test
@@ -56,20 +55,16 @@ class LevelDatCuratedGameRulesTest {
     }
 
     @Test
-    void everyLaidOutGameRuleRowMapsToCuratedRule() {
+    void everyCuratedRuleIsLaidOutAndOnlyTheBandAbsentRuleIsSkipped() {
         Map<String, CuratedGameRule> byId = curated();
-        assertEquals(byId.size(), SettingsLayout.GAME_RULE_ORDER.size(), "the row order covers the whole curated set");
-        for (String id : SettingsLayout.GAME_RULE_ORDER) {
-            assertTrue(byId.containsKey(id), id + " is laid out as a row but is not in the curated set");
+        for (String id : byId.keySet()) {
+            assertTrue(SettingsLayout.GAME_RULE_ORDER.contains(id), id + " is curated but not laid out as a row");
         }
-    }
-
-    @Test
-    void integerFireRuleDisablesToZeroAndEnablesToTheBandDefault() {
-        CuratedGameRule fire = curated().get("fire_spread_radius_around_player");
-        assertEquals("0", fire.curatedValue(), "fire spread is curated off (radius 0)");
-        assertEquals("0", fire.disabledValue(), "the off position writes radius 0");
-        assertEquals("128", fire.enabledValue(),
-                "the on position writes the band's vanilla fire-spread radius (128 at 1.21.11)");
+        for (String id : SettingsLayout.GAME_RULE_ORDER) {
+            if (!byId.containsKey(id)) {
+                assertEquals("fire_spread_radius_around_player", id,
+                        id + " is laid out but has no curated rule at this band");
+            }
+        }
     }
 }
