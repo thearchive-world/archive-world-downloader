@@ -5,8 +5,8 @@ package world.thearchive.wdl.neoforge;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.neoforged.neoforge.client.event.ExtractLevelRenderStateEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -38,6 +38,6 @@ final class NeoForgeOutlineRegistrar {
         }
         MultiBufferSource.BufferSource consumers = Minecraft.getInstance().renderBuffers().bufferSource();
         WdlOutlineRenderer.render(event.getPoseStack(), consumers, frustum, rimRenderer);
-        consumers.endBatch(RenderTypes.lines());
+        consumers.endBatch(RenderType.lines());
     }
 }

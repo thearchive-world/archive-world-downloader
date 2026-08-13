@@ -10,7 +10,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import world.thearchive.wdl.adapter.RenderSurface;
 
@@ -49,12 +49,15 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void outline(int x, int y, int width, int height, int color) {
-        graphics.renderOutline(x, y, width, height, color);
+        graphics.fill(x, y, x + width, y + 1, color);
+        graphics.fill(x, y + height - 1, x + width, y + height, color);
+        graphics.fill(x, y + 1, x + 1, y + height - 1, color);
+        graphics.fill(x + width - 1, y + 1, x + width, y + height - 1, color);
     }
 
     @Override
     public void blitSprite(String sprite, int x, int y, int width, int height, int color) {
-        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.fromNamespaceAndPath("wdl", sprite),
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, ResourceLocation.fromNamespaceAndPath("wdl", sprite),
                 x, y, width, height, color);
     }
 

@@ -5,7 +5,7 @@ package world.thearchive.wdl.adapter.impl;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -17,7 +17,7 @@ import world.thearchive.wdl.core.RimFace;
 
 /**
  * The 1.21.11 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
- * {@link RenderTypes#lines()} type, camera-relative. The rectangle's two in-plane axes come from the block cell and its
+ * {@link RenderType#lines()} type, camera-relative. The rectangle's two in-plane axes come from the block cell and its
  * normal axis from the model shape, lifted a small standoff along the face normal, so the rim frames a recessed model
  * (a chest) at block extent yet never z-fights a flush one. Each edge carries its own direction as its normal, because
  * the lines shader thickens perpendicular to position plus normal, so a face-outward normal would collapse the edge to
@@ -41,7 +41,7 @@ public final class RimRendererImpl implements RimRenderer {
         if (face == RimFace.NONE) {
             return;
         }
-        VertexConsumer lines = context.consumers().getBuffer(RenderTypes.lines());
+        VertexConsumer lines = context.consumers().getBuffer(RenderType.lines());
         PoseStack.Pose pose = context.pose().last();
         float width = context.lineWidth();
         Vec3 camera = context.cameraPos();
@@ -113,6 +113,6 @@ public final class RimRendererImpl implements RimRenderer {
             int colorArgb) {
         pose.pose().transformPosition(x, y, z, position);
         lines.addVertex(position.x(), position.y(), position.z()).setColor(colorArgb)
-                .setNormal(normal.x(), normal.y(), normal.z()).setLineWidth(width);
+                .setNormal(normal.x(), normal.y(), normal.z());
     }
 }
