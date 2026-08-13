@@ -135,7 +135,9 @@ class EntitySinkLeashDegradationTest {
         CompoundTag leashInput = new CompoundTag();
         // a delayed attachment the codec can encode, unlike the null-holder leash the unsavable cases carry
         leashInput.put("leash", NbtUtils.writeBlockPos(new BlockPos(1, 2, 3)));
-        mob.readLeashData(leashInput);
+        // On this band Leashable.readLeashData returns the parsed LeashData; the void, self-assigning form is
+        // 1.21.4+, so assign it explicitly here to reach the delayed-attachment state.
+        mob.setLeashData(mob.readLeashData(leashInput));
         assertTrue(mob.mayBeLeashed() && !mob.isLeashed(), "precondition: holder null, but a savable attachment");
 
         CompoundTag chunk = sink.encodeChunk(List.of(mob), pos, registries, false);
