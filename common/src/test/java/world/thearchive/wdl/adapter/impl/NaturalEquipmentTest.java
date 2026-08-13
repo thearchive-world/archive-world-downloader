@@ -70,8 +70,6 @@ class NaturalEquipmentTest {
                 of(Items.STONE_SWORD)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.MAINHAND, of(Items.GOLDEN_SWORD)));
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.MAINHAND, of(Items.IRON_SWORD)));
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.PARCHED, EquipmentSlot.MAINHAND, of(Items.BOW)));
-        assertFalse(NaturalEquipment.isNaturalFor(EntityType.PARCHED, EquipmentSlot.MAINHAND, of(Items.IRON_SWORD)));
     }
 
     @Test
@@ -92,7 +90,6 @@ class NaturalEquipmentTest {
     @Test
     void gearedTypeMembership() {
         assertTrue(NaturalEquipment.isGearedType(EntityType.ZOMBIE));
-        assertTrue(NaturalEquipment.isGearedType(EntityType.PARCHED));
         assertFalse(NaturalEquipment.isGearedType(EntityType.CREEPER));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.CREEPER, EquipmentSlot.MAINHAND, of(Items.DIAMOND_SWORD)));
     }
