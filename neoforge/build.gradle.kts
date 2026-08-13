@@ -106,9 +106,10 @@ dependencies {
     compileOnly("info.journeymap:journeymap-api-neoforge:${property("journeymap_api_coordinate")}")
 }
 
-// Release publishing (mod-publish-plugin): uploads the NeoForge jar to Modrinth, and attaches that same jar to
-// the single GitHub release :fabric creates (see the github block below). Nothing publishes on an ordinary
-// build; the release workflow drives it on a version tag.
+// Release publishing (mod-publish-plugin): uploads the NeoForge jar to CurseForge and Modrinth per this band's
+// MC version. There is no github block, because the plugin's parent() link is a same-build dependency and
+// cannot reach a release another band's separate run created, so the release workflow creates the shared
+// release with gh. Nothing publishes on an ordinary build.
 publishMods {
     file.set(tasks.jar.flatMap { it.archiveFile })
     changelog.set(providers.environmentVariable("CHANGELOG").orElse(""))
@@ -134,16 +135,5 @@ publishMods {
         // Client-only mod: CurseForge requires at least one declared environment.
         client.set(true)
         server.set(false)
-    }
-
-    // Attach the NeoForge jar (the top-level file above) to the single GitHub release that :fabric creates,
-    // rather than :fabric pulling it in as an additionalFile(Project) (a Gradle-10 deprecation). parent points
-    // at :fabric's publishGithub task: the plugin then uploads this jar to that task's release instead of
-    // creating a second release, and forcefully inherits repository/commitish/tagName/displayName/version from
-    // it, so only accessToken and the attached file are set here. The parent link also wires the task
-    // ordering, so this upload runs after :fabric has created the release.
-    github {
-        accessToken.set(providers.environmentVariable("GITHUB_TOKEN"))
-        parent(project(":fabric").tasks.named("publishGithub"))
     }
 }
