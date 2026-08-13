@@ -2073,7 +2073,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 atBlock = true;
                 atRightHalf = state.getValue(ChestBlock.TYPE) == ChestType.RIGHT; // the only left/right line
                 targetPosKey = target.asLong();
-                BlockPos partner = ChestBlock.getConnectedBlockPos(target, state);
+                BlockPos partner = target.relative(ChestBlock.getConnectedDirection(state));
                 partnerPosKey = partner.asLong();
                 menuSlotCount = ContainerCapture.countBlockSlots(menu, player); // 54 for a real double open
                 combinedContainerSize = targetHalf.getContainerSize(); // 27
@@ -4378,7 +4378,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             for (int riderId : promoted.frame().passengers()) {
                 Entity rider = byId.get(riderId);
                 if (rider != null) {
-                    rider.startRiding(promoted.entity(), true, false); // the vehicle's save then nests the rider
+                    rider.startRiding(promoted.entity(), true); // the vehicle's save then nests the rider
                 }
             }
             if (promoted.frame().leashHolderId() != 0 && promoted.entity() instanceof Leashable leashable) {
@@ -4651,8 +4651,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         String downloaderUuid = "";
         LocalPlayer player = minecraft.player;
         if (player != null) {
-            downloaderName = player.getGameProfile().name();
-            downloaderUuid = player.getGameProfile().id().toString();
+            downloaderName = player.getGameProfile().getName();
+            downloaderUuid = player.getGameProfile().getId().toString();
         }
         String address = "";
         String sourceName = "";

@@ -466,7 +466,7 @@ public final class OutlineTracker {
         if (!state.hasProperty(ChestBlock.TYPE) || state.getValue(ChestBlock.TYPE) == ChestType.SINGLE) {
             return null;
         }
-        BlockPos partner = ChestBlock.getConnectedBlockPos(pos, state);
+        BlockPos partner = pos.relative(ChestBlock.getConnectedDirection(state));
         return level.getBlockEntity(partner) instanceof ChestBlockEntity ? partner : null;
     }
 
