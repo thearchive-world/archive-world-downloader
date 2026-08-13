@@ -103,7 +103,7 @@ public final class WdlOutlineRenderer {
             RimRenderer rimRenderer) {
         float lineWidth = Wdl.config().outline().lineWidthScale();
         OutlineRenderContext context = new OutlineRenderContext(pose, consumers, frustum,
-                Minecraft.getInstance().gameRenderer.getMainCamera().position(), lineWidth);
+                Minecraft.getInstance().gameRenderer.getMainCamera().getPosition(), lineWidth);
         render(context, Wdl.outlineDrawSet(), rimRenderer);
     }
 

@@ -39,7 +39,7 @@ public class WdlOutlineRenderSmokeTest implements FabricClientGameTest {
             }
             OutlineRenderContext renderContext = new OutlineRenderContext(worldContext.matrixStack(),
                     worldContext.consumers(), new Frustum(new Matrix4f(), new Matrix4f()),
-                    client.gameRenderer.getMainCamera().position(), 2.5f);
+                    client.gameRenderer.getMainCamera().getPosition(), 2.5f);
             double x = client.player.getX();
             double y = client.player.getY();
             double z = client.player.getZ();

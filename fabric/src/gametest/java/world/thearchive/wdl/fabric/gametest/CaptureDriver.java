@@ -142,7 +142,7 @@ final class CaptureDriver {
         return context.computeOnClient(client -> {
             OutlineTracker tracker = new OutlineTracker();
             tracker.useBobbyFilter(BobbyChunkFilter.resolve(bridge));
-            tracker.tick(client.level, client.gameRenderer.getMainCamera().position(), liveConfig.outline(),
+            tracker.tick(client.level, client.gameRenderer.getMainCamera().getPosition(), liveConfig.outline(),
                     controller.aidToggles(liveConfig), controller.capturedContainers(), controller.recoveredCoverage());
             List<AABB> boxes = new ArrayList<>();
             for (List<OutlineRim> sectionRims : tracker.drawSet().sections().values()) {

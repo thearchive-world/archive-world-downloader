@@ -152,7 +152,7 @@ public final class Wdl {
 
     /** The current MC version via its Mojmap name. */
     public static String mcVersion() {
-        return SharedConstants.getCurrentVersion().name();
+        return SharedConstants.getCurrentVersion().getName();
     }
 
     /**
@@ -714,7 +714,7 @@ public final class Wdl {
             outlineTracker.clear();
             return;
         }
-        outlineTracker.tick(level, minecraft.gameRenderer.getMainCamera().position(), currentConfig.outline(),
+        outlineTracker.tick(level, minecraft.gameRenderer.getMainCamera().getPosition(), currentConfig.outline(),
                 controller.aidToggles(currentConfig), controller.capturedContainers(),
                 controller.recoveredCoverage());
     }
