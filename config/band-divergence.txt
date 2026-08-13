@@ -327,3 +327,68 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 
 # Fabric-API render package (same axis as FabricOutlineRegistrar): the smoke test's WorldRenderEvents resolves under rendering.v1, not rendering.v1.world, and WorldRenderContext exposes matrixStack(), not matrices().
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
+
+# ---------------------------------------------------------------------------
+# 1.21.5 band: further down-port reverts beyond the 1.21.8 set above -- principally the 1.21.6 ValueOutput/ValueInput
+# item-serialization cut, plus a wave of 1.21.6 client-API additions the code (now at 1.21.8) uses but 1.21.5 lacks
+# (WorldVersion.getName, Camera.getPosition, ConfirmScreen's individually-exposed Button widgets, the GuiGraphics
+# RenderPipeline/tooltip rework, EntityType.HAPPY_GHAST, the Fabric HUD-element API, and the NeoForge nested
+# RenderLevelStageEvent stage classes). The item-write cut and the GuiGraphics rework are plug-local (adapter/impl/**,
+# excluded by the gate); their read siblings and the remaining client-API reverts reach the shared main and test files
+# below. Several files already listed in the sections above also carry a 1.21.5-only axis (EntityPacketCapture the
+# HAPPY_GHAST removal; WdlOutlineRenderer / CaptureDriver / WdlOutlineRenderSmokeTest the Camera.getPosition revert;
+# NeoForgeOutlineRegistrar the RenderLevelStageEvent.getStage form; LiveCaptureSessionLossTallyTest, PlayerTagTest,
+# ItemLocationScrubTest, FixtureFidelity, ItemFixtures the item-read revert): their existing entries are kept as-is.
+# Listed per file per the narrow-pattern rule above.
+# ---------------------------------------------------------------------------
+
+# 1.21.6 client-API reverts: WorldVersion.getName() (not the record name() accessor) for the MC version string, and
+# Camera.getPosition() (not the position() rename) for the outline tick's camera read.
+common/src/main/java/world/thearchive/wdl/Wdl.java
+
+# ConfirmScreen delay revert: 1.21.5's ConfirmScreen exposes only the yes/no Component labels (not the 1.21.6 Button
+# widgets), so the danger delay is held via vanilla setDelay rather than focusing keep and disabling only the danger button.
+common/src/main/java/world/thearchive/wdl/client/WdlCaptureDisableConfirmScreen.java
+
+# Item-read cut revert: the test Entity overrides addAdditionalSaveData/readAdditionalSaveData on CompoundTag, not the 1.21.6 ValueOutput/ValueInput.
+common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
+
+# Item-read cut revert: decodes container Items via ContainerHelper.loadAllItems(CompoundTag, list, provider), not the 1.21.6 TagValueInput form.
+common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
+
+# Item-read cut revert: decodes container Items via ContainerHelper.loadAllItems(CompoundTag, list, provider), not the 1.21.6 TagValueInput form.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerMergeRoundTripTest.java
+
+# Item-read cut revert: decodes container Items via ContainerHelper.loadAllItems(CompoundTag, list, provider), not the 1.21.6 TagValueInput form.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerRecaptureSynergyTest.java
+
+# Item-read cut revert: decodes container Items via ContainerHelper.loadAllItems(CompoundTag, list, provider), not the 1.21.6 TagValueInput form.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerStashMergeTest.java
+
+# Item-read cut revert: decodes container Items via ContainerHelper.loadAllItems(CompoundTag, list, provider), not the 1.21.6 TagValueInput form.
+common/src/test/java/world/thearchive/wdl/adapter/EntityContainerStashMergeTest.java
+
+# Item-read cut revert: decodes container Items via ContainerHelper.loadAllItems(CompoundTag, list, provider), not the 1.21.6 TagValueInput form.
+common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
+
+# Item-read cut revert: decodes container Items via ContainerHelper.loadAllItems(CompoundTag, list, provider), not the 1.21.6 TagValueInput form.
+common/src/test/java/world/thearchive/wdl/adapter/OrphanedContainerSweepTest.java
+
+# Item-read cut revert: reads RecordItem/bees via CODEC.parse over NbtOps, not the 1.21.6 ValueInput.read.
+common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
+
+# Item-read cut revert: reads the lectern Book via ItemStack.CODEC.parse over NbtOps, not the 1.21.6 ValueInput.read.
+common/src/test/java/world/thearchive/wdl/adapter/LecternRecaptureSynergyTest.java
+
+# Item-read cut revert: reads the lectern Book via ItemStack.CODEC.parse over NbtOps, not the 1.21.6 ValueInput.read.
+common/src/test/java/world/thearchive/wdl/adapter/LecternSinkRoundTripTest.java
+
+# Item-read cut revert: reads the lectern Book via ItemStack.CODEC.parse over NbtOps, not the 1.21.6 ValueInput.read.
+common/src/test/java/world/thearchive/wdl/adapter/LecternStashMergeTest.java
+
+# Item-read cut revert: reads the components map via DataComponentMap.CODEC.parse over NbtOps, not the 1.21.6 ValueInput.read.
+common/src/test/java/world/thearchive/wdl/testsupport/BlockEntityFixtures.java
+
+# Empty-components serialization revert: a block entity's vanilla producer save omits the empty components map at 1.21.5
+# (1.21.6+ writes components:{}), so the metadata-only rejection test names only the omitted Items, not components.
+common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelityTest.java
