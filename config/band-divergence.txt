@@ -392,3 +392,7 @@ common/src/test/java/world/thearchive/wdl/testsupport/BlockEntityFixtures.java
 # Empty-components serialization revert: a block entity's vanilla producer save omits the empty components map at 1.21.5
 # (1.21.6+ writes components:{}), so the metadata-only rejection test names only the omitted Items, not components.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelityTest.java
+
+# JourneyMap plugin annotation: the beta-generation API this band's runtime bundles carries JourneyMapPlugin under
+# journeymap.api.v2.client, not the v2.common the 1.21.11 release added, so the plugin names the client-package annotation.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
