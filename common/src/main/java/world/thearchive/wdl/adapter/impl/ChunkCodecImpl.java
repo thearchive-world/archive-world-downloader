@@ -11,17 +11,19 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.chunk.PalettedContainerFactory;
 import net.minecraft.world.level.chunk.UpgradeData;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.storage.SerializableChunkData;
@@ -124,7 +126,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
 
     @Override
     public CompoundTag encode(ChunkSnapshotSource snapshot, RegistryAccess registries, boolean synthesizeBlending) {
-        PalettedContainerFactory containerFactory = PalettedContainerFactory.create(registries);
+        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
 
         // NeoForge marks the vanilla canonical SerializableChunkData constructor deprecated in favor of a
         // 20-argument attachment-aware overload that does not exist in vanilla. This captures vanilla client-chunk
@@ -132,7 +134,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
         // it, leaving the suppression inert there.
         @SuppressWarnings("deprecation")
         SerializableChunkData data = new SerializableChunkData(
-                containerFactory,
+                biomeRegistry,
                 snapshot.chunkPos(),
                 snapshot.minSectionY(),
                 snapshot.gameTime(),                 // LastUpdate
