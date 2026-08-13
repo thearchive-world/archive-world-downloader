@@ -16,7 +16,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -26,9 +25,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -92,7 +88,7 @@ class EntitySinkRootVehicleTest {
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         CompoundTag probe = new CompoundTag();
         probe.put("Items", folded.getListOrEmpty("Items"));
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, probe), back);
+        ContainerHelper.loadAllItems(probe, back, registries);
         assertEquals(Items.DIAMOND, back.get(3).getItem(),
                 "the captured chest-boat loot lands at its slot in the mount");
         assertEquals(9, back.get(3).getCount());
@@ -146,7 +142,7 @@ class EntitySinkRootVehicleTest {
         }
 
         @Override
-        protected void addAdditionalSaveData(ValueOutput output) {
+        protected void addAdditionalSaveData(CompoundTag tag) {
             // writes no save data, mirroring a live chest mount whose menu-only contents are absent from its serialize
         }
 
@@ -154,7 +150,7 @@ class EntitySinkRootVehicleTest {
         protected void defineSynchedData(SynchedEntityData.Builder builder) {}
 
         @Override
-        protected void readAdditionalSaveData(ValueInput input) {}
+        protected void readAdditionalSaveData(CompoundTag input) {}
 
         @Override
         public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
@@ -166,6 +162,12 @@ class EntitySinkRootVehicleTest {
     private static final class RiddenMountMob extends Mob {
         private RiddenMountMob() {
             super(EntityType.PIG, null);
+        }
+
+        // The equipment/custom-name save reads registryAccess off the level, which is null on this headless entity.
+        @Override
+        public RegistryAccess registryAccess() {
+            return TestRegistries.frozen();
         }
 
         @Override

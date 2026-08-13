@@ -17,13 +17,11 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -159,7 +157,7 @@ class PlayerTagTest {
         CompoundTag probe = new CompoundTag();
         probe.put("Items", tag.getListOrEmpty("EnderItems")); // read the remapped list via the same codec
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, probe), back);
+        ContainerHelper.loadAllItems(probe, back, registries);
         assertEquals(Items.ENDER_PEARL, back.get(5).getItem(), "the captured ender item lands at its EnderItems slot");
         assertEquals(9, back.get(5).getCount());
     }

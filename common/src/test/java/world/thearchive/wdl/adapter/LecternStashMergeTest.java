@@ -19,14 +19,13 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.network.Filterable;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -59,8 +58,8 @@ class LecternStashMergeTest {
     }
 
     private static String titleAt(RegistryAccess registries, CompoundTag lecternTag) {
-        Optional<ItemStack> back = TagValueInput.create(ProblemReporter.DISCARDING, registries, lecternTag)
-                .read("Book", ItemStack.CODEC);
+        Optional<ItemStack> back = ItemStack.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), lecternTag.get("Book")).result();
         assertTrue(back.isPresent(), "the merged lectern carries a decodable Book");
         return back.get().get(DataComponents.WRITTEN_BOOK_CONTENT).title().raw();
     }

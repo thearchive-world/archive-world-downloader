@@ -23,7 +23,6 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.ContainerHelper;
@@ -33,7 +32,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -105,8 +103,7 @@ class OrphanedContainerSweepTest {
             CompoundTag blockEntity = blockEntityAt(back, x, y, z);
             assertNotNull(blockEntity, "block entity present on disk at " + x + "," + y + "," + z);
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntity),
-                    decoded);
+            ContainerHelper.loadAllItems(blockEntity, decoded, registries);
             return decoded;
         }
     }

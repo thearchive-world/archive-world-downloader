@@ -33,7 +33,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.ContainerHelper;
@@ -43,7 +42,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -627,7 +625,7 @@ class AsyncSaveWriterTest {
             CompoundTag chest = findByPosOrNull(back, 2, 64, 2);
             assertNotNull(chest, "the chest block entity is on disk");
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, chest), decoded);
+            ContainerHelper.loadAllItems(chest, decoded, registries);
             assertEquals(Items.DIAMOND, decoded.get(0).getItem(), "the writer-thread fold merged the captured Items");
             assertEquals(5, decoded.get(0).getCount());
         }
@@ -1341,8 +1339,7 @@ class AsyncSaveWriterTest {
         CompoundTag blockEntity = findByPosOrNull(chunk, x, y, z);
         assertNotNull(blockEntity, "no block entity at " + x + "/" + y + "/" + z + " in " + pos);
         NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntity),
-                decoded);
+        ContainerHelper.loadAllItems(blockEntity, decoded, registries);
         return decoded.get(0);
     }
 

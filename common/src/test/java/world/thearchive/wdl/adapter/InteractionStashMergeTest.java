@@ -21,7 +21,6 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -34,7 +33,6 @@ import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.junit.jupiter.api.BeforeAll;
@@ -119,7 +117,7 @@ class InteractionStashMergeTest {
 
     private static NonNullList<ItemStack> readItems(CompoundTag holder, int size) {
         NonNullList<ItemStack> back = NonNullList.withSize(size, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, holder), back);
+        ContainerHelper.loadAllItems(holder, back, registries);
         return back;
     }
 

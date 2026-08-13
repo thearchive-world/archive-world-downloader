@@ -17,12 +17,10 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -116,7 +114,7 @@ class EntityContainerStashMergeTest {
         assertEquals("minecraft:chest_minecart", mergedEntity.getStringOr("id", ""),
                 "the id is preserved (no clobber)");
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, mergedEntity), back);
+        ContainerHelper.loadAllItems(mergedEntity, back, registries);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest minecart gains exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
 
@@ -144,7 +142,7 @@ class EntityContainerStashMergeTest {
         assertFalse(minecart.contains("Items"), "the plain minecart it was pushed under carries no contents");
         CompoundTag nestedMule = minecart.getListOrEmpty("Passengers").getCompoundOrEmpty(0);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, nestedMule), back);
+        ContainerHelper.loadAllItems(nestedMule, back, registries);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the nested mule carries exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
     }
@@ -233,8 +231,7 @@ class EntityContainerStashMergeTest {
 
         ListTag entities = chunkTag.getListOrEmpty("Entities");
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(
-                TagValueInput.create(ProblemReporter.DISCARDING, registries, findByUuid(entities, UUID_A)), back);
+        ContainerHelper.loadAllItems(findByUuid(entities, UUID_A), back, registries);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "this copy carries the loot rather than being empty");
         assertFalse(findByUuid(entities, UUID_C).contains("Items"), "the unfolded neighbor is untouched");
     }

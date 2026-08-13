@@ -7,13 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -72,10 +71,10 @@ class CaptureAnchorTest {
         protected void defineSynchedData(SynchedEntityData.Builder builder) {}
 
         @Override
-        protected void readAdditionalSaveData(ValueInput input) {}
+        protected void readAdditionalSaveData(CompoundTag input) {}
 
         @Override
-        protected void addAdditionalSaveData(ValueOutput output) {}
+        protected void addAdditionalSaveData(CompoundTag output) {}
 
         @Override
         public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {

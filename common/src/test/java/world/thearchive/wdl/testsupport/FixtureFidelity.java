@@ -15,7 +15,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
@@ -23,9 +22,6 @@ import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.level.storage.ValueInput;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -122,16 +118,14 @@ public final class FixtureFidelity {
         RegistryAccess registries = TestRegistries.frozen();
 
         NonNullList<ItemStack> stacks = NonNullList.withSize(containerSize(items), ItemStack.EMPTY);
-        ValueInput input = TagValueInput.create(ProblemReporter.DISCARDING, registries, holderTag);
-        ContainerHelper.loadAllItems(input, stacks);
+        ContainerHelper.loadAllItems(holderTag, stacks, registries);
 
-        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, registries);
-        ContainerHelper.saveAllItems(output, stacks);
+        CompoundTag output = ContainerHelper.saveAllItems(new CompoundTag(), stacks, registries);
 
         List<String> divergences = new ArrayList<>();
-        diff("Items", output.buildResult().getListOrEmpty("Items"), items, divergences);
+        diff("Items", output.getListOrEmpty("Items"), items, divergences);
         if (!divergences.isEmpty()) {
-            throw new AssertionError(message("items holder", divergences, output.buildResult(), holderTag));
+            throw new AssertionError(message("items holder", divergences, output, holderTag));
         }
     }
 

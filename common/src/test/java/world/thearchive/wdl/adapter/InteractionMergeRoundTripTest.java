@@ -19,13 +19,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.util.ProblemReporter;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.ValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -54,16 +52,19 @@ class InteractionMergeRoundTripTest {
     }
 
     private static ItemStack readRecordItem(CompoundTag jukeboxBlockEntityTag) {
-        ValueInput in = TagValueInput.create(ProblemReporter.DISCARDING, registries, jukeboxBlockEntityTag);
-        Optional<ItemStack> back = in.read("RecordItem", ItemStack.CODEC); // vanilla JukeboxBlockEntity.loadAdditional
+        // vanilla JukeboxBlockEntity.loadAdditional
+        Optional<ItemStack> back = ItemStack.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), jukeboxBlockEntityTag.get("RecordItem"))
+                .result();
         assertTrue(back.isPresent(), "the merged RecordItem must decode via vanilla ItemStack.CODEC");
         return back.get();
     }
 
     private static List<BeehiveBlockEntity.Occupant> readBees(CompoundTag beehiveBlockEntityTag) {
-        ValueInput in = TagValueInput.create(ProblemReporter.DISCARDING, registries, beehiveBlockEntityTag);
         // Vanilla BeehiveBlockEntity.loadAdditional's exact read
-        return in.read("bees", BeehiveBlockEntity.Occupant.LIST_CODEC).orElse(List.of());
+        return BeehiveBlockEntity.Occupant.LIST_CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), beehiveBlockEntityTag.get("bees"))
+                .result().orElse(List.of());
     }
 
     @Test

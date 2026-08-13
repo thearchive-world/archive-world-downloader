@@ -49,8 +49,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -412,10 +410,10 @@ class LiveCaptureSessionLossTallyTest {
         protected void defineSynchedData(SynchedEntityData.Builder builder) {}
 
         @Override
-        protected void readAdditionalSaveData(ValueInput input) {}
+        protected void readAdditionalSaveData(CompoundTag input) {}
 
         @Override
-        protected void addAdditionalSaveData(ValueOutput output) {}
+        protected void addAdditionalSaveData(CompoundTag output) {}
 
         @Override
         public boolean hurtServer(ServerLevel serverLevel, DamageSource source, float amount) {

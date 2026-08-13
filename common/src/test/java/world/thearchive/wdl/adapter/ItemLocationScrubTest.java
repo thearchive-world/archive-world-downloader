@@ -22,7 +22,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -33,7 +32,6 @@ import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.component.LodestoneTracker;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -121,7 +119,7 @@ class ItemLocationScrubTest {
 
     private NonNullList<ItemStack> readBack(CompoundTag holder, int size) {
         NonNullList<ItemStack> back = NonNullList.withSize(size, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(TagValueInput.create(ProblemReporter.DISCARDING, registries, holder), back);
+        ContainerHelper.loadAllItems(holder, back, registries);
         return back;
     }
 
@@ -170,8 +168,8 @@ class ItemLocationScrubTest {
     }
 
     private ItemStack itemOf(CompoundTag blockEntity) {
-        return TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntity)
-                .read("item", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        return ItemStack.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), blockEntity.get("item"))
+                .result().orElse(ItemStack.EMPTY);
     }
 
     private CompoundTag itemNbt(ItemStack stack) {

@@ -8,13 +8,12 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.storage.TagValueOutput;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
 /**
- * 1.21.11 container sink: serializes an open container's items via vanilla's own {@code ContainerHelper.saveAllItems}
- * (the codec/{@code ValueOutput} layer) and merges them into a captured block-entity tag.
+ * 1.21.5 container sink: serializes an open container's items via vanilla's own {@code ContainerHelper.saveAllItems}
+ * and merges them into a captured block-entity tag.
  *
  * <p>Two steps (see {@link ContainerSink}): {@link #captureItems} serializes the live menu's container slots and
  * {@link #merge} sets {@code "Items"} on a copy of an already-captured block-entity tag (pure, so the headless
@@ -23,12 +22,10 @@ import world.thearchive.wdl.adapter.ContainerSink;
 public final class ContainerSinkImpl implements ContainerSink {
     @Override
     public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
-        // Lift of a container block entity's save path, server-free: a DISCARDING ProblemReporter replaces
-        // the world-scoped collector (the same choice EntitySink made). saveAllItems writes the
-        // non-empty stacks under "Items" as ItemStackWithSlot (slot index = list position) via the codec.
-        TagValueOutput out = DiscardingTagOutput.create(registries);
-        ContainerHelper.saveAllItems(out, items);
-        return out.buildResult();
+        // saveAllItems writes the non-empty stacks under "Items", each a compound carrying its slot index.
+        CompoundTag tag = new CompoundTag();
+        ContainerHelper.saveAllItems(tag, items, registries);
+        return tag;
     }
 
     @Override

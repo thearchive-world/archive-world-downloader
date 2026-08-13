@@ -13,12 +13,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.ValueInput;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
@@ -59,8 +56,9 @@ public final class BlockEntityFixtures {
     /** The custom name a {@link #namedBlockEntity} tag carries, or {@code ""} when it carries none. */
     public static String customNameOf(CompoundTag blockEntityTag) {
         RegistryAccess registries = TestRegistries.frozen();
-        ValueInput input = TagValueInput.create(ProblemReporter.DISCARDING, registries, blockEntityTag);
-        Component name = input.read("components", DataComponentMap.CODEC)
+        Component name = DataComponentMap.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), blockEntityTag.get("components"))
+                .result()
                 .map(components -> components.get(DataComponents.CUSTOM_NAME))
                 .orElse(null);
         return name == null ? "" : name.getString();

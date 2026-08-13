@@ -15,15 +15,13 @@ import java.util.Optional;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.network.Filterable;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.WritableBookContent;
 import net.minecraft.world.item.component.WrittenBookContent;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.ValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -74,8 +72,9 @@ class LecternSinkRoundTripTest {
     }
 
     private static ItemStack readBackBook(CompoundTag merged) {
-        ValueInput in = TagValueInput.create(ProblemReporter.DISCARDING, registries, merged);
-        Optional<ItemStack> back = in.read("Book", ItemStack.CODEC); // vanilla loadAdditional's exact read
+        // vanilla loadAdditional's exact read
+        Optional<ItemStack> back = ItemStack.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), merged.get("Book")).result();
         assertTrue(back.isPresent(), "the merged Book must decode via vanilla ItemStack.CODEC");
         return back.get();
     }

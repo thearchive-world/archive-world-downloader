@@ -13,13 +13,12 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueOutput;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.EntitySink;
 
 /**
- * 1.21.11 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
+ * 1.21.5 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
  *
  * <p>Three members (see {@link EntitySink}): {@link #encodeChunk(List, ChunkPos, RegistryAccess, boolean)} serializes
  * the live client entities, {@link #encodeChunk(List, ChunkPos)} builds the entities-region envelope from
@@ -30,17 +29,16 @@ public final class EntitySinkImpl implements EntitySink {
     @Override
     public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, RegistryAccess registries,
             boolean forceMobPersistence) {
-        // Lift of EntityStorage.storeEntities, server-free: a DISCARDING ProblemReporter replaces the
-        // ServerLevel-scoped collector (the write path's only ServerLevel touch).
+        // Lift of EntityStorage.storeEntities' write branch, server-free: entity.save writes the entity NBT
+        // straight into a CompoundTag with no ServerLevel touch.
         List<CompoundTag> entityTags = new ArrayList<>();
         for (Entity entity : entities) {
             if (!entity.shouldBeSaved()) {
                 continue; // drops passengers (they also nest under their vehicle's Passengers list, so the flat
                          // list would otherwise write them twice), removed entities, and player-only vehicles
             }
-            TagValueOutput out = DiscardingTagOutput.create(registries);
-            if (saveDroppingUnsavableLeashes(entity, out)) {
-                CompoundTag entityTag = out.buildResult();
+            CompoundTag entityTag = new CompoundTag();
+            if (saveDroppingUnsavableLeashes(entity, entityTag)) {
                 applyMobPersistence(entityTag, entity, forceMobPersistence);
                 entityTags.add(entityTag);
             }
@@ -57,11 +55,10 @@ public final class EntitySinkImpl implements EntitySink {
         // PersistenceRequired restoration the standalone entity path applies via applyMobPersistence (a named mob,
         // a loot-equipped mob, and every mob under forceMobPersistence). A codec reject throws out of save (leash
         // gotcha class); the caller isolates it.
-        TagValueOutput out = DiscardingTagOutput.create(registries);
-        if (!saveDroppingUnsavableLeashes(vehicle, out)) {
+        CompoundTag tag = new CompoundTag();
+        if (!saveDroppingUnsavableLeashes(vehicle, tag)) {
             return null;
         }
-        CompoundTag tag = out.buildResult();
         applyMobPersistence(tag, vehicle, forceMobPersistence);
         return tag;
     }
@@ -75,7 +72,7 @@ public final class EntitySinkImpl implements EntitySink {
      * unset. Capture runs on the client main thread, so the detach is unobservable, and every detached leash is
      * restored before returning so the live entities are unchanged.
      */
-    private static boolean saveDroppingUnsavableLeashes(Entity entity, TagValueOutput out) {
+    private static boolean saveDroppingUnsavableLeashes(Entity entity, CompoundTag out) {
         List<DetachedLeash> detached = detachIfUnsavable(entity, null);
         if (entity.isVehicle()) {
             for (Entity passenger : entity.getIndirectPassengers()) {

@@ -19,12 +19,10 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.storage.TagValueInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -94,9 +92,7 @@ class ContainerStashMergeTest {
 
         ListTag blockEntities = chunkTag.getListOrEmpty("block_entities");
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(
-                TagValueInput.create(ProblemReporter.DISCARDING, registries, findByPos(blockEntities, 10, 70, 20)),
-                back);
+        ContainerHelper.loadAllItems(findByPos(blockEntities, 10, 70, 20), back, registries);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest gains exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
         assertTrue(findByPos(blockEntities, 11, 70, 20).getListOrEmpty("Items").isEmpty(),

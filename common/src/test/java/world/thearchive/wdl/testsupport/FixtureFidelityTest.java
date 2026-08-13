@@ -99,7 +99,6 @@ class FixtureFidelityTest {
         handBuilt.putInt("z", 20);
 
         String message = reject(() -> FixtureFidelity.assertBlockEntityShape(handBuilt));
-        assertTrue(message.contains("components"), "the divergence must name the omitted key: " + message);
         assertTrue(message.contains("Items"),
                 "an absent Items is the carry-forward defect's own shape and must be named: " + message);
     }

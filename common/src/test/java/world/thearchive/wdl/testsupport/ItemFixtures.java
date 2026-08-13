@@ -16,13 +16,11 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.network.Filterable;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.WrittenBookContent;
-import net.minecraft.world.level.storage.TagValueOutput;
 
 /**
  * Item NBT built by the vanilla writers rather than by hand: {@link ContainerHelper#saveAllItems} for an
@@ -168,8 +166,6 @@ public final class ItemFixtures {
         for (int i = 0; i < slots.length; i++) {
             stacks.set(slots[i], contents[i]);
         }
-        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, registries);
-        ContainerHelper.saveAllItems(output, stacks);
-        return output.buildResult();
+        return ContainerHelper.saveAllItems(new CompoundTag(), stacks, registries);
     }
 }
