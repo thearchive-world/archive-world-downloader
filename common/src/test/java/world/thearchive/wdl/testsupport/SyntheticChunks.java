@@ -9,15 +9,17 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.chunk.PalettedContainerFactory;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -84,12 +86,12 @@ public final class SyntheticChunks {
 
     private static ChunkSnapshotSource fullWithBlockEntities(RegistryAccess registries, boolean lightCorrect,
             List<CompoundTag> blockEntities, boolean checkShape) {
-        PalettedContainerFactory factory = PalettedContainerFactory.create(registries);
+        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
         int minSectionY = heightAccessor().getMinSectionY();
 
-        LevelChunkSection bottom = new LevelChunkSection(factory);
+        LevelChunkSection bottom = new LevelChunkSection(biomeRegistry);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
-        LevelChunkSection air = new LevelChunkSection(factory);
+        LevelChunkSection air = new LevelChunkSection(biomeRegistry);
 
         List<SerializableChunkData.SectionData> sections = new ArrayList<>();
         sections.add(new SerializableChunkData.SectionData(minSectionY, bottom, null, null));
@@ -136,8 +138,8 @@ public final class SyntheticChunks {
      * so the section lookup ({@code pos.getY() >> 4}) resolves it.
      */
     public static ChunkSnapshotSource withBlockAt(RegistryAccess registries, BlockPos worldPos, BlockState state) {
-        PalettedContainerFactory factory = PalettedContainerFactory.create(registries);
-        LevelChunkSection section = new LevelChunkSection(factory);
+        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
+        LevelChunkSection section = new LevelChunkSection(biomeRegistry);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
         List<SerializableChunkData.SectionData> sections = List
                 .of(new SerializableChunkData.SectionData(worldPos.getY() >> 4, section, null, null));
@@ -166,8 +168,8 @@ public final class SyntheticChunks {
 
     private static ChunkSnapshotSource withBlockEntityAt(RegistryAccess registries, BlockPos worldPos,
             BlockState state, CompoundTag blockEntity, boolean checkShape) {
-        PalettedContainerFactory factory = PalettedContainerFactory.create(registries);
-        LevelChunkSection section = new LevelChunkSection(factory);
+        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
+        LevelChunkSection section = new LevelChunkSection(biomeRegistry);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
         List<SerializableChunkData.SectionData> sections = List
                 .of(new SerializableChunkData.SectionData(worldPos.getY() >> 4, section, null, null));
@@ -183,12 +185,12 @@ public final class SyntheticChunks {
      * {@code SectionData} survives write and parse.
      */
     public static ChunkSnapshotSource fullWithLight(RegistryAccess registries) {
-        PalettedContainerFactory factory = PalettedContainerFactory.create(registries);
+        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
         int minSectionY = heightAccessor().getMinSectionY();
 
-        LevelChunkSection bottom = new LevelChunkSection(factory);
+        LevelChunkSection bottom = new LevelChunkSection(biomeRegistry);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
-        LevelChunkSection air = new LevelChunkSection(factory);
+        LevelChunkSection air = new LevelChunkSection(biomeRegistry);
 
         List<SerializableChunkData.SectionData> sections = new ArrayList<>();
         sections.add(new SerializableChunkData.SectionData(minSectionY - 1, null, null,

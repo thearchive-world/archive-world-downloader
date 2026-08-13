@@ -14,7 +14,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
-import net.minecraft.world.level.chunk.PalettedContainerFactory;
 import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -54,9 +53,7 @@ class ChunkRoundTripTest {
         assertTrue(heightmaps.contains("WORLD_SURFACE"), "client-sent heightmaps must be kept");
 
         // The serverless parse proves codec self-consistency (block-state/biome containers decode).
-        SerializableChunkData parsed = SerializableChunkData.parse(heightAccessor,
-                PalettedContainerFactory.create(registries),
-                back);
+        SerializableChunkData parsed = SerializableChunkData.parse(heightAccessor, registries, back);
         assertNotNull(parsed, "parse() must accept the round-tripped tag");
     }
 
@@ -93,8 +90,7 @@ class ChunkRoundTripTest {
                 padding.getByteArray("SkyLight").orElseThrow(), "below-chunk padding sky light survives");
         assertFalse(padding.contains("block_states"), "padding section carries no block states");
 
-        assertNotNull(SerializableChunkData.parse(heightAccessor,
-                PalettedContainerFactory.create(registries), back),
+        assertNotNull(SerializableChunkData.parse(heightAccessor, registries, back),
                 "parse() must accept a lit tag with a padding section");
     }
 
