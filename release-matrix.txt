@@ -1,0 +1,15 @@
+# The shipped release matrix: one line per Minecraft band, then that band's loader set.
+# release-finalize reads it to derive the expected band-times-loader jars for a version and fails the release
+# if any is missing. It is declared, not inferred from the tags or branches that exist, so a forgotten band
+# cannot silently shrink the expected set. Adding a band is one line; loaders are per band (a later
+# Forge-on-26.2 is one edited line).
+#
+# Format: <minecraft_version> <loader>[,<loader>...]
+1.21.3   fabric,neoforge
+1.21.4   fabric,neoforge
+1.21.5   fabric,neoforge
+1.21.8   fabric,neoforge
+1.21.10  fabric,neoforge
+1.21.11  fabric,neoforge
+26.1.2   fabric,neoforge
+26.2     fabric,neoforge

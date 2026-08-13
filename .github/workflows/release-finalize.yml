@@ -1,0 +1,90 @@
+name: Release finalize (verify matrix, publish)
+
+# Turns the shared DRAFT GitHub release into a published one, run by the maintainer once every band's
+# release.yml run is green. It reads the declared matrix in release-matrix.txt, fails if any band-times-loader
+# jar is missing from the draft, sets the authored changelog section as the body, and publishes. Publishing
+# the draft is the only moment the release goes public and fires a release event, so an announcement webhook
+# fires once for the whole matrix. No publish secrets are needed, and CurseForge and Modrinth are untouched.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Product version core to finalize (the release tag, e.g. 1.1.0). No +<mc>."
+        required: true
+        type: string
+
+permissions:
+  contents: write   # publish the GitHub release (draft -> published) and edit its notes
+
+concurrency:
+  group: release-finalize-${{ inputs.version }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # release-matrix.txt is the declared source of truth for the shipped band set, not inferred from the tags
+      # or branches that exist, because a forgotten band would silently shrink the expected set and pass an
+      # incomplete release. Loaders are read per band, so a later third loader is one manifest line, no logic
+      # change.
+      - name: Verify the release carries the full matrix
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [ -f release-matrix.txt ] || { echo "::error::release-matrix.txt not found on this ref"; exit 1; }
+          expected=()
+          while read -r mc loaders; do
+            [ -n "$mc" ] || continue
+            loaders="${loaders// /}"
+            [ -n "$loaders" ] || { echo "::error::release-matrix.txt line for band '$mc' has no loader column"; exit 1; }
+            IFS=',' read -ra ls <<< "$loaders"
+            for l in "${ls[@]}"; do
+              expected+=("archive-wdl-${l}-${VERSION}+${mc}.jar")
+            done
+          done < <(grep -vE '^[[:space:]]*(#|$)' release-matrix.txt)
+          if [ "${#expected[@]}" -eq 0 ]; then
+            echo "::error::release-matrix.txt declared no band-times-loader entries"; exit 1
+          fi
+          if ! gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "::error::release '$VERSION' not found; run the Release open workflow and the band runs first"; exit 1
+          fi
+          mapfile -t present < <(gh release view "$VERSION" --json assets --jq '.assets[].name')
+          missing=()
+          for e in "${expected[@]}"; do
+            printf '%s\n' "${present[@]}" | grep -qxF -- "$e" || missing+=("$e")
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            printf '::error::missing band-times-loader jar: %s\n' "${missing[@]}"
+            echo "Release '$VERSION' is incomplete: ${#missing[@]} of ${#expected[@]} expected jars missing. Not publishing." >&2
+            exit 1
+          fi
+          echo "matrix complete: all ${#expected[@]} expected jars present in release '$VERSION'."
+
+      # The body is the authored changelog section for this version (a missing section fails here). draft=false
+      # is the single moment the release goes public and fires a release event.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          NOTES="$(awk -v v="$VERSION" '/^##[[:space:]]/ { if (inblk) exit; inblk = ($2 == v); next } inblk { print }' CHANGELOG.md)"
+          if [ -z "${NOTES//[[:space:]]/}" ]; then
+            echo "::error::no CHANGELOG.md section headed '## ${VERSION}'; add the release notes before finalizing"; exit 1
+          fi
+          gh release edit "$VERSION" --notes "$NOTES"
+          gh release edit "$VERSION" --draft=false
+          echo "published release '$VERSION'."
