@@ -1,0 +1,57 @@
+name: Release open (create the draft)
+
+# Creates the empty DRAFT GitHub release for a product version, run once by the maintainer before pushing the
+# band tags. Centralizing draft creation here is what lets the per-band runs only append and never create:
+# GitHub does not enforce tag uniqueness for drafts, so two concurrent first-band creates would each make a
+# duplicate draft and later uploads would scatter across them. The release flow is: run this, push the band
+# tags a few at a time, then run release-finalize to verify the matrix and publish the draft.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Product version core to open a draft for (e.g. 1.1.0). No +<mc>."
+        required: true
+        type: string
+
+permissions:
+  contents: write   # create the draft release
+
+concurrency:
+  group: release-open-${{ inputs.version }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  open:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Idempotent: if the release already exists (a re-run, or the draft is already open) this is a no-op, so
+      # it never turns an in-progress release back into an empty draft. --target pins the umbrella tag, minted
+      # only at publish, to the commit this workflow runs on.
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          case "$VERSION" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::version '$VERSION' is not an X.Y.Z core"; exit 1 ;;
+          esac
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "release '$VERSION' already exists; nothing to open."
+            exit 0
+          fi
+          gh release create "$VERSION" --draft --title "$VERSION" \
+            --notes "Coordinated $VERSION release. Draft: bands append their artifacts; release-finalize publishes once the matrix is complete." \
+            --target "$GITHUB_SHA"
+          echo "opened draft release '$VERSION'."
