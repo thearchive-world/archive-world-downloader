@@ -44,7 +44,7 @@ class NaturalEquipmentTest {
     }
 
     @Test
-    void zombieArmorSixMaterialsNaturalExoticArmorNot() {
+    void zombieArmorFiveMaterialsNaturalExoticArmorNot() {
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.IRON_HELMET)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.FEET, of(Items.DIAMOND_BOOTS)));
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.TURTLE_HELMET)));
