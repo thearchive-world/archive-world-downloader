@@ -7,12 +7,10 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudLayerRegistrationCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.IdentifiedLayer;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionResult;
 import org.lwjgl.glfw.GLFW;
 
@@ -55,13 +53,10 @@ public final class WdlFabricClient implements ClientModInitializer {
         KeyMapping peekKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY));
         WdlHudOverlay.bindPeekKey(peekKey);
-        // addLayer appends to the root drawer, which carries no render condition, so it inherits none. Anchoring
-        // relative to a vanilla element (attachLayerBefore/attachLayerAfter) would adopt its condition, and those
-        // are gamemode-gated (the experience bar is hidden in creative, the hotbar in spectator), so the overlay
-        // would vanish there. Drawing at the root keeps it visible in every gamemode; the overlay self-gates F1 and
-        // blocking screens itself.
-        HudLayerRegistrationCallback.EVENT.register(layeredDrawer -> layeredDrawer.addLayer(
-                IdentifiedLayer.of(ResourceLocation.fromNamespaceAndPath("wdl", "hud"), WdlHudOverlay::render)));
+        // This band's Fabric API predates the layered-HUD registration (HudLayerRegistrationCallback/IdentifiedLayer,
+        // fabric-api 0.116+): HudRenderCallback fires after the whole vanilla HUD, unconditionally, so the overlay
+        // inherits no gamemode render condition and stays visible in every gamemode (see the class note).
+        HudRenderCallback.EVENT.register(WdlHudOverlay::render);
         new FabricOutlineRegistrar().register();
     }
 }
