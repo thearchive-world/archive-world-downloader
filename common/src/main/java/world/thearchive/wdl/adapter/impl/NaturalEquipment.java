@@ -49,13 +49,13 @@ final class NaturalEquipment {
             Items.CARVED_PUMPKIN, Items.JACK_O_LANTERN, Items.WHITE_BANNER);
 
     private static final Map<EquipmentSlot, Set<Item>> BASE_ARMOR = Map.of(
-            EquipmentSlot.HEAD, Set.of(Items.LEATHER_HELMET, Items.COPPER_HELMET, Items.GOLDEN_HELMET,
+            EquipmentSlot.HEAD, Set.of(Items.LEATHER_HELMET, Items.GOLDEN_HELMET,
                     Items.CHAINMAIL_HELMET, Items.IRON_HELMET, Items.DIAMOND_HELMET),
-            EquipmentSlot.CHEST, Set.of(Items.LEATHER_CHESTPLATE, Items.COPPER_CHESTPLATE, Items.GOLDEN_CHESTPLATE,
+            EquipmentSlot.CHEST, Set.of(Items.LEATHER_CHESTPLATE, Items.GOLDEN_CHESTPLATE,
                     Items.CHAINMAIL_CHESTPLATE, Items.IRON_CHESTPLATE, Items.DIAMOND_CHESTPLATE),
-            EquipmentSlot.LEGS, Set.of(Items.LEATHER_LEGGINGS, Items.COPPER_LEGGINGS, Items.GOLDEN_LEGGINGS,
+            EquipmentSlot.LEGS, Set.of(Items.LEATHER_LEGGINGS, Items.GOLDEN_LEGGINGS,
                     Items.CHAINMAIL_LEGGINGS, Items.IRON_LEGGINGS, Items.DIAMOND_LEGGINGS),
-            EquipmentSlot.FEET, Set.of(Items.LEATHER_BOOTS, Items.COPPER_BOOTS, Items.GOLDEN_BOOTS,
+            EquipmentSlot.FEET, Set.of(Items.LEATHER_BOOTS, Items.GOLDEN_BOOTS,
                     Items.CHAINMAIL_BOOTS, Items.IRON_BOOTS, Items.DIAMOND_BOOTS));
 
     private static final Map<EquipmentSlot, Set<Item>> GOLDEN_ARMOR = Map.of(
