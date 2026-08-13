@@ -135,6 +135,6 @@ public class WdlCustomLevelKeyRoutingTest implements FabricClientGameTest {
     }
 
     private static String levelKeyOf(ResourceKey<Level> dimension) {
-        return dimension.identifier().toString();
+        return dimension.location().toString();
     }
 }

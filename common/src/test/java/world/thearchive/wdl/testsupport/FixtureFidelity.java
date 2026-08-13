@@ -14,7 +14,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
@@ -51,7 +51,7 @@ public final class FixtureFidelity {
      */
     public static final String KEEP_PACKED = "keepPacked";
 
-    private static @Nullable Map<Identifier, BlockState> representativeStates;
+    private static @Nullable Map<ResourceLocation, BlockState> representativeStates;
 
     private FixtureFidelity() {}
 
@@ -150,7 +150,7 @@ public final class FixtureFidelity {
 
     /** The default state of some block hosting {@code blockEntityId}, for the load side of the round trip. */
     private static BlockState representativeState(String blockEntityId) {
-        Identifier id = Identifier.parse(blockEntityId);
+        ResourceLocation id = ResourceLocation.parse(blockEntityId);
         BlockState state = representativeStates().get(id);
         if (state == null) {
             throw new AssertionError("Fixture fidelity: no block hosts block-entity type " + blockEntityId
@@ -159,12 +159,12 @@ public final class FixtureFidelity {
         return state;
     }
 
-    private static synchronized Map<Identifier, BlockState> representativeStates() {
+    private static synchronized Map<ResourceLocation, BlockState> representativeStates() {
         if (representativeStates != null) {
             return representativeStates;
         }
         TestRegistries.frozen();
-        Map<Identifier, BlockState> states = new HashMap<>();
+        Map<ResourceLocation, BlockState> states = new HashMap<>();
         BlockPos probe = new BlockPos(0, 0, 0);
         for (Block block : BuiltInRegistries.BLOCK) {
             if (!(block instanceof EntityBlock entityBlock)) {

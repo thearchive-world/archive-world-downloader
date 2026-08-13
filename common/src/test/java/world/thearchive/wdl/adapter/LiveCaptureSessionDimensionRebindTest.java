@@ -11,8 +11,8 @@ import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.Properties;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import org.junit.jupiter.api.BeforeAll;
@@ -97,7 +97,7 @@ class LiveCaptureSessionDimensionRebindTest {
     void theServersOwnKeyIsKeptApartFromTheVanillaOneTheSaveIsLaidOutUnder(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
         ResourceKey<Level> serverNether = ResourceKey.create(Registries.DIMENSION,
-                Identifier.fromNamespaceAndPath("minecraft", "worlds/example/example_nether"));
+                ResourceLocation.fromNamespaceAndPath("minecraft", "worlds/example/example_nether"));
 
         session.rebindDimension(Level.NETHER, serverNether);
 

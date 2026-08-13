@@ -15,8 +15,8 @@ import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
@@ -121,7 +121,7 @@ class PlayerTagTest {
     void setDimensionWritesGivenIdVerbatim() {
         CompoundTag tag = playerTag();
         ResourceKey<Level> datapackDimension = ResourceKey.create(Registries.DIMENSION,
-                Identifier.fromNamespaceAndPath("examplepack", "skylands"));
+                ResourceLocation.fromNamespaceAndPath("examplepack", "skylands"));
         PlayerTag.setDimension(tag, datapackDimension);
         assertEquals("examplepack:skylands", tag.getStringOr("Dimension", ""),
                 "setDimension writes the id it is handed verbatim; the by-type canonicalization is VanillaDimensions");
@@ -141,7 +141,7 @@ class PlayerTagTest {
         CompoundTag tag = playerTag();
         assertNull(PlayerTag.dimensionOf(tag), "a player tag with no Dimension key names no dimension");
         ResourceKey<Level> datapackDimension = ResourceKey.create(Registries.DIMENSION,
-                Identifier.fromNamespaceAndPath("examplepack", "skylands"));
+                ResourceLocation.fromNamespaceAndPath("examplepack", "skylands"));
         PlayerTag.setDimension(tag, datapackDimension);
         assertNull(PlayerTag.dimensionOf(tag), "nor does one naming a dimension the capture never routes to");
     }

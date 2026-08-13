@@ -62,7 +62,7 @@ class VanillaDimensionsTest {
         // The round trip is what a resume depends on: the prior level.dat records the routed dimension as a
         // plain id string, and reading it back wrong sends a write into another dimension's folder.
         for (ResourceKey<Level> routed : List.of(Level.OVERWORLD, Level.NETHER, Level.END)) {
-            assertEquals(routed, VanillaDimensions.forId(routed.identifier().toString()),
+            assertEquals(routed, VanillaDimensions.forId(routed.location().toString()),
                     routed + " must survive the id round trip");
         }
     }

@@ -539,7 +539,7 @@ final class AsyncSaveWriter {
             } catch (Exception e) {
                 if (loggedFailures.add(dimension)) {
                     LOGGER.warn("cannot open the {} storage for {}; every chunk of that dimension is lost", target,
-                            dimension.identifier(), e);
+                            dimension.location(), e);
                 }
                 return null;
             }
@@ -562,7 +562,7 @@ final class AsyncSaveWriter {
                     entry.getValue().synchronize(true).join();
                 } catch (RuntimeException e) {
                     LOGGER.warn("cannot flush the {} storage for {}; its chunks may not survive a power loss",
-                            target, entry.getKey().identifier(), e);
+                            target, entry.getKey().location(), e);
                 }
             }
         }

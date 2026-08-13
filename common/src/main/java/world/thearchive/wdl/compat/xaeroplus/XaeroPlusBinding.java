@@ -75,7 +75,7 @@ final class XaeroPlusBinding {
         if (!ChunkUtils.getActualDimension().equals(dimension)) {
             return Long2LongMaps.EMPTY_MAP;
         }
-        String dimensionId = dimension.identifier().toString();
+        String dimensionId = dimension.location().toString();
         return OverlayHighlights.tag(Wdl.overlaySavedChunks(dimensionId), Wdl.overlayCoveredChunks(dimensionId));
     }
 }
