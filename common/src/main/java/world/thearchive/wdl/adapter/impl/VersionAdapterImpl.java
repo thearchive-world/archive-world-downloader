@@ -16,7 +16,7 @@ import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * The {@link VersionAdapter} plug for this branch (MC 1.21.4; the package note records the era band it serves): binds
+ * The {@link VersionAdapter} plug for this branch (MC 1.21.3; the package note records the era band it serves): binds
  * the chunk-save axes ({@link ChunkCodec}, {@link WorldPaths}, {@link LevelDataWriter}), {@link EntitySink},
  * {@link ContainerSink}, {@link LecternSink}, {@link PlayerSink}, and {@link MapSink} to their concrete
  * implementations. Registered via {@code META-INF/services/world.thearchive.wdl.adapter.VersionAdapter}.
@@ -28,7 +28,7 @@ public final class VersionAdapterImpl implements VersionAdapter {
      * that a plug never lands on a branch whose MC version predates its band. A version newer than the band is caught
      * instead by compile failure against the divergent vanilla save types.
      */
-    static final String BAND_FLOOR = "1.21.4";
+    static final String BAND_FLOOR = "1.21.3";
 
     private static final ChunkCodec chunkCodec = new ChunkCodecImpl();
 

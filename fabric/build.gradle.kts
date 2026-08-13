@@ -21,6 +21,12 @@ loom {
     accessWidenerPath.set(file("src/main/resources/wdl.accesswidener"))
 }
 
+// This band's Minecraft version predates the Fabric client game test framework (fabric-client-gametest-api-v1,
+// first shipped at 1.21.4), so the capture-verification tier is gated off here via client_gametest=false in
+// gradle.properties; the property is absent, hence true, from 1.21.4 up. On this band the capture proof is the
+// maintainer's manual in-world check rather than this automated tier.
+val clientGameTest = providers.gradleProperty("client_gametest").map(String::toBoolean).getOrElse(true)
+
 // Automated capture-verification tier: the official Fabric Client Game Test API boots a real client
 // plus an in-process server and hands the test a real ClientLevel, so the live capture front (the chunk
 // snapshot reading a ClientLevel and the inbound entity Netty tee) runs headlessly. createSourceSet puts
@@ -29,13 +35,15 @@ loom {
 // Minecraft EULA so the harness may write eula.txt: the tier connects the client to an in-process
 // DEDICATED server over a real connection, and createServer() refuses to start until the EULA is
 // accepted. The maintainer has read and accepted https://aka.ms/MinecraftEULA.
-fabricApi {
-    configureTests {
-        createSourceSet = true
-        modId = "wdl-gametest"
-        enableGameTests = false
-        enableClientGameTests = true
-        eula = true
+if (clientGameTest) {
+    fabricApi {
+        configureTests {
+            createSourceSet = true
+            modId = "wdl-gametest"
+            enableGameTests = false
+            enableClientGameTests = true
+            eula = true
+        }
     }
 }
 
@@ -58,8 +66,10 @@ loom {
 // The gametest source set is test-scope, so Error Prone / NullAway is off here, mirroring how
 // wdl.nullness-conventions disables it for compileTestJava (NullAway is production-only). The Error Prone
 // plugin otherwise attaches to every JavaCompile, and unconfigured NullAway aborts the gametest compile.
-tasks.named<JavaCompile>("compileGametestJava") {
-    options.errorprone.enabled.set(false)
+if (clientGameTest) {
+    tasks.named<JavaCompile>("compileGametestJava") {
+        options.errorprone.enabled.set(false)
+    }
 }
 
 // Headless CI runs the dev clientGameTest run (runClientGameTest) under a virtual framebuffer (xvfb-run).
@@ -121,8 +131,11 @@ dependencies {
 
     // JSpecify on the gametest source set so its package-info @NullMarked resolves; compileOnly is not
     // transitive across source sets. NullAway does not run here (test-scope, disabled above), so the marking
-    // is documentary only, but it keeps the tree visibly consistent with main and test.
-    "gametestCompileOnly"(libs.jspecify)
+    // is documentary only, but it keeps the tree visibly consistent with main and test. Guarded on
+    // clientGameTest: the gametestCompileOnly configuration exists only when the source set is created above.
+    if (clientGameTest) {
+        "gametestCompileOnly"(libs.jspecify)
+    }
 }
 
 tasks.named<ProcessResources>("processResources") {
