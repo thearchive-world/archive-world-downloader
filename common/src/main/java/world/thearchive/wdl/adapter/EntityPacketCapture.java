@@ -102,9 +102,8 @@ final class EntityPacketCapture
             EntityType.MANGROVE_CHEST_BOAT, EntityType.CHERRY_CHEST_BOAT, EntityType.PALE_OAK_CHEST_BOAT,
             EntityType.BAMBOO_CHEST_RAFT,
             EntityType.HORSE, EntityType.DONKEY, EntityType.SKELETON_HORSE, EntityType.ZOMBIE_HORSE,
-            EntityType.CAMEL, EntityType.CAMEL_HUSK, EntityType.LLAMA, EntityType.TRADER_LLAMA,
+            EntityType.CAMEL, EntityType.LLAMA, EntityType.TRADER_LLAMA,
             EntityType.PIG, EntityType.STRIDER, EntityType.HAPPY_GHAST,
-            EntityType.NAUTILUS, EntityType.ZOMBIE_NAUTILUS,
             EntityType.BLOCK_DISPLAY, EntityType.ITEM_DISPLAY, EntityType.TEXT_DISPLAY,
             EntityType.INTERACTION);
 
@@ -167,10 +166,10 @@ final class EntityPacketCapture
         } else if (packet instanceof ClientboundPlayerPositionPacket) {
             sampler.onAnomalyPacket();
         } else if (packet instanceof ClientboundRespawnPacket respawn) {
-            enterDimension(respawn.commonPlayerSpawnInfo().dimension().identifier().toString());
+            enterDimension(respawn.commonPlayerSpawnInfo().dimension().location().toString());
             sampler.onRespawn();
         } else if (packet instanceof ClientboundLoginPacket login) {
-            enterDimension(login.commonPlayerSpawnInfo().dimension().identifier().toString());
+            enterDimension(login.commonPlayerSpawnInfo().dimension().location().toString());
             sampler.onRespawn();
         } else if (packet instanceof ClientboundSetCameraPacket) {
             sampler.onSetCamera();
@@ -245,7 +244,7 @@ final class EntityPacketCapture
         if (distanceBlocks > plausibleMaxBlocks) {
             return;
         }
-        sendRange.observe(level.dimension().identifier().toString(), distanceBlocks);
+        sendRange.observe(level.dimension().location().toString(), distanceBlocks);
     }
 
     /**
@@ -279,7 +278,7 @@ final class EntityPacketCapture
             return;
         }
         int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(minecraft.options.getEffectiveRenderDistance());
-        String dimensionId = level.dimension().identifier().toString();
+        String dimensionId = level.dimension().location().toString();
         IntList ids = packet.getEntityIds();
         for (int i = 0; i < ids.size(); i++) {
             int distanceBlocks = sampler.removalSample(ids.getInt(i), player.getX(), player.getZ());

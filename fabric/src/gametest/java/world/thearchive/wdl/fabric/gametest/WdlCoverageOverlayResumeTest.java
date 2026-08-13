@@ -23,7 +23,7 @@ public class WdlCoverageOverlayResumeTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         try (MultiplayerFixture fixture = MultiplayerFixture.connect(context)) {
-            String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
+            String dimension = context.computeOnClient(client -> client.level.dimension().location().toString());
             long chunkA = context.computeOnClient(client -> client.player.chunkPosition().toLong());
 
             // Session 1 (NEW): capture and save area A, so its region files exist on disk.

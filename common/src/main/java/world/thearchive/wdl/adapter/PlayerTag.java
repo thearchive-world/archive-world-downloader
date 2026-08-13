@@ -73,7 +73,7 @@ final class PlayerTag {
      * {@code ServerPlayer.addAdditionalSaveData}, which writes the plain id string.
      */
     static void setDimension(CompoundTag raw, ResourceKey<Level> dimension) {
-        raw.putString("Dimension", dimension.identifier().toString());
+        raw.putString("Dimension", dimension.location().toString());
     }
 
     /**

@@ -4,7 +4,7 @@
 package world.thearchive.wdl.client;
 
 import net.minecraft.client.KeyMapping;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * The mod's shared keybind category (the "Archive World Downloader" controls heading), registered once and reused by
@@ -20,7 +20,7 @@ public final class WdlKeyBinds {
     // NeoForge-only deprecation is suppressed here.
     @SuppressWarnings("deprecation")
     public static final KeyMapping.Category CATEGORY = KeyMapping.Category
-            .register(Identifier.fromNamespaceAndPath("wdl", "downloader"));
+            .register(ResourceLocation.fromNamespaceAndPath("wdl", "downloader"));
 
     private WdlKeyBinds() {}
 }
