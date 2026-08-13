@@ -184,3 +184,6 @@ neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
 
 # Mount-menu revert: opens HorseInventoryMenu.horse (was AbstractMountInventoryMenu.mount).
 neoforge/src/main/resources/META-INF/accesstransformer.cfg
+
+# Game-rule test revert: reads the curated rules from level.dat's GameRules compound, the 1.21.10 key (1.21.11 writes game_rules).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlWorldOutputConfigTest.java
