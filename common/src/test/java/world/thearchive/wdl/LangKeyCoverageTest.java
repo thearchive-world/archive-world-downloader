@@ -42,7 +42,7 @@ class LangKeyCoverageTest {
     // Anchored on both quotes so a log line that merely mentions wdl.properties is not read as a key, and narrowed
     // to the three shapes the project uses so vanilla's own key.* names cannot be swept in.
     private static final Pattern keyLiteral = Pattern
-            .compile("\"((?:wdl|key\\.wdl|key\\.category\\.wdl)\\.[A-Za-z0-9_.]+)\"");
+            .compile("\"((?:wdl|key\\.wdl|key\\.categories\\.wdl)\\.[A-Za-z0-9_.]+)\"");
 
     private static final List<String> RESUME_CONFIRM_SUFFIXES = List.of(".title", ".message", ".message_no_backup");
     private static final List<String> SWEEP_NOTICE_SUFFIXES = List.of(".title", ".body");

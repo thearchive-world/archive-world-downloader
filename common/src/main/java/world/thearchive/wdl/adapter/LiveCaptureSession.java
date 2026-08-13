@@ -2053,8 +2053,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Translate the double-chest open signals into primitives for {@link ContainerAssociation#openDoubleChest}. The
      * double-chest analog of {@link #bindOpenedContainer}: a large chest opens a 54-slot {@code ChestMenu} over two
      * 27-slot halves, which the single-block path drops on the 54-vs-27 mismatch. The bind candidate is the target half
-     * plus its connected partner (derived from the target block state via {@link ChestBlock#getConnectedBlockPos}); the
-     * sum of the two halves' sizes is the mis-bind guard. Which target half is the RIGHT one is the only left/right
+     * plus its connected partner (derived from the target block state via {@link ChestBlock#getConnectedDirection});
+     * the sum of the two halves' sizes is the mis-bind guard. Which target half is the RIGHT one is the only left/right
      * line here; the core stores the two halves in menu-slot order from it. If the partner is not a loaded chest the
      * combined size stays at one half and the sum guard drops the open (empty, correct); in practice both halves are
      * always loaded when a double opens.
