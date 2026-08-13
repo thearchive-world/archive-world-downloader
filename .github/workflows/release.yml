@@ -1,22 +1,24 @@
 name: Release (CurseForge, Modrinth, GitHub)
 
-# Publishes a tagged release. The tag is the version core plus the MC build-metadata, e.g. 1.0.0+1.21.11
-# or 1.0.0+26.2 (mirrors the jar name archive-wdl-<loader>-<mod_version>+<minecraft_version>.jar). The
-# published version comes from gradle.properties (mod_version + minecraft_version via wdl.java-conventions),
-# not from the tag, so the flow is bump-then-tag: set mod_version to the release value (drop -SNAPSHOT),
-# commit, then tag that commit and push the tag. The guard step below fails the run unless the pushed tag
-# equals that built version, so a stale -SNAPSHOT can't be published and createRelease (tagName defaults to
-# the version) can't mint a tag that differs from the one you pushed.
+# Publishes one band of a coordinated release. The tag is the version core plus the MC build-metadata (e.g.
+# 1.1.0+26.2), mirroring the jar name archive-wdl-<loader>-<mod_version>+<minecraft_version>.jar. The published
+# version is read from gradle.properties, not from the tag, so the flow is bump-then-tag; the guard step below
+# fails the run unless the pushed tag equals the built version, so a stale -SNAPSHOT cannot ship.
 #
-# publishMods uploads the Fabric and NeoForge jars to CurseForge and Modrinth and creates one GitHub release
-# carrying both. It is not atomic across its publish tasks (:fabric:publishCurseforge, :fabric:publishModrinth,
-# :fabric:publishGithub, :neoforge:publishCurseforge, :neoforge:publishModrinth): if one fails after another
-# has already succeeded, a naive re-run re-creates a duplicate version and createRelease 422s on the
-# now-existing tag. To retry cleanly, first delete the partial CurseForge/Modrinth version(s) and the GitHub
-# release, then re-push. A first-run dry run (PUBLISH_DRY_RUN=1 passed to publishMods) validates coordinates
-# without uploading. Requires MODRINTH_TOKEN and CURSEFORGE_TOKEN in the release environment (the built-in
-# GITHUB_TOKEN covers the GitHub release). Modrinth's versions publish but stay non-public until the project
-# clears review.
+# Every band shares one product version, and the release is ONE GitHub release titled at the core (e.g. 1.1.0)
+# carrying every band-times-loader jar. The publish plugin cannot build that release: its github block always
+# creates a new release and 422s on an existing tag, and its parent() link is a same-build dependency, so it
+# cannot reach a release another band's separate run created. So publishMods here does only CurseForge and
+# Modrinth (per MC version, unchanged), and the funnel step below appends this band's jars to one shared DRAFT
+# release with gh. The draft is created once beforehand by release-open, not here, so concurrent band runs never
+# race to create duplicate drafts (GitHub does not enforce tag uniqueness for drafts).
+#
+# The release flow is: run release-open for the version, push the band tags a few at a time (GitHub creates no
+# tag-push events past three tags in one push, which also staggers the not-atomic platform publishes band by
+# band), then run release-finalize to verify the full matrix and publish the draft. A partial platform publish
+# is retried by deleting that band's partial version(s) and re-pushing its tag. Nothing is public until finalize
+# publishes the draft. PUBLISH_DRY_RUN=true validates the platform coordinates without uploading. Requires
+# MODRINTH_TOKEN and CURSEFORGE_TOKEN in the release environment; the built-in GITHUB_TOKEN covers the draft.
 on:
   push:
     tags:
@@ -75,14 +77,18 @@ jobs:
       # Fail fast unless the pushed tag equals the version the build will publish (mod_version + MC metadata).
       # Guards the bump-then-tag flow: a tag pushed before dropping -SNAPSHOT (or against the wrong MC pin)
       # stops here instead of publishing a mislabeled stable version and minting a divergent release tag.
+      # The pushed tag flows through an env var, never inlined into the script by ${{ }} templating, so a
+      # crafted tag name cannot inject shell into this job (which later holds the publish tokens).
       - name: "Guard: pushed tag must equal the built version"
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           BUILT=$(./gradlew -q :fabric:printVersion | sed -n 's/^PROJECT_VERSION=//p')
-          echo "pushed tag: ${{ github.ref_name }}"
+          echo "pushed tag: ${REF_NAME}"
           echo "built version: ${BUILT}"
-          if [ "${{ github.ref_name }}" != "${BUILT}" ]; then
-            echo "::error::Pushed tag '${{ github.ref_name }}' != built version '${BUILT}'. Bump mod_version (drop -SNAPSHOT) and match the MC pin before tagging."
+          if [ "${REF_NAME}" != "${BUILT}" ]; then
+            echo "::error::Pushed tag '${REF_NAME}' != built version '${BUILT}'. Bump mod_version (drop -SNAPSHOT) and match the MC pin before tagging."
             exit 1
           fi
 
@@ -107,10 +113,13 @@ jobs:
           # is never left changed. Sorted order puts fabric before neoforge.
           printf 'paths=%s,%s\n' "${JARS[0]}" "${JARS[1]}" >> "$GITHUB_OUTPUT"
 
+      # The reproducibility record is a per-band asset file, not an edit to the shared release body, so the
+      # concurrent per-band runs never race on a read-modify-write of the notes.
       - name: Build reproducibility record
         id: repro
         env:
           PATHS: ${{ steps.jars.outputs.paths }}
+          VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           JDK="$(./gradlew -q :fabric:printCompileJavaVersion | grep -E '\(Java [0-9]+\)$' | tail -n1)"
@@ -122,57 +131,57 @@ jobs:
           IFS=',' read -r FAB NEO <<< "$PATHS"
           FAB_SHA="$(sha256sum "$FAB" | awk '{print $1}')"
           NEO_SHA="$(sha256sum "$NEO" | awk '{print $1}')"
+          RECORD="reproducibility-${VERSION}.txt"
           {
-            echo 'record<<EOF'
-            echo ''
-            echo '---'
-            echo '### Reproducibility record'
+            echo "### Reproducibility record: ${VERSION}"
             echo "- Build JDK (compile toolchain): ${JDK}"
             echo "- Reference OS: ${{ runner.os }} (${{ runner.arch }}), GitHub-hosted ubuntu-latest"
-            echo "- \`$(basename "$FAB")\` SHA-256: \`${FAB_SHA}\`"
-            echo "- \`$(basename "$NEO")\` SHA-256: \`${NEO_SHA}\`"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
+            echo "- $(basename "$FAB") SHA-256: ${FAB_SHA}"
+            echo "- $(basename "$NEO") SHA-256: ${NEO_SHA}"
+          } > "$RECORD"
+          echo "file=${RECORD}" >> "$GITHUB_OUTPUT"
 
       - name: Attest build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
         with:
           subject-path: ${{ steps.jars.outputs.paths }}
 
-      - name: Generate changelog
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@c9bcd8238b6f41e05561348339429d360b1c0247  # v6.2.3
-        with:
-          mode: "COMMIT"
-          configurationJson: |
-            {
-              "template": "#{{CHANGELOG}}",
-              "commit_template": "- #{{TITLE}} (`#{{MERGE_SHA}}`)",
-              "categories": [
-                { "title": "## Features", "labels": ["feat"] },
-                { "title": "## Fixes", "labels": ["fix"] },
-                { "title": "## Build", "labels": ["build"] },
-                { "title": "## CI", "labels": ["ci"] },
-                { "title": "## Other", "labels": [] }
-              ],
-              "label_extractor": [
-                {
-                  "pattern": "^(feat|fix|build|ci|docs|refactor|test|perf|style)(\\(.*\\))?(!)?: ",
-                  "on_property": "title",
-                  "target": "$1"
-                }
-              ]
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # publishMods uploads both loader jars to CurseForge and Modrinth and creates the single GitHub release
-      # that carries them, so no separate upload-artifact step is needed (the release is the durable store).
-      - name: Publish to CurseForge, Modrinth and GitHub
-        run: ./gradlew publishMods
+      # The notes are the authored changelog section for this version, plus this band's reproducibility record
+      # for the platforms; a missing section fails the run. PUBLISH_DRY_RUN=true validates the platform
+      # coordinates without uploading. The plugin no longer publishes to GitHub; the funnel step does.
+      - name: Publish to CurseForge and Modrinth
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CHANGELOG: ${{ steps.changelog.outputs.changelog }}${{ steps.repro.outputs.record }}
-          GITHUB_SHA: ${{ github.sha }}
+          VERSION: ${{ github.ref_name }}
+          RECORD: ${{ steps.repro.outputs.file }}
+        run: |
+          set -euo pipefail
+          CORE="${VERSION%%+*}"
+          NOTES="$(awk -v v="$CORE" '/^##[[:space:]]/ { if (inblk) exit; inblk = ($2 == v); next } inblk { print }' CHANGELOG.md)"
+          if [ -z "${NOTES//[[:space:]]/}" ]; then
+            echo "::error::no CHANGELOG.md section headed '## ${CORE}'; add the release notes before tagging"; exit 1
+          fi
+          CHANGELOG="$(printf '%s\n\n%s\n' "$NOTES" "$(cat "$RECORD")")"
+          export CHANGELOG
+          ./gradlew publishMods
+
+      # Append this band's jars and record to the shared draft release that release-open created for this
+      # version. Release assets are independent of the tagged commit, so one release carries jars from many
+      # separate runs; --clobber makes a re-push idempotent. This step only appends, never creates, so there is
+      # no draft to race over. Not gated on PUBLISH_DRY_RUN: a draft is invisible and deletable, safe even in a
+      # dry run, while the irreversible platform uploads are what dry-run protects.
+      - name: Append this band's artifacts to the shared draft GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+          PATHS: ${{ steps.jars.outputs.paths }}
+          RECORD: ${{ steps.repro.outputs.file }}
+        run: |
+          set -euo pipefail
+          CORE="${VERSION%%+*}"
+          if ! gh release view "$CORE" >/dev/null 2>&1; then
+            echo "::error::draft release '$CORE' does not exist; run the Release open workflow for $CORE before pushing band tags"; exit 1
+          fi
+          IFS=',' read -r FAB NEO <<< "$PATHS"
+          gh release upload "$CORE" "$FAB" "$NEO" "$RECORD" --clobber
