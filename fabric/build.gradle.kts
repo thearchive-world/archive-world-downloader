@@ -168,11 +168,10 @@ tasks.register("printVersion") {
     doLast { println("PROJECT_VERSION=$projectVersion") }
 }
 
-// Release publishing (mod-publish-plugin), driven by the release workflow on a version tag. It uploads the
-// remapped Fabric jar to Modrinth and creates the single GitHub release that also carries the NeoForge jar
-// (attached by :neoforge's parent-linked github block). The published version is project.version (mod_version +
-// the MC build-metadata, set in wdl.java-conventions), and the changelog arrives via the CHANGELOG env the release
-// workflow sets; nothing publishes on an ordinary build. Coordinates live in gradle.properties.
+// Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the
+// Fabric jar to CurseForge and Modrinth per this band's MC version. There is no github block, because the
+// plugin cannot carry one GitHub release across the separate per-band runs, so the release workflow creates
+// that release with gh. The changelog arrives via the CHANGELOG env; nothing publishes on an ordinary build.
 publishMods {
     file.set(tasks.remapJar.flatMap { it.archiveFile })
     changelog.set(providers.environmentVariable("CHANGELOG").orElse(""))
@@ -204,20 +203,5 @@ publishMods {
         client.set(true)
         server.set(false)
         requires("fabric-api")
-    }
-
-    github {
-        repository.set("thearchive-world/archive-world-downloader")
-        accessToken.set(providers.environmentVariable("GITHUB_TOKEN"))
-        // target_commitish must be a branch or commit SHA, not the tag name, or GitHub 422s. GITHUB_SHA is the
-        // tag's commit; GITHUB_REF_NAME would pass the tag.
-        commitish.set(providers.environmentVariable("GITHUB_SHA"))
-        displayName.set("${property("mod_version")} (MC ${property("minecraft_version")})")
-        // This block creates the single GitHub release and carries the Fabric jar (the top-level file above).
-        // The NeoForge jar rides on this same release: :neoforge's own github block attaches it via the plugin's
-        // parent mechanism (parent(publishGithub)), which uploads to this task's release instead of creating a
-        // second one. So the release still holds both loader jars, with no additionalFile(Project): that
-        // overload resolves the project through Gradle's deprecated dependency-notation path (a hard error in
-        // Gradle 10), whereas parent navigates to a task and sidesteps it.
     }
 }
