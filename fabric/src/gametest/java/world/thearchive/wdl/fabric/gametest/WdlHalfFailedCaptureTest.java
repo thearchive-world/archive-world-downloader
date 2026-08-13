@@ -16,7 +16,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.GameRules;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.LogEvent;
 
@@ -82,8 +82,8 @@ public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
             // cow kill does not drop beef the creative player pockets into the half-failed save. Set-and-verify:
             // the gamerule names are a band seam (1.21.11 snake_case; older bands use camelCase doMobSpawning /
             // doMobLoot), and a wrong name would otherwise no-op silently through the void runCommand.
-            GameRuleFixture.set(server, GameRules.SPAWN_MOBS, false);
-            GameRuleFixture.set(server, GameRules.MOB_DROPS, false);
+            GameRuleFixture.set(server, GameRules.RULE_DOMOBSPAWNING, false);
+            GameRuleFixture.set(server, GameRules.RULE_DOMOBLOOT, false);
 
             // The saves directory persists across suite runs in the same run directory, and the download
             // report is append-only, so a second run would read two completion records where the assertions

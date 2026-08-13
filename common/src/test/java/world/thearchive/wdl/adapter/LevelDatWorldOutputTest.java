@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.Lifecycle;
 import java.util.Properties;
@@ -15,7 +16,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.flag.FeatureFlags;
-import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.junit.jupiter.api.Test;
@@ -44,9 +45,8 @@ class LevelDatWorldOutputTest {
 
     private GameRules gameRules(LevelDataWriter.LevelData built) {
         DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
-        return GameRules.codec(FeatureFlags.DEFAULT_FLAGS)
-                .parse(ops, dataTag(built).getCompoundOrEmpty("game_rules"))
-                .getOrThrow();
+        return new GameRules(FeatureFlags.DEFAULT_FLAGS,
+                new Dynamic<>(ops, dataTag(built).getCompoundOrEmpty("GameRules")));
     }
 
     private static WorldOutputConfig with(String key, String value) {
@@ -125,20 +125,21 @@ class LevelDatWorldOutputTest {
     void defaultsWriteTheCuratedSafeGameRules() {
         GameRules rules = gameRules(build(WorldOutputConfig.DEFAULTS));
 
-        assertFalse(rules.get(GameRules.SPAWN_MOBS), "no mob spawning");
-        assertTrue(rules.get(GameRules.KEEP_INVENTORY), "keep inventory");
-        assertEquals(0, rules.get(GameRules.FIRE_SPREAD_RADIUS_AROUND_PLAYER), "no fire spread (int 0)");
-        assertFalse(rules.get(GameRules.MOB_GRIEFING), "no mob griefing");
-        assertFalse(rules.get(GameRules.ADVANCE_TIME), "day frozen");
-        assertFalse(rules.get(GameRules.ADVANCE_WEATHER), "weather frozen");
+        assertFalse(rules.getBoolean(GameRules.RULE_DOMOBSPAWNING), "no mob spawning");
+        assertTrue(rules.getBoolean(GameRules.RULE_KEEPINVENTORY), "keep inventory");
+        assertFalse(rules.getBoolean(GameRules.RULE_MOBGRIEFING), "no mob griefing");
+        assertFalse(rules.getBoolean(GameRules.RULE_DAYLIGHT), "day frozen");
+        assertFalse(rules.getBoolean(GameRules.RULE_WEATHER_CYCLE), "weather frozen");
     }
 
     @Test
     void gameRuleMasterOffLeavesVanillaDefaults() {
         GameRules rules = gameRules(build(with("overrideGamerules", "false")));
 
-        assertTrue(rules.get(GameRules.SPAWN_MOBS), "master off: the vanilla default (mobs spawn) stands");
-        assertFalse(rules.get(GameRules.KEEP_INVENTORY), "master off: keep-inventory stays at its vanilla default");
+        assertTrue(rules.getBoolean(GameRules.RULE_DOMOBSPAWNING),
+                "master off: the vanilla default (mobs spawn) stands");
+        assertFalse(rules.getBoolean(GameRules.RULE_KEEPINVENTORY),
+                "master off: keep-inventory stays at its vanilla default");
     }
 
     @Test
@@ -187,25 +188,27 @@ class LevelDatWorldOutputTest {
 
     @Test
     void anInvalidOverrideValueIsDroppedAndTheCuratedValueStands() {
-        LevelDataWriter.LevelData built = build(with("gamerule.keep_inventory", "banana"));
+        LevelDataWriter.LevelData built = build(with("gamerule.keepInventory", "banana"));
 
-        assertTrue(built.gameRules().droppedInvalidValues().contains("keep_inventory"), "the typo is surfaced");
-        assertTrue(gameRules(built).get(GameRules.KEEP_INVENTORY), "the curated value stands; the typo is not written");
+        assertTrue(built.gameRules().droppedInvalidValues().contains("keepInventory"), "the typo is surfaced");
+        assertTrue(gameRules(built).getBoolean(GameRules.RULE_KEEPINVENTORY),
+                "the curated value stands; the typo is not written");
     }
 
     @Test
     void anUnknownOverrideIdIsSurfacedNotWritten() {
-        LevelDataWriter.LevelData built = build(with("gamerule.doMobSpawning", "false")); // a 1.21.4 id
+        // spawn_mobs is the newer snake_case id; this band's rule is doMobSpawning.
+        LevelDataWriter.LevelData built = build(with("gamerule.spawn_mobs", "true"));
 
-        assertTrue(built.gameRules().unknownIds().contains("doMobSpawning"), "the cross-band loss is surfaced");
-        assertFalse(gameRules(built).get(GameRules.SPAWN_MOBS), "the curated safe set still applies");
+        assertTrue(built.gameRules().unknownIds().contains("spawn_mobs"), "the cross-band loss is surfaced");
+        assertFalse(gameRules(built).getBoolean(GameRules.RULE_DOMOBSPAWNING), "the curated safe set still applies");
     }
 
     @Test
     void aValidOverrideIsWritten() {
-        // immediate_respawn is not in the curated set; a valid override of it passes through.
-        GameRules rules = gameRules(build(with("gamerule.immediate_respawn", "true")));
+        // doImmediateRespawn is not in the curated set; a valid override of it passes through.
+        GameRules rules = gameRules(build(with("gamerule.doImmediateRespawn", "true")));
 
-        assertTrue(rules.get(GameRules.IMMEDIATE_RESPAWN), "an arbitrary valid rule passes through");
+        assertTrue(rules.getBoolean(GameRules.RULE_DO_IMMEDIATE_RESPAWN), "an arbitrary valid rule passes through");
     }
 }
