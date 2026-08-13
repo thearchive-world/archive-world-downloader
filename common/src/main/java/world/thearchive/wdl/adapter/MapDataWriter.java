@@ -83,7 +83,7 @@ final class MapDataWriter {
         if (!Files.exists(file)) {
             return -1;
         }
-        CompoundTag envelope = NbtIo.readCompressed(file, NbtAccounter.uncompressedQuota());
+        CompoundTag envelope = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap());
         return envelope.getCompoundOrEmpty("data").getIntOr("map", -1);
     }
 }
