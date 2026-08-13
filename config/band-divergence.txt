@@ -327,3 +327,7 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 
 # Fabric-API render package (same axis as FabricOutlineRegistrar): the smoke test's WorldRenderEvents resolves under rendering.v1, not rendering.v1.world, and WorldRenderContext exposes matrixStack(), not matrices().
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
+
+# JourneyMap plugin annotation: the beta-generation API this band's runtime bundles carries JourneyMapPlugin under
+# journeymap.api.v2.client, not the v2.common the 1.21.11 release added, so the plugin names the client-package annotation.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
