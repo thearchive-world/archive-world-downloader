@@ -103,7 +103,7 @@ final class EntityPacketCapture
             EntityType.BAMBOO_CHEST_RAFT,
             EntityType.HORSE, EntityType.DONKEY, EntityType.SKELETON_HORSE, EntityType.ZOMBIE_HORSE,
             EntityType.CAMEL, EntityType.LLAMA, EntityType.TRADER_LLAMA,
-            EntityType.PIG, EntityType.STRIDER, EntityType.HAPPY_GHAST,
+            EntityType.PIG, EntityType.STRIDER,
             EntityType.BLOCK_DISPLAY, EntityType.ITEM_DISPLAY, EntityType.TEXT_DISPLAY,
             EntityType.INTERACTION);
 
