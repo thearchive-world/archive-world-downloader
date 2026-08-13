@@ -49,7 +49,6 @@ import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
-import net.minecraft.world.level.storage.LevelData.RespawnData;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.jspecify.annotations.Nullable;
@@ -275,7 +274,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
         PrimaryLevelData levelData = (PrimaryLevelData) data.worldData();
         levelData.setGameType(player.gameType());
-        levelData.setSpawn(RespawnData.of(player.dimension(), player.spawnPos(), player.yaw(), player.pitch()));
+        levelData.setSpawn(player.spawnPos(), player.yaw());
         levelData.setDifficulty(player.difficulty());
         // The 3-argument saveDataTag routes the captured tag into createTag's "Player" slot.
         access.saveDataTag(data.registries(), data.worldData(), player.playerTag());

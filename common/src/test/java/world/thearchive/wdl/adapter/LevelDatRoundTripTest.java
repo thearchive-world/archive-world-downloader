@@ -57,7 +57,7 @@ class LevelDatRoundTripTest {
         CompoundTag back = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("Data");
 
         assertTrue(back.getIntOr("DataVersion", -1) > 0, "DataVersion survives");
-        assertTrue(back.contains("spawn"), "spawn survives");
+        assertTrue(back.contains("SpawnX"), "spawn survives");
 
         WorldGenSettings worldGen = WorldGenSettings.CODEC
                 .parse(ops, back.getCompoundOrEmpty("WorldGenSettings"))

@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.GlobalPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
@@ -21,7 +20,6 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -75,9 +73,9 @@ class LevelDatPlayerRoundTripTest {
         assertEquals(GameType.CREATIVE.getId(), data.getIntOr("GameType", -99), "GameType flips to creative");
         assertEquals((byte) Difficulty.HARD.getId(), data.getByteOr("Difficulty", (byte) -1), "captured difficulty");
 
-        GlobalPos spawn = data.read("spawn", LevelData.RespawnData.CODEC).orElseThrow().globalPos();
-        assertEquals(Level.NETHER, spawn.dimension(), "the world spawn carries the capture dimension");
-        assertEquals(new BlockPos(120, 72, -340), spawn.pos(), "the world spawn is the capture position");
+        BlockPos spawn = new BlockPos(data.getIntOr("SpawnX", 0), data.getIntOr("SpawnY", 0),
+                data.getIntOr("SpawnZ", 0));
+        assertEquals(new BlockPos(120, 72, -340), spawn, "the world spawn is the capture position");
     }
 
     @Test
@@ -98,7 +96,7 @@ class LevelDatPlayerRoundTripTest {
         assertFalse(data.contains("Player"), "no captured player -> no Player slot");
         assertEquals(GameType.SURVIVAL.getId(), data.getIntOr("GameType", -99),
                 "the void world stays the default survival");
-        assertTrue(data.contains("spawn"), "the default spawn is still written");
+        assertTrue(data.contains("SpawnX"), "the default spawn is still written");
     }
 
     @Test
