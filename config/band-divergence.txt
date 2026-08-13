@@ -34,3 +34,153 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCapture
 # The shared capture driver's new entity-rim readback reads the camera through GameRenderer.getMainCamera, not the
 # 26.2 mainCamera rename.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
+
+# ---------------------------------------------------------------------------
+# 1.21.10 band: down-port reverts from the 1.21.11 mint parent. Each shared file below carries a band-local revert
+# of a 1.21.11 rename or removal. The plug (adapter/impl/**) and the coordinate files are excluded by the gate, not
+# listed here.
+# ---------------------------------------------------------------------------
+
+# Entity-package regroup revert: animal.equine.AbstractChestedHorse -> animal.horse.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
+
+# Entity-package regroup revert: npc.villager.* -> npc.* (Villager, AbstractVillager, VillagerProfession).
+common/src/main/java/world/thearchive/wdl/adapter/OpenClickTracker.java
+
+# Entity-package regroup revert: animal.equine + npc.villager + npc.wanderingtrader -> flat animal.horse / npc.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
+
+# Entity-package regroup + ResourceKey.location + NbtAccounter unlimitedHeap reverts.
+common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
+
+# ResourceKey.location rename revert plus 1.21.11-only entity-type removal (CAMEL_HUSK, NAUTILUS, ZOMBIE_NAUTILUS).
+common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
+
+# ResourceKey.location rename revert: dimension key .identifier() -> .location().
+common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
+
+# ResourceKey.location rename revert: dimension key .identifier() -> .location().
+common/src/main/java/world/thearchive/wdl/adapter/PlayerTag.java
+
+# ResourceKey.location rename revert: dimension key .identifier() -> .location().
+common/src/main/java/world/thearchive/wdl/adapter/VanillaDimensions.java
+
+# ResourceKey.location rename revert: dimension key .identifier() -> .location().
+common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDriver.java
+
+# ResourceKey.location rename revert: dimension key .identifier() -> .location().
+common/src/main/java/world/thearchive/wdl/compat/xaeroplus/XaeroPlusBinding.java
+
+# NbtAccounter revert: uncompressedQuota() -> unlimitedHeap() for the map data read.
+common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
+
+# Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation for the keybind category id.
+common/src/main/java/world/thearchive/wdl/client/WdlKeyBinds.java
+
+# Util rename revert: net.minecraft.util.Util -> top-level net.minecraft.Util at this band.
+common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
+
+# Per-vertex line-width revert: drops Window.getAppropriateLineWidth (absent pre-1.21.11); width carried, unapplied.
+common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
+
+# CycleButton revert: 2-arg builder(fn, value) -> 1-arg builder(fn) + withInitialValue.
+common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
+
+# Game-rule typed-leg test revert: gamerules.GameRules -> flat GameRules, RULE_* names, getBoolean, fire rule dropped.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
+
+# Game-rule typed-leg test revert: nine curated rules (no integer fire), band camelCase vanilla override ids.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.java
+
+# NbtAccounter unlimitedHeap test revert: drops the 1.21.11-only UNCOMPRESSED_NBT_QUOTA oversized-read test.
+common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.java
+
+# Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
+
+# Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation.
+common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+common/src/test/java/world/thearchive/wdl/adapter/VanillaDimensionsTest.java
+
+# Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation (type + parse).
+common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
+
+# Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation (type + parse).
+common/src/test/java/world/thearchive/wdl/testsupport/ItemFixtures.java
+
+# Game-rule typed-leg test revert: gamerules.GameRule -> GameRules.Key<BooleanValue>, id() -> getId().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/GameRuleFixture.java
+
+# Game-rule typed-leg test revert: gamerules.GameRules -> flat GameRules, RULE_DOMOBSPAWNING / RULE_DOMOBLOOT.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlHalfFailedCaptureTest.java
+
+# Entity-package regroup revert: animal.equine.AbstractChestedHorse -> animal.horse.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlChestedAnimalCaptureTest.java
+
+# Entity-package regroup (animal.cow.Cow -> animal.Cow) + ResourceKey.location rename reverts.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayMobRangeTest.java
+
+# Entity-package regroup (animal.pig.Pig -> animal.Pig) + ResourceKey.location rename reverts.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSpectateAnchorTest.java
+
+# Client-pick revert: LocalPlayer.raycastHitResult(reach, camera) -> GameRenderer.pick(1.0f).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlIncapableEntityClickCascadeTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayBoostedPairingTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayEntitiesOffTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayEntityRangeTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayIndexTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRemovalArrivalOriginTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRemovalSeedOriginTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRespawnFloodTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayResumeTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayStationarySeedTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayTeleportSuppressionTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCustomLevelKeyRoutingTest.java
+
+# ResourceKey.location rename revert: .identifier() -> .location().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDimensionRebindEntityCaptureTest.java
+
+# Mount-menu revert: AbstractMountInventoryMenu.mount -> HorseInventoryMenu.horse.
+fabric/src/main/java/world/thearchive/wdl/fabric/FabricMountMenuReader.java
+
+# Mount-menu revert: widens HorseInventoryMenu.horse (was AbstractMountInventoryMenu.mount).
+fabric/src/main/resources/wdl.accesswidener
+
+# Mount-menu revert: AbstractMountInventoryMenu.mount -> HorseInventoryMenu.horse.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeMountMenuReader.java
+
+# Rendertype revert: renderer.rendertype.RenderTypes -> renderer.RenderType.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeOutlineRegistrar.java
+
+# Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation for the HUD element id.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
+
+# Mount-menu revert: opens HorseInventoryMenu.horse (was AbstractMountInventoryMenu.mount).
+neoforge/src/main/resources/META-INF/accesstransformer.cfg
