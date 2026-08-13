@@ -187,3 +187,7 @@ neoforge/src/main/resources/META-INF/accesstransformer.cfg
 
 # Game-rule test revert: reads the curated rules from level.dat's GameRules compound, the 1.21.10 key (1.21.11 writes game_rules).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlWorldOutputConfigTest.java
+
+# JourneyMap plugin annotation: the beta-generation API this band's runtime bundles carries JourneyMapPlugin under
+# journeymap.api.v2.client, not the v2.common the 1.21.11 release added, so the plugin names the client-package annotation.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
