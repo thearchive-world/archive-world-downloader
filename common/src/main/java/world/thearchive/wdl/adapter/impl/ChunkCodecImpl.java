@@ -3,32 +3,41 @@
 
 package world.thearchive.wdl.adapter.impl;
 
+import com.mojang.serialization.Codec;
 import it.unimi.dsi.fastutil.shorts.ShortList;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.LongArrayTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.chunk.UpgradeData;
+import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.chunk.PalettedContainerRO;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.chunk.storage.SerializableChunkData;
+import net.minecraft.world.level.chunk.storage.ChunkSerializer;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.levelgen.blending.BlendingData;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import org.jspecify.annotations.Nullable;
 
@@ -36,17 +45,16 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.21.11 chunk codec: replicates the minimal client-safe slice of vanilla
- * {@code SerializableChunkData.copyOf(ServerLevel, ChunkAccess)} to {@code write()}.
+ * 1.21.1 chunk codec: replicates the minimal client-safe slice of vanilla
+ * {@code ChunkSerializer.write(ServerLevel, ChunkAccess)} to NBT. Below the 1.21.2 cut the chunk write is a static
+ * method that reads from a {@code ServerLevel} a multiplayer client never has, so {@link #encode} rebuilds the tag
+ * field by field from the captured snapshot rather than calling vanilla.
  *
  * <p>Two steps (see {@link ChunkCodec}): {@link #capture(LevelChunk, RegistryAccess)} captures a live client chunk into
  * a {@link ChunkSnapshotSource}, and {@link #encode(ChunkSnapshotSource, RegistryAccess, boolean)} encodes that
  * snapshot to NBT (pure, so the headless round-trip guards it).
  */
 public final class ChunkCodecImpl implements ChunkCodec {
-    /** Client chunks have no scheduled ticks (those are server state). */
-    private static final ChunkAccess.PackedTicks NO_TICKS = new ChunkAccess.PackedTicks(List.of(), List.of());
-
     /** Client chunks have no post-processing (a worldgen artifact). */
     private static final ShortList[] NO_POST_PROCESSING = new ShortList[0];
 
@@ -54,26 +62,18 @@ public final class ChunkCodecImpl implements ChunkCodec {
     private static final int OVERWORLD_MIN_Y = -64;
     private static final int OVERWORLD_HEIGHT = 384;
 
-    // The blending_data MC's BlendingDataFix would inject for the overworld: the section bounds marking this chunk
-    // as old generation so a freshly generated neighbor blends against it instead of forming a boundary wall.
-    // Heights are left empty; MC fills them lazily on the first neighbor-generation call.
-    private static final BlendingData.Packed OVERWORLD_BLENDING = new BlendingData.Packed(
-            SectionPos.blockToSectionCoord(OVERWORLD_MIN_Y),
-            SectionPos.blockToSectionCoord(OVERWORLD_MIN_Y + OVERWORLD_HEIGHT), Optional.empty());
-
     /**
      * Snapshot a live client chunk on the main thread (block-state/biome section copies, cloned heightmaps,
      * block-entity NBT), everything detached so only immutable data crosses to the async IO worker. The server-only
      * structure call is dropped here and reproduced as empty maps in
      * {@link #encode(ChunkSnapshotSource, RegistryAccess, boolean)}.
      *
-     * <p>Light is read from the client light engine the way the server's own save path reads its engine (the
-     * {@code SerializableChunkData.copyOf} slice): the padded section range, keeping only non-empty layers. A chunk
-     * qualifies only when the engine reports its initial server light applied ({@code lightOnInColumn}); otherwise the
-     * snapshot carries no light and reports {@code lightCorrect=false}, and vanilla relights that chunk on load.
-     * Pending light work is drained first, effectively once per tick (later calls find none): a block edit updates the
-     * section palette immediately while its relight waits for the render pass, so an undrained read could freeze
-     * pre-edit light under {@code isLightOn=true}.
+     * <p>Light is read from the client light engine the way the server's own save path reads its engine: the padded
+     * section range, keeping only non-empty layers. A chunk qualifies only when it reports its initial server light
+     * applied ({@code isLightCorrect}); otherwise the snapshot carries no light and reports {@code lightCorrect=false},
+     * and vanilla relights that chunk on load. Pending light work is drained first, effectively once per tick (later
+     * calls find none): a block edit updates the section palette immediately while its relight waits for the render
+     * pass, so an undrained read could freeze pre-edit light under {@code isLightOn=true}.
      */
     @Override
     public ChunkSnapshotSource capture(LevelChunk chunk, RegistryAccess registries) {
@@ -84,11 +84,11 @@ public final class ChunkCodecImpl implements ChunkCodec {
         if (lightEngine.hasLightWork()) {
             lightEngine.runLightUpdates();
         }
-        boolean lightCorrect = lightEngine.lightOnInColumn(SectionPos.getZeroNode(pos.x, pos.z));
+        boolean lightCorrect = chunk.isLightCorrect();
 
         LevelChunkSection[] sections = chunk.getSections();
-        int minSectionY = chunk.getMinSectionY();
-        List<SerializableChunkData.SectionData> sectionData = new ArrayList<>(sections.length + 2);
+        int minSectionY = chunk.getMinSection();
+        List<ChunkSnapshotSource.SectionData> sectionData = new ArrayList<>(sections.length + 2);
         for (int sectionY = lightEngine.getMinLightSection(); sectionY < lightEngine.getMaxLightSection(); sectionY++) {
             int index = chunk.getSectionIndexFromSectionY(sectionY);
             boolean inChunk = index >= 0 && index < sections.length;
@@ -101,8 +101,8 @@ public final class ChunkCodecImpl implements ChunkCodec {
                         .getDataLayerData(SectionPos.of(pos, sectionY)));
             }
             if (inChunk || blockLight != null || skyLight != null) {
-                sectionData.add(new SerializableChunkData.SectionData(sectionY,
-                        inChunk ? sections[index].copy() : null, blockLight, skyLight));
+                sectionData.add(new ChunkSnapshotSource.SectionData(sectionY,
+                        inChunk ? copySection(sections[index]) : null, blockLight, skyLight));
             }
         }
 
@@ -126,33 +126,93 @@ public final class ChunkCodecImpl implements ChunkCodec {
 
     @Override
     public CompoundTag encode(ChunkSnapshotSource snapshot, RegistryAccess registries, boolean synthesizeBlending) {
-        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
+        Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec = PalettedContainer.codecRO(
+                biomeRegistry.asHolderIdMap(), biomeRegistry.holderByNameCodec(),
+                PalettedContainer.Strategy.SECTION_BIOMES, biomeRegistry.getHolderOrThrow(Biomes.PLAINS));
+        // Built per encode, not as a static field: a static initializer here would touch the block registry at class
+        // load, before the headless test harness bootstraps the registries.
+        Codec<PalettedContainer<BlockState>> blockStateCodec = PalettedContainer.codecRW(
+                Block.BLOCK_STATE_REGISTRY, BlockState.CODEC, PalettedContainer.Strategy.SECTION_STATES,
+                Blocks.AIR.defaultBlockState());
 
-        // NeoForge marks the vanilla canonical SerializableChunkData constructor deprecated in favor of a
-        // 20-argument attachment-aware overload that does not exist in vanilla. This captures vanilla client-chunk
-        // data only, so the canonical constructor is the correct call; vanilla and Fabric do not deprecate
-        // it, leaving the suppression inert there.
-        @SuppressWarnings("deprecation")
-        SerializableChunkData data = new SerializableChunkData(
-                biomeRegistry,
-                snapshot.chunkPos(),
-                snapshot.minSectionY(),
-                snapshot.gameTime(),                 // LastUpdate
-                snapshot.inhabitedTime(),
-                snapshot.status(),
-                synthesizeBlending ? OVERWORLD_BLENDING : null, // blendingData: synthesized for a blended overworld
-                null,                                 // belowZeroRetrogen: none
-                UpgradeData.EMPTY,                    // upgradeData: none
-                null,                                 // carvingMask: LEVELCHUNK type, none
-                clientHeightmaps(snapshot),
-                NO_TICKS,
-                NO_POST_PROCESSING,
-                snapshot.lightCorrect(),
-                snapshot.sections(),
-                List.of(),                            // entities: saved to the entities/ region, not here
-                snapshot.blockEntities(),
-                emptyStructureData());                // structures: empty starts/references, no server call
-        return data.write();
+        ChunkPos pos = snapshot.chunkPos();
+        CompoundTag tag = NbtUtils.addCurrentDataVersion(new CompoundTag());
+        tag.putInt("xPos", pos.x);
+        tag.putInt("yPos", snapshot.minSectionY());
+        tag.putInt("zPos", pos.z);
+        tag.putLong("LastUpdate", snapshot.gameTime());
+        tag.putLong("InhabitedTime", snapshot.inhabitedTime());
+        tag.putString("Status", BuiltInRegistries.CHUNK_STATUS.getKey(snapshot.status()).toString());
+
+        if (synthesizeBlending) {
+            // The blending_data MC's BlendingDataFix would inject for the overworld: the section bounds marking this
+            // chunk as old generation so a freshly generated neighbor blends against it instead of forming a boundary
+            // wall. Heights are omitted; MC fills them lazily on the first neighbor-generation call. Written directly
+            // as the tag BlendingData.CODEC produces, since below 1.21.2 there is no BlendingData.Packed carrier.
+            CompoundTag blending = new CompoundTag();
+            blending.putInt("min_section", SectionPos.blockToSectionCoord(OVERWORLD_MIN_Y));
+            blending.putInt("max_section", SectionPos.blockToSectionCoord(OVERWORLD_MIN_Y + OVERWORLD_HEIGHT));
+            tag.put("blending_data", blending);
+        }
+
+        ListTag sectionsTag = new ListTag();
+        for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
+            CompoundTag sectionTag = new CompoundTag();
+            LevelChunkSection chunkSection = section.chunkSection();
+            if (chunkSection != null) {
+                sectionTag.put("block_states",
+                        blockStateCodec.encodeStart(NbtOps.INSTANCE, chunkSection.getStates()).getOrThrow());
+                sectionTag.put("biomes",
+                        biomeCodec.encodeStart(NbtOps.INSTANCE, chunkSection.getBiomes()).getOrThrow());
+            }
+            DataLayer blockLight = section.blockLight();
+            if (blockLight != null && !blockLight.isEmpty()) {
+                sectionTag.putByteArray("BlockLight", blockLight.getData());
+            }
+            DataLayer skyLight = section.skyLight();
+            if (skyLight != null && !skyLight.isEmpty()) {
+                sectionTag.putByteArray("SkyLight", skyLight.getData());
+            }
+            if (!sectionTag.isEmpty()) {
+                sectionTag.putByte("Y", (byte) section.y());
+                sectionsTag.add(sectionTag);
+            }
+        }
+        tag.put("sections", sectionsTag);
+
+        if (snapshot.lightCorrect()) {
+            tag.putBoolean("isLightOn", true);
+        }
+
+        ListTag blockEntitiesTag = new ListTag();
+        blockEntitiesTag.addAll(snapshot.blockEntities());
+        tag.put("block_entities", blockEntitiesTag);
+
+        // A captured chunk is a FULL LevelChunk, never a ProtoChunk, so the entities/CarvingMasks branch is dropped.
+        // Client chunks carry no scheduled ticks (those are server state), so both tick lists save empty.
+        tag.put("block_ticks", new ListTag());
+        tag.put("fluid_ticks", new ListTag());
+        tag.put("PostProcessing", ChunkSerializer.packOffsets(NO_POST_PROCESSING));
+
+        CompoundTag heightmapsTag = new CompoundTag();
+        clientHeightmaps(snapshot)
+                .forEach((type, data) -> heightmapsTag.put(type.getSerializationKey(), new LongArrayTag(data)));
+        tag.put("Heightmaps", heightmapsTag);
+
+        tag.put("structures", emptyStructureData());
+        return tag;
+    }
+
+    /**
+     * A detached copy of a live section. Below 1.21.2 LevelChunkSection has no copy() and its returned biome view has
+     * no copy() either, but a live client section always backs its biomes with a mutable PalettedContainer, so the copy
+     * goes through that concrete type. Post-capture edits mutate the block states, so those are copied outright.
+     */
+    @SuppressWarnings("unchecked")
+    private static LevelChunkSection copySection(LevelChunkSection section) {
+        PalettedContainer<Holder<Biome>> biomes = (PalettedContainer<Holder<Biome>>) section.getBiomes();
+        return new LevelChunkSection(section.getStates().copy(), biomes.copy());
     }
 
     /** A detached copy of a stored layer, or null when the engine holds none (empty layers are omitted). */
@@ -201,6 +261,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
             ChunkStatus status,
             boolean lightCorrect,
             Map<Heightmap.Types, long[]> heightmaps,
-            List<SerializableChunkData.SectionData> sections,
+            List<ChunkSnapshotSource.SectionData> sections,
             List<CompoundTag> blockEntities) implements ChunkSnapshotSource {}
 }

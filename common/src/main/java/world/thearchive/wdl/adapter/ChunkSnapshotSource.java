@@ -7,9 +7,11 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.level.levelgen.Heightmap;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The captured, immutable snapshot of a single chunk: the seam the {@link ChunkCodec} encodes.
@@ -49,8 +51,20 @@ public interface ChunkSnapshotSource {
     Map<Heightmap.Types, long[]> heightmaps();
 
     /** Per-section snapshot: a section copy plus the captured block/sky light layers (either may be null). */
-    List<SerializableChunkData.SectionData> sections();
+    List<SectionData> sections();
 
     /** Block-entity NBT in saved form (empty for synthetic terrain fixtures). */
     List<CompoundTag> blockEntities();
+
+    /**
+     * One captured section: its {@code Y} index, a detached section copy (null for a light-only section outside the
+     * chunk's own range), and the block/sky light layers (each null when the layer is empty or the column is unlit).
+     * Below the 1.21.2 chunk-serialization cut vanilla has no {@code SerializableChunkData.SectionData} record, so the
+     * snapshot carries the band-stable section pieces the encoder writes directly.
+     */
+    record SectionData(
+            int y,
+            @Nullable LevelChunkSection chunkSection,
+            @Nullable DataLayer blockLight,
+            @Nullable DataLayer skyLight) {}
 }

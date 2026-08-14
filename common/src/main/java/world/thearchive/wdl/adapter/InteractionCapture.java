@@ -46,7 +46,6 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
@@ -575,7 +574,7 @@ public final class InteractionCapture {
      */
     static @Nullable BlockState blockStateAt(ChunkSnapshotSource snapshot, BlockPos pos) {
         int sectionY = pos.getY() >> 4;
-        for (SerializableChunkData.SectionData section : snapshot.sections()) {
+        for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
             if (section.y() == sectionY) {
                 LevelChunkSection chunkSection = section.chunkSection();
                 if (chunkSection == null) {
