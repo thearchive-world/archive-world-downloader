@@ -144,7 +144,7 @@ public final class FixtureFidelity {
 
     /** The default state of some block hosting {@code blockEntityId}, for the load side of the round trip. */
     private static BlockState representativeState(String blockEntityId) {
-        ResourceLocation id = ResourceLocation.parse(blockEntityId);
+        ResourceLocation id = new ResourceLocation(blockEntityId);
         BlockState state = representativeStates().get(id);
         if (state == null) {
             throw new AssertionError("Fixture fidelity: no block hosts block-entity type " + blockEntityId

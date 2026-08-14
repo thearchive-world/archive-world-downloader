@@ -97,7 +97,7 @@ class LiveCaptureSessionDimensionRebindTest {
     void theServersOwnKeyIsKeptApartFromTheVanillaOneTheSaveIsLaidOutUnder(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
         ResourceKey<Level> serverNether = ResourceKey.create(Registries.DIMENSION,
-                ResourceLocation.fromNamespaceAndPath("minecraft", "worlds/example/example_nether"));
+                new ResourceLocation("minecraft", "worlds/example/example_nether"));
 
         session.rebindDimension(Level.NETHER, serverNether);
 

@@ -74,10 +74,10 @@ class ChunkMergeTest {
         return blockEntity("minecraft:jukebox", x, y, z);
     }
 
-    private static CompoundTag jukeboxWithDisc(int x, int y, int z, String discId, long ticks) {
+    private static CompoundTag jukeboxWithDisc(int x, int y, int z, String discId) {
         CompoundTag blockEntity = jukebox(x, y, z);
         blockEntity.put("RecordItem", ItemFixtures.itemTag(discId));
-        blockEntity.putLong("ticks_since_song_started", ticks);
+        blockEntity.putBoolean("IsPlaying", true);
         return blockEntity;
     }
 
@@ -181,8 +181,8 @@ class ChunkMergeTest {
     }
 
     @Test
-    void aJukeboxDiscAndItsTickCarryForwardWhenFreshHasNone() {
-        CompoundTag onDisk = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:music_disc_cat", 40L));
+    void aJukeboxDiscAndItsPlayingStateCarryForwardWhenFreshHasNone() {
+        CompoundTag onDisk = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:music_disc_cat"));
         CompoundTag fresh = chunkTagWith(jukebox(3, 65, 4)); // re-walked, never re-interacted: no disc client-side
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
@@ -190,15 +190,13 @@ class ChunkMergeTest {
         assertEquals(1, mergeBacks, "one jukebox disc carried forward");
         CompoundTag merged = findByPos(fresh, 3, 65, 4);
         assertEquals("minecraft:music_disc_cat", discId(merged), "the prior disc survives the re-walk");
-        assertEquals(40L,
-                (merged.contains("ticks_since_song_started") ? merged.getLong("ticks_since_song_started") : -1L),
-                "and its song-start tick sidecar");
+        assertTrue(merged.getBoolean("IsPlaying"), "and its playing state");
     }
 
     @Test
     void aReInsertedJukeboxDiscKeepsTheFresherDisc() {
-        CompoundTag onDisk = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:music_disc_cat", 0L));
-        CompoundTag fresh = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:music_disc_13", 0L));
+        CompoundTag onDisk = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:music_disc_cat"));
+        CompoundTag fresh = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:music_disc_13"));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -208,7 +206,7 @@ class ChunkMergeTest {
 
     @Test
     void aTypeChangedJukeboxDiscIsNotGhostedIntoTheReplacementChest() {
-        CompoundTag onDisk = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:music_disc_cat", 0L));
+        CompoundTag onDisk = chunkTagWith(jukeboxWithDisc(3, 65, 4, "minecraft:music_disc_cat"));
         CompoundTag fresh = chunkTagWith(chest(3, 65, 4)); // a chest now stands where the jukebox was
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
@@ -702,7 +700,7 @@ class ChunkMergeTest {
 
     @Test
     void hasCapturedContentRecognizesJukeboxDiscAndBeehiveBees() {
-        assertTrue(ChunkMerge.hasCapturedContent(jukeboxWithDisc(0, 0, 0, "minecraft:music_disc_cat", 0L)),
+        assertTrue(ChunkMerge.hasCapturedContent(jukeboxWithDisc(0, 0, 0, "minecraft:music_disc_cat")),
                 "a jukebox with a disc is content");
         assertTrue(ChunkMerge.hasCapturedContent(beehiveWithBees(0, 0, 0, 2)), "a beehive with bees is content");
     }

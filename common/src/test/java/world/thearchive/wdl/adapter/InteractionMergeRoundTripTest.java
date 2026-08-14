@@ -97,7 +97,7 @@ class InteractionMergeRoundTripTest {
     }
 
     @Test
-    void jukeboxHolderCarriesSongStartTickSoItShowsNoteParticlesOnLoad() {
+    void jukeboxHolderCarriesPlayingStateSoItShowsNoteParticlesOnLoad() {
         BlockPos jukeboxPos = new BlockPos(10, 70, 20);
         CompoundTag chunkTag = chunkTagWith(taggedBlockEntity("minecraft:jukebox", 10, 70, 20));
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
@@ -105,15 +105,11 @@ class InteractionMergeRoundTripTest {
 
         ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
 
-        // Vanilla JukeboxBlockEntity.loadAdditional starts the song player (the note particles) only when
-        // ticks_since_song_started is present, so the captured holder carries it (the disc just started at the
-        // click, hence tick 0). The disc sound itself cannot resume on load, an MC limitation.
+        // Vanilla JukeboxBlockEntity.tick spawns the note particles only while IsPlaying is set and a disc is
+        // present, so the captured holder marks the just-inserted disc playing.
         CompoundTag jukeboxBlockEntity = findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 10, 70, 20);
-        assertEquals(0L,
-                (jukeboxBlockEntity.contains("ticks_since_song_started")
-                        ? jukeboxBlockEntity.getLong("ticks_since_song_started")
-                        : -1L),
-                "the captured jukebox carries the song-start tick so it plays note particles on load");
+        assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"),
+                "the captured jukebox is marked playing so it shows note particles on load");
     }
 
     @Test

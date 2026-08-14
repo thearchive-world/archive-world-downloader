@@ -11,7 +11,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.LayeredRegistryAccess;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
@@ -25,6 +24,7 @@ import net.minecraft.server.packs.resources.MultiPackResourceManager;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.tags.TagKey;
 import net.minecraft.tags.TagLoader;
+import net.minecraft.tags.TagManager;
 
 /**
  * Headless vanilla {@link RegistryAccess} for plain JUnit tests.
@@ -95,7 +95,7 @@ public final class TestRegistries {
     private static <T> void bindRegistryTags(RegistryAccess.RegistryEntry<T> entry, ResourceManager resources) {
         ResourceKey<? extends Registry<T>> key = entry.key();
         Registry<T> registry = entry.value();
-        TagLoader<Holder<T>> loader = new TagLoader<>(registry::getHolder, Registries.tagsDirPath(key));
+        TagLoader<Holder<T>> loader = new TagLoader<>(registry::getHolder, TagManager.getTagDir(key));
         Map<TagKey<T>, List<Holder<T>>> bound = loader.loadAndBuild(resources).entrySet().stream()
                 .collect(Collectors.toUnmodifiableMap(tag -> TagKey.create(key, tag.getKey()),
                         tag -> List.copyOf(tag.getValue())));

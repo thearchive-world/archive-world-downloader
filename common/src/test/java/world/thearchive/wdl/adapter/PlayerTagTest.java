@@ -121,7 +121,7 @@ class PlayerTagTest {
     void setDimensionWritesGivenIdVerbatim() {
         CompoundTag tag = playerTag();
         ResourceKey<Level> datapackDimension = ResourceKey.create(Registries.DIMENSION,
-                ResourceLocation.fromNamespaceAndPath("examplepack", "skylands"));
+                new ResourceLocation("examplepack", "skylands"));
         PlayerTag.setDimension(tag, datapackDimension);
         assertEquals("examplepack:skylands", tag.getString("Dimension"),
                 "setDimension writes the id it is handed verbatim; the by-type canonicalization is VanillaDimensions");
@@ -141,7 +141,7 @@ class PlayerTagTest {
         CompoundTag tag = playerTag();
         assertNull(PlayerTag.dimensionOf(tag), "a player tag with no Dimension key names no dimension");
         ResourceKey<Level> datapackDimension = ResourceKey.create(Registries.DIMENSION,
-                ResourceLocation.fromNamespaceAndPath("examplepack", "skylands"));
+                new ResourceLocation("examplepack", "skylands"));
         PlayerTag.setDimension(tag, datapackDimension);
         assertNull(PlayerTag.dimensionOf(tag), "nor does one naming a dimension the capture never routes to");
     }

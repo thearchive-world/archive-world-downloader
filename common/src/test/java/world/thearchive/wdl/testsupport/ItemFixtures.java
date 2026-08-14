@@ -32,7 +32,7 @@ import net.minecraft.world.item.component.WrittenBookContent;
  * every entry collapsed onto one slot.
  */
 public final class ItemFixtures {
-    private static final ResourceLocation AIR_ID = ResourceLocation.parse("minecraft:air");
+    private static final ResourceLocation AIR_ID = new ResourceLocation("minecraft:air");
 
     private ItemFixtures() {}
 
@@ -45,7 +45,7 @@ public final class ItemFixtures {
      * degenerate fixture the gate exists to reject, arriving through the builder.
      */
     public static ItemStack stack(String itemId) {
-        ResourceLocation id = ResourceLocation.parse(itemId);
+        ResourceLocation id = new ResourceLocation(itemId);
         Item item = BuiltInRegistries.ITEM.get(id);
         if (item == Items.AIR && !AIR_ID.equals(id)) {
             throw new AssertionError(
