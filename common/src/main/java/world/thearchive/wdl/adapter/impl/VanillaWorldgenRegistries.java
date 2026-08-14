@@ -6,7 +6,6 @@ package world.thearchive.wdl.adapter.impl;
 import java.util.List;
 import java.util.function.Supplier;
 import net.minecraft.SharedConstants;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.LayeredRegistryAccess;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.RegistryDataLoader;
@@ -89,8 +88,7 @@ final class VanillaWorldgenRegistries {
             // Unlike WorldLoader, the STATIC-layer tags are deliberately left unbound: worldgen codecs store tag
             // references as lazy TagKeys, and this access only builds the presets and encodes WorldGenSettings by
             // id, never generates terrain, so binding block/item tags would be needless work.
-            List<HolderLookup.RegistryLookup<?>> loadingBase = layered.getAccessForLoading(RegistryLayer.WORLDGEN)
-                    .listRegistries().toList();
+            RegistryAccess.Frozen loadingBase = layered.getAccessForLoading(RegistryLayer.WORLDGEN);
             RegistryAccess.Frozen loaded = RegistryDataLoader.load(resources, loadingBase,
                     RegistryDataLoader.WORLDGEN_REGISTRIES);
             return layered.replaceFrom(RegistryLayer.WORLDGEN, loaded).compositeAccess();
