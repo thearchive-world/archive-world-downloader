@@ -73,7 +73,7 @@ public final class WdlNeoForge {
         // hidden in creative, the hotbar in spectator), so the overlay draws in every gamemode; it self-gates F1
         // and blocking screens itself.
         modEventBus.addListener(RegisterGuiLayersEvent.class, event -> event.registerAboveAll(
-                ResourceLocation.fromNamespaceAndPath("wdl", "hud"), WdlHudOverlay::render));
+                new ResourceLocation("wdl", "hud"), WdlHudOverlay::render));
         new NeoForgeOutlineRegistrar().register();
     }
 }

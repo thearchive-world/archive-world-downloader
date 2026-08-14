@@ -16,7 +16,7 @@ import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.core.RimFace;
 
 /**
- * The 1.21.1 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
+ * The 1.20.6 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
  * {@link RenderType#lines()} type, camera-relative. The rectangle's two in-plane axes come from the block cell and its
  * normal axis from the model shape, lifted a small standoff along the face normal, so the rim frames a recessed model
  * (a chest) at block extent yet never z-fights a flush one. Each edge carries its own direction as its normal, because
@@ -30,7 +30,7 @@ public final class RimRendererImpl implements RimRenderer {
     private static final double SURFACE_STANDOFF = 0.02;
 
     // The transformed position and edge normal, reused so neither per-vertex write allocates on the render
-    // path: addVertex(Pose, ...) and setNormal(Pose, ...) each new a Vector3f per call, two per vertex, the
+    // path: vertex(Pose, ...) and normal(Pose, ...) each new a Vector3f per call, two per vertex, the
     // dominant outline allocation under a dense base, and the per-frame path must stay allocation-free.
     // We do both transforms into these fields and write with the no-pose overloads. Render thread only.
     private final Vector3f position = new Vector3f();
@@ -106,13 +106,12 @@ public final class RimRendererImpl implements RimRenderer {
         vertex(lines, pose, width, x2, y2, z2, colorArgb);
     }
 
-    // The lines format is POSITION_COLOR_NORMAL_LINE_WIDTH on this band: the width moved from the old global
-    // RenderSystem.lineWidth to a per-vertex element, so every vertex must set it or the buffer rejects the
-    // vertex ("Missing elements in vertex: LineWidth"). The value is the context's resolved effective width.
+    // The lines format is POSITION_COLOR_NORMAL on this band: it carries no per-vertex width element, so line
+    // width is the global vanilla default and the context's resolved width is threaded here but not applied.
     private void vertex(VertexConsumer lines, PoseStack.Pose pose, float width, float x, float y, float z,
             int colorArgb) {
         pose.pose().transformPosition(x, y, z, position);
-        lines.addVertex(position.x(), position.y(), position.z()).setColor(colorArgb)
-                .setNormal(normal.x(), normal.y(), normal.z());
+        lines.vertex(position.x(), position.y(), position.z()).color(colorArgb)
+                .normal(normal.x(), normal.y(), normal.z()).endVertex();
     }
 }

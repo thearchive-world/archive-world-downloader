@@ -5,7 +5,6 @@ package world.thearchive.wdl.client;
 
 import com.mojang.logging.LogUtils;
 import java.util.OptionalLong;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -86,7 +85,7 @@ public final class WdlHudOverlay {
     }
 
     /** Draw one frame; called per render from each loader's registered HUD element/layer. */
-    public static void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
+    public static void render(GuiGraphics guiGraphics, float partialTick) {
         try {
             Minecraft minecraft = Minecraft.getInstance();
             HudConfig config = Wdl.config().hud();

@@ -730,7 +730,7 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         public void onClick(double mouseX, double mouseY) {
-            Util.getPlatform().openPath(savesDirectory);
+            Util.getPlatform().openFile(savesDirectory.toFile());
         }
 
         @Override
@@ -1283,7 +1283,7 @@ public final class WdlDownloadsScreen extends Screen {
 
             boolean handleEdgeClick(int mouseX, int mouseY) {
                 if (inLine(mouseX, mouseY, this.arrowLeft, this.arrowRight, this.line2Top)) {
-                    Util.getPlatform().openPath(this.folder); // the per-row open-folder affordance
+                    Util.getPlatform().openFile(this.folder.toFile()); // the per-row open-folder affordance
                     return true;
                 }
                 if (this.entry.health() == DownloadHealth.RECOVERABLE && this.recoverLeft >= 0

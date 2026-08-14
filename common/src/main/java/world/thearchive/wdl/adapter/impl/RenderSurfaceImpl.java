@@ -57,7 +57,7 @@ public final class RenderSurfaceImpl implements RenderSurface {
         // around the blit and reset to opaque white after.
         graphics.setColor((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
                 (color & 0xFF) / 255.0F, (color >>> 24) / 255.0F);
-        graphics.blitSprite(ResourceLocation.fromNamespaceAndPath("wdl", sprite), x, y, width, height);
+        graphics.blitSprite(new ResourceLocation("wdl", sprite), x, y, width, height);
         graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
