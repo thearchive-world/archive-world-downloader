@@ -16,6 +16,7 @@ version's notes here before tagging; a release with no matching section fails ra
 ### Fixed
 
 - Containers no longer save the wrong contents after you right-click a mob or place a block.
+- Invisible mobs no longer show a download outline.
 
 ## 1.0.0
 
