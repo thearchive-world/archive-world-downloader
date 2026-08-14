@@ -31,6 +31,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.RecordItem;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.ChunkPos;
@@ -367,7 +368,7 @@ public final class InteractionCapture {
     }
 
     boolean recordJukeboxInsert(BlockState state, BlockPos pos, ItemStack stack) {
-        if (state.getValue(JukeboxBlock.HAS_RECORD) || !stack.has(DataComponents.JUKEBOX_PLAYABLE)
+        if (state.getValue(JukeboxBlock.HAS_RECORD) || !(stack.getItem() instanceof RecordItem)
                 || !isCapturable(pos)) {
             return false; // an occupied jukebox ejects; only a playable disc inserts, and only where it can confirm
         }
@@ -605,16 +606,18 @@ public final class InteractionCapture {
     }
 
     /**
-     * Serialize {@code disc} to a holder carrying the jukebox disc ({@code "RecordItem"}) plus its song-start tick
-     * ({@code "ticks_since_song_started"} = 0, since the disc just started at the click). Vanilla loadAdditional starts
-     * the song player from that tick on load, so the saved jukebox emits the note particles; the disc sound itself
-     * cannot resume on load (an MC limitation, it fires only on the insert event).
+     * Serialize {@code disc} to a holder carrying the jukebox disc ({@code "RecordItem"}) plus the just-started playing
+     * state a fresh insert leaves ({@code "IsPlaying"} true, {@code "RecordStartTick"} and {@code "TickCount"} zero).
+     * Vanilla loadAdditional restores that state, so the saved jukebox plays and emits the note particles; the disc
+     * sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
      */
     static CompoundTag captureRecordItem(ItemStack disc, RegistryAccess registries) {
         RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
         CompoundTag holder = new CompoundTag();
         holder.put("RecordItem", ItemStack.CODEC.encodeStart(ops, disc).getOrThrow());
-        holder.putLong("ticks_since_song_started", 0L);
+        holder.putBoolean("IsPlaying", true);
+        holder.putLong("RecordStartTick", 0L);
+        holder.putLong("TickCount", 0L);
         return holder;
     }
 

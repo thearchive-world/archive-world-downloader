@@ -37,8 +37,8 @@ enum CapturedBlockField {
     ITEMS("Items", null, Shape.LIST),
     /** A lectern's book and the page it is open at, written by {@link LecternSink#merge}. */
     BOOK("Book", "Page", Shape.COMPOUND),
-    /** A jukebox's disc and its song-start tick, written by the interaction holder merge. */
-    RECORD_ITEM("RecordItem", "ticks_since_song_started", Shape.COMPOUND),
+    /** A jukebox's disc and its playing flag, written by the interaction holder merge. */
+    RECORD_ITEM("RecordItem", "IsPlaying", Shape.COMPOUND),
     /** A beehive's occupants, written by the interaction holder merge. */
     BEES("bees", null, Shape.LIST),
     /** A crafter's disabled input slots; vanilla writes an int array, empty when no slot is disabled. */
