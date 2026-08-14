@@ -8,7 +8,6 @@ import java.util.Optional;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.FaviconTexture;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -54,14 +53,17 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void blitSprite(String sprite, int x, int y, int width, int height, int color) {
-        graphics.blitSprite(RenderType::guiTextured, ResourceLocation.fromNamespaceAndPath("wdl", sprite),
-                x, y, width, height, color);
+        // Below 1.21.2 blitSprite takes no tint argument, so the ARGB color is applied as a draw-color multiplier
+        // around the blit and reset to opaque white after.
+        graphics.setColor((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
+                (color & 0xFF) / 255.0F, (color >>> 24) / 255.0F);
+        graphics.blitSprite(ResourceLocation.fromNamespaceAndPath("wdl", sprite), x, y, width, height);
+        graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     @Override
     public void blitFavicon(FaviconTexture icon, int x, int y, int size) {
-        graphics.blit(RenderType::guiTextured, icon.textureLocation(), x, y, 0.0F, 0.0F,
-                size, size, size, size);
+        graphics.blit(icon.textureLocation(), x, y, 0.0F, 0.0F, size, size, size, size);
     }
 
     @Override

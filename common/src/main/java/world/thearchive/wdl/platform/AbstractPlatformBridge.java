@@ -172,10 +172,10 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         }
         Minecraft mc = Minecraft.getInstance();
         SystemToast.SystemToastId id = toast.refusal() ? REFUSAL_TOAST_ID : TOAST_ID;
-        if (toast.refusal() && mc.getToastManager().getToast(SystemToast.class, id) != null) {
+        if (toast.refusal() && mc.getToasts().getToast(SystemToast.class, id) != null) {
             return;
         }
-        mc.getToastManager().addToast(SystemToast.multiline(mc, id,
+        mc.getToasts().addToast(SystemToast.multiline(mc, id,
                 Component.translatable(toast.titleKey()), body));
     }
 
