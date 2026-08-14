@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * 1.21.1 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
+ * 1.20.6 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
  * pre-creates {@code region/} + {@code entities/} so the region writer never sees a missing {@code externalFileDir}
  * (vanilla {@code RegionFile} throws otherwise).
  */

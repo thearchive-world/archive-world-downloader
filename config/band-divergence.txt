@@ -19,7 +19,8 @@
 # Below 1.21.2 the registry-load path has no PendingTags step (TagLoader.loadTagsForExistingRegistries and
 # Registry.PendingTags are 1.21.2 and above), so this shared test bootstrap loads the WORLDGEN registries from the
 # getAccessForLoading base and binds each registry's tags with TagLoader.loadAndBuild plus Registry.bindTags, the
-# pre-1.21.2 forms.
+# pre-1.21.2 forms. Below the 1.21 update the tags directory is TagManager.getTagDir rather than
+# Registries.tagsDirPath.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
 # Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
@@ -44,17 +45,25 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
 common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 
 # Reads the captured section through the band's own ChunkSnapshotSource.SectionData rather than the vanilla
-# SerializableChunkData.SectionData that exists only at 1.21.2 and above.
+# SerializableChunkData.SectionData that exists only at 1.21.2 and above. Below the 1.21 update there is no
+# jukebox_playable item component (a playable disc is a RecordItem instance), and a captured jukebox carries the
+# pre-JukeboxSongPlayer playing state (IsPlaying, RecordStartTick, TickCount).
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
+
+# Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
+# ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying.
+common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 
 # Below 1.21.2 the entity position wire differs: the absolute-only ClientboundTeleportEntityPacket replaces the
 # newer teleport plus ClientboundEntityPositionSyncPacket and PositionMoveRotation, the byte-encoded packet
-# rotations are decoded here, and the single BOAT and CHEST_BOAT types replace the per-wood split.
+# rotations are decoded here, and the single BOAT and CHEST_BOAT types replace the per-wood split. Below the 1.21
+# update VecDeltaCodec has no getBase accessor, so the packet-visible base position is read via decode(0, 0, 0).
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 
 # Below 1.21.2 there is no chunk unsaved-listener, so re-capture polls isUnsaved over the keep-hot buffer here;
 # it also reads the band's ChunkSnapshotSource.SectionData and reconstructs entities via the pre-spawn-reason
-# EntityType.create(Level).
+# EntityType.create(Level). Below the 1.21 update leash state lives on Mob rather than the Leashable interface, so
+# the reconstruct path rebinds a saved leash via Mob.setLeashedTo.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager.
@@ -73,7 +82,9 @@ common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
 # RegistryLookup, not a Registry, below the cut).
 common/src/test/java/world/thearchive/wdl/testsupport/RegistriesSmokeTest.java
 
-# Resolves an item by id via Registry.get, the pre-1.21.2 accessor (renamed getValue at 1.21.2).
+# Resolves an item by id via Registry.get, the pre-1.21.2 accessor (renamed getValue at 1.21.2). Below the 1.21
+# update ResourceLocation has no parse factory, so an id string is built with the public ResourceLocation(String)
+# constructor.
 common/src/test/java/world/thearchive/wdl/testsupport/ItemFixtures.java
 
 # Below 1.21.2 ChunkSerializer.read needs a ServerLevel the headless test lacks, so the round-trip proves
@@ -100,10 +111,6 @@ common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
 # ServerLevel-taking hurtServer is 1.21.2 and above).
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
 
-# The headless entity double overrides hurt(DamageSource, float), the pre-1.21.2 damage entry point (the
-# ServerLevel-taking hurtServer is 1.21.2 and above).
-common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkLeashDegradationTest.java
-
 # The headless mob double overrides hurt(DamageSource, float) (hurtServer with a ServerLevel is 1.21.2 and above) and
 # is built against the HeadlessLevel, since below 1.21.2 the Mob constructor needs a non-null level.
 common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest.java
@@ -111,3 +118,34 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest
 # The geared mob double is built against the HeadlessLevel, since below 1.21.2 the Mob constructor reads
 # level.getProfilerSupplier() and cannot take a null level.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
+
+# Below the 1.21 update the HUD render callback carries a float partial-tick rather than a DeltaTracker, so the
+# shared overlay's render entry point takes a float on this band.
+common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
+
+# Below the 1.21 update Util.OS has no openPath(Path), so the open-folder affordances call openFile(File).
+common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
+
+# Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the HUD-layer id is built with the
+# public ResourceLocation(String, String) constructor.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
+
+# Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
+# with the public ResourceLocation(String, String) constructor.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
+
+# Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
+# with the public ResourceLocation(String, String) constructor.
+common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
+
+# Below the 1.21 update ResourceLocation has no parse factory, so a block-entity id string is built with the public
+# ResourceLocation(String) constructor.
+common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
+
+# Below the 1.21 update a captured jukebox carries the pre-JukeboxSongPlayer playing flag (IsPlaying) rather than
+# the ticks_since_song_started sidecar, so these merge fixtures and assertions use that key.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
+
+# Below the 1.21 update a captured jukebox is marked playing via IsPlaying rather than the ticks_since_song_started
+# sidecar, so this round-trip asserts the playing flag.
+common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
