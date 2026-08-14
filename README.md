@@ -35,6 +35,7 @@ Join a multiplayer server first; there is no download button in singleplayer or 
 
 ## Getting help
 
+- **Chat and community:** join the [Discord](https://discord.gg/eDUscXhtUa) for help, discussion, and release news.
 - **Bugs and crashes:** file an issue on the [issue tracker](https://github.com/thearchive-world/archive-world-downloader/issues) using the report templates.
 - **Usage and configuration:** read the [documentation](https://wdl.docs.thearchive.world/).
 - **Security problems:** do not open a public issue. Follow the [security policy](SECURITY.md).
