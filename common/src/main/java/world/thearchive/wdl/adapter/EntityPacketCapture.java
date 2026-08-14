@@ -13,7 +13,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.network.protocol.game.ClientboundEntityPositionSyncPacket;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
@@ -30,7 +29,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
@@ -87,20 +85,14 @@ final class EntityPacketCapture
      * (a plugin hologram near the player would over-claim teal until the first decoration takes over). Only range-10
      * non-decoration types are otherwise sampled, so this lists only members whose vanilla clientTrackingRange is 10:
      * the range-8 mounts (all minecarts, the mule) are never sampled and need no entry. Re-derive per band from
-     * PlayerRideable, ItemSteerable, AbstractBoat, AbstractHorse, canAddPassenger overrides, and the Display hierarchy,
-     * keeping only the range-10 members; a missing entry over-claims coverage, the failure the measured range exists to
+     * PlayerRideable, ItemSteerable, Boat, AbstractHorse, canAddPassenger overrides, and the Display hierarchy, keeping
+     * only the range-10 members; a missing entry over-claims coverage, the failure the measured range exists to
      * prevent. Interaction is range 10, non-mountable, and absent from vanilla worlds; its real-world use is plugin
      * frameworks that teleport interaction and display pairs to follow players, the hazard profile that excluded the
      * Displays.
      */
     private static final Set<EntityType<?>> RANGE_SAMPLING_EXCLUSIONS = Set.of(
-            EntityType.OAK_BOAT, EntityType.SPRUCE_BOAT, EntityType.BIRCH_BOAT, EntityType.JUNGLE_BOAT,
-            EntityType.ACACIA_BOAT, EntityType.DARK_OAK_BOAT, EntityType.MANGROVE_BOAT, EntityType.CHERRY_BOAT,
-            EntityType.PALE_OAK_BOAT, EntityType.BAMBOO_RAFT,
-            EntityType.OAK_CHEST_BOAT, EntityType.SPRUCE_CHEST_BOAT, EntityType.BIRCH_CHEST_BOAT,
-            EntityType.JUNGLE_CHEST_BOAT, EntityType.ACACIA_CHEST_BOAT, EntityType.DARK_OAK_CHEST_BOAT,
-            EntityType.MANGROVE_CHEST_BOAT, EntityType.CHERRY_CHEST_BOAT, EntityType.PALE_OAK_CHEST_BOAT,
-            EntityType.BAMBOO_CHEST_RAFT,
+            EntityType.BOAT, EntityType.CHEST_BOAT,
             EntityType.HORSE, EntityType.DONKEY, EntityType.SKELETON_HORSE, EntityType.ZOMBIE_HORSE,
             EntityType.CAMEL, EntityType.LLAMA, EntityType.TRADER_LLAMA,
             EntityType.PIG, EntityType.STRIDER,
@@ -183,8 +175,6 @@ final class EntityPacketCapture
             onSetLink(link);
         } else if (packet instanceof ClientboundTeleportEntityPacket teleport) {
             onTeleport(teleport);
-        } else if (packet instanceof ClientboundEntityPositionSyncPacket sync) {
-            onPositionSync(sync);
         }
     }
 
@@ -329,26 +319,15 @@ final class EntityPacketCapture
     }
 
     private void onTeleport(ClientboundTeleportEntityPacket packet) {
-        if (packet.relatives().isEmpty()) {
-            Vec3 position = packet.change().position();
-            sampler.markMovedAbsolute(packet.id(), position.x, position.z);
-        } else {
-            sampler.markMovedRelativeTeleport(packet.id());
-        }
-        EntityPos current = positionOf(packet.id());
+        int id = packet.getId();
+        double x = packet.getX();
+        double y = packet.getY();
+        double z = packet.getZ();
+        sampler.markMovedAbsolute(id, x, z);
+        EntityPos current = positionOf(id);
         if (current != null) {
-            PositionMoveRotation base = new PositionMoveRotation(
-                    new Vec3(current.x(), current.y(), current.z()), Vec3.ZERO, current.yRot(), current.xRot());
-            applyAbsolute(packet.id(), PositionMoveRotation.calculateAbsolute(base, packet.change(),
-                    packet.relatives()));
-        }
-    }
-
-    private void onPositionSync(ClientboundEntityPositionSyncPacket packet) {
-        Vec3 position = packet.values().position();
-        sampler.markMovedAbsolute(packet.id(), position.x, position.z);
-        if (tracks(packet.id())) {
-            applyAbsolute(packet.id(), packet.values());
+            reposition(id, chunkKey(x, z),
+                    new EntityPos(x, y, z, decodeAngle(packet.getyRot()), decodeAngle(packet.getxRot())));
         }
     }
 
@@ -368,8 +347,8 @@ final class EntityPacketCapture
         if (current == null) {
             return;
         }
-        float yRot = move.hasRotation() ? move.getyRot() : current.yRot();
-        float xRot = move.hasRotation() ? move.getxRot() : current.xRot();
+        float yRot = move.hasRotation() ? decodeAngle(move.getyRot()) : current.yRot();
+        float xRot = move.hasRotation() ? decodeAngle(move.getxRot()) : current.xRot();
         if (!move.hasPosition()) {
             recordRotation(id, yRot, xRot);
             return;
@@ -380,17 +359,16 @@ final class EntityPacketCapture
         reposition(id, chunkKey(x, z), new EntityPos(x, y, z, yRot, xRot));
     }
 
-    private void applyAbsolute(int id, PositionMoveRotation values) {
-        Vec3 position = values.position();
-        reposition(id, chunkKey(position.x, position.z),
-                new EntityPos(position.x, position.y, position.z, values.yRot(), values.xRot()));
-    }
-
     private static long chunkKey(double x, double z) {
         return ChunkPos.asLong(Mth.floor(x) >> 4, Mth.floor(z) >> 4);
     }
 
     private static double decodeAxis(double base, short delta) {
         return delta == 0 ? base : (Math.round(base * 4096.0) + delta) / 4096.0;
+    }
+
+    /** Decode a wire-byte rotation (256 units per full turn) to degrees, as vanilla unpacks it. */
+    private static float decodeAngle(byte packed) {
+        return packed * 360 / 256.0F;
     }
 }

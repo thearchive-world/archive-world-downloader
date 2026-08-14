@@ -62,7 +62,6 @@ import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
@@ -94,7 +93,6 @@ import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.saveddata.maps.MapId;
@@ -1601,20 +1599,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Clear-then-attach: clear the chunk's construction-time {@code unsaved=true} FIRST, THEN install the listener, so
-     * the immediate-fire on a still-unsaved chunk does not flag every first-captured chunk dirty. After this the
-     * listener fires only on a real post-capture block-STATE change. The lambda guards on {@link #dirty} being non-null
-     * so it is inert after {@link #finish()} teardown.
+     * Clear the chunk's construction-time {@code unsaved=true} so the first post-capture poll does not flag every
+     * freshly captured chunk dirty. Below the 1.21.2 unsaved-listener there is no change callback, so a real
+     * post-capture block-STATE change re-sets the flag and {@link #pollDirtyChunks} picks it up on the next tick.
      */
     private void attachRecapture(LevelChunk chunk, ChunkPos pos) {
         capturedThisTick.add(pos.toLong());
-        chunk.tryMarkSaved();
-        chunk.setUnsavedListener(changed -> {
-            LongOpenHashSet dirtySet = dirty;
-            if (dirtySet != null) {
-                dirtySet.add(changed.toLong());
-            }
-        });
+        chunk.setUnsaved(false);
     }
 
     /**
@@ -1638,8 +1629,25 @@ public final class LiveCaptureSession implements CaptureController.Session {
             recaptureEditZone(anchor, codec, chunkSource, reencodedThisTick);
         }
         int slice = RecapturePolicy.floorSliceSize(captured.size(), config.recaptureSeconds(), TICKS_PER_SECOND);
+        pollDirtyChunks(chunkSource, dirtySet);
         drainDirtySlice(dirtySet, slice, codec, chunkSource, reencodedThisTick);
         runFloorSlice(slice, codec, chunkSource, reencodedThisTick);
+    }
+
+    /**
+     * Populate the change-driven dirty set by polling {@code isUnsaved()} across the keep-hot buffer. Below the 1.21.2
+     * {@code setUnsavedListener} push there is no change callback, so this pull replaces it. The buffer is bounded to
+     * the keep-hot square around the player, so a full scan per tick stays cheap; it does no encoding, so it spends no
+     * encode budget. Only chunks a real block-state change re-flagged since their last re-encode are added, and each
+     * re-encode clears the flag again ({@link #reencode}), so a chunk re-enters only on a fresh change.
+     */
+    private void pollDirtyChunks(ClientChunkCache chunkSource, LongOpenHashSet dirtySet) {
+        for (ChunkPos pos : captured.keySet()) {
+            LevelChunk chunk = liveChunkAt(chunkSource, pos);
+            if (chunk != null && chunk.isUnsaved()) {
+                dirtySet.add(pos.toLong());
+            }
+        }
     }
 
     /**
@@ -1732,7 +1740,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             captured.put(pos, codec.capture(chunk, registries));
             reencodedThisTick.add(key);
             dirtyRemove(key);
-            chunk.tryMarkSaved(); // re-arm the listener's false->true transition for the next change
+            chunk.setUnsaved(false); // re-arm the unsaved flag so the next block-state change re-flags this chunk
         } catch (RuntimeException e) {
             LOGGER.warn("failed to re-capture chunk {}", pos, e);
         }
@@ -3888,7 +3896,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** Whether any captured section of {@code snapshot} holds a non-air block state. */
     private static boolean hasNonAirBlocks(ChunkSnapshotSource snapshot) {
-        for (SerializableChunkData.SectionData section : snapshot.sections()) {
+        for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
             LevelChunkSection chunkSection = section.chunkSection();
             if (chunkSection != null && !chunkSection.hasOnlyAir()) {
                 return true;
@@ -4432,7 +4440,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private @Nullable Entity reconstructPacketEntity(
             PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> frame) {
         EntityType<?> type = frame.spawn().getType();
-        Entity entity = type.create(level(), EntitySpawnReason.LOAD);
+        Entity entity = type.create(level());
         if (entity == null) {
             return null;
         }
