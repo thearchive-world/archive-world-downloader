@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Discord community
+    url: https://discord.gg/eDUscXhtUa
+    about: Chat, support, and release news. Ask here for quick help before filing an issue.
   - name: Q&A and discussions
     url: https://github.com/thearchive-world/archive-world-downloader/discussions
     about: Usage questions, ideas, and general discussion go here, not the issue tracker.
