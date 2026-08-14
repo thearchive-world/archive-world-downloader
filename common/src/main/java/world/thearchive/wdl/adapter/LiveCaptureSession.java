@@ -63,8 +63,8 @@ import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
 import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.npc.Villager;
@@ -4395,10 +4395,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     rider.startRiding(promoted.entity(), true); // the vehicle's save then nests the rider
                 }
             }
-            if (promoted.frame().leashHolderId() != 0 && promoted.entity() instanceof Leashable leashable) {
+            if (promoted.frame().leashHolderId() != 0 && promoted.entity() instanceof Mob mob) {
                 Entity holder = byId.get(promoted.frame().leashHolderId());
                 if (holder != null) {
-                    leashable.setLeashedTo(holder, false); // saved as the holder's UUID, or a fence knot's block pos
+                    mob.setLeashedTo(holder, false); // saved as the holder's UUID, or a fence knot's block pos
                 }
                 // A holder in a different drained chunk is not resolved here (resolution is within this batch by
                 // int id), so a cross-chunk leashed mob saves unleashed, the leash sibling of the

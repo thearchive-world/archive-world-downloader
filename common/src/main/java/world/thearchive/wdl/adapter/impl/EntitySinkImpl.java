@@ -11,7 +11,6 @@ import net.minecraft.nbt.IntArrayTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.Nullable;
@@ -19,7 +18,7 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.EntitySink;
 
 /**
- * 1.21.1 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
+ * 1.20.6 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
  *
  * <p>Three members (see {@link EntitySink}): {@link #encodeChunk(List, ChunkPos, RegistryAccess, boolean)} serializes
  * the live client entities, {@link #encodeChunk(List, ChunkPos)} builds the entities-region envelope from
@@ -39,7 +38,7 @@ public final class EntitySinkImpl implements EntitySink {
                          // list would otherwise write them twice), removed entities, and player-only vehicles
             }
             CompoundTag entityTag = new CompoundTag();
-            if (saveDroppingUnsavableLeashes(entity, entityTag)) {
+            if (entity.save(entityTag)) {
                 applyMobPersistence(entityTag, entity, forceMobPersistence);
                 entityTags.add(entityTag);
             }
@@ -54,60 +53,14 @@ public final class EntitySinkImpl implements EntitySink {
         // bypassing shouldBeSaved (a one-player vehicle fails it). A ridden mount that finishes then gets dismounted
         // in the downloaded world despawns exactly like any other captured mob, so it gets the same server-side
         // PersistenceRequired restoration the standalone entity path applies via applyMobPersistence (a named mob,
-        // a loot-equipped mob, and every mob under forceMobPersistence). A codec reject throws out of save (leash
-        // gotcha class); the caller isolates it.
+        // a loot-equipped mob, and every mob under forceMobPersistence).
         CompoundTag tag = new CompoundTag();
-        if (!saveDroppingUnsavableLeashes(vehicle, tag)) {
+        if (!vehicle.save(tag)) {
             return null;
         }
         applyMobPersistence(tag, vehicle, forceMobPersistence);
         return tag;
     }
-
-    /**
-     * Save the entity, first detaching any leash the client cannot save from the entity and its passengers. A leash
-     * with neither a resolved holder nor a delayed attachment is what vanilla's {@link Leashable.LeashData} codec
-     * requireNonNulls on, so {@link Entity#save} throws on it; and because save recurses into passengers, a passenger's
-     * unsavable leash aborts the whole vehicle group, dropping a chested mob's container with it. Detaching just those
-     * unsavable leash links loses only the leash, mirroring the reconstruct path which leaves an unresolved leash link
-     * unset. Capture runs on the client main thread, so the detach is unobservable, and every detached leash is
-     * restored before returning so the live entities are unchanged.
-     */
-    private static boolean saveDroppingUnsavableLeashes(Entity entity, CompoundTag out) {
-        List<DetachedLeash> detached = detachIfUnsavable(entity, null);
-        if (entity.isVehicle()) {
-            for (Entity passenger : entity.getIndirectPassengers()) {
-                detached = detachIfUnsavable(passenger, detached);
-            }
-        }
-        try {
-            return entity.save(out);
-        } finally {
-            if (detached != null) {
-                for (DetachedLeash restore : detached) {
-                    restore.leashable().setLeashData(restore.leashData());
-                }
-            }
-        }
-    }
-
-    private static @Nullable List<DetachedLeash> detachIfUnsavable(Entity entity,
-            @Nullable List<DetachedLeash> detached) {
-        if (entity instanceof Leashable leashable) {
-            Leashable.LeashData leashData = leashable.getLeashData();
-            // Vanilla's LeashData codec requireNonNulls a leash with neither a resolved holder nor a delayed
-            // attachment, so save() throws on exactly that state; a resolvable leash still saves normally
-            if (leashData != null && leashData.leashHolder == null && leashData.delayedLeashInfo == null) {
-                List<DetachedLeash> list = detached != null ? detached : new ArrayList<>();
-                list.add(new DetachedLeash(leashable, leashData));
-                leashable.setLeashData(null);
-                return list;
-            }
-        }
-        return detached;
-    }
-
-    private record DetachedLeash(Leashable leashable, Leashable.LeashData leashData) {}
 
     /**
      * Restore the server-authoritative {@code PersistenceRequired} the client never receives. Two vanilla mechanisms

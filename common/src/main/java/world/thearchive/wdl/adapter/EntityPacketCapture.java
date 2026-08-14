@@ -251,7 +251,7 @@ final class EntityPacketCapture
         if (entity.isPassenger() || entity.isVehicle()) {
             return;
         }
-        Vec3 base = entity.getPositionCodec().getBase();
+        Vec3 base = entity.getPositionCodec().decode(0L, 0L, 0L);
         int id = entity.getId();
         sampler.registerSeed(id, base.x, base.z);
         int distanceBlocks = sampler.seedSample(id, playerX, playerZ);
