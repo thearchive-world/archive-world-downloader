@@ -11,7 +11,7 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import world.thearchive.wdl.adapter.MapSink;
 
 /**
- * 1.21.4 map sink: serializes a client {@code MapItemSavedData} via vanilla's own {@code MapItemSavedData.save} (the
+ * 1.21.1 map sink: serializes a client {@code MapItemSavedData} via vanilla's own {@code MapItemSavedData.save} (the
  * pre-1.21.5 {@code SavedData} write), so the captured inner {@code "data"} tag is byte-for-byte what a vanilla
  * {@code data/map_<id>.dat} would hold.
  *
