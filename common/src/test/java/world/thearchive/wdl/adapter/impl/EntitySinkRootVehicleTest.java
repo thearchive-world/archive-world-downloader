@@ -16,7 +16,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -31,6 +30,7 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 import world.thearchive.wdl.adapter.EntitySink;
+import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -154,7 +154,7 @@ class EntitySinkRootVehicleTest {
         protected void readAdditionalSaveData(CompoundTag tag) {}
 
         @Override
-        public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        public boolean hurt(DamageSource source, float amount) {
             return false;
         }
     }
@@ -162,13 +162,7 @@ class EntitySinkRootVehicleTest {
     /** A headless mount double on the {@link Mob} branch, where the persistence restoration applies. */
     private static final class RiddenMountMob extends Mob {
         private RiddenMountMob() {
-            super(EntityType.PIG, null);
-        }
-
-        // The custom-name save reads registryAccess off the level, which is null on this headless entity.
-        @Override
-        public RegistryAccess registryAccess() {
-            return TestRegistries.frozen();
+            super(EntityType.PIG, HeadlessLevel.get());
         }
 
         @Override
@@ -177,7 +171,7 @@ class EntitySinkRootVehicleTest {
         }
 
         @Override
-        public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        public boolean hurt(DamageSource source, float amount) {
             return false;
         }
     }

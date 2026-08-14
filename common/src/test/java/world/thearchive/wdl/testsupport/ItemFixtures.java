@@ -46,7 +46,7 @@ public final class ItemFixtures {
      */
     public static ItemStack stack(String itemId) {
         ResourceLocation id = ResourceLocation.parse(itemId);
-        Item item = BuiltInRegistries.ITEM.getValue(id);
+        Item item = BuiltInRegistries.ITEM.get(id);
         if (item == Items.AIR && !AIR_ID.equals(id)) {
             throw new AssertionError(
                     itemId + " is not a registered item, so this fixture would be silently empty");

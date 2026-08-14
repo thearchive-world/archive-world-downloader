@@ -21,7 +21,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
@@ -50,7 +49,7 @@ public final class SyntheticChunks {
 
     private SyntheticChunks() {}
 
-    /** The height accessor matching {@link #full}: feed this to {@code SerializableChunkData.parse}. */
+    /** The height accessor matching {@link #full}: the min-section and height the round-trip decodes against. */
     public static LevelHeightAccessor heightAccessor() {
         return LevelHeightAccessor.create(MIN_Y, HEIGHT);
     }
@@ -86,16 +85,16 @@ public final class SyntheticChunks {
 
     private static ChunkSnapshotSource fullWithBlockEntities(RegistryAccess registries, boolean lightCorrect,
             List<CompoundTag> blockEntities, boolean checkShape) {
-        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
-        int minSectionY = heightAccessor().getMinSectionY();
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
+        int minSectionY = heightAccessor().getMinSection();
 
         LevelChunkSection bottom = new LevelChunkSection(biomeRegistry);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
         LevelChunkSection air = new LevelChunkSection(biomeRegistry);
 
-        List<SerializableChunkData.SectionData> sections = new ArrayList<>();
-        sections.add(new SerializableChunkData.SectionData(minSectionY, bottom, null, null));
-        sections.add(new SerializableChunkData.SectionData(minSectionY + 1, air, null, null));
+        List<ChunkSnapshotSource.SectionData> sections = new ArrayList<>();
+        sections.add(new ChunkSnapshotSource.SectionData(minSectionY, bottom, null, null));
+        sections.add(new ChunkSnapshotSource.SectionData(minSectionY + 1, air, null, null));
 
         return new Snapshot(
                 new ChunkPos(0, 0), minSectionY, GAME_TIME, 0L, ChunkStatus.FULL,
@@ -138,13 +137,13 @@ public final class SyntheticChunks {
      * so the section lookup ({@code pos.getY() >> 4}) resolves it.
      */
     public static ChunkSnapshotSource withBlockAt(RegistryAccess registries, BlockPos worldPos, BlockState state) {
-        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
         LevelChunkSection section = new LevelChunkSection(biomeRegistry);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
-        List<SerializableChunkData.SectionData> sections = List
-                .of(new SerializableChunkData.SectionData(worldPos.getY() >> 4, section, null, null));
+        List<ChunkSnapshotSource.SectionData> sections = List
+                .of(new ChunkSnapshotSource.SectionData(worldPos.getY() >> 4, section, null, null));
         return new Snapshot(
-                new ChunkPos(worldPos), heightAccessor().getMinSectionY(), GAME_TIME, 0L, ChunkStatus.FULL,
+                new ChunkPos(worldPos), heightAccessor().getMinSection(), GAME_TIME, 0L, ChunkStatus.FULL,
                 true, new EnumMap<>(Heightmap.Types.class), sections, List.of());
     }
 
@@ -168,13 +167,13 @@ public final class SyntheticChunks {
 
     private static ChunkSnapshotSource withBlockEntityAt(RegistryAccess registries, BlockPos worldPos,
             BlockState state, CompoundTag blockEntity, boolean checkShape) {
-        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
         LevelChunkSection section = new LevelChunkSection(biomeRegistry);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
-        List<SerializableChunkData.SectionData> sections = List
-                .of(new SerializableChunkData.SectionData(worldPos.getY() >> 4, section, null, null));
+        List<ChunkSnapshotSource.SectionData> sections = List
+                .of(new ChunkSnapshotSource.SectionData(worldPos.getY() >> 4, section, null, null));
         return new Snapshot(
-                new ChunkPos(worldPos), heightAccessor().getMinSectionY(), GAME_TIME, 0L, ChunkStatus.FULL,
+                new ChunkPos(worldPos), heightAccessor().getMinSection(), GAME_TIME, 0L, ChunkStatus.FULL,
                 true, new EnumMap<>(Heightmap.Types.class), sections, saved(List.of(blockEntity), checkShape));
     }
 
@@ -185,19 +184,19 @@ public final class SyntheticChunks {
      * {@code SectionData} survives write and parse.
      */
     public static ChunkSnapshotSource fullWithLight(RegistryAccess registries) {
-        Registry<Biome> biomeRegistry = registries.lookupOrThrow(Registries.BIOME);
-        int minSectionY = heightAccessor().getMinSectionY();
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
+        int minSectionY = heightAccessor().getMinSection();
 
         LevelChunkSection bottom = new LevelChunkSection(biomeRegistry);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
         LevelChunkSection air = new LevelChunkSection(biomeRegistry);
 
-        List<SerializableChunkData.SectionData> sections = new ArrayList<>();
-        sections.add(new SerializableChunkData.SectionData(minSectionY - 1, null, null,
+        List<ChunkSnapshotSource.SectionData> sections = new ArrayList<>();
+        sections.add(new ChunkSnapshotSource.SectionData(minSectionY - 1, null, null,
                 new DataLayer(lightFill(SKY_LIGHT_FILL))));
-        sections.add(new SerializableChunkData.SectionData(minSectionY, bottom,
+        sections.add(new ChunkSnapshotSource.SectionData(minSectionY, bottom,
                 new DataLayer(lightFill(BLOCK_LIGHT_FILL)), new DataLayer(lightFill(SKY_LIGHT_FILL))));
-        sections.add(new SerializableChunkData.SectionData(minSectionY + 1, air, null,
+        sections.add(new ChunkSnapshotSource.SectionData(minSectionY + 1, air, null,
                 new DataLayer(lightFill(SKY_LIGHT_FILL))));
 
         return new Snapshot(new ChunkPos(0, 0), minSectionY, GAME_TIME, 0L, ChunkStatus.FULL,
@@ -225,6 +224,6 @@ public final class SyntheticChunks {
             ChunkStatus status,
             boolean lightCorrect,
             Map<Heightmap.Types, long[]> heightmaps,
-            List<SerializableChunkData.SectionData> sections,
+            List<ChunkSnapshotSource.SectionData> sections,
             List<CompoundTag> blockEntities) implements ChunkSnapshotSource {}
 }

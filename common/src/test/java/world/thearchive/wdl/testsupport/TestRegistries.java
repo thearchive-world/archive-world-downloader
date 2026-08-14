@@ -4,12 +4,16 @@
 package world.thearchive.wdl.testsupport;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import net.minecraft.SharedConstants;
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Holder;
 import net.minecraft.core.LayeredRegistryAccess;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.RegistryDataLoader;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.server.RegistryLayer;
 import net.minecraft.server.packs.PackResources;
@@ -18,6 +22,8 @@ import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.packs.repository.ServerPacksSource;
 import net.minecraft.server.packs.resources.CloseableResourceManager;
 import net.minecraft.server.packs.resources.MultiPackResourceManager;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.tags.TagKey;
 import net.minecraft.tags.TagLoader;
 
 /**
@@ -68,22 +74,31 @@ public final class TestRegistries {
         List<PackResources> openPacks = packs.openAllSelected();
         CloseableResourceManager resources = new MultiPackResourceManager(PackType.SERVER_DATA, openPacks);
 
-        // Mirror WorldLoader: load tags against the STATIC layer, then load the WORLDGEN registries
-        // (the dynamic ones, biomes are not in BuiltInRegistries) and compose them over STATIC.
+        // Mirror WorldLoader up to the WORLDGEN layer: load the dynamic worldgen registries (the biomes and the rest,
+        // absent from BuiltInRegistries) and compose them over STATIC.
         LayeredRegistryAccess<RegistryLayer> layered = RegistryLayer.createRegistryAccess();
-        List<Registry.PendingTags<?>> pendingTags = TagLoader.loadTagsForExistingRegistries(resources,
-                layered.getLayer(RegistryLayer.STATIC));
         RegistryAccess.Frozen loadingBase = layered.getAccessForLoading(RegistryLayer.WORLDGEN);
-        List<HolderLookup.RegistryLookup<?>> lookups = TagLoader.buildUpdatedLookups(loadingBase, pendingTags);
-        RegistryAccess.Frozen worldgen = RegistryDataLoader.load(resources, lookups,
+        RegistryAccess.Frozen worldgen = RegistryDataLoader.load(resources, loadingBase,
                 RegistryDataLoader.WORLDGEN_REGISTRIES);
+        RegistryAccess.Frozen composite = layered.replaceFrom(RegistryLayer.WORLDGEN, worldgen).compositeAccess();
 
-        // Bind the loaded tags onto the STATIC registries (the updateStaticRegistryTags step WorldLoader runs
-        // last via ReloadableServerResources), so ItemStack.is(tag) resolves against BuiltInRegistries headless.
-        pendingTags.forEach(Registry.PendingTags::apply);
+        // Bind the data-driven tags onto every registry (the TagManager reload the running server runs), so
+        // ItemStack.is(tag) resolves headless. Below 1.21.2 there is no PendingTags step; each registry loads its tag
+        // directory and binds the result, the way ReloadableServerResources.updateStaticRegistryTags does.
+        composite.registries().forEach(entry -> bindRegistryTags(entry, resources));
 
         // Keep resources open (as WorldLoader does): the composite is the long-lived result.
-        frozen = layered.replaceFrom(RegistryLayer.WORLDGEN, worldgen).compositeAccess();
+        frozen = composite;
         return frozen;
+    }
+
+    private static <T> void bindRegistryTags(RegistryAccess.RegistryEntry<T> entry, ResourceManager resources) {
+        ResourceKey<? extends Registry<T>> key = entry.key();
+        Registry<T> registry = entry.value();
+        TagLoader<Holder<T>> loader = new TagLoader<>(registry::getHolder, Registries.tagsDirPath(key));
+        Map<TagKey<T>, List<Holder<T>>> bound = loader.loadAndBuild(resources).entrySet().stream()
+                .collect(Collectors.toUnmodifiableMap(tag -> TagKey.create(key, tag.getKey()),
+                        tag -> List.copyOf(tag.getValue())));
+        registry.bindTags(bound);
     }
 }

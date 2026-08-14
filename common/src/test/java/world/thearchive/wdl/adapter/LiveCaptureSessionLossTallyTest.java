@@ -35,7 +35,6 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.damagesource.DamageSource;
@@ -417,7 +416,7 @@ class LiveCaptureSessionLossTallyTest {
         protected void addAdditionalSaveData(CompoundTag tag) {}
 
         @Override
-        public boolean hurtServer(ServerLevel serverLevel, DamageSource source, float amount) {
+        public boolean hurt(DamageSource source, float amount) {
             return false;
         }
     }

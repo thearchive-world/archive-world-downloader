@@ -9,7 +9,6 @@ import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -77,7 +76,7 @@ class CaptureAnchorTest {
         protected void addAdditionalSaveData(CompoundTag tag) {}
 
         @Override
-        public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        public boolean hurt(DamageSource source, float amount) {
             return false;
         }
     }

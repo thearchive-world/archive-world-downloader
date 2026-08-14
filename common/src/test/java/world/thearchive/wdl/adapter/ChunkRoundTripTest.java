@@ -6,16 +6,26 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.mojang.serialization.Codec;
 import java.nio.file.Path;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
-import net.minecraft.world.level.chunk.storage.SerializableChunkData;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.chunk.PalettedContainerRO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -27,7 +37,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for chunk capture: the mod's
  * {@link ChunkCodec#encode(ChunkSnapshotSource, RegistryAccess, boolean)} slice, written through vanilla's real region
- * pipeline and read back, is self-consistent. Sections decode via {@code SerializableChunkData.parse},
+ * pipeline and read back, is self-consistent. Every section's block-state and biome container decodes,
  * {@code OCEAN_FLOOR} is dropped, and {@code isLightOn} tracks the captured light flag (not a hardcoded {@code true}).
  * Full game-load validity is not exercised headless.
  */
@@ -37,7 +47,6 @@ class ChunkRoundTripTest {
     @Test
     void chunkRoundTripsSelfConsistently(@TempDir Path directory) {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        LevelHeightAccessor heightAccessor = SyntheticChunks.heightAccessor();
 
         CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
         CompoundTag back = RegionRoundTrip.writeThenRead(directory, new ChunkPos(0, 0), tag);
@@ -55,9 +64,7 @@ class ChunkRoundTripTest {
         assertFalse(heightmaps.contains("OCEAN_FLOOR"), "OCEAN_FLOOR must be dropped from the written tag");
         assertTrue(heightmaps.contains("WORLD_SURFACE"), "client-sent heightmaps must be kept");
 
-        // The serverless parse proves codec self-consistency (block-state/biome containers decode).
-        SerializableChunkData parsed = SerializableChunkData.parse(heightAccessor, registries, back);
-        assertNotNull(parsed, "parse() must accept the round-tripped tag");
+        assertSectionsDecode(back, registries);
     }
 
     @Test
@@ -75,7 +82,7 @@ class ChunkRoundTripTest {
     void capturedLightRoundTripsInVanillaShape(@TempDir Path directory) {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelHeightAccessor heightAccessor = SyntheticChunks.heightAccessor();
-        int minSectionY = heightAccessor.getMinSectionY();
+        int minSectionY = heightAccessor.getMinSection();
 
         CompoundTag tag = codec.encode(SyntheticChunks.fullWithLight(registries), registries, false);
         CompoundTag back = RegionRoundTrip.writeThenRead(directory, new ChunkPos(0, 0), tag);
@@ -93,8 +100,7 @@ class ChunkRoundTripTest {
                 padding.getByteArray("SkyLight"), "below-chunk padding sky light survives");
         assertFalse(padding.contains("block_states"), "padding section carries no block states");
 
-        assertNotNull(SerializableChunkData.parse(heightAccessor, registries, back),
-                "parse() must accept a lit tag with a padding section");
+        assertSectionsDecode(back, registries);
     }
 
     /** The written section tag with the given Y, failing the test if absent. */
@@ -103,5 +109,29 @@ class ChunkRoundTripTest {
                 .filter(section -> (section.contains("Y") ? section.getByte("Y") : Byte.MIN_VALUE) == sectionY)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no written section at Y=" + sectionY));
+    }
+
+    /**
+     * Serverless self-consistency: every written section's block-state and biome container decodes through the same
+     * vanilla codecs the codec encoded them with. Below 1.21.2 the full {@code ChunkSerializer.read} needs a
+     * {@code ServerLevel} the headless test has none of, so the section containers are decoded directly instead.
+     */
+    private static void assertSectionsDecode(CompoundTag chunkTag, RegistryAccess registries) {
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
+        Codec<PalettedContainer<BlockState>> blockStateCodec = PalettedContainer.codecRW(
+                Block.BLOCK_STATE_REGISTRY, BlockState.CODEC, PalettedContainer.Strategy.SECTION_STATES,
+                Blocks.AIR.defaultBlockState());
+        Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec = PalettedContainer.codecRO(
+                biomeRegistry.asHolderIdMap(), biomeRegistry.holderByNameCodec(),
+                PalettedContainer.Strategy.SECTION_BIOMES, biomeRegistry.getHolderOrThrow(Biomes.PLAINS));
+        for (Tag sectionTag : chunkTag.getList("sections", Tag.TAG_COMPOUND)) {
+            CompoundTag section = (CompoundTag) sectionTag;
+            if (section.contains("block_states")) {
+                assertTrue(blockStateCodec.parse(NbtOps.INSTANCE, section.get("block_states")).result().isPresent(),
+                        "block_states must decode");
+                assertTrue(biomeCodec.parse(NbtOps.INSTANCE, section.get("biomes")).result().isPresent(),
+                        "biomes must decode");
+            }
+        }
     }
 }

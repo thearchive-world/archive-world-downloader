@@ -13,7 +13,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.chunk.storage.SerializableChunkData;
 import net.minecraft.world.level.levelgen.Heightmap;
 import org.junit.jupiter.api.Test;
 
@@ -60,6 +59,6 @@ class ChunkCodecImplTest {
 
     private record TestSnapshot(ChunkPos chunkPos, int minSectionY, long gameTime, long inhabitedTime,
             ChunkStatus status, boolean lightCorrect, Map<Heightmap.Types, long[]> heightmaps,
-            List<SerializableChunkData.SectionData> sections, List<CompoundTag> blockEntities)
+            List<ChunkSnapshotSource.SectionData> sections, List<CompoundTag> blockEntities)
             implements ChunkSnapshotSource {}
 }

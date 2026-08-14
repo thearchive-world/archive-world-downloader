@@ -28,7 +28,7 @@ class RegistriesSmokeTest {
         // PLAINS present in the dynamic BIOME registry, else getOrThrow throws.
         assertNotNull(registries.lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.PLAINS));
 
-        // The biome-registry read the 1.21.4 chunk codec makes when it builds a section.
-        assertNotNull(new LevelChunkSection(registries.lookupOrThrow(Registries.BIOME)));
+        // The biome-registry read the 1.21.1 chunk codec makes when it builds a section.
+        assertNotNull(new LevelChunkSection(registries.registryOrThrow(Registries.BIOME)));
     }
 }

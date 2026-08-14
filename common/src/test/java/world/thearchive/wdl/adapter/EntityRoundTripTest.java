@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.util.List;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
@@ -92,8 +91,9 @@ class EntityRoundTripTest {
 
         assertTrue((tag.contains("DataVersion") ? tag.getInt("DataVersion") : -1) > 0,
                 "must stamp a current DataVersion");
-        assertEquals(pos, ChunkPos.CODEC.parse(NbtOps.INSTANCE, tag.get("Position")).result().orElseThrow(),
-                "Position must encode the chunk pos via ChunkPos.CODEC");
+        int[] position = tag.getIntArray("Position");
+        assertEquals(pos, new ChunkPos(position[0], position[1]),
+                "Position must encode the chunk pos as [x, z]");
 
         ListTag entities = tag.getList("Entities", Tag.TAG_COMPOUND);
         assertEquals(2, entities.size(), "both entity tags must be retained in the Entities list");
@@ -131,8 +131,8 @@ class EntityRoundTripTest {
             for (int i = 0; i < positions.size(); i++) {
                 CompoundTag back = in.read(positions.get(i)).join()
                         .orElseThrow(() -> new AssertionError("missing entity-chunk"));
-                assertEquals(positions.get(i),
-                        ChunkPos.CODEC.parse(NbtOps.INSTANCE, back.get("Position")).result().orElseThrow(),
+                int[] position = back.getIntArray("Position");
+                assertEquals(positions.get(i), new ChunkPos(position[0], position[1]),
                         "Position must survive the region round-trip");
                 ListTag entities = back.getList("Entities", Tag.TAG_COMPOUND);
                 assertEquals(1, entities.size());

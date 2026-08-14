@@ -16,6 +16,7 @@ import net.minecraft.world.item.Items;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -119,12 +120,12 @@ class NaturalEquipmentTest {
         assertFalse(NaturalEquipment.wasLootEquipped(pig), "a type with no spawn-gear profile is never inferred");
     }
 
-    /** A Mob double with a null level whose gear is served straight from the map, avoiding equipment machinery. */
+    /** A Mob double whose gear is served straight from the map, avoiding equipment machinery. */
     private static final class GearedMob extends Mob {
         private final Map<EquipmentSlot, ItemStack> gear;
 
         GearedMob(EntityType<? extends Mob> type, Map<EquipmentSlot, ItemStack> gear) {
-            super(type, null);
+            super(type, HeadlessLevel.get());
             this.gear = gear;
         }
 

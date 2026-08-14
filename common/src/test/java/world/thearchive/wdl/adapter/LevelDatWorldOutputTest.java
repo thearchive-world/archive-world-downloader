@@ -15,7 +15,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.PrimaryLevelData;
@@ -45,8 +44,7 @@ class LevelDatWorldOutputTest {
 
     private GameRules gameRules(LevelDataWriter.LevelData built) {
         DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
-        return new GameRules(FeatureFlags.DEFAULT_FLAGS,
-                new Dynamic<>(ops, dataTag(built).getCompound("GameRules")));
+        return new GameRules(new Dynamic<>(ops, dataTag(built).getCompound("GameRules")));
     }
 
     private static WorldOutputConfig with(String key, String value) {
