@@ -55,15 +55,27 @@ jobs:
         with:
           persist-credentials: false
 
+      # A band whose Minecraft version predates fabric-client-gametest-api-v1 (first shipped at 1.21.4) sets
+      # client_gametest=false, and fabric/build.gradle.kts then leaves runClientGameTest unregistered. Resolve
+      # the same flag here so the tier skips cleanly on those bands instead of invoking a task that does not
+      # exist; an absent key defaults to enabled, so every 1.21.4-and-later band runs the tier unchanged.
+      - name: Resolve whether this band registers the client gametest tier
+        id: tier
+        run: |
+          enabled="$(sed -n 's/^client_gametest=//p' gradle.properties | tail -n1 | tr -d '[:space:]')"
+          echo "enabled=${enabled:-true}" >> "$GITHUB_OUTPUT"
+
       - name: Resolve the build JDK
         # setup-java cannot read a .properties file, so this branch's own coordinate is lifted here.
         id: jdk
+        if: steps.tier.outputs.enabled == 'true'
         run: |
           version="$(sed -n 's/^java_build_version=//p' gradle.properties | tail -n1 | tr -d '[:space:]')"
           [ -n "$version" ] || { echo "no java_build_version=<jdk> line in gradle.properties" >&2; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up the build JDK (Temurin)
+        if: steps.tier.outputs.enabled == 'true'
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
         with:
           distribution: temurin
@@ -72,6 +84,7 @@ jobs:
       - name: Set up Gradle
         # basic is the MIT caching provider. The v6 default routes caching through the proprietary
         # gradle-actions-caching library, whose terms every fork's CI would otherwise accept silently.
+        if: steps.tier.outputs.enabled == 'true'
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
         with:
           cache-provider: basic
@@ -79,12 +92,14 @@ jobs:
       # xvfb supplies the virtual framebuffer; libgl1-mesa-dri supplies the llvmpipe software rasterizer the
       # client's GL context needs on a runner with no GPU (it is usually preinstalled, but pin it explicitly).
       - name: Install Xvfb + software OpenGL (virtual framebuffer for the headless client)
+        if: steps.tier.outputs.enabled == 'true'
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
 
       # LIBGL_ALWAYS_SOFTWARE pins mesa to llvmpipe so GL never tries a (nonexistent) GPU. --no-configuration-cache
       # is required because the Loom run task reads a stale argFile under the configuration cache (enabled in
       # gradle.properties), which fails on cache reuse.
       - name: Run the Fabric capture-verification tier (headless client)
+        if: steps.tier.outputs.enabled == 'true'
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: xvfb-run -a ./gradlew :fabric:runClientGameTest --no-configuration-cache --stacktrace
@@ -93,7 +108,7 @@ jobs:
       # green run and carries the failing frame otherwise. if-no-files-found: ignore keeps a green run (and a
       # future run-dir path change) from failing the step; it is post-mortem only.
       - name: Upload gametest screenshots
-        if: failure()
+        if: ${{ failure() && steps.tier.outputs.enabled == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: capture-verification-screenshots
