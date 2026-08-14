@@ -384,6 +384,9 @@ public final class OutlineTracker {
                 cameraPos.y + clamp, cameraPos.z + clamp);
         for (Entity entity : level.getEntitiesOfClass(Entity.class, clampBox,
                 candidate -> isContainerEntity(candidate) || isTradeableMerchant(candidate))) {
+            if (entity.isInvisible()) {
+                continue; // an invisible mob's body does not render, so its rim would reveal it: a fairness leak
+            }
             Vec3 center = entity.position();
             if (!OutlineClamp.isWithin(cameraPos.x, cameraPos.y, cameraPos.z, center.x, center.y, center.z, clamp)) {
                 continue;
