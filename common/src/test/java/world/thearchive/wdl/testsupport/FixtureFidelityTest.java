@@ -113,11 +113,11 @@ class FixtureFidelityTest {
 
     @Test
     void aBlockEntityTagMissingAnAlwaysWrittenStateKeyIsRejected() {
-        CompoundTag crafter = BlockEntityFixtures.blockEntity("minecraft:crafter", 6, 64, 6);
-        crafter.remove("triggered");
+        CompoundTag brewingStand = BlockEntityFixtures.blockEntity("minecraft:brewing_stand", 6, 64, 6);
+        brewingStand.remove("BrewTime");
 
-        String message = reject(() -> FixtureFidelity.assertBlockEntityShape(crafter));
-        assertTrue(message.contains("triggered"), "the divergence must name the omitted key: " + message);
+        String message = reject(() -> FixtureFidelity.assertBlockEntityShape(brewingStand));
+        assertTrue(message.contains("BrewTime"), "the divergence must name the omitted key: " + message);
     }
 
     @Test

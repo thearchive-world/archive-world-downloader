@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -158,9 +157,9 @@ class ChunkFlushPlanTest {
     void theReadMergeHonorsTheOpenTimePositionsItWasBuiltWith() {
         // Both fresh sides read as the client defaults, which is the whole difficulty: only the position set
         // says whether that default was captured from a re-opened menu or never captured at all.
-        CompoundTag onDisk = chunkTagWith(crafter(6, 64, 6, new int[] { 2, 5 }, 1));
-        CompoundTag freshReopened = chunkTagWith(crafter(6, 64, 6, new int[0], 0));
-        CompoundTag freshRewalked = chunkTagWith(crafter(6, 64, 6, new int[0], 0));
+        CompoundTag onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
+        CompoundTag freshReopened = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
+        CompoundTag freshRewalked = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
         LongSet openTimeCaptured = ChunkMerge.capturedPositions(List.of(new BlockPos(6, 64, 6)));
 
         int withPosition = ChunkFlushPlan.readMerge(ChunkMerge.occupancyMap(), openTimeCaptured, LongSet.of())
@@ -168,13 +167,14 @@ class ChunkFlushPlanTest {
         int withoutPosition = ChunkFlushPlan.readMerge(ChunkMerge.occupancyMap(), LongSet.of(), LongSet.of())
                 .merge(onDisk.copy(), freshRewalked);
 
-        assertEquals(0, withPosition, "a crafter re-opened this session captured its own state, nothing carries back");
-        assertArrayEquals(new int[0],
-                findByPos(freshReopened, 6, 64, 6).getIntArray("disabled_slots"),
+        assertEquals(0, withPosition,
+                "a brewing stand re-opened this session captured its own state, nothing carries back");
+        assertEquals((short) 0,
+                findByPos(freshReopened, 6, 64, 6).getShort("BrewTime"),
                 "so the state the re-open captured survives");
         assertEquals(1, withoutPosition, "and without the position the prior state does carry forward");
-        assertArrayEquals(new int[] { 2, 5 },
-                findByPos(freshRewalked, 6, 64, 6).getIntArray("disabled_slots"),
+        assertEquals((short) 220,
+                findByPos(freshRewalked, 6, 64, 6).getShort("BrewTime"),
                 "which is what proves the set is read rather than ignored");
     }
 
@@ -200,20 +200,20 @@ class ChunkFlushPlanTest {
 
     @Test
     void theComposedReadMergeDerivesTheOpenTimePositionsFromTheLandingHolders() {
-        BlockPos crafterPos = new BlockPos(6, 64, 6);
-        ChunkSnapshotSource snapshot = snapshotOf(blockEntity("minecraft:crafter", 6, 64, 6));
-        CompoundTag onDisk = chunkTagWith(crafter(6, 64, 6, new int[] { 2, 5 }, 1));
-        CompoundTag freshReopened = chunkTagWith(crafter(6, 64, 6, new int[0], 0));
-        CompoundTag freshRewalked = chunkTagWith(crafter(6, 64, 6, new int[0], 0));
+        BlockPos pos = new BlockPos(6, 64, 6);
+        ChunkSnapshotSource snapshot = snapshotOf(blockEntity("minecraft:brewing_stand", 6, 64, 6));
+        CompoundTag onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
+        CompoundTag freshReopened = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
+        CompoundTag freshRewalked = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
 
-        int landed = ChunkFlushPlan.readMerge(snapshot, List.of(crafterPos), LongSet.of())
+        int landed = ChunkFlushPlan.readMerge(snapshot, List.of(pos), LongSet.of())
                 .merge(onDisk.copy(), freshReopened);
         int none = ChunkFlushPlan.readMerge(snapshot, List.of(), LongSet.of()).merge(onDisk.copy(), freshRewalked);
 
         assertEquals(0, landed, "a position named as landing captured its own state, so nothing carries back");
         assertEquals(1, none, "and one not named carries the prior state forward");
-        assertArrayEquals(new int[] { 2, 5 },
-                findByPos(freshRewalked, 6, 64, 6).getIntArray("disabled_slots"),
+        assertEquals((short) 220,
+                findByPos(freshRewalked, 6, 64, 6).getShort("BrewTime"),
                 "which is what proves the landing list reaches the merge rather than being dropped");
     }
 
@@ -221,8 +221,8 @@ class ChunkFlushPlanTest {
     void landingHolderPositionsIsWhatTheComposedReadMergeShouldBeGiven() {
         // The list handed to the composed merge has to be the LANDING holders, not every drained one: a holder
         // the fold drops writes no state, and calling it captured would blank what an earlier visit saved.
-        CompoundTag crafterTag = blockEntity("minecraft:crafter", 6, 64, 6);
-        ChunkSnapshotSource snapshot = snapshotOf(crafterTag);
+        CompoundTag brewingStandTag = blockEntity("minecraft:brewing_stand", 6, 64, 6);
+        ChunkSnapshotSource snapshot = snapshotOf(brewingStandTag);
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(6, 64, 6), itemsHolder("minecraft:diamond"));
         holders.put(new BlockPos(9, 64, 9), itemsHolder("minecraft:dirt")); // no block entity captured here
@@ -233,11 +233,11 @@ class ChunkFlushPlanTest {
                 "the position with no captured block entity is not a landing holder");
     }
 
-    /** A crafter carrying the two state keys vanilla writes unconditionally, at the given values. */
-    private static CompoundTag crafter(int x, int y, int z, int[] disabledSlots, int triggered) {
-        CompoundTag tag = blockEntity("minecraft:crafter", x, y, z);
-        tag.putIntArray("disabled_slots", disabledSlots);
-        tag.putInt("triggered", triggered);
+    /** A brewing stand carrying the two state keys vanilla writes unconditionally, at the given values. */
+    private static CompoundTag brewingStand(int x, int y, int z, short brewTime, byte fuel) {
+        CompoundTag tag = blockEntity("minecraft:brewing_stand", x, y, z);
+        tag.putShort("BrewTime", brewTime);
+        tag.putByte("Fuel", fuel);
         return tag;
     }
 

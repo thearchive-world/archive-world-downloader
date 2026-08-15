@@ -12,7 +12,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.profiling.InactiveProfiler;
-import net.minecraft.world.TickRateManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.flag.FeatureFlagSet;
@@ -115,11 +114,6 @@ public final class HeadlessLevel extends Level {
 
     @Override
     public @Nullable Entity getEntity(int id) {
-        return null;
-    }
-
-    @Override
-    public @Nullable TickRateManager tickRateManager() {
         return null;
     }
 

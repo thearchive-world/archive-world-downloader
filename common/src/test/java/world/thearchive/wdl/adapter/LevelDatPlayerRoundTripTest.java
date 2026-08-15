@@ -15,7 +15,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.Difficulty;
@@ -58,7 +57,7 @@ class LevelDatPlayerRoundTripTest {
             writer.save(access, built, player);
         }
         Path levelDat = saves.resolve(name).resolve("level.dat");
-        return NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompound("Data");
+        return NbtIo.readCompressed(levelDat.toFile()).getCompound("Data");
     }
 
     @Test

@@ -16,7 +16,6 @@ import java.nio.file.Path;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
@@ -54,8 +53,8 @@ class LevelDatRoundTripTest {
         Path levelDat = directory.resolve("level.dat");
         CompoundTag root = new CompoundTag();
         root.put("Data", dataTag);
-        NbtIo.writeCompressed(root, levelDat);
-        CompoundTag back = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompound("Data");
+        NbtIo.writeCompressed(root, levelDat.toFile());
+        CompoundTag back = NbtIo.readCompressed(levelDat.toFile()).getCompound("Data");
 
         assertTrue((back.contains("DataVersion") ? back.getInt("DataVersion") : -1) > 0, "DataVersion survives");
         assertTrue(back.contains("SpawnX"), "spawn survives");
@@ -96,7 +95,7 @@ class LevelDatRoundTripTest {
         Path levelDat = saves.resolve("wdltest").resolve("level.dat");
         assertTrue(Files.exists(levelDat), "save() must write level.dat via the vanilla LevelStorageAccess envelope");
 
-        CompoundTag data = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompound("Data");
+        CompoundTag data = NbtIo.readCompressed(levelDat.toFile()).getCompound("Data");
         DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, built.registries());
         assertTrue((data.contains("DataVersion") ? data.getInt("DataVersion") : -1) > 0,
                 "DataVersion survives the production save");
@@ -130,7 +129,7 @@ class LevelDatRoundTripTest {
     }
 
     private static String levelName(Path worldFolder) throws IOException {
-        CompoundTag data = NbtIo.readCompressed(worldFolder.resolve("level.dat"), NbtAccounter.unlimitedHeap())
+        CompoundTag data = NbtIo.readCompressed(worldFolder.resolve("level.dat").toFile())
                 .getCompound("Data");
         return data.getString("LevelName");
     }

@@ -14,7 +14,6 @@ import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -57,8 +56,7 @@ class MapWriteTaskTest {
         LiveCaptureSession.mapWriteTask(dataDirectory, "map_7", mapData(), failures, lossLog()).run();
 
         assertEquals(0, failures.get(), "a successful write counts no failure");
-        CompoundTag envelope = NbtIo.readCompressed(dataDirectory.resolve("map_7.dat"),
-                NbtAccounter.unlimitedHeap());
+        CompoundTag envelope = NbtIo.readCompressed(dataDirectory.resolve("map_7.dat").toFile());
         assertEquals("minecraft:overworld", envelope.getCompound("data").getString("dimension"),
                 "the map reached disk under its key carrying the caller's own tag");
     }

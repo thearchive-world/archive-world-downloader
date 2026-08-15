@@ -150,9 +150,10 @@ class ContainerStashMergeTest {
     void whitelistedStateKeysReachTheMergedBlockEntity() {
         // Gate 1 (recordedTypeMatches) runs before the merge and drops the entry when the holder's
         // wdl_block_entity_id does not equal the block entity's saved id, so the block entity id here MUST be
-        // minecraft:crafter to match the holder's claim, or all four state-key assertions would fail on correct code.
-        BlockPos crafterPos = new BlockPos(10, 70, 20);
-        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:crafter", 10, 70, 20));
+        // minecraft:brewing_stand to match the holder's claim, or all four state-key assertions would fail on correct
+        // code.
+        BlockPos pos = new BlockPos(10, 70, 20);
+        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:brewing_stand", 10, 70, 20));
 
         CompoundTag holder = new CompoundTag();
         holder.put("Items", new ListTag());
@@ -160,7 +161,7 @@ class ContainerStashMergeTest {
         holder.putInt("triggered", 1);
         holder.putShort("BrewTime", (short) 123);
         holder.putByte("Fuel", (byte) 7);
-        holder.putString("wdl_block_entity_id", "minecraft:crafter");
+        holder.putString("wdl_block_entity_id", "minecraft:brewing_stand");
         holder.putString("junk", "never");
         // The three captured content keys the sink does not own. They are what tells a whitelist keyed on
         // open-time state apart from one that copies whatever it recognizes: a key this mod captures is not
@@ -170,9 +171,9 @@ class ContainerStashMergeTest {
         holder.put("bees", BlockEntityFixtures.bees(20));
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
-        stash.put(crafterPos, holder);
+        stash.put(pos, holder);
 
-        ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(crafterPos), stash);
+        ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(pos), stash);
 
         CompoundTag mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
         assertArrayEquals(new int[] { 0, 4 }, mergedBlockEntity.getIntArray("disabled_slots"));
@@ -188,26 +189,26 @@ class ContainerStashMergeTest {
 
     @Test
     void holderWithoutStateKeysMergesItemsOnly() {
-        BlockPos crafterPos = new BlockPos(10, 70, 20);
-        // The captured crafter carries NON-default state, so "the merge left it alone" is distinguishable from
+        BlockPos pos = new BlockPos(10, 70, 20);
+        // The captured brewing stand carries NON-default state, so "the merge left it alone" is distinguishable from
         // "the merge rewrote it with defaults". At the producer defaults the two are the same tag.
-        CompoundTag crafter = blockEntity("minecraft:crafter", 10, 70, 20);
-        crafter.putIntArray("disabled_slots", new int[] { 2, 5 });
-        crafter.putInt("triggered", 1);
-        CompoundTag chunkTag = chunkTagWith(crafter);
+        CompoundTag brewingStand = blockEntity("minecraft:brewing_stand", 10, 70, 20);
+        brewingStand.putShort("BrewTime", (short) 220);
+        brewingStand.putByte("Fuel", (byte) 12);
+        CompoundTag chunkTag = chunkTagWith(brewingStand);
 
         CompoundTag holder = new CompoundTag();
         holder.put("Items", new ListTag());
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
-        stash.put(crafterPos, holder);
+        stash.put(pos, holder);
 
-        ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(crafterPos), stash);
+        ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(pos), stash);
 
         CompoundTag mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
-        assertArrayEquals(new int[] { 2, 5 }, mergedBlockEntity.getIntArray("disabled_slots"));
-        assertEquals(1, (mergedBlockEntity.contains("triggered") ? mergedBlockEntity.getInt("triggered") : -1));
-        assertFalse(mergedBlockEntity.contains("BrewTime"));
-        assertFalse(mergedBlockEntity.contains("Fuel"));
+        assertEquals((short) 220, mergedBlockEntity.getShort("BrewTime"));
+        assertEquals((byte) 12, (mergedBlockEntity.contains("Fuel") ? mergedBlockEntity.getByte("Fuel") : (byte) -1));
+        assertFalse(mergedBlockEntity.contains("disabled_slots"));
+        assertFalse(mergedBlockEntity.contains("triggered"));
     }
 }

@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -392,23 +391,6 @@ class ChunkMergeTest {
         return slots;
     }
 
-    /**
-     * A crafter block entity. Both state keys are always present, because vanilla's saveAdditional writes them
-     * unconditionally and this mod's chunk capture serializes the client's own block entity: a fixture that omits them
-     * is a shape vanilla never produces, and a carry-forward tested against it proves nothing.
-     */
-    private static CompoundTag crafter(int x, int y, int z, int[] disabledSlots, int triggered) {
-        CompoundTag blockEntity = blockEntity("minecraft:crafter", x, y, z);
-        blockEntity.putIntArray("disabled_slots", disabledSlots);
-        blockEntity.putInt("triggered", triggered);
-        return blockEntity;
-    }
-
-    /** A crafter as the client re-captures one it never opened: the keys present, at their client defaults. */
-    private static CompoundTag freshCrafter(int x, int y, int z) {
-        return crafter(x, y, z, new int[0], 0);
-    }
-
     private static CompoundTag brewingStand(int x, int y, int z, short brewTime, byte fuel) {
         CompoundTag blockEntity = blockEntity("minecraft:brewing_stand", x, y, z);
         blockEntity.putShort("BrewTime", brewTime);
@@ -561,36 +543,20 @@ class ChunkMergeTest {
     }
 
     @Test
-    void aCrafterKeepsItsOpenTimeStateAcrossAnyRewrite() {
-        // The open-time merge writes these beside "Items"; a re-walk that never re-opens the crafter re-captures
-        // it bare, so without the carry-forward the re-write drops the state the earlier open captured.
-        CompoundTag onDisk = chunkTagWith(crafter(6, 64, 6, new int[] { 2, 5 }, 1));
-        CompoundTag fresh = chunkTagWith(freshCrafter(6, 64, 6));
-
-        int mergeBacks = ChunkMerge.merge(onDisk, fresh);
-
-        assertEquals(1, mergeBacks, "the crafter carried forward");
-        CompoundTag merged = findByPos(fresh, 6, 64, 6);
-        assertArrayEquals(new int[] { 2, 5 }, merged.getIntArray("disabled_slots"),
-                "the disabled slots survive the re-write");
-        assertEquals(1, (merged.contains("triggered") ? merged.getInt("triggered") : -1), "and the powered flag");
-    }
-
-    @Test
-    void aReOpenedCrafterKeepsItsFresherState() {
-        // A crafter the player re-opened is captured from its menu, so its state is a real capture even where
+    void aReOpenedBrewingStandKeepsItsFresherState() {
+        // A brewing stand the player re-opened is captured from its menu, so its state is a real capture even where
         // every value happens to read as the client default. Naming the position is what says so; without it
         // the merge cannot tell a captured zero from a never-captured one and would carry the stale value.
-        CompoundTag onDisk = chunkTagWith(crafter(6, 64, 6, new int[] { 2, 5 }, 1));
-        CompoundTag fresh = chunkTagWith(crafter(6, 64, 6, new int[] { 7 }, 0));
+        CompoundTag onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
+        CompoundTag fresh = chunkTagWith(brewingStand(6, 64, 6, (short) 60, (byte) 0));
         LongSet reopened = ChunkMerge.capturedPositions(List.of(new BlockPos(6, 64, 6)));
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), reopened, LongSet.of()),
                 "the fresh open is authoritative");
         CompoundTag merged = findByPos(fresh, 6, 64, 6);
-        assertArrayEquals(new int[] { 7 }, merged.getIntArray("disabled_slots"));
-        assertEquals(0, (merged.contains("triggered") ? merged.getInt("triggered") : -1),
-                "a re-open that saw the crafter unpowered keeps that, rather than inheriting the stale flag");
+        assertEquals((short) 60, merged.getShort("BrewTime"));
+        assertEquals((byte) 0, (merged.contains("Fuel") ? merged.getByte("Fuel") : (byte) -1),
+                "a re-open that saw the stand out of fuel keeps that, rather than inheriting the stale fuel");
     }
 
     @Test
@@ -652,17 +618,17 @@ class ChunkMergeTest {
         // capture whatever the position set says, and must not be replaced by the older on-disk one. Both state
         // keys are non-default here, so nothing at all is left for the carry to do and the count says so; with
         // one of them at its default that key carries, and the count could not tell the two halves apart.
-        CompoundTag onDisk = chunkTagWith(crafter(6, 64, 6, new int[] { 2, 5 }, 1));
-        CompoundTag fresh = chunkTagWith(crafter(6, 64, 6, new int[] { 8 }, 1));
+        CompoundTag onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
+        CompoundTag fresh = chunkTagWith(brewingStand(6, 64, 6, (short) 180, (byte) 7));
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSet.of(), LongSet.of()),
                 "a block entity whose every field is its own capture is not a carry-forward");
 
         CompoundTag merged = findByPos(fresh, 6, 64, 6);
-        assertArrayEquals(new int[] { 8 }, merged.getIntArray("disabled_slots"),
+        assertEquals((short) 180, merged.getShort("BrewTime"),
                 "the fresh non-default capture stands");
-        assertEquals(1, (merged.contains("triggered") ? merged.getInt("triggered") : -1),
-                "and so does the flag it captured beside it");
+        assertEquals((byte) 7, (merged.contains("Fuel") ? merged.getByte("Fuel") : (byte) -1),
+                "and so does the value it captured beside it");
     }
 
     @Test
@@ -690,10 +656,8 @@ class ChunkMergeTest {
 
     @Test
     void hasCapturedContentRejectsOpenTimeStateAlone() {
-        // A crafter carries state on every visit once opened; counting it as content would tell the resume
+        // A brewing stand carries state on every visit once opened; counting it as content would tell the resume
         // outline the container was recovered when nothing of its contents was.
-        assertFalse(ChunkMerge.hasCapturedContent(crafter(0, 0, 0, new int[] { 1 }, 1)),
-                "state without items is not captured content");
         assertFalse(ChunkMerge.hasCapturedContent(brewingStand(0, 0, 0, (short) 20, (byte) 3)),
                 "a brewing stand's ticks and fuel are not captured content");
     }
