@@ -18,7 +18,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -29,8 +29,8 @@ import world.thearchive.wdl.core.SaveProgress;
  * client render thread never blocks on region I/O and never runs the heavy chunk serialize either. {@link #submitChunk}
  * hands over a lazy encode-and-fold {@link Supplier} that the writer thread resolves (the deferred but deterministic
  * encode of immutable, detached inputs); {@link #submitEntity} hands over a fully-encoded, immutable
- * {@link CompoundTag}. Either way the writer thread is the sole owner of the {@link SimpleRegionStorage}s, the
- * one-writer invariant, and the reason only immutable or deferred-immutable work may cross the queue.
+ * {@link CompoundTag}. Either way the writer thread is the sole owner of the {@link IOWorker}s, the one-writer
+ * invariant, and the reason only immutable or deferred-immutable work may cross the queue.
  *
  * <p>That invariant is this class's own, not one vanilla imposes: the region {@code IOWorker} is safe to call from any
  * thread, because it queues onto a concurrent queue and serializes execution by a status compare-and-set rather than by
@@ -55,7 +55,7 @@ final class AsyncSaveWriter {
      */
     @FunctionalInterface
     public interface StorageOpener {
-        SimpleRegionStorage open(ResourceKey<Level> dimension) throws Exception;
+        IOWorker open(ResourceKey<Level> dimension) throws Exception;
     }
 
     /** The best-effort pre-write step run before the drain opens any storage (the resume backup). */
@@ -330,7 +330,7 @@ final class AsyncSaveWriter {
                 }
                 if (next instanceof RewriteTask rewrite) {
                     progress.chunks(++drained, submitted);
-                    SimpleRegionStorage region = regions.storageFor(rewrite.dimension());
+                    IOWorker region = regions.storageFor(rewrite.dimension());
                     // An unopenable dimension leaves no on-disk chunk to fold the orphaned contents onto, the
                     // same outcome rewriteExisting reports for a position with no prior, and neither has a
                     // tally of its own.
@@ -356,7 +356,7 @@ final class AsyncSaveWriter {
                     continue;
                 }
                 if (task.target() == Target.REGION) {
-                    SimpleRegionStorage region = regions.storageFor(task.dimension());
+                    IOWorker region = regions.storageFor(task.dimension());
                     if (region == null) {
                         // The cause is per dimension and is logged there once; the loss is per chunk, because
                         // each task whose storage never opened is a chunk that did not reach disk, exactly what
@@ -383,7 +383,7 @@ final class AsyncSaveWriter {
                         case NOTHING_TO_WRITE -> {}
                     }
                 } else {
-                    SimpleRegionStorage entityStore = entities.storageFor(task.dimension());
+                    IOWorker entityStore = entities.storageFor(task.dimension());
                     if (entityStore == null) {
                         entityChunksFailed++; // per chunk, as above
                         continue;
@@ -459,12 +459,12 @@ final class AsyncSaveWriter {
         if (observer == null) {
             return;
         }
-        SimpleRegionStorage storage = (region ? regions : entities).storageFor(scan.dimension());
+        IOWorker storage = (region ? regions : entities).storageFor(scan.dimension());
         if (storage == null) {
             return; // the dimension logged its own open failure; a scan reads nothing and loses nothing
         }
         try {
-            storage.read(scan.pos()).join().ifPresent(onDisk -> observer.accept(scan.dimension(), onDisk));
+            storage.loadAsync(scan.pos()).join().ifPresent(onDisk -> observer.accept(scan.dimension(), onDisk));
         } catch (RuntimeException e) {
             LOGGER.warn("chunk {} recovered-coverage scan failed", scan.pos(), e);
         }
@@ -515,7 +515,7 @@ final class AsyncSaveWriter {
     private static final class Storages {
         private final StorageOpener opener;
         private final String target;
-        private final Map<ResourceKey<Level>, SimpleRegionStorage> open = new LinkedHashMap<>();
+        private final Map<ResourceKey<Level>, IOWorker> open = new LinkedHashMap<>();
         private final Set<ResourceKey<Level>> loggedFailures = new HashSet<>();
 
         private Storages(StorageOpener opener, String target) {
@@ -529,8 +529,8 @@ final class AsyncSaveWriter {
          * and leave the chunks already on disk in a folder with no level.dat, which is a save the player cannot open,
          * so the caller counts the dropped task and the drain runs on to the finalize.
          */
-        private @Nullable SimpleRegionStorage storageFor(ResourceKey<Level> dimension) {
-            SimpleRegionStorage storage = open.get(dimension);
+        private @Nullable IOWorker storageFor(ResourceKey<Level> dimension) {
+            IOWorker storage = open.get(dimension);
             if (storage != null) {
                 return storage;
             }
@@ -557,7 +557,7 @@ final class AsyncSaveWriter {
          * and leave a folder the player cannot open.
          */
         private void synchronizeAll() {
-            for (Map.Entry<ResourceKey<Level>, SimpleRegionStorage> entry : open.entrySet()) {
+            for (Map.Entry<ResourceKey<Level>, IOWorker> entry : open.entrySet()) {
                 try {
                     entry.getValue().synchronize(true).join();
                 } catch (RuntimeException e) {

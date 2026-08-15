@@ -58,8 +58,6 @@ import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Mth;
-import net.minecraft.util.datafix.DataFixTypes;
-import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -77,6 +75,7 @@ import net.minecraft.world.inventory.CrafterMenu;
 import net.minecraft.world.inventory.LecternMenu;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.MapItem;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
@@ -90,12 +89,10 @@ import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.level.block.entity.LecternBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
+import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
 import net.minecraft.world.level.dimension.DimensionType;
-import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.phys.AABB;
@@ -3340,7 +3337,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * (every {@link MapArchive#archiveIdFor} call is), where the mutable {@code MapItemSavedData} may be read.
      */
     private @Nullable Tag resolveMapImage(int sessionId) {
-        MapItemSavedData saved = level().getMapData(new MapId(sessionId));
+        MapItemSavedData saved = level().getMapData(MapItem.makeKey(sessionId));
         if (saved == null) {
             return null; // colors never received (imageless): skipped, never fabricated
         }
@@ -3463,11 +3460,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // for its type on a loss whose cause is the message itself.
             mapsFailed.incrementAndGet();
             LOGGER.info("map data {} had no writer to stream to; it is missing from the save",
-                    new MapId(archiveId).key());
+                    MapItem.makeKey(archiveId));
             return;
         }
         Path dataDirectory = paths.dataDirectory();
-        String key = new MapId(archiveId).key();
+        String key = MapItem.makeKey(archiveId);
         if (finishBatchClosed) {
             // Unreachable today: every remap site precedes the handover, and the inbound hooks are detached
             // before it. Counted and logged so a future late remap site becomes visible instead of losing a map
@@ -3646,11 +3643,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     resolveWorldName());
             surfaceGameRuleOverrideLoss(levelData.gameRules());
             writer = new AsyncSaveWriter(
-                    dimension -> new SimpleRegionStorage(paths.regionStorageInfo(dimension),
-                            paths.regionDirectory(dimension), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK),
-                    dimension -> new SimpleRegionStorage(paths.entitiesStorageInfo(dimension),
-                            paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
-                            DataFixTypes.ENTITY_CHUNK),
+                    paths::openRegionStorage,
+                    paths::openEntitiesStorage,
                     // Pre-merge safety copy on a resume, on the writer thread before any chunk is written into the
                     // folder; a no-op for a fresh download or with zipOnResume off. The in-progress download.md
                     // regenerates strictly after the backup, so the zip archives the prior session's rendering

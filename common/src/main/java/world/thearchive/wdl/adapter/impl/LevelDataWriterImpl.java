@@ -30,6 +30,7 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameRules;
@@ -62,7 +63,7 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.20.6 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
+ * 1.20.4 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
  * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
  * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
  * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
@@ -82,7 +83,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /**
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.20.6 id and carries no spec.
+     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.20.4 id and carries no spec.
      * The user's gamerule.* overrides, keyed by band id, are validated and applied on top of this (see
      * {@link WorldOutputConfig}).
      */
@@ -124,7 +125,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
         // Fail loud: PrimaryLevelData.setTagData silently omits WorldGenSettings if its encode errors,
         // yielding an unopenable world. Pre-encode and reject any error/partial result first.
-        DynamicOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
+        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
         DataResult<Tag> worldGen = WorldGenSettings.encode(ops, worldOptions, registries);
         if (worldGen.error().isPresent()) {
             throw new IllegalStateException(
@@ -245,8 +246,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are dev's band-neutral keys; each maps to its 1.20.6 vanilla rule id here, and the newer bands'
-    // fire rule is dropped by omitting its spec, since 1.20.6 has no equivalent.
+    // The WDL names are dev's band-neutral keys; each maps to its 1.20.4 vanilla rule id here, and the newer bands'
+    // fire rule is dropped by omitting its spec, since 1.20.4 has no equivalent.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
@@ -334,17 +335,19 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         ResourceKey<Biome> biomeKey = biomes.containsKey(Biomes.THE_VOID) ? Biomes.THE_VOID : Biomes.PLAINS;
         Holder<Biome> voidBiome = biomes.getHolderOrThrow(biomeKey);
 
-        FlatLevelGeneratorSettings flat = new FlatLevelGeneratorSettings(Optional.of(HolderSet.<StructureSet>empty()),
+        FlatLevelGeneratorSettings flat = new FlatLevelGeneratorSettings(Optional.of(HolderSet.<StructureSet>direct()),
                 voidBiome, List.of());
         flat.updateLayers(); // no layers -> all air (voidSettings)
 
         Registry<DimensionType> dimensionTypes = registries.registryOrThrow(Registries.DIMENSION_TYPE);
-        Map<ResourceKey<LevelStem>, LevelStem> stems = Map.of(
-                LevelStem.OVERWORLD, voidStem(dimensionTypes, BuiltinDimensionTypes.OVERWORLD, flat),
-                LevelStem.NETHER, voidStem(dimensionTypes, BuiltinDimensionTypes.NETHER, flat),
-                LevelStem.END, voidStem(dimensionTypes, BuiltinDimensionTypes.END, flat));
+        MappedRegistry<LevelStem> stems = new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable());
+        stems.register(LevelStem.OVERWORLD, voidStem(dimensionTypes, BuiltinDimensionTypes.OVERWORLD, flat),
+                Lifecycle.stable());
+        stems.register(LevelStem.NETHER, voidStem(dimensionTypes, BuiltinDimensionTypes.NETHER, flat),
+                Lifecycle.stable());
+        stems.register(LevelStem.END, voidStem(dimensionTypes, BuiltinDimensionTypes.END, flat), Lifecycle.stable());
 
-        return new WorldDimensions(stems).bake(emptyLevelStems());
+        return new WorldDimensions(stems.freeze()).bake(emptyLevelStems());
     }
 
     private static LevelStem voidStem(

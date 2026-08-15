@@ -7,11 +7,11 @@ import java.nio.file.Path;
 import java.util.Map;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 
 /**
  * Per-band save-layout axis: maps a dimension to its on-disk {@code region/} and {@code entities/} directories and
- * supplies the {@link RegionStorageInfo} the vanilla region writer needs.
+ * opens the vanilla region storage rooted at each.
  *
  * <p>The per-band implementation pre-creates the {@code region/} and {@code entities/} directories before any region
  * write.
@@ -21,10 +21,10 @@ public interface WorldPaths {
 
     Path entitiesDirectory(ResourceKey<Level> dimension);
 
-    RegionStorageInfo regionStorageInfo(ResourceKey<Level> dimension);
+    IOWorker openRegionStorage(ResourceKey<Level> dimension);
 
-    /** Like {@link #regionStorageInfo} but typed {@code "entities"} for the {@code entities/} region. */
-    RegionStorageInfo entitiesStorageInfo(ResourceKey<Level> dimension);
+    /** Like {@link #openRegionStorage} but rooted at the {@code entities/} region. */
+    IOWorker openEntitiesStorage(ResourceKey<Level> dimension);
 
     /**
      * The global {@code data/} directory (the SavedData surface: the map files and the map-id index), which lives under

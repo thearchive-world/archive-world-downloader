@@ -7,7 +7,7 @@ import com.mojang.logging.LogUtils;
 import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -59,7 +59,7 @@ final class RegionChunkWriter {
      * leave what is stored untouched as {@link MergeOutcome#PRESERVED}, discarding the whole of {@code tag} rather than
      * only the part the merge would have added; a write that throws is {@link MergeOutcome#FAILED}.
      */
-    public static MergeWriteResult writeMerging(SimpleRegionStorage storage, ChunkPos pos,
+    public static MergeWriteResult writeMerging(IOWorker storage, ChunkPos pos,
             @Nullable CompoundTag tag, ChunkReadMerge merge) {
         if (tag == null) {
             return new MergeWriteResult(MergeOutcome.NOTHING_TO_WRITE, 0);
@@ -67,7 +67,7 @@ final class RegionChunkWriter {
         @Nullable
         CompoundTag onDisk;
         try {
-            Optional<CompoundTag> read = storage.read(pos).join();
+            Optional<CompoundTag> read = storage.loadAsync(pos).join();
             onDisk = read.orElse(null);
         } catch (RuntimeException e) {
             LOGGER.warn("preserving chunk {}: on-disk read failed", pos, e);
@@ -86,7 +86,7 @@ final class RegionChunkWriter {
             }
         }
         try {
-            storage.write(pos, tag).join();
+            storage.store(pos, tag).join();
         } catch (RuntimeException e) {
             LOGGER.warn("skipping chunk {}: write failed", pos, e);
             return new MergeWriteResult(MergeOutcome.FAILED, 0);
@@ -104,10 +104,10 @@ final class RegionChunkWriter {
      * on-disk prior to fold into (the contents are logged as lost rather than synthesized onto a terrainless chunk) or
      * a read, fold, or write failure isolates the chunk per the per-chunk discipline, never aborting the drain.
      */
-    public static int rewriteExisting(SimpleRegionStorage storage, ChunkPos pos, ChunkRewrite rewrite) {
+    public static int rewriteExisting(IOWorker storage, ChunkPos pos, ChunkRewrite rewrite) {
         CompoundTag onDisk;
         try {
-            Optional<CompoundTag> read = storage.read(pos).join();
+            Optional<CompoundTag> read = storage.loadAsync(pos).join();
             onDisk = read.orElse(null);
         } catch (RuntimeException e) {
             LOGGER.warn("orphaned-content merge for chunk {}: on-disk read failed; its captured contents are lost",
@@ -126,7 +126,7 @@ final class RegionChunkWriter {
             return 0;
         }
         try {
-            storage.write(pos, onDisk).join();
+            storage.store(pos, onDisk).join();
         } catch (RuntimeException e) {
             LOGGER.warn("orphaned-content merge for chunk {}: write-back failed", pos, e);
             return 0;

@@ -14,18 +14,17 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.TreeMap;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * 1.20.6 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
+ * 1.20.4 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
  * pre-creates {@code region/} + {@code entities/} so the region writer never sees a missing {@code externalFileDir}
  * (vanilla {@code RegionFile} throws otherwise).
  */
@@ -49,19 +48,14 @@ public final class WorldPathsImpl implements WorldPaths {
     }
 
     @Override
-    public RegionStorageInfo regionStorageInfo(ResourceKey<Level> dimension) {
-        return storageInfo(dimension, "chunk");
+    public IOWorker openRegionStorage(ResourceKey<Level> dimension) {
+        return new WdlRegionStorage(regionDirectory(dimension), false, "chunk");
     }
 
     @Override
-    public RegionStorageInfo entitiesStorageInfo(ResourceKey<Level> dimension) {
-        // Vanilla EntityStorage uses the "entities" type string for the entities/ region.
-        return storageInfo(dimension, "entities");
-    }
-
-    private RegionStorageInfo storageInfo(ResourceKey<Level> dimension, String type) {
-        // level and type are cosmetic crash-report strings; the real dimension key is load-bearing.
-        return new RegionStorageInfo(Objects.toString(saveRoot.getFileName(), "wdl"), dimension, type);
+    public IOWorker openEntitiesStorage(ResourceKey<Level> dimension) {
+        // Vanilla EntityStorage uses the "entities" name for the entities/ region.
+        return new WdlRegionStorage(entitiesDirectory(dimension), false, "entities");
     }
 
     @Override
@@ -145,6 +139,13 @@ public final class WorldPathsImpl implements WorldPaths {
             return directory;
         } catch (IOException e) {
             throw new UncheckedIOException("failed to create " + directory, e);
+        }
+    }
+
+    /** IOWorker's constructor is protected, so this subclass is how the plug opens one. */
+    private static final class WdlRegionStorage extends IOWorker {
+        private WdlRegionStorage(Path directory, boolean sync, String name) {
+            super(directory, sync, name);
         }
     }
 }
