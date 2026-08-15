@@ -964,6 +964,15 @@ public final class WdlDownloadsScreen extends Screen {
             return this.width - 14; // scale rows to the (centered) list band, less the scrollbar gutter
         }
 
+        @Override
+        protected int getScrollbarPosition() {
+            // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row and a list at
+            // x zero, so with this screen's wider row and setX applied it lands inside each row and
+            // getEntryAtPosition treats everything past it as the scrollbar. Later bands derive it from the real
+            // row right edge, which this follows.
+            return getX() + this.width / 2 + getRowWidth() / 2 + 10;
+        }
+
         void populate(List<DownloadEntry> rows) {
             for (DownloadEntry entry : rows) {
                 addEntry(new Row(entry));
@@ -1297,6 +1306,14 @@ public final class WdlDownloadsScreen extends Screen {
                     return true;
                 }
                 return false;
+            }
+
+            @Override
+            public boolean mouseClicked(double mouseX, double mouseY, int button) {
+                // At 1.20.4 ObjectSelectionList.Entry has no mouseClicked override, so a clicked row returns false
+                // and the list's setFocused-driven selection never fires; later bands override it to return true.
+                DownloadList.this.setSelected(this);
+                return true;
             }
 
             /**

@@ -195,7 +195,8 @@ final class EntityContainerMerge {
         if (holder.get("Offers") instanceof CompoundTag offers) {
             entityTag.put("Offers", offers.copy());
         }
-        if (holder.get("Xp") instanceof Tag experience) {
+        Tag experience = holder.get("Xp");
+        if (experience != null) {
             entityTag.put("Xp", experience.copy());
         }
     }

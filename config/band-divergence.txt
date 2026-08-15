@@ -151,8 +151,18 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 # shared overlay's render entry point takes a float on this band.
 common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
 
-# Below the 1.21 update Util.OS has no openPath(Path), so the open-folder affordances call openFile(File).
+# Below the 1.21 update Util.OS has no openPath(Path), so the open-folder affordances call openFile(File). And at
+# 1.20.4 ObjectSelectionList.Entry has no mouseClicked override, so a clicked row returns false and the list's
+# setFocused-driven selection never fires (later bands override it to return true), so the download row overrides
+# mouseClicked to select itself. And this band's getScrollbarPosition is a fixed width/2 + 124 that ignores getX()
+# and the row width, so the list follows later bands and derives it from the row right edge, restoring hover and
+# clicks on the right of a row.
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
+
+# The same getScrollbarPosition divergence reaches the settings list: this band's fixed width/2 + 124 assumes the
+# 220-wide default row, so with the settings list's wider row it lands inside each row and cuts through the
+# controls, so the list follows later bands and derives it from the row right edge.
+common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the HUD-layer id is built with the
 # public ResourceLocation(String, String) constructor. NeoForge 20.4 registers the HUD through

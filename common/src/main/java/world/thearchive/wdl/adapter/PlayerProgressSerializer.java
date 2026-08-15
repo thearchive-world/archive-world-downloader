@@ -31,7 +31,7 @@ final class PlayerProgressSerializer {
     static byte[] advancementsJson(Map<String, AdvancementProgress> progressById, int dataVersion) {
         JsonObject root = new JsonObject();
         progressById.forEach((id, progress) -> root.add(id,
-                AdvancementProgress.CODEC.encodeStart(JsonOps.INSTANCE, progress).getOrThrow()));
+                AdvancementProgress.CODEC.encodeStart(JsonOps.INSTANCE, progress).getOrThrow(false, s -> {})));
         root.addProperty("DataVersion", dataVersion);
         return gson.toJson(root).getBytes(StandardCharsets.UTF_8);
     }

@@ -75,7 +75,6 @@ final class NaturalEquipment {
                     new Profile(Set.of(Items.TRIDENT, Items.FISHING_ROD), ArmorKind.NONE)),
             Map.entry(EntityType.SKELETON, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
             Map.entry(EntityType.STRAY, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
-            Map.entry(EntityType.BOGGED, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
             Map.entry(EntityType.WITHER_SKELETON, new Profile(Set.of(Items.STONE_SWORD), ArmorKind.NONE)),
             Map.entry(EntityType.PIGLIN,
                     new Profile(Set.of(Items.CROSSBOW, Items.GOLDEN_SWORD), ArmorKind.GOLDEN)),

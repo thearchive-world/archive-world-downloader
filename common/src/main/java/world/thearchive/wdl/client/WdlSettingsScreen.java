@@ -457,6 +457,14 @@ public final class WdlSettingsScreen extends Screen {
         public int getRowWidth() {
             return contentBandWidth();
         }
+
+        @Override
+        protected int getScrollbarPosition() {
+            // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row, so with this
+            // screen's wider row it lands inside each row and cuts through the controls; later bands derive it
+            // from the row right edge, which this follows.
+            return getX() + this.width / 2 + getRowWidth() / 2 + 10;
+        }
     }
 
     /** A list row: a section header, an option, or a game rule. */

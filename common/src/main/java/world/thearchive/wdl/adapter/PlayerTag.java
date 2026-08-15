@@ -124,7 +124,7 @@ final class PlayerTag {
      */
     static void setRootVehicle(CompoundTag raw, UUID attach, CompoundTag entityTag) {
         CompoundTag rootVehicle = new CompoundTag();
-        rootVehicle.put("Attach", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, attach).getOrThrow());
+        rootVehicle.put("Attach", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, attach).getOrThrow(false, s -> {}));
         rootVehicle.put("Entity", entityTag);
         raw.put("RootVehicle", rootVehicle);
     }
