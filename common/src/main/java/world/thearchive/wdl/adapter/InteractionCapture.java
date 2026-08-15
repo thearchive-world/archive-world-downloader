@@ -19,20 +19,16 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
 import net.minecraft.tags.ItemTags;
+import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.RecordItem;
-import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -42,7 +38,6 @@ import net.minecraft.world.level.block.ChiseledBookShelfBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
-import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -67,9 +62,8 @@ import org.slf4j.Logger;
  * runs at a time, so a process singleton is correct.
  *
  * <p>Two of the four writes reuse the open-time {@code "Items"} path (bookshelf, shulker, via {@link ContainerSink});
- * the other two encode directly over {@code RegistryOps(NbtOps)} with no {@code ValueOutput} layer
- * ({@code ItemStack.CODEC} under {@code "RecordItem"}, {@code Occupant.LIST_CODEC} under {@code "bees"}), so they stay
- * byte-identical across the current bands and need no per-band sink (the {@link MapSink} encode discipline).
+ * the other two write the item's pre-component block-entity form directly ({@code ItemStack#save} under
+ * {@code "RecordItem"}, a {@code ListTag} copy under {@code "Bees"}).
  */
 public final class InteractionCapture {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -252,7 +246,7 @@ public final class InteractionCapture {
 
     /**
      * A jukebox disc, placed shulker, or placed beehive: one merge-ready single-key holder
-     * ({@code "RecordItem"}/{@code "Items"}/{@code "bees"}). The gate keeps it whole only when the authoritative
+     * ({@code "RecordItem"}/{@code "Items"}/{@code "Bees"}). The gate keeps it whole only when the authoritative
      * block-state confirms the content is present (HAS_RECORD, or the expected placed block type).
      */
     record HolderCandidate(InteractionKind kind, CompoundTag holder) implements Candidate {}
@@ -261,7 +255,7 @@ public final class InteractionCapture {
      * A chunk's confirmed holders, split by merge path: {@code items} folds through the open-time container
      * {@code "Items"} merge (placed shulker, bookshelf books) under the open-time-wins precedence; {@code holders}
      * takes the generic field-copy merge (jukebox disc under {@code "RecordItem"}, beehive occupants under
-     * {@code "bees"}), each holder already carrying exactly the key its block entity reads. One bundle drains per
+     * {@code "Bees"}), each holder already carrying exactly the key its block entity reads. One bundle drains per
      * chunk.
      */
     record ChunkBundles(Map<BlockPos, CompoundTag> items, Map<BlockPos, CompoundTag> holders) {}
@@ -372,7 +366,7 @@ public final class InteractionCapture {
                 || !isCapturable(pos)) {
             return false; // an occupied jukebox ejects; only a playable disc inserts, and only where it can confirm
         }
-        insertStash.put(pos, new HolderCandidate(InteractionKind.JUKEBOX, captureRecordItem(stack, registries)));
+        insertStash.put(pos, new HolderCandidate(InteractionKind.JUKEBOX, captureRecordItem(stack)));
         return true;
     }
 
@@ -413,20 +407,26 @@ public final class InteractionCapture {
         }
         placementSink.blockPlacedAt(placedPos.asLong());
         Block block = Block.byItem(stack.getItem());
-        // Keyed by the (component, block) pairing: component presence alone does not imply this block saves
-        // under the mapped key, and an unrecognized pairing has no general component-to-key mapping, so it drops.
-        if (block instanceof ShulkerBoxBlock && stack.has(DataComponents.CONTAINER)) {
-            ItemContainerContents contents = stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
-            NonNullList<ItemStack> items = NonNullList.withSize(ShulkerBoxBlockEntity.CONTAINER_SIZE, ItemStack.EMPTY);
-            contents.copyInto(items);
-            CompoundTag holder = containerSink.captureItems(items, registries);
-            placeStash.put(placedPos, new HolderCandidate(InteractionKind.SHULKER, holder));
-            placedContainerSink.containerCaptured(placedPos.asLong(), shulkerBlockEntityId());
+        // Keyed by the (block-entity-NBT key, block) pairing: key presence alone does not imply this block saves
+        // under the mapped key, and an unrecognized pairing has no general block-to-key mapping, so it drops.
+        if (block instanceof ShulkerBoxBlock) {
+            CompoundTag blockEntityTag = BlockItem.getBlockEntityData(stack);
+            if (blockEntityTag != null && blockEntityTag.contains("Items", 9)) {
+                NonNullList<ItemStack> items = NonNullList.withSize(ShulkerBoxBlockEntity.CONTAINER_SIZE,
+                        ItemStack.EMPTY);
+                ContainerHelper.loadAllItems(blockEntityTag, items);
+                CompoundTag holder = containerSink.captureItems(items, registries);
+                placeStash.put(placedPos, new HolderCandidate(InteractionKind.SHULKER, holder));
+                placedContainerSink.containerCaptured(placedPos.asLong(), shulkerBlockEntityId());
+            }
         } else if (block instanceof BeehiveBlock) {
-            List<BeehiveBlockEntity.Occupant> bees = stack.getOrDefault(DataComponents.BEES, List.of());
-            if (!bees.isEmpty()) {
-                CompoundTag holder = captureBees(bees, registries);
-                placeStash.put(placedPos, new HolderCandidate(InteractionKind.BEEHIVE, holder));
+            CompoundTag blockEntityTag = BlockItem.getBlockEntityData(stack);
+            if (blockEntityTag != null) {
+                ListTag beesList = blockEntityTag.getList("Bees", 10);
+                if (!beesList.isEmpty()) {
+                    CompoundTag holder = captureBees(beesList);
+                    placeStash.put(placedPos, new HolderCandidate(InteractionKind.BEEHIVE, holder));
+                }
             }
         }
     }
@@ -530,12 +530,13 @@ public final class InteractionCapture {
      * prediction, not a fixable case: there is no client-side signal that distinguishes it from a confirmed placement.
      */
     static Optional<CompoundTag> confirm(BlockState authoritative, Candidate candidate) {
-        return switch (candidate) {
-            case BookshelfCandidate bookshelf -> confirmBookshelf(authoritative, bookshelf.slotEntries());
-            case HolderCandidate held -> held.kind().confirms(authoritative)
-                    ? Optional.of(held.holder())
-                    : Optional.empty();
-        };
+        if (candidate instanceof BookshelfCandidate bookshelf) {
+            return confirmBookshelf(authoritative, bookshelf.slotEntries());
+        }
+        if (candidate instanceof HolderCandidate held) {
+            return held.kind().confirms(authoritative) ? Optional.of(held.holder()) : Optional.empty();
+        }
+        throw new IllegalStateException("unhandled candidate: " + candidate);
     }
 
     private static Optional<CompoundTag> confirmBookshelf(BlockState state, Map<Integer, CompoundTag> slotEntries) {
@@ -611,21 +612,19 @@ public final class InteractionCapture {
      * Vanilla loadAdditional restores that state, so the saved jukebox plays and emits the note particles; the disc
      * sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
      */
-    static CompoundTag captureRecordItem(ItemStack disc, RegistryAccess registries) {
-        RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
+    static CompoundTag captureRecordItem(ItemStack disc) {
         CompoundTag holder = new CompoundTag();
-        holder.put("RecordItem", ItemStack.CODEC.encodeStart(ops, disc).getOrThrow());
+        holder.put("RecordItem", disc.save(new CompoundTag()));
         holder.putBoolean("IsPlaying", true);
         holder.putLong("RecordStartTick", 0L);
         holder.putLong("TickCount", 0L);
         return holder;
     }
 
-    /** Serialize {@code occupants} to a holder carrying {@code "bees"} (the beehive occupants). */
-    static CompoundTag captureBees(List<BeehiveBlockEntity.Occupant> occupants, RegistryAccess registries) {
-        RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
+    /** Serialize {@code beesList} to a holder carrying {@code "Bees"} (the beehive occupants). */
+    static CompoundTag captureBees(ListTag beesList) {
         CompoundTag holder = new CompoundTag();
-        holder.put("bees", BeehiveBlockEntity.Occupant.LIST_CODEC.encodeStart(ops, occupants).getOrThrow());
+        holder.put("Bees", beesList.copy());
         return holder;
     }
 }

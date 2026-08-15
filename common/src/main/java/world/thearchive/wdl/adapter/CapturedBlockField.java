@@ -40,7 +40,7 @@ enum CapturedBlockField {
     /** A jukebox's disc and its playing flag, written by the interaction holder merge. */
     RECORD_ITEM("RecordItem", "IsPlaying", Shape.COMPOUND),
     /** A beehive's occupants, written by the interaction holder merge. */
-    BEES("bees", null, Shape.LIST),
+    BEES("Bees", null, Shape.LIST),
     /** A crafter's disabled input slots; vanilla writes an int array, empty when no slot is disabled. */
     DISABLED_SLOTS("disabled_slots", new IntArrayTag(new int[0])),
     /** Whether a crafter is powered; vanilla writes an int, zero when it is not. */

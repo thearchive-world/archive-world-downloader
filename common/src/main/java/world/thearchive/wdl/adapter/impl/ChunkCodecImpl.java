@@ -30,12 +30,12 @@ import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.storage.ChunkSerializer;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.lighting.LevelLightEngine;
@@ -45,7 +45,7 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.20.6 chunk codec: replicates the minimal client-safe slice of vanilla
+ * 1.20.4 chunk codec: replicates the minimal client-safe slice of vanilla
  * {@code ChunkSerializer.write(ServerLevel, ChunkAccess)} to NBT. Below the 1.21.2 cut the chunk write is a static
  * method that reads from a {@code ServerLevel} a multiplayer client never has, so {@link #encode} rebuilds the tag
  * field by field from the captured snapshot rather than calling vanilla.
@@ -113,7 +113,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
 
         List<CompoundTag> blockEntities = new ArrayList<>();
         for (BlockPos blockEntityPos : chunk.getBlockEntitiesPos()) {
-            CompoundTag tag = chunk.getBlockEntityNbtForSaving(blockEntityPos, registries);
+            CompoundTag tag = chunk.getBlockEntityNbtForSaving(blockEntityPos);
             if (tag != null) {
                 blockEntities.add(tag);
             }
@@ -162,9 +162,10 @@ public final class ChunkCodecImpl implements ChunkCodec {
             LevelChunkSection chunkSection = section.chunkSection();
             if (chunkSection != null) {
                 sectionTag.put("block_states",
-                        blockStateCodec.encodeStart(NbtOps.INSTANCE, chunkSection.getStates()).getOrThrow());
+                        blockStateCodec.encodeStart(NbtOps.INSTANCE, chunkSection.getStates()).getOrThrow(false,
+                                s -> {}));
                 sectionTag.put("biomes",
-                        biomeCodec.encodeStart(NbtOps.INSTANCE, chunkSection.getBiomes()).getOrThrow());
+                        biomeCodec.encodeStart(NbtOps.INSTANCE, chunkSection.getBiomes()).getOrThrow(false, s -> {}));
             }
             DataLayer blockLight = section.blockLight();
             if (blockLight != null && !blockLight.isEmpty()) {

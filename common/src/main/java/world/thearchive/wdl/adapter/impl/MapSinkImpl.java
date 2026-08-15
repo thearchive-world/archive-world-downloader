@@ -11,7 +11,7 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import world.thearchive.wdl.adapter.MapSink;
 
 /**
- * 1.20.6 map sink: serializes a client {@code MapItemSavedData} via vanilla's own {@code MapItemSavedData.save} (the
+ * 1.20.4 map sink: serializes a client {@code MapItemSavedData} via vanilla's own {@code MapItemSavedData.save} (the
  * pre-1.21.5 {@code SavedData} write), so the captured inner {@code "data"} tag is byte-for-byte what a vanilla
  * {@code data/map_<id>.dat} would hold.
  *
@@ -23,6 +23,6 @@ public final class MapSinkImpl implements MapSink {
     public Tag serializeMap(MapItemSavedData saved, RegistryAccess registries) {
         // save writes the inner map "data" compound the band-agnostic MapDataWriter then wraps as
         // {data, DataVersion} and gzips.
-        return saved.save(new CompoundTag(), registries);
+        return saved.save(new CompoundTag());
     }
 }

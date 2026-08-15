@@ -8,41 +8,37 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * Reusable, band-agnostic privacy scrub for item-borne location data: blanks the lodestone-compass target and the
- * flower position of each bee inside a beehive item on every item it reaches, recursing into shulker boxes (the
- * {@code minecraft:container} component) and bundles (the {@code minecraft:bundle_contents} component) over the shared
- * {@link ItemTreeWalk}. Blanking removes only the coordinate key: the {@code "target"} subkey of the
- * {@code minecraft:lodestone_tracker} component (leaving the {@code tracked} flag, so the compass stays a valid
- * lodestone compass that points nowhere, exactly the state vanilla produces when a tracked lodestone is destroyed) and
- * the {@code "flower_pos"} subkey of each occupant's {@code entity_data} in the {@code minecraft:bees} component
- * (leaving the occupant a valid bee).
+ * Reusable privacy scrub for item-borne location data: blanks the lodestone-compass target and the flower position
+ * carried by a silk-touched beehive item on every item it reaches, recursing into shulker boxes (the item's
+ * {@code BlockEntityTag.Items}) and bundles (the item's {@code Items}) over the shared {@link ItemTreeWalk}. Below the
+ * 1.20.5 component update an item's data lives in its {@code tag} compound, so the scrub removes the coordinate keys
+ * there: the lodestone target ({@code LodestonePos} plus {@code LodestoneDimension}, leaving {@code LodestoneTracked})
+ * and, on a beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and each occupant's
+ * {@code BlockEntityTag.Bees[].EntityData.FlowerPos} (leaving each a valid bee). The pre-component item copies the
+ * hive's whole block-entity NBT, so it carries the hive's own top-level flower position too, which the component era
+ * drops; both are stripped here.
  *
  * <p>Operates only on already-serialized NBT (our own captured copy), never on a live {@code ItemStack}, so it cannot
- * corrupt the player's session. Uses only the post-1.20.5-stable component NBT shape ({@code {id, count, components}})
- * and the band-stable {@code get}/{@code instanceof}/{@code remove} NBT ops (the {@link ContainerMerge} discipline), so
- * it is byte-identical across the era bands. Kept callable at any item-bearing persist surface (the inventory list, the
- * ender-items list, a drained container holder) by taking the holder plus the list key rather than hard-coding the
- * player tag.
+ * corrupt the player's session. Below the 1.20.5 update it uses the {@code {id, Count, tag}} item shape and the
+ * band-stable {@code get}/{@code instanceof}/{@code remove} NBT ops, so this band re-authors the pre-component key
+ * paths while the walk and merge discipline are shared.
  *
  * <p>Reaches items three ways: an item-list holder via {@link #scrub(CompoundTag, String)} (the inventory, the ender
  * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)} (a decorated pot, a
  * shelf), and a serialized entity via {@link #scrubEntity(CompoundTag)} (an item frame, an item display, mob equipment,
  * an allay, a dropped item, and their passengers).
  *
- * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive bee
- * flower positions only. {@code minecraft:custom_data} and {@code minecraft:map_decorations} are the two named
- * residuals, and both do reach a client when a server puts them on an item (a component registered without a dedicated
- * network codec still syncs through one derived from its persistent codec). They stay unscrubbed deliberately: vanilla
- * authors {@code map_decorations} only on explorer maps pointing at seed-derived structures, {@code custom_data} is
- * opaque server NBT whose coordinate leak is speculative, and blanking either whole component would corrupt legitimate
- * items, unlike the single-subkey removals above.
+ * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive flower
+ * positions only. Opaque server NBT whose coordinate leak is speculative is left alone, since blanking a whole unknown
+ * subtree would corrupt legitimate items, unlike the single-key removals above.
  */
 final class ItemLocationScrub {
-    private static final String LODESTONE_TRACKER = "minecraft:lodestone_tracker";
-    private static final String TARGET = "target";
-    private static final String BEES = "minecraft:bees";
-    private static final String ENTITY_DATA = "entity_data";
-    private static final String FLOWER_POS = "flower_pos";
+    private static final String LODESTONE_POS = "LodestonePos";
+    private static final String LODESTONE_DIMENSION = "LodestoneDimension";
+    private static final String BLOCK_ENTITY_TAG = "BlockEntityTag";
+    private static final String BEES = "Bees";
+    private static final String ENTITY_DATA = "EntityData";
+    private static final String FLOWER_POS = "FlowerPos";
     private static final String EQUIPMENT = "equipment";
     private static final String PASSENGERS = "Passengers";
 
@@ -55,24 +51,24 @@ final class ItemLocationScrub {
      */
     public static void scrub(CompoundTag holder, String listKey) {
         if (holder.get(listKey) instanceof ListTag list) {
-            ItemTreeWalk.walkList(list, ItemLocationScrub::scrubComponents);
+            ItemTreeWalk.walkList(list, ItemLocationScrub::scrubItemTag);
         }
     }
 
     /**
      * Blank every item-borne coordinate on every item held by {@code blockEntity}, wherever the block entity stores it
      * (a decorated pot's {@code item}, a campfire's {@code Items}, and so on), recursing into nested containers and
-     * bundles. Walks the block entity's direct children through {@link ItemTreeWalk}, which acts only on a real item
-     * {@code components} map, so non-item children (the block entity's own {@code components} metadata, its
-     * coordinates, its type id) are a no-op. Works for every block-entity type without a per-type key list.
+     * bundles. Walks the block entity's direct children through {@link ItemTreeWalk}, which acts only on a real item's
+     * {@code tag}, so non-item children (the block entity's own coordinates, its type id) are a no-op. Works for every
+     * block-entity type without a per-type key list.
      */
     public static void scrubBlockEntity(CompoundTag blockEntity) {
         for (String key : blockEntity.getAllKeys()) {
             Tag value = blockEntity.get(key);
             if (value instanceof ListTag list) {
-                ItemTreeWalk.walkList(list, ItemLocationScrub::scrubComponents);
+                ItemTreeWalk.walkList(list, ItemLocationScrub::scrubItemTag);
             } else if (value instanceof CompoundTag compound) {
-                ItemTreeWalk.walkItem(compound, ItemLocationScrub::scrubComponents);
+                ItemTreeWalk.walkItem(compound, ItemLocationScrub::scrubItemTag);
             }
         }
     }
@@ -89,15 +85,15 @@ final class ItemLocationScrub {
         for (String key : entity.getAllKeys()) {
             Tag value = entity.get(key);
             if (value instanceof ListTag list) {
-                ItemTreeWalk.walkList(list, ItemLocationScrub::scrubComponents);
+                ItemTreeWalk.walkList(list, ItemLocationScrub::scrubItemTag);
             } else if (value instanceof CompoundTag compound) {
-                ItemTreeWalk.walkItem(compound, ItemLocationScrub::scrubComponents);
+                ItemTreeWalk.walkItem(compound, ItemLocationScrub::scrubItemTag);
             }
         }
         if (entity.get(EQUIPMENT) instanceof CompoundTag equipment) {
             for (String slot : equipment.getAllKeys()) {
                 if (equipment.get(slot) instanceof CompoundTag item) {
-                    ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubComponents);
+                    ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
                 }
             }
         }
@@ -111,24 +107,26 @@ final class ItemLocationScrub {
     }
 
     /**
-     * Blank every item-borne coordinate on a single serialized item compound ({@code {id, count, components}}),
-     * recursing into nested containers and bundles. The single-item entry, for an offer's {@code sell} item, which sits
-     * under no list holder.
+     * Blank every item-borne coordinate on a single serialized item compound ({@code {id, Count, tag}}), recursing into
+     * nested containers and bundles. The single-item entry, for an offer's {@code sell} item, which sits under no list
+     * holder.
      */
     public static void scrubItem(CompoundTag item) {
-        ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubComponents);
+        ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
     }
 
-    /** Blank the lodestone target and the bee flower positions on {@code components}. */
-    private static void scrubComponents(CompoundTag components) {
-        if (components.get(LODESTONE_TRACKER) instanceof CompoundTag tracker) {
-            tracker.remove(TARGET);
-        }
-        if (components.get(BEES) instanceof ListTag bees) {
-            for (int i = 0; i < bees.size(); i++) {
-                if (bees.get(i) instanceof CompoundTag occupant
-                        && occupant.get(ENTITY_DATA) instanceof CompoundTag entityData) {
-                    entityData.remove(FLOWER_POS);
+    /** Blank the lodestone target and the beehive flower positions on an item's {@code tag}. */
+    private static void scrubItemTag(CompoundTag tag) {
+        tag.remove(LODESTONE_POS);
+        tag.remove(LODESTONE_DIMENSION);
+        if (tag.get(BLOCK_ENTITY_TAG) instanceof CompoundTag blockEntityTag) {
+            blockEntityTag.remove(FLOWER_POS);
+            if (blockEntityTag.get(BEES) instanceof ListTag bees) {
+                for (int i = 0; i < bees.size(); i++) {
+                    if (bees.get(i) instanceof CompoundTag occupant
+                            && occupant.get(ENTITY_DATA) instanceof CompoundTag entityData) {
+                        entityData.remove(FLOWER_POS);
+                    }
                 }
             }
         }
