@@ -367,7 +367,7 @@ tasks.named("check") {
 
 repositories {
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
-    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
+    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
 }
 
 dependencies {
@@ -377,7 +377,7 @@ dependencies {
     compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+neoforge-${property("minecraft_version")}")
 
     // JourneyMap public API for the overlay binding (compat/journeymap), compile-only (never a runtime require).
-    // The -common flavor carries no Mojmap/loader flavor split, so it is the correct pick here as well as in
-    // the loader subprojects' source-merged compile.
-    compileOnly("info.journeymap:journeymap-api-common:${property("journeymap_api_coordinate")}")
+    // The 1.9 generation ships one artifact per loader with no common flavor, so common (Mojmap ModDev) pulls the
+    // neoforge (Mojmapped) flavor to match its classpath, as it does for XaeroPlus above.
+    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-neoforge-SNAPSHOT")
 }

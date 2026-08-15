@@ -3,18 +3,21 @@
 
 package world.thearchive.wdl.compat.journeymap;
 
-import journeymap.api.v2.client.IClientAPI;
-import journeymap.api.v2.client.IClientPlugin;
-import journeymap.api.v2.client.JourneyMapPlugin;
+import journeymap.client.api.ClientPlugin;
+import journeymap.client.api.IClientAPI;
+import journeymap.client.api.IClientPlugin;
+import journeymap.client.api.event.ClientEvent;
 
 import world.thearchive.wdl.Wdl;
 
 /**
- * JourneyMap discovers this through the {@code journeymap} entrypoint (Fabric) or the {@code
- * JourneyMapPlugin}-annotated classpath scan (NeoForge) only when it is installed, so it never loads without JourneyMap
- * present; the JourneyMap API is compile-only and never ships.
+ * JourneyMap discovers this through the {@code journeymap} entrypoint (Fabric) or the {@code ClientPlugin}-annotated
+ * classpath scan (NeoForge) only when it is installed, so it never loads without JourneyMap present; the JourneyMap API
+ * is compile-only and never ships.
  */
-@JourneyMapPlugin(apiVersion = "2.0.0")
+// ClientPlugin is deprecated by JourneyMap in favor of the Fabric entrypoint, but it is the NeoForge discovery scan.
+@SuppressWarnings("deprecation")
+@ClientPlugin
 public final class WdlJourneyMapPlugin implements IClientPlugin {
     private final JourneyMapOverlayDriver driver = new JourneyMapOverlayDriver();
 
@@ -27,13 +30,17 @@ public final class WdlJourneyMapPlugin implements IClientPlugin {
 
     @Override
     public void initialize(IClientAPI jmClientApi) {
-        driver.setApi(jmClientApi);
-        driver.subscribeMappingEvents();
+        driver.initialize(jmClientApi);
         Wdl.runWhenReady(driver::wireOnce);
     }
 
     @Override
     public String getModId() {
         return "wdl";
+    }
+
+    @Override
+    public void onEvent(ClientEvent event) {
+        driver.onClientEvent(event);
     }
 }

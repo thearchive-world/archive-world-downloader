@@ -92,7 +92,7 @@ registerVerifyProductionJar("jar")
 
 repositories {
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
-    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
+    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
 }
 
 dependencies {
@@ -103,7 +103,7 @@ dependencies {
 
     // JourneyMap public API for the source-merged overlay binding (compat/journeymap), compile-only. NeoForge
     // is ModDev (no remap), neoforge flavor, no runtime require.
-    compileOnly("info.journeymap:journeymap-api-neoforge:${property("journeymap_api_coordinate")}")
+    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-neoforge-SNAPSHOT")
 }
 
 // Release publishing (mod-publish-plugin): uploads the NeoForge jar to CurseForge and Modrinth per this band's

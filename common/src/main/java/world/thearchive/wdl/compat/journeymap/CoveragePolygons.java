@@ -5,9 +5,9 @@ package world.thearchive.wdl.compat.journeymap;
 
 import java.util.ArrayList;
 import java.util.List;
-import journeymap.api.v2.client.model.MapPolygon;
-import journeymap.api.v2.client.model.MapPolygonWithHoles;
-import journeymap.api.v2.client.model.ShapeProperties;
+import journeymap.client.api.model.MapPolygon;
+import journeymap.client.api.model.MapPolygonWithHoles;
+import journeymap.client.api.model.ShapeProperties;
 import net.minecraft.core.BlockPos;
 
 /**

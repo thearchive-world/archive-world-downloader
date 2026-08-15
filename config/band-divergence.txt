@@ -130,6 +130,18 @@ common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 # public ResourceLocation(String, String) constructor.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
 
+# JourneyMap 5.10.0 for this version uses the older 1.9 API generation (journeymap.client.api), so this plugin binds
+# the @ClientPlugin annotation and the IClientPlugin.onEvent push model rather than the journeymap.api.v2 forms.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
+
+# The overlay driver binds the 1.9 JourneyMap API: it subscribes the mapping events through IClientAPI.subscribe and
+# handles them in onClientEvent, and builds each PolygonOverlay with the 1.9 display-id constructor.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDriver.java
+
+# The polygon builder binds the 1.9 JourneyMap model package (journeymap.client.api.model) for MapPolygon,
+# MapPolygonWithHoles and ShapeProperties.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.java
+
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
 # with the public ResourceLocation(String, String) constructor.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java

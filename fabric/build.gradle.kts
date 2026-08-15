@@ -94,7 +94,7 @@ spotless {
 repositories {
     maven("https://maven.parchmentmc.org")   // Loom layered Parchment mappings live here
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
-    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
+    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
 }
 
 // Parchment param-name mappings are layered only on bands that publish them; a band with no Parchment
@@ -125,9 +125,9 @@ dependencies {
     modCompileOnly("maven.modrinth:modmenu:${property("modmenu_version")}")
 
     // JourneyMap API for the source-merged overlay binding (compat/journeymap) and the journeymap entrypoint
-    // (WdlJourneyMapPlugin), compile-only. Loom remaps it to Mojmap for the compile; there is no runtime
-    // require, so JourneyMap's absence just means the entrypoint is never queried.
-    modCompileOnly("info.journeymap:journeymap-api-fabric:${property("journeymap_api_coordinate")}")
+    // (WdlJourneyMapPlugin), compile-only. Loom remaps the fabric flavor to Mojmap for the compile; there is no
+    // runtime require, so JourneyMap's absence just means the entrypoint is never queried.
+    modCompileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-fabric-SNAPSHOT")
 
     // JSpecify on the gametest source set so its package-info @NullMarked resolves; compileOnly is not
     // transitive across source sets. NullAway does not run here (test-scope, disabled above), so the marking

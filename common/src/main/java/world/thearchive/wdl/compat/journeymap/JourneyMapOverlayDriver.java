@@ -5,16 +5,16 @@ package world.thearchive.wdl.compat.journeymap;
 
 import com.mojang.logging.LogUtils;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import journeymap.api.v2.client.IClientAPI;
-import journeymap.api.v2.client.display.DisplayType;
-import journeymap.api.v2.client.display.PolygonOverlay;
-import journeymap.api.v2.client.event.MappingEvent;
-import journeymap.api.v2.client.model.MapPolygonWithHoles;
-import journeymap.api.v2.client.model.ShapeProperties;
-import journeymap.api.v2.common.event.ClientEventRegistry;
+import journeymap.client.api.IClientAPI;
+import journeymap.client.api.display.DisplayType;
+import journeymap.client.api.display.PolygonOverlay;
+import journeymap.client.api.event.ClientEvent;
+import journeymap.client.api.model.MapPolygonWithHoles;
+import journeymap.client.api.model.ShapeProperties;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
@@ -66,8 +66,8 @@ public final class JourneyMapOverlayDriver {
         return thread;
     });
 
-    private boolean wired;             // wireOnce guard
-    private boolean mappingSubscribed; // subscribeMappingEvents guard
+    private boolean wired;      // wireOnce guard
+    private boolean subscribed; // initialize subscribe guard
 
     // True between JourneyMap MAPPING_STARTED and MAPPING_STOPPED. The tick never rebuilds while false. Volatile
     // because it is set from the mapping callback and read from the tick.
@@ -106,17 +106,13 @@ public final class JourneyMapOverlayDriver {
     // read on the client thread. A batch whose layers are null means the build threw, and the map is left as is.
     private volatile @Nullable OverlayBatch pendingBatch;
 
-    void setApi(IClientAPI api) {
+    void initialize(IClientAPI api) {
         this.api = api;
-    }
-
-    void subscribeMappingEvents() {
-        if (mappingSubscribed) {
+        if (subscribed) {
             return;
         }
-        // MAPPING_EVENT.subscribe registers permanently with no unsubscribe, so a repeat init must not re-add.
-        mappingSubscribed = true;
-        ClientEventRegistry.MAPPING_EVENT.subscribe(MOD_ID, this::onMappingEvent);
+        subscribed = true;
+        api.subscribe(MOD_ID, EnumSet.of(ClientEvent.Type.MAPPING_STARTED, ClientEvent.Type.MAPPING_STOPPED));
     }
 
     void wireOnce() {
@@ -133,13 +129,13 @@ public final class JourneyMapOverlayDriver {
         bridge.onDisconnect(this::onDisconnect);
     }
 
-    private void onMappingEvent(MappingEvent event) {
-        if (event.getStage() == MappingEvent.Stage.MAPPING_STARTED) {
+    void onClientEvent(ClientEvent event) {
+        if (event.type == ClientEvent.Type.MAPPING_STARTED) {
             mapping = true;
             // Force the next tick to rebuild from scratch for the freshly mapped world.
             lastGeneration = NO_GENERATION;
             lastDimension = null;
-        } else {
+        } else if (event.type == ClientEvent.Type.MAPPING_STOPPED) {
             mapping = false;
             hideAll(api);
         }
@@ -233,7 +229,8 @@ public final class JourneyMapOverlayDriver {
         int count = 0;
         for (ToneLayer layer : layers) {
             for (MapPolygonWithHoles hull : layer.hulls()) {
-                showQuietly(localApi, new PolygonOverlay(MOD_ID, resourceKey, layer.style(), hull));
+                showQuietly(localApi, new PolygonOverlay(MOD_ID, "wdl-coverage-" + count, resourceKey,
+                        layer.style(), hull));
                 count++;
             }
         }
