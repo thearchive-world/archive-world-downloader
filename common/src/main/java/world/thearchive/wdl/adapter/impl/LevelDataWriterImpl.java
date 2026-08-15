@@ -31,6 +31,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.GameRules;
@@ -275,7 +276,10 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
         PrimaryLevelData levelData = (PrimaryLevelData) data.worldData();
         levelData.setGameType(player.gameType());
-        levelData.setSpawn(RespawnData.of(player.dimension(), player.spawnPos(), player.yaw(), player.pitch()));
+        // Keep this wrap: 1.21.10's RespawnData.of stores the raw yaw, rejected by the codec's [-180,180) bound.
+        float yaw = Mth.wrapDegrees(player.yaw());
+        float pitch = Mth.clamp(player.pitch(), -90.0F, 90.0F);
+        levelData.setSpawn(RespawnData.of(player.dimension(), player.spawnPos(), yaw, pitch));
         levelData.setDifficulty(player.difficulty());
         // The 3-argument saveDataTag routes the captured tag into createTag's "Player" slot.
         access.saveDataTag(data.registries(), data.worldData(), player.playerTag());
