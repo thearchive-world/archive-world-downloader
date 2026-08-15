@@ -267,7 +267,7 @@ public final class WdlDownloadsScreen extends Screen {
         int availableHeight = Math.max(this.height - listTopY - LIST_BOTTOM_MARGIN, 2 * ITEM_HEIGHT + 8);
         int listHeight = Math.min(this.entries.size() * ITEM_HEIGHT + 8, availableHeight);
         DownloadList downloadList = new DownloadList(this.minecraft, listWidth, listHeight, listTopY, ITEM_HEIGHT);
-        downloadList.setX(listX);
+        downloadList.setLeftPos(listX);
         downloadList.populate(this.entries);
         this.list = downloadList;
         if (!listCollapsed && !this.entries.isEmpty()) {
@@ -294,7 +294,7 @@ public final class WdlDownloadsScreen extends Screen {
 
         String name = this.activeDownloadName != null ? this.activeDownloadName : this.defaultName;
         Component labelText = Component.translatable("wdl.screen.downloads.downloading", name)
-                .withColor(BrandColors.AMBER);
+                .withStyle(style -> style.withColor(BrandColors.AMBER));
         StringWidget label = new StringWidget(this.font.width(labelText), FIELD_HEIGHT, labelText, this.font);
         centerTopWidget(label);
         addRenderableWidget(label);
@@ -324,7 +324,7 @@ public final class WdlDownloadsScreen extends Screen {
         Component labelText = (name != null
                 ? Component.translatable("wdl.screen.downloads.restoring", name)
                 : Component.translatable("wdl.screen.downloads.restoring_sweep"))
-                        .withColor(BrandColors.AMBER);
+                        .withStyle(style -> style.withColor(BrandColors.AMBER));
         StringWidget label = new StringWidget(this.font.width(labelText), FIELD_HEIGHT, labelText, this.font);
         centerTopWidget(label);
         addRenderableWidget(label);
@@ -969,7 +969,7 @@ public final class WdlDownloadsScreen extends Screen {
         private boolean suppressPrefill;
 
         DownloadList(Minecraft minecraft, int width, int height, int y, int itemHeight) {
-            super(minecraft, width, height, y, itemHeight);
+            super(minecraft, width, height, y, y + height, itemHeight);
         }
 
         @Override
@@ -983,7 +983,7 @@ public final class WdlDownloadsScreen extends Screen {
             // x zero, so with this screen's wider row and setX applied it lands inside each row and
             // getEntryAtPosition treats everything past it as the scrollbar. Later bands derive it from the real
             // row right edge, which this follows.
-            return getX() + this.width / 2 + getRowWidth() / 2 + 10;
+            return this.x0 + this.width / 2 + getRowWidth() / 2 + 10;
         }
 
         void populate(List<DownloadEntry> rows) {

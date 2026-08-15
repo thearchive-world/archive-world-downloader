@@ -60,7 +60,8 @@ public final class ResumeConfirm {
             }
         };
         return new ConfirmScreen(onChoice,
-                Component.translatable(keyPrefix + ".title").withColor(BrandColors.AMBER), message,
+                Component.translatable(keyPrefix + ".title").withStyle(style -> style.withColor(BrandColors.AMBER)),
+                message,
                 yesLabel, noLabel);
     }
 
@@ -105,6 +106,6 @@ public final class ResumeConfirm {
     }
 
     private static Component amber(String text) {
-        return Component.literal(text).withColor(BrandColors.AMBER);
+        return Component.literal(text).withStyle(style -> style.withColor(BrandColors.AMBER));
     }
 }

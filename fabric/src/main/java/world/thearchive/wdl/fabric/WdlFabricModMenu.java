@@ -5,7 +5,6 @@ package world.thearchive.wdl.fabric;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
-import com.terraformersmc.modmenu.api.UpdateChecker;
 import net.minecraft.client.gui.screens.Screen;
 
 import world.thearchive.wdl.Wdl;
@@ -20,10 +19,5 @@ public final class WdlFabricModMenu implements ModMenuApi {
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
         ConfigScreenFactory<Screen> factory = Wdl::createSettingsScreen;
         return factory;
-    }
-
-    @Override
-    public UpdateChecker getUpdateChecker() {
-        return new WdlModMenuUpdateChecker();
     }
 }

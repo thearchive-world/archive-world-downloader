@@ -49,7 +49,6 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
@@ -71,7 +70,6 @@ import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.BrewingStandMenu;
 import net.minecraft.world.inventory.ChestMenu;
-import net.minecraft.world.inventory.CrafterMenu;
 import net.minecraft.world.inventory.LecternMenu;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.item.ItemStack;
@@ -84,7 +82,6 @@ import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.block.entity.CrafterBlockEntity;
 import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.level.block.entity.LecternBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -94,6 +91,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.phys.AABB;
 import org.jspecify.annotations.Nullable;
@@ -109,7 +107,6 @@ import world.thearchive.wdl.core.CapturedContainers;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ContainerAssociation;
 import world.thearchive.wdl.core.CoveredChunkIndex;
-import world.thearchive.wdl.core.CrafterSlots;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.FlushPolicy;
@@ -1841,10 +1838,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * {@code ClientboundContainerSetContentPacket}), never in the chunk packet, so they are stashed here and merged
      * into their target at {@link #finish()}. Each recognition axis has its own bind leg and its own confidence test,
      * and an open that no leg claims confidently is DROPPED: mis-binding would write the wrong items onto a block or
-     * entity (a corrupt archive) while an empty container is correct. The ender chest, the double chest, the crafter,
-     * the lectern, the chested animal and the container vehicle each bind through their own leg rather than being
-     * dropped; what is dropped is an open whose target the click chain cannot account for, and any open whose slot
-     * count fails its leg's size guard.
+     * entity (a corrupt archive) while an empty container is correct. The ender chest, the double chest, the lectern,
+     * the chested animal and the container vehicle each bind through their own leg rather than being dropped; what is
+     * dropped is an open whose target the click chain cannot account for, and any open whose slot count fails its leg's
+     * size guard.
      *
      * <p>The binding is decided once when the menu first appears, from the target the player clicked (see
      * {@link ContainerCapture#resolveOpenTarget}, since the live crosshair keeps drifting until the menu freezes the
@@ -1907,8 +1904,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 bindOpenedChestedAnimal(menu, player, chestedAnimal);
             } else if (vehicleClaimsOpen) {
                 bindOpenedEntityContainer(menu, player, entity);
-            } else if (menu instanceof CrafterMenu crafterMenu) {
-                bindOpenedCrafter(crafterMenu, block);
             } else {
                 bindOpenedContainer(menu, player, block);
             }
@@ -1935,7 +1930,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 case ENTITY -> stashEntityContainerItems(menu, player);
                 case CHESTED_ANIMAL -> stashChestedAnimalItems(menu, player);
                 case DOUBLE_CHEST -> stashDoubleChestItems(menu, player);
-                case CRAFTER -> stashCrafterItems((CrafterMenu) menu, posKey);
                 case CONTAINER -> stashContainerItems(menu, player, posKey);
                 default -> {}
             }
@@ -1999,36 +1993,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (bound.isPresent()) {
             reportCounts.addContainer("l:" + bound.getAsLong());
             LOGGER.debug("bound open lectern to {}", BlockPos.of(bound.getAsLong()));
-        }
-    }
-
-    /**
-     * Translate the crafter-open target into primitives for {@link ContainerAssociation#openCrafter}. The crafter
-     * sibling of {@link #bindOpenedLectern}: the crafter menu is exclusive to crafters, so menu-plus-block plus the
-     * crafting-grid size is the confident match ({@code menuIsCrafter} is true at this call site, the dispatch already
-     * matched it; the parameter keeps the negative unit-testable in the core). The count is taken over the menu's own
-     * crafting container, so the result slot the crafter menu also carries is not counted against the block's nine.
-     */
-    private void bindOpenedCrafter(CrafterMenu menu, @Nullable BlockPos target) {
-        boolean atBlock = false;
-        long posKey = 0L;
-        boolean blockIsCrafter = false;
-        int menuCraftingSlotCount = 0;
-        int crafterContainerSize = 0;
-        if (target != null) {
-            atBlock = true;
-            posKey = target.asLong();
-            menuCraftingSlotCount = ContainerCapture.countCrafterInputSlots(menu);
-            if (level().getBlockEntity(target) instanceof CrafterBlockEntity crafter) {
-                blockIsCrafter = true;
-                crafterContainerSize = crafter.getContainerSize();
-            }
-        }
-        OptionalLong bound = association.openCrafter(atBlock, posKey, true, blockIsCrafter,
-                menuCraftingSlotCount, crafterContainerSize);
-        if (bound.isPresent()) {
-            reportCounts.addContainer("b:" + bound.getAsLong());
-            LOGGER.debug("bound open crafter to {}", BlockPos.of(bound.getAsLong()));
         }
     }
 
@@ -2215,30 +2179,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Serialize the bound crafter's input slots and menu-only state and stash them keyed by block pos, overwriting any
-     * earlier capture for the same open menu (last-seen-wins, like every block stash).
-     */
-    private void stashCrafterItems(CrafterMenu menu, long posKey) {
-        CompoundTag holder = containerCapture.captureCrafterSlots(menu);
-        if (holder != null) {
-            stashBlockHolder(containerStash, BlockPos.of(posKey), holder);
-        }
-    }
-
-    /**
-     * The menu-only ContainerData values the change gate tracks beside the slots: the crafter's nine disabled flags
-     * plus triggered, the brewing stand's brew time plus fuel. Every other menu tracks no data; the state-less constant
-     * keeps the per-tick call allocation-free for them.
+     * The menu-only ContainerData values the change gate tracks beside the slots: the brewing stand's brew time plus
+     * fuel. Every other menu tracks no data; the state-less constant keeps the per-tick call allocation-free for them.
      */
     private static int[] menuDataVector(AbstractContainerMenu menu) {
-        if (menu instanceof CrafterMenu crafter) {
-            int[] data = new int[CrafterSlots.SLOT_COUNT + 1];
-            for (int i = 0; i < CrafterSlots.SLOT_COUNT; i++) {
-                data[i] = crafter.isSlotDisabled(i) ? 1 : 0;
-            }
-            data[CrafterSlots.SLOT_COUNT] = crafter.isPowered() ? 1 : 0;
-            return data;
-        }
         if (menu instanceof BrewingStandMenu brewingStand) {
             return new int[] { brewingStand.getBrewingTicks(), brewingStand.getFuel() };
         }
@@ -3251,7 +3195,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (file == null || !Files.exists(file)) {
             return null;
         }
-        CompoundTag root = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap());
+        CompoundTag root = NbtIo.readCompressed(file.toFile());
         return root.get("Data") instanceof CompoundTag data ? data : null;
     }
 
@@ -3615,7 +3559,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // where the overworld sits at the save root (1.21.11 and earlier); at 26.x DimensionType
             // .getStorageFolder puts every dimension under dimensions/minecraft/<name>, so getDimensionPath here
             // would root WorldPaths, the map manifest and the export zip one dimension too deep.
-            Path saveRoot = access.getLevelDirectory().path();
+            Path saveRoot = access.getLevelPath(LevelResource.ROOT);
             WorldPaths paths = adapter.worldPaths(saveRoot);
             this.worldPaths = paths;
             this.mapIdsFile = MapManifest.pathIn(saveRoot);

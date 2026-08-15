@@ -77,10 +77,14 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 # net.minecraft.world.level.chunk, not the .status subpackage, and Level.getMapData is keyed by the raw String
 # MapItem.makeKey returns rather than a MapId. Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer
 # opens the vanilla IOWorker through WorldPaths (openRegionStorage/openEntitiesStorage) rather than constructing
-# one directly.
+# one directly. Below 1.20.3 there is no Crafter menu or block entity, so the crafter open-bind and stash legs are
+# dropped; NbtIo.readCompressed takes a File with no NbtAccounter; and the world save root is read via
+# getLevelPath(LevelResource.ROOT), the pre-getLevelDirectory form.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
-# Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager.
+# Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
+# SystemToast has no custom-id class, so the two toast streams reuse two distinct vanilla SystemToastIds enum
+# categories, and MutableComponent has no withColor(int), so toast text colors go through withStyle.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
 # The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
@@ -92,7 +96,8 @@ common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
 # this headless Level supplies the overworld dimension type, the vanilla registries, and an inactive profiler. New at
 # this band. Below 1.20.5 LevelAccessor.gameEvent takes a raw GameEvent rather than a Holder<GameEvent>,
 # Level.getMapData/setMapData are keyed by a String rather than a MapId, getFreeMapId returns an int rather than a
-# MapId, and Level has no potionBrewing accessor to override.
+# MapId, and Level has no potionBrewing accessor to override. Below 1.20.3 Level has no tickRateManager() accessor
+# to override either.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
 
 # Builds the section's biome registry via registryOrThrow, the pre-1.21.2 form (lookupOrThrow returns a
@@ -156,12 +161,16 @@ common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
 # setFocused-driven selection never fires (later bands override it to return true), so the download row overrides
 # mouseClicked to select itself. And this band's getScrollbarPosition is a fixed width/2 + 124 that ignores getX()
 # and the row width, so the list follows later bands and derives it from the row right edge, restoring hover and
-# clicks on the right of a row.
+# clicks on the right of a row. Below 1.20.3 AbstractSelectionList takes a six-argument (top, bottom, itemHeight)
+# constructor and exposes the list left as the protected x0 field with setLeftPos rather than getX/setX, and
+# MutableComponent has no withColor(int), so a label color is applied through withStyle.
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 
 # The same getScrollbarPosition divergence reaches the settings list: this band's fixed width/2 + 124 assumes the
 # 220-wide default row, so with the settings list's wider row it lands inside each row and cuts through the
-# controls, so the list follows later bands and derives it from the row right edge.
+# controls, so the list follows later bands and derives it from the row right edge. Below 1.20.3
+# AbstractSelectionList takes a six-argument (top, bottom, itemHeight) constructor and exposes the list left as the
+# protected x0 field, and MutableComponent has no withColor(int), so option labels are colored through withStyle.
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the HUD-layer id is built with the
@@ -286,7 +295,7 @@ common/src/test/java/world/thearchive/wdl/adapter/PriorPlayerReadRoundTripTest.j
 
 # Below 1.20.5 RegistryAccess has no createSerializationContext, so the ops are built via
 # RegistryOps.create(NbtOps.INSTANCE, registries); its DataResult.getOrThrow also takes (boolean, Consumer<String>),
-# not the no-argument form.
+# not the no-argument form. Below 1.20.3 NbtIo.readCompressed takes a File with no NbtAccounter argument.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 
 # 1.20.4 CompoundTag.get returns a non-null Tag, so a carry-forward reads it with a null check rather than a
@@ -412,3 +421,46 @@ neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgePlatformBridge.java
 # ServiceLoader smoke test is excluded from the build; it carries the 1.20.4 @Mod form (no dist element) for when
 # the tier returns.
 neoforge/src/test/java/world/thearchive/wdl/neoforge/NeoForgeServiceResolutionTest.java
+
+# Below 1.20.3 there is no Crafter block, block entity or menu (the Bats and Pots update added them, experimental),
+# so this band drops the crafter open-bind leg, the crafter stash and the crafter menu-only ContainerData; the
+# core CrafterSlots and ContainerAssociation.openCrafter stay as unused-but-compiling code.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
+
+# Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so the compressed write takes a File
+# (NbtIo.writeCompressed(CompoundTag, File)) and the read a File with no accounter; the OutputStream write
+# overload the id-counts staging uses is unchanged.
+common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
+
+# Below 1.20.3 NbtIo.readCompressed takes an InputStream with no NbtAccounter argument.
+common/src/main/java/world/thearchive/wdl/adapter/StashHolder.java
+
+# Below 1.20.3 MutableComponent has no withColor(int) convenience, so a template color is applied through
+# withStyle(style -> style.withColor(rgb)).
+common/src/main/java/world/thearchive/wdl/client/ResumeConfirm.java
+
+# Below 1.20.3 there is no Crafter menu or block entity, so the crafter capture tests are dropped.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerCaptureTest.java
+
+# Below 1.20.3 there is no Crafter block entity, so this flush-plan test builds its state-bearing block-entity
+# fixtures on the brewing stand (BrewTime/Fuel) rather than the crafter.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkFlushPlanTest.java
+
+# Below 1.20.3 NbtIo.readCompressed takes a File with no NbtAccounter argument.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
+
+# Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this round trip reads and writes through the File
+# forms.
+common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.java
+
+# Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.
+common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
+
+# The ModMenu API for this band (the 8.x line for 1.20.2) ships no update-checker API (UpdateChecker/UpdateInfo/
+# UpdateChannel arrived in a later ModMenu), so this entrypoint implements only the config-screen factory and does
+# not override getUpdateChecker.
+fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
+
+# The ModMenu API for this band ships no update-checker API, so the ModMenu update-badge feeder does not exist on
+# this band (deleted, not merely divergent); the launch update check still runs, only its ModMenu badge is gone.
+fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java

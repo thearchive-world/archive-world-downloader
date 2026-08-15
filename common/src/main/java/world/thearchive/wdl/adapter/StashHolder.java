@@ -7,7 +7,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import org.jspecify.annotations.Nullable;
 
@@ -71,6 +70,6 @@ final class StashHolder {
         if (bytes == null) {
             throw new IOException("stash holder holds neither a tag nor packed bytes");
         }
-        return NbtIo.readCompressed(new ByteArrayInputStream(bytes), NbtAccounter.unlimitedHeap());
+        return NbtIo.readCompressed(new ByteArrayInputStream(bytes));
     }
 }

@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
@@ -51,7 +50,7 @@ final class MapDataWriter {
     public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");
         Files.createDirectories(file.getParent());
-        NbtIo.writeCompressed(envelope(dataTag), file);
+        NbtIo.writeCompressed(envelope(dataTag), file.toFile());
     }
 
     /**
@@ -83,7 +82,7 @@ final class MapDataWriter {
         if (!Files.exists(file)) {
             return -1;
         }
-        CompoundTag envelope = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap());
+        CompoundTag envelope = NbtIo.readCompressed(file.toFile());
         CompoundTag data = envelope.getCompound("data");
         return data.contains("map") ? data.getInt("map") : -1;
     }

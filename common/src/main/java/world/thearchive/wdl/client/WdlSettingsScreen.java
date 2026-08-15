@@ -342,7 +342,8 @@ public final class WdlSettingsScreen extends Screen {
                 : "wdl.settings.confirm.recapture.to_nearby.message";
         minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
                 Component.translatable("wdl.settings.confirm.recapture.title",
-                        Component.translatable(valueLabelKey(value)).withColor(BrandColors.AMBER)),
+                        Component.translatable(valueLabelKey(value))
+                                .withStyle(style -> style.withColor(BrandColors.AMBER))),
                 Component.translatable(messageKey),
                 Component.translatable("wdl.settings.confirm.recapture.confirm"),
                 CommonComponents.GUI_CANCEL));
@@ -399,7 +400,8 @@ public final class WdlSettingsScreen extends Screen {
         };
         minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
                 Component.translatable(base + ".title",
-                        Component.translatable(SettingsLayout.optionLabelKey(key)).withColor(BrandColors.AMBER)),
+                        Component.translatable(SettingsLayout.optionLabelKey(key))
+                                .withStyle(style -> style.withColor(BrandColors.AMBER))),
                 Component.translatable(SettingsLayout.confirmMessageKey(key)),
                 Component.translatable(base + ".confirm"),
                 CommonComponents.GUI_CANCEL));
@@ -414,7 +416,8 @@ public final class WdlSettingsScreen extends Screen {
             minecraft.setScreen(this);
         };
         minecraft.setScreen(new ConfirmScreen(choice,
-                Component.translatable("wdl.settings.defaults.title").withColor(BrandColors.AMBER),
+                Component.translatable("wdl.settings.defaults.title")
+                        .withStyle(style -> style.withColor(BrandColors.AMBER)),
                 Component.translatable("wdl.settings.defaults.message"),
                 Component.translatable("wdl.settings.defaults.confirm"),
                 CommonComponents.GUI_CANCEL));
@@ -424,7 +427,8 @@ public final class WdlSettingsScreen extends Screen {
         Minecraft minecraft = Minecraft.getInstance();
         BooleanConsumer choice = confirmed -> minecraft.setScreen(confirmed ? this.parent : this);
         minecraft.setScreen(new ConfirmScreen(choice,
-                Component.translatable("wdl.settings.discard.title").withColor(BrandColors.AMBER),
+                Component.translatable("wdl.settings.discard.title")
+                        .withStyle(style -> style.withColor(BrandColors.AMBER)),
                 Component.translatable("wdl.settings.discard.message"),
                 Component.translatable("wdl.settings.discard.confirm"),
                 CommonComponents.GUI_CANCEL));
@@ -446,7 +450,7 @@ public final class WdlSettingsScreen extends Screen {
     /** The scrollable list of rows for the active tab; rebuilt whole on a tab switch or resize. */
     private final class SettingsList extends ContainerObjectSelectionList<SettingsEntry> {
         SettingsList(Minecraft minecraft, int width, int height, int top, int itemHeight) {
-            super(minecraft, width, height, top, itemHeight);
+            super(minecraft, width, height, top, top + height, itemHeight);
         }
 
         void add(SettingsEntry entry) {
@@ -463,7 +467,7 @@ public final class WdlSettingsScreen extends Screen {
             // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row, so with this
             // screen's wider row it lands inside each row and cuts through the controls; later bands derive it
             // from the row right edge, which this follows.
-            return getX() + this.width / 2 + getRowWidth() / 2 + 10;
+            return this.x0 + this.width / 2 + getRowWidth() / 2 + 10;
         }
     }
 

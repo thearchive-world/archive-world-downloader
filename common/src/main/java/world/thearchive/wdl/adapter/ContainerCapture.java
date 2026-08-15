@@ -19,7 +19,6 @@ import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ChestMenu;
-import net.minecraft.world.inventory.CrafterMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -35,7 +34,6 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import world.thearchive.wdl.core.ContainerAssociation;
-import world.thearchive.wdl.core.CrafterSlots;
 import world.thearchive.wdl.core.OpenClickIntent;
 import world.thearchive.wdl.core.SpectatorCrosshairFallback;
 import world.thearchive.wdl.platform.PlatformBridge;
@@ -272,22 +270,6 @@ final class ContainerCapture {
     }
 
     /**
-     * Count a crafter menu's crafting-grid slots: the slots backed by the menu's own crafting container, which excludes
-     * the recipe-preview result slot sitting on a separate container. Equals the crafter block's own container size,
-     * the mis-bind guard, and applies the same exclusion {@link #selectCrafterInputs} lifts by.
-     */
-    static int countCrafterInputSlots(CrafterMenu menu) {
-        Container crafting = menu.getContainer();
-        int count = 0;
-        for (Slot slot : menu.slots) {
-            if (slot.container == crafting) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    /**
      * Serialize a menu's non-player block slots (each at its container-slot index) into an {@code "Items"} holder via
      * the per-band {@link ContainerSink}, or {@code null} when the menu exposes no block slots this tick. Shared by the
      * container and ender-chest stashes (both lift the same synthetic client slots).
@@ -317,52 +299,6 @@ final class ContainerCapture {
             }
         }
         return adapter.containerSink().captureItems(items, registries);
-    }
-
-    /**
-     * Serialize the crafter menu's nine input slots (selected by {@link #selectCrafterInputs}) into an {@code "Items"}
-     * holder via the per-band {@link ContainerSink}, then ride the menu-only persisted state on the same holder:
-     * {@code disabled_slots} (vanilla's sparse form) and {@code triggered}. {@code null} when the menu exposed no
-     * crafting slots this tick.
-     */
-    @Nullable
-    CompoundTag captureCrafterSlots(CrafterMenu menu) {
-        NonNullList<ItemStack> items = selectCrafterInputs(menu.slots, menu.getContainer());
-        if (items == null) {
-            return null; // bound but no crafting slots this tick; nothing to capture
-        }
-        CompoundTag holder = adapter.containerSink().captureItems(items, registries);
-        boolean[] disabled = new boolean[CrafterSlots.SLOT_COUNT];
-        for (int i = 0; i < disabled.length; i++) {
-            disabled[i] = menu.isSlotDisabled(i);
-        }
-        holder.putIntArray("disabled_slots", CrafterSlots.disabledSlotIndices(disabled));
-        holder.putInt("triggered", menu.isPowered() ? 1 : 0);
-        return holder;
-    }
-
-    /**
-     * Select a crafter menu's input slots into a 0-based {@code "Items"} list, or {@code null} when no slot backed by
-     * {@code crafting} appears (nothing to capture this tick). Only slots whose backing container is {@code crafting}
-     * (the menu's own crafting container) are taken: the crafter menu also carries the recipe-preview result slot on a
-     * SEPARATE container whose single slot reports container index 0, so a lift keyed on container index alone would
-     * clobber input slot 0. The player inventory is excluded the same way. Pure over the slot list and container so
-     * this exclusion is testable without a live menu.
-     */
-    @Nullable
-    static NonNullList<ItemStack> selectCrafterInputs(List<Slot> slots, Container crafting) {
-        NonNullList<ItemStack> items = NonNullList.withSize(crafting.getContainerSize(), ItemStack.EMPTY);
-        boolean any = false;
-        for (Slot slot : slots) {
-            if (slot.container == crafting) {
-                int index = slot.getContainerSlot();
-                if (index >= 0 && index < items.size()) {
-                    items.set(index, slot.getItem());
-                    any = true;
-                }
-            }
-        }
-        return any ? items : null;
     }
 
     /**

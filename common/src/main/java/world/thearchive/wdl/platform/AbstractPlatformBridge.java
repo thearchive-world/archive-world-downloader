@@ -48,13 +48,14 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
 public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    // The no-argument ids keep the vanilla default display time (which the accessibility
-    // notification-time multiplier scales). Job-done toasts are always constructed fresh, never
-    // addOrUpdate-reset, so each event surfaces its own toast. Refusals get their own id so a repeated
-    // click cannot queue a parade: one refusal on screen or in the queue is the whole message, and
+    // Below 1.20.3 SystemToast has no custom-id class, so these reuse two distinct vanilla toast categories
+    // (PERIODIC_NOTIFICATION for job-done, TUTORIAL_HINT for refusals), which keep the vanilla default display
+    // time (which the accessibility notification-time multiplier scales). Job-done toasts are always constructed
+    // fresh, never addOrUpdate-reset, so each event surfaces its own toast. Refusals use their own category so a
+    // repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message, and
     // vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body unwrapped).
-    private static final SystemToast.SystemToastId TOAST_ID = new SystemToast.SystemToastId();
-    private static final SystemToast.SystemToastId REFUSAL_TOAST_ID = new SystemToast.SystemToastId();
+    private static final SystemToast.SystemToastIds TOAST_ID = SystemToast.SystemToastIds.PERIODIC_NOTIFICATION;
+    private static final SystemToast.SystemToastIds REFUSAL_TOAST_ID = SystemToast.SystemToastIds.TUTORIAL_HINT;
 
     // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
     // inside the methods, never the constructor, and isModLoaded is a loader call. Read only on the client
@@ -130,7 +131,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                             ? Component.translatable(argument.translationKey())
                             : Component.translatable(argument.translationKey(), argument.text());
             if (argument.color().isPresent()) {
-                rendered = rendered.withColor(argument.color().getAsInt());
+                rendered = rendered.withStyle(style -> style.withColor(argument.color().getAsInt()));
             }
             ChatCopy.Click click = argument.click();
             if (click != null) {
@@ -146,7 +147,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         }
         MutableComponent rendered = Component.translatable(line.translationKey(), renderedArguments);
         if (line.templateColor().isPresent()) {
-            rendered = rendered.withColor(line.templateColor().getAsInt());
+            rendered = rendered.withStyle(style -> style.withColor(line.templateColor().getAsInt()));
         }
         return rendered;
     }
@@ -162,16 +163,16 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                             ? Component.translatable(argument.translationKey())
                             : Component.translatable(argument.translationKey(), argument.text());
             if (argument.color().isPresent()) {
-                rendered = rendered.withColor(argument.color().getAsInt());
+                rendered = rendered.withStyle(style -> style.withColor(argument.color().getAsInt()));
             }
             renderedArguments[slot++] = rendered;
         }
         MutableComponent body = Component.translatable(toast.bodyKey(), renderedArguments);
         if (toast.bodyColor().isPresent()) {
-            body = body.withColor(toast.bodyColor().getAsInt());
+            body = body.withStyle(style -> style.withColor(toast.bodyColor().getAsInt()));
         }
         Minecraft mc = Minecraft.getInstance();
-        SystemToast.SystemToastId id = toast.refusal() ? REFUSAL_TOAST_ID : TOAST_ID;
+        SystemToast.SystemToastIds id = toast.refusal() ? REFUSAL_TOAST_ID : TOAST_ID;
         if (toast.refusal() && mc.getToasts().getToast(SystemToast.class, id) != null) {
             return;
         }
