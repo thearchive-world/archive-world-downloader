@@ -62,7 +62,7 @@ neoForge {
     // uses) and loads the test/ classes AS the mod. This is strictly stronger than a plain-classpath
     // test: it reproduces the real JPMS module setup, so it catches mod-LOAD failures a flat-classpath
     // test cannot: it catches the automatic-module uses crash that a services array in
-    // neoforge.mods.toml triggers. ServiceLoader resolution is then exercised
+    // mods.toml triggers. ServiceLoader resolution is then exercised
     // against the loaded mod's own classloader.
     // The FML-module smoke test needs the FancyModLoader JUnit helper (junit-fml), which this NeoForge line's
     // FancyModLoader 2.0.x does not publish (see the neoforge_fml_unit_test note in gradle.properties). A band
@@ -85,7 +85,7 @@ if (!providers.gradleProperty("neoforge_fml_unit_test").map { it.toBoolean() }.o
 }
 
 tasks.named<ProcessResources>("processResources") {
-    // Keep neoforge.mods.toml's templated fields in sync with gradle.properties: the mod version, the
+    // Keep mods.toml's templated fields in sync with gradle.properties: the mod version, the
     // MC pin, and the NeoForge floor (neoforge_version_min, a deliberate value distinct from the build
     // coordinate neoforge_version). The :common resource merge and the .gitkeep exclude are handled by
     // wdl.common-merge.
@@ -97,7 +97,7 @@ tasks.named<ProcessResources>("processResources") {
         "mod_id" to project.property("mod_id").toString(),
     )
     inputs.properties(tokens)
-    filesMatching("META-INF/neoforge.mods.toml") { expand(tokens) }
+    filesMatching("META-INF/mods.toml") { expand(tokens) }
     filesMatching("wdl-publishing.properties") { expand(tokens) }
 }
 

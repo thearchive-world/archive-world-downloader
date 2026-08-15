@@ -6,14 +6,13 @@ package world.thearchive.wdl.neoforge;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.client.ConfigScreenHandler;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.event.RegisterGuiOverlaysEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import org.lwjgl.glfw.GLFW;
@@ -29,7 +28,7 @@ import world.thearchive.wdl.client.WdlKeyBinds;
  * NeoForge client entrypoint (the analog of {@code WdlFabricClient#onInitializeClient}).
  *
  * <p>Runs at registration time: the {@code @Mod} constructor fires <i>after</i> all mod constructors but <i>before</i>
- * {@link RegisterKeyMappingsEvent} and {@link RegisterGuiLayersEvent}, so it is the right (and only correct) point to
+ * {@link RegisterKeyMappingsEvent} and {@link RegisterGuiOverlaysEvent}, so it is the right (and only correct) point to
  * add the mod-bus listeners that register the keybinds and the HUD layer. We hand the injected mod event bus to a new
  * {@link NeoForgePlatformBridge} and pass it to the loader-agnostic {@link Wdl#initialize}.
  *
@@ -39,17 +38,19 @@ import world.thearchive.wdl.client.WdlKeyBinds;
  * and stays visible in creative and spectator; the render body is shared. The tee is always installed (entity packet
  * capture is the default mechanism) and no-ops while no download is running.
  *
- * <p>{@code dist = Dist.CLIENT}: this is a client-only mod, so the entrypoint never loads on a dedicated server.
+ * <p>NeoForge 20.4's {@code @Mod} has no {@code dist} element (20.6's {@code dist = Dist.CLIENT} does not exist here);
+ * {@code mods.toml} declares {@code side = "CLIENT"} on this mod's dependency entries.
  */
-@Mod(value = "wdl", dist = Dist.CLIENT)
+@Mod("wdl")
 public final class WdlNeoForge {
     public WdlNeoForge(IEventBus modEventBus, ModContainer modContainer) {
         Wdl.initialize(new NeoForgePlatformBridge(modEventBus));
         MountMenuReader.install(new NeoForgeMountMenuReader());
         // The mods-list config button: opens the same settings screen the pause-menu button does, with the
         // mod list as its back target. First-party NeoForge, no soft dependency.
-        modContainer.registerExtensionPoint(IConfigScreenFactory.class,
-                (container, modListScreen) -> Wdl.createSettingsScreen(modListScreen));
+        modContainer.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
+                () -> new ConfigScreenHandler.ConfigScreenFactory(
+                        (minecraft, modListScreen) -> Wdl.createSettingsScreen(modListScreen)));
         NeoForge.EVENT_BUS.addListener(
                 (ClientPlayerNetworkEvent.LoggingIn event) -> NeoForgeConnectionTee.install(event.getConnection()));
         // Observe the local player's right-clicks for interaction-prediction capture and the open-container
@@ -72,8 +73,10 @@ public final class WdlNeoForge {
         // Register above all layers rather than relative to a gamemode-gated vanilla layer (the experience bar is
         // hidden in creative, the hotbar in spectator), so the overlay draws in every gamemode; it self-gates F1
         // and blocking screens itself.
-        modEventBus.addListener(RegisterGuiLayersEvent.class, event -> event.registerAboveAll(
-                new ResourceLocation("wdl", "hud"), WdlHudOverlay::render));
+        modEventBus.addListener(RegisterGuiOverlaysEvent.class, event -> event.registerAboveAll(
+                new ResourceLocation("wdl", "hud"),
+                (gui, guiGraphics, partialTick, screenWidth, screenHeight) -> WdlHudOverlay.render(guiGraphics,
+                        partialTick)));
         new NeoForgeOutlineRegistrar().register();
     }
 }

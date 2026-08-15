@@ -21,11 +21,11 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.TickEvent;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
@@ -42,10 +42,11 @@ import world.thearchive.wdl.platform.WdlCommands;
  * are pure-vanilla and inherited from {@link AbstractPlatformBridge}.
  *
  * <p>NeoForge splits a <i>mod</i> event bus (lifecycle/registration, e.g. {@link RegisterKeyMappingsEvent}) from the
- * <i>game</i> event bus ({@link NeoForge#EVENT_BUS}, gameplay, e.g. {@link ClientTickEvent.Post}). A {@code KeyMapping}
- * can only be registered by listening to {@link RegisterKeyMappingsEvent} on the mod bus, and the loader injects that
- * bus into the {@code @Mod} constructor, which runs before the event fires. {@link WdlNeoForge} therefore passes that
- * injected bus straight to this bridge's constructor, which holds it for {@link #registerKeybind}.
+ * <i>game</i> event bus ({@link NeoForge#EVENT_BUS}, gameplay, e.g. {@link TickEvent.ClientTickEvent}). A
+ * {@code KeyMapping} can only be registered by listening to {@link RegisterKeyMappingsEvent} on the mod bus, and the
+ * loader injects that bus into the {@code @Mod} constructor, which runs before the event fires. {@link WdlNeoForge}
+ * therefore passes that injected bus straight to this bridge's constructor, which holds it for
+ * {@link #registerKeybind}.
  */
 final class NeoForgePlatformBridge extends AbstractPlatformBridge {
     /** The mod event bus, injected into {@link WdlNeoForge}'s {@code @Mod} constructor and handed here. */
@@ -61,9 +62,11 @@ final class NeoForgePlatformBridge extends AbstractPlatformBridge {
         KeyMapping key = new KeyMapping(keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
                 WdlKeyBinds.CATEGORY);
         modEventBus.addListener(RegisterKeyMappingsEvent.class, event -> event.register(key));
-        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> {
-            while (key.consumeClick()) {
-                onPress.run();
+        NeoForge.EVENT_BUS.addListener(TickEvent.ClientTickEvent.class, event -> {
+            if (event.phase == TickEvent.Phase.END) {
+                while (key.consumeClick()) {
+                    onPress.run();
+                }
             }
         });
     }
@@ -94,7 +97,11 @@ final class NeoForgePlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public void onClientTickEnd(Runnable callback) {
-        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> callback.run());
+        NeoForge.EVENT_BUS.addListener(TickEvent.ClientTickEvent.class, event -> {
+            if (event.phase == TickEvent.Phase.END) {
+                callback.run();
+            }
+        });
     }
 
     @Override

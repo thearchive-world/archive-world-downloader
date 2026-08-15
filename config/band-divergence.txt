@@ -158,8 +158,16 @@ common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 # public ResourceLocation(String, String) constructor. NeoForge 20.4 registers the HUD through
 # RegisterGuiOverlaysEvent plus an IGuiOverlay (RegisterGuiLayersEvent is later), the config screen through
 # ConfigScreenHandler.ConfigScreenFactory (not IConfigScreenFactory), and @Mod has no dist element; the
-# client-only declaration lives in neoforge.mods.toml's side = "CLIENT" dependency entries instead.
+# client-only declaration lives in mods.toml's side = "CLIENT" dependency entries instead.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
+
+# NeoForge 20.4 scans META-INF/mods.toml for the mod manifest; it was renamed to META-INF/neoforge.mods.toml above
+# this band. The template content is unchanged, only the path, so this band ships the manifest under the 20.4 name.
+neoforge/src/main/resources/META-INF/mods.toml
+
+# The counterpart to the above: the dev branch's manifest name has no file on this band, which uses the 20.4
+# META-INF/mods.toml name instead.
+neoforge/src/main/resources/META-INF/neoforge.mods.toml
 
 # JourneyMap 5.10.0 for this version uses the older 1.9 API generation (journeymap.client.api), so this plugin binds
 # the @ClientPlugin annotation and the IClientPlugin.onEvent push model rather than the journeymap.api.v2 forms.
