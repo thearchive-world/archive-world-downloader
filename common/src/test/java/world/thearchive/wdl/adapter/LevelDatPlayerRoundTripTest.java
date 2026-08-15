@@ -81,6 +81,18 @@ class LevelDatPlayerRoundTripTest {
     }
 
     @Test
+    void savesWithOutOfRangeCapturedYawPersistValidSpawnYaw(@TempDir Path saves) throws IOException {
+        // 271.2334 is a captured yaw outside the RespawnData codec's [-180,180) bound.
+        CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(), BlockPos.ZERO, 271.2334F, 12.0F,
+                Level.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);
+
+        CompoundTag data = saveAndReadBack(saves, "outofrangeyaw", captured);
+
+        float yaw = data.read("spawn", LevelData.RespawnData.CODEC).orElseThrow().yaw();
+        assertTrue(yaw >= -180.0F && yaw < 180.0F, "the persisted spawn yaw is wrapped into the codec's valid range");
+    }
+
+    @Test
     void savesWithSurvivalOptOutWriteTheCapturedMode(@TempDir Path saves) throws IOException {
         CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(), BlockPos.ZERO, 0.0F, 0.0F,
                 Level.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);
