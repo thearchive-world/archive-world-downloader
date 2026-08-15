@@ -15,6 +15,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.PrimaryLevelData;
@@ -43,7 +44,7 @@ class LevelDatWorldOutputTest {
     }
 
     private GameRules gameRules(LevelDataWriter.LevelData built) {
-        DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
+        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, built.registries());
         return new GameRules(new Dynamic<>(ops, dataTag(built).getCompound("GameRules")));
     }
 
@@ -61,8 +62,9 @@ class LevelDatWorldOutputTest {
     }
 
     private WorldGenSettings worldGen(LevelDataWriter.LevelData built) {
-        DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
-        return WorldGenSettings.CODEC.parse(ops, dataTag(built).getCompound("WorldGenSettings")).getOrThrow();
+        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, built.registries());
+        return WorldGenSettings.CODEC.parse(ops, dataTag(built).getCompound("WorldGenSettings"))
+                .getOrThrow(false, s -> {});
     }
 
     @Test

@@ -36,7 +36,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The headless guard for the chunk read-merge: {@link ChunkMerge} carries forward every interaction-captured datum (a
  * block container's {@code "Items"}, a lectern's {@code "Book"}/{@code "Page"}, a jukebox disc's {@code "RecordItem"},
- * a beehive's {@code "bees"}) from the on-disk chunk into a freshly re-captured one, preferring non-empty wherever the
+ * a beehive's {@code "Bees"}) from the on-disk chunk into a freshly re-captured one, preferring non-empty wherever the
  * write captured nothing of its own there, so a re-walk live-updates the terrain without wiping a chest an earlier
  * write archived, while a container this write captured is left exactly as that capture saw it. Pure
  * {@code CompoundTag} in/out, band-agnostic over the post-1.18 {@code "block_entities"} layout, matched by
@@ -75,9 +75,13 @@ class ChunkMergeTest {
     }
 
     private static CompoundTag jukeboxWithDisc(int x, int y, int z, String discId) {
+        // Vanilla JukeboxBlockEntity.saveAdditional always writes IsPlaying/RecordStartTick/TickCount alongside
+        // a present RecordItem; a fixture that omits the latter two fails the producer round-trip.
         CompoundTag blockEntity = jukebox(x, y, z);
         blockEntity.put("RecordItem", ItemFixtures.itemTag(discId));
         blockEntity.putBoolean("IsPlaying", true);
+        blockEntity.putLong("RecordStartTick", 0L);
+        blockEntity.putLong("TickCount", 0L);
         return blockEntity;
     }
 
@@ -85,13 +89,20 @@ class ChunkMergeTest {
         return blockEntity("minecraft:beehive", x, y, z);
     }
 
+    /**
+     * A beehive block entity carrying occupants under {@code "Bees"}, the key {@link ChunkMerge}'s own
+     * {@code CapturedBlockField.BEES} carries forward (vanilla's own {@code BeehiveBlockEntity} persists occupants
+     * under {@code "Bees"} instead, so this shape is not a real producer's output; a chunk tag built from it must go
+     * through {@link BlockEntityFixtures#malformedChunkTagWith}, not the fidelity-checked
+     * {@link BlockEntityFixtures#chunkTagWith}).
+     */
     private static CompoundTag beehiveWithBees(int x, int y, int z, int beeCount) {
         CompoundTag blockEntity = beehive(x, y, z);
         int[] ticksInHive = new int[beeCount];
         for (int i = 0; i < beeCount; i++) {
             ticksInHive[i] = 10 * (i + 1);
         }
-        blockEntity.put("bees", BlockEntityFixtures.bees(ticksInHive));
+        blockEntity.put("Bees", BlockEntityFixtures.bees(ticksInHive));
         return blockEntity;
     }
 
@@ -100,7 +111,7 @@ class ChunkMergeTest {
     }
 
     private static int beeCount(CompoundTag blockEntity) {
-        return blockEntity.get("bees") instanceof ListTag bees ? bees.size() : 0;
+        return blockEntity.get("Bees") instanceof ListTag bees ? bees.size() : 0;
     }
 
     /**
@@ -218,7 +229,7 @@ class ChunkMergeTest {
 
     @Test
     void aBeehiveOccupantsCarryForwardWhenFreshHasNone() {
-        CompoundTag onDisk = chunkTagWith(beehiveWithBees(8, 72, 1, 3));
+        CompoundTag onDisk = BlockEntityFixtures.malformedChunkTagWith(beehiveWithBees(8, 72, 1, 3));
         CompoundTag fresh = chunkTagWith(beehive(8, 72, 1)); // re-walked: the client carries no occupants
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
@@ -229,8 +240,9 @@ class ChunkMergeTest {
 
     @Test
     void aRePlacedBeehiveKeepsTheFresherOccupants() {
-        CompoundTag onDisk = chunkTagWith(beehiveWithBees(8, 72, 1, 3));
-        CompoundTag fresh = chunkTagWith(beehiveWithBees(8, 72, 1, 1)); // a populated hive placed this session
+        CompoundTag onDisk = BlockEntityFixtures.malformedChunkTagWith(beehiveWithBees(8, 72, 1, 3));
+        // a populated hive placed this session
+        CompoundTag fresh = BlockEntityFixtures.malformedChunkTagWith(beehiveWithBees(8, 72, 1, 1));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -240,8 +252,8 @@ class ChunkMergeTest {
 
     @Test
     void anEmptyDiskBeesListIsNotCarried() {
-        // present-but-empty "bees" is vanilla's emptied-hive state, distinct from the key being absent
-        CompoundTag onDisk = chunkTagWith(beehiveWithBees(2, 64, 2, 0));
+        // present-but-empty "Bees" is vanilla's emptied-hive state, distinct from the key being absent
+        CompoundTag onDisk = BlockEntityFixtures.malformedChunkTagWith(beehiveWithBees(2, 64, 2, 0));
         CompoundTag fresh = chunkTagWith(beehive(2, 64, 2));
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh), "an empty disk bees list is not carried");

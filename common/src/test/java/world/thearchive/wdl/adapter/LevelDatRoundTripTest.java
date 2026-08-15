@@ -20,6 +20,7 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.FlatLevelSource;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
@@ -43,12 +44,12 @@ class LevelDatRoundTripTest {
     void levelDatRoundTripsVoidDimensionsSeedAndDataVersion(@TempDir Path directory) throws IOException {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
-        DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
+        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, built.registries());
 
         CompoundTag dataTag = built.worldData().createTag(built.registries(), null);
         CompoundTag worldGenTag = dataTag.getCompound("WorldGenSettings");
         assertFalse(worldGenTag.isEmpty(), "WorldGenSettings must be present in the level.dat Data tag");
-        long originalSeed = WorldGenSettings.CODEC.parse(ops, worldGenTag).getOrThrow().options().seed();
+        long originalSeed = WorldGenSettings.CODEC.parse(ops, worldGenTag).getOrThrow(false, s -> {}).options().seed();
 
         Path levelDat = directory.resolve("level.dat");
         CompoundTag root = new CompoundTag();
@@ -61,7 +62,7 @@ class LevelDatRoundTripTest {
 
         WorldGenSettings worldGen = WorldGenSettings.CODEC
                 .parse(ops, back.getCompound("WorldGenSettings"))
-                .getOrThrow();
+                .getOrThrow(false, s -> {});
         assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
         assertEquals(originalSeed, worldGen.options().seed(), "seed survives the round-trip");
         assertInstanceOf(FlatLevelSource.class,
@@ -96,11 +97,11 @@ class LevelDatRoundTripTest {
         assertTrue(Files.exists(levelDat), "save() must write level.dat via the vanilla LevelStorageAccess envelope");
 
         CompoundTag data = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompound("Data");
-        DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
+        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, built.registries());
         assertTrue((data.contains("DataVersion") ? data.getInt("DataVersion") : -1) > 0,
                 "DataVersion survives the production save");
         WorldGenSettings worldGen = WorldGenSettings.CODEC.parse(ops, data.getCompound("WorldGenSettings"))
-                .getOrThrow();
+                .getOrThrow(false, s -> {});
         assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
         assertInstanceOf(FlatLevelSource.class,
                 worldGen.dimensions().dimensions().get(LevelStem.OVERWORLD).generator(),

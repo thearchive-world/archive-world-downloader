@@ -115,7 +115,7 @@ class EntityContainerStashMergeTest {
         assertEquals("minecraft:chest_minecart", mergedEntity.getString("id"),
                 "the id is preserved (no clobber)");
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(mergedEntity, back, registries);
+        ContainerHelper.loadAllItems(mergedEntity, back);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest minecart gains exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
 
@@ -143,7 +143,7 @@ class EntityContainerStashMergeTest {
         assertFalse(minecart.contains("Items"), "the plain minecart it was pushed under carries no contents");
         CompoundTag nestedMule = minecart.getList("Passengers", Tag.TAG_COMPOUND).getCompound(0);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(nestedMule, back, registries);
+        ContainerHelper.loadAllItems(nestedMule, back);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the nested mule carries exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
     }
@@ -232,7 +232,7 @@ class EntityContainerStashMergeTest {
 
         ListTag entities = chunkTag.getList("Entities", Tag.TAG_COMPOUND);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(findByUuid(entities, UUID_A), back, registries);
+        ContainerHelper.loadAllItems(findByUuid(entities, UUID_A), back);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "this copy carries the loot rather than being empty");
         assertFalse(findByUuid(entities, UUID_C).contains("Items"), "the unfolded neighbor is untouched");
     }

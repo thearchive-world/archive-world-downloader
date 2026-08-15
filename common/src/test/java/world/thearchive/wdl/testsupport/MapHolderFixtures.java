@@ -3,16 +3,11 @@
 
 package world.thearchive.wdl.testsupport;
 
-import java.util.List;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.BundleContents;
-import net.minecraft.world.item.component.ItemContainerContents;
-import net.minecraft.world.level.saveddata.maps.MapId;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
@@ -24,24 +19,31 @@ import world.thearchive.wdl.adapter.ContainerSink;
 public final class MapHolderFixtures {
     private MapHolderFixtures() {}
 
-    /** A filled-map stack carrying {@code id} in its {@code minecraft:map_id} component. */
+    /**
+     * A filled-map stack carrying {@code id} in its raw {@code "map"} tag (below 1.20.5, no {@code map_id} component).
+     */
     public static ItemStack filledMap(int id) {
         ItemStack map = new ItemStack(Items.FILLED_MAP);
-        map.set(DataComponents.MAP_ID, new MapId(id));
+        map.getOrCreateTag().putInt("map", id);
         return map;
     }
 
-    /** A shulker box whose {@code minecraft:container} component nests {@code contents}. */
+    /**
+     * A shulker box whose {@code tag.BlockEntityTag.Items} nests {@code contents} (below 1.20.5, no container
+     * component).
+     */
     public static ItemStack shulkerHolding(ItemStack... contents) {
         ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
-        shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(List.of(contents)));
+        CompoundTag blockEntityTag = new CompoundTag();
+        blockEntityTag.put("Items", ItemFixtures.items(contents));
+        shulker.getOrCreateTag().put("BlockEntityTag", blockEntityTag);
         return shulker;
     }
 
-    /** A bundle whose {@code minecraft:bundle_contents} component nests {@code contents}. */
+    /** A bundle whose {@code tag.Items} nests {@code contents} (below 1.20.5, no bundle_contents component). */
     public static ItemStack bundleHolding(ItemStack... contents) {
         ItemStack bundle = new ItemStack(Items.BUNDLE);
-        bundle.set(DataComponents.BUNDLE_CONTENTS, new BundleContents(List.of(contents)));
+        bundle.getOrCreateTag().put("Items", ItemFixtures.items(contents));
         return bundle;
     }
 

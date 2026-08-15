@@ -3,13 +3,11 @@
 
 package world.thearchive.wdl.neoforge;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.ServiceLoader;
-import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.Mod;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +52,7 @@ class NeoForgeServiceResolutionTest {
         Mod mod = WdlNeoForge.class.getAnnotation(Mod.class);
         assertNotNull(mod, "WdlNeoForge must carry @Mod");
         assertEquals("wdl", mod.value(), "@Mod id must match the mods.toml modId + ServiceLoader wiring");
-        assertArrayEquals(new Dist[] { Dist.CLIENT }, mod.dist(), "client-only entrypoint");
+        // NeoForge 20.4's @Mod has no dist element (20.6's dist = Dist.CLIENT does not exist here); the
+        // client-only declaration lives in mods.toml's side = "CLIENT" dependency entries instead.
     }
 }

@@ -4,6 +4,7 @@
 package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
@@ -25,11 +26,9 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.util.datafix.DataFixTypes;
-import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -43,8 +42,8 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * Region-pipeline integration: the real {@link SimpleRegionStorage} path under {@link WorldPaths}, covering multi-chunk
- * + region-boundary placement, the &gt;1 MiB external-{@code .mcc} spill, {@code synchronize(true)}+{@code close()}
+ * Region-pipeline integration: the real {@link IOWorker} path under {@link WorldPaths}, covering multi-chunk +
+ * region-boundary placement, the &gt;1 MiB external-{@code .mcc} spill, {@code synchronize(true)}+{@code close()}
  * drain, reopen-and-read-back from a fresh storage, and the read-merge recapture path over an on-disk prior.
  *
  * <p>The chiseled bookshelf rides here rather than only in {@link ChunkMerge}'s own headless test because the loss it
@@ -56,14 +55,12 @@ class RegionIntegrationTest {
     private final ContainerSink containerSink = new ContainerSinkImpl();
     private final LecternSink lecternSink = new LecternSinkImpl();
 
-    private static SimpleRegionStorage storage(WorldPaths paths, Path regionDirectory) {
-        return new SimpleRegionStorage(
-                paths.regionStorageInfo(Level.OVERWORLD), regionDirectory,
-                DataFixers.getDataFixer(), false, DataFixTypes.CHUNK);
+    private static IOWorker storage(WorldPaths paths, Path regionDirectory) {
+        return paths.openRegionStorage(Level.OVERWORLD);
     }
 
     @Test
-    void worldPathsPreCreatesDirectoriesAndSuppliesStorageInfo(@TempDir Path save) {
+    void worldPathsPreCreatesDirectoriesAndOpensRegionStorage(@TempDir Path save) throws IOException {
         WorldPaths paths = new WorldPathsImpl(save);
 
         Path region = paths.regionDirectory(Level.OVERWORLD);
@@ -72,7 +69,9 @@ class RegionIntegrationTest {
         assertTrue(Files.isDirectory(region), "region/ must be pre-created before any write");
         assertTrue(Files.isDirectory(entities), "entities/ must be pre-created");
         assertEquals(save.resolve("region"), region, "overworld region/ is at the save root");
-        assertEquals(Level.OVERWORLD, paths.regionStorageInfo(Level.OVERWORLD).dimension());
+        try (IOWorker opened = paths.openRegionStorage(Level.OVERWORLD)) {
+            assertNotNull(opened, "the overworld region storage must open");
+        }
     }
 
     @Test
@@ -86,11 +85,11 @@ class RegionIntegrationTest {
                 new ChunkPos(0, 0), new ChunkPos(31, 31), new ChunkPos(32, 0),
                 new ChunkPos(0, 32), new ChunkPos(-1, -1));
 
-        try (SimpleRegionStorage out = storage(paths, region)) {
+        try (IOWorker out = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
                 CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
                 tag.putInt("wdlTestId", i); // distinct marker -> proves each chunk lands at its own pos
-                out.write(positions.get(i), tag).join();
+                out.store(positions.get(i), tag).join();
             }
             out.synchronize(true).join();
         } catch (IOException e) {
@@ -98,9 +97,9 @@ class RegionIntegrationTest {
         }
 
         // Reopen with a FRESH storage and read every chunk back at its position.
-        try (SimpleRegionStorage in = storage(paths, region)) {
+        try (IOWorker in = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag back = in.read(positions.get(i)).join()
+                CompoundTag back = in.loadAsync(positions.get(i)).join()
                         .orElseThrow(() -> new AssertionError("missing chunk"));
                 assertEquals(i, (back.contains("wdlTestId") ? back.getInt("wdlTestId") : -1),
                         "wrong chunk read back at " + positions.get(i));
@@ -128,8 +127,8 @@ class RegionIntegrationTest {
         CompoundTag big = new CompoundTag();
         big.putByteArray("pad", pad);
 
-        try (SimpleRegionStorage out = storage(paths, region)) {
-            out.write(pos, big).join();
+        try (IOWorker out = storage(paths, region)) {
+            out.store(pos, big).join();
             out.synchronize(true).join();
         }
 
@@ -138,8 +137,8 @@ class RegionIntegrationTest {
                     files.anyMatch(path -> path.getFileName().toString().matches("c\\.-?\\d+\\.-?\\d+\\.mcc")),
                     "a >1 MiB chunk must spill to an external c.x.z.mcc file");
         }
-        try (SimpleRegionStorage in = storage(paths, region)) {
-            CompoundTag back = in.read(pos).join().orElseThrow(() -> new AssertionError("oversize chunk lost"));
+        try (IOWorker in = storage(paths, region)) {
+            CompoundTag back = in.loadAsync(pos).join().orElseThrow(() -> new AssertionError("oversize chunk lost"));
             assertEquals(2 * 1024 * 1024, back.getByteArray("pad").length);
         }
     }
@@ -155,7 +154,7 @@ class RegionIntegrationTest {
             return 3; // a stand-in carry-forward count; ChunkMerge's own logic is tested headlessly
         };
 
-        try (SimpleRegionStorage out = storage(paths, region)) {
+        try (IOWorker out = storage(paths, region)) {
             // No prior on disk: a plain new write, the merge is never invoked.
             RegionChunkWriter.MergeWriteResult first = RegionChunkWriter.writeMerging(out, new ChunkPos(0, 0),
                     codec.encode(SyntheticChunks.full(registries, true), registries, false), merge);
@@ -183,7 +182,7 @@ class RegionIntegrationTest {
         Path region = paths.regionDirectory(Level.OVERWORLD);
         ChunkPos pos = new ChunkPos(0, 0);
 
-        try (SimpleRegionStorage out = storage(paths, region)) {
+        try (IOWorker out = storage(paths, region)) {
             // Three books go in, the chunk flushes; later one more book goes in and the chunk flushes again. The
             // second capture names only the slot it saw, because a bookshelf's contents never reach the client.
             RegionChunkWriter.writeMerging(out, pos, bookshelfChunk(registries, 0, 1, 2), ChunkMerge::merge);
@@ -192,8 +191,8 @@ class RegionIntegrationTest {
             out.synchronize(true).join();
         }
 
-        try (SimpleRegionStorage in = storage(paths, region)) {
-            CompoundTag back = in.read(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
+        try (IOWorker in = storage(paths, region)) {
+            CompoundTag back = in.loadAsync(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
             assertEquals(Set.of(0, 1, 2, 3), occupiedSlots(findByPos(back, 4, 64, 9)),
                     "the books written by the earlier flush are still in the region file beside the newer one");
         }
@@ -212,7 +211,7 @@ class RegionIntegrationTest {
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 
-        try (SimpleRegionStorage out = storage(paths, region)) {
+        try (IOWorker out = storage(paths, region)) {
             ChunkSnapshotSource captured = chestSnapshot(registries, chestPos, "minecraft:diamond");
             RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, registries, false),
                     ChunkFlushPlan.readMerge(captured, List.of(), LongSet.of()));
@@ -224,8 +223,8 @@ class RegionIntegrationTest {
             out.synchronize(true).join();
         }
 
-        try (SimpleRegionStorage in = storage(paths, region)) {
-            CompoundTag back = in.read(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
+        try (IOWorker in = storage(paths, region)) {
+            CompoundTag back = in.loadAsync(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
             assertEquals(1, findByPos(back, 4, 64, 9).getList("Items", Tag.TAG_COMPOUND).size(),
                     "a chunk the player walked past again must not lose the chest an earlier flush archived");
         }
@@ -244,7 +243,7 @@ class RegionIntegrationTest {
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 
-        try (SimpleRegionStorage out = storage(paths, region)) {
+        try (IOWorker out = storage(paths, region)) {
             ChunkSnapshotSource captured = chestSnapshot(registries, chestPos, "minecraft:diamond");
             RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, registries, false),
                     ChunkFlushPlan.readMerge(captured, List.of(), LongSet.of()));
@@ -269,8 +268,8 @@ class RegionIntegrationTest {
             assertEquals(0, written.mergeBacks(), "and carried nothing back into the container it captured");
         }
 
-        try (SimpleRegionStorage in = storage(paths, region)) {
-            CompoundTag back = in.read(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
+        try (IOWorker in = storage(paths, region)) {
+            CompoundTag back = in.loadAsync(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
             CompoundTag chest = findByPos(back, 4, 64, 9);
             assertTrue(chest.get("Items") instanceof ListTag items && items.isEmpty(),
                     "the chest is left with the present-but-empty list a vanilla chest writes, not with the items "

@@ -25,13 +25,11 @@ import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.util.datafix.DataFixTypes;
-import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -199,11 +197,11 @@ class EntityVehicleRelocationTest {
                         + "the mount ends up naming another map's picture, or none");
     }
 
-    /** The map id the first item of a tag's container contents references. */
+    /** The map id the first item of a tag's container contents references (below 1.20.5, the raw {@code "map"} tag). */
     private static int mapIdOf(CompoundTag tag) {
         ListTag items = (ListTag) tag.get("Items");
-        CompoundTag components = (CompoundTag) ((CompoundTag) items.get(0)).get("components");
-        return ((net.minecraft.nbt.NumericTag) components.get("minecraft:map_id")).getAsInt();
+        CompoundTag itemTag = (CompoundTag) ((CompoundTag) items.get(0)).get("tag");
+        return itemTag.getInt("map");
     }
 
     @SuppressWarnings("unchecked")
@@ -234,11 +232,9 @@ class EntityVehicleRelocationTest {
     private static List<CompoundTag> entitiesOnDisk(WorldPaths paths, UUID uuid, ChunkPos... positions)
             throws Exception {
         List<CompoundTag> found = new ArrayList<>();
-        try (SimpleRegionStorage storage = new SimpleRegionStorage(paths.entitiesStorageInfo(Level.OVERWORLD),
-                paths.entitiesDirectory(Level.OVERWORLD), DataFixers.getDataFixer(), false,
-                DataFixTypes.ENTITY_CHUNK)) {
+        try (IOWorker storage = paths.openEntitiesStorage(Level.OVERWORLD)) {
             for (ChunkPos pos : positions) {
-                CompoundTag chunkTag = storage.read(pos).join().orElse(null);
+                CompoundTag chunkTag = storage.loadAsync(pos).join().orElse(null);
                 if (chunkTag == null || !(chunkTag.get("Entities") instanceof ListTag entities)) {
                     continue;
                 }
@@ -281,11 +277,8 @@ class EntityVehicleRelocationTest {
     /** A writer over real region and entities storages, since the duplicate is only visible in the written bytes. */
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
-                dimension -> new SimpleRegionStorage(paths.regionStorageInfo(dimension),
-                        paths.regionDirectory(dimension), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK),
-                dimension -> new SimpleRegionStorage(paths.entitiesStorageInfo(dimension),
-                        paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
-                        DataFixTypes.ENTITY_CHUNK),
+                paths::openRegionStorage,
+                paths::openEntitiesStorage,
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -296,7 +289,7 @@ class EntityVehicleRelocationTest {
     /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
     private static CompoundTag entity(UUID uuid) {
         CompoundTag entity = new CompoundTag();
-        entity.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow());
+        entity.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
         return entity;
     }
 

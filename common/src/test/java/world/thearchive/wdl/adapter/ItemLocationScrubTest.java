@@ -10,27 +10,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Method;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.BundleContents;
-import net.minecraft.world.item.component.CustomData;
-import net.minecraft.world.item.component.ItemContainerContents;
-import net.minecraft.world.item.component.LodestoneTracker;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -54,13 +49,21 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The automated guard for the item-coordinate privacy scrub: {@link ItemLocationScrub} blanks the lodestone target and
  * the beehive bee flower positions on every item it reaches, over a serialized item list (the inventory or the ender
  * items), a block entity's own NBT (a decorated pot, a campfire), and a serialized entity (an item frame, mob
- * equipment, an inventory list, passengers), reaching items nested inside a shulker box (the
- * {@code minecraft:container} component) and inside a bundle (the {@code minecraft:bundle_contents} component), while
- * leaving the scrubbed item valid and every other item untouched. Real {@link ItemStack}s serialized via the production
- * {@link ContainerSink#captureItems} drive the round-trip, so neither a live menu nor a {@code Level} is needed; the
- * scrub key strings are pinned by the assertions (a wrong key leaves the coordinate and fails).
+ * equipment, an inventory list, passengers), reaching items nested inside a shulker box ({@code tag.BlockEntityTag})
+ * and inside a bundle ({@code tag.Items}), while leaving the scrubbed item valid and every other item untouched. Real
+ * {@link ItemStack}s serialized via the production {@link ContainerSink#captureItems} drive the round-trip, so neither
+ * a live menu nor a {@code Level} is needed; the scrub key strings are pinned by the assertions (a wrong key leaves the
+ * coordinate and fails).
  */
 class ItemLocationScrubTest {
+    private static final String LODESTONE_POS = "LodestonePos";
+    private static final String LODESTONE_DIMENSION = "LodestoneDimension";
+    private static final String LODESTONE_TRACKED = "LodestoneTracked";
+    private static final String BEES = "Bees";
+    private static final String ENTITY_DATA = "EntityData";
+    private static final String FLOWER_POS = "FlowerPos";
+    private static final String BLOCK_ENTITY_TAG = "BlockEntityTag";
+
     private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
@@ -73,39 +76,109 @@ class ItemLocationScrubTest {
         return GlobalPos.of(Level.OVERWORLD, new BlockPos(128, 64, -512));
     }
 
+    /**
+     * A lodestone compass whose target is the raw {@code LodestonePos}/{@code LodestoneDimension} keys
+     * {@link ItemLocationScrub} scrubs (below 1.20.5 there is no {@code lodestone_tracker} component; vanilla's own
+     * {@code CompassItem.addLodestoneTags} writes exactly these three keys on the item's {@code tag}).
+     */
     private static ItemStack lodestoneCompass() {
         ItemStack compass = new ItemStack(Items.COMPASS);
-        compass.set(DataComponents.LODESTONE_TRACKER, new LodestoneTracker(Optional.of(basePos()), true));
+        GlobalPos pos = basePos();
+        CompoundTag tag = compass.getOrCreateTag();
+        tag.put(LODESTONE_POS, NbtUtils.writeBlockPos(pos.pos()));
+        tag.put(LODESTONE_DIMENSION,
+                Level.RESOURCE_KEY_CODEC.encodeStart(NbtOps.INSTANCE, pos.dimension()).getOrThrow(false, s -> {}));
+        tag.putBoolean(LODESTONE_TRACKED, true);
         return compass;
     }
 
     private static ItemStack shulkerHoldingLodestone() {
         ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
-        shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(List.of(lodestoneCompass())));
+        CompoundTag blockEntityTag = new CompoundTag();
+        blockEntityTag.put("Items", ItemFixtures.items(lodestoneCompass()));
+        shulker.getOrCreateTag().put(BLOCK_ENTITY_TAG, blockEntityTag);
         return shulker;
     }
 
     private static ItemStack bundleHoldingLodestone() {
         ItemStack bundle = new ItemStack(Items.BUNDLE);
-        bundle.set(DataComponents.BUNDLE_CONTENTS, new BundleContents(List.of(lodestoneCompass())));
+        bundle.getOrCreateTag().put("Items", ItemFixtures.items(lodestoneCompass()));
         return bundle;
     }
 
+    /**
+     * A beehive item carrying two flower positions the scrub must both blank: the hive's own top-level
+     * {@code BlockEntityTag.FlowerPos} (the pre-component item copies the hive's whole block-entity NBT, so it carries
+     * the hive's own flower position too, an E2a-only leak the component era does not carry), and one occupant's
+     * {@code BlockEntityTag.Bees[].EntityData.FlowerPos}.
+     */
     private static ItemStack beehiveWithBeeFlowerPos() {
         ItemStack hive = new ItemStack(Items.BEEHIVE);
-        CompoundTag beeNbt = new CompoundTag();
-        beeNbt.put("flower_pos",
-                BlockPos.CODEC.encodeStart(NbtOps.INSTANCE, new BlockPos(128, 64, -512)).getOrThrow());
-        BeehiveBlockEntity.Occupant occupant = new BeehiveBlockEntity.Occupant(
-                CustomData.of(beeNbt), 0, 600);
-        hive.set(DataComponents.BEES, List.of(occupant));
+        CompoundTag blockEntityTag = new CompoundTag();
+        blockEntityTag.put(FLOWER_POS, NbtUtils.writeBlockPos(new BlockPos(130, 64, -510)));
+        CompoundTag entityData = new CompoundTag();
+        entityData.put(FLOWER_POS, NbtUtils.writeBlockPos(new BlockPos(128, 64, -512)));
+        CompoundTag occupant = new CompoundTag();
+        occupant.put(ENTITY_DATA, entityData);
+        ListTag bees = new ListTag();
+        bees.add(occupant);
+        blockEntityTag.put(BEES, bees);
+        hive.getOrCreateTag().put(BLOCK_ENTITY_TAG, blockEntityTag);
         return hive;
     }
 
+    /** Whether the hive's own top-level flower_pos (the pre-component block-entity copy) is present. */
+    private static boolean hiveFlowerPosPresent(ItemStack hive) {
+        CompoundTag tag = hive.getTag();
+        return tag != null && tag.get(BLOCK_ENTITY_TAG) instanceof CompoundTag blockEntityTag
+                && blockEntityTag.contains(FLOWER_POS);
+    }
+
+    /** Whether the first occupant's flower_pos is present. */
     private static boolean beeFlowerPresent(ItemStack hive) {
-        List<BeehiveBlockEntity.Occupant> bees = hive.get(DataComponents.BEES);
-        return bees != null && !bees.isEmpty()
-                && bees.get(0).entityData().contains("flower_pos");
+        ListTag bees = beesOf(hive);
+        return !bees.isEmpty() && bees.getCompound(0).get(ENTITY_DATA) instanceof CompoundTag entityData
+                && entityData.contains(FLOWER_POS);
+    }
+
+    /** The item's {@code LodestoneTracked} tag (kept, unlike the coordinate keys), or {@code null} when absent. */
+    private static @Nullable Tag lodestoneTrackerOf(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        return tag == null ? null : tag.get(LODESTONE_TRACKED);
+    }
+
+    /** The lodestone target position, present unless the scrub blanked it (or the item never carried one). */
+    private static Optional<Tag> targetOf(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        return tag == null ? Optional.empty() : Optional.ofNullable(tag.get(LODESTONE_POS));
+    }
+
+    /** The hive item's {@code BlockEntityTag.Bees} list, or an empty list when the item carries none. */
+    private static ListTag beesOf(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        if (tag == null || !(tag.get(BLOCK_ENTITY_TAG) instanceof CompoundTag blockEntityTag)) {
+            return new ListTag();
+        }
+        return blockEntityTag.getList(BEES, Tag.TAG_COMPOUND);
+    }
+
+    /** The nested items inside a captured shulker box's {@code BlockEntityTag.Items}, or {@code null} when absent. */
+    private static @Nullable ListTag containerItemsOf(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        if (tag == null || !(tag.get(BLOCK_ENTITY_TAG) instanceof CompoundTag blockEntityTag)) {
+            return null;
+        }
+        return blockEntityTag.getList("Items", Tag.TAG_COMPOUND);
+    }
+
+    /** The nested items inside a captured bundle's {@code Items}, or {@code null} when the bundle carries none. */
+    private static @Nullable ListTag bundleItemsOf(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        if (tag == null) {
+            return null;
+        }
+        ListTag items = tag.getList("Items", Tag.TAG_COMPOUND);
+        return items.isEmpty() ? null : items;
     }
 
     private CompoundTag holderOf(ItemStack... stacks) {
@@ -118,7 +191,7 @@ class ItemLocationScrubTest {
 
     private NonNullList<ItemStack> readBack(CompoundTag holder, int size) {
         NonNullList<ItemStack> back = NonNullList.withSize(size, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(holder, back, registries);
+        ContainerHelper.loadAllItems(holder, back);
         return back;
     }
 
@@ -155,11 +228,6 @@ class ItemLocationScrubTest {
         }
     }
 
-    private static Optional<GlobalPos> targetOf(ItemStack stack) {
-        LodestoneTracker tracker = stack.get(DataComponents.LODESTONE_TRACKER);
-        return tracker == null ? Optional.empty() : tracker.target();
-    }
-
     private CompoundTag blockEntityWithItem(ItemStack item) {
         CompoundTag blockEntity = BlockEntityFixtures.blockEntity("minecraft:decorated_pot", 0, 64, 0);
         blockEntity.put("item", ItemFixtures.itemTag(item));
@@ -167,19 +235,15 @@ class ItemLocationScrubTest {
     }
 
     private ItemStack itemOf(CompoundTag blockEntity) {
-        return ItemStack.CODEC
-                .parse(registries.createSerializationContext(NbtOps.INSTANCE), blockEntity.get("item"))
-                .result().orElse(ItemStack.EMPTY);
+        return ItemStack.CODEC.parse(NbtOps.INSTANCE, blockEntity.get("item")).result().orElse(ItemStack.EMPTY);
     }
 
     private CompoundTag itemNbt(ItemStack stack) {
-        return (CompoundTag) ItemStack.CODEC
-                .encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), stack).getOrThrow();
+        return (CompoundTag) ItemStack.CODEC.encodeStart(NbtOps.INSTANCE, stack).getOrThrow(false, s -> {});
     }
 
     private ItemStack itemFrom(Tag itemNbt) {
-        return ItemStack.CODEC
-                .parse(registries.createSerializationContext(NbtOps.INSTANCE), itemNbt).getOrThrow();
+        return ItemStack.CODEC.parse(NbtOps.INSTANCE, itemNbt).getOrThrow(false, s -> {});
     }
 
     private CompoundTag entity(String id) {
@@ -201,7 +265,7 @@ class ItemLocationScrubTest {
 
         NonNullList<ItemStack> back = readBack(holder, 2);
         assertTrue(targetOf(back.get(0)).isEmpty(), "the lodestone target is blanked");
-        assertNotNull(back.get(0).get(DataComponents.LODESTONE_TRACKER),
+        assertNotNull(lodestoneTrackerOf(back.get(0)),
                 "the lodestone_tracker component is kept: the compass stays a valid compass pointing nowhere");
         assertEquals(Items.COMPASS, back.get(0).getItem(), "still a compass");
         assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-lodestone item is untouched");
@@ -225,14 +289,14 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrub(holder, "Items");
 
         NonNullList<ItemStack> back = readBack(holder, 2);
-        ItemContainerContents container = back.get(0).get(DataComponents.CONTAINER);
+        ListTag container = containerItemsOf(back.get(0));
         assertNotNull(container, "the shulker keeps its container component");
-        ItemStack nestedInShulker = container.nonEmptyStream().toList().get(0);
+        ItemStack nestedInShulker = ItemStack.of(container.getCompound(0));
         assertTrue(targetOf(nestedInShulker).isEmpty(), "a lodestone nested in a shulker box is blanked");
 
-        BundleContents bundle = back.get(1).get(DataComponents.BUNDLE_CONTENTS);
+        ListTag bundle = bundleItemsOf(back.get(1));
         assertNotNull(bundle, "the bundle keeps its contents component");
-        ItemStack nestedInBundle = bundle.itemCopyStream().toList().get(0);
+        ItemStack nestedInBundle = ItemStack.of(bundle.getCompound(0));
         assertTrue(targetOf(nestedInBundle).isEmpty(), "a lodestone nested in a bundle is blanked");
     }
 
@@ -265,7 +329,7 @@ class ItemLocationScrubTest {
 
         ItemStack back = itemOf(pot);
         assertTrue(targetOf(back).isEmpty(), "the lodestone target under the block entity's item key is blanked");
-        assertNotNull(back.get(DataComponents.LODESTONE_TRACKER),
+        assertNotNull(lodestoneTrackerOf(back),
                 "the lodestone_tracker component is kept: the compass stays a valid compass pointing nowhere");
         assertEquals(Items.COMPASS, back.getItem(), "still a compass");
     }
@@ -286,22 +350,23 @@ class ItemLocationScrubTest {
     void scrubBlockEntityReachesLodestonesNestedInShulkerAndBundle() {
         CompoundTag potWithShulker = blockEntityWithItem(shulkerHoldingLodestone());
         ItemLocationScrub.scrubBlockEntity(potWithShulker);
-        ItemContainerContents container = itemOf(potWithShulker).get(DataComponents.CONTAINER);
-        assertNotNull(container, "the shulker keeps its container component");
-        assertTrue(targetOf(container.nonEmptyStream().toList().get(0)).isEmpty(),
+        ListTag containerPot = containerItemsOf(itemOf(potWithShulker));
+        assertNotNull(containerPot, "the shulker keeps its container component");
+        assertTrue(targetOf(ItemStack.of(containerPot.getCompound(0))).isEmpty(),
                 "a lodestone nested in a shulker stored as the block entity's item is blanked");
 
         CompoundTag potWithBundle = blockEntityWithItem(bundleHoldingLodestone());
         ItemLocationScrub.scrubBlockEntity(potWithBundle);
-        BundleContents bundle = itemOf(potWithBundle).get(DataComponents.BUNDLE_CONTENTS);
-        assertNotNull(bundle, "the bundle keeps its contents component");
-        assertTrue(targetOf(bundle.itemCopyStream().toList().get(0)).isEmpty(),
+        ListTag bundlePot = bundleItemsOf(itemOf(potWithBundle));
+        assertNotNull(bundlePot, "the bundle keeps its contents component");
+        assertTrue(targetOf(ItemStack.of(bundlePot.getCompound(0))).isEmpty(),
                 "a lodestone nested in a bundle stored as the block entity's item is blanked");
     }
 
     @Test
     void scrubBlockEntityLeavesNonItemBlockEntityUnchanged() {
-        CompoundTag blockEntity = BlockEntityFixtures.namedBlockEntity("minecraft:decorated_pot", 1, 2, 3, "urn");
+        CompoundTag blockEntity = BlockEntityFixtures.blockEntityWithForeignKey("minecraft:decorated_pot", 1, 2, 3,
+                "wdl_test_marker", "urn");
         ListTag sherds = new ListTag();
         CompoundTag sherd = new CompoundTag();
         sherd.putString("front", "minecraft:brick");
@@ -317,15 +382,20 @@ class ItemLocationScrubTest {
     @Test
     void scrubBlanksBeeFlowerPosButKeepsTheOccupant() {
         CompoundTag holder = holderOf(beehiveWithBeeFlowerPos(), new ItemStack(Items.DIAMOND, 3));
-        assertTrue(beeFlowerPresent(readBack(holder, 2).get(0)), "precondition: the fixture bee has a flower_pos");
+        ItemStack precondition = readBack(holder, 2).get(0);
+        assertTrue(hiveFlowerPosPresent(precondition), "precondition: the fixture hive has its own flower_pos");
+        assertTrue(beeFlowerPresent(precondition), "precondition: the fixture bee has a flower_pos");
 
         ItemLocationScrub.scrub(holder, "Items");
 
         NonNullList<ItemStack> back = readBack(holder, 2);
-        List<BeehiveBlockEntity.Occupant> bees = back.get(0).get(DataComponents.BEES);
-        assertNotNull(bees, "the bees component is kept");
+        assertFalse(hiveFlowerPosPresent(back.get(0)), "the hive's own flower_pos is blanked too");
+        ListTag bees = beesOf(back.get(0));
+        assertFalse(bees.isEmpty(), "the bees component is kept");
         assertEquals(1, bees.size(), "the occupant is kept");
-        assertFalse(bees.get(0).entityData().contains("flower_pos"),
+        assertFalse(
+                bees.getCompound(0).get(ENTITY_DATA) instanceof CompoundTag entityData
+                        && entityData.contains(FLOWER_POS),
                 "the bee flower_pos is blanked");
         assertEquals(Items.BEEHIVE, back.get(0).getItem(), "still a beehive");
         assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-beehive item is untouched");
@@ -334,14 +404,16 @@ class ItemLocationScrubTest {
     @Test
     void scrubReachesBeeFlowerPosNestedInShulker() {
         ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
-        shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(List.of(beehiveWithBeeFlowerPos())));
+        CompoundTag blockEntityTag = new CompoundTag();
+        blockEntityTag.put("Items", ItemFixtures.items(beehiveWithBeeFlowerPos()));
+        shulker.getOrCreateTag().put(BLOCK_ENTITY_TAG, blockEntityTag);
         CompoundTag holder = holderOf(shulker);
 
         ItemLocationScrub.scrub(holder, "Items");
 
-        ItemContainerContents container = readBack(holder, 1).get(0).get(DataComponents.CONTAINER);
+        ListTag container = containerItemsOf(readBack(holder, 1).get(0));
         assertNotNull(container, "the shulker keeps its container component");
-        assertFalse(beeFlowerPresent(container.nonEmptyStream().toList().get(0)),
+        assertFalse(beeFlowerPresent(ItemStack.of(container.getCompound(0))),
                 "a beehive nested in a shulker box has its bee flower_pos blanked");
     }
 
@@ -411,10 +483,9 @@ class ItemLocationScrubTest {
 
         assertTrue(targetOf(itemFrom(((ListTag) zombie.get("HandItems")).get(0))).isEmpty(),
                 "a lodestone in a pre-1.21.5 HandItems mainhand slot is blanked");
-        ItemContainerContents offhandShulker = itemFrom(((ListTag) zombie.get("HandItems")).get(1))
-                .get(DataComponents.CONTAINER);
-        assertNotNull(offhandShulker, "the offhand shulker keeps its container component");
-        assertTrue(targetOf(offhandShulker.nonEmptyStream().toList().get(0)).isEmpty(),
+        ListTag offhandContainer = containerItemsOf(itemFrom(((ListTag) zombie.get("HandItems")).get(1)));
+        assertNotNull(offhandContainer, "the offhand shulker keeps its container component");
+        assertTrue(targetOf(ItemStack.of(offhandContainer.getCompound(0))).isEmpty(),
                 "a lodestone nested in a shulker in a pre-1.21.5 HandItems slot is blanked");
         assertTrue(targetOf(itemFrom(((ListTag) zombie.get("ArmorItems")).get(3))).isEmpty(),
                 "a lodestone in a pre-1.21.5 ArmorItems slot is blanked");
@@ -427,8 +498,9 @@ class ItemLocationScrubTest {
 
         ItemLocationScrub.scrubEntity(frame);
 
-        assertFalse(beeFlowerPresent(itemFrom(frame.get("Item"))),
-                "a beehive held in an item frame has its bee flower_pos blanked");
+        ItemStack held = itemFrom(frame.get("Item"));
+        assertFalse(hiveFlowerPosPresent(held), "a beehive held in an item frame has its own flower_pos blanked too");
+        assertFalse(beeFlowerPresent(held), "a beehive held in an item frame has its bee flower_pos blanked");
     }
 
     @Test

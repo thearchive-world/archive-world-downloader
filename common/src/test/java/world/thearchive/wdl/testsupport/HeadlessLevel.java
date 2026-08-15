@@ -17,7 +17,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.flag.FeatureFlags;
-import net.minecraft.world.item.alchemy.PotionBrewing;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
@@ -28,7 +27,6 @@ import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import net.minecraft.world.level.entity.LevelEntityGetter;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.Scoreboard;
@@ -57,7 +55,7 @@ public final class HeadlessLevel extends Level {
     public void sendBlockUpdated(BlockPos pos, BlockState oldState, BlockState newState, int flags) {}
 
     @Override
-    public void gameEvent(Holder<GameEvent> event, Vec3 position, GameEvent.Context context) {}
+    public void gameEvent(GameEvent event, Vec3 position, GameEvent.Context context) {}
 
     @Override
     public void levelEvent(@Nullable Player player, int type, BlockPos pos, int data) {}
@@ -126,16 +124,16 @@ public final class HeadlessLevel extends Level {
     }
 
     @Override
-    public @Nullable MapItemSavedData getMapData(MapId id) {
+    public @Nullable MapItemSavedData getMapData(String id) {
         return null;
     }
 
     @Override
-    public void setMapData(MapId id, MapItemSavedData data) {}
+    public void setMapData(String id, MapItemSavedData data) {}
 
     @Override
-    public @Nullable MapId getFreeMapId() {
-        return null;
+    public int getFreeMapId() {
+        return 0;
     }
 
     @Override
@@ -153,11 +151,6 @@ public final class HeadlessLevel extends Level {
 
     @Override
     protected @Nullable LevelEntityGetter<Entity> getEntities() {
-        return null;
-    }
-
-    @Override
-    public @Nullable PotionBrewing potionBrewing() {
         return null;
     }
 }

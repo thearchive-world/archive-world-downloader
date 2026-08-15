@@ -33,22 +33,18 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.datafix.DataFixTypes;
-import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.trading.ItemCost;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -204,11 +200,8 @@ class LiveCaptureSessionLossTallyTest {
      */
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
-                dimension -> new SimpleRegionStorage(paths.regionStorageInfo(dimension),
-                        paths.regionDirectory(dimension), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK),
-                dimension -> new SimpleRegionStorage(paths.entitiesStorageInfo(dimension),
-                        paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
-                        DataFixTypes.ENTITY_CHUNK),
+                paths::openRegionStorage,
+                paths::openEntitiesStorage,
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -407,7 +400,7 @@ class LiveCaptureSessionLossTallyTest {
         }
 
         @Override
-        protected void defineSynchedData(SynchedEntityData.Builder builder) {}
+        protected void defineSynchedData() {}
 
         @Override
         protected void readAdditionalSaveData(CompoundTag tag) {}
@@ -431,9 +424,9 @@ class LiveCaptureSessionLossTallyTest {
     /** The block entity of the given type in the chunk written to {@code paths}, or null when absent. */
     private static @Nullable CompoundTag blockEntityOnDisk(WorldPaths paths, ChunkPos pos, BlockPos at)
             throws Exception {
-        try (SimpleRegionStorage storage = new SimpleRegionStorage(paths.regionStorageInfo(Level.OVERWORLD),
-                paths.regionDirectory(Level.OVERWORLD), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK)) {
-            CompoundTag chunkTag = storage.read(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
+        try (IOWorker storage = paths.openRegionStorage(Level.OVERWORLD)) {
+            CompoundTag chunkTag = storage.loadAsync(pos).join()
+                    .orElseThrow(() -> new AssertionError("chunk not on disk"));
             return findByPosOrNull(chunkTag, at.getX(), at.getY(), at.getZ());
         }
     }
@@ -448,7 +441,7 @@ class LiveCaptureSessionLossTallyTest {
     /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
     private static CompoundTag entity(UUID uuid) {
         CompoundTag entity = new CompoundTag();
-        entity.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow());
+        entity.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
         return entity;
     }
 
@@ -540,8 +533,9 @@ class LiveCaptureSessionLossTallyTest {
 
     /** A serialized offer holder whose one offer sells a filled map, so its flush-time remap reaches the archive. */
     private CompoundTag merchantHolderSellingMap(int mapId) {
+        // Below 1.20.5 there is no ItemCost; a merchant offer's buy cost is a plain ItemStack.
         MerchantOffers offers = new MerchantOffers();
-        offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, 1), filledMap(mapId), 1, 0, 0.0f));
+        offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), filledMap(mapId), 1, 0, 0.0f));
         return MerchantOfferCapture.serialize(offers, 0, false, registries);
     }
 

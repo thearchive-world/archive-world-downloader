@@ -41,7 +41,7 @@ class HandBuiltFixtureGuardTest {
 
     /**
      * A write of one of the keys that decide a fixture's shape: {@code "id"} anchors both gated shapes (a block
-     * entity's type, an item entry's item), and {@code "Slot"} and {@code "count"} are the two an item entry is forever
+     * entity's type, an item entry's item), and {@code "Slot"} and {@code "Count"} are the two an item entry is forever
      * losing.
      *
      * <p>Matched by regex over the whole file rather than by substring per line, because both narrower forms leak. Any
@@ -51,8 +51,8 @@ class HandBuiltFixtureGuardTest {
      * code with nothing to do with a fixture.
      */
     private static final List<Pattern> DECIDING_KEY_WRITES = List.of(
-            Pattern.compile("put\\w+\\(\\s*\"(id|Slot|count)\""),
-            Pattern.compile("put\\(\\s*\"(id|Slot|count)\"\\s*,\\s*\\w*Tag\\."));
+            Pattern.compile("put\\w+\\(\\s*\"(id|Slot|Count)\""),
+            Pattern.compile("put\\(\\s*\"(id|Slot|Count)\"\\s*,\\s*\\w*Tag\\."));
 
     private static final String BUILDERS = "BlockEntityFixtures, ItemFixtures or EntityFixtures";
 

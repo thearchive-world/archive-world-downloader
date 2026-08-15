@@ -159,7 +159,7 @@ class PlayerTagTest {
         CompoundTag probe = new CompoundTag();
         probe.put("Items", tag.getList("EnderItems", Tag.TAG_COMPOUND)); // read the remapped list via the same codec
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(probe, back, registries);
+        ContainerHelper.loadAllItems(probe, back);
         assertEquals(Items.ENDER_PEARL, back.get(5).getItem(), "the captured ender item lands at its EnderItems slot");
         assertEquals(9, back.get(5).getCount());
     }

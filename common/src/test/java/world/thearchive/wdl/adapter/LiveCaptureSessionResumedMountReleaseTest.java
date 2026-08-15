@@ -25,14 +25,12 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.datafix.DataFixTypes;
-import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -352,7 +350,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         CompoundTag player = new CompoundTag();
         // The band's save keys the player file on its UUID (players/data/<uuid>.dat at 26.x), so a prior written
         // through it must carry one; a client saveWithoutId always does.
-        player.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, PRIOR_PLAYER).getOrThrow());
+        player.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, PRIOR_PLAYER).getOrThrow(false, s -> {}));
         PlayerTag.setDimension(player, dimension);
         if (mount != null) {
             CompoundTag root = new CompoundTag();
@@ -433,11 +431,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
     /** A writer over real storages, so which dimension a submit routed to is answerable off disk. */
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
-                dimension -> new SimpleRegionStorage(paths.regionStorageInfo(dimension),
-                        paths.regionDirectory(dimension), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK),
-                dimension -> new SimpleRegionStorage(paths.entitiesStorageInfo(dimension),
-                        paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
-                        DataFixTypes.ENTITY_CHUNK),
+                paths::openRegionStorage,
+                paths::openEntitiesStorage,
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -448,10 +443,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
     /** The entities-region chunk at {@code pos} in {@code dimension}, or null when none was written. */
     private static @Nullable CompoundTag entityChunk(WorldPaths paths, ResourceKey<Level> dimension, ChunkPos pos)
             throws Exception {
-        try (SimpleRegionStorage storage = new SimpleRegionStorage(paths.entitiesStorageInfo(dimension),
-                paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
-                DataFixTypes.ENTITY_CHUNK)) {
-            Optional<CompoundTag> read = storage.read(pos).join();
+        try (IOWorker storage = paths.openEntitiesStorage(dimension)) {
+            Optional<CompoundTag> read = storage.loadAsync(pos).join();
             return read.orElse(null);
         }
     }

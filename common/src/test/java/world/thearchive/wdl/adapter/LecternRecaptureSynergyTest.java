@@ -10,19 +10,15 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.network.Filterable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -54,22 +50,30 @@ class LecternRecaptureSynergyTest {
         registries = TestRegistries.frozen();
     }
 
-    private CompoundTag stashBook(String title, int page) {
+    /** A written book with a custom {@code title}, below 1.20.5's pre-component {@code title}/{@code pages} NBT. */
+    private static ItemStack writtenBook(String title) {
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
-        book.set(DataComponents.WRITTEN_BOOK_CONTENT, new WrittenBookContent(
-                Filterable.passThrough(title), "Author", 0,
-                List.of(Filterable.passThrough(Component.literal("page"))), true));
-        return sink.captureBook(book, page, registries);
+        CompoundTag tag = book.getOrCreateTag();
+        tag.putString("title", title);
+        tag.putString("author", "Author");
+        tag.putInt("generation", 0);
+        tag.putBoolean("resolved", true);
+        ListTag pages = new ListTag();
+        pages.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal("page"))));
+        tag.put("pages", pages);
+        return book;
+    }
+
+    private CompoundTag stashBook(String title, int page) {
+        return sink.captureBook(writtenBook(title), page, registries);
     }
 
     private static String mergedTitle(CompoundTag chunkTag) {
         ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
         CompoundTag lectern = blockEntities.getCompound(0);
-        Optional<ItemStack> back = ItemStack.CODEC
-                .parse(registries.createSerializationContext(NbtOps.INSTANCE), lectern.get("Book"))
-                .result();
-        assertTrue(back.isPresent(), "the re-captured lectern carries a decodable Book");
-        return back.get().get(DataComponents.WRITTEN_BOOK_CONTENT).title().raw();
+        ItemStack back = ItemStack.of(lectern.getCompound("Book"));
+        assertTrue(!back.isEmpty(), "the re-captured lectern carries a decodable Book");
+        return back.getTag().getString("title");
     }
 
     @Test

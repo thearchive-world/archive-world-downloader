@@ -19,18 +19,15 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChiseledBookShelfBlock;
 import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
-import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -38,6 +35,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.testsupport.BlockEntityFixtures;
+import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
@@ -116,8 +115,26 @@ class InteractionStashMergeTest {
 
     private static NonNullList<ItemStack> readItems(CompoundTag holder, int size) {
         NonNullList<ItemStack> back = NonNullList.withSize(size, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(holder, back, registries);
+        ContainerHelper.loadAllItems(holder, back);
         return back;
+    }
+
+    /** A placed shulker box item holding {@code contents} in its pre-component {@code BlockEntityTag.Items}. */
+    private static ItemStack shulkerHolding(ItemStack... contents) {
+        ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
+        CompoundTag blockEntityTag = new CompoundTag();
+        blockEntityTag.put("Items", ItemFixtures.items(contents));
+        shulker.getOrCreateTag().put("BlockEntityTag", blockEntityTag);
+        return shulker;
+    }
+
+    /** A placed beehive item carrying occupants in its pre-component {@code BlockEntityTag.Bees}. */
+    private static ItemStack beehiveWithBees(int... ticksInHive) {
+        ItemStack hive = new ItemStack(Items.BEEHIVE);
+        CompoundTag blockEntityTag = new CompoundTag();
+        blockEntityTag.put("Bees", BlockEntityFixtures.bees(ticksInHive));
+        hive.getOrCreateTag().put("BlockEntityTag", blockEntityTag);
+        return hive;
     }
 
     // A placed or inserted prediction the block-state confirms survives the gate.
@@ -137,7 +154,7 @@ class InteractionStashMergeTest {
 
     @Test
     void jukeboxWithRecordKeepsTheRecordHolder() {
-        CompoundTag holder = InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT), registries);
+        CompoundTag holder = InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.JUKEBOX, holder);
 
@@ -150,8 +167,7 @@ class InteractionStashMergeTest {
 
     @Test
     void beehiveWithBlockPresentKeepsTheBeesHolder() {
-        CompoundTag holder = InteractionCapture.captureBees(List.of(BeehiveBlockEntity.Occupant.create(120)),
-                registries);
+        CompoundTag holder = InteractionCapture.captureBees(BlockEntityFixtures.bees(120));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.BEEHIVE, holder);
 
@@ -191,7 +207,7 @@ class InteractionStashMergeTest {
 
     @Test
     void jukeboxDiscardedWhenNoRecord() {
-        CompoundTag holder = InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_11), registries);
+        CompoundTag holder = InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_11));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.JUKEBOX, holder);
 
@@ -212,8 +228,7 @@ class InteractionStashMergeTest {
 
     @Test
     void beehiveDiscardedWhenBlockAbsent() {
-        CompoundTag holder = InteractionCapture.captureBees(List.of(BeehiveBlockEntity.Occupant.create(60)),
-                registries);
+        CompoundTag holder = InteractionCapture.captureBees(BlockEntityFixtures.bees(60));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.BEEHIVE, holder);
 
@@ -223,7 +238,7 @@ class InteractionStashMergeTest {
 
     @Test
     void jukeboxDiscardedAgainstWrongBlockType() {
-        CompoundTag holder = InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT), registries);
+        CompoundTag holder = InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.JUKEBOX, holder);
 
@@ -329,7 +344,7 @@ class InteractionStashMergeTest {
         BlockPos pos = new BlockPos(5, -60, 7);
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(pos, new InteractionCapture.HolderCandidate(InteractionCapture.InteractionKind.JUKEBOX,
-                        InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT), registries))),
+                        InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT)))),
                 SyntheticChunks.withBlockAt(registries, pos,
                         Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, true)));
         assertTrue(bundles.holders().containsKey(pos), "a confirmed jukebox routes to the holder-merge bundle");
@@ -341,7 +356,7 @@ class InteractionStashMergeTest {
         BlockPos pos = new BlockPos(5, -60, 7);
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(pos, new InteractionCapture.HolderCandidate(InteractionCapture.InteractionKind.BEEHIVE,
-                        InteractionCapture.captureBees(List.of(BeehiveBlockEntity.Occupant.create(50)), registries))),
+                        InteractionCapture.captureBees(BlockEntityFixtures.bees(50)))),
                 SyntheticChunks.withBlockAt(registries, pos, Blocks.BEEHIVE.defaultBlockState()));
         assertTrue(bundles.holders().containsKey(pos), "a confirmed beehive routes to the holder-merge bundle");
         assertTrue(bundles.items().isEmpty(), "and not to the Items bundle");
@@ -443,8 +458,7 @@ class InteractionStashMergeTest {
                     sinkType[0] = blockTypeId;
                 }, posKey -> {});
         BlockPos pos = new BlockPos(4, 70, 8);
-        ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
-        shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(List.of(new ItemStack(Items.DIAMOND))));
+        ItemStack shulker = shulkerHolding(new ItemStack(Items.DIAMOND));
 
         capture.recordPlaceAt(pos, shulker);
 
@@ -493,8 +507,7 @@ class InteractionStashMergeTest {
         InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> true,
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> sinkPos[0] = posKey, posKey -> {});
         BlockPos pos = new BlockPos(3, 70, 5);
-        ItemStack hive = new ItemStack(Items.BEEHIVE);
-        hive.set(DataComponents.BEES, List.of(BeehiveBlockEntity.Occupant.create(120)));
+        ItemStack hive = beehiveWithBees(120);
 
         capture.recordPlaceAt(pos, hive);
 
@@ -543,8 +556,7 @@ class InteractionStashMergeTest {
     void emptyHiveReplacementDropsStaleBeehivePrediction() {
         InteractionCapture capture = plainCapture(sink, registries, true);
         BlockPos pos = new BlockPos(3, 70, 5);
-        ItemStack filled = new ItemStack(Items.BEEHIVE);
-        filled.set(DataComponents.BEES, List.of(BeehiveBlockEntity.Occupant.create(120)));
+        ItemStack filled = beehiveWithBees(120);
 
         capture.recordPlaceAt(pos, filled);
         assertFalse(capture.pendingCandidateChunks().isEmpty(), "the occupied beehive placement is predicted");
@@ -637,8 +649,7 @@ class InteractionStashMergeTest {
         InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> false,
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> sinkPos[0] = posKey, posKey -> {});
         BlockPos pos = new BlockPos(4, 70, 8);
-        ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
-        shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(List.of(new ItemStack(Items.DIAMOND))));
+        ItemStack shulker = shulkerHolding(new ItemStack(Items.DIAMOND));
 
         capture.recordPlaceAt(pos, shulker);
 
@@ -653,8 +664,7 @@ class InteractionStashMergeTest {
         boolean[] capturable = { true };
         InteractionCapture capture = plainCapture(sink, registries, true, chunk -> capturable[0]);
         BlockPos pos = new BlockPos(4, 70, 8);
-        ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
-        shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(List.of(new ItemStack(Items.DIAMOND))));
+        ItemStack shulker = shulkerHolding(new ItemStack(Items.DIAMOND));
         capture.recordPlaceAt(pos, shulker);
         assertFalse(capture.pendingCandidateChunks().isEmpty(), "the first placement is predicted");
 

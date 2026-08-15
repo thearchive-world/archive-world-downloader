@@ -24,15 +24,12 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.util.datafix.DataFixTypes;
-import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,18 +50,26 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * ({@link AsyncSaveWriter#submitChunkRewrite} over {@link RegionChunkWriter#rewriteExisting}), reusing the
  * {@link ContainerMerge} fold.
  *
- * <p>These headless tests drive the real writer against a real {@link SimpleRegionStorage}, the seam the fix lives at:
- * a chunk is flushed to disk carrying an empty container (the flushed-empty orphaned state a backtrack-and-open lands
- * in), then the orphan rewrite folds the captured contents onto the on-disk block entity. The session wiring that
- * identifies the orphaned holders and routes them here ({@code LiveCaptureSession.flushBuffer}'s whole-buffer drain) is
- * not exercised headless, as with the rest of the MC-coupled session.
+ * <p>These headless tests drive the real writer against a real {@link IOWorker}, the seam the fix lives at: a chunk is
+ * flushed to disk carrying an empty container (the flushed-empty orphaned state a backtrack-and-open lands in), then
+ * the orphan rewrite folds the captured contents onto the on-disk block entity. The session wiring that identifies the
+ * orphaned holders and routes them here ({@code LiveCaptureSession.flushBuffer}'s whole-buffer drain) is not exercised
+ * headless, as with the rest of the MC-coupled session.
  */
 class OrphanedContainerSweepTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
 
-    private static SimpleRegionStorage storage(Path region) {
-        return new SimpleRegionStorage(new RegionStorageInfo("wdl", Level.OVERWORLD, "chunk"), region,
-                DataFixers.getDataFixer(), false, DataFixTypes.CHUNK);
+    private static IOWorker storage(Path region) {
+        return new TestRegionStorage(region, false, "chunk");
+    }
+
+    /**
+     * {@code IOWorker}'s constructor is protected and cross-package, so a test-local subclass is how a test reaches it.
+     */
+    private static final class TestRegionStorage extends IOWorker {
+        private TestRegionStorage(Path directory, boolean sync, String name) {
+            super(directory, sync, name);
+        }
     }
 
     private static AsyncSaveWriter regionWriter(Path region) {
@@ -99,12 +104,13 @@ class OrphanedContainerSweepTest {
     private NonNullList<ItemStack> itemsOnDisk(Path region, ChunkPos chunk, int x, int y, int z,
             RegistryAccess registries)
             throws IOException {
-        try (SimpleRegionStorage in = storage(region)) {
-            CompoundTag back = in.read(chunk).join().orElseThrow(() -> new AssertionError("chunk missing on disk"));
+        try (IOWorker in = storage(region)) {
+            CompoundTag back = in.loadAsync(chunk).join()
+                    .orElseThrow(() -> new AssertionError("chunk missing on disk"));
             CompoundTag blockEntity = blockEntityAt(back, x, y, z);
             assertNotNull(blockEntity, "block entity present on disk at " + x + "," + y + "," + z);
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(blockEntity, decoded, registries);
+            ContainerHelper.loadAllItems(blockEntity, decoded);
             return decoded;
         }
     }
@@ -171,8 +177,9 @@ class OrphanedContainerSweepTest {
                 onDisk -> ContainerMerge.mergeLecternChunkStash(sink, onDisk, chunk, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
-        try (SimpleRegionStorage in = storage(region)) {
-            CompoundTag back = in.read(chunk).join().orElseThrow(() -> new AssertionError("chunk missing on disk"));
+        try (IOWorker in = storage(region)) {
+            CompoundTag back = in.loadAsync(chunk).join()
+                    .orElseThrow(() -> new AssertionError("chunk missing on disk"));
             CompoundTag lectern = blockEntityAt(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
             assertEquals("minecraft:writable_book", lectern.getCompound("Book").getString("id"),
@@ -235,8 +242,8 @@ class OrphanedContainerSweepTest {
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(),
                 "a rewrite for a chunk with no on-disk prior does not fail the save");
 
-        try (SimpleRegionStorage in = storage(region)) {
-            assertTrue(in.read(missing).join().isEmpty(), "no partial chunk is written when there is no prior");
+        try (IOWorker in = storage(region)) {
+            assertTrue(in.loadAsync(missing).join().isEmpty(), "no partial chunk is written when there is no prior");
         }
     }
 

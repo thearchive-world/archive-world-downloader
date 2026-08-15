@@ -8,20 +8,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.LodestoneTracker;
-import net.minecraft.world.item.trading.ItemCost;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.saveddata.maps.MapId;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -44,22 +41,33 @@ class MerchantOfferCaptureTest {
         registries = TestRegistries.frozen();
     }
 
+    /**
+     * A lodestone compass whose target is the raw {@code LodestonePos}/{@code LodestoneDimension} keys
+     * {@link ItemLocationScrub} scrubs (below 1.20.5 there is no {@code LodestoneTracker} component; vanilla's own
+     * {@code CompassItem.addLodestoneTags} writes exactly these three keys on the item's {@code tag}).
+     */
     private static ItemStack lodestoneCompass() {
         ItemStack compass = new ItemStack(Items.COMPASS);
-        compass.set(DataComponents.LODESTONE_TRACKER,
-                new LodestoneTracker(Optional.of(GlobalPos.of(Level.OVERWORLD, new BlockPos(128, 64, -512))), true));
+        GlobalPos pos = GlobalPos.of(Level.OVERWORLD, new BlockPos(128, 64, -512));
+        CompoundTag tag = compass.getOrCreateTag();
+        tag.put("LodestonePos", NbtUtils.writeBlockPos(pos.pos()));
+        tag.put("LodestoneDimension",
+                Level.RESOURCE_KEY_CODEC.encodeStart(NbtOps.INSTANCE, pos.dimension()).getOrThrow(false, s -> {}));
+        tag.putBoolean("LodestoneTracked", true);
         return compass;
     }
 
+    /** A filled-map stack carrying {@code mapId} in its raw {@code "map"} tag (below 1.20.5, no {@code map_id}). */
     private static ItemStack filledMap(int mapId) {
         ItemStack map = new ItemStack(Items.FILLED_MAP);
-        map.set(DataComponents.MAP_ID, new MapId(mapId));
+        map.getOrCreateTag().putInt("map", mapId);
         return map;
     }
 
     private static MerchantOffers offering(ItemStack sell) {
+        // Below 1.20.5 there is no ItemCost; a merchant offer's buy cost is a plain ItemStack.
         MerchantOffers offers = new MerchantOffers();
-        offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, 1), sell, 1, 0, 0.0f));
+        offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), sell, 1, 0, 0.0f));
         return offers;
     }
 
@@ -67,13 +75,14 @@ class MerchantOfferCaptureTest {
         return MerchantOfferCapture.serialize(offering(sell), 0, false, registries);
     }
 
-    private static CompoundTag sellComponents(CompoundTag holder) {
+    /** The {@code sell} item's pre-component {@code tag} compound (below 1.20.5, no {@code components} map). */
+    private static CompoundTag sellItemTag(CompoundTag holder) {
         return holder.getCompound("Offers").getList("Recipes", 10).getCompound(0)
-                .getCompound("sell").getCompound("components");
+                .getCompound("sell").getCompound("tag");
     }
 
     private static boolean sellHasLodestoneTarget(CompoundTag holder) {
-        return sellComponents(holder).getCompound("minecraft:lodestone_tracker").contains("target");
+        return sellItemTag(holder).contains("LodestonePos");
     }
 
     @Test
@@ -119,7 +128,7 @@ class MerchantOfferCaptureTest {
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, false, archive);
 
-        assertNotEquals(7, sellComponents(holder).getInt("minecraft:map_id"),
+        assertNotEquals(7, sellItemTag(holder).getInt("map"),
                 "the session map id was rewritten to an archive id");
     }
 

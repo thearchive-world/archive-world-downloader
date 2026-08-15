@@ -92,7 +92,7 @@ class ContainerStashMergeTest {
 
         ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(findByPos(blockEntities, 10, 70, 20), back, registries);
+        ContainerHelper.loadAllItems(findByPos(blockEntities, 10, 70, 20), back);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest gains exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
         assertTrue(findByPos(blockEntities, 11, 70, 20).getList("Items", Tag.TAG_COMPOUND).isEmpty(),

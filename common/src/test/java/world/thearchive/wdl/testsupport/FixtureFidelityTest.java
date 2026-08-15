@@ -38,7 +38,10 @@ class FixtureFidelityTest {
         }
         entry.putString("id", itemId);
         if (withCount) {
-            entry.putInt("count", 1);
+            // Vanilla's own ItemStack#save writes "Count" as a byte; a count under any other key or shape
+            // decodes to 0, which ItemStack.of reads as empty and ContainerHelper.saveAllItems then drops the
+            // entry entirely, so the deliberately-omitted key below stops being the fixture's only divergence.
+            entry.putByte("Count", (byte) 1);
         }
         return entry;
     }
@@ -80,9 +83,13 @@ class FixtureFidelityTest {
 
     @Test
     void anItemEntryWithoutCountIsRejected() {
+        // Unlike a missing Slot (which still round-trips as a valid entry at slot 0, so the divergence names
+        // "Slot" directly), a missing Count decodes to 0 via ItemStack.of, which ItemStack#isEmpty treats as
+        // empty; ContainerHelper.saveAllItems then skips it entirely, so the producer's list comes back one
+        // element short rather than missing a single named key.
         String message = reject(() -> FixtureFidelity
                 .assertItemsHolderShape(holderOf(handBuiltEntry("minecraft:diamond", true, false))));
-        assertTrue(message.contains("count"), "the divergence must name the omitted key: " + message);
+        assertTrue(message.contains("element(s)"), "the divergence must name the lost entry: " + message);
     }
 
     @Test

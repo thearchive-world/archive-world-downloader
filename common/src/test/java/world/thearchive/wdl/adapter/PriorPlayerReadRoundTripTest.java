@@ -53,7 +53,7 @@ class PriorPlayerReadRoundTripTest {
 
     private static CompoundTag capturedPlayerTag(ListTag enderItems) {
         CompoundTag tag = new CompoundTag();
-        tag.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, PLAYER_UUID).getOrThrow());
+        tag.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, PLAYER_UUID).getOrThrow(false, s -> {}));
         tag.put("Inventory", new ListTag());
         tag.put("EnderItems", enderItems);
         return tag;

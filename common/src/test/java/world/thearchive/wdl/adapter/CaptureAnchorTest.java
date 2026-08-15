@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -67,7 +66,7 @@ class CaptureAnchorTest {
         }
 
         @Override
-        protected void defineSynchedData(SynchedEntityData.Builder builder) {}
+        protected void defineSynchedData() {}
 
         @Override
         protected void readAdditionalSaveData(CompoundTag tag) {}

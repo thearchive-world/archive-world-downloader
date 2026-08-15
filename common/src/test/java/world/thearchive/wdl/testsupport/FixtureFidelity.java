@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -32,9 +31,9 @@ import org.jspecify.annotations.Nullable;
  * {@link BlockEntity#loadStatic} and saved back through {@link BlockEntity#saveWithFullMetadata}; an {@code "Items"}
  * holder is fed to {@link ContainerHelper#loadAllItems} and saved back through {@link ContainerHelper#saveAllItems}. A
  * fixture built from a mental model rather than from the producer differs from its own round trip, because vanilla
- * writes keys unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "count"} on every item entry,
- * {@code "components"} on every block entity, and each block entity's own always-written state). Such a fixture
- * collapses the cases a test means to distinguish, so the test passes for a reason unrelated to the behavior it names.
+ * writes keys unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "Count"} on every item entry, and
+ * each block entity's own always-written state). Such a fixture collapses the cases a test means to distinguish, so the
+ * test passes for a reason unrelated to the behavior it names.
  *
  * <p>Nothing here is a key list to maintain. The producer is called, so the expected shape follows the band the tests
  * compile against.
@@ -65,7 +64,7 @@ public final class FixtureFidelity {
 
     /** What vanilla writes for {@code blockEntity}, the same call the chunk save makes. */
     public static CompoundTag save(BlockEntity blockEntity) {
-        return blockEntity.saveWithFullMetadata(TestRegistries.frozen());
+        return blockEntity.saveWithFullMetadata();
     }
 
     /**
@@ -87,15 +86,14 @@ public final class FixtureFidelity {
         String id = subject.getString("id");
         BlockPos pos = new BlockPos(subject.getInt("x"), subject.getInt("y"), subject.getInt("z"));
         BlockState state = representativeState(id);
-        RegistryAccess registries = TestRegistries.frozen();
 
-        BlockEntity blockEntity = BlockEntity.loadStatic(pos, state, subject, registries);
+        BlockEntity blockEntity = BlockEntity.loadStatic(pos, state, subject);
         if (blockEntity == null) {
             throw new AssertionError("Fixture fidelity: the fixture at " + pos
                     + " does not load as a block entity: " + subject);
         }
 
-        CompoundTag produced = blockEntity.saveWithFullMetadata(registries);
+        CompoundTag produced = blockEntity.saveWithFullMetadata();
         List<String> divergences = new ArrayList<>();
         diff("", produced, subject, divergences);
         if (!divergences.isEmpty()) {
@@ -115,12 +113,11 @@ public final class FixtureFidelity {
                     + ", which no producer writes; an empty read of it would pass this check silently");
         }
         ListTag items = holderTag.getList("Items", Tag.TAG_COMPOUND);
-        RegistryAccess registries = TestRegistries.frozen();
 
         NonNullList<ItemStack> stacks = NonNullList.withSize(containerSize(items), ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(holderTag, stacks, registries);
+        ContainerHelper.loadAllItems(holderTag, stacks);
 
-        CompoundTag output = ContainerHelper.saveAllItems(new CompoundTag(), stacks, registries);
+        CompoundTag output = ContainerHelper.saveAllItems(new CompoundTag(), stacks);
 
         List<String> divergences = new ArrayList<>();
         diff("Items", output.getList("Items", Tag.TAG_COMPOUND), items, divergences);

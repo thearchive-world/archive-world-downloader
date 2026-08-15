@@ -95,7 +95,11 @@ public final class TestRegistries {
     private static <T> void bindRegistryTags(RegistryAccess.RegistryEntry<T> entry, ResourceManager resources) {
         ResourceKey<? extends Registry<T>> key = entry.key();
         Registry<T> registry = entry.value();
-        TagLoader<Holder<T>> loader = new TagLoader<>(registry::getHolder, TagManager.getTagDir(key));
+        // Below 1.20.5 Registry has no getHolder(ResourceLocation) overload (only int / ResourceKey<T>), so the
+        // loader's id-to-value function must build the ResourceKey itself rather than pass the method reference
+        // directly.
+        TagLoader<Holder<T>> loader = new TagLoader<>(
+                location -> registry.getHolder(ResourceKey.create(key, location)), TagManager.getTagDir(key));
         Map<TagKey<T>, List<Holder<T>>> bound = loader.loadAndBuild(resources).entrySet().stream()
                 .collect(Collectors.toUnmodifiableMap(tag -> TagKey.create(key, tag.getKey()),
                         tag -> List.copyOf(tag.getValue())));

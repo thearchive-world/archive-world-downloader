@@ -21,14 +21,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.util.datafix.DataFixTypes;
-import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -209,15 +207,16 @@ class CarryForwardWiringTest {
 
     private static void writePrior(WorldPaths paths, ChunkPos pos, CompoundTag blockEntity) throws Exception {
         CompoundTag chunk = BlockEntityFixtures.chunkTagWith(blockEntity);
-        try (SimpleRegionStorage storage = regionStorage(paths)) {
-            storage.write(pos, chunk).join();
+        try (IOWorker storage = regionStorage(paths)) {
+            storage.store(pos, chunk).join();
             storage.synchronize(true).join();
         }
     }
 
     private List<String> itemsOnDisk(WorldPaths paths, ChunkPos pos) throws Exception {
-        try (SimpleRegionStorage storage = regionStorage(paths)) {
-            CompoundTag chunk = storage.read(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
+        try (IOWorker storage = regionStorage(paths)) {
+            CompoundTag chunk = storage.loadAsync(pos).join()
+                    .orElseThrow(() -> new AssertionError("chunk not on disk"));
             CompoundTag written = findByPos(chunk, chest.getX(), chest.getY(), chest.getZ());
             List<String> ids = new ArrayList<>();
             if (written.get("Items") instanceof ListTag items) {
@@ -229,9 +228,8 @@ class CarryForwardWiringTest {
         }
     }
 
-    private static SimpleRegionStorage regionStorage(WorldPaths paths) {
-        return new SimpleRegionStorage(paths.regionStorageInfo(Level.OVERWORLD),
-                paths.regionDirectory(Level.OVERWORLD), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK);
+    private static IOWorker regionStorage(WorldPaths paths) {
+        return paths.openRegionStorage(Level.OVERWORLD);
     }
 
     private static LiveCaptureSession session(Path configDirectory) {
@@ -255,9 +253,7 @@ class CarryForwardWiringTest {
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
                 dimension -> regionStorage(paths),
-                dimension -> new SimpleRegionStorage(paths.entitiesStorageInfo(dimension),
-                        paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
-                        DataFixTypes.ENTITY_CHUNK),
+                paths::openEntitiesStorage,
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
     }
 

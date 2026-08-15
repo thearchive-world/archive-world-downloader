@@ -10,18 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.customNameOf;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.namedBlockEntity;
 
-import java.util.List;
-import java.util.Optional;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.network.Filterable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.WritableBookContent;
-import net.minecraft.world.item.component.WrittenBookContent;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -29,8 +25,8 @@ import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for lectern-book capture: the {@link LecternSink} 1.21.11 path (captureBook -> merge) plus
- * vanilla's own {@code ItemStack.CODEC} read-back (the exact form {@code LecternBlockEntity.loadAdditional} uses) is a
+ * The automated guard for lectern-book capture: the {@link LecternSink} 1.20.4 path (captureBook -> merge) plus
+ * vanilla's own {@code ItemStack.of} read-back (the exact form {@code LecternBlockEntity.loadAdditional} uses) is a
  * self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity tag under
  * {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field
  * clobbered. Runs for both a signed <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern
@@ -54,30 +50,43 @@ class LecternSinkRoundTripTest {
         return namedBlockEntity("minecraft:lectern", x, y, z, "keep-me");
     }
 
+    /**
+     * A signed written book. Below 1.20.5 there is no {@code WrittenBookContent} component; vanilla's own
+     * {@code WrittenBookItem} reads {@code title}/{@code author}/{@code generation}/{@code resolved} and a
+     * {@code "pages"} list of JSON-component strings straight off the item tag.
+     */
     private static ItemStack writtenBook() {
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
-        book.set(DataComponents.WRITTEN_BOOK_CONTENT, new WrittenBookContent(
-                Filterable.passThrough("The Title"), "An Author", 0,
-                List.of(Filterable.passThrough(Component.literal("Page one")),
-                        Filterable.passThrough(Component.literal("Page two"))),
-                true));
+        CompoundTag tag = book.getOrCreateTag();
+        tag.putString("title", "The Title");
+        tag.putString("author", "An Author");
+        tag.putInt("generation", 0);
+        tag.putBoolean("resolved", true);
+        ListTag pages = new ListTag();
+        pages.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal("Page one"))));
+        pages.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal("Page two"))));
+        tag.put("pages", pages);
         return book;
     }
 
+    /**
+     * An unsigned writable (book and quill) book. Below 1.20.5 there is no {@code WritableBookContent} component;
+     * vanilla's own {@code WritableBookItem} reads a {@code "pages"} list of plain (non-JSON) strings.
+     */
     private static ItemStack writableBook() {
         ItemStack book = new ItemStack(Items.WRITABLE_BOOK);
-        book.set(DataComponents.WRITABLE_BOOK_CONTENT, new WritableBookContent(
-                List.of(Filterable.passThrough("draft page one"), Filterable.passThrough("draft page two"))));
+        ListTag pages = new ListTag();
+        pages.add(StringTag.valueOf("draft page one"));
+        pages.add(StringTag.valueOf("draft page two"));
+        book.getOrCreateTag().put("pages", pages);
         return book;
     }
 
     private static ItemStack readBackBook(CompoundTag merged) {
         // vanilla loadAdditional's exact read
-        Optional<ItemStack> back = ItemStack.CODEC
-                .parse(registries.createSerializationContext(NbtOps.INSTANCE), merged.get("Book"))
-                .result();
-        assertTrue(back.isPresent(), "the merged Book must decode via vanilla ItemStack.CODEC");
-        return back.get();
+        ItemStack back = ItemStack.of(merged.getCompound("Book"));
+        assertTrue(!back.isEmpty(), "the merged Book must decode via vanilla ItemStack.of");
+        return back;
     }
 
     @Test
@@ -85,7 +94,7 @@ class LecternSinkRoundTripTest {
         CompoundTag holder = sink.captureBook(writtenBook(), 1, registries);
 
         assertInstanceOf(CompoundTag.class, holder.get("Book"),
-                "ItemStack.CODEC serializes a stack to a compound under Book");
+                "ItemStack#save serializes a stack to a compound under Book");
         assertEquals(1, (holder.contains("Page") ? holder.getInt("Page") : -1),
                 "the reading page is stored as a plain int under Page");
     }
@@ -105,12 +114,13 @@ class LecternSinkRoundTripTest {
 
         ItemStack back = readBackBook(merged);
         assertEquals(Items.WRITTEN_BOOK, back.getItem());
-        WrittenBookContent content = back.get(DataComponents.WRITTEN_BOOK_CONTENT);
-        assertEquals("The Title", content.title().raw(), "the book title survives the round-trip");
-        assertEquals("An Author", content.author());
-        assertEquals(2, content.pages().size(), "both pages survive");
-        assertEquals("Page one", content.pages().get(0).raw().getString());
-        assertEquals("Page two", content.pages().get(1).raw().getString());
+        CompoundTag content = back.getTag();
+        assertEquals("The Title", content.getString("title"), "the book title survives the round-trip");
+        assertEquals("An Author", content.getString("author"));
+        ListTag pages = content.getList("pages", Tag.TAG_STRING);
+        assertEquals(2, pages.size(), "both pages survive");
+        assertEquals("Page one", Component.Serializer.fromJson(pages.getString(0)).getString());
+        assertEquals("Page two", Component.Serializer.fromJson(pages.getString(1)).getString());
     }
 
     @Test
@@ -121,10 +131,10 @@ class LecternSinkRoundTripTest {
         assertEquals(0, (merged.contains("Page") ? merged.getInt("Page") : -1));
         ItemStack back = readBackBook(merged);
         assertEquals(Items.WRITABLE_BOOK, back.getItem(), "an unsigned writable book is a valid lectern content");
-        WritableBookContent content = back.get(DataComponents.WRITABLE_BOOK_CONTENT);
-        assertEquals(2, content.pages().size());
-        assertEquals("draft page one", content.pages().get(0).raw());
-        assertEquals("draft page two", content.pages().get(1).raw());
+        ListTag pages = back.getTag().getList("pages", Tag.TAG_STRING);
+        assertEquals(2, pages.size());
+        assertEquals("draft page one", pages.getString(0));
+        assertEquals("draft page two", pages.getString(1));
     }
 
     @Test

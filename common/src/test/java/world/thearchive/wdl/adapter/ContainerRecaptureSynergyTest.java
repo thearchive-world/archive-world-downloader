@@ -59,7 +59,7 @@ class ContainerRecaptureSynergyTest {
         ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
         CompoundTag chest = blockEntities.getCompound(0);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(chest, back, registries);
+        ContainerHelper.loadAllItems(chest, back);
         return back.get(slot);
     }
 

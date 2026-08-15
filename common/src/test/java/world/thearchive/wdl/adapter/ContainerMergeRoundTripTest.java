@@ -77,7 +77,7 @@ class ContainerMergeRoundTripTest {
 
         // The merged "Items" decode via vanilla loadAllItems back to the same stacks at the same slots.
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(merged, back, registries);
+        ContainerHelper.loadAllItems(merged, back);
 
         assertEquals(3, countNonEmpty(back), "exactly the three captured stacks come back");
         assertEquals(Items.DIAMOND, back.get(0).getItem());
@@ -108,7 +108,7 @@ class ContainerMergeRoundTripTest {
         CompoundTag merged = sink.merge(chestTag(1, 1, 1), sink.captureItems(items, registries));
 
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(merged, back, registries);
+        ContainerHelper.loadAllItems(merged, back);
         assertEquals(0, countNonEmpty(back), "an opened-but-empty container stays empty and uncorrupted");
     }
 }

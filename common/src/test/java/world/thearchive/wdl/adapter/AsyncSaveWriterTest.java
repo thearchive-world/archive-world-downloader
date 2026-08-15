@@ -34,15 +34,12 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.datafix.DataFixTypes;
-import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -56,18 +53,25 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The off-main-thread save writer drained against a real {@link SimpleRegionStorage}: chunk encode-and-fold thunks
- * submitted from the (test) main thread are resolved on the writer's own thread, the finalizer (the level.dat stand-in)
- * runs there too, and the completion future reports the per-target tallies. This is the headless half of the
- * no-render-freeze contract; the live freeze itself is not exercised headless.
+ * The off-main-thread save writer drained against a real {@link IOWorker}: chunk encode-and-fold thunks submitted from
+ * the (test) main thread are resolved on the writer's own thread, the finalizer (the level.dat stand-in) runs there
+ * too, and the completion future reports the per-target tallies. This is the headless half of the no-render-freeze
+ * contract; the live freeze itself is not exercised headless.
  */
 class AsyncSaveWriterTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
 
-    private static SimpleRegionStorage storage(Path directory, String type) {
-        return new SimpleRegionStorage(new RegionStorageInfo("wdl", Level.OVERWORLD, type), directory,
-                DataFixers.getDataFixer(), false,
-                "entities".equals(type) ? DataFixTypes.ENTITY_CHUNK : DataFixTypes.CHUNK);
+    private static IOWorker storage(Path directory, String type) {
+        return new TestRegionStorage(directory, false, type);
+    }
+
+    /**
+     * {@code IOWorker}'s constructor is protected and cross-package, so a test-local subclass is how a test reaches it.
+     */
+    private static class TestRegionStorage extends IOWorker {
+        private TestRegionStorage(Path directory, boolean sync, String name) {
+            super(directory, sync, name);
+        }
     }
 
     @Test
@@ -98,9 +102,9 @@ class AsyncSaveWriterTest {
         assertEquals(0, result.entityChunksWritten());
         assertTrue(finalized.get(), "the finalizer (level.dat) ran on the writer thread after the drain");
 
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
-            assertTrue(in.read(new ChunkPos(0, 0)).join().isPresent(), "submitted chunk reached disk");
-            assertTrue(in.read(new ChunkPos(31, 31)).join().isPresent(), "submitted chunk reached disk");
+        try (IOWorker in = storage(region, "chunk")) {
+            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "submitted chunk reached disk");
+            assertTrue(in.loadAsync(new ChunkPos(31, 31)).join().isPresent(), "submitted chunk reached disk");
         }
     }
 
@@ -158,8 +162,8 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.chunksWritten(), "and the dimension that did open still wrote its own chunk");
         assertEquals(2, netherOpens.get(),
                 "the open is retried per chunk rather than written off, since the failure can be of the moment");
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
-            assertTrue(in.read(new ChunkPos(2, 2)).join().isPresent(),
+        try (IOWorker in = storage(region, "chunk")) {
+            assertTrue(in.loadAsync(new ChunkPos(2, 2)).join().isPresent(),
                     "the openable dimension's chunk reached disk past the failure");
         }
     }
@@ -392,8 +396,8 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.chunksWritten(), "the terrain chunk went to region/");
         assertEquals(1, result.entityChunksWritten(), "the entity chunk went to entities/");
 
-        try (SimpleRegionStorage in = storage(entities, "entities")) {
-            assertTrue(in.read(new ChunkPos(2, 2)).join().isPresent(), "the entity chunk reached entities/");
+        try (IOWorker in = storage(entities, "entities")) {
+            assertTrue(in.loadAsync(new ChunkPos(2, 2)).join().isPresent(), "the entity chunk reached entities/");
         }
     }
 
@@ -423,11 +427,11 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         assertEquals(2, result.chunksWritten(), "both dimensions' same-position chunks were written");
-        try (SimpleRegionStorage in = storage(overworldRegion, "chunk")) {
-            assertTrue(in.read(new ChunkPos(0, 0)).join().isPresent(), "the overworld chunk reached region/");
+        try (IOWorker in = storage(overworldRegion, "chunk")) {
+            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "the overworld chunk reached region/");
         }
-        try (SimpleRegionStorage in = storage(netherRegion, "chunk")) {
-            assertTrue(in.read(new ChunkPos(0, 0)).join().isPresent(), "the nether chunk reached DIM-1/region/");
+        try (IOWorker in = storage(netherRegion, "chunk")) {
+            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "the nether chunk reached DIM-1/region/");
         }
     }
 
@@ -465,11 +469,11 @@ class AsyncSaveWriterTest {
                 "the chunk encode must be deferred to the writer thread, not run at submit on the caller's");
         CompoundTag offThreadOnDisk;
         CompoundTag onThreadOnDisk;
-        try (SimpleRegionStorage in = storage(overworldRegion, "chunk")) {
-            offThreadOnDisk = in.read(new ChunkPos(0, 0)).join().orElseThrow();
+        try (IOWorker in = storage(overworldRegion, "chunk")) {
+            offThreadOnDisk = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
         }
-        try (SimpleRegionStorage in = storage(netherRegion, "chunk")) {
-            onThreadOnDisk = in.read(new ChunkPos(0, 0)).join().orElseThrow();
+        try (IOWorker in = storage(netherRegion, "chunk")) {
+            onThreadOnDisk = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
         }
         assertEquals(onThreadOnDisk, offThreadOnDisk,
                 "the writer-thread encode is byte-identical to the main-thread encode");
@@ -505,9 +509,9 @@ class AsyncSaveWriterTest {
                 "a soft chunk loss with no hard error is a partial finish; the aggregate must not read it as clean");
         assertTrue(finalized.get(), "finish() still completed past the isolated failure");
 
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
-            assertTrue(in.read(new ChunkPos(0, 0)).join().isPresent(), "the good chunk landed");
-            assertFalse(in.read(new ChunkPos(1, 1)).join().isPresent(), "the throwing chunk wrote nothing");
+        try (IOWorker in = storage(region, "chunk")) {
+            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "the good chunk landed");
+            assertFalse(in.loadAsync(new ChunkPos(1, 1)).join().isPresent(), "the throwing chunk wrote nothing");
         }
     }
 
@@ -523,10 +527,9 @@ class AsyncSaveWriterTest {
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
-                dimension -> new SimpleRegionStorage(new RegionStorageInfo("wdl", Level.OVERWORLD, "chunk"),
-                        region, DataFixers.getDataFixer(), false, DataFixTypes.CHUNK) {
+                dimension -> new TestRegionStorage(region, false, "chunk") {
                     @Override
-                    public CompletableFuture<Void> write(ChunkPos pos, CompoundTag tag) {
+                    public CompletableFuture<Void> store(ChunkPos pos, CompoundTag tag) {
                         throw new IllegalStateException("the region store rejected the write");
                     }
                 },
@@ -564,10 +567,9 @@ class AsyncSaveWriterTest {
                 dimension -> {
                     throw new AssertionError("no region chunk was submitted, so the region storage must not open");
                 },
-                dimension -> new SimpleRegionStorage(new RegionStorageInfo("wdl", Level.OVERWORLD, "entities"),
-                        entities, DataFixers.getDataFixer(), false, DataFixTypes.ENTITY_CHUNK) {
+                dimension -> new TestRegionStorage(entities, false, "entities") {
                     @Override
-                    public CompletableFuture<Void> write(ChunkPos pos, CompoundTag tag) {
+                    public CompletableFuture<Void> store(ChunkPos pos, CompoundTag tag) {
                         throw new IllegalStateException("the entities store rejected the write");
                     }
                 },
@@ -621,12 +623,12 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
-            CompoundTag back = in.read(new ChunkPos(0, 0)).join().orElseThrow();
+        try (IOWorker in = storage(region, "chunk")) {
+            CompoundTag back = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
             CompoundTag chest = findByPosOrNull(back, 2, 64, 2);
             assertNotNull(chest, "the chest block entity is on disk");
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(chest, decoded, registries);
+            ContainerHelper.loadAllItems(chest, decoded);
             assertEquals(Items.DIAMOND, decoded.get(0).getItem(), "the writer-thread fold merged the captured Items");
             assertEquals(5, decoded.get(0).getCount());
         }
@@ -661,8 +663,8 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
-            CompoundTag back = in.read(new ChunkPos(0, 0)).join().orElseThrow();
+        try (IOWorker in = storage(region, "chunk")) {
+            CompoundTag back = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
             CompoundTag lectern = findByPosOrNull(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
             assertTrue(lectern.getCompound("Book").contains("id"), "the writer-thread fold merged the Book");
@@ -806,8 +808,8 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed(), "a failed pre-merge backup never aborts the save");
         assertEquals(1, result.chunksWritten(), "the drain still ran past the failed preflight");
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
-            assertTrue(in.read(new ChunkPos(0, 0)).join().isPresent(), "the chunk still reached disk");
+        try (IOWorker in = storage(region, "chunk")) {
+            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "the chunk still reached disk");
         }
     }
 
@@ -974,7 +976,7 @@ class AsyncSaveWriterTest {
         assertEquals(4, result.entityChunksWritten(), "every entity-chunk write landed, first and re-flush alike");
         assertEquals(1, result.entitiesCarriedForward(),
                 "exactly the one prior-contents carry (the revisit clobber case) reached the tally");
-        try (SimpleRegionStorage in = storage(entities, "entities")) {
+        try (IOWorker in = storage(entities, "entities")) {
             assertFalse(vehicleItems(in, new ChunkPos(0, 0), openedAfterFlush).isEmpty(),
                     "the re-flush folded the opened contents onto the on-disk vehicle (open-after-flush recovers)");
             assertFalse(vehicleItems(in, new ChunkPos(0, 1), openedBeforeFlush).isEmpty(),
@@ -1044,8 +1046,8 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         assertEquals(2, result.mergedContainers(), "the fold count reached the merged-containers tally");
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
-            CompoundTag onDisk = in.read(new ChunkPos(0, 0)).join().orElseThrow();
+        try (IOWorker in = storage(region, "chunk")) {
+            CompoundTag onDisk = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
             assertEquals("contents", onDisk.getString("wdl_test_folded"),
                     "the folded chunk was written back to region/");
             assertFalse(onDisk.getList("sections", Tag.TAG_COMPOUND).isEmpty(),
@@ -1087,8 +1089,8 @@ class AsyncSaveWriterTest {
         return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid);
     }
 
-    private static ListTag vehicleItems(SimpleRegionStorage storage, ChunkPos pos, UUID uuid) {
-        CompoundTag chunk = storage.read(pos).join().orElseThrow();
+    private static ListTag vehicleItems(IOWorker storage, ChunkPos pos, UUID uuid) {
+        CompoundTag chunk = storage.loadAsync(pos).join().orElseThrow();
         ListTag list = chunk.getList("Entities", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entity = list.getCompound(i);
@@ -1104,22 +1106,21 @@ class AsyncSaveWriterTest {
      * drain has to survive without taking the level.dat write down with them. Everything else is the vanilla behavior,
      * so a chunk written through it really does reach the region file.
      */
-    private static final class FaultyStorage extends SimpleRegionStorage {
+    private static final class FaultyStorage extends TestRegionStorage {
         private final boolean failRead;
         private final boolean failFlush;
 
         private FaultyStorage(Path directory, String type, boolean failRead, boolean failFlush) {
-            super(new RegionStorageInfo("wdl", Level.OVERWORLD, type), directory, DataFixers.getDataFixer(),
-                    false, "entities".equals(type) ? DataFixTypes.ENTITY_CHUNK : DataFixTypes.CHUNK);
+            super(directory, false, type);
             this.failRead = failRead;
             this.failFlush = failFlush;
         }
 
         @Override
-        public CompletableFuture<Optional<CompoundTag>> read(ChunkPos pos) {
+        public CompletableFuture<Optional<CompoundTag>> loadAsync(ChunkPos pos) {
             return failRead
                     ? CompletableFuture.failedFuture(new IOException("the region read failed"))
-                    : super.read(pos);
+                    : super.loadAsync(pos);
         }
 
         @Override
@@ -1164,7 +1165,7 @@ class AsyncSaveWriterTest {
         assertEquals(0, result.chunksWritten(), "and it is not counted as written");
         assertEquals(1, finalizedChunksFailed.get(),
                 "the finalize sees it too, so the completion record cannot stamp this download clean");
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
+        try (IOWorker in = storage(region, "chunk")) {
             assertEquals(Items.DIAMOND, firstItemOf(in, registries, new ChunkPos(0, 0), 2, 64, 2).getItem(),
                     "the prior the writer refused to overwrite is still on disk");
         }
@@ -1231,7 +1232,7 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.entityChunksFailed(), "the capture never reached the save, so it counts lost");
         assertEquals(0, result.entityChunksWritten(), "and it is not counted as written");
         assertEquals(1, finalizedEntityChunksFailed.get(), "the finalize sees it on its own target's term");
-        try (SimpleRegionStorage in = storage(entities, "entities")) {
+        try (IOWorker in = storage(entities, "entities")) {
             assertFalse(vehicleItems(in, new ChunkPos(0, 0), parked).isEmpty(),
                     "the prior the writer refused to overwrite is still on disk");
         }
@@ -1277,7 +1278,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertTrue(merged.get(), "the arm under test is the merge arm, so the injected carry-forward must have run");
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
+        try (IOWorker in = storage(region, "chunk")) {
             // Only the unreached chest can show this. The carried one holds the stack either way, because the
             // merge copied it into the fresh tag before throwing, so asserting on it would prove nothing.
             assertEquals(Items.DIAMOND, firstItemOf(in, registries, new ChunkPos(0, 0), unreached.getX(),
@@ -1321,7 +1322,7 @@ class AsyncSaveWriterTest {
         }, ChunkMerge::merge);
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed());
         CompoundTag revisit = codec.encode(snapshot, registries, false);
-        try (SimpleRegionStorage in = storage(region, "chunk")) {
+        try (IOWorker in = storage(region, "chunk")) {
             for (BlockPos chest : chests) {
                 assertEquals(Items.DIAMOND, firstItemOf(in, registries, new ChunkPos(0, 0), chest.getX(),
                         chest.getY(), chest.getZ()).getItem(),
@@ -1335,13 +1336,13 @@ class AsyncSaveWriterTest {
     }
 
     /** Slot 0 of the block entity saved at {@code x/y/z} in {@code pos}'s on-disk chunk. */
-    private static ItemStack firstItemOf(SimpleRegionStorage storage, RegistryAccess registries, ChunkPos pos,
+    private static ItemStack firstItemOf(IOWorker storage, RegistryAccess registries, ChunkPos pos,
             int x, int y, int z) {
-        CompoundTag chunk = storage.read(pos).join().orElseThrow();
+        CompoundTag chunk = storage.loadAsync(pos).join().orElseThrow();
         CompoundTag blockEntity = findByPosOrNull(chunk, x, y, z);
         assertNotNull(blockEntity, "no block entity at " + x + "/" + y + "/" + z + " in " + pos);
         NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(blockEntity, decoded, registries);
+        ContainerHelper.loadAllItems(blockEntity, decoded);
         return decoded.get(0);
     }
 

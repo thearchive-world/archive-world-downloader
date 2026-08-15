@@ -14,12 +14,9 @@ import java.util.List;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.util.datafix.DataFixTypes;
-import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
-import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
+import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -32,9 +29,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for entity capture: the {@link EntitySink} pure envelope slice
  * ({@link EntitySink#encodeChunk(List, ChunkPos)} over already-serialized entity tags) plus the {@code entities/}
- * {@link SimpleRegionStorage} ({@link DataFixTypes#ENTITY_CHUNK}) write/read is a self-consistent, vanilla-valid Anvil
- * round-trip: {@code Position} decodes via {@link ChunkPos#CODEC}, the {@code Entities} list survives with each
- * entity's {@code id}, and {@code DataVersion} is stamped.
+ * {@link IOWorker} write/read is a self-consistent, vanilla-valid Anvil round-trip: {@code Position} decodes via
+ * {@link ChunkPos#CODEC}, the {@code Entities} list survives with each entity's {@code id}, and {@code DataVersion} is
+ * stamped.
  *
  * <p>Server-free by construction: hand-built entity tags drive the envelope, so neither a live {@code Entity} nor a
  * {@code Level} is needed. The two client/level-coupled steps are not exercised headless, exactly as for chunks
@@ -59,10 +56,8 @@ class EntityRoundTripTest {
         TestRegistries.frozen();
     }
 
-    private static SimpleRegionStorage entityStorage(WorldPaths paths, Path entitiesDirectory) {
-        return new SimpleRegionStorage(
-                paths.entitiesStorageInfo(Level.OVERWORLD), entitiesDirectory,
-                DataFixers.getDataFixer(), false, DataFixTypes.ENTITY_CHUNK);
+    private static IOWorker entityStorage(WorldPaths paths) {
+        return paths.openEntitiesStorage(Level.OVERWORLD);
     }
 
     /** A minimal stand-in for a serialized entity tag: an {@code id} (its type) plus a placement marker. */
@@ -70,17 +65,6 @@ class EntityRoundTripTest {
         CompoundTag tag = EntityFixtures.entityTag(id);
         tag.putInt("wdlMarker", marker);
         return tag;
-    }
-
-    @Test
-    void entitiesStorageInfoIsTypedEntitiesNotChunk() {
-        WorldPaths paths = new WorldPathsImpl(Path.of("unused"));
-
-        RegionStorageInfo entities = paths.entitiesStorageInfo(Level.OVERWORLD);
-        assertEquals("entities", entities.type(), "the entities region must be typed \"entities\", not \"chunk\"");
-        assertEquals(Level.OVERWORLD, entities.dimension());
-        assertEquals("chunk", paths.regionStorageInfo(Level.OVERWORLD).type(),
-                "the chunk region info must stay byte-compatible (type \"chunk\")");
     }
 
     @Test
@@ -118,18 +102,18 @@ class EntityRoundTripTest {
                 new ChunkPos(0, 0), new ChunkPos(31, 31), new ChunkPos(32, 0),
                 new ChunkPos(0, 32), new ChunkPos(-1, -1));
 
-        try (SimpleRegionStorage out = entityStorage(paths, entitiesDirectory)) {
+        try (IOWorker out = entityStorage(paths)) {
             for (int i = 0; i < positions.size(); i++) {
-                out.write(positions.get(i), sink.encodeChunk(List.of(entityTag("minecraft:item", i)), positions.get(i)))
+                out.store(positions.get(i), sink.encodeChunk(List.of(entityTag("minecraft:item", i)), positions.get(i)))
                         .join();
             }
             out.synchronize(true).join();
         }
 
         // Reopen with a FRESH storage and read every entity-chunk back at its position.
-        try (SimpleRegionStorage in = entityStorage(paths, entitiesDirectory)) {
+        try (IOWorker in = entityStorage(paths)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag back = in.read(positions.get(i)).join()
+                CompoundTag back = in.loadAsync(positions.get(i)).join()
                         .orElseThrow(() -> new AssertionError("missing entity-chunk"));
                 int[] position = back.getIntArray("Position");
                 assertEquals(positions.get(i), new ChunkPos(position[0], position[1]),

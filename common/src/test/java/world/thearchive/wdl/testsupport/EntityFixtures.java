@@ -37,7 +37,7 @@ public final class EntityFixtures {
     /** An entity tag carrying the {@code id} and {@code "UUID"} a merge matches on, and nothing else. */
     public static CompoundTag entity(String id, UUID uuid) {
         CompoundTag tag = entityTag(id);
-        tag.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow());
+        tag.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
         return tag;
     }
 
@@ -48,7 +48,7 @@ public final class EntityFixtures {
      */
     public static CompoundTag entityAt(String id, UUID uuid, double x, double y, double z) {
         CompoundTag tag = entity(id, uuid);
-        tag.put("Pos", Vec3.CODEC.encodeStart(NbtOps.INSTANCE, new Vec3(x, y, z)).getOrThrow());
+        tag.put("Pos", Vec3.CODEC.encodeStart(NbtOps.INSTANCE, new Vec3(x, y, z)).getOrThrow(false, s -> {}));
         return tag;
     }
 

@@ -47,7 +47,7 @@ class MapSinkRoundTripTest {
 
     private MapItemSavedData roundTrip(MapItemSavedData map) {
         Tag data = sink.serializeMap(map, registries);
-        return MapItemSavedData.load((CompoundTag) data, registries);
+        return MapItemSavedData.load((CompoundTag) data);
     }
 
     @Test

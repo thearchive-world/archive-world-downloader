@@ -8,15 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.BundleContents;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -79,17 +79,18 @@ class MenuChangeTrackerTest {
 
     @Test
     void inPlaceBundleContentMutationFires() {
-        // BundleItem's click-prediction override mutates the slot-resident stack in place: same object, same
-        // count, only the bundle_contents component value swapped. The gate must not read that as unchanged.
+        // Below 1.20.5 BundleItem's click-prediction override mutates the slot-resident stack's "Items" tag in
+        // place: same object, same count, only the tag's Items list swapped. The gate must not read that as
+        // unchanged.
         MenuChangeTracker tracker = new MenuChangeTracker();
         SimpleContainer container = new SimpleContainer(1);
         ItemStack bundle = new ItemStack(Items.BUNDLE);
-        bundle.set(DataComponents.BUNDLE_CONTENTS, BundleContents.EMPTY);
+        bundle.getOrCreateTag().put("Items", new ListTag());
         container.setItem(0, bundle);
         List<Slot> slots = slotsOver(container);
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
 
-        bundle.set(DataComponents.BUNDLE_CONTENTS, new BundleContents(List.of(new ItemStack(Items.DIAMOND))));
+        bundle.getTag().put("Items", ItemFixtures.items(new ItemStack(Items.DIAMOND)));
 
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA),
                 "an in-place bundle contents swap is a change");

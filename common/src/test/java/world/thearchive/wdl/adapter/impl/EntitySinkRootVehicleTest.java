@@ -15,7 +15,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -89,7 +88,7 @@ class EntitySinkRootVehicleTest {
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         CompoundTag probe = new CompoundTag();
         probe.put("Items", folded.getList("Items", Tag.TAG_COMPOUND));
-        ContainerHelper.loadAllItems(probe, back, registries);
+        ContainerHelper.loadAllItems(probe, back);
         assertEquals(Items.DIAMOND, back.get(3).getItem(),
                 "the captured chest-boat loot lands at its slot in the mount");
         assertEquals(9, back.get(3).getCount());
@@ -148,7 +147,7 @@ class EntitySinkRootVehicleTest {
         }
 
         @Override
-        protected void defineSynchedData(SynchedEntityData.Builder builder) {}
+        protected void defineSynchedData() {}
 
         @Override
         protected void readAdditionalSaveData(CompoundTag tag) {}

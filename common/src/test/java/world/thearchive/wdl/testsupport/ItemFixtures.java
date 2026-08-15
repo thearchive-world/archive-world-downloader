@@ -3,32 +3,26 @@
 
 package world.thearchive.wdl.testsupport;
 
-import java.util.ArrayList;
-import java.util.List;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.network.Filterable;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.WrittenBookContent;
 
 /**
  * Item NBT built by the vanilla writers rather than by hand: {@link ContainerHelper#saveAllItems} for an
- * {@code "Items"} list and {@code ItemStack.CODEC} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
+ * {@code "Items"} list and {@code ItemStack#save} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
  * {@code "RecordItem"}).
  *
  * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: vanilla always writes {@code "Slot"}
- * and {@code "count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under test sees
+ * and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under test sees
  * every entry collapsed onto one slot.
  */
 public final class ItemFixtures {
@@ -57,7 +51,7 @@ public final class ItemFixtures {
     /** The stack for {@code itemId} carrying {@code customName}, count 1. */
     public static ItemStack namedStack(String itemId, String customName) {
         ItemStack stack = stack(itemId);
-        stack.set(DataComponents.CUSTOM_NAME, Component.literal(customName));
+        stack.setHoverName(Component.literal(customName));
         return stack;
     }
 
@@ -112,28 +106,35 @@ public final class ItemFixtures {
         return itemTag(stack(itemId));
     }
 
-    /** The tag vanilla writes for {@code stack}, as a lectern's {@code "Book"} carries it. */
+    /**
+     * The tag vanilla writes for {@code stack}, as a lectern's {@code "Book"} or a jukebox's {@code "RecordItem"}
+     * carries it: {@code ItemStack#save}, the same call every 1.20.4 block-entity single-stack field uses (a
+     * {@code {id, Count, tag}} compound with {@code Count} as a byte). {@code ItemStack.CODEC} exists on this band but
+     * encodes {@code Count} as an int, which is not byte-for-byte what a real block entity's own save produces.
+     */
     public static CompoundTag itemTag(ItemStack stack) {
-        RegistryAccess registries = TestRegistries.frozen();
-        Tag tag = ItemStack.CODEC
-                .encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), stack)
-                .getOrThrow();
-        return (CompoundTag) tag;
+        return stack.save(new CompoundTag());
     }
 
     /**
      * A written book of {@code pageCount} pages. The page count is load-bearing wherever a lectern's {@code "Page"}
      * matters: vanilla clamps the saved page into the book's own page range, so a book with no pages can only ever be
-     * on page -1.
+     * on page -1. Below 1.20.5 a written book has no {@code WrittenBookContent} component; vanilla's own
+     * {@code WrittenBookItem} reads {@code title}/{@code author}/{@code generation}/{@code resolved} and a
+     * {@code "pages"} list of JSON-component strings straight off the item tag.
      */
     public static ItemStack writtenBook(int pageCount) {
-        List<Filterable<Component>> pages = new ArrayList<>();
+        ListTag pages = new ListTag();
         for (int page = 0; page < pageCount; page++) {
-            pages.add(Filterable.passThrough(Component.literal("page " + page)));
+            pages.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal("page " + page))));
         }
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
-        book.set(DataComponents.WRITTEN_BOOK_CONTENT,
-                new WrittenBookContent(Filterable.passThrough("title"), "author", 0, pages, true));
+        CompoundTag tag = book.getOrCreateTag();
+        tag.putString("title", "title");
+        tag.putString("author", "author");
+        tag.putInt("generation", 0);
+        tag.putBoolean("resolved", true);
+        tag.put("pages", pages);
         return book;
     }
 
@@ -157,7 +158,6 @@ public final class ItemFixtures {
         if (slots.length != contents.length) {
             throw new IllegalArgumentException("slots and contents differ in length");
         }
-        RegistryAccess registries = TestRegistries.frozen();
         int size = 0;
         for (int slot : slots) {
             size = Math.max(size, slot + 1);
@@ -166,6 +166,6 @@ public final class ItemFixtures {
         for (int i = 0; i < slots.length; i++) {
             stacks.set(slots[i], contents[i]);
         }
-        return ContainerHelper.saveAllItems(new CompoundTag(), stacks, registries);
+        return ContainerHelper.saveAllItems(new CompoundTag(), stacks);
     }
 }

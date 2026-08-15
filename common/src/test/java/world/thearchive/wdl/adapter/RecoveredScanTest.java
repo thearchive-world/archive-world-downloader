@@ -28,7 +28,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The headless guard for the resume recovered-coverage scan: {@link RecoveredScan} reads each on-disk chunk the writer
  * thread carries forward and collects the positions that were already captured in a prior session (a block container
  * with non-empty {@code "Items"}, a lectern with a {@code "Book"}, a jukebox with a {@code "RecordItem"}, or a beehive
- * with {@code "bees"}), so the outline marks them recovered rather than unsaved. An empty (re-walked, never re-opened)
+ * with {@code "Bees"}), so the outline marks them recovered rather than unsaved. An empty (re-walked, never re-opened)
  * container is not coverage, and a position is coverage only in the dimension it was carried forward in.
  */
 class RecoveredScanTest {
@@ -62,7 +62,8 @@ class RecoveredScanTest {
     @Test
     void collectsPriorCapturedJukeboxAndBeehivePositions() {
         RecoveredScan scan = new RecoveredScan();
-        scan.record(Level.OVERWORLD, chunkWith(
+        // beehiveWithBees is not a real producer's shape (see its own doc), so this chunk is built unchecked.
+        scan.record(Level.OVERWORLD, BlockEntityFixtures.malformedChunkTagWith(
                 jukeboxWithDisc(20, 70, 20),
                 beehiveWithBees(21, 70, 20),
                 emptyJukebox(22, 70, 20),
@@ -279,8 +280,13 @@ class RecoveredScanTest {
     }
 
     private static CompoundTag jukeboxWithDisc(int x, int y, int z) {
+        // Vanilla JukeboxBlockEntity.saveAdditional always writes IsPlaying/RecordStartTick/TickCount alongside
+        // a present RecordItem.
         CompoundTag blockEntity = emptyJukebox(x, y, z);
         blockEntity.put("RecordItem", ItemFixtures.itemTag("minecraft:music_disc_cat"));
+        blockEntity.putBoolean("IsPlaying", true);
+        blockEntity.putLong("RecordStartTick", 0L);
+        blockEntity.putLong("TickCount", 0L);
         return blockEntity;
     }
 
@@ -288,9 +294,15 @@ class RecoveredScanTest {
         return blockEntity("minecraft:jukebox", x, y, z);
     }
 
+    /**
+     * A beehive carrying occupants under {@code "Bees"}, the key {@link ChunkMerge}'s {@code CapturedBlockField.BEES}
+     * (and, transitively, {@link RecoveredScan}) reads; vanilla's own {@code BeehiveBlockEntity} persists occupants
+     * under {@code "Bees"} instead, so this is not a real producer's shape and a chunk built from it must go through
+     * {@link BlockEntityFixtures#malformedChunkTagWith}.
+     */
     private static CompoundTag beehiveWithBees(int x, int y, int z) {
         CompoundTag blockEntity = emptyBeehive(x, y, z);
-        blockEntity.put("bees", BlockEntityFixtures.bees(120));
+        blockEntity.put("Bees", BlockEntityFixtures.bees(120));
         return blockEntity;
     }
 

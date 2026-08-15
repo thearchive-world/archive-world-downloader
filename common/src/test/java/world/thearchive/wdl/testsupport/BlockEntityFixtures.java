@@ -3,20 +3,13 @@
 
 package world.thearchive.wdl.testsupport;
 
-import java.util.ArrayList;
-import java.util.List;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
@@ -43,25 +36,22 @@ public final class BlockEntityFixtures {
 
     /**
      * As {@link #blockEntity} for a block entity the player renamed, so a merge can be shown to leave a real sibling
-     * field alone. An invented probe key would serve the same test and fail the fidelity gate, since no vanilla writer
-     * emits it.
+     * field alone. Below 1.20.5 only a {@link net.minecraft.world.level.block.entity.BaseContainerBlockEntity} (a chest
+     * and the like) carries an arbitrary name; the raw {@code "CustomName"} JSON key written here is exactly what its
+     * {@code setCustomName} would write, so the fidelity round trip still passes for one.
      */
     public static CompoundTag namedBlockEntity(String id, int x, int y, int z, String customName) {
-        BlockEntity blockEntity = FixtureFidelity.newBlockEntity(id, x, y, z);
-        blockEntity.setComponents(DataComponentMap.builder()
-                .set(DataComponents.CUSTOM_NAME, Component.literal(customName))
-                .build());
-        return FixtureFidelity.save(blockEntity);
+        CompoundTag tag = blockEntity(id, x, y, z);
+        tag.putString("CustomName", Component.Serializer.toJson(Component.literal(customName)));
+        return tag;
     }
 
     /** The custom name a {@link #namedBlockEntity} tag carries, or {@code ""} when it carries none. */
     public static String customNameOf(CompoundTag blockEntityTag) {
-        RegistryAccess registries = TestRegistries.frozen();
-        Component name = DataComponentMap.CODEC
-                .parse(registries.createSerializationContext(NbtOps.INSTANCE), blockEntityTag.get("components"))
-                .result()
-                .map(components -> components.get(DataComponents.CUSTOM_NAME))
-                .orElse(null);
+        if (!blockEntityTag.contains("CustomName", Tag.TAG_STRING)) {
+            return "";
+        }
+        Component name = Component.Serializer.fromJson(blockEntityTag.getString("CustomName"));
         return name == null ? "" : name.getString();
     }
 
@@ -94,16 +84,23 @@ public final class BlockEntityFixtures {
         return holder;
     }
 
-    /** The {@code "bees"} list vanilla writes for one occupant per named {@code ticksInHive}. */
+    /**
+     * A {@code "Bees"}-shaped list of one occupant per named {@code ticksInHive}, the pre-component
+     * {@code {EntityData, TicksInHive, MinOccupationTicks}} entry vanilla's {@code BeehiveBlockEntity.load} reads
+     * (below 1.20.5 there is no {@code Occupant} record to encode through).
+     */
     public static ListTag bees(int... ticksInHive) {
-        List<BeehiveBlockEntity.Occupant> occupants = new ArrayList<>();
+        ListTag list = new ListTag();
         for (int ticks : ticksInHive) {
-            occupants.add(BeehiveBlockEntity.Occupant.create(ticks));
+            CompoundTag entityData = new CompoundTag();
+            entityData.putString("id", "minecraft:bee");
+            CompoundTag occupant = new CompoundTag();
+            occupant.put("EntityData", entityData);
+            occupant.putInt("TicksInHive", ticks);
+            occupant.putInt("MinOccupationTicks", 600);
+            list.add(occupant);
         }
-        RegistryAccess registries = TestRegistries.frozen();
-        return (ListTag) BeehiveBlockEntity.Occupant.LIST_CODEC
-                .encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), occupants)
-                .getOrThrow();
+        return list;
     }
 
     /**

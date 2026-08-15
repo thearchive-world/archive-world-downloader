@@ -12,9 +12,8 @@ import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.resources.RegistryOps;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.trading.ItemCost;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import org.jspecify.annotations.Nullable;
@@ -94,12 +93,12 @@ class EntityMergeTest {
         return tag;
     }
 
-    /** The Recipes offers holder vanilla's own MerchantOffers codec writes, one offer selling the given item. */
+    /** The Recipes offers holder vanilla's own {@code MerchantOffers.createTag} writes, one offer selling the item. */
     private static CompoundTag offersWith(String sellId) {
+        // Below 1.20.5 there is no ItemCost; a merchant offer's buy cost is a plain ItemStack.
         MerchantOffers offers = new MerchantOffers();
-        offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, 1), ItemFixtures.stack(sellId), 1, 0, 0.0f));
-        return (CompoundTag) MerchantOffers.CODEC
-                .encodeStart(RegistryOps.create(NbtOps.INSTANCE, TestRegistries.frozen()), offers).getOrThrow();
+        offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), ItemFixtures.stack(sellId), 1, 0, 0.0f));
+        return offers.createTag();
     }
 
     private static CompoundTag entitiesChunk(CompoundTag... villagers) {
