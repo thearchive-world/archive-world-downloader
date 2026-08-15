@@ -26,7 +26,6 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
@@ -63,7 +62,7 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.20.4 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
+ * 1.20.2 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
  * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
  * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
  * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
@@ -83,7 +82,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /**
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.20.4 id and carries no spec.
+     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.20.2 id and carries no spec.
      * The user's gamerule.* overrides, keyed by band id, are validated and applied on top of this (see
      * {@link WorldOutputConfig}).
      */
@@ -246,8 +245,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are dev's band-neutral keys; each maps to its 1.20.4 vanilla rule id here, and the newer bands'
-    // fire rule is dropped by omitting its spec, since 1.20.4 has no equivalent.
+    // The WDL names are dev's band-neutral keys; each maps to its 1.20.2 vanilla rule id here, and the newer bands'
+    // fire rule is dropped by omitting its spec, since 1.20.2 has no equivalent.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
@@ -286,7 +285,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
             return null;
         }
         try {
-            CompoundTag root = NbtIo.readCompressed(levelDatFile, NbtAccounter.unlimitedHeap());
+            CompoundTag root = NbtIo.readCompressed(levelDatFile.toFile());
             return root.get("Data") instanceof CompoundTag data && data.get("Player") instanceof CompoundTag player
                     ? player
                     : null;
