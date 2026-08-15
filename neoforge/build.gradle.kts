@@ -64,10 +64,24 @@ neoForge {
     // test cannot: it catches the automatic-module uses crash that a services array in
     // neoforge.mods.toml triggers. ServiceLoader resolution is then exercised
     // against the loaded mod's own classloader.
-    unitTest {
-        enable()
-        testedMod = mods[property("mod_id") as String]
+    // The FML-module smoke test needs the FancyModLoader JUnit helper (junit-fml), which this NeoForge line's
+    // FancyModLoader 2.0.x does not publish (see the neoforge_fml_unit_test note in gradle.properties). A band
+    // below that floor leaves the tier off and runs the NeoForge tests plain-classpath; bands above it omit the
+    // property, which then defaults to true.
+    if (providers.gradleProperty("neoforge_fml_unit_test").map { it.toBoolean() }.orElse(true).get()) {
+        unitTest {
+            enable()
+            testedMod = mods[property("mod_id") as String]
+        }
     }
+}
+
+// See the FML-module note above: with that tier off, net.neoforged.fml.* is not on the plain test classpath, so
+// the lone NeoForge test (the FML-module ServiceLoader smoke test) cannot compile and is excluded on this band.
+if (!providers.gradleProperty("neoforge_fml_unit_test").map { it.toBoolean() }.orElse(true).get()) {
+    sourceSets.named("test") { java.exclude("**/NeoForgeServiceResolutionTest.java") }
+    // Excluding the sole NeoForge test leaves the test task with nothing to run, which is intended on this band.
+    tasks.named<Test>("test") { failOnNoDiscoveredTests = false }
 }
 
 tasks.named<ProcessResources>("processResources") {

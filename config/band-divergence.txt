@@ -20,7 +20,9 @@
 # Registry.PendingTags are 1.21.2 and above), so this shared test bootstrap loads the WORLDGEN registries from the
 # getAccessForLoading base and binds each registry's tags with TagLoader.loadAndBuild plus Registry.bindTags, the
 # pre-1.21.2 forms. Below the 1.21 update the tags directory is TagManager.getTagDir rather than
-# Registries.tagsDirPath.
+# Registries.tagsDirPath. Below 1.20.5 Registry has no getHolder(ResourceLocation) overload (only int or
+# ResourceKey<T>), so the loader's id-to-value function builds the ResourceKey itself rather than passing the
+# method reference directly.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
 # Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
@@ -41,17 +43,25 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCapture
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
 
 # Below the 1.21.2 chunk-serialization cut vanilla has no SerializableChunkData.SectionData record, so this
-# chunk-snapshot seam defines its own band-stable SectionData carrier for the static-write codec.
+# chunk-snapshot seam defines its own band-stable SectionData carrier for the static-write codec. Below 1.20.5
+# ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 
 # Reads the captured section through the band's own ChunkSnapshotSource.SectionData rather than the vanilla
 # SerializableChunkData.SectionData that exists only at 1.21.2 and above. Below the 1.21 update there is no
 # jukebox_playable item component (a playable disc is a RecordItem instance), and a captured jukebox carries the
-# pre-JukeboxSongPlayer playing state (IsPlaying, RecordStartTick, TickCount).
+# pre-JukeboxSongPlayer playing state (IsPlaying, RecordStartTick, TickCount). Below 1.20.5 there are no item
+# components: the RecordItem write is ItemStack#save rather than ItemStack.CODEC, a placed shulker's contents are
+# read via BlockItem.getBlockEntityData plus ContainerHelper.loadAllItems rather than DataComponents.CONTAINER,
+# and a placed beehive's occupants are its BlockEntityTag.Bees list rather than DataComponents.BEES. This band's
+# java_version is 17, not 21, so pattern-matching switch over the sealed Candidate type is unavailable (a Java 21
+# feature); confirm() is an if/instanceof chain instead.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
 # Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
-# ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying.
+# ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying. Below 1.20.5 the
+# beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so this field
+# carries that key rather than bees.
 common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 
 # Below 1.21.2 the entity position wire differs: the absolute-only ClientboundTeleportEntityPacket replaces the
@@ -63,19 +73,26 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 # Below 1.21.2 there is no chunk unsaved-listener, so re-capture polls isUnsaved over the keep-hot buffer here;
 # it also reads the band's ChunkSnapshotSource.SectionData and reconstructs entities via the pre-spawn-reason
 # EntityType.create(Level). Below the 1.21 update leash state lives on Mob rather than the Leashable interface, so
-# the reconstruct path rebinds a saved leash via Mob.setLeashedTo.
+# the reconstruct path rebinds a saved leash via Mob.setLeashedTo. Below 1.20.5 ChunkStatus is in
+# net.minecraft.world.level.chunk, not the .status subpackage, and Level.getMapData is keyed by the raw String
+# MapItem.makeKey returns rather than a MapId. Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer
+# opens the vanilla IOWorker through WorldPaths (openRegionStorage/openEntitiesStorage) rather than constructing
+# one directly.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
 # The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
-# below the cut) and read the biome registry via registryOrThrow and the section floor via getMinSection.
+# below the cut) and read the biome registry via registryOrThrow and the section floor via getMinSection. Below
+# 1.20.5 ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update.
 common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
 
 # Below 1.21.2 the Mob constructor reads level.getProfilerSupplier(), so a mob cannot be built against a null level;
 # this headless Level supplies the overworld dimension type, the vanilla registries, and an inactive profiler. New at
-# this band.
+# this band. Below 1.20.5 LevelAccessor.gameEvent takes a raw GameEvent rather than a Holder<GameEvent>,
+# Level.getMapData/setMapData are keyed by a String rather than a MapId, getFreeMapId returns an int rather than a
+# MapId, and Level has no potionBrewing accessor to override.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
 
 # Builds the section's biome registry via registryOrThrow, the pre-1.21.2 form (lookupOrThrow returns a
@@ -84,7 +101,10 @@ common/src/test/java/world/thearchive/wdl/testsupport/RegistriesSmokeTest.java
 
 # Resolves an item by id via Registry.get, the pre-1.21.2 accessor (renamed getValue at 1.21.2). Below the 1.21
 # update ResourceLocation has no parse factory, so an id string is built with the public ResourceLocation(String)
-# constructor.
+# constructor. Below 1.20.5 there are no item components: a custom name is set via ItemStack#setHoverName, a
+# single stored stack is written with ItemStack#save (a {id, Count, tag} compound with Count as a byte, not the
+# int ItemStack.CODEC on this band would write), a written book's title/author/pages live directly on the item's
+# tag, and ContainerHelper.saveAllItems takes no registries argument.
 common/src/test/java/world/thearchive/wdl/testsupport/ItemFixtures.java
 
 # Below 1.21.2 ChunkSerializer.read needs a ServerLevel the headless test lacks, so the round-trip proves
@@ -96,19 +116,27 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
 common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkCodecImplTest.java
 
 # Below 1.21.2 there is no ChunkPos.CODEC, so the entities-region Position is read back as its {x, z} int array, the
-# pre-1.21.2 EntityStorage form the sink writes.
+# pre-1.21.2 EntityStorage form the sink writes. Below the 1.20.6 cut there is no SimpleRegionStorage or
+# RegionStorageInfo, so the round trip opens the vanilla IOWorker through WorldPaths (store/loadAsync) rather than
+# constructing one directly.
 common/src/test/java/world/thearchive/wdl/adapter/EntityRoundTripTest.java
 
 # Constructs GameRules from a Dynamic via the pre-1.21.2 single-argument constructor (the feature-flag-filtered
-# constructor is 1.21.2 and above).
+# constructor is 1.21.2 and above). Below 1.20.5 RegistryAccess has no createSerializationContext, so the ops are
+# built via RegistryOps.create(NbtOps.INSTANCE, registries); its DataResult.getOrThrow also takes (boolean,
+# Consumer<String>), not the no-argument form.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
 
 # The headless entity double overrides hurt(DamageSource, float), the pre-1.21.2 damage entry point (the
-# ServerLevel-taking hurtServer is 1.21.2 and above).
+# ServerLevel-taking hurtServer is 1.21.2 and above). Below 1.20.5 Entity.defineSynchedData is no-arg (the
+# SynchedEntityData.Builder parameter is 1.20.5 and above), so the double overrides that form too.
 common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
 
 # The headless entity double overrides hurt(DamageSource, float), the pre-1.21.2 damage entry point (the
-# ServerLevel-taking hurtServer is 1.21.2 and above).
+# ServerLevel-taking hurtServer is 1.21.2 and above). Below 1.20.5 Entity.defineSynchedData is no-arg, so the
+# double overrides that form too; below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the
+# read-back open the vanilla IOWorker through WorldPaths; and below 1.20.5 there is no ItemCost, so a merchant
+# offer's buy cost is a plain ItemStack.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
 
 # The headless mob double overrides hurt(DamageSource, float) (hurtServer with a ServerLevel is 1.21.2 and above) and
@@ -127,7 +155,10 @@ common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the HUD-layer id is built with the
-# public ResourceLocation(String, String) constructor.
+# public ResourceLocation(String, String) constructor. NeoForge 20.4 registers the HUD through
+# RegisterGuiOverlaysEvent plus an IGuiOverlay (RegisterGuiLayersEvent is later), the config screen through
+# ConfigScreenHandler.ConfigScreenFactory (not IConfigScreenFactory), and @Mod has no dist element; the
+# client-only declaration lives in neoforge.mods.toml's side = "CLIENT" dependency entries instead.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
 
 # JourneyMap 5.10.0 for this version uses the older 1.9 API generation (journeymap.client.api), so this plugin binds
@@ -147,17 +178,219 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.jav
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
-# with the public ResourceLocation(String, String) constructor.
+# with the public ResourceLocation(String, String) constructor. Below 1.20.5 ContainerHelper.loadAllItems takes no
+# registries argument.
 common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 
 # Below the 1.21 update ResourceLocation has no parse factory, so a block-entity id string is built with the public
-# ResourceLocation(String) constructor.
+# ResourceLocation(String) constructor. Below 1.20.5 BlockEntity.saveWithFullMetadata and loadStatic take no
+# Provider, and ContainerHelper.loadAllItems/saveAllItems take no registries argument.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
 
 # Below the 1.21 update a captured jukebox carries the pre-JukeboxSongPlayer playing flag (IsPlaying) rather than
-# the ticks_since_song_started sidecar, so these merge fixtures and assertions use that key.
+# the ticks_since_song_started sidecar, so these merge fixtures and assertions use that key. Below 1.20.5 a beehive
+# block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and vanilla's
+# JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount alongside a present RecordItem, so the
+# jukebox fixture carries those too and the beehive fixture goes through the unchecked malformedChunkTagWith
+# instead of the fidelity-checked chunkTagWith.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
 
 # Below the 1.21 update a captured jukebox is marked playing via IsPlaying rather than the ticks_since_song_started
-# sidecar, so this round-trip asserts the playing flag.
+# sidecar, so this round-trip asserts the playing flag. Below 1.20.5 there are no item components: the RecordItem
+# write is ItemStack#save (read back via vanilla's own ItemStack.of) and the beehive occupants are the
+# pre-component {EntityData, TicksInHive, MinOccupationTicks} entries under Bees rather than Occupant.LIST_CODEC.
 common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage or RegionStorageInfo, so the region storage this writer
+# drains against is the vanilla IOWorker (store/loadAsync/synchronize/close), opened per dimension through
+# WorldPaths.
+common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the merge-write reads and writes through the vanilla
+# IOWorker's loadAsync and store rather than read and write.
+common/src/main/java/world/thearchive/wdl/adapter/RegionChunkWriter.java
+
+# Below the 1.20.6 cut there is no RegionStorageInfo; instead of supplying one per dimension, this seam opens the
+# vanilla IOWorker directly (openRegionStorage/openEntitiesStorage).
+common/src/main/java/world/thearchive/wdl/adapter/WorldPaths.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the drain is proven against the vanilla IOWorker (a
+# test-local subclass reaches its protected constructor) rather than constructing one via
+# RegionStorageInfo/DataFixers. Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
+common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the prior-write and read-back open the vanilla IOWorker
+# through WorldPaths rather than constructing one directly.
+common/src/test/java/world/thearchive/wdl/adapter/BookshelfOccupancyFlushTest.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the prior-write and read-back open the vanilla IOWorker
+# through WorldPaths rather than constructing one directly.
+common/src/test/java/world/thearchive/wdl/adapter/CarryForwardWiringTest.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the entity read-back open the vanilla
+# IOWorker through WorldPaths. Below 1.20.5 a filled map's id is the raw int tag."map", not a components entry,
+# and DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+common/src/test/java/world/thearchive/wdl/adapter/EntityVehicleRelocationTest.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the entity read-back open the vanilla
+# IOWorker through WorldPaths. Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the
+# no-argument form.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the sweep is proven against the vanilla IOWorker (a
+# test-local subclass reaches its protected constructor). Below 1.20.5 ContainerHelper.loadAllItems takes no
+# registries argument.
+common/src/test/java/world/thearchive/wdl/adapter/OrphanedContainerSweepTest.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage or RegionStorageInfo, so this integration test drives the
+# vanilla IOWorker opened through WorldPaths (store/loadAsync/synchronize/close) rather than constructing one
+# directly.
+common/src/test/java/world/thearchive/wdl/adapter/RegionIntegrationTest.java
+
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so this drives the vanilla IOWorker directly (a test-local
+# subclass reaches its protected constructor) rather than the newer wrapper.
+common/src/test/java/world/thearchive/wdl/testsupport/RegionRoundTrip.java
+
+# Below 1.20.5 ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
+
+# Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+common/src/main/java/world/thearchive/wdl/adapter/PlayerTag.java
+
+# Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressSerializer.java
+
+# Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+common/src/test/java/world/thearchive/wdl/testsupport/EntityFixtures.java
+
+# Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+common/src/test/java/world/thearchive/wdl/adapter/PriorPlayerReadRoundTripTest.java
+
+# Below 1.20.5 RegistryAccess has no createSerializationContext, so the ops are built via
+# RegistryOps.create(NbtOps.INSTANCE, registries); its DataResult.getOrThrow also takes (boolean, Consumer<String>),
+# not the no-argument form.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
+
+# 1.20.4 CompoundTag.get returns a non-null Tag, so a carry-forward reads it with a null check rather than a
+# redundant instanceof-Tag pattern.
+common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
+
+# Below 1.20.5 an item is {id, Count, tag}; the walk recurses into a shulker's nested items via
+# tag.BlockEntityTag.Items and a bundle's via tag.Items, rather than the minecraft:container/minecraft:bundle_contents
+# components.
+common/src/main/java/world/thearchive/wdl/adapter/ItemTreeWalk.java
+
+# Below 1.20.5 a filled map's id is the raw int tag."map", not a minecraft:map_id component, so the remap reads
+# and writes that key directly rather than through MapId.CODEC.
+common/src/main/java/world/thearchive/wdl/adapter/MapIdRemap.java
+
+# Below 1.20.5 a filled map's id is the raw int tag."map", not a minecraft:map_id component, so the collector
+# reads that key directly rather than through MapId.CODEC.
+common/src/main/java/world/thearchive/wdl/adapter/MapIdCollector.java
+
+# Below 1.20.5 there is no BundleContents component; a bundle mutates its stack's tag."Items" list in place, so
+# the change signal snapshots a value copy of that tag rather than reference-comparing the (immutable,
+# always-swapped) component.
+common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
+
+# Below 1.20.5 MerchantOffers has no CODEC, so the offers holder is written via the vanilla
+# MerchantOffers.createTag (a lenient NBT write that never rejects an offer) rather than encoding through
+# RegistryOps; the per-villager isolation of a rejecting serialize is inert on this band but kept because the
+# caller is band-stable.
+common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
+
+# Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the
+# raw LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position (carried
+# by a pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and
+# tag.BlockEntityTag.FlowerPos, both scrubbed here.
+common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
+
+# Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerMergeRoundTripTest.java
+
+# Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerRecaptureSynergyTest.java
+
+# Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerStashMergeTest.java
+
+# Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
+common/src/test/java/world/thearchive/wdl/adapter/EntityContainerStashMergeTest.java
+
+# Below 1.20.5 there is no ItemCost, so a merchant offer's buy cost is a plain ItemStack, and MerchantOffers has
+# no CODEC, so the offers holder is built via MerchantOffers.createTag rather than encoding through RegistryOps.
+common/src/test/java/world/thearchive/wdl/adapter/EntityMergeTest.java
+
+# Below 1.20.5 there are no item components: a placed shulker's contents and a placed beehive's occupants live
+# under the item's tag.BlockEntityTag (Items / Bees) rather than DataComponents.CONTAINER/BEES, and
+# InteractionCapture.captureRecordItem/captureBees take no registries argument.
+common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
+
+# Below 1.20.5 there are no item components: the lodestone target is the raw LodestonePos/LodestoneDimension/
+# LodestoneTracked keys vanilla's CompassItem.addLodestoneTags writes, a beehive item's occupants and the hive's
+# own flower position are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and tag.BlockEntityTag.FlowerPos,
+# shulker and bundle contents live under tag.BlockEntityTag.Items and tag.Items, ContainerHelper.loadAllItems
+# takes no registries argument, and DataResult.getOrThrow takes (boolean, Consumer<String>).
+common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
+
+# Below 1.20.5 an item is {id, Count, tag}; the walk drives hand-built NBT keyed by tag.BlockEntityTag.Items (a
+# shulker) and tag.Items (a bundle) rather than the component keys, and there is no sulfur cube to recurse into.
+common/src/test/java/world/thearchive/wdl/adapter/ItemTreeWalkTest.java
+
+# Below 1.20.5 there is no WrittenBookContent component; a written book's title/author/generation/resolved and its
+# pages live directly on the item's tag, so the fixture and the read-back build/read that shape.
+common/src/test/java/world/thearchive/wdl/adapter/LecternRecaptureSynergyTest.java
+
+# Below 1.20.5 there are no WrittenBookContent/WritableBookContent components; a written book's
+# title/author/generation/resolved and its pages (JSON-component strings) live on the item's tag, an unsigned
+# book's pages are plain strings, and the read-back is vanilla's own ItemStack.of rather than ItemStack.CODEC.
+common/src/test/java/world/thearchive/wdl/adapter/LecternSinkRoundTripTest.java
+
+# Below 1.20.5 there is no WrittenBookContent component; a written book's title/author/generation/resolved and its
+# pages live directly on the item's tag, so the fixture and the read-back build/read that shape.
+common/src/test/java/world/thearchive/wdl/adapter/LecternStashMergeTest.java
+
+# Below 1.20.5 MapItemSavedData.load takes only the tag, not a registries argument.
+common/src/test/java/world/thearchive/wdl/adapter/MapSinkRoundTripTest.java
+
+# Below 1.20.5 there is no BundleContents component; a bundle mutates its stack's tag."Items" list in place, so
+# the in-place-mutation fixture swaps that tag rather than the component.
+common/src/test/java/world/thearchive/wdl/adapter/MenuChangeTrackerTest.java
+
+# Below 1.20.5 there are no item components: the lodestone target is the raw LodestonePos/LodestoneDimension/
+# LodestoneTracked keys, a filled map's id is the raw int tag."map", and there is no ItemCost, so a merchant
+# offer's buy cost is a plain ItemStack. The sell item's fields are read off its tag rather than its components
+# map.
+common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
+
+# Below 1.20.5 there is no ItemCost, so a merchant offer's buy cost is a plain ItemStack, and MerchantOffers has
+# no CODEC, so the offers holder is built via MerchantOffers.createTag rather than encoding through RegistryOps.
+common/src/test/java/world/thearchive/wdl/adapter/MerchantStashMergeTest.java
+
+# Below 1.20.5 a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and
+# vanilla's JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount alongside a present
+# RecordItem, so the fixtures carry those too and the beehive fixture goes through the unchecked
+# malformedChunkTagWith instead of the fidelity-checked chunkTagWith.
+common/src/test/java/world/thearchive/wdl/adapter/RecoveredScanTest.java
+
+# Below 1.20.5 only a BaseContainerBlockEntity carries an arbitrary custom name, written as the raw CustomName
+# JSON key rather than the minecraft:custom_name component, and a beehive's occupants are the pre-component
+# {EntityData, TicksInHive, MinOccupationTicks} entries under Bees rather than an Occupant.LIST_CODEC encode.
+common/src/test/java/world/thearchive/wdl/testsupport/BlockEntityFixtures.java
+
+# Below 1.20.5 an item's count is the raw Count byte (not a components-map int), so a hand-built entry without it
+# is silently dropped by ContainerHelper.saveAllItems rather than round-tripping with a single named key missing.
+common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelityTest.java
+
+# Below 1.20.5 there are no item components: a filled map's id is the raw int tag."map", and a shulker's/bundle's
+# nested contents live under tag.BlockEntityTag.Items and tag.Items.
+common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
+
+# NeoForge 20.4's tick event is TickEvent.ClientTickEvent gated by a phase check (event.phase ==
+# TickEvent.Phase.END) rather than ClientTickEvent.Post.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgePlatformBridge.java
+
+# This band leaves the FML-module test tier off (no junit-fml for FancyModLoader 2.0.x), so this lone FML-module
+# ServiceLoader smoke test is excluded from the build; it carries the 1.20.4 @Mod form (no dist element) for when
+# the tier returns.
+neoforge/src/test/java/world/thearchive/wdl/neoforge/NeoForgeServiceResolutionTest.java
