@@ -153,6 +153,8 @@ public final class WdlDownloadsScreen extends Screen {
     private @Nullable DownloadEntry selectedEntry;
     private boolean suppressNameResponder;
 
+    private @Nullable Runnable pendingTooltip;
+
     // The capture state init() last built its widgets for; tick() rebuilds when the live state diverges, so a
     // flip between idle and capturing swaps the whole widget set rather than leaving a stale control on screen.
     private CaptureState builtForState = CaptureState.IDLE;
@@ -866,6 +868,17 @@ public final class WdlDownloadsScreen extends Screen {
     }
 
     @Override
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
+        // Drawing a tooltip during the row render clips it against the list's scissor; deferring it to after
+        // the list lets it paint past the scissor.
+        if (this.pendingTooltip != null) {
+            this.pendingTooltip.run();
+            this.pendingTooltip = null;
+        }
+    }
+
+    @Override
     public void tick() {
         CaptureState state = this.captureState.get();
         if (state != this.builtForState) {
@@ -1200,7 +1213,8 @@ public final class WdlDownloadsScreen extends Screen {
                         drawRestoreChip(surface, restoreChip, this.restoreLeft, y,
                                 overRestore ? LINK_HOVER_ARGB : RECOVER_ARGB);
                         if (overRestore) {
-                            surface.tooltip(font, restoreTooltip(source), TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
+                            pendingTooltip = () -> surface.tooltip(font, restoreTooltip(source),
+                                    TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
                         }
                         slotRight = this.restoreLeft - 4;
                     }
@@ -1210,10 +1224,10 @@ public final class WdlDownloadsScreen extends Screen {
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
                         // With the Restore chip present the tooltip drops the fresh-download advice: the
                         // chip beside it is the better way out.
-                        surface.tooltip(font, Component.translatable(restorable
+                        Component taintedTip = Component.translatable(restorable
                                 ? "wdl.screen.downloads.tooltip.tainted_restorable"
-                                : "wdl.screen.downloads.tooltip.tainted"),
-                                TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
+                                : "wdl.screen.downloads.tooltip.tainted");
+                        pendingTooltip = () -> surface.tooltip(font, taintedTip, TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
                     }
                     slotLeft = chipLeft;
                 } else if (this.entry.health() == DownloadHealth.RECOVERABLE) {
@@ -1229,8 +1243,8 @@ public final class WdlDownloadsScreen extends Screen {
                     int chipLeft = slotRight - font.width(chip);
                     surface.text(font, chip, chipLeft, y, PARTIAL_ARGB);
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
-                        surface.tooltip(font, Component.translatable("wdl.toast.partial.title"), TOOLTIP_WRAP_WIDTH,
-                                mouseX, mouseY);
+                        pendingTooltip = () -> surface.tooltip(font,
+                                Component.translatable("wdl.toast.partial.title"), TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
                     }
                     slotLeft = chipLeft;
                 } else {
@@ -1244,7 +1258,7 @@ public final class WdlDownloadsScreen extends Screen {
                 }
 
                 if (overArrow) {
-                    surface.tooltip(font, List.of(
+                    pendingTooltip = () -> surface.tooltip(font, List.of(
                             Component.translatable("wdl.screen.downloads.tooltip.folder", entry.folderName()),
                             Component.translatable("wdl.screen.downloads.tooltip.version", modVersion, mcVersion)),
                             mouseX, mouseY);
