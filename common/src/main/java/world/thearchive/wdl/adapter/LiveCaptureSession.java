@@ -3559,7 +3559,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // where the overworld sits at the save root (1.21.11 and earlier); at 26.x DimensionType
             // .getStorageFolder puts every dimension under dimensions/minecraft/<name>, so getDimensionPath here
             // would root WorldPaths, the map manifest and the export zip one dimension too deep.
-            Path saveRoot = access.getLevelPath(LevelResource.ROOT);
+            // getLevelDirectory does not exist at 1.20.2, so the level directory is taken from getLevelPath(ROOT) here.
+            // LevelResource.ROOT's id is a bare dot, so that path ends in a dot component; normalize it, or the
+            // export derives its zip name and parent directory from getFileName and getParent on the dot and lands
+            // the archive inside the save folder it is zipping.
+            Path saveRoot = access.getLevelPath(LevelResource.ROOT).normalize();
             WorldPaths paths = adapter.worldPaths(saveRoot);
             this.worldPaths = paths;
             this.mapIdsFile = MapManifest.pathIn(saveRoot);

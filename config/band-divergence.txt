@@ -79,7 +79,8 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 # opens the vanilla IOWorker through WorldPaths (openRegionStorage/openEntitiesStorage) rather than constructing
 # one directly. Below 1.20.3 there is no Crafter menu or block entity, so the crafter open-bind and stash legs are
 # dropped; NbtIo.readCompressed takes a File with no NbtAccounter; and the world save root is read via
-# getLevelPath(LevelResource.ROOT), the pre-getLevelDirectory form.
+# getLevelPath(LevelResource.ROOT).normalize(), the pre-getLevelDirectory form (normalized because ROOT's bare-dot
+# id would otherwise misplace the export zip).
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
