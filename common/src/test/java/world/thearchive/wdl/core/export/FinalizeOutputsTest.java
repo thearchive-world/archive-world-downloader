@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,6 +38,38 @@ class FinalizeOutputsTest {
 
         assertTrue(Files.exists(saves.resolve("world.zip")), "the export zip lands beside the folder");
         assertTrue(Files.exists(folder.resolve("level.dat")), "the openable folder is untouched");
+    }
+
+    @Test
+    void exportOnDotSuffixedRootLandsBesideTheFolderNotInsideIt(@TempDir Path saves) throws IOException {
+        Path folder = saveFolder(saves);
+        // The shape the level directory takes below 1.20.5, where it is read through LevelResource.ROOT, whose id
+        // is a bare dot, so the path arrives ending in a dot component.
+        Path dotSuffixed = folder.resolve(".");
+
+        String written = FinalizeOutputs.exportZip(dotSuffixed, true, new SaveProgress());
+
+        assertEquals("world.zip", written, "the archive is named for the folder, not the dot component");
+        assertTrue(Files.exists(saves.resolve("world.zip")),
+                "the export lands in the saves directory, beside the folder");
+        try (Stream<Path> inside = Files.list(folder)) {
+            assertFalse(inside.anyMatch(path -> path.getFileName().toString().endsWith(".zip")),
+                    "no archive is ever created inside the folder being zipped");
+        }
+    }
+
+    @Test
+    void compressingReachesFullWithStaleStagingFileInTheFolder(@TempDir Path saves) throws IOException {
+        Path folder = saveFolder(saves);
+        // A leftover staging file from an earlier run; the zip skips it, so the size denominator must skip it too or
+        // the compressing bar never reaches full.
+        Files.write(folder.resolve("wdl-export-stale.part"), new byte[10_000]);
+        SaveProgress progress = new SaveProgress();
+
+        FinalizeOutputs.exportZip(folder, true, progress);
+
+        assertEquals(1.0f, progress.fraction(), 0.0f,
+                "the compressing bar reaches full: the size denominator excludes the staging file the zip also skips");
     }
 
     @Test
@@ -124,6 +157,21 @@ class FinalizeOutputsTest {
         FinalizeOutputs.backupBeforeResume(folder, DownloadMode.RESUME, false);
 
         assertFalse(Files.exists(saves.resolve("world-pre-resume.zip")), "zipOnResume off skips the backup");
+    }
+
+    @Test
+    void resumeBackupOnDotSuffixedRootLandsBesideTheFolder(@TempDir Path saves) throws IOException {
+        Path folder = saveFolder(saves);
+        Path dotSuffixed = folder.resolve(".");
+
+        FinalizeOutputs.backupBeforeResume(dotSuffixed, DownloadMode.RESUME, true);
+
+        assertTrue(Files.exists(saves.resolve("world-pre-resume.zip")),
+                "the resume backup lands beside the folder on a dot-suffixed root too");
+        try (Stream<Path> inside = Files.list(folder)) {
+            assertFalse(inside.anyMatch(path -> path.getFileName().toString().endsWith(".zip")),
+                    "no backup is created inside the folder being zipped");
+        }
     }
 
     @Test
