@@ -177,8 +177,8 @@ public final class JourneyMapOverlayDriver {
                 return;
             }
             if (clientTicks - lastDispatchTick < REBUILD_DEBOUNCE_TICKS) {
-                // Inside the debounce window: leave lastGen unchanged so this change is not marked seen, and a
-                // later tick dispatches it once the window passes.
+                // Inside the debounce window: leave lastGeneration unchanged so this change is not marked seen,
+                // and a later tick dispatches it once the window passes.
                 return;
             }
             lastGeneration = generation;
