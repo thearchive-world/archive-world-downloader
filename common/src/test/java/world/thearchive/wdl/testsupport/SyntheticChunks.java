@@ -88,9 +88,9 @@ public final class SyntheticChunks {
         Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
         int minSectionY = heightAccessor().getMinSection();
 
-        LevelChunkSection bottom = new LevelChunkSection(biomeRegistry);
+        LevelChunkSection bottom = new LevelChunkSection(minSectionY, biomeRegistry);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
-        LevelChunkSection air = new LevelChunkSection(biomeRegistry);
+        LevelChunkSection air = new LevelChunkSection(minSectionY + 1, biomeRegistry);
 
         List<ChunkSnapshotSource.SectionData> sections = new ArrayList<>();
         sections.add(new ChunkSnapshotSource.SectionData(minSectionY, bottom, null, null));
@@ -138,7 +138,7 @@ public final class SyntheticChunks {
      */
     public static ChunkSnapshotSource withBlockAt(RegistryAccess registries, BlockPos worldPos, BlockState state) {
         Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
-        LevelChunkSection section = new LevelChunkSection(biomeRegistry);
+        LevelChunkSection section = new LevelChunkSection(worldPos.getY() >> 4, biomeRegistry);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
         List<ChunkSnapshotSource.SectionData> sections = List
                 .of(new ChunkSnapshotSource.SectionData(worldPos.getY() >> 4, section, null, null));
@@ -168,7 +168,7 @@ public final class SyntheticChunks {
     private static ChunkSnapshotSource withBlockEntityAt(RegistryAccess registries, BlockPos worldPos,
             BlockState state, CompoundTag blockEntity, boolean checkShape) {
         Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
-        LevelChunkSection section = new LevelChunkSection(biomeRegistry);
+        LevelChunkSection section = new LevelChunkSection(worldPos.getY() >> 4, biomeRegistry);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
         List<ChunkSnapshotSource.SectionData> sections = List
                 .of(new ChunkSnapshotSource.SectionData(worldPos.getY() >> 4, section, null, null));
@@ -187,9 +187,9 @@ public final class SyntheticChunks {
         Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
         int minSectionY = heightAccessor().getMinSection();
 
-        LevelChunkSection bottom = new LevelChunkSection(biomeRegistry);
+        LevelChunkSection bottom = new LevelChunkSection(minSectionY, biomeRegistry);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
-        LevelChunkSection air = new LevelChunkSection(biomeRegistry);
+        LevelChunkSection air = new LevelChunkSection(minSectionY + 1, biomeRegistry);
 
         List<ChunkSnapshotSource.SectionData> sections = new ArrayList<>();
         sections.add(new ChunkSnapshotSource.SectionData(minSectionY - 1, null, null,

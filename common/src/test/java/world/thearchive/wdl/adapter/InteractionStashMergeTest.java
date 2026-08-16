@@ -32,6 +32,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
@@ -390,6 +391,7 @@ class InteractionStashMergeTest {
     // consume it (a book, a playable disc), so a content block placed against that face falls through to a place
     // capture instead of being dropped.
 
+    @Disabled("chiseled bookshelf is UPDATE_1_20-experimental at 1.19.4; bookshelf_books is empty headless")
     @Test
     void bookshelfInsertRecognizesBookAtHitSlot() {
         InteractionCapture capture = plainCapture(sink, registries, true);
@@ -414,6 +416,7 @@ class InteractionStashMergeTest {
         assertTrue(capture.pendingCandidateChunks().isEmpty(), "no phantom bookshelf candidate is stashed");
     }
 
+    @Disabled("chiseled bookshelf is UPDATE_1_20-experimental at 1.19.4; bookshelf_books is empty headless")
     @Test
     void bookshelfInsertNotifiesTheCapturedSlotSink() {
         long[] sinkPos = { 0L };
@@ -570,6 +573,7 @@ class InteractionStashMergeTest {
                 "re-placing an empty beehive at the same pos clears the stale prediction");
     }
 
+    @Disabled("chiseled bookshelf is UPDATE_1_20-experimental at 1.19.4; bookshelf_books is empty headless")
     @Test
     void bookshelfInsertCapturesOneBookNotTheWholeStack() {
         InteractionCapture capture = plainCapture(sink, registries, true);

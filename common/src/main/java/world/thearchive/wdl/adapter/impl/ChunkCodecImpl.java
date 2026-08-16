@@ -45,7 +45,7 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.20.1 chunk codec: replicates the minimal client-safe slice of vanilla
+ * 1.19.4 chunk codec: replicates the minimal client-safe slice of vanilla
  * {@code ChunkSerializer.write(ServerLevel, ChunkAccess)} to NBT. Below the 1.21.2 cut the chunk write is a static
  * method that reads from a {@code ServerLevel} a multiplayer client never has, so {@link #encode} rebuilds the tag
  * field by field from the captured snapshot rather than calling vanilla.
@@ -82,7 +82,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
 
         LevelLightEngine lightEngine = level.getChunkSource().getLightEngine();
         if (lightEngine.hasLightWork()) {
-            lightEngine.runLightUpdates();
+            lightEngine.runUpdates(Integer.MAX_VALUE, true, true);
         }
         boolean lightCorrect = chunk.isLightCorrect();
 
@@ -102,7 +102,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
             }
             if (inChunk || blockLight != null || skyLight != null) {
                 sectionData.add(new ChunkSnapshotSource.SectionData(sectionY,
-                        inChunk ? copySection(sections[index]) : null, blockLight, skyLight));
+                        inChunk ? copySection(sectionY, sections[index]) : null, blockLight, skyLight));
             }
         }
 
@@ -208,12 +208,13 @@ public final class ChunkCodecImpl implements ChunkCodec {
     /**
      * A detached copy of a live section. Below 1.21.2 LevelChunkSection has no copy() and its returned biome view has
      * no copy() either, but a live client section always backs its biomes with a mutable PalettedContainer, so the copy
-     * goes through that concrete type. Post-capture edits mutate the block states, so those are copied outright.
+     * goes through that concrete type. Post-capture edits mutate the block states, so those are copied outright. Below
+     * 1.20 the constructor also takes the section y-index, so the caller threads it through.
      */
     @SuppressWarnings("unchecked")
-    private static LevelChunkSection copySection(LevelChunkSection section) {
+    private static LevelChunkSection copySection(int sectionY, LevelChunkSection section) {
         PalettedContainer<Holder<Biome>> biomes = (PalettedContainer<Holder<Biome>>) section.getBiomes();
-        return new LevelChunkSection(section.getStates().copy(), biomes.copy());
+        return new LevelChunkSection(sectionY, section.getStates().copy(), biomes.copy());
     }
 
     /** A detached copy of a stored layer, or null when the engine holds none (empty layers are omitted). */

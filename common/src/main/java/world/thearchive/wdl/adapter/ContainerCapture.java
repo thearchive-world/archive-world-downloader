@@ -149,7 +149,7 @@ final class ContainerCapture {
         // between it and the capture tick. The rule still decides; this only withholds an input it cannot use.
         boolean spectator = player.isSpectator();
         boolean blockOpensForSpectator = spectator && blockHit != null
-                && spectatorCouldOpen(player.level(), blockHit.getBlockPos());
+                && spectatorCouldOpen(player.level, blockHit.getBlockPos());
         SpectatorCrosshairFallback.Axis axis = SpectatorCrosshairFallback.axisFor(spectator,
                 loaderObservesSpectatorBlockClick, loaderObservesSpectatorEntityClick, blockHit != null,
                 entityHit != null, blockOpensForSpectator);

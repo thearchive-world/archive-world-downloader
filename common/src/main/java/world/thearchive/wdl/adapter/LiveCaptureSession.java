@@ -1077,7 +1077,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         Entity camera = minecraft.getCameraEntity();
         // The level guard is mod-compatibility armor, not a live case: vanilla resolves the camera entity in
         // the current level and nulls it on a level swap.
-        return camera != null && camera.level() == this.level() ? camera : player;
+        return camera != null && camera.level == this.level() ? camera : player;
     }
 
     /**

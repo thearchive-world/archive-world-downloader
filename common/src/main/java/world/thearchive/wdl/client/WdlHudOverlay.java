@@ -3,12 +3,12 @@
 
 package world.thearchive.wdl.client;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.logging.LogUtils;
 import java.util.OptionalLong;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.Mth;
@@ -85,7 +85,7 @@ public final class WdlHudOverlay {
     }
 
     /** Draw one frame; called per render from each loader's registered HUD element/layer. */
-    public static void render(GuiGraphics guiGraphics, float partialTick) {
+    public static void render(PoseStack poseStack, float partialTick) {
         try {
             Minecraft minecraft = Minecraft.getInstance();
             HudConfig config = Wdl.config().hud();
@@ -98,7 +98,7 @@ public final class WdlHudOverlay {
                 return; // idle, or past the done linger: the overlay draws nothing
             }
             boolean detailed = config.detailed() || isPeeking(config);
-            draw(new RenderSurfaceImpl(guiGraphics), minecraft.font, config, frame, detailed);
+            draw(new RenderSurfaceImpl(poseStack), minecraft.font, config, frame, detailed);
         } catch (RuntimeException e) {
             // A per-frame draw must never crash the HUD pass or spam the log; surface the first failure only.
             if (!errorLogged) {

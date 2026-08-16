@@ -29,6 +29,6 @@ class RegistriesSmokeTest {
         assertNotNull(registries.lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.PLAINS));
 
         // The biome-registry read the 1.21.1 chunk codec makes when it builds a section.
-        assertNotNull(new LevelChunkSection(registries.registryOrThrow(Registries.BIOME)));
+        assertNotNull(new LevelChunkSection(0, registries.registryOrThrow(Registries.BIOME)));
     }
 }

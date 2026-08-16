@@ -16,7 +16,7 @@ import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.core.RimFace;
 
 /**
- * The 1.20.1 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
+ * The 1.19.4 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
  * {@link RenderType#lines()} type, camera-relative. The rectangle's two in-plane axes come from the block cell and its
  * normal axis from the model shape, lifted a small standoff along the face normal, so the rim frames a recessed model
  * (a chest) at block extent yet never z-fights a flush one. Each edge carries its own direction as its normal, because

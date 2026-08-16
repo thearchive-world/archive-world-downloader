@@ -46,7 +46,6 @@ repositories {
     maven("https://maven.minecraftforge.net/")
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
     maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
-    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
 }
 
 configure<UserDevExtension> {
@@ -72,10 +71,8 @@ dependencies {
     // resolves: XaeroPlus's +forge file (which declares both the forge and neoforge loaders) and the
     // loader-suffixless JourneyMap 1.9 API. reobfJar maps WDL's calls to SRG for the shipped Forge jar.
     compileOnly("maven.modrinth:xaeroplus:${band("xaeroplus_version")}+forge-${band("minecraft_version")}")
-    // Both JourneyMap generations, matching :common: the loader-suffixless 1.9 API for the 5.x plugin, and the
-    // 2.0 API's -forge flavor for the 6.x plugin in compat/journeymap/v2.
+    // The loader-suffixless 1.9 JourneyMap API for the plugin (compat/journeymap), matching :common.
     compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
-    compileOnly("info.journeymap:journeymap-api-forge:${band("journeymap_api_v2_coordinate")}")
 }
 
 // Source-merge :common the way wdl.common-merge does for the Gradle-9 loaders, but by direct path since the

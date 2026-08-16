@@ -3,7 +3,9 @@
 
 package world.thearchive.wdl.client;
 
+import com.google.common.hash.Hashing;
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.vertex.PoseStack;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,7 +28,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -38,10 +39,11 @@ import net.minecraft.client.gui.layouts.GridLayout;
 import net.minecraft.client.gui.layouts.LayoutSettings;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -697,8 +699,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
+        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(poseStack);
             String triangle = listCollapsed ? TRIANGLE_COLLAPSED : TRIANGLE_EXPANDED;
             Component header = Component.literal(triangle)
                     .append(Component.translatable("wdl.screen.downloads.existing", entries.size()));
@@ -724,8 +726,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
+        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(poseStack);
             int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             surface.text(font, openSavesText(), getX() + 4,
                     getY() + (getHeight() - font.lineHeight) / 2, color);
@@ -753,8 +755,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
+        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(poseStack);
             surface.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), BANNER_FILL_ARGB);
             surface.outline(getX(), getY(), getWidth(), getHeight(), BANNER_OUTLINE_ARGB);
             int textY = getY() + (getHeight() - font.lineHeight) / 2;
@@ -780,8 +782,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
+        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(poseStack);
             int color = isHovered() ? BANNER_LINK_HOVER_ARGB : BANNER_LINK_ARGB;
             surface.text(font, this.label, getX(), getY() + (getHeight() - font.lineHeight) / 2, color);
         }
@@ -805,8 +807,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
+        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(poseStack);
             int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             // The glyph comes from the fallback font, whose ink sits high in its line box, so the shared
             // centering formula reads a pixel high without the nudge.
@@ -838,8 +840,8 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
+        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl(poseStack);
             int textY = getY() + (getHeight() - font.lineHeight) / 2;
             surface.text(font, WARNING_GLYPH, getX(), textY, BANNER_GLYPH_ARGB);
             surface.text(font, this.text, getX() + font.width(WARNING_GLYPH), textY, NAME_ARGB);
@@ -869,8 +871,8 @@ public final class WdlDownloadsScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
+    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        super.render(poseStack, mouseX, mouseY, partialTick);
         // Drawing a tooltip during the row render clips it against the list's scissor; deferring it to after
         // the list lets it paint past the scissor.
         if (this.pendingTooltip != null) {
@@ -1030,7 +1032,8 @@ public final class WdlDownloadsScreen extends Screen {
             private final String displayName;
             private final String lastPlayed;
             private final Path folder;
-            private final @Nullable FaviconTexture icon;
+            private final @Nullable DynamicTexture icon;
+            private @Nullable ResourceLocation iconLocation;
             private @Nullable String snapshotName;
             private int line2Top;
             private int arrowLeft;
@@ -1053,15 +1056,19 @@ public final class WdlDownloadsScreen extends Screen {
                 this.icon = loadIcon(entry);
             }
 
-            private @Nullable FaviconTexture loadIcon(DownloadEntry entry) {
+            private @Nullable DynamicTexture loadIcon(DownloadEntry entry) {
                 byte[] bytes = entry.iconBytes();
                 if (bytes == null || minecraft == null) {
                     return null;
                 }
                 try {
-                    FaviconTexture texture = FaviconTexture.forWorld(minecraft.getTextureManager(),
-                            entry.folderName());
-                    texture.upload(NativeImage.read(bytes));
+                    // Below 1.20 there is no FaviconTexture; the world icon is managed by hand as vanilla's list does.
+                    DynamicTexture texture = new DynamicTexture(NativeImage.read(bytes));
+                    ResourceLocation location = new ResourceLocation("wdl", "world/"
+                            + Util.sanitizeName(entry.folderName(), ResourceLocation::validPathChar) + "/"
+                            + Hashing.sha1().hashUnencodedChars(entry.folderName()) + "/icon");
+                    minecraft.getTextureManager().register(location, texture);
+                    this.iconLocation = location;
                     return texture;
                 } catch (IOException | RuntimeException e) {
                     return null; // a validated-but-undecodable icon is dropped, not fatal
@@ -1069,12 +1076,12 @@ public final class WdlDownloadsScreen extends Screen {
             }
 
             @Override
-            public void render(GuiGraphics guiGraphics, int index, int top, int left, int width, int height,
+            public void render(PoseStack poseStack, int index, int top, int left, int width, int height,
                     int mouseX, int mouseY, boolean hovering, float partialTick) {
                 this.contentX = left;
                 this.contentY = top;
                 this.contentWidth = width;
-                renderContent(guiGraphics, mouseX, mouseY, hovering, partialTick);
+                renderContent(poseStack, mouseX, mouseY, hovering, partialTick);
             }
 
             private int getContentX() {
@@ -1089,9 +1096,9 @@ public final class WdlDownloadsScreen extends Screen {
                 return contentWidth;
             }
 
-            private void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean hovering,
+            private void renderContent(PoseStack poseStack, int mouseX, int mouseY, boolean hovering,
                     float partialTick) {
-                RenderSurface surface = new RenderSurfaceImpl(guiGraphics);
+                RenderSurface surface = new RenderSurfaceImpl(poseStack, WdlDownloadsScreen.this);
                 // Probe or walk only visible rows, on disjoint domains: a tainted row is availability-probed
                 // for its restore chip and never walked, a complete row is walked for its size.
                 if (this.entry.isTainted()) {
@@ -1103,8 +1110,8 @@ public final class WdlDownloadsScreen extends Screen {
                 int rowY = getContentY();
                 int entryWidth = getContentWidth();
                 int rightEdge = rowX + entryWidth - 4;
-                if (this.icon != null) {
-                    surface.blitFavicon(this.icon, rowX + 2, rowY + 3, ICON_SIZE);
+                if (this.iconLocation != null) {
+                    surface.blitFavicon(this.iconLocation, rowX + 2, rowY + 3, ICON_SIZE);
                 }
                 int textX = rowX + 4 + ICON_ADVANCE;
                 int dateX = rightEdge - font.width(this.lastPlayed);
@@ -1350,8 +1357,9 @@ public final class WdlDownloadsScreen extends Screen {
             }
 
             void close() {
-                // removed() closes the icons when a confirm screen is pushed on top, then init() closes them again
-                // on the way back; FaviconTexture.close throws if already closed, so skip a second close.
+                // removed() closes the icons when a confirm screen is pushed on top and init() closes them again on the
+                // way back; the iconClosed guard skips the second close, which would double-free the GL texture. Close
+                // does not release the location; the next init() re-registers it, evicting the stale entry.
                 if (this.icon != null && !this.iconClosed) {
                     this.icon.close();
                     this.iconClosed = true;

@@ -5,16 +5,17 @@ package world.thearchive.wdl.adapter;
 
 import java.util.List;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * The client draw seam: the band-stable subset of the vanilla GUI surface that shared client code draws through, so
  * {@code client/} names no vanilla draw-surface type. One implementation per band in {@code adapter/impl} wraps that
  * band's concrete surface, which is the type that moves across the version bands. The interface may name band-stable
  * vanilla types ({@link Font}, {@link Component}) on the same license {@code adapter/} already has, but never the draw
- * surface itself and never the resource-id type, which is why a sprite is addressed by a mod-owned key that the plug
- * resolves rather than by a vanilla id.
+ * surface itself. A sprite is addressed by a mod-owned key the plug resolves rather than a vanilla id; below 1.20,
+ * where there is no {@code FaviconTexture} handle to pass, a world favicon is addressed by its already-registered
+ * texture location.
  */
 public interface RenderSurface {
     /** Draw a string with a drop shadow. */
@@ -38,8 +39,8 @@ public interface RenderSurface {
     /** Draw a mod-owned atlas sprite tinted by an ARGB color, named by its {@code wdl}-namespace path. */
     void blitSprite(String sprite, int x, int y, int width, int height, int color);
 
-    /** Draw a square world favicon. */
-    void blitFavicon(FaviconTexture icon, int x, int y, int size);
+    /** Draw a square world favicon from its registered texture location. */
+    void blitFavicon(ResourceLocation icon, int x, int y, int size);
 
     /** Show a tooltip that wraps {@code content} at {@code wrapWidth}, anchored at the cursor. */
     void tooltip(Font font, Component content, int wrapWidth, int mouseX, int mouseY);
