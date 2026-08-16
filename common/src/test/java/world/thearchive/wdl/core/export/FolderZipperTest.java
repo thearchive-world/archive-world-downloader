@@ -121,6 +121,23 @@ class FolderZipperTest {
         assertEquals(5, walked, "its bytes are excluded from the walked total too");
     }
 
+    @Test
+    void excludesStaleExportPartFileFromTheArchiveAndTheByteTotal(@TempDir Path saves) throws IOException {
+        Path folder = Files.createDirectories(saves.resolve("world"));
+        Files.write(folder.resolve("level.dat"), new byte[] { 1, 2, 3 });
+        // An export staging file left inside a save by an earlier run; it must never be archived back into a new zip.
+        Files.write(folder.resolve("wdl-export-abc123.part"), new byte[500]);
+        Path target = saves.resolve("world.zip");
+
+        long walked = FolderZipper.zip(folder, target);
+
+        Map<String, byte[]> entries = readEntries(target);
+        assertTrue(entries.containsKey("world/level.dat"), "world data is archived");
+        assertFalse(entries.containsKey("world/wdl-export-abc123.part"),
+                "the export's own staging artifact is never archived, whether stale or in flight");
+        assertEquals(3, walked, "its bytes are excluded from the walked total too");
+    }
+
     private static Map<String, byte[]> readEntries(Path zip) throws IOException {
         Map<String, byte[]> out = new HashMap<>();
         try (ZipFile zipFile = new ZipFile(zip.toFile())) {
