@@ -33,7 +33,7 @@ group = band("mod_group")
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
-    // -> archive-wdl-forge  (the Fabric sibling is archive-wdl-fabric)
+    // -> archive-wdl-forge
     archivesName.set("${band("mod_archives_base")}-forge")
 }
 

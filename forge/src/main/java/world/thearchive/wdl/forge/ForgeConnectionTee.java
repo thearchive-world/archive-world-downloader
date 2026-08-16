@@ -17,7 +17,7 @@ import world.thearchive.wdl.adapter.ConnectionTee;
 final class ForgeConnectionTee extends ConnectionTee {
     private ForgeConnectionTee() {}
 
-    /** Insert the tee into the play connection, once. Called from the play-join hook. */
+    /** Insert the tee into the play connection, once. */
     static void install(Connection connection) {
         new ForgeConnectionTee().installInto(connection);
     }
