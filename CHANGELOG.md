@@ -6,6 +6,18 @@ The release pipeline ships the section whose heading matches the release version
 `<version>` is the mod_version core) as the notes on CurseForge, Modrinth, and the GitHub release. Write each
 version's notes here before tagging; a release with no matching section fails rather than shipping empty notes.
 
+## 1.2.0
+
+### Added
+
+- Support for Minecraft 1.20.1, 1.20.2, 1.20.4, 1.20.6, and 1.21.1.
+- Forge loader support on Minecraft 1.20.1 and 1.20.2.
+
+### Fixed
+
+- Minecraft 1.21.10: worlds no longer save as incomplete (missing level.dat) after looking at certain angles.
+- Minecraft 1.21.3-1.21.5: download list tooltips no longer clip at the list edge.
+
 ## 1.1.0
 
 ### Added
