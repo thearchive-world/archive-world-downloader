@@ -68,7 +68,7 @@ public final class TestRegistries {
         // MinecraftServer.configurePackRepository selects it), so without an explicit selection
         // openAllSelected() is empty and every data-driven registry loads empty. Select the vanilla
         // base pack so its PackResources (carrying the biome/cat_variant/... JSONs) are opened.
-        PackRepository packs = ServerPacksSource.createVanillaTrustedRepository();
+        PackRepository packs = new PackRepository(new ServerPacksSource());
         packs.reload();
         packs.setSelected(List.of(VANILLA_PACK_ID));
         List<PackResources> openPacks = packs.openAllSelected();

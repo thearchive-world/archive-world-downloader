@@ -35,6 +35,7 @@ import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.layouts.FrameLayout;
 import net.minecraft.client.gui.layouts.GridLayout;
+import net.minecraft.client.gui.layouts.LayoutSettings;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.FaviconTexture;
@@ -337,7 +338,7 @@ public final class WdlDownloadsScreen extends Screen {
 
     private void centerTopWidget(AbstractWidget widget) {
         GridLayout grid = new GridLayout();
-        grid.addChild(widget, 0, 0, settings -> settings.padding(4, 4, 4, 4));
+        grid.addChild(widget, 0, 0, LayoutSettings.defaults().padding(4, 4, 4, 4));
         grid.arrangeElements();
         FrameLayout.alignInRectangle(grid, 0, TOP_Y, this.width, this.height, 0.5f, 0.05f);
         grid.arrangeElements();
@@ -488,7 +489,7 @@ public final class WdlDownloadsScreen extends Screen {
         if (this.nameField != null) {
             suppressNameResponder = true;
             this.nameField.setValue(entry.folderName()); // resume targets the folder verbatim
-            this.nameField.moveCursorToEnd(false); // a long prefilled name shows its end
+            this.nameField.moveCursorToEnd(); // a long prefilled name shows its end
             suppressNameResponder = false;
             setFocused(this.nameField);
         }
@@ -970,6 +971,10 @@ public final class WdlDownloadsScreen extends Screen {
 
         DownloadList(Minecraft minecraft, int width, int height, int y, int itemHeight) {
             super(minecraft, width, height, y, y + height, itemHeight);
+            // Below 1.20.2 the list fills tiled dirt above and below itself, sized as if width and height were
+            // the screen's; this in-world list passes its own dimensions, so the fill would paint dirt from the
+            // screen top down to the list. The 1.20.2 list rewrite dropped that fill.
+            setRenderTopAndBottom(false);
         }
 
         @Override

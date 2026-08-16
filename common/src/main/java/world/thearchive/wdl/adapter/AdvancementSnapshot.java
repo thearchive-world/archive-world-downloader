@@ -5,8 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import java.util.HashMap;
 import java.util.Map;
-import net.minecraft.advancements.AdvancementHolder;
-import net.minecraft.advancements.AdvancementNode;
+import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.client.multiplayer.ClientAdvancements;
 import org.jspecify.annotations.Nullable;
@@ -25,24 +24,24 @@ final class AdvancementSnapshot {
         Map<String, AdvancementProgress> byId = new HashMap<>();
         advancements.setListener(new ClientAdvancements.Listener() {
             @Override
-            public void onUpdateAdvancementProgress(AdvancementNode node, AdvancementProgress progress) {
-                byId.put(node.holder().id().toString(), progress);
+            public void onUpdateAdvancementProgress(Advancement advancement, AdvancementProgress progress) {
+                byId.put(advancement.getId().toString(), progress);
             }
 
             @Override
-            public void onSelectedTabChanged(@Nullable AdvancementHolder holder) {}
+            public void onSelectedTabChanged(@Nullable Advancement advancement) {}
 
             @Override
-            public void onAddAdvancementRoot(AdvancementNode node) {}
+            public void onAddAdvancementRoot(Advancement advancement) {}
 
             @Override
-            public void onRemoveAdvancementRoot(AdvancementNode node) {}
+            public void onRemoveAdvancementRoot(Advancement advancement) {}
 
             @Override
-            public void onAddAdvancementTask(AdvancementNode node) {}
+            public void onAddAdvancementTask(Advancement advancement) {}
 
             @Override
-            public void onRemoveAdvancementTask(AdvancementNode node) {}
+            public void onRemoveAdvancementTask(Advancement advancement) {}
 
             @Override
             public void onAdvancementsCleared() {}

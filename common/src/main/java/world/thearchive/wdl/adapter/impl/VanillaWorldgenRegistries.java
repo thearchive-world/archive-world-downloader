@@ -76,7 +76,7 @@ final class VanillaWorldgenRegistries {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
 
-        PackRepository packs = ServerPacksSource.createVanillaTrustedRepository();
+        PackRepository packs = new PackRepository(new ServerPacksSource());
         packs.reload();
         packs.setSelected(List.of(VANILLA_PACK_ID));
         List<PackResources> openPacks = packs.openAllSelected();

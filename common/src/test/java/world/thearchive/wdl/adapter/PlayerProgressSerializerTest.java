@@ -12,9 +12,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.Set;
 import net.minecraft.advancements.AdvancementProgress;
-import net.minecraft.advancements.AdvancementRequirements;
+import net.minecraft.advancements.Criterion;
 import net.minecraft.stats.Stats;
 import net.minecraft.stats.StatsCounter;
 import net.minecraft.world.level.block.Blocks;
@@ -63,7 +62,7 @@ class PlayerProgressSerializerTest {
     @Test
     void advancementsJsonKeysByIdStringWithDoneAndRealTimestamp() {
         AdvancementProgress progress = new AdvancementProgress();
-        progress.update(AdvancementRequirements.allOf(Set.of("minecraft:foo")));
+        progress.update(Map.of("minecraft:foo", new Criterion()), new String[][] { { "minecraft:foo" } });
         progress.grantProgress("minecraft:foo");
         assertTrue(progress.isDone(), "precondition: the constructed advancement is genuinely done");
 

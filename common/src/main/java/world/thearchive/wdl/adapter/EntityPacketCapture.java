@@ -158,10 +158,10 @@ final class EntityPacketCapture
         } else if (packet instanceof ClientboundPlayerPositionPacket) {
             sampler.onAnomalyPacket();
         } else if (packet instanceof ClientboundRespawnPacket respawn) {
-            enterDimension(respawn.commonPlayerSpawnInfo().dimension().location().toString());
+            enterDimension(respawn.getDimension().location().toString());
             sampler.onRespawn();
         } else if (packet instanceof ClientboundLoginPacket login) {
-            enterDimension(login.commonPlayerSpawnInfo().dimension().location().toString());
+            enterDimension(login.dimension().location().toString());
             sampler.onRespawn();
         } else if (packet instanceof ClientboundSetCameraPacket) {
             sampler.onSetCamera();

@@ -1,7 +1,7 @@
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
-    id("net.neoforged.moddev")     // version comes from the root apply-false declaration
+    id("net.neoforged.gradle.vanilla") version "7.1.38" // common's Minecraft toolchain, versioned inline
     id("com.diffplug.spotless")    // applied per-subproject, not via build-logic (see below)
     id("wdl.java-conventions")
     id("wdl.nullness-conventions")
@@ -22,29 +22,20 @@ spotless {
     }
 }
 
-// Parchment param-name mappings are layered only on bands that publish them; a band with no Parchment
-// release (26.x) omits both properties and skips the parchment block below.
-val parchmentMinecraft = providers.gradleProperty("parchment_minecraft_version")
-val parchmentMappings = providers.gradleProperty("parchment_mappings_version")
-
-neoForge {
-    // Vanilla mode: set a NeoForm version (NOT a NeoForge version)
-    neoFormVersion = property("neoform_version") as String
-    if (parchmentMinecraft.isPresent && parchmentMappings.isPresent) {
-        parchment {
-            minecraftVersion = parchmentMinecraft.get()
-            mappingsVersion  = parchmentMappings.get()
-        }
-    }
-    // Vanilla mode supports only client/server/data run types (no loader); common needs none.
+// --- Minecraft toolchain: NeoGradle vanilla, not ModDevGradle Vanilla mode ---
+// NeoForm has no 1.20.1 release: NeoForged forked from Forge at 1.20.2, so net.neoforged:neoform starts there,
+// and ModDevGradle Vanilla mode (which resolves that coordinate) cannot target this band. NeoGradle's vanilla
+// plugin builds the same Mojmap (official) Minecraft on Gradle 9 by deriving it from mcp_config 1.20.1 instead,
+// the exact namespace common is written in, with no intermediary remap. The net.minecraft:client distribution
+// carries the shared and server-side classes the codec reads plus the bundled vanilla data pack, and an
+// implementation dependency is inherited by the test source set, so the headless JUnit suite boots the vanilla
+// registries against it with no extra wiring (the analog of MDG Vanilla mode's addModdingDependenciesTo(test)).
+// Parchment is not layered on this band's common: NeoGradle vanilla takes no Parchment coordinate here, so the
+// decompiled Minecraft carries generated parameter names, which WDL never references; fabric keeps its own
+// Loom-layered Parchment separately.
+dependencies {
+    implementation("net.minecraft:client:${property("minecraft_version")}")
 }
-
-// --- headless unit tests (JUnit 5) with real Minecraft on the TEST classpath ---
-// MDG Vanilla-mode puts net.minecraft.* (classes + bundled vanilla data) on the MAIN classpath;
-// addModdingDependenciesTo wires those same modding deps into the test source set so plain JUnit
-// tests can boot vanilla registries headlessly. No gametest/loader harness. These are pure JUnit.
-// JUnit itself comes from wdl.java-conventions.
-neoForge.addModdingDependenciesTo(sourceSets["test"])
 
 // --- PITest mutation testing: on-demand fidelity-gap discovery (./gradlew :common:pitest) ---
 // Mutation testing perturbs production bytecode one change at a time (negate a conditional, drop a void
@@ -60,7 +51,7 @@ neoForge.addModdingDependenciesTo(sourceSets["test"])
 // build when a new core/adapter class is neither enrolled here nor explicitly acknowledged-excluded.
 //
 // The minion JVMs inherit sourceSets.test.runtimeClasspath (net.minecraft + the bundled vanilla data pack
-// from addModdingDependenciesTo above), so registry-booting tests run in the minion exactly as under :test.
+// from the net.minecraft:client implementation above), so registry-booting tests run in the minion exactly as under :test.
 // CI-gated by .github/workflows/mutation-testing.yml on dev and version-branch pushes; a new survivor is
 // triaged (killed, suppressed, or rewritten away) rather than absorbed by lowering the floor.
 pitest {
@@ -372,12 +363,14 @@ repositories {
 
 dependencies {
     // XaeroPlus public API for the overlay binding (compat/xaeroplus), compile-only (never a runtime require).
-    // common is ModDev in Mojmap mode, so pull the NeoForge (Mojmapped) flavor to match the classpath; the
-    // loader subprojects add their own flavor for the source-merged compile.
-    compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+neoforge-${property("minecraft_version")}")
+    // common is Mojmap here (NeoGradle vanilla), so it needs a Mojmapped flavor. XaeroPlus 2.35.1 publishes no
+    // separate +neoforge-1.20.1 file at this band; its +forge-1.20.1 file declares both the forge and neoforge
+    // loaders, and the binding uses only XaeroPlus's own API types, so it matches this classpath.
+    compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+forge-${property("minecraft_version")}")
 
     // JourneyMap public API for the overlay binding (compat/journeymap), compile-only (never a runtime require).
-    // The 1.9 generation ships one artifact per loader with no common flavor, so common (Mojmap ModDev) pulls the
-    // neoforge (Mojmapped) flavor to match its classpath, as it does for XaeroPlus above.
-    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-neoforge-SNAPSHOT")
+    // The 1.20-1.9 stem (see gradle.properties) publishes no -neoforge-SNAPSHOT flavor, so common pulls the
+    // loader-suffixless -SNAPSHOT flavor; the 1.9 journeymap.client.api surface the binding compiles against is
+    // its own API types, not Minecraft signatures.
+    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
 }

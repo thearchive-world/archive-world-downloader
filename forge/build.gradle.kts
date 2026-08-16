@@ -29,7 +29,7 @@ val band = Properties().apply {
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.20.2.
+// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.20.1.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
@@ -66,11 +66,12 @@ dependencies {
     compileOnly("org.jspecify:jspecify:1.0.0")
 
     // Compat overlay APIs for the source-merged bindings (compat/xaeroplus, compat/journeymap), compile-only,
-    // never a runtime require. FG6 compiles against Mojmap (official mappings), so these come from the NeoForge
-    // (Mojmapped) flavor that :common already pulls, not the SRG-named Forge flavor: the Mojmap flavor matches
-    // this classpath, and reobfJar maps WDL's calls to SRG for the shipped Forge jar.
-    compileOnly("maven.modrinth:xaeroplus:${band("xaeroplus_version")}+neoforge-${band("minecraft_version")}")
-    compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-neoforge-SNAPSHOT")
+    // never a runtime require. FG6 compiles against Mojmap (official mappings). At this band there is no
+    // +neoforge XaeroPlus file or -neoforge-SNAPSHOT JourneyMap flavor, so these use the same coordinates :common
+    // resolves: XaeroPlus's +forge file (which declares both the forge and neoforge loaders) and the
+    // loader-suffixless JourneyMap 1.9 API. reobfJar maps WDL's calls to SRG for the shipped Forge jar.
+    compileOnly("maven.modrinth:xaeroplus:${band("xaeroplus_version")}+forge-${band("minecraft_version")}")
+    compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
 }
 
 // Source-merge :common the way wdl.common-merge does for the Gradle-9 loaders, but by direct path since the

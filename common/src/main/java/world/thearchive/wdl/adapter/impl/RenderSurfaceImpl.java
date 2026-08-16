@@ -53,11 +53,13 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void blitSprite(String sprite, int x, int y, int width, int height, int color) {
-        // Below 1.21.2 blitSprite takes no tint argument, so the ARGB color is applied as a draw-color multiplier
-        // around the blit and reset to opaque white after.
+        // This band has no GUI sprite atlas (blitSprite is 1.20.2 and later), so the sprite is drawn from its
+        // texture file directly; the ARGB color is applied as a draw-color multiplier around the blit, since the
+        // pre-1.21.2 blit likewise takes no tint argument. The sole wdl sprite is the 10 by 10 revert icon.
         graphics.setColor((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
                 (color & 0xFF) / 255.0F, (color >>> 24) / 255.0F);
-        graphics.blitSprite(new ResourceLocation("wdl", sprite), x, y, width, height);
+        graphics.blit(new ResourceLocation("wdl", "textures/gui/sprites/" + sprite + ".png"), x, y, width, height,
+                0.0F, 0.0F, 10, 10, 10, 10);
         graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 

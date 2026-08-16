@@ -68,6 +68,8 @@ common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 # newer teleport plus ClientboundEntityPositionSyncPacket and PositionMoveRotation, the byte-encoded packet
 # rotations are decoded here, and the single BOAT and CHEST_BOAT types replace the per-wood split. Below the 1.21
 # update VecDeltaCodec has no getBase accessor, so the packet-visible base position is read via decode(0, 0, 0).
+# Below 1.20.2 the respawn and login packets carry no CommonPlayerSpawnInfo, so the entered dimension is read
+# directly through ClientboundRespawnPacket.getDimension and the ClientboundLoginPacket dimension record accessor.
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 
 # Below 1.21.2 there is no chunk unsaved-listener, so re-capture polls isUnsaved over the keep-hot buffer here;
@@ -80,7 +82,8 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 # one directly. Below 1.20.3 there is no Crafter menu or block entity, so the crafter open-bind and stash legs are
 # dropped; NbtIo.readCompressed takes a File with no NbtAccounter; and the world save root is read via
 # getLevelPath(LevelResource.ROOT).normalize(), the pre-getLevelDirectory form (normalized because ROOT's bare-dot
-# id would otherwise misplace the export zip).
+# id would otherwise misplace the export zip). Below 1.20.2 ClientPacketListener has no serverBrand, so the
+# report environment reads the server brand through LocalPlayer.getServerBrand().
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
@@ -164,7 +167,12 @@ common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
 # and the row width, so the list follows later bands and derives it from the row right edge, restoring hover and
 # clicks on the right of a row. Below 1.20.3 AbstractSelectionList takes a six-argument (top, bottom, itemHeight)
 # constructor and exposes the list left as the protected x0 field with setLeftPos rather than getX/setX, and
-# MutableComponent has no withColor(int), so a label color is applied through withStyle.
+# MutableComponent has no withColor(int), so a label color is applied through withStyle. Below 1.20.2
+# LayoutSettings is not a functional interface (it declares several abstract methods), so the centered top
+# widget's padding is built through LayoutSettings.defaults(), and EditBox.moveCursorToEnd takes no argument.
+# Below 1.20.2 AbstractSelectionList also fills tiled dirt above and below itself, sized as if its width and
+# height were the screen's, so the in-world download list calls setRenderTopAndBottom(false), a method the 1.20.2
+# list rewrite removed.
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 
 # The same getScrollbarPosition divergence reaches the settings list: this band's fixed width/2 + 124 assumes the
@@ -285,7 +293,8 @@ common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
 common/src/main/java/world/thearchive/wdl/adapter/PlayerTag.java
 
-# Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+# Below 1.20.2 there is no AdvancementProgress.CODEC, so the advancement value is serialized through vanilla's own
+# AdvancementProgress.Serializer Gson adapter rather than encoded through a codec.
 common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressSerializer.java
 
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
@@ -466,9 +475,24 @@ fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 # this band (deleted, not merely divergent); the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
-# The entire Forge second-loader tree is band-local: it exists only on the deep bands that ship a Forge jar, since
-# dev and the modern bands ship NeoForge, not Forge, so no path under it corresponds to anything on dev. A
-# directory pattern is safe here where the header cautions against globs: the caution is about a glob masking
-# drift in a file shared with dev, and nothing under forge/ is shared with dev, so there is no drift to mask. The
-# tree is a separate ForgeGradle-6 Gradle-8 island built by forge/gradlew, outside the root's include list.
-forge/
+# Below 1.20.2 there is no AdvancementHolder/AdvancementNode split (the advancement datapack rewrite is 1.20.2),
+# so the harvesting ClientAdvancements.Listener works in Advancement and reads the id via Advancement.getId().
+common/src/main/java/world/thearchive/wdl/adapter/AdvancementSnapshot.java
+
+# Below 1.20.2 there is no configuration phase, so the connection tee does not observe
+# ClientboundStartConfigurationPacket; the backend-transfer stop machinery (signalTransfer / consumeTransferSignal)
+# stays for the controller wiring but is never raised on this band.
+common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
+
+# Below 1.20.2 there is no AdvancementRequirements, so the fixture drives the two-argument
+# AdvancementProgress.update(Map<String, Criterion>, String[][]) with a no-argument Criterion (update reads only
+# the map keys).
+common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
+
+# The Forge island's manifest carries loaderVersion [47,) at this band (Forge 47.x for 1.20.1) versus the [48,)
+# of the 1.20.2 mint parent. The rest of the forge/ tree does not diverge from the parent: forge/build.gradle.kts
+# is excluded from the diff as a *.gradle.kts, and the shim, wrapper and access transformer are byte-identical.
+forge/src/main/resources/META-INF/mods.toml
+
+# The resource pack_format tracks this band's Minecraft version, 15 for 1.20.1 versus the parent's 18 for 1.20.2.
+forge/src/main/resources/pack.mcmeta

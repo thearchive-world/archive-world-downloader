@@ -4,8 +4,8 @@
 package world.thearchive.wdl.adapter;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.mojang.serialization.JsonOps;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import net.minecraft.advancements.AdvancementProgress;
@@ -17,21 +17,22 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Pure JSON builders for the player's progress surfaces: data in, detached JSON bytes out, no {@code Minecraft} or live
- * client state, so the logic is headless-testable. The advancement value shape is the public
- * {@code AdvancementProgress.CODEC}; the stats shape is hand-built (the vanilla serializer is server-only). The
- * advancement id is keyed as a plain {@code String} so the band-renamed id codec ({@code ResourceLocation} vs
- * {@code Identifier}) never appears here.
+ * client state, so the logic is headless-testable. The advancement value shape is vanilla's own
+ * {@code AdvancementProgress.Serializer} Gson adapter; the stats shape is hand-built (the vanilla serializer is
+ * server-only). The advancement id is keyed as a plain {@code String} so the band-renamed id codec
+ * ({@code ResourceLocation} vs {@code Identifier}) never appears here.
  */
 final class PlayerProgressSerializer {
-    private static final Gson gson = new Gson();
+    private static final Gson gson = new GsonBuilder()
+            .registerTypeAdapter(AdvancementProgress.class, new AdvancementProgress.Serializer())
+            .create();
 
     private PlayerProgressSerializer() {}
 
     /** The {@code advancements/<uuid>.json} bytes: id-string keyed progress + a {@code DataVersion} stamp. */
     static byte[] advancementsJson(Map<String, AdvancementProgress> progressById, int dataVersion) {
         JsonObject root = new JsonObject();
-        progressById.forEach((id, progress) -> root.add(id,
-                AdvancementProgress.CODEC.encodeStart(JsonOps.INSTANCE, progress).getOrThrow(false, s -> {})));
+        progressById.forEach((id, progress) -> root.add(id, gson.toJsonTree(progress)));
         root.addProperty("DataVersion", dataVersion);
         return gson.toJson(root).getBytes(StandardCharsets.UTF_8);
     }

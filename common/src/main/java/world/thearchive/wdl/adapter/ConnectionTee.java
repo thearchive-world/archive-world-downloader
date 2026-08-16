@@ -17,7 +17,6 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundBundlePacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundSetPassengersPacket;
-import net.minecraft.network.protocol.game.ClientboundStartConfigurationPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import org.slf4j.Logger;
 
@@ -96,16 +95,6 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext context, Object message) {
-        if (message instanceof ClientboundStartConfigurationPacket) {
-            // A backend transfer: same dimension ids on a different server name a different world, and this
-            // download does not follow across servers, so it stops like a disconnect. The stop is not only the
-            // folder collision one layer out: the configuration phase rebuilds the connection's RegistryAccess
-            // from the new backend, while a session holds the registries it was constructed with and encodes
-            // every chunk, entity, player and level.dat through them, so following a transfer would write the
-            // new server's world through the old server's registries. Signaled before the active-capture gate
-            // below, because a captureEntities-off download routes nothing yet must still stop.
-            ConnectionTee.signalTransfer();
-        }
         EntityPacketCapture capture = EntityPacketCapture.active();
         if (capture != null && message instanceof Packet<?> packet) {
             try {
