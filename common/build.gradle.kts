@@ -359,6 +359,7 @@ tasks.named("check") {
 repositories {
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
     maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
+    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
 }
 
 dependencies {
@@ -368,9 +369,11 @@ dependencies {
     // loaders, and the binding uses only XaeroPlus's own API types, so it matches this classpath.
     compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+forge-${property("minecraft_version")}")
 
-    // JourneyMap public API for the overlay binding (compat/journeymap), compile-only (never a runtime require).
+    // JourneyMap public APIs for the overlay bindings, compile-only (never a runtime require). This band binds
+    // both JourneyMap generations, each in its own binding: the 1.9 API (journeymap.client.api) for the 5.x
+    // plugin in compat/journeymap, and the 2.0 API (journeymap.api.v2) for the 6.x plugin in compat/journeymap/v2.
     // The 1.20-1.9 stem (see gradle.properties) publishes no -neoforge-SNAPSHOT flavor, so common pulls the
-    // loader-suffixless -SNAPSHOT flavor; the 1.9 journeymap.client.api surface the binding compiles against is
-    // its own API types, not Minecraft signatures.
+    // loader-suffixless -SNAPSHOT flavor; both API surfaces are their own types, not Minecraft signatures.
     compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
+    compileOnly("info.journeymap:journeymap-api-common:${property("journeymap_api_v2_coordinate")}")
 }

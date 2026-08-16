@@ -16,6 +16,9 @@
   "license": "LGPL-3.0-or-later",
   "environment": "client",
   "accessWidener": "wdl.accesswidener",
+  "languageAdapters": {
+    "wdl_jm": "world.thearchive.wdl.fabric.WdlJourneyMapAdapter"
+  },
   "entrypoints": {
     "client": [
       "world.thearchive.wdl.fabric.WdlFabricClient"
@@ -24,7 +27,10 @@
       "world.thearchive.wdl.fabric.WdlFabricModMenu"
     ],
     "journeymap": [
-      "world.thearchive.wdl.compat.journeymap.WdlJourneyMapPlugin"
+      {
+        "adapter": "wdl_jm",
+        "value": "select"
+      }
     ]
   },
   "depends": {

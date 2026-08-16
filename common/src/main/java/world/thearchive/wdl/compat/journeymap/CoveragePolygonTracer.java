@@ -21,11 +21,11 @@ import java.util.List;
  * hull with no hole carved, and floods the whole covered tone with the suspect fill. Pairing each hole with the
  * smallest hull that contains it, the innermost, is the correct association and renders the two tones without overlap.
  */
-final class CoveragePolygonTracer {
+public final class CoveragePolygonTracer {
     private CoveragePolygonTracer() {}
 
     /** A hull ring and the hole rings cut from it, each a flat array of alternating block x and z coordinates. */
-    static final class HoledRing {
+    public static final class HoledRing {
         private final int[] hull;
         private final List<int[]> holes;
 
@@ -34,11 +34,11 @@ final class CoveragePolygonTracer {
             this.holes = holes;
         }
 
-        int[] hull() {
+        public int[] hull() {
             return hull;
         }
 
-        List<int[]> holes() {
+        public List<int[]> holes() {
             return holes;
         }
     }
@@ -49,7 +49,7 @@ final class CoveragePolygonTracer {
      * rectangles are unioned before tracing, so adjacent rectangles merge into a single hull. Empty input yields an
      * empty list.
      */
-    static List<HoledRing> trace(int[] chunkRectangles) {
+    public static List<HoledRing> trace(int[] chunkRectangles) {
         if (chunkRectangles.length == 0) {
             return List.of();
         }

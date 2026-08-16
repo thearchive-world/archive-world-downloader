@@ -209,6 +209,39 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDri
 # MapPolygonWithHoles and ShapeProperties.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.java
 
+# This Minecraft has both JourneyMap generations installed in the wild (5.x on the 1.9 API and 6.x on the 2.0
+# API), so this band carries a second plugin for the 2.0 API beside the 1.9 one above. The shared coverage
+# geometry is public here so that second-generation polygon builder can reach it across packages; dev carries a
+# single JourneyMap generation, so its copy stays package-private.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygonTracer.java
+
+# The 2.0 plugin entry for this band's second JourneyMap generation, discovered by the JourneyMapPlugin annotation
+# and the journeymap entrypoint; dev carries only the 2.0 form at the base package and has no v2 subpackage.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/WdlJourneyMapPlugin.java
+
+# The 2.0 overlay driver for this band's second JourneyMap plugin, binding the journeymap.api.v2 mapping events
+# and PolygonOverlay; dev has no compat/journeymap/v2 subpackage.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/JourneyMapOverlayDriver.java
+
+# The 2.0 polygon builder for this band's second JourneyMap plugin, binding the journeymap.api.v2 model types; dev
+# has no compat/journeymap/v2 subpackage.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/CoveragePolygons.java
+
+# The null-marking marker for this band's second-generation JourneyMap binding; dev has no compat/journeymap/v2
+# subpackage.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/package-info.java
+
+# The Fabric language adapter for this band's two JourneyMap generations. JourneyMap reads the journeymap
+# entrypoint eagerly and fails the whole scan if a listed entry throws, so neither plugin can be a static entry;
+# the loader routes this adapter per entry with the requested plugin interface as its type argument, so it
+# constructs only the plugin matching the installed JourneyMap and returns null otherwise. A single-generation
+# band lists its plugin in the manifest directly and has no adapter.
+fabric/src/main/java/world/thearchive/wdl/fabric/WdlJourneyMapAdapter.java
+
+# The Fabric manifest declares the wdl_jm language adapter and routes the journeymap entrypoint through it rather
+# than naming a plugin class directly; dev lists its single plugin class directly.
+fabric/src/main/resources/fabric.mod.json
+
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
 # with the public ResourceLocation(String, String) constructor.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
