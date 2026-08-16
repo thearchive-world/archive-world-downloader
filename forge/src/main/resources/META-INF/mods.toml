@@ -1,0 +1,31 @@
+modLoader = "javafml"
+loaderVersion = "[48,)"
+license = "LGPL-3.0-or-later"
+issueTrackerURL = "https://github.com/thearchive-world/archive-world-downloader/issues"
+
+[[mods]]
+modId = "wdl"
+version = "${version}"
+displayName = "Archive World Downloader"
+authors = "terbin"
+displayURL = "https://modrinth.com/mod/${mod_id}"
+description = "Keep the multiplayer worlds you visit. As you explore, the mod saves the terrain, mobs, and maps around you into a singleplayer world you can open offline, and containers save their contents when you open them. Everything comes from your own game, so nothing runs on the server."
+logoFile = "assets/wdl/icon.png"
+logoBlur = false
+
+# Loader floor = gradle.properties forge_version_min (a deliberate value, not the build coordinate); the exact
+# minecraft pin below already locks the band one-to-one, so the upper bound stays open. Forge uses the boolean
+# mandatory key here where NeoForge 20.4 uses type = "required".
+[[dependencies.wdl]]
+modId = "forge"
+mandatory = true
+versionRange = "[${forge_version_min},)"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies.wdl]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[${minecraft_version}]"
+ordering = "AFTER"
+side = "CLIENT"

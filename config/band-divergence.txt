@@ -465,3 +465,10 @@ fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 # The ModMenu API for this band ships no update-checker API, so the ModMenu update-badge feeder does not exist on
 # this band (deleted, not merely divergent); the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
+
+# The entire Forge second-loader tree is band-local: it exists only on the deep bands that ship a Forge jar, since
+# dev and the modern bands ship NeoForge, not Forge, so no path under it corresponds to anything on dev. A
+# directory pattern is safe here where the header cautions against globs: the caution is about a glob masking
+# drift in a file shared with dev, and nothing under forge/ is shared with dev, so there is no drift to mask. The
+# tree is a separate ForgeGradle-6 Gradle-8 island built by forge/gradlew, outside the root's include list.
+forge/
