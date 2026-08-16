@@ -442,8 +442,9 @@ public final class OutlineTracker {
 
     /** Whether {@code entity} is a container vehicle or a chested animal (the open-time entity-container set). */
     private static boolean isContainerEntity(Entity entity) {
+        // Below 1.21 getInventoryColumns is nonzero without a chest, so it cannot substitute for hasChest.
         return entity instanceof ContainerEntity
-                || (entity instanceof AbstractChestedHorse animal && animal.getInventoryColumns() > 0);
+                || (entity instanceof AbstractChestedHorse animal && animal.hasChest());
     }
 
     /**
