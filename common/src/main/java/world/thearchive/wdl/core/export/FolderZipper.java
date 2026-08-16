@@ -28,9 +28,6 @@ import java.util.zip.ZipOutputStream;
  * {@link #zip} returns the on-disk byte total it walked.
  */
 final class FolderZipper {
-    private static final String TEMPORARY_PREFIX = "wdl-export-";
-    private static final String TEMPORARY_SUFFIX = ".part";
-
     private FolderZipper() {}
 
     /** Zip {@code sourceFolder} into {@code target}; returns the walked on-disk byte total. */
@@ -44,7 +41,7 @@ final class FolderZipper {
      */
     public static long zip(Path sourceFolder, Path target, LongConsumer onBytesZipped) throws IOException {
         Path directory = target.getParent();
-        Path temporaryFile = Files.createTempFile(directory, TEMPORARY_PREFIX, TEMPORARY_SUFFIX);
+        Path temporaryFile = Files.createTempFile(directory, SaveWalk.TEMPORARY_PREFIX, SaveWalk.TEMPORARY_SUFFIX);
         try {
             long walked = writeZip(sourceFolder, temporaryFile, onBytesZipped);
             move(temporaryFile, target);
@@ -66,15 +63,10 @@ final class FolderZipper {
             Files.walkFileTree(sourceFolder, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                    if (!attributes.isRegularFile() || SessionLock.matches(file)) {
+                    if (!attributes.isRegularFile() || SaveWalk.isExcluded(sourceFolder, file)) {
                         return FileVisitResult.CONTINUE;
                     }
                     String relative = sourceFolder.relativize(file).toString().replace(File.separatorChar, '/');
-                    if (relative.equals("wdl/download.pending")) {
-                        // The crash sentinel predates the pre-resume backup by design, so archiving it would
-                        // plant a false crash signal in the zip; mirrors the restore extractor's strip.
-                        return FileVisitResult.CONTINUE;
-                    }
                     String entryName = top.isEmpty() ? relative : top + "/" + relative;
                     zip.putNextEntry(new ZipEntry(entryName));
                     Files.copy(file, zip);

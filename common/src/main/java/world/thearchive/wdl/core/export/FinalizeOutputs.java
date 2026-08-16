@@ -44,9 +44,10 @@ public final class FinalizeOutputs {
         if (!zipOnResume || mode != DownloadMode.RESUME) {
             return;
         }
-        Path target = ZipName.nextFreeBackup(savesDirectory(saveFolder), folderName(saveFolder));
+        Path folder = saveRoot(saveFolder);
+        Path target = ZipName.nextFreeBackup(savesDirectory(folder), folderName(folder));
         try {
-            FolderZipper.zip(saveFolder, target);
+            FolderZipper.zip(folder, target);
         } catch (IOException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "the resume backup zip failed; the resume proceeds without a safety copy", e);
         }
@@ -63,17 +64,28 @@ public final class FinalizeOutputs {
         if (!zipOnFinish) {
             return null;
         }
-        Path target = ZipName.nextFreeExport(savesDirectory(saveFolder), folderName(saveFolder));
-        OptionalLong size = FolderSize.onDiskSize(saveFolder);
+        Path folder = saveRoot(saveFolder);
+        Path target = ZipName.nextFreeExport(savesDirectory(folder), folderName(folder));
+        OptionalLong size = FolderSize.onDiskSize(folder);
         long byteTotal = size.orElse(0L);
         progress.compressing(0, byteTotal);
         try {
-            FolderZipper.zip(saveFolder, target, bytesZipped -> progress.compressing(bytesZipped, byteTotal));
+            FolderZipper.zip(folder, target, bytesZipped -> progress.compressing(bytesZipped, byteTotal));
         } catch (IOException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "the export zip failed; the openable folder is intact", e);
             return null;
         }
         return target.getFileName().toString();
+    }
+
+    /**
+     * The save root with any trailing dot component stripped, so the archive is named and placed beside the folder
+     * rather than inside it. Below 1.20.5 the level directory is read through {@code LevelResource.ROOT}, whose id is a
+     * bare dot, so the path arrives ending in a dot that {@code getParent} and {@code getFileName} would otherwise
+     * resolve to the folder itself.
+     */
+    private static Path saveRoot(Path saveFolder) {
+        return saveFolder.normalize();
     }
 
     /** The saves directory the zips land in (beside the folder); never null for a {@code saves/<folder>} path. */
