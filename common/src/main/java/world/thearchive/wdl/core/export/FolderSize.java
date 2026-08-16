@@ -26,7 +26,7 @@ public final class FolderSize {
             Files.walkFileTree(folder, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-                    if (attributes.isRegularFile() && !SessionLock.matches(file)) {
+                    if (attributes.isRegularFile() && !SaveWalk.isExcluded(folder, file)) {
                         total[0] += attributes.size();
                     }
                     return FileVisitResult.CONTINUE;
