@@ -81,6 +81,14 @@ jobs:
       - name: Build (source-merge gate) + core invariant + headless suite
         run: ./gradlew build --stacktrace
 
+      # The non-Fabric jar on the deep bands is a separate ForgeGradle-6 Gradle-8 island (forge/) with its own
+      # wrapper, which the root build above does not reach. Build it only on bands that carry one. It runs on the
+      # setup-java JDK (Java 17), where ForgeGradle 6 is supported; the root build's daemon runs on a detected
+      # Java 21 for Loom.
+      - name: Build the Forge island (deep bands only)
+        if: hashFiles('forge/gradlew') != ''
+        run: cd forge && ./gradlew build --stacktrace
+
       # Convenience: grab the built jars off a green run without a local build. The real distribution is the
       # release workflow's publishMods, not these. Exclude the sources / dev jars Loom and ModDev also drop
       # into libs/ so the artifact carries only the production jar.
@@ -94,11 +102,25 @@ jobs:
             !fabric/build/libs/*-dev.jar
           if-no-files-found: error
 
+      # Each loader's upload is gated on its jar existing: a band includes only the loaders it ships (NeoForge on
+      # the modern bands, Forge on the deep bands), so the other loader's build directory is empty and its upload
+      # is skipped rather than failing the run.
       - name: Upload NeoForge artifact
+        if: hashFiles('neoforge/build/libs/*.jar') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: archive-wdl-neoforge
           path: |
             neoforge/build/libs/*.jar
             !neoforge/build/libs/*-sources.jar
+          if-no-files-found: error
+
+      - name: Upload Forge artifact
+        if: hashFiles('forge/build/libs/*.jar') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: archive-wdl-forge
+          path: |
+            forge/build/libs/*.jar
+            !forge/build/libs/*-sources.jar
           if-no-files-found: error
