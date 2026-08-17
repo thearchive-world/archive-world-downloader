@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
@@ -16,8 +16,8 @@ import net.minecraft.nbt.NbtOps;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The read-merge for the {@code entities/} target, UUID-keyed ({@code UUIDUtil.CODEC}, band-stable post-1.16). Two
- * carry-forwards, both so a re-write of an entity-chunk adds to, never overwrites, what is already on disk:
+ * The read-merge for the {@code entities/} target, UUID-keyed ({@code SerializableUUID.CODEC}, band-stable post-1.16).
+ * Two carry-forwards, both so a re-write of an entity-chunk adds to, never overwrites, what is already on disk:
  *
  * <ul>
  * <li>Container contents: a container vehicle's or chested animal's on-disk {@code "Items"}, and a villager's trade
@@ -116,8 +116,11 @@ final class EntityMerge {
         return entity.get("Offers") instanceof CompoundTag offers && NbtMerge.isNonEmptyList(offers, "Recipes");
     }
 
-    /** Decode an entity tag's {@code "UUID"} (the {@code UUIDUtil.CODEC} 4-int array), or null if absent/malformed. */
+    /**
+     * Decode an entity tag's {@code "UUID"} (the {@code SerializableUUID.CODEC} 4-int array), or null if
+     * absent/malformed.
+     */
     static @Nullable UUID readUuid(CompoundTag entityTag) {
-        return UUIDUtil.CODEC.parse(NbtOps.INSTANCE, entityTag.get("UUID")).result().orElse(null);
+        return SerializableUUID.CODEC.parse(NbtOps.INSTANCE, entityTag.get("UUID")).result().orElse(null);
     }
 }

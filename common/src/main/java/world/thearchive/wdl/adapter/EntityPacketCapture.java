@@ -6,6 +6,7 @@ package world.thearchive.wdl.adapter;
 import com.mojang.datafixers.util.Pair;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
@@ -67,7 +68,7 @@ import world.thearchive.wdl.core.SendRangeSampler;
  */
 final class EntityPacketCapture
         extends
-        EntityPacketAccumulator<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> {
+        EntityPacketAccumulator<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> {
     private static volatile @Nullable EntityPacketCapture active;
 
     /**
@@ -92,12 +93,10 @@ final class EntityPacketCapture
      * Displays.
      */
     private static final Set<EntityType<?>> RANGE_SAMPLING_EXCLUSIONS = Set.of(
-            EntityType.BOAT, EntityType.CHEST_BOAT,
+            EntityType.BOAT,
             EntityType.HORSE, EntityType.DONKEY, EntityType.SKELETON_HORSE, EntityType.ZOMBIE_HORSE,
-            EntityType.CAMEL, EntityType.LLAMA, EntityType.TRADER_LLAMA,
-            EntityType.PIG, EntityType.STRIDER,
-            EntityType.BLOCK_DISPLAY, EntityType.ITEM_DISPLAY, EntityType.TEXT_DISPLAY,
-            EntityType.INTERACTION);
+            EntityType.LLAMA, EntityType.TRADER_LLAMA,
+            EntityType.PIG, EntityType.STRIDER);
 
     /**
      * Diagnostic only (gated by {@code dumpReceivedFrames}, default off): the {@code (blockX blockY blockZ facing)} key
@@ -183,7 +182,8 @@ final class EntityPacketCapture
         if (add.getType() == EntityType.PLAYER) {
             return; // the client builds a RemotePlayer for PLAYER, and players are not saved as entities
         }
-        EntityPos pos = new EntityPos(add.getX(), add.getY(), add.getZ(), add.getYRot(), add.getXRot());
+        EntityPos pos = new EntityPos(add.getX(), add.getY(), add.getZ(),
+                decodeAngle((byte) add.getyRot()), decodeAngle((byte) add.getxRot()));
         spawn(add.getId(), add.getUUID(), chunkKey(add.getX(), add.getZ()), pos, add);
         if (dumpReceivedFrames
                 && (add.getType() == EntityType.ITEM_FRAME || add.getType() == EntityType.GLOW_ITEM_FRAME)) {
@@ -251,7 +251,7 @@ final class EntityPacketCapture
         if (entity.isPassenger() || entity.isVehicle()) {
             return;
         }
-        Vec3 base = entity.getPositionCodec().decode(0L, 0L, 0L);
+        Vec3 base = entity.getPacketCoordinates();
         int id = entity.getId();
         sampler.registerSeed(id, base.x, base.z);
         int distanceBlocks = sampler.seedSample(id, playerX, playerZ);
@@ -284,9 +284,12 @@ final class EntityPacketCapture
     }
 
     private void onSetData(ClientboundSetEntityDataPacket packet) {
-        if (tracks(packet.id())) {
-            for (SynchedEntityData.DataValue<?> value : packet.packedItems()) {
-                recordData(packet.id(), value.id(), value);
+        if (tracks(packet.getId())) {
+            List<SynchedEntityData.DataItem<?>> items = packet.getUnpackedData();
+            if (items != null) {
+                for (SynchedEntityData.DataItem<?> value : items) {
+                    recordData(packet.getId(), value.getAccessor().getId(), value);
+                }
             }
         }
     }

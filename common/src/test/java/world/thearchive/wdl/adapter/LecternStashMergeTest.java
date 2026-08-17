@@ -19,6 +19,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
@@ -54,7 +55,7 @@ class LecternStashMergeTest {
         tag.putInt("generation", 0);
         tag.putBoolean("resolved", true);
         ListTag pages = new ListTag();
-        pages.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal("only page"))));
+        pages.add(StringTag.valueOf(Component.Serializer.toJson(new TextComponent("only page"))));
         tag.put("pages", pages);
         return book;
     }

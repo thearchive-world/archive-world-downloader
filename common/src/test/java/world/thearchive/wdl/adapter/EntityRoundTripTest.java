@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -113,7 +114,7 @@ class EntityRoundTripTest {
         // Reopen with a FRESH storage and read every entity-chunk back at its position.
         try (IOWorker in = entityStorage(paths)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag back = in.loadAsync(positions.get(i)).join()
+                CompoundTag back = Optional.ofNullable(in.load(positions.get(i)))
                         .orElseThrow(() -> new AssertionError("missing entity-chunk"));
                 int[] position = back.getIntArray("Position");
                 assertEquals(positions.get(i), new ChunkPos(position[0], position[1]),

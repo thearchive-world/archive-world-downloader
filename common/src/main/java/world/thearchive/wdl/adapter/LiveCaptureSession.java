@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import net.minecraft.SharedConstants;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientChunkCache;
@@ -44,13 +46,12 @@ import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
@@ -66,7 +67,7 @@ import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
 import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.vehicle.ContainerEntity;
+import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.BrewingStandMenu;
 import net.minecraft.world.inventory.ChestMenu;
@@ -833,7 +834,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             SendRangeEstimator sendRange, boolean overlayActive, boolean cameraDetachedAtStart,
             BobbyChunkFilter bobbyFilter, Runnable saveCompletePoke) {
         this(adapter, bridge, config, level,
-                VanillaDimensions.forType(level.dimensionTypeRegistration().unwrapKey().orElse(null)),
+                VanillaDimensions.forType(level.dimensionType()),
                 level.dimension(), level.registryAccess(), target, overlayIndex, coveredIndex, sendRange,
                 overlayActive, cameraDetachedAtStart, bobbyFilter, saveCompletePoke);
     }
@@ -1281,8 +1282,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * resumes this same tick in the new dimension.
      */
     private void rebindDimension(ClientLevel newLevel) {
-        rebindDimension(VanillaDimensions.forType(newLevel.dimensionTypeRegistration().unwrapKey().orElse(null)),
-                newLevel.dimension());
+        rebindDimension(VanillaDimensions.forType(newLevel.dimensionType()), newLevel.dimension());
         this.level = newLevel;
     }
 
@@ -2083,8 +2083,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         int menuSlotCount = 0;
         int entityContainerSize = 0;
         UUID uuid = null;
-        Entity vehicle = target instanceof ContainerEntity ? target : player.getVehicle();
-        if (vehicle instanceof ContainerEntity containerVehicle) {
+        Entity vehicle = target instanceof AbstractMinecartContainer ? target : player.getVehicle();
+        if (vehicle instanceof AbstractMinecartContainer containerVehicle) {
             atEntity = true;
             entityIsVehicle = true;
             entityContainerSize = containerVehicle.getContainerSize();
@@ -2148,7 +2148,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void recordBlockType(BlockPos pos, CompoundTag holder) {
         BlockEntity blockEntity = level().getBlockEntity(pos);
         if (blockEntity != null) {
-            String typeId = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString();
+            String typeId = Registry.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString();
             holder.putString("wdl_block_entity_id", typeId);
             capturedBlockTypes.put(pos.asLong(), typeId);
         }
@@ -2282,8 +2282,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         CompoundTag holder;
         try {
-            holder = MerchantOfferCapture.serialize(offers, merchant.getTraderXp(), boundMerchantIsVillager,
-                    registries);
+            holder = MerchantOfferCapture.serialize(offers, merchant.getTraderXp(), boundMerchantIsVillager);
         } catch (RuntimeException e) {
             merchantEncodeFailed.add(uuid);
             LOGGER.warn("skipping villager {} trades: offers encode failed", uuid, e);
@@ -2509,7 +2508,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // the writer thread reads the frozen bytes. Reading at finish, not begin, also catches an icon pushed
         // mid-session after join. Null in singleplayer or with no cached icon, so no icon file is written.
         ServerData iconServer = minecraft.getCurrentServer();
-        this.reportIconBytes = iconServer != null ? iconServer.getIconBytes() : null;
+        String iconB64 = iconServer != null ? iconServer.getIconB64() : null;
+        this.reportIconBytes = iconB64 != null ? Base64.getDecoder().decode(iconB64) : null;
         prepareReportCompletion(); // freeze the end-of-capture counts before the writer finalizes
         // After every remap site above, so the batch is complete and queues behind the last chunk and entity
         // write: the bar then finishes the chunk phase, advances through the map phase, and only then compresses.
@@ -3035,7 +3035,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** The data version, read band-stably via the same vanilla stamp {@link MapDataWriter} uses. */
     private static int currentDataVersion() {
         CompoundTag probe = new CompoundTag();
-        NbtUtils.addCurrentDataVersion(probe);
+        probe.putInt("DataVersion", SharedConstants.getCurrentVersion().getWorldVersion());
         return probe.getInt("DataVersion");
     }
 
@@ -4315,10 +4315,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * inside the vehicle).
      */
     private void promoteChunk(ChunkPos pos,
-            List<PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry>> held) {
+            List<PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry>> held) {
         List<Promoted> built = new ArrayList<>();
         Map<Integer, Entity> byId = new HashMap<>();
-        for (PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> frame : held) {
+        for (PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> frame : held) {
             if (excludedRootVehicleUuids.contains(frame.uuid())) {
                 continue; // captured into the player's RootVehicle; not also a standalone entity (same-UUID clash)
             }
@@ -4367,7 +4367,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** A drained entity paired with the entity reconstructed from it, for the in-batch relationship wiring. */
     private record Promoted(
-            PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> frame,
+            PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> frame,
             Entity entity) {}
 
     /**
@@ -4380,7 +4380,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * cannot create.
      */
     private @Nullable Entity reconstructPacketEntity(
-            PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> frame) {
+            PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> frame) {
         EntityType<?> type = frame.spawn().getType();
         Entity entity = type.create(level());
         if (entity == null) {
@@ -4389,7 +4389,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         entity.recreateFromPacket(frame.spawn());
         EntityPos pos = frame.pos();
         entity.moveTo(pos.x(), pos.y(), pos.z(), pos.yRot(), pos.xRot());
-        List<SynchedEntityData.DataValue<?>> synced = frame.synced();
+        List<SynchedEntityData.DataItem<?>> synced = frame.synced();
         if (!synced.isEmpty()) {
             entity.getEntityData().assignValues(synced);
         }

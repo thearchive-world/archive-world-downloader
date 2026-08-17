@@ -15,22 +15,21 @@ import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Registry;
 import net.minecraft.core.SectionPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.entity.npc.WanderingTrader;
-import net.minecraft.world.entity.vehicle.ContainerEntity;
+import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.LecternBlock;
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.block.entity.ChiseledBookShelfBlockEntity;
 import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.level.block.entity.LecternBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -109,7 +108,6 @@ public final class OutlineTracker {
     private static final class CachedContainer {
         final OutlineRim rim;
         final boolean ender;
-        final boolean bookshelf;
         // The live block-entity type id at scan time, compared against the recorded capture type so a
         // same-position block replacement re-rims the stale capture (Gate 2).
         final String liveTypeId;
@@ -119,11 +117,10 @@ public final class OutlineTracker {
         final double centerY;
         final double centerZ;
 
-        CachedContainer(OutlineRim rim, boolean ender, boolean bookshelf, String liveTypeId,
+        CachedContainer(OutlineRim rim, boolean ender, String liveTypeId,
                 long sectionKey, long secondSectionKey, double centerX, double centerY, double centerZ) {
             this.rim = rim;
             this.ender = ender;
-            this.bookshelf = bookshelf;
             this.liveTypeId = liveTypeId;
             this.sectionKey = sectionKey;
             this.secondSectionKey = secondSectionKey;
@@ -271,18 +268,15 @@ public final class OutlineTracker {
         long[] cells;
         AABB box;
         boolean ender = false;
-        boolean bookshelf = false;
         // Invariant, kept in sync by hand: every type outlined here (and in isContainerEntity and
         // isTradeableMerchant) must have an enabled capture path, or its rim is a to-do the player can never
         // clear. Contents arrive either on open, bound in LiveCaptureSession.captureOpenContainer (a container
         // menu, or a merchant menu whose non-empty offers clear a tradeable villager's rim), or on interaction,
         // recorded in InteractionCapture. The invariant is one-way; a capturable type need not be outlined.
-        // Three deliberate asymmetries: a chiseled bookshelf is outlined here but captured on interaction (it opens
-        // no menu and is not a BaseContainerBlockEntity), and its rim is suppressed in emit when interaction capture
-        // is off so it never becomes a stuck to-do; an ender chest reaches the save through the player tag rather than
-        // this position, so its rim is suppressed in emit on the toggle that write is gated on; a jukebox is
-        // captured on interaction but deliberately not outlined (not a BaseContainerBlockEntity, it falls
-        // through to the else return below).
+        // Two deliberate asymmetries: an ender chest reaches the save through the player tag rather than this
+        // position, so its rim is suppressed in emit on the toggle that write is gated on; a jukebox is captured on
+        // interaction but deliberately not outlined (not a BaseContainerBlockEntity, it falls through to the else
+        // return below).
         if (blockEntity instanceof ChestBlockEntity) {
             BlockState state = level.getBlockState(pos);
             BlockPos partner = doubleChestPartner(level, pos, state);
@@ -307,13 +301,6 @@ public final class OutlineTracker {
             }
             cells = new long[] { pos.asLong() };
             box = boxOf(level, pos);
-        } else if (blockEntity instanceof ChiseledBookShelfBlockEntity) {
-            if (BookshelfSlots.occupiedSlotMask(level.getBlockState(pos)) == 0) {
-                return; // an empty bookshelf holds nothing capturable, so it is not a candidate (mirrors the lectern)
-            }
-            cells = new long[] { pos.asLong() };
-            box = boxOf(level, pos);
-            bookshelf = true;
         } else if (blockEntity instanceof BaseContainerBlockEntity) {
             cells = new long[] { pos.asLong() };
             box = boxOf(level, pos);
@@ -324,7 +311,7 @@ public final class OutlineTracker {
         OutlineRim rim = new OutlineRim(config.unscannedColor(), box, cells);
         long sectionKey = SectionPos.blockToSection(cells[0]);
         long secondSectionKey = cells.length > 1 ? SectionPos.blockToSection(cells[1]) : sectionKey;
-        entry.containers.add(new CachedContainer(rim, ender, bookshelf, blockEntityTypeId(blockEntity), sectionKey,
+        entry.containers.add(new CachedContainer(rim, ender, blockEntityTypeId(blockEntity), sectionKey,
                 secondSectionKey, (box.minX + box.maxX) * 0.5, (box.minY + box.maxY) * 0.5,
                 (box.minZ + box.maxZ) * 0.5));
     }
@@ -334,7 +321,7 @@ public final class OutlineTracker {
     // vs Identifier), so this shared file stays band-portable.
     @SuppressWarnings("NullAway") // getKey is non-null for a live block entity's registered type
     private static String blockEntityTypeId(BlockEntity blockEntity) {
-        return BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString();
+        return Registry.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString();
     }
 
     private void emit(ClientLevel level, ChunkContainers entry, Vec3 cameraPos, double clamp, OutlineConfig config,
@@ -348,22 +335,8 @@ public final class OutlineTracker {
             if (container.ender && !toggles.savePlayerEnderChest()) {
                 continue; // the finish strips EnderItems, so this rim would be a to-do no open can clear
             }
-            OutlineClass classification;
-            if (container.bookshelf) {
-                long posKey = container.rim.cells()[0];
-                int occupiedMask = BookshelfSlots.occupiedSlotMask(level.getBlockState(BlockPos.of(posKey)));
-                if (occupiedMask == 0) {
-                    continue; // emptied or broken since the last rescan; nothing to flag, the rescan will evict it
-                }
-                classification = OutlineClassifier.classifyBookshelf(occupiedMask,
-                        captured.bookshelfCapturedSlots(posKey), recovered.bookshelfSavedSlots(posKey));
-                if (classification == OutlineClass.UNSAVED && !toggles.refreshesHotChunks()) {
-                    continue; // with the interaction-capture axis off the red rim is an unclearable to-do
-                }
-            } else {
-                classification = OutlineClassifier.classify(container.rim.cells(), container.liveTypeId, null,
-                        container.ender, captured, recovered);
-            }
+            OutlineClass classification = OutlineClassifier.classify(container.rim.cells(), container.liveTypeId, null,
+                    container.ender, captured, recovered);
             if (classification == OutlineClass.CAPTURED) {
                 continue;
             }
@@ -443,7 +416,7 @@ public final class OutlineTracker {
     /** Whether {@code entity} is a container vehicle or a chested animal (the open-time entity-container set). */
     private static boolean isContainerEntity(Entity entity) {
         // Below 1.21 getInventoryColumns is nonzero without a chest, so it cannot substitute for hasChest.
-        return entity instanceof ContainerEntity
+        return entity instanceof AbstractMinecartContainer
                 || (entity instanceof AbstractChestedHorse animal && animal.hasChest());
     }
 

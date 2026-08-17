@@ -18,13 +18,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
@@ -32,21 +30,17 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.DataPackConfig;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
-import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.FlatLevelSource;
-import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
-import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
-import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
@@ -62,7 +56,7 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.19.4 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
+ * 1.18.2 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
  * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
  * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
  * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
@@ -82,7 +76,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /**
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.19.4 id and carries no spec.
+     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.18.2 id and carries no spec.
      * The user's gamerule.* overrides, keyed by band id, are validated and applied on top of this (see
      * {@link WorldOutputConfig}).
      */
@@ -91,24 +85,24 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /** One curated rule: its stable WDL name, the running band's id for it, and the curated raw value. */
     private record CuratedSpec(String wdlId, String bandId, String curatedValue) {}
 
-    // SpecialWorldProperty is vanilla-deprecated, but the only public PrimaryLevelData ctor still
-    // requires it; we take it from the baked dimensions (FLAT, for this superflat void world).
-    @SuppressWarnings("deprecation")
     @Override
     public LevelData buildLevelData(RegistryAccess clientRegistries, WorldOutputConfig worldOutput,
             @Nullable String worldName) {
         WorldType worldType = worldOutput.worldType();
-        // A real generator needs the full vanilla worldgen registries, which a multiplayer client is never sent;
-        // the void generator only needs the client's synced biome/dimension-type registries, so it stays on them
-        // and its output is unchanged. The dimensions and the encode context must share one registry set (their
-        // generator holders must be owned by the registries the encode resolves against), so both derive here.
-        RegistryAccess generatorRegistries = worldType.needsWorldgenReconstruction()
+        // A real generator needs the full vanilla worldgen registries, which a multiplayer client is never sent. The
+        // void generator would otherwise stay on the client's synced biome/dimension-type registries, but below 1.19.3
+        // Forge tags every registry entry with a registry name and never sets one on a client-synced biome, so
+        // FlatLevelGeneratorSettings rebuilding the void biome trips ForgeRegistryEntry.setRegistryName on a null name.
+        // The locally reconstructed vanilla registries carry names, so the void generator builds from them too here; it
+        // uses only standard vanilla dimension types and biomes, so nothing server-specific is lost.
+        RegistryAccess registries = worldType == WorldType.VOID || worldType.needsWorldgenReconstruction()
                 ? VanillaWorldgenRegistries.get()
                 : clientRegistries;
-        WorldDimensions.Complete dimensions = bakedDimensions(worldType, generatorRegistries);
-        RegistryAccess.Frozen registries = new RegistryAccess.ImmutableRegistryAccess(
-                Stream.concat(generatorRegistries.registries(), dimensions.dimensionsRegistryAccess().registries()))
-                        .freeze();
+
+        long seed = worldType == WorldType.VOID ? PLACEHOLDER_SEED : worldOutput.worldSeed();
+        boolean generateFeatures = worldType != WorldType.VOID && worldOutput.generateFeatures();
+        Registry<LevelStem> dimensions = buildDimensions(worldType, registries, seed);
+        WorldGenSettings worldGenSettings = new WorldGenSettings(seed, generateFeatures, false, dimensions);
 
         GameRules gameRules = new GameRules();
         GameRuleResolution gameRuleResolution = applyGameRules(gameRules, worldOutput);
@@ -119,21 +113,23 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         boolean allowCommands = worldOutput.overrideWorldDefaults() && worldOutput.allowCommands();
         LevelSettings settings = new LevelSettings(
                 levelName, GameType.SURVIVAL, false, Difficulty.NORMAL, allowCommands,
-                gameRules, WorldDataConfiguration.DEFAULT);
-        WorldOptions worldOptions = worldOptions(worldType, worldOutput);
+                gameRules, DataPackConfig.DEFAULT);
 
-        // Fail loud: PrimaryLevelData.setTagData silently omits WorldGenSettings if its encode errors,
-        // yielding an unopenable world. Pre-encode and reject any error/partial result first.
+        // Fail loud: PrimaryLevelData.setTagData silently omits WorldGenSettings if its encode errors, yielding an
+        // unopenable world. Pre-encode and reject any error/partial result first.
         DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
-        DataResult<Tag> worldGen = WorldGenSettings.encode(ops, worldOptions, registries);
+        DataResult<Tag> worldGen = WorldGenSettings.CODEC.encodeStart(ops, worldGenSettings);
         if (worldGen.error().isPresent()) {
             throw new IllegalStateException(
                     "level.dat WorldGenSettings encode failed (world would be unopenable): "
                             + worldGen.error().get().message());
         }
 
-        PrimaryLevelData worldData = new PrimaryLevelData(
-                settings, worldOptions, dimensions.specialWorldProperty(), dimensions.lifecycle());
+        // The lifecycle vanilla derives for these settings: a default world's three vanilla generators are stable,
+        // while the void world's flat nether and end are not, so it opens experimental. Minecraft re-derives this
+        // from the baked generators at load, so the write here only matches the in-memory PrimaryLevelData to it.
+        Lifecycle lifecycle = LevelStem.stable(seed, dimensions) ? Lifecycle.stable() : Lifecycle.experimental();
+        PrimaryLevelData worldData = new PrimaryLevelData(settings, worldGenSettings, lifecycle);
         // Downloaded worlds always open at noon, a fixed world-open invariant. A fresh PrimaryLevelData already
         // opens clear (raining, thundering, and their timers default off), so weather needs no write here.
         worldData.setDayTime(NOON);
@@ -245,8 +241,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are dev's band-neutral keys; each maps to its 1.19.4 vanilla rule id here, and the newer bands'
-    // fire rule is dropped by omitting its spec, since 1.19.4 has no equivalent.
+    // The WDL names are dev's band-neutral keys; each maps to its 1.18.2 vanilla rule id here, and the newer bands'
+    // fire rule is dropped by omitting its spec, since 1.18.2 has no equivalent.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
@@ -295,62 +291,57 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     }
 
     /**
-     * The baked dimensions for the chosen generator: the vanilla NORMAL/FLAT presets (real terrain, built from the same
-     * worldgen registries the encode resolves against) or the hardcoded superflat void. The captured chunks always
+     * The dimensions registry for the chosen generator: the vanilla DEFAULT/FLAT presets (real terrain, built from the
+     * same worldgen registries the encode resolves against) or the hardcoded superflat void. The captured chunks always
      * supply the real terrain; the generator only governs the un-captured surroundings, which for DEFAULT/FLAT are
      * freshly generated and not the server's actual land (the server seed is not recoverable).
      */
-    private static WorldDimensions.Complete bakedDimensions(WorldType worldType, RegistryAccess registries) {
+    private static Registry<LevelStem> buildDimensions(WorldType worldType, RegistryAccess registries, long seed) {
+        Registry<DimensionType> dimensionTypes = registries.registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY);
         return switch (worldType) {
-            case DEFAULT -> WorldPresets.createNormalWorldDimensions(registries).bake(emptyLevelStems());
-            case FLAT -> flatWorldDimensions(registries).bake(emptyLevelStems());
+            case DEFAULT -> WorldGenSettings.withOverworld(dimensionTypes,
+                    DimensionType.defaultDimensions(registries, seed),
+                    WorldGenSettings.makeDefaultOverworld(registries, seed));
+            case FLAT -> {
+                Registry<Biome> biomes = registries.registryOrThrow(Registry.BIOME_REGISTRY);
+                Registry<StructureSet> structureSets = registries.registryOrThrow(Registry.STRUCTURE_SET_REGISTRY);
+                FlatLevelSource flat = new FlatLevelSource(
+                        structureSets, FlatLevelGeneratorSettings.getDefault(biomes, structureSets));
+                yield WorldGenSettings.withOverworld(dimensionTypes,
+                        DimensionType.defaultDimensions(registries, seed), flat);
+            }
             case VOID -> voidDimensions(registries);
         };
     }
 
-    /**
-     * The FLAT preset's dimensions. Below 1.21.2 WorldPresets exposes only createNormalWorldDimensions, so the flat
-     * preset is resolved from the reconstructed WORLD_PRESET registry the same way vanilla builds the normal one.
-     */
-    private static WorldDimensions flatWorldDimensions(RegistryAccess registries) {
-        return registries.registryOrThrow(Registries.WORLD_PRESET)
-                .getHolderOrThrow(WorldPresets.FLAT).value().createWorldDimensions();
-    }
-
-    private static WorldOptions worldOptions(WorldType worldType, WorldOutputConfig worldOutput) {
-        if (worldType == WorldType.VOID) {
-            return new WorldOptions(PLACEHOLDER_SEED, false, false); // no structures for void
-        }
-        return new WorldOptions(worldOutput.worldSeed(), worldOutput.generateFeatures(), false);
-    }
-
-    private static Registry<LevelStem> emptyLevelStems() {
-        return new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable());
-    }
-
-    /** The three vanilla dimensions, each a void superflat generator, baked into a LEVEL_STEM set. */
-    private static WorldDimensions.Complete voidDimensions(RegistryAccess registries) {
-        Registry<Biome> biomes = registries.registryOrThrow(Registries.BIOME);
+    private static Registry<LevelStem> voidDimensions(RegistryAccess registries) {
+        Registry<Biome> biomes = registries.registryOrThrow(Registry.BIOME_REGISTRY);
+        Registry<DimensionType> dimensionTypes = registries.registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY);
         ResourceKey<Biome> biomeKey = biomes.containsKey(Biomes.THE_VOID) ? Biomes.THE_VOID : Biomes.PLAINS;
-        Holder<Biome> voidBiome = biomes.getHolderOrThrow(biomeKey);
+        Holder<Biome> voidBiome = biomes.getOrCreateHolder(biomeKey);
 
+        // A void world places no structures, and a multiplayer client is never sent the structure-set registry, so
+        // the generator carries an empty one rather than resolving one it does not have.
+        MappedRegistry<StructureSet> structureSets = new MappedRegistry<>(Registry.STRUCTURE_SET_REGISTRY,
+                Lifecycle.stable(), null);
         FlatLevelGeneratorSettings flat = new FlatLevelGeneratorSettings(Optional.of(HolderSet.<StructureSet>direct()),
-                voidBiome, List.of());
-        flat.updateLayers(); // no layers -> all air (voidSettings)
+                biomes);
+        flat.setBiome(voidBiome);
+        flat.updateLayers(); // no layers -> all air
+        FlatLevelSource generator = new FlatLevelSource(structureSets, flat);
 
-        Registry<DimensionType> dimensionTypes = registries.registryOrThrow(Registries.DIMENSION_TYPE);
-        MappedRegistry<LevelStem> stems = new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable());
-        stems.register(LevelStem.OVERWORLD, voidStem(dimensionTypes, BuiltinDimensionTypes.OVERWORLD, flat),
+        MappedRegistry<LevelStem> stems = new MappedRegistry<>(Registry.LEVEL_STEM_REGISTRY, Lifecycle.stable(), null);
+        stems.register(LevelStem.OVERWORLD, voidStem(dimensionTypes, DimensionType.OVERWORLD_LOCATION, generator),
                 Lifecycle.stable());
-        stems.register(LevelStem.NETHER, voidStem(dimensionTypes, BuiltinDimensionTypes.NETHER, flat),
+        stems.register(LevelStem.NETHER, voidStem(dimensionTypes, DimensionType.NETHER_LOCATION, generator),
                 Lifecycle.stable());
-        stems.register(LevelStem.END, voidStem(dimensionTypes, BuiltinDimensionTypes.END, flat), Lifecycle.stable());
-
-        return new WorldDimensions(stems.freeze()).bake(emptyLevelStems());
+        stems.register(LevelStem.END, voidStem(dimensionTypes, DimensionType.END_LOCATION, generator),
+                Lifecycle.stable());
+        return stems;
     }
 
     private static LevelStem voidStem(
-            Registry<DimensionType> dimensionTypes, ResourceKey<DimensionType> type, FlatLevelGeneratorSettings flat) {
-        return new LevelStem(dimensionTypes.getHolderOrThrow(type), new FlatLevelSource(flat));
+            Registry<DimensionType> dimensionTypes, ResourceKey<DimensionType> type, FlatLevelSource generator) {
+        return new LevelStem(dimensionTypes.getOrCreateHolder(type), generator);
     }
 }

@@ -16,7 +16,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
-import net.minecraft.world.entity.vehicle.ContainerEntity;
+import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.Slot;
@@ -222,8 +222,8 @@ final class ContainerCapture {
      * {@link ContainerAssociation#shouldClaimVehicleOpen}, decided MC-free; this extracts the live booleans.
      */
     boolean shouldClaimVehicleOpen(LocalPlayer player, @Nullable Entity target, boolean vehicleIntentOpen) {
-        return ContainerAssociation.shouldClaimVehicleOpen(target instanceof ContainerEntity,
-                player.getVehicle() instanceof ContainerEntity, vehicleIntentOpen);
+        return ContainerAssociation.shouldClaimVehicleOpen(target instanceof AbstractMinecartContainer,
+                player.getVehicle() instanceof AbstractMinecartContainer, vehicleIntentOpen);
     }
 
     /**

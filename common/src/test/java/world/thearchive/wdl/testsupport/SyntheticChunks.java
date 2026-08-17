@@ -11,7 +11,6 @@ import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
@@ -85,7 +84,7 @@ public final class SyntheticChunks {
 
     private static ChunkSnapshotSource fullWithBlockEntities(RegistryAccess registries, boolean lightCorrect,
             List<CompoundTag> blockEntities, boolean checkShape) {
-        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
         int minSectionY = heightAccessor().getMinSection();
 
         LevelChunkSection bottom = new LevelChunkSection(minSectionY, biomeRegistry);
@@ -137,7 +136,7 @@ public final class SyntheticChunks {
      * so the section lookup ({@code pos.getY() >> 4}) resolves it.
      */
     public static ChunkSnapshotSource withBlockAt(RegistryAccess registries, BlockPos worldPos, BlockState state) {
-        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
         LevelChunkSection section = new LevelChunkSection(worldPos.getY() >> 4, biomeRegistry);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
         List<ChunkSnapshotSource.SectionData> sections = List
@@ -167,7 +166,7 @@ public final class SyntheticChunks {
 
     private static ChunkSnapshotSource withBlockEntityAt(RegistryAccess registries, BlockPos worldPos,
             BlockState state, CompoundTag blockEntity, boolean checkShape) {
-        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
         LevelChunkSection section = new LevelChunkSection(worldPos.getY() >> 4, biomeRegistry);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
         List<ChunkSnapshotSource.SectionData> sections = List
@@ -184,7 +183,7 @@ public final class SyntheticChunks {
      * {@code SectionData} survives write and parse.
      */
     public static ChunkSnapshotSource fullWithLight(RegistryAccess registries) {
-        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
         int minSectionY = heightAccessor().getMinSection();
 
         LevelChunkSection bottom = new LevelChunkSection(minSectionY, biomeRegistry);

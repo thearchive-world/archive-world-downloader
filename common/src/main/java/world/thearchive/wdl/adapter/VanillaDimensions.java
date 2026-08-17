@@ -5,7 +5,6 @@ package world.thearchive.wdl.adapter;
 
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.jspecify.annotations.Nullable;
 
@@ -15,8 +14,9 @@ import world.thearchive.wdl.core.WorldType;
  * Maps a captured dimension to the vanilla single-player dimension it is written under, keyed by its dimension TYPE
  * rather than its level key. A server with non-standard level keys (e.g. Multiverse's
  * {@code minecraft:worlds/2b2t/2b2t_1}) still uses a vanilla dimension type, so routing by type lays the save out under
- * the vanilla dimension's own folder rather than one derived from the custom level key. Band-agnostic: only stable
- * vanilla constants, so it is byte-identical across the era bands.
+ * the vanilla dimension's own folder rather than one derived from the custom level key. Below the 1.19 registry-sync
+ * rework the client's dimension type arrives keyless (an inline Holder.Direct), so the nether and end are recognized by
+ * the type's effects id rather than its registry key; above that band the key is available and either signal works.
  *
  * <p>The consequence for two server worlds is ACCEPTED rather than guarded, and it is stated here because this method
  * is where it comes from: worlds routing to one folder share it, so their terrain interleaves and their captured
@@ -27,16 +27,23 @@ final class VanillaDimensions {
     private VanillaDimensions() {}
 
     /**
-     * The vanilla single-player dimension for a captured dimension's {@code typeKey} (the dimension type's registry
-     * key, or {@code null} for an unregistered holder): the Nether type goes to {@link Level#NETHER}, the End to
-     * {@link Level#END}, and everything else (overworld, its variants, and any unrecognized type) to
-     * {@link Level#OVERWORLD}.
+     * The vanilla single-player dimension for a captured dimension {@code type}: the Nether goes to
+     * {@link Level#NETHER}, the End to {@link Level#END}, and everything else (overworld, its variants, and any
+     * unrecognized type) to {@link Level#OVERWORLD}.
+     *
+     * <p>Classified by the type's effects id, not its registry key, because below the 1.19 registry-sync rework the
+     * client receives the dimension type inline (a keyless {@code Holder.Direct} decoded through a plain ops), so
+     * {@code dimensionTypeRegistration().unwrapKey()} is empty and no registry key is available. The effects id, which
+     * the inline value still carries, is {@code the_nether} / {@code the_end} for the vanilla nether and end.
      */
-    static ResourceKey<Level> forType(@Nullable ResourceKey<DimensionType> typeKey) {
-        if (BuiltinDimensionTypes.NETHER.equals(typeKey)) {
+    static ResourceKey<Level> forType(@Nullable DimensionType type) {
+        if (type == null) {
+            return Level.OVERWORLD;
+        }
+        if (DimensionType.NETHER_EFFECTS.equals(type.effectsLocation())) {
             return Level.NETHER;
         }
-        if (BuiltinDimensionTypes.END.equals(typeKey)) {
+        if (DimensionType.END_EFFECTS.equals(type.effectsLocation())) {
             return Level.END;
         }
         return Level.OVERWORLD;

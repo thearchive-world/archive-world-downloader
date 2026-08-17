@@ -86,6 +86,6 @@ class EntityPacketCaptureTest {
     }
 
     private static ClientboundAddEntityPacket addEntity(int id, UUID uuid) {
-        return new ClientboundAddEntityPacket(id, uuid, 0.0, 64.0, 0.0, 0f, 0f, EntityType.PIG, 0, Vec3.ZERO, 0.0);
+        return new ClientboundAddEntityPacket(id, uuid, 0.0, 64.0, 0.0, 0f, 0f, EntityType.PIG, 0, Vec3.ZERO);
     }
 }

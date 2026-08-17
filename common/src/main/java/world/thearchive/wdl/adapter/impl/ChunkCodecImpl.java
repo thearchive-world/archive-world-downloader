@@ -10,18 +10,16 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.LongArrayTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
@@ -35,7 +33,6 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainer;
-import net.minecraft.world.level.chunk.PalettedContainerRO;
 import net.minecraft.world.level.chunk.storage.ChunkSerializer;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.lighting.LevelLightEngine;
@@ -45,7 +42,7 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.19.4 chunk codec: replicates the minimal client-safe slice of vanilla
+ * 1.18.2 chunk codec: replicates the minimal client-safe slice of vanilla
  * {@code ChunkSerializer.write(ServerLevel, ChunkAccess)} to NBT. Below the 1.21.2 cut the chunk write is a static
  * method that reads from a {@code ServerLevel} a multiplayer client never has, so {@link #encode} rebuilds the tag
  * field by field from the captured snapshot rather than calling vanilla.
@@ -126,24 +123,25 @@ public final class ChunkCodecImpl implements ChunkCodec {
 
     @Override
     public CompoundTag encode(ChunkSnapshotSource snapshot, RegistryAccess registries, boolean synthesizeBlending) {
-        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
-        Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec = PalettedContainer.codecRO(
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
+        Codec<PalettedContainer<Holder<Biome>>> biomeCodec = PalettedContainer.codec(
                 biomeRegistry.asHolderIdMap(), biomeRegistry.holderByNameCodec(),
-                PalettedContainer.Strategy.SECTION_BIOMES, biomeRegistry.getHolderOrThrow(Biomes.PLAINS));
+                PalettedContainer.Strategy.SECTION_BIOMES, biomeRegistry.getOrCreateHolder(Biomes.PLAINS));
         // Built per encode, not as a static field: a static initializer here would touch the block registry at class
         // load, before the headless test harness bootstraps the registries.
-        Codec<PalettedContainer<BlockState>> blockStateCodec = PalettedContainer.codecRW(
+        Codec<PalettedContainer<BlockState>> blockStateCodec = PalettedContainer.codec(
                 Block.BLOCK_STATE_REGISTRY, BlockState.CODEC, PalettedContainer.Strategy.SECTION_STATES,
                 Blocks.AIR.defaultBlockState());
 
         ChunkPos pos = snapshot.chunkPos();
-        CompoundTag tag = NbtUtils.addCurrentDataVersion(new CompoundTag());
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("DataVersion", SharedConstants.getCurrentVersion().getWorldVersion());
         tag.putInt("xPos", pos.x);
         tag.putInt("yPos", snapshot.minSectionY());
         tag.putInt("zPos", pos.z);
         tag.putLong("LastUpdate", snapshot.gameTime());
         tag.putLong("InhabitedTime", snapshot.inhabitedTime());
-        tag.putString("Status", BuiltInRegistries.CHUNK_STATUS.getKey(snapshot.status()).toString());
+        tag.putString("Status", Registry.CHUNK_STATUS.getKey(snapshot.status()).toString());
 
         if (synthesizeBlending) {
             // The blending_data MC's BlendingDataFix would inject for the overworld: the section bounds marking this

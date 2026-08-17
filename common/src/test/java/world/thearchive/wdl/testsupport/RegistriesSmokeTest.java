@@ -5,8 +5,8 @@ package world.thearchive.wdl.testsupport;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import org.junit.jupiter.api.Test;
@@ -26,9 +26,9 @@ class RegistriesSmokeTest {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
 
         // PLAINS present in the dynamic BIOME registry, else getOrThrow throws.
-        assertNotNull(registries.lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.PLAINS));
+        assertNotNull(registries.registryOrThrow(Registry.BIOME_REGISTRY).getOrThrow(Biomes.PLAINS));
 
         // The biome-registry read the chunk codec makes when it builds a section.
-        assertNotNull(new LevelChunkSection(0, registries.registryOrThrow(Registries.BIOME)));
+        assertNotNull(new LevelChunkSection(0, registries.registryOrThrow(Registry.BIOME_REGISTRY)));
     }
 }

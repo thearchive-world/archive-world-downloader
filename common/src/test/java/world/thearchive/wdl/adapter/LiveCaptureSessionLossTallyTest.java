@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -28,10 +29,11 @@ import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.damagesource.DamageSource;
@@ -400,6 +402,11 @@ class LiveCaptureSessionLossTallyTest {
         }
 
         @Override
+        public Packet<?> getAddEntityPacket() {
+            return new ClientboundAddEntityPacket(this);
+        }
+
+        @Override
         protected void defineSynchedData() {}
 
         @Override
@@ -425,7 +432,7 @@ class LiveCaptureSessionLossTallyTest {
     private static @Nullable CompoundTag blockEntityOnDisk(WorldPaths paths, ChunkPos pos, BlockPos at)
             throws Exception {
         try (IOWorker storage = paths.openRegionStorage(Level.OVERWORLD)) {
-            CompoundTag chunkTag = storage.loadAsync(pos).join()
+            CompoundTag chunkTag = Optional.ofNullable(storage.load(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             return findByPosOrNull(chunkTag, at.getX(), at.getY(), at.getZ());
         }
@@ -441,7 +448,7 @@ class LiveCaptureSessionLossTallyTest {
     /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
     private static CompoundTag entity(UUID uuid) {
         CompoundTag entity = new CompoundTag();
-        entity.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
+        entity.put("UUID", SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
         return entity;
     }
 
@@ -536,7 +543,7 @@ class LiveCaptureSessionLossTallyTest {
         // Below 1.20.5 there is no ItemCost; a merchant offer's buy cost is a plain ItemStack.
         MerchantOffers offers = new MerchantOffers();
         offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), filledMap(mapId), 1, 0, 0.0f));
-        return MerchantOfferCapture.serialize(offers, 0, false, registries);
+        return MerchantOfferCapture.serialize(offers, 0, false);
     }
 
     @Test
@@ -1090,7 +1097,7 @@ class LiveCaptureSessionLossTallyTest {
     private static void spawn(EntityPacketCapture capture, int id, UUID uuid, ChunkPos pos) {
         capture.spawn(id, uuid, pos.toLong(), new EntityPos(pos.getMinBlockX(), 64.0, pos.getMinBlockZ(), 0f, 0f),
                 new ClientboundAddEntityPacket(id, uuid, pos.getMinBlockX(), 64.0, pos.getMinBlockZ(), 0f, 0f,
-                        EntityType.PIG, 0, Vec3.ZERO, 0.0));
+                        EntityType.PIG, 0, Vec3.ZERO));
     }
 
     /**

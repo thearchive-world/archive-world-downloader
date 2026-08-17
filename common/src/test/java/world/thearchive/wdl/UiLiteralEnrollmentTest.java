@@ -20,20 +20,20 @@ import org.junit.jupiter.api.Test;
 /**
  * Fail-closed guard that new user-facing UI text lands as a translation key, not a hardcoded literal. Every user-facing
  * string is a {@code Component.translatable(...)} keyed under the {@code wdl} namespace; the
- * {@code Component.literal(...)} calls left in the view layer render data or glyphs, never prose, and each is enrolled
+ * {@code new TextComponent(...)} calls left in the view layer render data or glyphs, never prose, and each is enrolled
  * below with the reason it is not text. This test pins that inventory per file, so a newly hardcoded literal fails the
  * build until it is classified: made a translation key if it is text, or enrolled here with a note if it is data or a
  * glyph. Same fail-closed enrollment shape as {@link PitestAllowlistEnrollmentTest}.
  */
 class UiLiteralEnrollmentTest {
-    private static final String NEEDLE = "Component.literal(";
+    private static final String NEEDLE = "new TextComponent(";
 
     private static final List<Path> VIEW_ROOTS = List.of(
             Path.of("src/main/java/world/thearchive/wdl"),
             Path.of("../fabric/src/main/java/world/thearchive/wdl"),
             Path.of("../neoforge/src/main/java/world/thearchive/wdl"));
 
-    // File to number of Component.literal(...) calls, each one data or a glyph, never user-facing prose.
+    // File to number of new TextComponent(...) calls, each one data or a glyph, never user-facing prose.
     private static final Map<String, Integer> ACKNOWLEDGED_UI_LITERALS = Map.of(
             // the one amber-argument helper every confirm body's data insert (folder, backup or source zip
             // name, snapshot name) routes through
@@ -41,7 +41,9 @@ class UiLiteralEnrollmentTest {
             "WdlDownloadsScreen.java", 4, // disclosure triangle, update banner label and url
             // the chat and toast arguments core flattened to data, plus the pause-menu config button's ellipsis
             // glyph, which lives on the shared bridge rather than duplicated on each loader
-            "AbstractPlatformBridge.java", 4);
+            "AbstractPlatformBridge.java", 4,
+            // the empty no-phase HUD label placeholder, phaseLabel's NONE case
+            "WdlHudOverlay.java", 1);
 
     @Test
     void everyViewLayerLiteralIsAcknowledgedData() {
@@ -58,7 +60,7 @@ class UiLiteralEnrollmentTest {
         assertEquals(
                 new TreeMap<>(ACKNOWLEDGED_UI_LITERALS),
                 found,
-                "The view layer's Component.literal(...) inventory changed. Every user-facing\n"
+                "The view layer's new TextComponent(...) inventory changed. Every user-facing\n"
                         + "string must be a Component.translatable(...) keyed under wdl.*, never a\n"
                         + "hardcoded literal. Component.literal is only for a data value or a\n"
                         + "non-linguistic glyph. Classify the change: make it a translation key if it\n"

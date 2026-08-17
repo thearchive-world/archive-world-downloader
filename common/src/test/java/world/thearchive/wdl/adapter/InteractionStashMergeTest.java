@@ -16,23 +16,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.ChiseledBookShelfBlock;
 import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
@@ -72,40 +66,6 @@ class InteractionStashMergeTest {
             boolean recaptureEnabled, InteractionCapture.ChunkCaptureGate gate) {
         return new InteractionCapture(sink, registries, recaptureEnabled, gate,
                 (posKey, slot, occupiedMask) -> {}, (posKey, blockTypeId) -> {}, posKey -> {});
-    }
-
-    /** A chiseled-bookshelf state with the listed slots' occupancy bits set true, the rest false. */
-    private static BlockState bookshelf(int... occupiedSlots) {
-        BlockState state = Blocks.CHISELED_BOOKSHELF.defaultBlockState();
-        for (int slot : occupiedSlots) {
-            state = state.setValue(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.get(slot), true);
-        }
-        return state;
-    }
-
-    /**
-     * A right-click on the north face of a default-facing bookshelf at {@code pos} that resolves to {@code slot},
-     * reproducing vanilla SelectableSlotContainer.getHitSlot (three columns, two rows): the hit aims at the center of
-     * that slot's section.
-     */
-    private static BlockHitResult bookshelfHit(BlockPos pos, int slot) {
-        double columnCenter = (slot % 3 + 0.5) / 3.0;
-        double rowCenter = 1.0 - (slot / 3 + 0.5) / 2.0;
-        Vec3 location = new Vec3(pos.getX() + (1.0 - columnCenter), pos.getY() + rowCenter, pos.getZ());
-        return new BlockHitResult(location, Direction.NORTH, pos, false);
-    }
-
-    private static ChiseledBookShelfBlock bookshelfBlock() {
-        return (ChiseledBookShelfBlock) Blocks.CHISELED_BOOKSHELF;
-    }
-
-    private InteractionCapture.BookshelfCandidate bookshelfCandidate(Map<Integer, ItemStack> booksBySlot) {
-        Map<Integer, CompoundTag> entries = new LinkedHashMap<>();
-        for (Map.Entry<Integer, ItemStack> book : booksBySlot.entrySet()) {
-            entries.put(book.getKey(),
-                    InteractionCapture.captureBookSlotEntry(sink, book.getValue(), book.getKey(), registries));
-        }
-        return new InteractionCapture.BookshelfCandidate(entries);
     }
 
     private CompoundTag itemsHolder(int slot, ItemStack stack) {
@@ -177,20 +137,6 @@ class InteractionStashMergeTest {
         assertTrue(confirmed.isPresent(), "a beehive present at the pos confirms the placement");
         assertSame(holder, confirmed.get());
     }
-
-    @Test
-    void bookshelfWithSlotOccupiedKeepsTheBookAtThatSlot() {
-        InteractionCapture.BookshelfCandidate candidate = bookshelfCandidate(
-                Map.of(3, new ItemStack(Items.WRITTEN_BOOK)));
-
-        Optional<CompoundTag> confirmed = InteractionCapture.confirm(bookshelf(3), candidate);
-
-        assertTrue(confirmed.isPresent(), "SLOT_3_OCCUPIED true keeps the slot-3 book");
-        NonNullList<ItemStack> items = readItems(confirmed.get(), 6);
-        assertEquals(Items.WRITTEN_BOOK, items.get(3).getItem(), "the book lands at slot 3 of the Items list");
-        assertTrue(items.get(0).isEmpty(), "no other slot is populated");
-    }
-
     // The headline discard: a prediction the synced block-state never confirms is dropped.
 
     @Test
@@ -218,16 +164,6 @@ class InteractionStashMergeTest {
     }
 
     @Test
-    void bookshelfSlotDiscardedWhenOccupancyBitFalse() {
-        InteractionCapture.BookshelfCandidate candidate = bookshelfCandidate(
-                Map.of(3, new ItemStack(Items.WRITTEN_BOOK)));
-
-        // SLOT_3_OCCUPIED is false: the book was taken back or the insert was refused.
-        assertTrue(InteractionCapture.confirm(bookshelf(), candidate).isEmpty(),
-                "the only slot's bit is false, so nothing is kept and the candidate discards whole");
-    }
-
-    @Test
     void beehiveDiscardedWhenBlockAbsent() {
         CompoundTag holder = InteractionCapture.captureBees(BlockEntityFixtures.bees(60));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
@@ -248,34 +184,7 @@ class InteractionStashMergeTest {
         assertTrue(InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isEmpty(),
                 "a jukebox prediction against a non-jukebox block discards, it does not throw");
     }
-
-    @Test
-    void bookshelfDropsAnOutOfRangeSlot() {
-        Map<Integer, CompoundTag> entries = new LinkedHashMap<>();
-        entries.put(99, new CompoundTag()); // a slot beyond the six-slot range
-        InteractionCapture.BookshelfCandidate candidate = new InteractionCapture.BookshelfCandidate(entries);
-
-        // The range guard drops the out-of-range slot rather than indexing the occupancy property list out of bounds.
-        assertTrue(InteractionCapture.confirm(bookshelf(), candidate).isEmpty(),
-                "an out-of-range slot is discarded, not indexed out of bounds");
-    }
-
     // Per-slot gate independence: one slot survives while another is dropped.
-
-    @Test
-    void insertThenRemovedDropsOneSlotAndKeepsAnother() {
-        InteractionCapture.BookshelfCandidate candidate = bookshelfCandidate(
-                Map.of(1, new ItemStack(Items.ENCHANTED_BOOK), 3, new ItemStack(Items.WRITTEN_BOOK)));
-
-        // Slot 1 confirmed, slot 3 reverted (book taken back): only slot 1 survives.
-        Optional<CompoundTag> confirmed = InteractionCapture.confirm(bookshelf(1), candidate);
-
-        assertTrue(confirmed.isPresent());
-        NonNullList<ItemStack> items = readItems(confirmed.get(), 6);
-        assertEquals(Items.ENCHANTED_BOOK, items.get(1).getItem(), "the still-occupied slot persists");
-        assertTrue(items.get(3).isEmpty(), "the reverted slot is dropped");
-    }
-
     // Place-then-open precedence: an opened container supersedes a stale place-time snapshot.
 
     @Test
@@ -390,67 +299,6 @@ class InteractionStashMergeTest {
     // Recognition: a right-click on a bookshelf or jukebox records an insert candidate only when the block would
     // consume it (a book, a playable disc), so a content block placed against that face falls through to a place
     // capture instead of being dropped.
-
-    @Disabled("chiseled bookshelf is UPDATE_1_20-experimental at 1.19.4; bookshelf_books is empty headless")
-    @Test
-    void bookshelfInsertRecognizesBookAtHitSlot() {
-        InteractionCapture capture = plainCapture(sink, registries, true);
-        BlockPos pos = new BlockPos(0, 70, 0);
-
-        boolean recorded = capture.recordBookshelfInsert(bookshelfBlock(), bookshelf(), pos,
-                bookshelfHit(pos, 0), new ItemStack(Items.WRITTEN_BOOK));
-
-        assertTrue(recorded, "a book into an empty bookshelf slot is an insert");
-        assertFalse(capture.pendingCandidateChunks().isEmpty(), "the book insert candidate is stashed");
-    }
-
-    @Test
-    void bookshelfClickHoldingPlaceableBlockIsNotInsert() {
-        InteractionCapture capture = plainCapture(sink, registries, true);
-        BlockPos pos = new BlockPos(0, 70, 0);
-
-        boolean recorded = capture.recordBookshelfInsert(bookshelfBlock(), bookshelf(), pos,
-                bookshelfHit(pos, 0), new ItemStack(Items.SHULKER_BOX));
-
-        assertFalse(recorded, "a shulker clicked on a bookshelf face is a placement, not a book insert");
-        assertTrue(capture.pendingCandidateChunks().isEmpty(), "no phantom bookshelf candidate is stashed");
-    }
-
-    @Disabled("chiseled bookshelf is UPDATE_1_20-experimental at 1.19.4; bookshelf_books is empty headless")
-    @Test
-    void bookshelfInsertNotifiesTheCapturedSlotSink() {
-        long[] sinkPos = { 0L };
-        int[] sinkSlot = { -1 };
-        int[] sinkOccupied = { -1 };
-        InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> true,
-                (posKey, slot, occupied) -> {
-                    sinkPos[0] = posKey;
-                    sinkSlot[0] = slot;
-                    sinkOccupied[0] = occupied;
-                }, (posKey, blockTypeId) -> {}, posKey -> {});
-        BlockPos pos = new BlockPos(0, 70, 0);
-
-        capture.recordBookshelfInsert(bookshelfBlock(), bookshelf(0), pos, bookshelfHit(pos, 2),
-                new ItemStack(Items.WRITTEN_BOOK));
-
-        assertEquals(pos.asLong(), sinkPos[0], "a successful insert notifies the sink with the bookshelf pos");
-        assertEquals(2, sinkSlot[0], "and the hit slot");
-        assertEquals(0b1, sinkOccupied[0], "and the pre-insert occupancy mask (slot 0 was already occupied)");
-    }
-
-    @Test
-    void rejectedBookshelfInsertDoesNotNotifyTheSink() {
-        int[] sinkSlot = { -1 };
-        InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> true,
-                (posKey, slot, occupied) -> sinkSlot[0] = slot, (posKey, blockTypeId) -> {}, posKey -> {});
-        BlockPos pos = new BlockPos(0, 70, 0);
-
-        capture.recordBookshelfInsert(bookshelfBlock(), bookshelf(), pos, bookshelfHit(pos, 0),
-                new ItemStack(Items.SHULKER_BOX));
-
-        assertEquals(-1, sinkSlot[0], "a non-book click does not notify the sink");
-    }
-
     @Test
     void placedShulkerNotifiesThePlacedContainerSink() {
         long[] sinkPos = { -1L };
@@ -573,23 +421,6 @@ class InteractionStashMergeTest {
                 "re-placing an empty beehive at the same pos clears the stale prediction");
     }
 
-    @Disabled("chiseled bookshelf is UPDATE_1_20-experimental at 1.19.4; bookshelf_books is empty headless")
-    @Test
-    void bookshelfInsertCapturesOneBookNotTheWholeStack() {
-        InteractionCapture capture = plainCapture(sink, registries, true);
-        BlockPos pos = new BlockPos(0, 70, 0);
-
-        capture.recordBookshelfInsert(bookshelfBlock(), bookshelf(), pos, bookshelfHit(pos, 0),
-                new ItemStack(Items.BOOK, 5));
-
-        // Vanilla inserts exactly one book and the slot holds one, so the captured book must be a single item even
-        // though the hand held a stack of five. Drain against a bookshelf whose slot 0 reads occupied.
-        InteractionCapture.ChunkBundles bundles = capture.drainChunk(new ChunkPos(pos),
-                SyntheticChunks.withBlockAt(registries, pos, bookshelf(0)));
-        NonNullList<ItemStack> items = readItems(bundles.items().get(pos), 6);
-        assertEquals(1, items.get(0).getCount(), "the captured bookshelf book is a single item, not the held stack");
-    }
-
     @Test
     void throwingRecognitionIsSwallowedFailSoft() {
         InteractionCapture capture = plainCapture(sink, registries, true);
@@ -619,22 +450,6 @@ class InteractionStashMergeTest {
     // The per-chunk capturability gate. A chunk already written and frozen is re-captured by nothing, so its
     // reconcile gate has no post-interaction block-state and no flush ever drains the candidate: recording one
     // there can only end in a silent drop, with the outline already told the content is downloaded.
-
-    @Test
-    void aBookshelfInsertInAnUncapturableChunkIsNeitherStashedNorMarked() {
-        int[] sinkSlot = { -1 };
-        InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> false,
-                (posKey, slot, occupied) -> sinkSlot[0] = slot, (posKey, blockTypeId) -> {}, posKey -> {});
-        BlockPos pos = new BlockPos(0, 70, 0);
-
-        boolean recorded = capture.recordBookshelfInsert(bookshelfBlock(), bookshelf(), pos, bookshelfHit(pos, 0),
-                new ItemStack(Items.WRITTEN_BOOK));
-
-        assertFalse(recorded, "a book into a chunk nothing will capture again is not recorded");
-        assertTrue(capture.pendingCandidateChunks().isEmpty(), "so no doomed candidate is stashed");
-        assertEquals(-1, sinkSlot[0], "and the outline is not told the slot is downloaded");
-    }
-
     @Test
     void aJukeboxInsertInAnUncapturableChunkIsNotStashed() {
         InteractionCapture capture = plainCapture(sink, registries, true, chunk -> false);

@@ -5,18 +5,19 @@ package world.thearchive.wdl.adapter.impl;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Vector3f;
+import com.mojang.math.Vector4f;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Vector3f;
 
 import world.thearchive.wdl.adapter.OutlineRenderContext;
 import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.core.RimFace;
 
 /**
- * The 1.19.4 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
+ * The 1.18.2 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
  * {@link RenderType#lines()} type, camera-relative. The rectangle's two in-plane axes come from the block cell and its
  * normal axis from the model shape, lifted a small standoff along the face normal, so the rim frames a recessed model
  * (a chest) at block extent yet never z-fights a flush one. Each edge carries its own direction as its normal, because
@@ -33,7 +34,7 @@ public final class RimRendererImpl implements RimRenderer {
     // path: vertex(Pose, ...) and normal(Pose, ...) each new a Vector3f per call, two per vertex, the
     // dominant outline allocation under a dense base, and the per-frame path must stay allocation-free.
     // We do both transforms into these fields and write with the no-pose overloads. Render thread only.
-    private final Vector3f position = new Vector3f();
+    private final Vector4f position = new Vector4f();
     private final Vector3f normal = new Vector3f();
 
     @Override
@@ -101,7 +102,8 @@ public final class RimRendererImpl implements RimRenderer {
             dy /= length;
             dz /= length;
         }
-        pose.normal().transform(dx, dy, dz, normal); // once per edge; both vertices share the edge direction
+        normal.set(dx, dy, dz);
+        normal.transform(pose.normal()); // once per edge; both vertices share the edge direction
         vertex(lines, pose, width, x1, y1, z1, colorArgb);
         vertex(lines, pose, width, x2, y2, z2, colorArgb);
     }
@@ -110,7 +112,8 @@ public final class RimRendererImpl implements RimRenderer {
     // width is the global vanilla default and the context's resolved width is threaded here but not applied.
     private void vertex(VertexConsumer lines, PoseStack.Pose pose, float width, float x, float y, float z,
             int colorArgb) {
-        pose.pose().transformPosition(x, y, z, position);
+        position.set(x, y, z, 1.0F);
+        position.transform(pose.pose());
         lines.vertex(position.x(), position.y(), position.z()).color(colorArgb)
                 .normal(normal.x(), normal.y(), normal.z()).endVertex();
     }

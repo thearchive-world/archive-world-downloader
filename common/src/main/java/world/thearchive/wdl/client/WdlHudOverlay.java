@@ -11,6 +11,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.util.Mth;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -220,7 +222,7 @@ public final class WdlHudOverlay {
         // Anchor the chunk label at a fixed x so a growing count extends to its right rather than shoving the
         // word left; right-aligning the whole label-and-count phrase would drift the word as digits are added.
         // Clamp the anchor past the timer so an over-wide localized label sits behind it rather than overlapping.
-        String label = Component.translatable("wdl.hud.label.chunks").getString();
+        String label = new TranslatableComponent("wdl.hud.label.chunks").getString();
         String count = CaptureStatus.compactCount(frame.counts().chunks());
         int rightEdge = contentX + contentWidth;
         int labelAdvance = font.width(label + " ");
@@ -248,7 +250,7 @@ public final class WdlHudOverlay {
         int textY = y + (SAVING_BAR_HEIGHT - font.lineHeight) / 2 + 1;
         surface.text(font, phaseLabel(stage), x + 2, textY, textColor, true);
         int percent = Math.round(Mth.clamp(fraction, 0.0f, 1.0f) * 100.0f);
-        Component percentText = Component.translatable("wdl.hud.percent", percent);
+        Component percentText = new TranslatableComponent("wdl.hud.percent", percent);
         surface.text(font, percentText, x + width - font.width(percentText) - 1, textY, textColor, true);
     }
 
@@ -278,8 +280,9 @@ public final class WdlHudOverlay {
         if (frame.phase() == Phase.SAVING) {
             rowY += LINE_HEIGHT;
             int percent = Math.round(Mth.clamp(frame.progress(), 0.0f, 1.0f) * 100.0f);
-            surface.text(font, Component.translatable("wdl.hud.label.stage"), rowX, rowY, textColor, shadow);
-            Component stageValue = Component.translatable("wdl.hud.stage_percent", phaseLabel(frame.stage()), percent);
+            surface.text(font, new TranslatableComponent("wdl.hud.label.stage"), rowX, rowY, textColor, shadow);
+            Component stageValue = new TranslatableComponent("wdl.hud.stage_percent", phaseLabel(frame.stage()),
+                    percent);
             surface.text(font, stageValue, rowX + rowWidth - font.width(stageValue), rowY,
                     withAlpha(BrandColors.SAVING_GRAY, alpha), shadow);
             fillBar(surface, rowX, rowY + LINE_HEIGHT - 1, rowWidth, BAR_HEIGHT, frame.progress(), alpha);
@@ -288,7 +291,7 @@ public final class WdlHudOverlay {
 
     private static void drawRow(RenderSurface surface, Font font, String labelKey, String value, int x, int y,
             int width, int color, boolean shadow) {
-        surface.text(font, Component.translatable(labelKey), x, y, color, shadow);
+        surface.text(font, new TranslatableComponent(labelKey), x, y, color, shadow);
         surface.text(font, value, x + width - font.width(value), y, color, shadow);
     }
 
@@ -303,10 +306,10 @@ public final class WdlHudOverlay {
 
     private static MutableComponent phaseLabel(SaveStage stage) {
         return switch (stage) {
-            case WRITING_CHUNKS -> Component.translatable("wdl.hud.phase.chunks");
-            case WRITING_MAPS -> Component.translatable("wdl.hud.phase.maps");
-            case COMPRESSING -> Component.translatable("wdl.hud.phase.compressing");
-            case NONE -> Component.empty();
+            case WRITING_CHUNKS -> new TranslatableComponent("wdl.hud.phase.chunks");
+            case WRITING_MAPS -> new TranslatableComponent("wdl.hud.phase.maps");
+            case COMPRESSING -> new TranslatableComponent("wdl.hud.phase.compressing");
+            case NONE -> new TextComponent("");
         };
     }
 

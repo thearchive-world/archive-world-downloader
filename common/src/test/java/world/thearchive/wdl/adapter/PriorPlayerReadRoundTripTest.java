@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
@@ -53,7 +53,7 @@ class PriorPlayerReadRoundTripTest {
 
     private static CompoundTag capturedPlayerTag(ListTag enderItems) {
         CompoundTag tag = new CompoundTag();
-        tag.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, PLAYER_UUID).getOrThrow(false, s -> {}));
+        tag.put("UUID", SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, PLAYER_UUID).getOrThrow(false, s -> {}));
         tag.put("Inventory", new ListTag());
         tag.put("EnderItems", enderItems);
         return tag;

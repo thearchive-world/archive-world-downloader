@@ -21,7 +21,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.ConfirmScreen;
@@ -29,6 +28,8 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.RenderSurface;
@@ -79,10 +80,13 @@ public final class WdlSettingsScreen extends Screen {
 
     private int activeTab;
     private @Nullable Button defaults;
+    // Below 1.19.3 there is no per-widget Tooltip, and a control's tooltip inside the scrolling list clips to the
+    // list scissor, so hovered tooltips are recorded here and drawn screen-side after the list in render.
+    private final List<Map.Entry<AbstractWidget, Component>> hoverTooltips = new ArrayList<>();
 
     public WdlSettingsScreen(@Nullable Screen parent, WdlConfig live, Consumer<WdlConfig> onSave,
             List<CuratedGameRule> curatedGameRules, Predicate<String> modLoaded) {
-        super(Component.translatable("wdl.settings.title"));
+        super(new TranslatableComponent("wdl.settings.title"));
         this.parent = parent;
         this.draft = SettingsDraft.of(live);
         this.onSave = onSave;
@@ -98,8 +102,14 @@ public final class WdlSettingsScreen extends Screen {
         return byId;
     }
 
+    private void rebuildWidgets() {
+        clearWidgets();
+        init();
+    }
+
     @Override
     protected void init() {
+        this.hoverTooltips.clear();
         buildTabStrip();
 
         int listHeight = Math.max(this.height - LIST_TOP - FOOTER_HEIGHT, ROW_HEIGHT * 3);
@@ -120,9 +130,8 @@ public final class WdlSettingsScreen extends Screen {
             int tabX = column.left() + i * tabWidth;
             // the last tab absorbs the division remainder so the strip's right edge meets the control edge
             int thisTabWidth = i == count - 1 ? column.right() - tabX : tabWidth;
-            Component title = Component.translatable(SettingsLayout.tabLabelKey(SettingsLayout.TABS.get(i).id()));
-            Button tab = Button.builder(title, button -> selectTab(index))
-                    .bounds(tabX, TAB_TOP, thisTabWidth, TAB_HEIGHT).build();
+            Component title = new TranslatableComponent(SettingsLayout.tabLabelKey(SettingsLayout.TABS.get(i).id()));
+            Button tab = new Button(tabX, TAB_TOP, thisTabWidth, TAB_HEIGHT, title, button -> selectTab(index));
             tab.active = i != this.activeTab; // the active tab reads as pressed by being inert
             addRenderableWidget(tab);
         }
@@ -159,13 +168,20 @@ public final class WdlSettingsScreen extends Screen {
         int doneX = column.left();
         int defaultsX = doneX + buttonWidth + GAP;
         int discardX = defaultsX + buttonWidth + GAP;
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> onClose())
-                .bounds(doneX, footerY, buttonWidth, 20).build());
-        this.defaults = addRenderableWidget(Button.builder(Component.translatable("wdl.settings.defaults"),
-                button -> onDefaults()).bounds(defaultsX, footerY, buttonWidth, 20).build());
+        addRenderableWidget(new Button(doneX, footerY, buttonWidth, 20, CommonComponents.GUI_DONE,
+                button -> onClose()));
+        this.defaults = addRenderableWidget(new Button(defaultsX, footerY, buttonWidth, 20,
+                new TranslatableComponent("wdl.settings.defaults"), button -> onDefaults(),
+                (button, poseStack, mouseX, mouseY) -> {
+                    if (this.draft.isAtDefaults()) {
+                        this.renderTooltip(poseStack,
+                                this.font.split(new TranslatableComponent("wdl.settings.defaults.tooltip"), 200),
+                                mouseX, mouseY);
+                    }
+                }));
         // the last button absorbs the division remainder so the footer's right edge meets the control edge
-        addRenderableWidget(Button.builder(Component.translatable("wdl.settings.discard"), button -> onDiscard())
-                .bounds(discardX, footerY, column.right() - discardX, 20).build());
+        addRenderableWidget(new Button(discardX, footerY, column.right() - discardX, 20,
+                new TranslatableComponent("wdl.settings.discard"), button -> onDiscard()));
     }
 
     @Override
@@ -178,12 +194,16 @@ public final class WdlSettingsScreen extends Screen {
             boolean atDefaults = this.draft.isAtDefaults();
             if (this.defaults.active == atDefaults) {
                 this.defaults.active = !atDefaults;
-                this.defaults.setTooltip(atDefaults
-                        ? Tooltip.create(Component.translatable("wdl.settings.defaults.tooltip"))
-                        : null);
             }
         }
         super.render(poseStack, mouseX, mouseY, partialTick);
+        // The recorded hover tooltips are drawn here, unclipped, after the list.
+        for (Map.Entry<AbstractWidget, Component> tip : this.hoverTooltips) {
+            if (tip.getKey().isHoveredOrFocused()) {
+                this.renderTooltip(poseStack, this.font.split(tip.getValue(), 200), mouseX, mouseY);
+                break;
+            }
+        }
     }
 
     private void selectTab(int index) {
@@ -239,7 +259,7 @@ public final class WdlSettingsScreen extends Screen {
             case BOOLEAN:
                 CycleButton<Boolean> toggle = CycleButton.onOffBuilder(this.draft.getBoolean(key))
                         .displayOnlyValue()
-                        .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty(),
+                        .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY,
                                 (button, value) -> onBoolChange(key, value));
                 return new Control(toggle, () -> toggle.setValue(this.draft.getBoolean(key)));
             case INTEGER:
@@ -293,22 +313,22 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     private <E extends Enum<E>> Control cycleControl(String key, Class<E> type, List<E> values, E initial) {
-        CycleButton<E> cycle = CycleButton.<E>builder(value -> Component.translatable(valueLabelKey(value)))
+        CycleButton<E> cycle = CycleButton.<E>builder(value -> new TranslatableComponent(valueLabelKey(value)))
                 .withInitialValue(initial)
                 .withValues(values)
                 .displayOnlyValue()
-                .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty(),
+                .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY,
                         (button, value) -> this.draft.set(key, value.name()));
         return new Control(cycle, () -> cycle.setValue(this.draft.getEnum(key, type)));
     }
 
     private Control recaptureControl(String key) {
         CycleButton<RecaptureMode> cycle = CycleButton.<RecaptureMode>builder(
-                value -> Component.translatable(valueLabelKey(value)))
+                value -> new TranslatableComponent(valueLabelKey(value)))
                 .withInitialValue(this.draft.getEnum(key, RecaptureMode.class))
                 .withValues(List.of(RecaptureMode.values()))
                 .displayOnlyValue()
-                .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty(),
+                .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY,
                         (button, value) -> onRecaptureChange(key, value));
         return new Control(cycle, () -> cycle.setValue(this.draft.getEnum(key, RecaptureMode.class)));
     }
@@ -341,17 +361,17 @@ public final class WdlSettingsScreen extends Screen {
                 ? "wdl.settings.confirm.recapture.to_off.message"
                 : "wdl.settings.confirm.recapture.to_nearby.message";
         minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
-                Component.translatable("wdl.settings.confirm.recapture.title",
-                        Component.translatable(valueLabelKey(value))
+                new TranslatableComponent("wdl.settings.confirm.recapture.title",
+                        new TranslatableComponent(valueLabelKey(value))
                                 .withStyle(style -> style.withColor(BrandColors.AMBER))),
-                Component.translatable(messageKey),
-                Component.translatable("wdl.settings.confirm.recapture.confirm"),
+                new TranslatableComponent(messageKey),
+                new TranslatableComponent("wdl.settings.confirm.recapture.confirm"),
                 CommonComponents.GUI_CANCEL));
     }
 
     private Control textControl(String key) {
         EditBox box = new EditBox(this.font, 0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
-                Component.translatable(SettingsLayout.optionLabelKey(key)));
+                new TranslatableComponent(SettingsLayout.optionLabelKey(key)));
         box.setMaxLength(32);
         box.setValue(currentText(key));
         box.setResponder(text -> this.draft.set(key, text));
@@ -368,10 +388,10 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     /** Attach the option's help tooltip to its control, only when the language file carries the key (helpKey). */
-    private static void applyTooltip(AbstractWidget widget, String key) {
+    private void applyTooltip(AbstractWidget widget, String key) {
         String tooltipKey = SettingsLayout.optionTooltipKey(key);
         if (I18n.exists(tooltipKey)) {
-            widget.setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
+            this.hoverTooltips.add(Map.entry(widget, new TranslatableComponent(tooltipKey)));
         }
     }
 
@@ -399,11 +419,11 @@ public final class WdlSettingsScreen extends Screen {
             minecraft.setScreen(this);
         };
         minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
-                Component.translatable(base + ".title",
-                        Component.translatable(SettingsLayout.optionLabelKey(key))
+                new TranslatableComponent(base + ".title",
+                        new TranslatableComponent(SettingsLayout.optionLabelKey(key))
                                 .withStyle(style -> style.withColor(BrandColors.AMBER))),
-                Component.translatable(SettingsLayout.confirmMessageKey(key)),
-                Component.translatable(base + ".confirm"),
+                new TranslatableComponent(SettingsLayout.confirmMessageKey(key)),
+                new TranslatableComponent(base + ".confirm"),
                 CommonComponents.GUI_CANCEL));
     }
 
@@ -416,10 +436,10 @@ public final class WdlSettingsScreen extends Screen {
             minecraft.setScreen(this);
         };
         minecraft.setScreen(new ConfirmScreen(choice,
-                Component.translatable("wdl.settings.defaults.title")
+                new TranslatableComponent("wdl.settings.defaults.title")
                         .withStyle(style -> style.withColor(BrandColors.AMBER)),
-                Component.translatable("wdl.settings.defaults.message"),
-                Component.translatable("wdl.settings.defaults.confirm"),
+                new TranslatableComponent("wdl.settings.defaults.message"),
+                new TranslatableComponent("wdl.settings.defaults.confirm"),
                 CommonComponents.GUI_CANCEL));
     }
 
@@ -427,10 +447,10 @@ public final class WdlSettingsScreen extends Screen {
         Minecraft minecraft = Minecraft.getInstance();
         BooleanConsumer choice = confirmed -> minecraft.setScreen(confirmed ? this.parent : this);
         minecraft.setScreen(new ConfirmScreen(choice,
-                Component.translatable("wdl.settings.discard.title")
+                new TranslatableComponent("wdl.settings.discard.title")
                         .withStyle(style -> style.withColor(BrandColors.AMBER)),
-                Component.translatable("wdl.settings.discard.message"),
-                Component.translatable("wdl.settings.discard.confirm"),
+                new TranslatableComponent("wdl.settings.discard.message"),
+                new TranslatableComponent("wdl.settings.discard.confirm"),
                 CommonComponents.GUI_CANCEL));
     }
 
@@ -507,7 +527,7 @@ public final class WdlSettingsScreen extends Screen {
         private final Component label;
 
         HeaderRow(String labelKey) {
-            this.label = Component.translatable(labelKey).withStyle(ChatFormatting.BOLD);
+            this.label = new TranslatableComponent(labelKey).withStyle(ChatFormatting.BOLD);
         }
 
         @Override
@@ -538,11 +558,12 @@ public final class WdlSettingsScreen extends Screen {
         ControlRow(Component label, @Nullable String masterKey) {
             this.label = label;
             this.masterKey = masterKey;
-            this.revert = Button.builder(Component.empty(), button -> {
+            this.revert = new Button(0, 0, REVERT_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY, button -> {
                 doRevert();
                 refresh();
-            }).tooltip(Tooltip.create(Component.translatable("wdl.settings.defaults")))
-                    .bounds(0, 0, REVERT_WIDTH, CONTROL_HEIGHT).build();
+            });
+            WdlSettingsScreen.this.hoverTooltips.add(
+                    Map.entry(this.revert, new TranslatableComponent("wdl.settings.defaults")));
         }
 
         abstract AbstractWidget control();
@@ -575,8 +596,8 @@ public final class WdlSettingsScreen extends Screen {
                     : BrandColors.GRAY));
 
             control.active = enabled;
-            control.setX(controlX);
-            control.setY(controlY);
+            control.x = controlX;
+            control.y = controlY;
             control.render(poseStack, mouseX, mouseY, partialTick);
 
             // Passive indicator: an amber caution mark sits just left of an off core-capture toggle, a
@@ -593,8 +614,8 @@ public final class WdlSettingsScreen extends Screen {
             boolean modified = isModified();
             this.revert.visible = modified;
             this.revert.active = enabled && modified;
-            this.revert.setX(revertX);
-            this.revert.setY(controlY);
+            this.revert.x = revertX;
+            this.revert.y = controlY;
             this.revert.render(poseStack, mouseX, mouseY, partialTick);
 
             // The revert icon is a bundled sprite, not a font glyph: the revert codepoint resolves only through
@@ -633,7 +654,7 @@ public final class WdlSettingsScreen extends Screen {
         private final Runnable refresher;
 
         OptionRow(String key, AbstractWidget control, Runnable refresher, @Nullable String masterKey) {
-            super(Component.translatable(SettingsLayout.optionLabelKey(key)), masterKey);
+            super(new TranslatableComponent(SettingsLayout.optionLabelKey(key)), masterKey);
             this.key = key;
             this.control = control;
             this.refresher = refresher;
@@ -672,10 +693,10 @@ public final class WdlSettingsScreen extends Screen {
         private final CycleButton<Boolean> toggle;
 
         GameRuleRow(CuratedGameRule rule) {
-            super(Component.translatable(SettingsLayout.gameRuleLabelKey(rule.id())), "overrideGamerules");
+            super(new TranslatableComponent(SettingsLayout.gameRuleLabelKey(rule.id())), "overrideGamerules");
             this.rule = rule;
             this.toggle = CycleButton.onOffBuilder(isOn()).displayOnlyValue()
-                    .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty(),
+                    .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY,
                             (button, value) -> draft.setGameRule(rule.bandId(),
                                     value ? rule.enabledValue() : rule.disabledValue(), rule.curatedValue()));
         }
@@ -714,7 +735,7 @@ public final class WdlSettingsScreen extends Screen {
         final String key;
 
         RangeSlider(String key, double initialFraction) {
-            super(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty(), initialFraction);
+            super(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY, initialFraction);
             this.key = key;
         }
 
@@ -726,7 +747,7 @@ public final class WdlSettingsScreen extends Screen {
 
         @Override
         protected void updateMessage() {
-            setMessage(Component.translatable(SettingsLayout.optionValueKey(this.key), currentText()));
+            setMessage(new TranslatableComponent(SettingsLayout.optionValueKey(this.key), currentText()));
         }
 
         @Override

@@ -13,13 +13,11 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Stream;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
@@ -45,10 +43,6 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * Region-pipeline integration: the real {@link IOWorker} path under {@link WorldPaths}, covering multi-chunk +
  * region-boundary placement, the &gt;1 MiB external-{@code .mcc} spill, {@code synchronize(true)}+{@code close()}
  * drain, reopen-and-read-back from a fresh storage, and the read-merge recapture path over an on-disk prior.
- *
- * <p>The chiseled bookshelf rides here rather than only in {@link ChunkMerge}'s own headless test because the loss it
- * guards is invisible anywhere else: both writes succeed, no counter moves, and the only evidence that the earlier
- * books are gone is the bytes left in the region file.
  */
 class RegionIntegrationTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
@@ -99,7 +93,7 @@ class RegionIntegrationTest {
         // Reopen with a FRESH storage and read every chunk back at its position.
         try (IOWorker in = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag back = in.loadAsync(positions.get(i)).join()
+                CompoundTag back = Optional.ofNullable(in.load(positions.get(i)))
                         .orElseThrow(() -> new AssertionError("missing chunk"));
                 assertEquals(i, (back.contains("wdlTestId") ? back.getInt("wdlTestId") : -1),
                         "wrong chunk read back at " + positions.get(i));
@@ -138,7 +132,8 @@ class RegionIntegrationTest {
                     "a >1 MiB chunk must spill to an external c.x.z.mcc file");
         }
         try (IOWorker in = storage(paths, region)) {
-            CompoundTag back = in.loadAsync(pos).join().orElseThrow(() -> new AssertionError("oversize chunk lost"));
+            CompoundTag back = Optional.ofNullable(in.load(pos))
+                    .orElseThrow(() -> new AssertionError("oversize chunk lost"));
             assertEquals(2 * 1024 * 1024, back.getByteArray("pad").length);
         }
     }
@@ -175,29 +170,6 @@ class RegionIntegrationTest {
         }
     }
 
-    @Test
-    void aSecondBookshelfInsertDoesNotEraseTheBooksAlreadyInTheRegionFile(@TempDir Path save) throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
-        WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(Level.OVERWORLD);
-        ChunkPos pos = new ChunkPos(0, 0);
-
-        try (IOWorker out = storage(paths, region)) {
-            // Three books go in, the chunk flushes; later one more book goes in and the chunk flushes again. The
-            // second capture names only the slot it saw, because a bookshelf's contents never reach the client.
-            RegionChunkWriter.writeMerging(out, pos, bookshelfChunk(registries, 0, 1, 2), ChunkMerge::merge);
-            out.synchronize(true).join();
-            RegionChunkWriter.writeMerging(out, pos, bookshelfChunk(registries, 3), ChunkMerge::merge);
-            out.synchronize(true).join();
-        }
-
-        try (IOWorker in = storage(paths, region)) {
-            CompoundTag back = in.loadAsync(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
-            assertEquals(Set.of(0, 1, 2, 3), occupiedSlots(findByPos(back, 4, 64, 9)),
-                    "the books written by the earlier flush are still in the region file beside the newer one");
-        }
-    }
-
     /**
      * The un-opened half of the container carry-forward, driven through the composed read-merge the flush actually
      * builds. A chest's contents exist on the client only while its menu is open, so a re-walk re-captures the terrain
@@ -224,7 +196,8 @@ class RegionIntegrationTest {
         }
 
         try (IOWorker in = storage(paths, region)) {
-            CompoundTag back = in.loadAsync(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
+            CompoundTag back = Optional.ofNullable(in.load(pos))
+                    .orElseThrow(() -> new AssertionError("chunk not on disk"));
             assertEquals(1, findByPos(back, 4, 64, 9).getList("Items", Tag.TAG_COMPOUND).size(),
                     "a chunk the player walked past again must not lose the chest an earlier flush archived");
         }
@@ -269,7 +242,8 @@ class RegionIntegrationTest {
         }
 
         try (IOWorker in = storage(paths, region)) {
-            CompoundTag back = in.loadAsync(pos).join().orElseThrow(() -> new AssertionError("chunk not on disk"));
+            CompoundTag back = Optional.ofNullable(in.load(pos))
+                    .orElseThrow(() -> new AssertionError("chunk not on disk"));
             CompoundTag chest = findByPos(back, 4, 64, 9);
             assertTrue(chest.get("Items") instanceof ListTag items && items.isEmpty(),
                     "the chest is left with the present-but-empty list a vanilla chest writes, not with the items "
@@ -283,27 +257,5 @@ class RegionIntegrationTest {
         CompoundTag chest = blockEntity("minecraft:chest", pos.getX(), pos.getY(), pos.getZ());
         chest.put("Items", ItemFixtures.items(itemIds));
         return SyntheticChunks.fullWithBlockEntities(registries, true, List.of(chest));
-    }
-
-    /** A captured chunk whose one chiseled bookshelf holds a book at each named slot. */
-    private CompoundTag bookshelfChunk(RegistryAccess.Frozen registries, int... slots) {
-        CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
-        CompoundTag shelf = blockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, 4, 64, 9);
-        String[] books = new String[slots.length];
-        Arrays.fill(books, "minecraft:written_book");
-        shelf.put("Items", ItemFixtures.itemsAtSlots(slots, books));
-        tag.put("block_entities", BlockEntityFixtures.chunkTagWith(shelf).getList("block_entities", Tag.TAG_COMPOUND));
-        return tag;
-    }
-
-    private static Set<Integer> occupiedSlots(CompoundTag blockEntity) {
-        Set<Integer> slots = new TreeSet<>();
-        ListTag items = (ListTag) blockEntity.get("Items");
-        for (int i = 0; i < items.size(); i++) {
-            slots.add(
-                    (int) (((CompoundTag) items.get(i)).contains("Slot") ? ((CompoundTag) items.get(i)).getByte("Slot")
-                            : (byte) -1));
-        }
-        return slots;
     }
 }

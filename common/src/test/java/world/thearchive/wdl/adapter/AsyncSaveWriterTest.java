@@ -103,8 +103,8 @@ class AsyncSaveWriterTest {
         assertTrue(finalized.get(), "the finalizer (level.dat) ran on the writer thread after the drain");
 
         try (IOWorker in = storage(region, "chunk")) {
-            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "submitted chunk reached disk");
-            assertTrue(in.loadAsync(new ChunkPos(31, 31)).join().isPresent(), "submitted chunk reached disk");
+            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(), "submitted chunk reached disk");
+            assertTrue(Optional.ofNullable(in.load(new ChunkPos(31, 31))).isPresent(), "submitted chunk reached disk");
         }
     }
 
@@ -163,7 +163,7 @@ class AsyncSaveWriterTest {
         assertEquals(2, netherOpens.get(),
                 "the open is retried per chunk rather than written off, since the failure can be of the moment");
         try (IOWorker in = storage(region, "chunk")) {
-            assertTrue(in.loadAsync(new ChunkPos(2, 2)).join().isPresent(),
+            assertTrue(Optional.ofNullable(in.load(new ChunkPos(2, 2))).isPresent(),
                     "the openable dimension's chunk reached disk past the failure");
         }
     }
@@ -397,7 +397,8 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.entityChunksWritten(), "the entity chunk went to entities/");
 
         try (IOWorker in = storage(entities, "entities")) {
-            assertTrue(in.loadAsync(new ChunkPos(2, 2)).join().isPresent(), "the entity chunk reached entities/");
+            assertTrue(Optional.ofNullable(in.load(new ChunkPos(2, 2))).isPresent(),
+                    "the entity chunk reached entities/");
         }
     }
 
@@ -428,10 +429,12 @@ class AsyncSaveWriterTest {
         assertFalse(result.failed());
         assertEquals(2, result.chunksWritten(), "both dimensions' same-position chunks were written");
         try (IOWorker in = storage(overworldRegion, "chunk")) {
-            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "the overworld chunk reached region/");
+            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(),
+                    "the overworld chunk reached region/");
         }
         try (IOWorker in = storage(netherRegion, "chunk")) {
-            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "the nether chunk reached DIM-1/region/");
+            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(),
+                    "the nether chunk reached DIM-1/region/");
         }
     }
 
@@ -470,10 +473,10 @@ class AsyncSaveWriterTest {
         CompoundTag offThreadOnDisk;
         CompoundTag onThreadOnDisk;
         try (IOWorker in = storage(overworldRegion, "chunk")) {
-            offThreadOnDisk = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
+            offThreadOnDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
         }
         try (IOWorker in = storage(netherRegion, "chunk")) {
-            onThreadOnDisk = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
+            onThreadOnDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
         }
         assertEquals(onThreadOnDisk, offThreadOnDisk,
                 "the writer-thread encode is byte-identical to the main-thread encode");
@@ -510,8 +513,9 @@ class AsyncSaveWriterTest {
         assertTrue(finalized.get(), "finish() still completed past the isolated failure");
 
         try (IOWorker in = storage(region, "chunk")) {
-            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "the good chunk landed");
-            assertFalse(in.loadAsync(new ChunkPos(1, 1)).join().isPresent(), "the throwing chunk wrote nothing");
+            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(), "the good chunk landed");
+            assertFalse(Optional.ofNullable(in.load(new ChunkPos(1, 1))).isPresent(),
+                    "the throwing chunk wrote nothing");
         }
     }
 
@@ -624,7 +628,7 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag back = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
+            CompoundTag back = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
             CompoundTag chest = findByPosOrNull(back, 2, 64, 2);
             assertNotNull(chest, "the chest block entity is on disk");
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
@@ -664,7 +668,7 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag back = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
+            CompoundTag back = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
             CompoundTag lectern = findByPosOrNull(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
             assertTrue(lectern.getCompound("Book").contains("id"), "the writer-thread fold merged the Book");
@@ -809,7 +813,7 @@ class AsyncSaveWriterTest {
         assertFalse(result.failed(), "a failed pre-merge backup never aborts the save");
         assertEquals(1, result.chunksWritten(), "the drain still ran past the failed preflight");
         try (IOWorker in = storage(region, "chunk")) {
-            assertTrue(in.loadAsync(new ChunkPos(0, 0)).join().isPresent(), "the chunk still reached disk");
+            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(), "the chunk still reached disk");
         }
     }
 
@@ -1047,7 +1051,7 @@ class AsyncSaveWriterTest {
         assertFalse(result.failed());
         assertEquals(2, result.mergedContainers(), "the fold count reached the merged-containers tally");
         try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag onDisk = in.loadAsync(new ChunkPos(0, 0)).join().orElseThrow();
+            CompoundTag onDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
             assertEquals("contents", onDisk.getString("wdl_test_folded"),
                     "the folded chunk was written back to region/");
             assertFalse(onDisk.getList("sections", Tag.TAG_COMPOUND).isEmpty(),
@@ -1089,8 +1093,8 @@ class AsyncSaveWriterTest {
         return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid);
     }
 
-    private static ListTag vehicleItems(IOWorker storage, ChunkPos pos, UUID uuid) {
-        CompoundTag chunk = storage.loadAsync(pos).join().orElseThrow();
+    private static ListTag vehicleItems(IOWorker storage, ChunkPos pos, UUID uuid) throws IOException {
+        CompoundTag chunk = Optional.ofNullable(storage.load(pos)).orElseThrow();
         ListTag list = chunk.getList("Entities", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entity = list.getCompound(i);
@@ -1117,7 +1121,7 @@ class AsyncSaveWriterTest {
         }
 
         @Override
-        public CompletableFuture<Optional<CompoundTag>> loadAsync(ChunkPos pos) {
+        protected CompletableFuture<CompoundTag> loadAsync(ChunkPos pos) {
             return failRead
                     ? CompletableFuture.failedFuture(new IOException("the region read failed"))
                     : super.loadAsync(pos);
@@ -1337,8 +1341,8 @@ class AsyncSaveWriterTest {
 
     /** Slot 0 of the block entity saved at {@code x/y/z} in {@code pos}'s on-disk chunk. */
     private static ItemStack firstItemOf(IOWorker storage, RegistryAccess registries, ChunkPos pos,
-            int x, int y, int z) {
-        CompoundTag chunk = storage.loadAsync(pos).join().orElseThrow();
+            int x, int y, int z) throws IOException {
+        CompoundTag chunk = Optional.ofNullable(storage.load(pos)).orElseThrow();
         CompoundTag blockEntity = findByPosOrNull(chunk, x, y, z);
         assertNotNull(blockEntity, "no block entity at " + x + "/" + y + "/" + z + " in " + pos);
         NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);

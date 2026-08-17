@@ -8,8 +8,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v1.ClientCommandManager;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -126,7 +125,8 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public void registerCommands(WdlCommands commands) {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
-                wdlCommandTree(commands, ClientCommandManager::literal, ClientCommandManager::argument)));
+        // The 1.18.2 client-command API is v1: a static DISPATCHER registered at construction.
+        ClientCommandManager.DISPATCHER.register(
+                wdlCommandTree(commands, ClientCommandManager::literal, ClientCommandManager::argument));
     }
 }

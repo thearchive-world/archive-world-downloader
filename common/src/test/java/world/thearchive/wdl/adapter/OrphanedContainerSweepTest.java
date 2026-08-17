@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
@@ -105,7 +106,7 @@ class OrphanedContainerSweepTest {
             RegistryAccess registries)
             throws IOException {
         try (IOWorker in = storage(region)) {
-            CompoundTag back = in.loadAsync(chunk).join()
+            CompoundTag back = Optional.ofNullable(in.load(chunk))
                     .orElseThrow(() -> new AssertionError("chunk missing on disk"));
             CompoundTag blockEntity = blockEntityAt(back, x, y, z);
             assertNotNull(blockEntity, "block entity present on disk at " + x + "," + y + "," + z);
@@ -178,7 +179,7 @@ class OrphanedContainerSweepTest {
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
         try (IOWorker in = storage(region)) {
-            CompoundTag back = in.loadAsync(chunk).join()
+            CompoundTag back = Optional.ofNullable(in.load(chunk))
                     .orElseThrow(() -> new AssertionError("chunk missing on disk"));
             CompoundTag lectern = blockEntityAt(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
@@ -243,7 +244,8 @@ class OrphanedContainerSweepTest {
                 "a rewrite for a chunk with no on-disk prior does not fail the save");
 
         try (IOWorker in = storage(region)) {
-            assertTrue(in.loadAsync(missing).join().isEmpty(), "no partial chunk is written when there is no prior");
+            assertTrue(Optional.ofNullable(in.load(missing)).isEmpty(),
+                    "no partial chunk is written when there is no prior");
         }
     }
 

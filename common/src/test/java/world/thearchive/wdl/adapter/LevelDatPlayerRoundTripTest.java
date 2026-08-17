@@ -12,7 +12,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
@@ -115,7 +115,8 @@ class LevelDatPlayerRoundTripTest {
         CompoundTag rootVehicle = data.getCompound("Player").getCompound("RootVehicle");
         assertEquals("minecraft:chest_boat", rootVehicle.getCompound("Entity").getString("id"),
                 "the Entity child keeps its id, or loadEntityRecursive silently skips it (no re-seat)");
-        assertEquals(boat, UUIDUtil.CODEC.parse(NbtOps.INSTANCE, rootVehicle.get("Attach")).result().orElse(null),
-                "Attach round-trips through UUIDUtil.CODEC as the direct vehicle UUID the re-seat matches");
+        assertEquals(boat,
+                SerializableUUID.CODEC.parse(NbtOps.INSTANCE, rootVehicle.get("Attach")).result().orElse(null),
+                "Attach round-trips through SerializableUUID.CODEC as the direct vehicle UUID the re-seat matches");
     }
 }

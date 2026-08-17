@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
@@ -76,7 +76,7 @@ class EntityMergeTest {
     }
 
     private static boolean matches(CompoundTag tag, UUID uuid) {
-        return UUIDUtil.CODEC.parse(NbtOps.INSTANCE, tag.get("UUID")).result()
+        return SerializableUUID.CODEC.parse(NbtOps.INSTANCE, tag.get("UUID")).result()
                 .map(uuid::equals).orElse(false);
     }
 

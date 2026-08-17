@@ -72,7 +72,10 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void outline(int x, int y, int width, int height, int color) {
-        GuiComponent.renderOutline(poseStack, x, y, width, height, color);
+        GuiComponent.fill(poseStack, x, y, x + width, y + 1, color);
+        GuiComponent.fill(poseStack, x, y + height - 1, x + width, y + height, color);
+        GuiComponent.fill(poseStack, x, y + 1, x + 1, y + height - 1, color);
+        GuiComponent.fill(poseStack, x + width - 1, y + 1, x + width, y + height - 1, color);
     }
 
     @Override
@@ -90,7 +93,13 @@ public final class RenderSurfaceImpl implements RenderSurface {
     @Override
     public void blitFavicon(ResourceLocation icon, int x, int y, int size) {
         RenderSystem.setShaderTexture(0, icon);
+        // A selected list row leaves the shader color at black (the 1.18.2 AbstractSelectionList highlight sets it and
+        // never resets it), and GuiComponent.blit does not set its own, so without this reset the selected row's icon
+        // multiplies to black. Vanilla's own world-selection list resets to white here for the same reason.
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.enableBlend();
         GuiComponent.blit(poseStack, x, y, 0.0F, 0.0F, size, size, size, size);
+        RenderSystem.disableBlend();
     }
 
     @Override

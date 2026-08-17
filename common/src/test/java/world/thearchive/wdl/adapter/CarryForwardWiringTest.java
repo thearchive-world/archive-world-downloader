@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
@@ -215,7 +216,7 @@ class CarryForwardWiringTest {
 
     private List<String> itemsOnDisk(WorldPaths paths, ChunkPos pos) throws Exception {
         try (IOWorker storage = regionStorage(paths)) {
-            CompoundTag chunk = storage.loadAsync(pos).join()
+            CompoundTag chunk = Optional.ofNullable(storage.load(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             CompoundTag written = findByPos(chunk, chest.getX(), chest.getY(), chest.getZ());
             List<String> ids = new ArrayList<>();

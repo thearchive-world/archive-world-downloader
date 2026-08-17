@@ -229,7 +229,7 @@ class ItemLocationScrubTest {
     }
 
     private CompoundTag blockEntityWithItem(ItemStack item) {
-        CompoundTag blockEntity = BlockEntityFixtures.blockEntity("minecraft:decorated_pot", 0, 64, 0);
+        CompoundTag blockEntity = BlockEntityFixtures.blockEntity("minecraft:bell", 0, 64, 0);
         blockEntity.put("item", ItemFixtures.itemTag(item));
         return blockEntity;
     }
@@ -365,7 +365,7 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubBlockEntityLeavesNonItemBlockEntityUnchanged() {
-        CompoundTag blockEntity = BlockEntityFixtures.blockEntityWithForeignKey("minecraft:decorated_pot", 1, 2, 3,
+        CompoundTag blockEntity = BlockEntityFixtures.blockEntityWithForeignKey("minecraft:bell", 1, 2, 3,
                 "wdl_test_marker", "urn");
         ListTag sherds = new ListTag();
         CompoundTag sherd = new CompoundTag();

@@ -4,12 +4,13 @@
 package world.thearchive.wdl.testsupport;
 
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Registry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.Item;
@@ -33,14 +34,14 @@ public final class ItemFixtures {
     /**
      * The stack for {@code itemId}, count 1.
      *
-     * <p>An unregistered id is rejected rather than resolved. {@code BuiltInRegistries.ITEM} is a defaulted registry,
-     * so a typo returns air, an air stack is empty, and the vanilla writer skips empty stacks: the fixture would come
-     * back as an empty list that this gate then accepts, since an empty list is its own round trip. That is the
-     * degenerate fixture the gate exists to reject, arriving through the builder.
+     * <p>An unregistered id is rejected rather than resolved. {@code Registry.ITEM} is a defaulted registry, so a typo
+     * returns air, an air stack is empty, and the vanilla writer skips empty stacks: the fixture would come back as an
+     * empty list that this gate then accepts, since an empty list is its own round trip. That is the degenerate fixture
+     * the gate exists to reject, arriving through the builder.
      */
     public static ItemStack stack(String itemId) {
         ResourceLocation id = new ResourceLocation(itemId);
-        Item item = BuiltInRegistries.ITEM.get(id);
+        Item item = Registry.ITEM.get(id);
         if (item == Items.AIR && !AIR_ID.equals(id)) {
             throw new AssertionError(
                     itemId + " is not a registered item, so this fixture would be silently empty");
@@ -51,7 +52,7 @@ public final class ItemFixtures {
     /** The stack for {@code itemId} carrying {@code customName}, count 1. */
     public static ItemStack namedStack(String itemId, String customName) {
         ItemStack stack = stack(itemId);
-        stack.setHoverName(Component.literal(customName));
+        stack.setHoverName(new TextComponent(customName));
         return stack;
     }
 
@@ -126,7 +127,7 @@ public final class ItemFixtures {
     public static ItemStack writtenBook(int pageCount) {
         ListTag pages = new ListTag();
         for (int page = 0; page < pageCount; page++) {
-            pages.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal("page " + page))));
+            pages.add(StringTag.valueOf(Component.Serializer.toJson(new TextComponent("page " + page))));
         }
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
         CompoundTag tag = book.getOrCreateTag();

@@ -13,10 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.ChiseledBookShelfBlock;
-import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * What a flushed chunk hands its writer thunks: the values read off the captured snapshot on the main thread, and the
@@ -44,15 +41,14 @@ final class ChunkFlushPlan {
     }
 
     /**
-     * The read-merge for {@code snapshot}, deriving both of its chunk-specific arguments here rather than at the call
-     * site. The derivation is the half that has actually broken: reading the occupancy under a condition, or handing
-     * over an empty one, writes books into slots the chunk's own saved block-state reports empty, and neither is a
-     * deletion nor a compile error. Composed inside this class so a test can reach it; a caller that assembled the
-     * arguments itself would put that step back out of reach.
+     * The read-merge for {@code snapshot}, deriving its captured positions here rather than at the call site. There is
+     * no chiseled bookshelf on this band, so the occupancy re-gate carries nothing and the merge takes an empty one.
+     * Composed inside this class so a test can reach it; a caller that assembled the arguments itself would put that
+     * step back out of reach.
      */
     static RegionChunkWriter.ChunkReadMerge readMerge(ChunkSnapshotSource snapshot,
             List<BlockPos> landingContainers, LongSet replaced) {
-        return readMerge(bookshelfOccupancy(snapshot), ChunkMerge.capturedPositions(landingContainers), replaced);
+        return readMerge(ChunkMerge.occupancyMap(), ChunkMerge.capturedPositions(landingContainers), replaced);
     }
 
     /**
@@ -133,37 +129,6 @@ final class ChunkFlushPlan {
             }
         }
         return landing;
-    }
-
-    /**
-     * The occupied-slot mask of every chiseled bookshelf in {@code snapshot}, keyed by packed position, for the
-     * writer-side carry-forward. A bookshelf is the one container captured a slot at a time, so its on-disk slots have
-     * to be re-gated against the authoritative block-state before they are carried into a re-write; that state lives in
-     * the captured snapshot and nowhere in the serialized tags the merge sees.
-     *
-     * <p>Built unconditionally, including when container capture is off: this mask re-gates what an EARLIER session
-     * wrote, not what this one captured, and an empty map reads downstream as occupancy unknown, which carries every
-     * on-disk slot back. Skipping it would write books into slots the same chunk's saved block-state reports empty.
-     */
-    static Long2IntOpenHashMap bookshelfOccupancy(ChunkSnapshotSource snapshot) {
-        Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
-        for (CompoundTag blockEntity : snapshot.blockEntities()) {
-            // Filter on the saved id before resolving a block state: that resolve walks the snapshot's sections
-            // to find the one covering the position, so doing it for every block entity of every flushed chunk
-            // would put a scan per block entity on the main thread to answer a question only a bookshelf asks.
-            if (!ChunkMerge.CHISELED_BOOKSHELF_ID.equals(blockEntity.getString("id"))
-                    || !(blockEntity.get("x") instanceof IntTag x)
-                    || !(blockEntity.get("y") instanceof IntTag y)
-                    || !(blockEntity.get("z") instanceof IntTag z)) {
-                continue;
-            }
-            BlockPos pos = new BlockPos(x.getAsInt(), y.getAsInt(), z.getAsInt());
-            BlockState state = InteractionCapture.blockStateAt(snapshot, pos);
-            if (state != null && state.getBlock() instanceof ChiseledBookShelfBlock) {
-                occupancy.put(pos.asLong(), BookshelfSlots.occupiedSlotMask(state));
-            }
-        }
-        return occupancy;
     }
 
     /** The distinct chunks the given container and lectern holder positions fall in, each listed once. */

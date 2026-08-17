@@ -14,7 +14,9 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -98,7 +100,7 @@ class EntitySinkRootVehicleTest {
     void namedRootMountKeepsTheServerPersistenceTheClientNeverCarries() {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         RiddenMountMob mount = new RiddenMountMob();
-        mount.setCustomName(Component.literal("Rocinante"));
+        mount.setCustomName(new TextComponent("Rocinante"));
 
         CompoundTag tag = sink.captureRootVehicle(mount, registries, false);
         assertNotNull(tag);
@@ -134,6 +136,11 @@ class EntitySinkRootVehicleTest {
     private static final class RiddenVehicleEntity extends Entity {
         private RiddenVehicleEntity() {
             super(EntityType.PIG, null);
+        }
+
+        @Override
+        public Packet<?> getAddEntityPacket() {
+            return new ClientboundAddEntityPacket(this);
         }
 
         @Override

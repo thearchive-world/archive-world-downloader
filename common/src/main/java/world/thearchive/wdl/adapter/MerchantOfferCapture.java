@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -34,7 +33,7 @@ final class MerchantOfferCapture {
      * Serialize {@code offers} to the {@code "Offers"} holder, adding {@code "Xp"} only when {@code isVillager}. The
      * pre-component NBT write does not reject an offer on this band, so it does not throw (see the class note).
      */
-    static CompoundTag serialize(MerchantOffers offers, int xp, boolean isVillager, HolderLookup.Provider registries) {
+    static CompoundTag serialize(MerchantOffers offers, int xp, boolean isVillager) {
         CompoundTag holder = new CompoundTag();
         Tag offersTag = offers.createTag();
         holder.put("Offers", offersTag);

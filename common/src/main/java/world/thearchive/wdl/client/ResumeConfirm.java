@@ -8,6 +8,8 @@ import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 
 import world.thearchive.wdl.core.BrandColors;
 
@@ -37,11 +39,11 @@ public final class ResumeConfirm {
             Runnable onContinue, Runnable onCancel) {
         Component message;
         if (zipOnResume) {
-            message = Component.translatable(keyPrefix + ".message", amber(folderName), amber(backupZipName));
+            message = new TranslatableComponent(keyPrefix + ".message", amber(folderName), amber(backupZipName));
         } else {
-            message = Component.translatable(keyPrefix + ".message_no_backup", amber(folderName));
+            message = new TranslatableComponent(keyPrefix + ".message_no_backup", amber(folderName));
         }
-        return create(keyPrefix, message, CommonComponents.GUI_CONTINUE, CommonComponents.GUI_CANCEL,
+        return create(keyPrefix, message, CommonComponents.GUI_PROCEED, CommonComponents.GUI_CANCEL,
                 onContinue, onCancel);
     }
 
@@ -60,7 +62,7 @@ public final class ResumeConfirm {
             }
         };
         return new ConfirmScreen(onChoice,
-                Component.translatable(keyPrefix + ".title").withStyle(style -> style.withColor(BrandColors.AMBER)),
+                new TranslatableComponent(keyPrefix + ".title").withStyle(style -> style.withColor(BrandColors.AMBER)),
                 message,
                 yesLabel, noLabel);
     }
@@ -75,14 +77,14 @@ public final class ResumeConfirm {
             String snapshotZipName, boolean zipOnResume, Runnable onRestore, Runnable onCancel) {
         Component message;
         if (zipOnResume) {
-            message = Component.translatable(keyPrefix + ".message", amber(folderName), amber(sourceZipName),
+            message = new TranslatableComponent(keyPrefix + ".message", amber(folderName), amber(sourceZipName),
                     amber(snapshotZipName));
         } else {
-            message = Component.translatable(keyPrefix + ".message_no_backup", amber(folderName),
+            message = new TranslatableComponent(keyPrefix + ".message_no_backup", amber(folderName),
                     amber(sourceZipName));
         }
         return create(keyPrefix, message,
-                Component.translatable("wdl.screen.downloads.restore_action"), CommonComponents.GUI_CANCEL,
+                new TranslatableComponent("wdl.screen.downloads.restore_action"), CommonComponents.GUI_CANCEL,
                 onRestore, onCancel);
     }
 
@@ -95,17 +97,17 @@ public final class ResumeConfirm {
             boolean zipOnResume, Runnable onContinue, Runnable onCancel) {
         Component message;
         if (zipOnResume) {
-            message = Component.translatable("wdl.screen.downloads.confirm_tainted.message_restorable",
+            message = new TranslatableComponent("wdl.screen.downloads.confirm_tainted.message_restorable",
                     amber(folderName), amber(backupZipName), amber(sourceZipName));
         } else {
-            message = Component.translatable("wdl.screen.downloads.confirm_tainted.message_restorable_no_backup",
+            message = new TranslatableComponent("wdl.screen.downloads.confirm_tainted.message_restorable_no_backup",
                     amber(folderName), amber(sourceZipName));
         }
         return create("wdl.screen.downloads.confirm_tainted", message,
-                CommonComponents.GUI_CONTINUE, CommonComponents.GUI_CANCEL, onContinue, onCancel);
+                CommonComponents.GUI_PROCEED, CommonComponents.GUI_CANCEL, onContinue, onCancel);
     }
 
     private static Component amber(String text) {
-        return Component.literal(text).withStyle(style -> style.withColor(BrandColors.AMBER));
+        return new TextComponent(text).withStyle(style -> style.withColor(BrandColors.AMBER));
     }
 }

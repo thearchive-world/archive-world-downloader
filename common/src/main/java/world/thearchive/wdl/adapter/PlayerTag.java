@@ -6,7 +6,7 @@ package world.thearchive.wdl.adapter;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.FloatTag;
@@ -31,9 +31,9 @@ import org.jspecify.annotations.Nullable;
  * lands with the world spawn.</li>
  * <li>{@link #setEnderItems} remaps a captured container holder's {@code "Items"} into {@code "EnderItems"}.</li>
  * <li>{@link #setRootVehicle} writes the vanilla {@code "RootVehicle"} record ({@code "Attach"} plus {@code "Entity"})
- * for a seated player's mount, the {@code store}-with-codec op ({@code UUIDUtil.CODEC}) whose int-array {@code Attach}
- * shape is band-local vanilla-verbatim, re-authored at the deep-band seam, the vanilla-verbatim-shape discipline
- * {@link #setPosition} already carries.</li>
+ * for a seated player's mount, the {@code store}-with-codec op ({@code SerializableUUID.CODEC}) whose int-array
+ * {@code Attach} shape is band-local vanilla-verbatim, re-authored at the deep-band seam, the vanilla-verbatim-shape
+ * discipline {@link #setPosition} already carries.</li>
  * </ul>
  */
 final class PlayerTag {
@@ -117,14 +117,15 @@ final class PlayerTag {
 
     /**
      * Write the seated player's mount as vanilla's {@code "RootVehicle"} record: {@code "Attach"} is the direct
-     * vehicle's {@code UUID} (the {@code UUIDUtil.CODEC} four-int array) and {@code "Entity"} is the root vehicle
-     * serialized standalone. Mirrors {@code ServerPlayer.saveParentVehicle}, which
+     * vehicle's {@code UUID} (the {@code SerializableUUID.CODEC} four-int array) and {@code "Entity"} is the root
+     * vehicle serialized standalone. Mirrors {@code ServerPlayer.saveParentVehicle}, which
      * {@code ServerPlayer.loadAndSpawnParentVehicle} reads on a vanilla open (a singleplayer saved player included) to
      * respawn the vehicle and re-seat the player; an absent record is a clean load that leaves the player standing.
      */
     static void setRootVehicle(CompoundTag raw, UUID attach, CompoundTag entityTag) {
         CompoundTag rootVehicle = new CompoundTag();
-        rootVehicle.put("Attach", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, attach).getOrThrow(false, s -> {}));
+        rootVehicle.put("Attach",
+                SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, attach).getOrThrow(false, s -> {}));
         rootVehicle.put("Entity", entityTag);
         raw.put("RootVehicle", rootVehicle);
     }

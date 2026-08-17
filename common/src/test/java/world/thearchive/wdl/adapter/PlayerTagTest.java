@@ -10,9 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.core.registries.Registries;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
@@ -23,7 +23,6 @@ import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -113,14 +112,14 @@ class PlayerTagTest {
     @Test
     void setDimensionWritesCanonicalVanillaIdForCanonicalKey() {
         CompoundTag tag = playerTag();
-        PlayerTag.setDimension(tag, VanillaDimensions.forType(BuiltinDimensionTypes.NETHER));
+        PlayerTag.setDimension(tag, Level.NETHER);
         assertEquals("minecraft:the_nether", tag.getString("Dimension"));
     }
 
     @Test
     void setDimensionWritesGivenIdVerbatim() {
         CompoundTag tag = playerTag();
-        ResourceKey<Level> datapackDimension = ResourceKey.create(Registries.DIMENSION,
+        ResourceKey<Level> datapackDimension = ResourceKey.create(Registry.DIMENSION_REGISTRY,
                 new ResourceLocation("examplepack", "skylands"));
         PlayerTag.setDimension(tag, datapackDimension);
         assertEquals("examplepack:skylands", tag.getString("Dimension"),
@@ -130,7 +129,7 @@ class PlayerTagTest {
     @Test
     void dimensionOfReadsBackWhatSetDimensionWrote() {
         CompoundTag tag = playerTag();
-        PlayerTag.setDimension(tag, VanillaDimensions.forType(BuiltinDimensionTypes.NETHER));
+        PlayerTag.setDimension(tag, Level.NETHER);
         assertEquals(Level.NETHER, PlayerTag.dimensionOf(tag));
     }
 
@@ -140,7 +139,7 @@ class PlayerTagTest {
         // by accident: the overworld is what an unroutable id would collapse onto if this fell back.
         CompoundTag tag = playerTag();
         assertNull(PlayerTag.dimensionOf(tag), "a player tag with no Dimension key names no dimension");
-        ResourceKey<Level> datapackDimension = ResourceKey.create(Registries.DIMENSION,
+        ResourceKey<Level> datapackDimension = ResourceKey.create(Registry.DIMENSION_REGISTRY,
                 new ResourceLocation("examplepack", "skylands"));
         PlayerTag.setDimension(tag, datapackDimension);
         assertNull(PlayerTag.dimensionOf(tag), "nor does one naming a dimension the capture never routes to");
@@ -174,8 +173,8 @@ class PlayerTagTest {
 
         CompoundTag rootVehicle = tag.getCompound("RootVehicle");
         assertEquals(directVehicle,
-                UUIDUtil.CODEC.parse(NbtOps.INSTANCE, rootVehicle.get("Attach")).result().orElse(null),
-                "Attach is the direct vehicle UUID in the UUIDUtil.CODEC four-int form ServerPlayer reads");
+                SerializableUUID.CODEC.parse(NbtOps.INSTANCE, rootVehicle.get("Attach")).result().orElse(null),
+                "Attach is the direct vehicle UUID in the SerializableUUID.CODEC four-int form ServerPlayer reads");
         assertEquals("minecraft:chest_boat", rootVehicle.getCompound("Entity").getString("id"),
                 "the vehicle NBT nests under Entity, the shape loadAndSpawnParentVehicle spawns from");
         assertTrue(tag.contains("Air"), "the rest of the player tag is untouched");
@@ -269,7 +268,7 @@ class PlayerTagTest {
 
         assertTrue(carried, "the prior download's contents restore onto the same seated mount");
         assertEquals(2, mountItems(fresh).size(), "the empty seated capture is refilled from the prior download");
-        assertEquals(mount, UUIDUtil.CODEC.parse(NbtOps.INSTANCE,
+        assertEquals(mount, SerializableUUID.CODEC.parse(NbtOps.INSTANCE,
                 fresh.getCompound("RootVehicle").getCompound("Entity").get("UUID")).result().orElse(null),
                 "the fresh mount identity is untouched");
     }

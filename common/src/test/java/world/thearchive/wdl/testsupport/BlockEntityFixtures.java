@@ -9,6 +9,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
@@ -42,7 +43,7 @@ public final class BlockEntityFixtures {
      */
     public static CompoundTag namedBlockEntity(String id, int x, int y, int z, String customName) {
         CompoundTag tag = blockEntity(id, x, y, z);
-        tag.putString("CustomName", Component.Serializer.toJson(Component.literal(customName)));
+        tag.putString("CustomName", Component.Serializer.toJson(new TextComponent(customName)));
         return tag;
     }
 

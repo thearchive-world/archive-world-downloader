@@ -5,14 +5,14 @@ package world.thearchive.wdl.adapter;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Registry;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.HasCustomInventoryScreen;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.vehicle.ContainerEntity;
+import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
@@ -154,13 +154,13 @@ public final class OpenClickTracker {
      */
     private static boolean menuIncapable(Entity entity) {
         boolean vanilla = "minecraft".equals(
-                BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).getNamespace());
+                Registry.ENTITY_TYPE.getKey(entity.getType()).getNamespace());
         boolean villager = entity instanceof Villager;
         boolean baby = villager && ((Villager) entity).isBaby();
         boolean nitwit = villager
                 && ((Villager) entity).getVillagerData().getProfession() == VillagerProfession.NITWIT;
-        return EntityMenuCapability.isMenuIncapable(vanilla, entity instanceof ContainerEntity,
-                entity instanceof HasCustomInventoryScreen, entity instanceof AbstractVillager,
+        return EntityMenuCapability.isMenuIncapable(vanilla, entity instanceof AbstractMinecartContainer,
+                entity instanceof AbstractHorse, entity instanceof AbstractVillager,
                 villager, baby, nitwit);
     }
 
@@ -191,21 +191,21 @@ public final class OpenClickTracker {
      *
      * <p>The signal is drained whether or not it is latched, so a request sent while riding something with no container
      * cannot sit and seed a later open. The eligible set is deliberately narrower than vanilla's own gate for this
-     * request. Vanilla sends it for anything implementing HasCustomInventoryScreen, which is three families on this
-     * band (the chest boats, the horses, and the nautiluses); only the container vehicles are latched here, because a
-     * chested mount's menu names its own animal and is recognized without click provenance at all, and a nautilus
-     * carries no chest, so neither has a container this latch could claim. Eligibility deliberately ignores the
-     * entity-capture toggle: the latch is what tells the vehicle's own click-less open apart from an open with no
-     * provenance at all, whatever the toggle. The vehicle is read on the tick the request is OBSERVED, which is not
-     * always the tick it was sent: the send hops to the connection's event loop, so the signal can surface a tick late.
-     * The intent carries the vehicle's network id so the bind can require the same vehicle to still be the one ridden.
+     * request. Vanilla sends it for anything implementing AbstractHorse, which is three families on this band (the
+     * chest boats, the horses, and the nautiluses); only the container vehicles are latched here, because a chested
+     * mount's menu names its own animal and is recognized without click provenance at all, and a nautilus carries no
+     * chest, so neither has a container this latch could claim. Eligibility deliberately ignores the entity-capture
+     * toggle: the latch is what tells the vehicle's own click-less open apart from an open with no provenance at all,
+     * whatever the toggle. The vehicle is read on the tick the request is OBSERVED, which is not always the tick it was
+     * sent: the send hops to the connection's event loop, so the signal can surface a tick late. The intent carries the
+     * vehicle's network id so the bind can require the same vehicle to still be the one ridden.
      */
     void claimOpenInventoryRequest(@Nullable Entity vehicle) {
         if (!openInventoryRequested) {
             return;
         }
         openInventoryRequested = false;
-        if (vehicle instanceof ContainerEntity) {
+        if (vehicle instanceof AbstractMinecartContainer) {
             intent.recordVehicleOpenIntent(vehicle.getId(), currentTick);
         }
     }

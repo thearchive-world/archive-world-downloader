@@ -4,6 +4,7 @@
 package world.thearchive.wdl.adapter;
 
 import com.mojang.logging.LogUtils;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -464,8 +465,11 @@ final class AsyncSaveWriter {
             return; // the dimension logged its own open failure; a scan reads nothing and loses nothing
         }
         try {
-            storage.loadAsync(scan.pos()).join().ifPresent(onDisk -> observer.accept(scan.dimension(), onDisk));
-        } catch (RuntimeException e) {
+            CompoundTag onDisk = storage.load(scan.pos());
+            if (onDisk != null) {
+                observer.accept(scan.dimension(), onDisk);
+            }
+        } catch (IOException | RuntimeException e) {
             LOGGER.warn("chunk {} recovered-coverage scan failed", scan.pos(), e);
         }
     }

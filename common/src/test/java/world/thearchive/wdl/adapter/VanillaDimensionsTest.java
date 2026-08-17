@@ -9,9 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -30,30 +31,37 @@ class VanillaDimensionsTest {
         TestRegistries.frozen();
     }
 
+    /** The built-in dimension type value for a key; forType classifies the value, not the key. */
+    private static DimensionType type(ResourceKey<DimensionType> key) {
+        return TestRegistries.frozen().registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY).getOrThrow(key);
+    }
+
     @Test
     void netherTypeMapsToNether() {
-        assertEquals(Level.NETHER, VanillaDimensions.forType(BuiltinDimensionTypes.NETHER));
+        assertEquals(Level.NETHER, VanillaDimensions.forType(type(DimensionType.NETHER_LOCATION)));
     }
 
     @Test
     void endTypeMapsToEnd() {
-        assertEquals(Level.END, VanillaDimensions.forType(BuiltinDimensionTypes.END));
+        assertEquals(Level.END, VanillaDimensions.forType(type(DimensionType.END_LOCATION)));
     }
 
     @Test
     void overworldTypeMapsToOverworld() {
-        assertEquals(Level.OVERWORLD, VanillaDimensions.forType(BuiltinDimensionTypes.OVERWORLD));
+        assertEquals(Level.OVERWORLD, VanillaDimensions.forType(type(DimensionType.OVERWORLD_LOCATION)));
     }
 
     @Test
     void overworldVariantTypeMapsToOverworld() {
-        assertEquals(Level.OVERWORLD, VanillaDimensions.forType(BuiltinDimensionTypes.OVERWORLD_CAVES));
+        // The caves variant is a distinct dimension type but carries the overworld effects id, so it routes to the
+        // overworld: forType classifies by effects, since the 1.18.2 client's type holder carries no registry key.
+        assertEquals(Level.OVERWORLD, VanillaDimensions.forType(type(DimensionType.OVERWORLD_CAVES_LOCATION)));
     }
 
     @Test
     void unknownOrUnregisteredTypeFallsBackToOverworld() {
-        // A dimension whose TYPE key we do not recognize (or whose holder carries no key -> null) opens as
-        // the overworld so the capture is still a loadable vanilla single-player world.
+        // A null type (a holder that resolved to no value) opens as the overworld so the capture is still a loadable
+        // vanilla single-player world.
         assertEquals(Level.OVERWORLD, VanillaDimensions.forType(null));
     }
 
@@ -82,7 +90,7 @@ class VanillaDimensionsTest {
         // overworld TYPE. Routing by TYPE lands it on OVERWORLD, so the DEFAULT generator blends its edge; a gate
         // keyed on the raw level key would not match minecraft:overworld and would wall instead. The call site
         // (LiveCaptureSession) is what feeds forType's routed key, not the raw key, into this predicate.
-        ResourceKey<Level> routedByType = VanillaDimensions.forType(BuiltinDimensionTypes.OVERWORLD);
+        ResourceKey<Level> routedByType = VanillaDimensions.forType(type(DimensionType.OVERWORLD_LOCATION));
         assertEquals(Level.OVERWORLD, routedByType);
         assertTrue(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, routedByType));
     }

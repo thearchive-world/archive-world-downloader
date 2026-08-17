@@ -6,23 +6,15 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.mojang.serialization.DynamicOps;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.level.dimension.LevelStem;
-import net.minecraft.world.level.levelgen.FlatLevelSource;
-import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -43,12 +35,11 @@ class LevelDatRoundTripTest {
     void levelDatRoundTripsVoidDimensionsSeedAndDataVersion(@TempDir Path directory) throws IOException {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
-        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, built.registries());
 
         CompoundTag dataTag = built.worldData().createTag(built.registries(), null);
         CompoundTag worldGenTag = dataTag.getCompound("WorldGenSettings");
         assertFalse(worldGenTag.isEmpty(), "WorldGenSettings must be present in the level.dat Data tag");
-        long originalSeed = WorldGenSettings.CODEC.parse(ops, worldGenTag).getOrThrow(false, s -> {}).options().seed();
+        long originalSeed = worldGenTag.getLong("seed");
 
         Path levelDat = directory.resolve("level.dat");
         CompoundTag root = new CompoundTag();
@@ -59,13 +50,12 @@ class LevelDatRoundTripTest {
         assertTrue((back.contains("DataVersion") ? back.getInt("DataVersion") : -1) > 0, "DataVersion survives");
         assertTrue(back.contains("SpawnX"), "spawn survives");
 
-        WorldGenSettings worldGen = WorldGenSettings.CODEC
-                .parse(ops, back.getCompound("WorldGenSettings"))
-                .getOrThrow(false, s -> {});
-        assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
-        assertEquals(originalSeed, worldGen.options().seed(), "seed survives the round-trip");
-        assertInstanceOf(FlatLevelSource.class,
-                worldGen.dimensions().dimensions().get(LevelStem.OVERWORLD).generator(),
+        CompoundTag backWorldGen = back.getCompound("WorldGenSettings");
+        CompoundTag dimensions = backWorldGen.getCompound("dimensions");
+        assertEquals(3, dimensions.getAllKeys().size(), "overworld + nether + end survive");
+        assertEquals(originalSeed, backWorldGen.getLong("seed"), "seed survives the round-trip");
+        assertEquals("minecraft:flat",
+                dimensions.getCompound("minecraft:overworld").getCompound("generator").getString("type"),
                 "overworld is a (void) superflat generator");
     }
 
@@ -73,7 +63,7 @@ class LevelDatRoundTripTest {
     void buildsFromClientRegistryWithoutLevelStem() {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         // Precondition mirrors a real multiplayer client: dimension types + biomes synced, no LEVEL_STEM.
-        assertTrue(registries.lookup(Registries.LEVEL_STEM).isEmpty(),
+        assertTrue(registries.registry(Registry.LEVEL_STEM_REGISTRY).isEmpty(),
                 "precondition: client-like reg has no LEVEL_STEM");
         assertDoesNotThrow(() -> writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null),
                 "must derive void dimensions, not fail");
@@ -96,14 +86,12 @@ class LevelDatRoundTripTest {
         assertTrue(Files.exists(levelDat), "save() must write level.dat via the vanilla LevelStorageAccess envelope");
 
         CompoundTag data = NbtIo.readCompressed(levelDat.toFile()).getCompound("Data");
-        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, built.registries());
         assertTrue((data.contains("DataVersion") ? data.getInt("DataVersion") : -1) > 0,
                 "DataVersion survives the production save");
-        WorldGenSettings worldGen = WorldGenSettings.CODEC.parse(ops, data.getCompound("WorldGenSettings"))
-                .getOrThrow(false, s -> {});
-        assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
-        assertInstanceOf(FlatLevelSource.class,
-                worldGen.dimensions().dimensions().get(LevelStem.OVERWORLD).generator(),
+        CompoundTag dimensions = data.getCompound("WorldGenSettings").getCompound("dimensions");
+        assertEquals(3, dimensions.getAllKeys().size(), "overworld + nether + end survive");
+        assertEquals("minecraft:flat",
+                dimensions.getCompound("minecraft:overworld").getCompound("generator").getString("type"),
                 "overworld is a (void) superflat generator");
     }
 

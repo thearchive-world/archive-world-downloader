@@ -6,6 +6,7 @@ package world.thearchive.wdl.client;
 import com.google.common.hash.Hashing;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.vertex.PoseStack;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,17 +33,14 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
-import net.minecraft.client.gui.components.StringWidget;
-import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.layouts.FrameLayout;
-import net.minecraft.client.gui.layouts.GridLayout;
-import net.minecraft.client.gui.layouts.LayoutSettings;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import org.jspecify.annotations.Nullable;
@@ -186,7 +184,7 @@ public final class WdlDownloadsScreen extends Screen {
             boolean capturePartiallyDisabled, String modVersion, String mcVersion,
             Consumer<DownloadTarget> onStart, Supplier<CaptureState> captureState, Runnable onStop,
             Consumer<ToastCopy> onRefusal, BooleanSupplier remoteWorld, @Nullable String activeDownloadName) {
-        super(Component.translatable("wdl.screen.downloads.title"));
+        super(new TranslatableComponent("wdl.screen.downloads.title"));
         this.parent = parent;
         this.savesDirectory = savesDirectory;
         this.loadedWorld = loadedWorld;
@@ -242,14 +240,14 @@ public final class WdlDownloadsScreen extends Screen {
         String name = this.selectedEntry != null ? this.selectedEntry.folderName() : this.retainedName;
 
         NameField field = new NameField(this.font, 0, 0, NAME_WIDTH, FIELD_HEIGHT,
-                Component.translatable("wdl.screen.downloads.name"));
+                new TranslatableComponent("wdl.screen.downloads.name"));
         field.setMaxLength(NAME_MAX_LENGTH);
         field.setValue(name);
         field.setResponder(this::onNameTyped);
         centerTopWidget(field);
         this.nameField = addRenderableWidget(field);
 
-        int buttonRowY = field.getY() + field.getHeight() + 6;
+        int buttonRowY = field.y + field.getHeight() + 6;
         Component primaryLabel = this.selectedEntry != null ? resumeLabel() : downloadLabel();
         boolean primaryActive = this.selectedEntry != null || TargetResolver.hasUsableName(name);
         addButtonRow(buttonRowY, primaryLabel, button -> onPrimary(), primaryActive);
@@ -296,13 +294,13 @@ public final class WdlDownloadsScreen extends Screen {
         this.selectedEntry = null;
 
         String name = this.activeDownloadName != null ? this.activeDownloadName : this.defaultName;
-        Component labelText = Component.translatable("wdl.screen.downloads.downloading", name)
+        Component labelText = new TranslatableComponent("wdl.screen.downloads.downloading", name)
                 .withStyle(style -> style.withColor(BrandColors.AMBER));
-        StringWidget label = new StringWidget(this.font.width(labelText), FIELD_HEIGHT, labelText, this.font);
+        StringLabel label = new StringLabel(labelText, this.font.width(labelText), FIELD_HEIGHT);
         centerTopWidget(label);
         addRenderableWidget(label);
 
-        int buttonRowY = label.getY() + label.getHeight() + 6;
+        int buttonRowY = label.y + label.getHeight() + 6;
         boolean recording = state == CaptureState.RECORDING;
         // a finishing save shows a disabled Saving label, not an actionable Stop
         Button primary = addButtonRow(buttonRowY, recording ? stopLabel() : savingLabel(),
@@ -325,37 +323,40 @@ public final class WdlDownloadsScreen extends Screen {
 
         String name = Wdl.restoringFolderName();
         Component labelText = (name != null
-                ? Component.translatable("wdl.screen.downloads.restoring", name)
-                : Component.translatable("wdl.screen.downloads.restoring_sweep"))
+                ? new TranslatableComponent("wdl.screen.downloads.restoring", name)
+                : new TranslatableComponent("wdl.screen.downloads.restoring_sweep"))
                         .withStyle(style -> style.withColor(BrandColors.AMBER));
-        StringWidget label = new StringWidget(this.font.width(labelText), FIELD_HEIGHT, labelText, this.font);
+        StringLabel label = new StringLabel(labelText, this.font.width(labelText), FIELD_HEIGHT);
         centerTopWidget(label);
         addRenderableWidget(label);
 
-        int buttonRowY = label.getY() + label.getHeight() + 6;
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> onClose())
-                .bounds((this.width - BUTTON_WIDTH) / 2, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT).build());
+        int buttonRowY = label.y + label.getHeight() + 6;
+        addRenderableWidget(new Button((this.width - BUTTON_WIDTH) / 2, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                CommonComponents.GUI_DONE, button -> onClose()));
         addUpdateBanner(buttonRowY + BUTTON_HEIGHT + 8);
     }
 
     private void centerTopWidget(AbstractWidget widget) {
-        GridLayout grid = new GridLayout();
-        grid.addChild(widget, 0, 0, LayoutSettings.defaults().padding(4, 4, 4, 4));
-        grid.arrangeElements();
-        FrameLayout.alignInRectangle(grid, 0, TOP_Y, this.width, this.height, 0.5f, 0.05f);
-        grid.arrangeElements();
+        widget.x = (this.width - widget.getWidth()) / 2;
+        widget.y = TOP_Y + 4 + Math.round(0.05f * Math.max(0, this.height - TOP_Y - widget.getHeight() - 8));
     }
 
     private Button addButtonRow(int buttonRowY, Component primaryLabel, Button.OnPress onPrimary,
             boolean primaryActive) {
         int total = BUTTON_WIDTH * 2 + BUTTON_GAP;
         int startX = (this.width - total) / 2;
-        Button primary = Button.builder(primaryLabel, onPrimary)
-                .bounds(startX, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT).build();
+        Button primary = new Button(startX, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT, primaryLabel, onPrimary,
+                (button, poseStack, mouseX, mouseY) -> {
+                    if (!button.active) {
+                        this.renderTooltip(poseStack, this.font.split(
+                                new TranslatableComponent("wdl.screen.downloads.download.tooltip"), 200),
+                                mouseX, mouseY);
+                    }
+                });
         primary.active = primaryActive;
         this.primaryButton = addRenderableWidget(primary);
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> onClose())
-                .bounds(startX + BUTTON_WIDTH + BUTTON_GAP, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT).build());
+        addRenderableWidget(new Button(startX + BUTTON_WIDTH + BUTTON_GAP, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                CommonComponents.GUI_DONE, button -> onClose()));
         return primary;
     }
 
@@ -377,7 +378,7 @@ public final class WdlDownloadsScreen extends Screen {
             return y;
         }
         UpdateAvailable update = updateCheck.available().orElseThrow();
-        Component prose = Component.translatable("wdl.screen.downloads.update_available",
+        Component prose = new TranslatableComponent("wdl.screen.downloads.update_available",
                 update.runningDisplay(), update.latestDisplay());
         int maxBandWidth = listBandWidth();
         int modrinthWidth = this.font.width("Modrinth");
@@ -417,7 +418,7 @@ public final class WdlDownloadsScreen extends Screen {
         if (!this.capturePartiallyDisabled) {
             return y;
         }
-        Component text = Component.translatable("wdl.screen.downloads.capture_disabled");
+        Component text = new TranslatableComponent("wdl.screen.downloads.capture_disabled");
         int width = this.font.width(WARNING_GLYPH) + this.font.width(text);
         addRenderableWidget(new CaptureWarningWidget((this.width - width) / 2, y, width, text));
         return y + HEADER_ROW_HEIGHT + 6;
@@ -438,23 +439,23 @@ public final class WdlDownloadsScreen extends Screen {
     }
 
     private Component downloadLabel() {
-        return Component.translatable("wdl.screen.downloads.download");
+        return new TranslatableComponent("wdl.screen.downloads.download");
     }
 
     private Component resumeLabel() {
-        return Component.translatable("wdl.screen.downloads.resume");
+        return new TranslatableComponent("wdl.screen.downloads.resume");
     }
 
     private Component stopLabel() {
-        return Component.translatable("wdl.screen.downloads.stop");
+        return new TranslatableComponent("wdl.screen.downloads.stop");
     }
 
     private Component savingLabel() {
-        return Component.translatable("wdl.screen.downloads.saving");
+        return new TranslatableComponent("wdl.screen.downloads.saving");
     }
 
     private String openSavesText() {
-        return Component.translatable("wdl.screen.downloads.open_saves").getString();
+        return new TranslatableComponent("wdl.screen.downloads.open_saves").getString();
     }
 
     private void onNameTyped(String text) {
@@ -482,8 +483,6 @@ public final class WdlDownloadsScreen extends Screen {
             return;
         }
         this.primaryButton.active = active;
-        this.primaryButton.setTooltip(active ? null
-                : Tooltip.create(Component.translatable("wdl.screen.downloads.download.tooltip")));
     }
 
     private void onRowSelected(DownloadEntry entry) {
@@ -692,19 +691,46 @@ public final class WdlDownloadsScreen extends Screen {
     }
 
     /** The "Existing Worlds (N)" disclosure: a focusable, narratable header whose whole row toggles the list. */
+    private void rebuildWidgets() {
+        clearWidgets();
+        init();
+    }
+
+    /** A centered, inert header label: below the 1.19.4 GUI additions there is no vanilla StringWidget. */
+    private final class StringLabel extends AbstractWidget {
+        private final Component text;
+
+        StringLabel(Component text, int width, int height) {
+            super(0, 0, width, height, text);
+            this.text = text;
+            this.active = false;
+        }
+
+        @Override
+        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+            new RenderSurfaceImpl(poseStack).text(font, this.text, this.x,
+                    this.y + (getHeight() - font.lineHeight) / 2, NAME_ARGB);
+        }
+
+        @Override
+        public void updateNarration(NarrationElementOutput narrationElementOutput) {
+            defaultButtonNarrationText(narrationElementOutput);
+        }
+    }
+
     private final class DisclosureWidget extends AbstractWidget {
         DisclosureWidget(int x, int y, int width) {
-            super(x, y, width, HEADER_ROW_HEIGHT, Component.translatable("wdl.screen.downloads.existing",
+            super(x, y, width, HEADER_ROW_HEIGHT, new TranslatableComponent("wdl.screen.downloads.existing",
                     entries.size()));
         }
 
         @Override
-        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(poseStack);
             String triangle = listCollapsed ? TRIANGLE_COLLAPSED : TRIANGLE_EXPANDED;
-            Component header = Component.literal(triangle)
-                    .append(Component.translatable("wdl.screen.downloads.existing", entries.size()));
-            surface.text(font, header, getX() + 4, getY() + (getHeight() - font.lineHeight) / 2,
+            Component header = new TextComponent(triangle)
+                    .append(new TranslatableComponent("wdl.screen.downloads.existing", entries.size()));
+            surface.text(font, header, this.x + 4, this.y + (getHeight() - font.lineHeight) / 2,
                     HEADER_ARGB);
         }
 
@@ -714,7 +740,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {
+        public void updateNarration(NarrationElementOutput narrationElementOutput) {
             defaultButtonNarrationText(narrationElementOutput);
         }
     }
@@ -722,15 +748,15 @@ public final class WdlDownloadsScreen extends Screen {
     /** The "Open Saves Folder" link: a focusable, narratable control that opens the saves directory. */
     private final class OpenSavesWidget extends AbstractWidget {
         OpenSavesWidget(int x, int y, int width) {
-            super(x, y, width, HEADER_ROW_HEIGHT, Component.translatable("wdl.screen.downloads.open_saves"));
+            super(x, y, width, HEADER_ROW_HEIGHT, new TranslatableComponent("wdl.screen.downloads.open_saves"));
         }
 
         @Override
-        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(poseStack);
-            int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
-            surface.text(font, openSavesText(), getX() + 4,
-                    getY() + (getHeight() - font.lineHeight) / 2, color);
+            int color = isHovered ? LINK_HOVER_ARGB : LINK_REST_ARGB;
+            surface.text(font, openSavesText(), this.x + 4,
+                    this.y + (getHeight() - font.lineHeight) / 2, color);
         }
 
         @Override
@@ -739,7 +765,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {
+        public void updateNarration(NarrationElementOutput narrationElementOutput) {
             defaultButtonNarrationText(narrationElementOutput);
         }
     }
@@ -755,18 +781,18 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(poseStack);
-            surface.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), BANNER_FILL_ARGB);
-            surface.outline(getX(), getY(), getWidth(), getHeight(), BANNER_OUTLINE_ARGB);
-            int textY = getY() + (getHeight() - font.lineHeight) / 2;
-            surface.text(font, WARNING_GLYPH, getX() + BANNER_GAP, textY, BANNER_GLYPH_ARGB);
-            surface.text(font, this.prose, getX() + BANNER_GAP + font.width(WARNING_GLYPH), textY,
+            surface.fill(this.x, this.y, this.x + getWidth(), this.y + getHeight(), BANNER_FILL_ARGB);
+            surface.outline(this.x, this.y, getWidth(), getHeight(), BANNER_OUTLINE_ARGB);
+            int textY = this.y + (getHeight() - font.lineHeight) / 2;
+            surface.text(font, WARNING_GLYPH, this.x + BANNER_GAP, textY, BANNER_GLYPH_ARGB);
+            surface.text(font, this.prose, this.x + BANNER_GAP + font.width(WARNING_GLYPH), textY,
                     BANNER_TEXT_ARGB);
         }
 
         @Override
-        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {}
+        public void updateNarration(NarrationElementOutput narrationElementOutput) {}
     }
 
     /** One named banner link: an underlined teal label opening its release page in the OS browser. */
@@ -775,17 +801,19 @@ public final class WdlDownloadsScreen extends Screen {
         private final String url;
 
         BannerLinkWidget(int x, int y, int width, String label, String url) {
-            super(x, y, width, BANNER_HEIGHT, Component.literal(label));
-            this.label = Component.literal(label).withStyle(ChatFormatting.UNDERLINE);
+            super(x, y, width, BANNER_HEIGHT, new TextComponent(label));
+            this.label = new TextComponent(label).withStyle(ChatFormatting.UNDERLINE);
             this.url = url;
-            setTooltip(Tooltip.create(Component.literal(url)));
         }
 
         @Override
-        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(poseStack);
-            int color = isHovered() ? BANNER_LINK_HOVER_ARGB : BANNER_LINK_ARGB;
-            surface.text(font, this.label, getX(), getY() + (getHeight() - font.lineHeight) / 2, color);
+            int color = isHovered ? BANNER_LINK_HOVER_ARGB : BANNER_LINK_ARGB;
+            surface.text(font, this.label, this.x, this.y + (getHeight() - font.lineHeight) / 2, color);
+            if (this.isHovered) {
+                WdlDownloadsScreen.this.renderTooltip(poseStack, new TextComponent(this.url), mouseX, mouseY);
+            }
         }
 
         @Override
@@ -794,7 +822,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {
+        public void updateNarration(NarrationElementOutput narrationElementOutput) {
             defaultButtonNarrationText(narrationElementOutput);
         }
     }
@@ -803,17 +831,17 @@ public final class WdlDownloadsScreen extends Screen {
     private final class BannerDismissWidget extends AbstractWidget {
         BannerDismissWidget(int x, int y, int width) {
             super(x, y, width, BANNER_HEIGHT,
-                    Component.translatable("wdl.screen.downloads.update_dismiss"));
+                    new TranslatableComponent("wdl.screen.downloads.update_dismiss"));
         }
 
         @Override
-        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(poseStack);
-            int color = isHovered() ? LINK_HOVER_ARGB : LINK_REST_ARGB;
+            int color = isHovered ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             // The glyph comes from the fallback font, whose ink sits high in its line box, so the shared
             // centering formula reads a pixel high without the nudge.
-            surface.text(font, DISMISS_GLYPH, getX(),
-                    getY() + (getHeight() - font.lineHeight) / 2 + 1, color);
+            surface.text(font, DISMISS_GLYPH, this.x,
+                    this.y + (getHeight() - font.lineHeight) / 2 + 1, color);
         }
 
         @Override
@@ -823,7 +851,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
 
         @Override
-        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {
+        public void updateNarration(NarrationElementOutput narrationElementOutput) {
             defaultButtonNarrationText(narrationElementOutput);
         }
     }
@@ -836,19 +864,23 @@ public final class WdlDownloadsScreen extends Screen {
             super(x, y, width, HEADER_ROW_HEIGHT, text);
             this.text = text;
             this.active = false; // a passive indicator, like the update banner's panel, not a control
-            setTooltip(Tooltip.create(Component.translatable("wdl.screen.downloads.capture_disabled.tooltip")));
         }
 
         @Override
-        public void renderWidget(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl(poseStack);
-            int textY = getY() + (getHeight() - font.lineHeight) / 2;
-            surface.text(font, WARNING_GLYPH, getX(), textY, BANNER_GLYPH_ARGB);
-            surface.text(font, this.text, getX() + font.width(WARNING_GLYPH), textY, NAME_ARGB);
+            int textY = this.y + (getHeight() - font.lineHeight) / 2;
+            surface.text(font, WARNING_GLYPH, this.x, textY, BANNER_GLYPH_ARGB);
+            surface.text(font, this.text, this.x + font.width(WARNING_GLYPH), textY, NAME_ARGB);
+            if (this.isHovered) {
+                WdlDownloadsScreen.this.renderTooltip(poseStack, font.split(
+                        new TranslatableComponent("wdl.screen.downloads.capture_disabled.tooltip"), 200),
+                        mouseX, mouseY);
+            }
         }
 
         @Override
-        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {}
+        public void updateNarration(NarrationElementOutput narrationElementOutput) {}
     }
 
     private void toggleCollapsed() {
@@ -873,8 +905,8 @@ public final class WdlDownloadsScreen extends Screen {
     @Override
     public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
         super.render(poseStack, mouseX, mouseY, partialTick);
-        // Drawing a tooltip during the row render clips it against the list's scissor; deferring it to after
-        // the list lets it paint past the scissor.
+        // Drawing a tooltip during the row render leaves it clipped or painted over by the list; deferring it to
+        // after the list draws it cleanly on top.
         if (this.pendingTooltip != null) {
             this.pendingTooltip.run();
             this.pendingTooltip = null;
@@ -936,7 +968,7 @@ public final class WdlDownloadsScreen extends Screen {
      * to null; read the box only while the list is expanded. Exists for the test harness, so the screen gametests read
      * the live rectangle instead of recomputing pixel math.
      */
-    public @Nullable ScreenRectangle restoreChipBox(String folderName) {
+    public @Nullable Rect2i restoreChipBox(String folderName) {
         DownloadList downloadList = this.list;
         if (downloadList == null) {
             return null;
@@ -1063,7 +1095,7 @@ public final class WdlDownloadsScreen extends Screen {
                 }
                 try {
                     // Below 1.20 there is no FaviconTexture; the world icon is managed by hand as vanilla's list does.
-                    DynamicTexture texture = new DynamicTexture(NativeImage.read(bytes));
+                    DynamicTexture texture = new DynamicTexture(NativeImage.read(new ByteArrayInputStream(bytes)));
                     ResourceLocation location = new ResourceLocation("wdl", "world/"
                             + Util.sanitizeName(entry.folderName(), ResourceLocation::validPathChar) + "/"
                             + Hashing.sha1().hashUnencodedChars(entry.folderName()) + "/icon");
@@ -1173,7 +1205,7 @@ public final class WdlDownloadsScreen extends Screen {
                     surface.text(font, DOT, pairX + 6, y, GRAY_ARGB);
                     pairX += 6 + font.width(DOT) + 6;
                 }
-                String label = Component.translatable(labelKey).getString();
+                String label = new TranslatableComponent(labelKey).getString();
                 String clampedLabel = ClientText.ellipsize(font, label, rightLimit - pairX);
                 surface.text(font, clampedLabel, pairX, y, GRAY_ARGB);
                 if (!clampedLabel.equals(label)) {
@@ -1217,7 +1249,7 @@ public final class WdlDownloadsScreen extends Screen {
                     boolean restorable = false;
                     if (source != null && !this.entry.isCurrentlyLoaded()) {
                         restorable = true;
-                        String restoreChip = Component.translatable("wdl.screen.downloads.restore").getString();
+                        String restoreChip = new TranslatableComponent("wdl.screen.downloads.restore").getString();
                         this.restoreLeft = slotRight - font.width(restoreChip);
                         this.restoreRight = slotRight;
                         boolean overRestore = hovering
@@ -1230,20 +1262,20 @@ public final class WdlDownloadsScreen extends Screen {
                         }
                         slotRight = this.restoreLeft - 4;
                     }
-                    String chip = Component.translatable("wdl.screen.downloads.tainted").getString();
+                    String chip = new TranslatableComponent("wdl.screen.downloads.tainted").getString();
                     int chipLeft = slotRight - font.width(chip);
                     surface.text(font, chip, chipLeft, y, TAINTED_ARGB);
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
                         // With the Restore chip present the tooltip drops the fresh-download advice: the
                         // chip beside it is the better way out.
-                        Component taintedTip = Component.translatable(restorable
+                        Component taintedTip = new TranslatableComponent(restorable
                                 ? "wdl.screen.downloads.tooltip.tainted_restorable"
                                 : "wdl.screen.downloads.tooltip.tainted");
                         pendingTooltip = () -> surface.tooltip(font, taintedTip, TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
                     }
                     slotLeft = chipLeft;
                 } else if (this.entry.health() == DownloadHealth.RECOVERABLE) {
-                    String chip = Component.translatable("wdl.screen.downloads.recover").getString();
+                    String chip = new TranslatableComponent("wdl.screen.downloads.recover").getString();
                     this.recoverLeft = slotRight - font.width(chip);
                     this.recoverRight = slotRight;
                     boolean overRecover = hovering && inLine(mouseX, mouseY, this.recoverLeft, this.recoverRight, y);
@@ -1251,19 +1283,20 @@ public final class WdlDownloadsScreen extends Screen {
                             overRecover ? LINK_HOVER_ARGB : RECOVER_ARGB);
                     slotLeft = this.recoverLeft;
                 } else if (this.entry.health() == DownloadHealth.PARTIAL) {
-                    String chip = Component.translatable("wdl.screen.downloads.partial").getString();
+                    String chip = new TranslatableComponent("wdl.screen.downloads.partial").getString();
                     int chipLeft = slotRight - font.width(chip);
                     surface.text(font, chip, chipLeft, y, PARTIAL_ARGB);
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
                         pendingTooltip = () -> surface.tooltip(font,
-                                Component.translatable("wdl.toast.partial.title"), TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
+                                new TranslatableComponent("wdl.toast.partial.title"), TOOLTIP_WRAP_WIDTH, mouseX,
+                                mouseY);
                     }
                     slotLeft = chipLeft;
                 } else {
                     OptionalLong size = effectiveSize();
                     if (size.isPresent()) {
                         SizeFormatter.Size formatted = SizeFormatter.format(size.getAsLong());
-                        Component text = Component.translatable(formatted.unitKey(), formatted.number());
+                        Component text = new TranslatableComponent(formatted.unitKey(), formatted.number());
                         surface.text(font, text, slotRight - font.width(text), y, GRAY_ARGB);
                         slotLeft = slotRight - font.width(text);
                     }
@@ -1271,8 +1304,8 @@ public final class WdlDownloadsScreen extends Screen {
 
                 if (overArrow) {
                     pendingTooltip = () -> surface.tooltip(font, List.of(
-                            Component.translatable("wdl.screen.downloads.tooltip.folder", entry.folderName()),
-                            Component.translatable("wdl.screen.downloads.tooltip.version", modVersion, mcVersion)),
+                            new TranslatableComponent("wdl.screen.downloads.tooltip.folder", entry.folderName()),
+                            new TranslatableComponent("wdl.screen.downloads.tooltip.version", modVersion, mcVersion)),
                             mouseX, mouseY);
                 }
                 return slotLeft;
@@ -1296,13 +1329,13 @@ public final class WdlDownloadsScreen extends Screen {
             private Component restoreTooltip(Path source) {
                 String sourceName = source.getFileName().toString();
                 if (!zipOnResume) {
-                    return Component.translatable("wdl.screen.downloads.tooltip.restore_no_backup", sourceName);
+                    return new TranslatableComponent("wdl.screen.downloads.tooltip.restore_no_backup", sourceName);
                 }
                 if (this.snapshotName == null) {
                     // A directory probe, and a row is rebuilt whenever a restore could have taken the next free name.
                     this.snapshotName = RestoreOperation.nextSnapshotName(savesDirectory, this.entry.folderName());
                 }
-                return Component.translatable("wdl.screen.downloads.tooltip.restore", sourceName,
+                return new TranslatableComponent("wdl.screen.downloads.tooltip.restore", sourceName,
                         this.snapshotName);
             }
 
@@ -1348,11 +1381,11 @@ public final class WdlDownloadsScreen extends Screen {
              * clicks the chip.
              */
             @Nullable
-            ScreenRectangle restoreChipBox() {
+            Rect2i restoreChipBox() {
                 if (this.restoreLeft < 0) {
                     return null;
                 }
-                return new ScreenRectangle(this.restoreLeft, this.line2Top,
+                return new Rect2i(this.restoreLeft, this.line2Top,
                         this.restoreRight - this.restoreLeft + 1, font.lineHeight + 1);
             }
 
@@ -1368,7 +1401,7 @@ public final class WdlDownloadsScreen extends Screen {
 
             @Override
             public Component getNarration() {
-                return Component.translatable("wdl.screen.downloads.narration", this.displayName, this.lastPlayed);
+                return new TranslatableComponent("wdl.screen.downloads.narration", this.displayName, this.lastPlayed);
             }
         }
     }

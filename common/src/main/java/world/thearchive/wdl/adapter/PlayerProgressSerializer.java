@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.stats.StatType;
 import net.minecraft.stats.StatsCounter;
 import org.jspecify.annotations.Nullable;
@@ -46,7 +45,7 @@ final class PlayerProgressSerializer {
     static byte @Nullable [] statsJson(StatsCounter counter, int dataVersion) {
         JsonObject stats = new JsonObject();
         boolean any = false;
-        for (StatType<?> type : BuiltInRegistries.STAT_TYPE) {
+        for (StatType<?> type : Registry.STAT_TYPE) {
             any |= collectStatType(type, counter, stats);
         }
         if (!any) {
@@ -61,7 +60,7 @@ final class PlayerProgressSerializer {
     // getKey returns non-null for elements obtained by iterating the same registry
     @SuppressWarnings("NullAway")
     private static <T> boolean collectStatType(StatType<T> type, StatsCounter counter, JsonObject stats) {
-        String typeId = BuiltInRegistries.STAT_TYPE.getKey(type).toString();
+        String typeId = Registry.STAT_TYPE.getKey(type).toString();
         Registry<T> registry = type.getRegistry();
         boolean any = false;
         for (T value : registry) {

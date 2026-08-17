@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Registry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -157,7 +157,7 @@ public final class FixtureFidelity {
         TestRegistries.frozen();
         Map<ResourceLocation, BlockState> states = new HashMap<>();
         BlockPos probe = new BlockPos(0, 0, 0);
-        for (Block block : BuiltInRegistries.BLOCK) {
+        for (Block block : Registry.BLOCK) {
             if (!(block instanceof EntityBlock entityBlock)) {
                 continue;
             }
@@ -167,7 +167,7 @@ public final class FixtureFidelity {
                 continue;
             }
             BlockEntityType<?> type = blockEntity.getType();
-            states.putIfAbsent(BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type), state);
+            states.putIfAbsent(Registry.BLOCK_ENTITY_TYPE.getKey(type), state);
         }
         representativeStates = states;
         return states;

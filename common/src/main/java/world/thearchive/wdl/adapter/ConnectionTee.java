@@ -9,14 +9,11 @@ import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientboundBundlePacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
-import net.minecraft.network.protocol.game.ClientboundSetPassengersPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import org.slf4j.Logger;
 
@@ -127,36 +124,10 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
     }
 
     private void route(Packet<?> packet, EntityPacketCapture capture) {
-        // The inbound bundler packs a delimited run of packets into one ClientboundBundlePacket before
-        // packet_handler; the per-packet split happens later, at the listener (handleBundlePacket). Entity spawn
-        // pairing data is bundled, so unwrap one level or the AddEntity and friends sit inside a wrapper (bundles
-        // do not nest, so one level is enough).
-        if (packet instanceof ClientboundBundlePacket bundle) {
-            // Pass 1: collect every id any SetPassengers sub-packet names, vehicle or passenger slot. The
-            // pairing bundle of a ridden vehicle self-contains its SetPassengers, so this one set feeds
-            // both the arrival commit rule and the ridden bit with no bundle-end callback or buffer.
-            IntSet named = new IntOpenHashSet();
-            for (Packet<?> sub : bundle.subPackets()) {
-                if (sub instanceof ClientboundSetPassengersPacket passengers) {
-                    named.add(passengers.getVehicle());
-                    for (int passenger : passengers.getPassengers()) {
-                        named.add(passenger);
-                    }
-                }
-            }
-            for (Packet<?> sub : bundle.subPackets()) {
-                try {
-                    routeOne(sub, capture, named);
-                } catch (RuntimeException e) {
-                    // Per-sub-packet isolation: one throwing sub-packet must not drop the rest of the
-                    // bundle. Bundles carry the spawn pairing data, so a dropped spawn would silently lose the
-                    // entity and every later packet for its id; the rest of the bundle is still routed.
-                    LOGGER.warn("connection tee: a bundled sub-packet failed (rest of bundle still routed)", e);
-                }
-            }
-        } else {
-            routeOne(packet, capture, IntSets.EMPTY_SET);
-        }
+        // No inbound packet bundling below 1.19.4, so there is no bundle-scoped SetPassengers pre-scan: every
+        // packet routes directly and SetPassengers arrives as an ordinary in-stream packet, so no ids are named
+        // ahead of their spawn and bundleNamedIds is always empty here.
+        routeOne(packet, capture, IntSets.EMPTY_SET);
     }
 
     private void routeOne(Packet<?> packet, EntityPacketCapture capture, IntSet bundleNamedIds) {

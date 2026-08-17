@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -68,7 +68,10 @@ class EntityContainerStashMergeTest {
         registries = TestRegistries.frozen();
     }
 
-    /** A serialized container-vehicle tag: an {@code id}, the {@code "UUID"} via {@link UUIDUtil#CODEC}, no items. */
+    /**
+     * A serialized container-vehicle tag: an {@code id}, the {@code "UUID"} via {@link SerializableUUID#CODEC}, no
+     * items.
+     */
     private static CompoundTag entityTag(String id, UUID uuid) {
         return EntityFixtures.entity(id, uuid);
     }

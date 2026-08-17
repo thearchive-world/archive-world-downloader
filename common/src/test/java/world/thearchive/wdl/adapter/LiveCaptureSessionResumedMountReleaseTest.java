@@ -19,7 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
@@ -350,7 +350,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
         CompoundTag player = new CompoundTag();
         // The band's save keys the player file on its UUID (players/data/<uuid>.dat at 26.x), so a prior written
         // through it must carry one; a client saveWithoutId always does.
-        player.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, PRIOR_PLAYER).getOrThrow(false, s -> {}));
+        player.put("UUID",
+                SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, PRIOR_PLAYER).getOrThrow(false, s -> {}));
         PlayerTag.setDimension(player, dimension);
         if (mount != null) {
             CompoundTag root = new CompoundTag();
@@ -444,7 +445,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
     private static @Nullable CompoundTag entityChunk(WorldPaths paths, ResourceKey<Level> dimension, ChunkPos pos)
             throws Exception {
         try (IOWorker storage = paths.openEntitiesStorage(dimension)) {
-            Optional<CompoundTag> read = storage.loadAsync(pos).join();
+            Optional<CompoundTag> read = Optional.ofNullable(storage.load(pos));
             return read.orElse(null);
         }
     }

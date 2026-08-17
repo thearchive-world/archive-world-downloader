@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
@@ -25,7 +24,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
-import net.minecraft.world.level.chunk.PalettedContainerRO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -117,11 +115,11 @@ class ChunkRoundTripTest {
      * {@code ServerLevel} the headless test has none of, so the section containers are decoded directly instead.
      */
     private static void assertSectionsDecode(CompoundTag chunkTag, RegistryAccess registries) {
-        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registries.BIOME);
-        Codec<PalettedContainer<BlockState>> blockStateCodec = PalettedContainer.codecRW(
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
+        Codec<PalettedContainer<BlockState>> blockStateCodec = PalettedContainer.codec(
                 Block.BLOCK_STATE_REGISTRY, BlockState.CODEC, PalettedContainer.Strategy.SECTION_STATES,
                 Blocks.AIR.defaultBlockState());
-        Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec = PalettedContainer.codecRO(
+        Codec<PalettedContainer<Holder<Biome>>> biomeCodec = PalettedContainer.codec(
                 biomeRegistry.asHolderIdMap(), biomeRegistry.holderByNameCodec(),
                 PalettedContainer.Strategy.SECTION_BIOMES, biomeRegistry.getHolderOrThrow(Biomes.PLAINS));
         for (Tag sectionTag : chunkTag.getList("sections", Tag.TAG_COMPOUND)) {

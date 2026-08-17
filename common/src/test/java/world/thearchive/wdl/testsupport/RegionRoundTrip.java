@@ -5,6 +5,7 @@ package world.thearchive.wdl.testsupport;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.IOWorker;
@@ -33,7 +34,7 @@ public final class RegionRoundTrip {
             throw new RuntimeException("failed writing region chunk " + pos, e);
         }
         try (IOWorker reader = open(directory)) {
-            return reader.loadAsync(pos).join()
+            return Optional.ofNullable(reader.load(pos))
                     .orElseThrow(() -> new IllegalStateException("no chunk read back at " + pos));
         } catch (IOException e) {
             throw new RuntimeException("failed reading region chunk " + pos, e);

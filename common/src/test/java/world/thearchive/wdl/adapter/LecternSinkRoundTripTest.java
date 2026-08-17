@@ -16,6 +16,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,8 +64,8 @@ class LecternSinkRoundTripTest {
         tag.putInt("generation", 0);
         tag.putBoolean("resolved", true);
         ListTag pages = new ListTag();
-        pages.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal("Page one"))));
-        pages.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal("Page two"))));
+        pages.add(StringTag.valueOf(Component.Serializer.toJson(new TextComponent("Page one"))));
+        pages.add(StringTag.valueOf(Component.Serializer.toJson(new TextComponent("Page two"))));
         tag.put("pages", pages);
         return book;
     }

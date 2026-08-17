@@ -7,9 +7,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import net.minecraft.SharedConstants;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 
 import world.thearchive.wdl.core.AtomicFileWrite;
@@ -67,7 +67,7 @@ final class MapDataWriter {
     private static CompoundTag envelope(Tag dataTag) {
         CompoundTag envelope = new CompoundTag();
         envelope.put("data", dataTag);
-        NbtUtils.addCurrentDataVersion(envelope);
+        envelope.putInt("DataVersion", SharedConstants.getCurrentVersion().getWorldVersion());
         return envelope;
     }
 

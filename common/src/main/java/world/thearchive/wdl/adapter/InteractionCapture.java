@@ -11,18 +11,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.Predicate;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.tags.ItemTags;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
@@ -34,8 +31,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BeehiveBlock;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.ChiseledBookShelfBlock;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -43,15 +38,14 @@ import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 /**
  * The MC-typed, loader-agnostic recognizer for interaction-prediction capture: content the chunk packet and an opened
- * menu never carry to the client (chiseled-bookshelf books, jukebox discs, placed shulker contents, placed beehive
- * occupants) is predicted from the local player's own right-click and reconciled against the authoritative synced
- * block-state before it is persisted, so a prediction the server never confirmed is never written.
+ * menu never carry to the client (jukebox discs, placed shulker contents, placed beehive occupants) is predicted from
+ * the local player's own right-click and reconciled against the authoritative synced block-state before it is
+ * persisted, so a prediction the server never confirmed is never written.
  *
  * <p>Mirrors {@link EntityPacketCapture}: a connection-scoped {@code static volatile} publication point the per-loader
  * use-block hook resolves (the hook has no session reference), {@code null} when no download is running so the hook
@@ -61,9 +55,9 @@ import org.slf4j.Logger;
  * {@link #blockStateAt}) and routing the confirmed holders to their merge ({@link ContainerMerge}). At most one capture
  * runs at a time, so a process singleton is correct.
  *
- * <p>Two of the four writes reuse the open-time {@code "Items"} path (bookshelf, shulker, via {@link ContainerSink});
- * the other two write the item's pre-component block-entity form directly ({@code ItemStack#save} under
- * {@code "RecordItem"}, a {@code ListTag} copy under {@code "Bees"}).
+ * <p>One of the three writes reuses the open-time {@code "Items"} path (shulker, via {@link ContainerSink}); the other
+ * two write the item's pre-component block-entity form directly ({@code ItemStack#save} under {@code "RecordItem"}, a
+ * {@code ListTag} copy under {@code "Bees"}).
  */
 public final class InteractionCapture {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -89,7 +83,7 @@ public final class InteractionCapture {
      */
     private final ChunkCaptureGate chunkCaptureGate;
 
-    /** Insert-time candidates (bookshelf, jukebox), keyed by the looked-at block pos. Main-thread only. */
+    /** Insert-time candidates (jukebox), keyed by the looked-at block pos. Main-thread only. */
     private final Map<BlockPos, Candidate> insertStash = new LinkedHashMap<>();
 
     /** Place-time candidates (shulker, beehive), keyed by the derived placed pos. Main-thread only. */
@@ -202,13 +196,12 @@ public final class InteractionCapture {
     }
 
     /**
-     * The kind of a {@link HolderCandidate} (a bookshelf insert is a {@link BookshelfCandidate}, not here), and the one
-     * descriptor per holder content type. Each constant carries the reconcile predicate that confirms its content
-     * against the authoritative block-state, and whether its confirmed holder folds into the open-time {@code "Items"}
-     * container bundle (a placed shulker, which opening supersedes) or the generic holder merge
-     * ({@link ContainerMerge#mergeHolderChunkStash}: a jukebox disc, beehive occupants). Adding a content type is one
-     * constant that drives the gate, {@link #route}, and the merge together, so a half-wired type cannot compile rather
-     * than silently capturing but never writing.
+     * The kind of a {@link HolderCandidate}, and the one descriptor per holder content type. Each constant carries the
+     * reconcile predicate that confirms its content against the authoritative block-state, and whether its confirmed
+     * holder folds into the open-time {@code "Items"} container bundle (a placed shulker, which opening supersedes) or
+     * the generic holder merge ({@link ContainerMerge#mergeHolderChunkStash}: a jukebox disc, beehive occupants).
+     * Adding a content type is one constant that drives the gate, {@link #route}, and the merge together, so a
+     * half-wired type cannot compile rather than silently capturing but never writing.
      */
     enum InteractionKind {
         JUKEBOX(false, state -> state.getBlock() instanceof JukeboxBlock && state.getValue(JukeboxBlock.HAS_RECORD)),
@@ -235,14 +228,7 @@ public final class InteractionCapture {
     }
 
     /** A predicted interaction awaiting the reconcile gate. */
-    sealed interface Candidate permits BookshelfCandidate, HolderCandidate {}
-
-    /**
-     * A chiseled-bookshelf insert: the captured {@code ItemStackWithSlot} entry per hit slot (last-seen-wins per slot).
-     * The gate keeps slot {@code n} only when the authoritative {@code SLOT_n_OCCUPIED} bit is set, so several books
-     * loaded into one bookshelf each stand or fall on their own slot.
-     */
-    record BookshelfCandidate(Map<Integer, CompoundTag> slotEntries) implements Candidate {}
+    sealed interface Candidate permits HolderCandidate {}
 
     /**
      * A jukebox disc, placed shulker, or placed beehive: one merge-ready single-key holder
@@ -253,16 +239,15 @@ public final class InteractionCapture {
 
     /**
      * A chunk's confirmed holders, split by merge path: {@code items} folds through the open-time container
-     * {@code "Items"} merge (placed shulker, bookshelf books) under the open-time-wins precedence; {@code holders}
-     * takes the generic field-copy merge (jukebox disc under {@code "RecordItem"}, beehive occupants under
-     * {@code "Bees"}), each holder already carrying exactly the key its block entity reads. One bundle drains per
-     * chunk.
+     * {@code "Items"} merge (placed shulker) under the open-time-wins precedence; {@code holders} takes the generic
+     * field-copy merge (jukebox disc under {@code "RecordItem"}, beehive occupants under {@code "Bees"}), each holder
+     * already carrying exactly the key its block entity reads. One bundle drains per chunk.
      */
     record ChunkBundles(Map<BlockPos, CompoundTag> items, Map<BlockPos, CompoundTag> holders) {}
 
     /**
-     * Observe one local-player right-click (client main thread). Recognize an insert into an existing bookshelf/jukebox
-     * or a place of a content-bearing block-item, snapshot the hand content to immutable NBT at once, and stash it; the
+     * Observe one local-player right-click (client main thread). Recognize an insert into an existing jukebox or a
+     * place of a content-bearing block-item, snapshot the hand content to immutable NBT at once, and stash it; the
      * reconcile gate at flush decides whether it survives. Never mutates the interaction or the live stack.
      */
     private void onUseBlock(Player player, Level level, InteractionHand hand, BlockHitResult hit) {
@@ -289,76 +274,15 @@ public final class InteractionCapture {
         BlockPos clicked = hit.getBlockPos().immutable();
         BlockState state = level.getBlockState(clicked);
         boolean inserted = false;
-        if (state.getBlock() instanceof ChiseledBookShelfBlock bookshelf) {
-            inserted = recordBookshelfInsert(bookshelf, state, clicked, hit, stack);
-        } else if (state.getBlock() instanceof JukeboxBlock) {
+        if (state.getBlock() instanceof JukeboxBlock) {
             inserted = recordJukeboxInsert(state, clicked, stack);
         }
-        // A right-click on a bookshelf or jukebox that the block did not consume as an insert (a non-book, a
-        // non-disc, an occupied slot) still places a held block against that face, so fall through to recordPlace
-        // rather than returning: vanilla's useItemOn yields to item use on a non-consuming result.
+        // A right-click on a jukebox that the block did not consume as an insert (a non-disc, an occupied slot) still
+        // places a held block against that face, so fall through to recordPlace rather than returning: vanilla's
+        // useItemOn yields to item use on a non-consuming result.
         if (!inserted && recaptureEnabled) {
             recordPlace(player, hand, hit, stack);
         }
-    }
-
-    boolean recordBookshelfInsert(ChiseledBookShelfBlock bookshelf, BlockState state, BlockPos pos,
-            BlockHitResult hit, ItemStack stack) {
-        if (!stack.is(ItemTags.BOOKSHELF_BOOKS) || !isCapturable(pos)) {
-            return false; // only a book is consumed as an insert, and only where a later capture can confirm it
-        }
-        OptionalInt hitSlot = bookshelfHitSlot(state, hit);
-        if (hitSlot.isEmpty()) {
-            return false;
-        }
-        int slot = hitSlot.getAsInt();
-        if (!slotInRange(slot) || slotOccupied(state, slot)) {
-            return false; // out of range, or the slot is already occupied pre-click: this click is not inserting
-        }
-        // Vanilla inserts exactly one book and the slot holds one, so capture a single item rather than the held
-        // stack's count, which would otherwise persist an invalid over-count on reload.
-        CompoundTag entry = captureBookSlotEntry(containerSink, stack.copyWithCount(1), slot, registries);
-        if (entry.isEmpty()) {
-            // The click-time encode produced nothing. Recording it anyway would clear this slot's rim for a book
-            // that can never reach disk, so leave the rim armed and let the player see it is not captured.
-            LOGGER.warn("skipping bookshelf slot {} at {}: the book could not be serialized", slot, pos);
-            return false;
-        }
-        Map<Integer, CompoundTag> slots = insertStash.get(pos) instanceof BookshelfCandidate existing
-                ? new LinkedHashMap<>(existing.slotEntries())
-                : new LinkedHashMap<>();
-        slots.put(slot, entry);
-        insertStash.put(pos, new BookshelfCandidate(slots));
-        bookshelfSlotSink.slotCaptured(pos.asLong(), slot, BookshelfSlots.occupiedSlotMask(state));
-        return true;
-    }
-
-    /**
-     * The 0-to-5 chiseled-bookshelf slot a hit lands in, or empty when the hit is not on the shelf face. Mirrors
-     * vanilla ChiseledBookShelfBlock.getHitSlot, which is private and takes the block state below 1.21.11: the face is
-     * three columns wide and two rows tall, the top row slots 0 to 2 and the bottom row 3 to 5.
-     */
-    private static OptionalInt bookshelfHitSlot(BlockState state, BlockHitResult hit) {
-        Direction facing = state.getValue(HorizontalDirectionalBlock.FACING);
-        if (facing != hit.getDirection()) {
-            return OptionalInt.empty();
-        }
-        BlockPos frontPos = hit.getBlockPos().relative(facing);
-        Vec3 local = hit.getLocation().subtract(frontPos.getX(), frontPos.getY(), frontPos.getZ());
-        float upFace = (float) local.y();
-        float acrossFace;
-        switch (facing) {
-            case NORTH -> acrossFace = (float) (1.0 - local.x());
-            case SOUTH -> acrossFace = (float) local.x();
-            case WEST -> acrossFace = (float) local.z();
-            case EAST -> acrossFace = (float) (1.0 - local.z());
-            default -> {
-                return OptionalInt.empty();
-            }
-        }
-        int row = upFace >= 0.5F ? 0 : 1;
-        int column = acrossFace < 0.375F ? 0 : (acrossFace < 0.6875F ? 1 : 2);
-        return OptionalInt.of(column + row * 3);
     }
 
     boolean recordJukeboxInsert(BlockState state, BlockPos pos, ItemStack stack) {
@@ -433,7 +357,7 @@ public final class InteractionCapture {
 
     @SuppressWarnings("NullAway") // getKey is non-null for a registered vanilla block-entity type
     private static String shulkerBlockEntityId() {
-        return BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(BlockEntityType.SHULKER_BOX).toString();
+        return Registry.BLOCK_ENTITY_TYPE.getKey(BlockEntityType.SHULKER_BOX).toString();
     }
 
     /** The chunks holding a pending candidate, so the session can re-encode the loaded ones before the gate. */
@@ -510,7 +434,7 @@ public final class InteractionCapture {
     private static void route(BlockPos pos, Candidate candidate, CompoundTag holder, ChunkBundles bundles) {
         // The descriptor decides the merge path, so a new content type adds an InteractionKind constant, never a
         // case here: a holder kind not bound to the "Items" bundle takes the generic field-copy merge, while a
-        // shulker and every bookshelf confirm to an open-time "Items" holder.
+        // shulker confirms to an open-time "Items" holder.
         if (candidate instanceof HolderCandidate held && !held.kind().itemsBundle()) {
             bundles.holders().put(pos, holder);
         } else {
@@ -521,8 +445,8 @@ public final class InteractionCapture {
     /**
      * The reconcile gate: keep a predicted candidate's content only when the authoritative synced block-state
      * {@code authoritative} confirms it, otherwise drop it (a placement the server refused or the player reverted
-     * reduces to the same negative gate). Pure, so it is exercised headless against hand-built block-states. A
-     * bookshelf is filtered per slot; the others stand or fall whole.
+     * reduces to the same negative gate). Pure, so it is exercised headless against hand-built block-states. The
+     * candidates stand or fall whole.
      *
      * <p>The whole-confirm kinds gate on block type alone, since the synced block-state carries no occupant or contents
      * dimension: a server that strips a placed container's contents, or bees that leave a hive on placement, still
@@ -530,41 +454,10 @@ public final class InteractionCapture {
      * prediction, not a fixable case: there is no client-side signal that distinguishes it from a confirmed placement.
      */
     static Optional<CompoundTag> confirm(BlockState authoritative, Candidate candidate) {
-        if (candidate instanceof BookshelfCandidate bookshelf) {
-            return confirmBookshelf(authoritative, bookshelf.slotEntries());
-        }
         if (candidate instanceof HolderCandidate held) {
             return held.kind().confirms(authoritative) ? Optional.of(held.holder()) : Optional.empty();
         }
         throw new IllegalStateException("unhandled candidate: " + candidate);
-    }
-
-    private static Optional<CompoundTag> confirmBookshelf(BlockState state, Map<Integer, CompoundTag> slotEntries) {
-        if (!(state.getBlock() instanceof ChiseledBookShelfBlock)) {
-            return Optional.empty();
-        }
-        ListTag kept = new ListTag();
-        for (Map.Entry<Integer, CompoundTag> entry : slotEntries.entrySet()) {
-            if (slotOccupied(state, entry.getKey())) {
-                kept.add(entry.getValue());
-            }
-        }
-        if (kept.isEmpty()) {
-            return Optional.empty();
-        }
-        CompoundTag holder = new CompoundTag();
-        holder.put("Items", kept);
-        return Optional.of(holder);
-    }
-
-    /** Whether bookshelf slot {@code slot} is addressable (a six-slot index), guarding the fixed-size capture. */
-    private static boolean slotInRange(int slot) {
-        return slot >= 0 && slot < ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.size();
-    }
-
-    /** Whether bookshelf {@code state}'s slot {@code slot} reads occupied (false for an out-of-range slot). */
-    private static boolean slotOccupied(BlockState state, int slot) {
-        return slotInRange(slot) && state.getValue(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.get(slot));
     }
 
     /**
@@ -586,24 +479,6 @@ public final class InteractionCapture {
             }
         }
         return null;
-    }
-
-    /**
-     * The single {@code ItemStackWithSlot} entry for {@code book} at bookshelf slot {@code slot}, the
-     * {@link BookshelfCandidate} per-slot value: a six-slot serialize via {@link ContainerSink} whose one non-empty
-     * entry carries {@code Slot = slot}, so the gate can assemble surviving slots into an {@code
-     * "Items"} list vanilla reads straight back. An empty book yields an empty compound the gate ignores.
-     */
-    static CompoundTag captureBookSlotEntry(ContainerSink sink, ItemStack book, int slot, RegistryAccess registries) {
-        NonNullList<ItemStack> items = NonNullList.withSize(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.size(),
-                ItemStack.EMPTY);
-        items.set(slot, book);
-        CompoundTag holder = sink.captureItems(items, registries);
-        if (holder.get("Items") instanceof ListTag list && !list.isEmpty()
-                && list.get(0) instanceof CompoundTag entry) {
-            return entry;
-        }
-        return new CompoundTag();
     }
 
     /**

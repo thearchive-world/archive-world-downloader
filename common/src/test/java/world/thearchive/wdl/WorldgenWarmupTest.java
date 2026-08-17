@@ -66,8 +66,10 @@ class WorldgenWarmupTest {
     }
 
     @Test
-    void screenOpenSubmitsNothingForVoid() {
-        assertEquals(0, submittedAtScreenOpen(WorldType.VOID), "VOID uses the synced registries, so no warmup");
+    void screenOpenSubmitsWarmForVoidToo() {
+        // Below 1.19 the void generator reconstructs the vanilla registries as well, since its biome needs a Forge
+        // registry name the client's synced biome lacks, so it warms like the terrain generators.
+        assertEquals(1, submittedAtScreenOpen(WorldType.VOID), "below 1.19 VOID reconstructs too, so it warms");
     }
 
     @Test

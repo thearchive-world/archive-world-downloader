@@ -5,11 +5,11 @@ package world.thearchive.wdl.adapter.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.SharedConstants;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntArrayTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
@@ -18,7 +18,7 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.EntitySink;
 
 /**
- * 1.19.4 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
+ * 1.18.2 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
  *
  * <p>Three members (see {@link EntitySink}): {@link #encodeChunk(List, ChunkPos, RegistryAccess, boolean)} serializes
  * the live client entities, {@link #encodeChunk(List, ChunkPos)} builds the entities-region envelope from
@@ -103,7 +103,8 @@ public final class EntitySinkImpl implements EntitySink {
         for (CompoundTag entityTag : entityTags) {
             entities.add(entityTag);
         }
-        CompoundTag tag = NbtUtils.addCurrentDataVersion(new CompoundTag());
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("DataVersion", SharedConstants.getCurrentVersion().getWorldVersion());
         tag.put("Entities", entities);
         tag.put("Position", new IntArrayTag(new int[] { pos.x, pos.z }));
         return tag;

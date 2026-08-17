@@ -17,14 +17,15 @@ import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraftforge.client.ClientRegistry;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.loading.FMLPaths;
 import org.lwjgl.glfw.GLFW;
 
@@ -35,9 +36,9 @@ import world.thearchive.wdl.platform.WdlCommands;
 /**
  * Forge implementation of {@link world.thearchive.wdl.platform.PlatformBridge PlatformBridge}, constructed by
  * {@link WdlForge} with the mod event bus it fetched from FMLJavaModLoadingContext. Forge, like NeoForge, splits
- * a <i>mod</i> event bus (registration, e.g. {@link RegisterKeyMappingsEvent}) from the <i>game</i> event bus
- * ({@link MinecraftForge#EVENT_BUS}, gameplay, e.g. {@link TickEvent.ClientTickEvent}); a {@code KeyMapping} can
- * only be registered on the mod bus, so this bridge holds it for {@link #registerKeybind}. {@code isRemoteWorld}
+ * a <i>mod</i> event bus (registration and lifecycle, e.g. {@link FMLClientSetupEvent}) from the <i>game</i> event
+ * bus ({@link MinecraftForge#EVENT_BUS}, gameplay, e.g. {@link TickEvent.ClientTickEvent}); a {@code KeyMapping} is
+ * registered from the mod bus, so this bridge holds it for {@link #registerKeybind}. {@code isRemoteWorld}
  * and {@code sendChat} are pure-vanilla and inherited from {@link AbstractPlatformBridge}.
  */
 final class ForgePlatformBridge extends AbstractPlatformBridge {
@@ -52,7 +53,9 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     protected void registerKeybind(String keyId, Runnable onPress) {
         KeyMapping key = new KeyMapping(keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
                 WdlKeyBinds.CATEGORY);
-        modEventBus.addListener((RegisterKeyMappingsEvent event) -> event.register(key));
+        // Below 1.19 there is no RegisterKeyMappingsEvent; keys register through ClientRegistry during client setup.
+        modEventBus.addListener(
+                (FMLClientSetupEvent event) -> event.enqueueWork(() -> ClientRegistry.registerKeyBinding(key)));
         MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent event) -> {
             if (event.phase == TickEvent.Phase.END) {
                 while (key.consumeClick()) {
@@ -65,9 +68,9 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     @Override
     public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
             Runnable onPrimary, Runnable onConfig) {
-        // ScreenEvent.Init.Post fires on the game bus for every screen init; guard to the pause screen and add
-        // the buttons as listeners (a Button is a renderable GuiEventListener), the mixin-free injection path.
-        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.Init.Post event) -> {
+        // ScreenEvent.InitScreenEvent.Post fires on the game bus for every screen, and a Button is a renderable
+        // GuiEventListener, so the pause-menu buttons inject as screen listeners with no mixin.
+        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.InitScreenEvent.Post event) -> {
             if (!(event.getScreen() instanceof PauseScreen)) {
                 return;
             }
@@ -97,12 +100,12 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public void onDisconnect(Runnable callback) {
-        MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut event) -> callback.run());
+        MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggedOutEvent event) -> callback.run());
     }
 
     @Override
     public void onServerJoin(Runnable callback) {
-        MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingIn event) -> callback.run());
+        MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggedInEvent event) -> callback.run());
     }
 
     @Override

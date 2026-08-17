@@ -72,7 +72,7 @@ class MerchantOfferCaptureTest {
     }
 
     private static CompoundTag holderSelling(ItemStack sell) {
-        return MerchantOfferCapture.serialize(offering(sell), 0, false, registries);
+        return MerchantOfferCapture.serialize(offering(sell), 0, false);
     }
 
     /** The {@code sell} item's pre-component {@code tag} compound (below 1.20.5, no {@code components} map). */
@@ -87,8 +87,7 @@ class MerchantOfferCaptureTest {
 
     @Test
     void serializeRoundTripsOffersUnderRecipes() {
-        CompoundTag holder = MerchantOfferCapture.serialize(offering(new ItemStack(Items.DIAMOND)), 42, true,
-                registries);
+        CompoundTag holder = MerchantOfferCapture.serialize(offering(new ItemStack(Items.DIAMOND)), 42, true);
 
         assertEquals(1, holder.getCompound("Offers").getList("Recipes", 10).size(),
                 "one offer under Recipes");
@@ -97,7 +96,7 @@ class MerchantOfferCaptureTest {
 
     @Test
     void serializeWanderingTraderWritesNoXp() {
-        CompoundTag holder = MerchantOfferCapture.serialize(new MerchantOffers(), 0, false, registries);
+        CompoundTag holder = MerchantOfferCapture.serialize(new MerchantOffers(), 0, false);
 
         assertFalse(holder.contains("Xp"), "a wandering trader gets no experience key");
     }

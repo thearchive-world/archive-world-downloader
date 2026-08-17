@@ -10,10 +10,8 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.chunkTagWith;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +22,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.ChiseledBookShelfBlock;
-import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -59,21 +54,6 @@ class ChunkFlushPlanTest {
     /** Built on demand, never as a static initializer: ChunkPos static init needs the vanilla bootstrap. */
     private static ChunkPos origin() {
         return new ChunkPos(0, 0);
-    }
-
-    private static CompoundTag bookshelf(int x, int y, int z, int... slots) {
-        CompoundTag tag = blockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, x, y, z);
-        String[] books = new String[slots.length];
-        Arrays.fill(books, "minecraft:written_book");
-        tag.put("Items", ItemFixtures.itemsAtSlots(slots, books));
-        return tag;
-    }
-
-    private static List<Integer> slotsOf(CompoundTag blockEntityTag) {
-        return blockEntityTag.getList("Items", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
-                .map(entry -> (int) (entry.contains("Slot") ? entry.getByte("Slot") : (byte) -1))
-                .sorted()
-                .toList();
     }
 
     private CompoundTag itemsHolder(String itemId) {
@@ -119,22 +99,6 @@ class ChunkFlushPlanTest {
         }
     };
 
-    @Test
-    void theReadMergeHonorsTheBookshelfOccupancyItWasBuiltWith() {
-        // Reverting the writer to the hardcoded two-argument merge left the whole suite green once, because
-        // every other case passed the same merge that one used. The occupancy is what makes it chunk-specific.
-        CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9, 0, 1, 2));
-        CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9));
-        Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
-        occupancy.put(new BlockPos(4, 64, 9).asLong(), 0b110);
-
-        int merged = ChunkFlushPlan.readMerge(occupancy, LongSet.of(), LongSet.of()).merge(onDisk, fresh);
-
-        assertEquals(1, merged, "the shelf carried forward, so the merge really ran");
-        assertEquals(List.of(1, 2), slotsOf(findByPos(fresh, 4, 64, 9)),
-                "slot 0 reads empty in the block-state the occupancy carries, so it is not carried back");
-    }
-
     /**
      * The replaced positions are held per dimension and handed to the writer per chunk, so the narrowing is both what
      * detaches them from the live set and what keeps one chunk's placements out of another's merge.
@@ -176,26 +140,6 @@ class ChunkFlushPlanTest {
         assertEquals((short) 220,
                 findByPos(freshRewalked, 6, 64, 6).getShort("BrewTime"),
                 "which is what proves the set is read rather than ignored");
-    }
-
-    @Test
-    void theComposedReadMergeDerivesTheOccupancyFromTheSnapshotItWasGiven() {
-        // The derivation, not just its use: reading the occupancy under a condition, or handing over an empty
-        // one, is the shape that broke, and it is neither a deletion nor a compile error.
-        BlockPos shelfPos = new BlockPos(4, 64, 9);
-        BlockState shelf = Blocks.CHISELED_BOOKSHELF.defaultBlockState()
-                .setValue(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.get(1), true)
-                .setValue(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.get(2), true);
-        ChunkSnapshotSource snapshot = SyntheticChunks.withBlockEntityAt(registries, shelfPos, shelf,
-                blockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, shelfPos.getX(), shelfPos.getY(), shelfPos.getZ()));
-        CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9, 0, 1, 2));
-        CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9));
-
-        int merged = ChunkFlushPlan.readMerge(snapshot, List.of(), LongSet.of()).merge(onDisk, fresh);
-
-        assertEquals(1, merged, "the shelf carried forward, so the composed merge really ran");
-        assertEquals(List.of(1, 2), slotsOf(findByPos(fresh, 4, 64, 9)),
-                "and slot 0 was dropped, which only the occupancy read off this snapshot can decide");
     }
 
     @Test
@@ -347,30 +291,6 @@ class ChunkFlushPlanTest {
 
         assertEquals(List.of(new BlockPos(1, 64, 1)), landing,
                 "a type-changed position and a position with no captured block entity both drop out");
-    }
-
-    @Test
-    void bookshelfOccupancySkipsWhatIsNotCapturedAsChiseledBookshelf() {
-        BlockPos pos = new BlockPos(4, 64, 9);
-        BlockState shelf = Blocks.CHISELED_BOOKSHELF.defaultBlockState()
-                .setValue(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.get(0), true);
-
-        CompoundTag otherType = blockEntity("minecraft:chest", pos.getX(), pos.getY(), pos.getZ());
-        assertTrue(ChunkFlushPlan
-                .bookshelfOccupancy(SyntheticChunks.withBlockEntityAt(registries, pos, shelf, otherType)).isEmpty(),
-                "a block entity of another type is skipped before the block-state resolve");
-
-        CompoundTag noCoordinates = blockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, pos.getX(), pos.getY(),
-                pos.getZ());
-        noCoordinates.remove("y");
-        assertTrue(ChunkFlushPlan.bookshelfOccupancy(
-                SyntheticChunks.withMalformedBlockEntityAt(registries, pos, shelf, noCoordinates)).isEmpty(),
-                "a block entity with no int coordinates cannot be keyed and is skipped");
-
-        CompoundTag shelfTag = blockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, pos.getX(), pos.getY(), pos.getZ());
-        assertTrue(ChunkFlushPlan.bookshelfOccupancy(SyntheticChunks.withBlockEntityAt(registries, pos,
-                Blocks.STONE.defaultBlockState(), shelfTag)).isEmpty(),
-                "and a saved bookshelf id over a block-state that is not one records nothing");
     }
 
     /** A snapshot whose block-entity list is {@code blockEntities}, with no block states behind them. */

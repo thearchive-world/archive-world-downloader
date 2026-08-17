@@ -7,27 +7,24 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.profiling.InactiveProfiler;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.flag.FeatureFlagSet;
-import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkSource;
-import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.entity.LevelEntityGetter;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
-import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.Scoreboard;
 import net.minecraft.world.ticks.LevelTickAccess;
 import org.jspecify.annotations.Nullable;
@@ -39,10 +36,19 @@ import org.jspecify.annotations.Nullable;
  * profiler, and inert stubs for the abstract members no fixture calls.
  */
 public final class HeadlessLevel extends Level {
+    private final RegistryAccess registries;
+
     private HeadlessLevel(RegistryAccess registries) {
-        super(null, Level.OVERWORLD, registries,
-                registries.registryOrThrow(Registries.DIMENSION_TYPE).getHolderOrThrow(BuiltinDimensionTypes.OVERWORLD),
-                () -> InactiveProfiler.INSTANCE, true, false, 0L, 0);
+        super(null, Level.OVERWORLD,
+                registries.registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY)
+                        .getOrCreateHolder(DimensionType.OVERWORLD_LOCATION),
+                () -> InactiveProfiler.INSTANCE, true, false, 0L);
+        this.registries = registries;
+    }
+
+    @Override
+    public RegistryAccess registryAccess() {
+        return this.registries;
     }
 
     /** A fresh headless overworld backed by the shared {@link TestRegistries}. */
@@ -54,7 +60,7 @@ public final class HeadlessLevel extends Level {
     public void sendBlockUpdated(BlockPos pos, BlockState oldState, BlockState newState, int flags) {}
 
     @Override
-    public void gameEvent(GameEvent event, Vec3 position, GameEvent.Context context) {}
+    public void gameEvent(@Nullable Entity entity, GameEvent event, BlockPos pos) {}
 
     @Override
     public void levelEvent(@Nullable Player player, int type, BlockPos pos, int data) {}
@@ -95,17 +101,12 @@ public final class HeadlessLevel extends Level {
     }
 
     @Override
-    public FeatureFlagSet enabledFeatures() {
-        return FeatureFlags.DEFAULT_FLAGS;
-    }
+    public void playSound(@Nullable Player player, double x, double y, double z, SoundEvent sound,
+            SoundSource source, float volume, float pitch) {}
 
     @Override
-    public void playSeededSound(@Nullable Player player, double x, double y, double z, Holder<SoundEvent> sound,
-            SoundSource source, float volume, float pitch, long seed) {}
-
-    @Override
-    public void playSeededSound(@Nullable Player player, Entity entity, Holder<SoundEvent> sound, SoundSource source,
-            float volume, float pitch, long seed) {}
+    public void playSound(@Nullable Player player, Entity entity, SoundEvent sound, SoundSource source,
+            float volume, float pitch) {}
 
     @Override
     public String gatherChunkSourceStats() {

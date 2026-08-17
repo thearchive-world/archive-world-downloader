@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -63,6 +65,11 @@ class CaptureAnchorTest {
     private static final class BareEntity extends Entity {
         private BareEntity() {
             super(EntityType.PIG, null);
+        }
+
+        @Override
+        public Packet<?> getAddEntityPacket() {
+            return new ClientboundAddEntityPacket(this);
         }
 
         @Override

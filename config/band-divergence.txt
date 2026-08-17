@@ -16,13 +16,10 @@
 # band-fragile test assertions, and the keybind lang key. A broad glob for those would mask real drift or
 # guess divergences that do not exist yet.
 
-# Below 1.21.2 the registry-load path has no PendingTags step (TagLoader.loadTagsForExistingRegistries and
-# Registry.PendingTags are 1.21.2 and above), so this shared test bootstrap loads the WORLDGEN registries from the
-# getAccessForLoading base and binds each registry's tags with TagLoader.loadAndBuild plus Registry.bindTags, the
-# pre-1.21.2 forms. Below the 1.21 update the tags directory is TagManager.getTagDir rather than
-# Registries.tagsDirPath. Below 1.20.5 Registry has no getHolder(ResourceLocation) overload (only int or
-# ResourceKey<T>), so the loader's id-to-value function builds the ResourceKey itself rather than passing the
-# method reference directly.
+# Below 1.19 the composite test registry access is RegistryAccess.builtinCopy().freeze(), which populates the
+# dimension types (via DimensionType.registerBuiltin) and the biomes and the rest of worldgen from code. There is no
+# layered registry loader or tag-load step (the RegistryDataLoader, LayeredRegistryAccess and PendingTags machinery
+# the deeper bands thread through is all post-1.19), and no kept test binds data-driven tags.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
 # Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
@@ -231,12 +228,11 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 # Provider, and ContainerHelper.loadAllItems/saveAllItems take no registries argument.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
 
-# Below the 1.21 update a captured jukebox carries the pre-JukeboxSongPlayer playing flag (IsPlaying) rather than
-# the ticks_since_song_started sidecar, so these merge fixtures and assertions use that key. Below 1.20.5 a beehive
-# block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and vanilla's
-# JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount alongside a present RecordItem, so the
-# jukebox fixture carries those too and the beehive fixture goes through the unchecked malformedChunkTagWith
-# instead of the fidelity-checked chunkTagWith.
+# Below 1.19 a captured jukebox carries only RecordItem: vanilla's JukeboxBlockEntity.saveAdditional writes no
+# IsPlaying or tick sidecar (those are 1.19 additions), so the jukebox merge fixtures set only that key. Below 1.20.5
+# a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so these merge
+# fixtures use that key and the beehive fixture goes through the unchecked malformedChunkTagWith instead of the
+# fidelity-checked chunkTagWith.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
 
 # Below the 1.21 update a captured jukebox is marked playing via IsPlaying rather than the ticks_since_song_started
@@ -263,8 +259,8 @@ common/src/main/java/world/thearchive/wdl/adapter/WorldPaths.java
 # RegionStorageInfo/DataFixers. Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
 common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
 
-# Below the 1.20.6 cut there is no SimpleRegionStorage, so the prior-write and read-back open the vanilla IOWorker
-# through WorldPaths rather than constructing one directly.
+# Deleted on this band: the whole test exercises chiseled-bookshelf occupancy flush, and ChiseledBookShelfBlock does
+# not exist below 1.19.
 common/src/test/java/world/thearchive/wdl/adapter/BookshelfOccupancyFlushTest.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the prior-write and read-back open the vanilla IOWorker
@@ -501,11 +497,99 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 # the map keys).
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
-# The Forge island's manifest carries loaderVersion [45,) at this band (Forge 45.x for 1.19.4) versus the [47,)
-# of the 1.20.1 mint parent. The rest of the forge/ tree does not diverge from the parent: forge/build.gradle.kts
-# is excluded from the diff as a *.gradle.kts, and the shim, wrapper and access transformer are byte-identical (the
-# three widened SRG field ids are unchanged 1.19.4 to 1.20.1, confirmed against the official mappings).
+# The Forge island's manifest carries loaderVersion [40,) at this band (Forge 40.x for 1.18.2) versus the [45,) of
+# the 1.19.4 mint parent. The rest of the forge/ tree diverges only in the loader entrypoint and platform bridge
+# listed above; forge/build.gradle.kts is excluded from the diff as a *.gradle.kts, and the shim, wrapper and access
+# transformer are byte-identical, the widened SRG field ids unchanged from 1.19.4, confirmed by ForgeGradle against
+# the official 1.18.2 mappings.
 forge/src/main/resources/META-INF/mods.toml
 
-# The resource pack_format tracks this band's Minecraft version, 13 for 1.19.4 versus the parent's 15 for 1.20.1.
+# The resource pack_format tracks this band's Minecraft version, 8 for 1.18.2 versus the parent's 13 for 1.19.4.
 forge/src/main/resources/pack.mcmeta
+
+# Below the 1.19 registry split the code-defined registries are static fields on Registry (Registry.ENTITY_TYPE),
+# not the net.minecraft.core.registries.BuiltInRegistries added at 1.19.3, so this open-click type check resolves the
+# entity id through Registry.ENTITY_TYPE.
+common/src/main/java/world/thearchive/wdl/adapter/OpenClickTracker.java
+
+# Below the 1.19 registry-sync rework the client receives the dimension type inline (a keyless Holder.Direct), so
+# unwrapKey is empty and forType classifies the nether and end by the type's effects id rather than its registry key.
+# Above this band forType takes the ResourceKey the client resolves against the synced registry.
+common/src/main/java/world/thearchive/wdl/adapter/VanillaDimensions.java
+
+# Below 1.19 there is no chiseled bookshelf, so the per-chunk bookshelf-occupancy producer is dropped and the
+# read-merge composer passes an empty occupancy map (ChunkMerge.occupancyMap); the ChunkMerge per-slot union stays as
+# unused-but-compiling code, the way the crafter open-bind stays below 1.20.3.
+common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
+
+# Below 1.19 the entity read-merge keys the entities/ target UUID through SerializableUUID.CODEC, the pre-1.19 name for
+# the four-int UUID codec that became UUIDUtil.CODEC at 1.19.
+common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
+
+# XaeroPlus publishes no 1.18.x build for either loader, so the coverage overlay's XaeroPlus binding is dropped as a
+# disclosed limit on this band: Wdl.initialize no longer constructs the XaeroPlus integration, and the compat/xaeroplus
+# package is deleted. The JourneyMap overlay covers the same role where its API resolves.
+common/src/main/java/world/thearchive/wdl/Wdl.java
+
+# Deleted on this band with the rest of the XaeroPlus binding (XaeroPlus ships no 1.18.x build for either loader): the
+# plugin binding that reads the coverage index into XaeroPlus.
+common/src/main/java/world/thearchive/wdl/compat/xaeroplus/XaeroPlusBinding.java
+
+# Deleted on this band with the rest of the XaeroPlus binding: the launch-time integration hook Wdl.initialize called.
+common/src/main/java/world/thearchive/wdl/compat/xaeroplus/XaeroPlusIntegration.java
+
+# Deleted on this band with the rest of the XaeroPlus binding: the package's @NullMarked marker.
+common/src/main/java/world/thearchive/wdl/compat/xaeroplus/package-info.java
+
+# Deleted on this band: ChiseledBookShelfBlock does not exist below 1.19, so the chiseled-bookshelf slot helper is
+# dropped; the MC-free core bookshelf helpers (CapturedContainers, OutlineClassifier.classifyBookshelf) stay
+# byte-identical.
+common/src/main/java/world/thearchive/wdl/adapter/BookshelfSlots.java
+
+# The view-layer literal inventory is band-specific: below 1.20 the GUI writes user-facing strings through the
+# new TextComponent(...) constructor rather than Component.literal, and the acknowledged-literals map (including the
+# empty no-phase HUD placeholder in WdlHudOverlay) reflects this band's set.
+common/src/test/java/world/thearchive/wdl/UiLiteralEnrollmentTest.java
+
+# Deleted on this band: the chiseled-bookshelf slot-mask helper it tests (BookshelfSlots) is dropped because
+# ChiseledBookShelfBlock does not exist below 1.19.
+common/src/test/java/world/thearchive/wdl/adapter/BookshelfSlotsTest.java
+
+# Below 1.19 the ClientboundAddEntityPacket constructor takes ten arguments ending at the packet-visible Vec3 velocity,
+# without the trailing double the 1.19 constructor added, so the synthetic add-entity packets are built with the
+# ten-argument form.
+common/src/test/java/world/thearchive/wdl/adapter/EntityPacketCaptureTest.java
+
+# Two of the nine band-neutral curated game-rule specs have no rule at 1.18.2 (doVinesSpread and doWardenSpawning are
+# 1.19 additions), so the runtime filter surfaces seven and the layout skips their order slots alongside the
+# band-neutral fire-spread row.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.java
+
+# Below the 1.19 registry-sync rework forType classifies a dimension type by its effects id (the keyless client holder
+# carries no registry key), so these assertions feed forType the built-in DimensionType values looked up from the test
+# registries rather than the *_LOCATION keys, and the caves variant routes to the overworld by its overworld effects.
+common/src/test/java/world/thearchive/wdl/adapter/VanillaDimensionsTest.java
+
+# Below 1.19 the Forge client-registration APIs differ: the config screen is ConfigGuiHandler.ConfigGuiFactory rather
+# than the ConfigScreenHandler added at 1.19, keys register through ClientRegistry.registerKeyBinding during
+# FMLClientSetupEvent rather than the RegisterKeyMappingsEvent added at 1.19, the HUD registers through
+# OverlayRegistry.registerOverlayTop with a PoseStack draw callback rather than RegisterGuiOverlaysEvent, the login
+# event is ClientPlayerNetworkEvent.LoggedInEvent rather than LoggingIn, and PlayerInteractEvent exposes
+# getPlayer/getWorld rather than getEntity/getLevel.
+forge/src/main/java/world/thearchive/wdl/forge/WdlForge.java
+
+# Below 1.19 keys register through ClientRegistry.registerKeyBinding during FMLClientSetupEvent rather than the
+# RegisterKeyMappingsEvent added at 1.19, the screen-init event is ScreenEvent.InitScreenEvent.Post rather than the
+# flattened ScreenEvent.Init.Post, and the login and logout events are ClientPlayerNetworkEvent.LoggedInEvent and
+# LoggedOutEvent rather than LoggingIn and LoggingOut.
+forge/src/main/java/world/thearchive/wdl/forge/ForgePlatformBridge.java
+
+# Below 1.19 the void generator reconstructs the vanilla worldgen registries too (its biome needs a Forge registry name
+# the client's synced biome lacks; see the LevelDataWriter void note), so the pre-download warm gate warms the void
+# default as well, matching the level-data build's reconstruction branch. Above this band only DEFAULT and FLAT warm.
+common/src/main/java/world/thearchive/wdl/WorldgenWarmup.java
+
+# Below 1.19 the void generator reconstructs too (see WorldgenWarmup), so the screen-open warm submits for VOID; this
+# test asserts VOID warms rather than the above-band behavior where the void default uses the synced registries and
+# does not warm.
+common/src/test/java/world/thearchive/wdl/WorldgenWarmupTest.java

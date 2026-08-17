@@ -15,13 +15,14 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
@@ -234,7 +235,7 @@ class EntityVehicleRelocationTest {
         List<CompoundTag> found = new ArrayList<>();
         try (IOWorker storage = paths.openEntitiesStorage(Level.OVERWORLD)) {
             for (ChunkPos pos : positions) {
-                CompoundTag chunkTag = storage.loadAsync(pos).join().orElse(null);
+                CompoundTag chunkTag = Optional.ofNullable(storage.load(pos)).orElse(null);
                 if (chunkTag == null || !(chunkTag.get("Entities") instanceof ListTag entities)) {
                     continue;
                 }
@@ -289,7 +290,7 @@ class EntityVehicleRelocationTest {
     /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
     private static CompoundTag entity(UUID uuid) {
         CompoundTag entity = new CompoundTag();
-        entity.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
+        entity.put("UUID", SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
         return entity;
     }
 

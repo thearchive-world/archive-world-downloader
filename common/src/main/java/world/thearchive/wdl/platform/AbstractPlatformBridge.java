@@ -21,15 +21,15 @@ import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -126,10 +126,10 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         int slot = 0;
         for (ChatCopy.Argument argument : line.arguments()) {
             MutableComponent rendered = argument.translationKey() == null
-                    ? Component.literal(argument.text())
+                    ? new TextComponent(argument.text())
                     : argument.text().isEmpty()
-                            ? Component.translatable(argument.translationKey())
-                            : Component.translatable(argument.translationKey(), argument.text());
+                            ? new TranslatableComponent(argument.translationKey())
+                            : new TranslatableComponent(argument.translationKey(), argument.text());
             if (argument.color().isPresent()) {
                 rendered = rendered.withStyle(style -> style.withColor(argument.color().getAsInt()));
             }
@@ -140,12 +140,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                         : new ClickEvent(ClickEvent.Action.OPEN_FILE, click.target());
                 rendered = rendered.withStyle(style -> style.withClickEvent(clickEvent)
                         .withHoverEvent(
-                                new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(click.target()))));
+                                new HoverEvent(HoverEvent.Action.SHOW_TEXT, new TextComponent(click.target()))));
                 linkTargets.append(" <").append(click.target()).append('>');
             }
             renderedArguments[slot++] = rendered;
         }
-        MutableComponent rendered = Component.translatable(line.translationKey(), renderedArguments);
+        MutableComponent rendered = new TranslatableComponent(line.translationKey(), renderedArguments);
         if (line.templateColor().isPresent()) {
             rendered = rendered.withStyle(style -> style.withColor(line.templateColor().getAsInt()));
         }
@@ -158,16 +158,16 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         int slot = 0;
         for (ToastCopy.Argument argument : toast.arguments()) {
             MutableComponent rendered = argument.translationKey() == null
-                    ? Component.literal(argument.text())
+                    ? new TextComponent(argument.text())
                     : argument.text().isEmpty()
-                            ? Component.translatable(argument.translationKey())
-                            : Component.translatable(argument.translationKey(), argument.text());
+                            ? new TranslatableComponent(argument.translationKey())
+                            : new TranslatableComponent(argument.translationKey(), argument.text());
             if (argument.color().isPresent()) {
                 rendered = rendered.withStyle(style -> style.withColor(argument.color().getAsInt()));
             }
             renderedArguments[slot++] = rendered;
         }
-        MutableComponent body = Component.translatable(toast.bodyKey(), renderedArguments);
+        MutableComponent body = new TranslatableComponent(toast.bodyKey(), renderedArguments);
         if (toast.bodyColor().isPresent()) {
             body = body.withStyle(style -> style.withColor(toast.bodyColor().getAsInt()));
         }
@@ -177,7 +177,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             return;
         }
         mc.getToasts().addToast(SystemToast.multiline(mc, id,
-                Component.translatable(toast.titleKey()), body));
+                new TranslatableComponent(toast.titleKey()), body));
     }
 
     /**
@@ -195,16 +195,21 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (!isRemoteWorld()) {
             return List.of();
         }
-        int x = anchor.getX();
-        int y = anchor.getY();
+        int x = anchor.x;
+        int y = anchor.y;
         int width = anchor.getWidth();
-        anchor.setY(y + 24); // shift the bottom button (Disconnect) down to open a row above it
-        Button primary = Button.builder(Component.translatable(primaryLabelKey.get()), button -> onPrimary.run())
-                .bounds(x, y, width - 24, 20).build();
+        anchor.y = y + 24; // shift the bottom button (Disconnect) down to open a row above it
+        Button primary = new Button(x, y, width - 24, 20, new TranslatableComponent(primaryLabelKey.get()),
+                button -> onPrimary.run());
         primary.active = primaryEnabled.getAsBoolean();
-        Button config = Button.builder(Component.literal("..."), button -> onConfig.run())
-                .tooltip(Tooltip.create(Component.translatable("wdl.pause.settings.tooltip")))
-                .bounds(x + width - 20, y, 20, 20).build();
+        Button config = new Button(x + width - 20, y, 20, 20, new TextComponent("..."), button -> onConfig.run(),
+                (button, poseStack, mouseX, mouseY) -> {
+                    Screen screen = Minecraft.getInstance().screen;
+                    if (screen != null) {
+                        screen.renderTooltip(poseStack,
+                                new TranslatableComponent("wdl.pause.settings.tooltip"), mouseX, mouseY);
+                    }
+                });
         return List.of(primary, config);
     }
 
@@ -212,7 +217,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     protected static @Nullable AbstractWidget lowest(List<AbstractWidget> widgets) {
         AbstractWidget lowest = null;
         for (AbstractWidget widget : widgets) {
-            if (lowest == null || widget.getY() > lowest.getY()) {
+            if (lowest == null || widget.y > lowest.y) {
                 lowest = widget;
             }
         }

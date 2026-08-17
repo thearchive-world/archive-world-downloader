@@ -42,7 +42,6 @@ import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.client.WdlDownloadsScreen;
 import world.thearchive.wdl.client.WdlSettingsScreen;
 import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
-import world.thearchive.wdl.compat.xaeroplus.XaeroPlusIntegration;
 import world.thearchive.wdl.core.AtomicFileWrite;
 import world.thearchive.wdl.core.CaptureController;
 import world.thearchive.wdl.core.CaptureCounts;
@@ -111,8 +110,8 @@ public final class Wdl {
 
     // The most recently loaded config, cached so the per-frame HUD overlay reads it without disk IO. Refreshed
     // at initialize and on each download start (the existing "applies on the next download" model). Volatile
-    // because the client thread writes it while the render thread and XaeroPlus's cache-refresh executor read
-    // it; the config objects are deeply immutable, so publishing the reference is all this needs.
+    // because the client thread writes it while the render thread reads it; the config objects are deeply
+    // immutable, so publishing the reference is all this needs.
     private static volatile WdlConfig currentConfig = WdlConfig.DEFAULTS;
 
     // The display name of the download currently running, set when a capture begins; meaningful only while the
@@ -209,7 +208,6 @@ public final class Wdl {
         // One permanent hook for the JVM's life rather than one per operation, matching the bounded halt
         // the vanilla client shutdown hook gives the integrated server.
         Runtime.getRuntime().addShutdownHook(new Thread(Wdl::abortRestoreOnShutdown, "wdl-restore-shutdown"));
-        XaeroPlusIntegration.initialize(bridge);
         READY.markReadyAndDrain();
     }
 

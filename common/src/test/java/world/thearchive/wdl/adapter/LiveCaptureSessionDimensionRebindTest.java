@@ -10,7 +10,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.Properties;
-import net.minecraft.core.registries.Registries;
+import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
@@ -96,7 +96,7 @@ class LiveCaptureSessionDimensionRebindTest {
     @Test
     void theServersOwnKeyIsKeptApartFromTheVanillaOneTheSaveIsLaidOutUnder(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
-        ResourceKey<Level> serverNether = ResourceKey.create(Registries.DIMENSION,
+        ResourceKey<Level> serverNether = ResourceKey.create(Registry.DIMENSION_REGISTRY,
                 new ResourceLocation("minecraft", "worlds/example/example_nether"));
 
         session.rebindDimension(Level.NETHER, serverNether);

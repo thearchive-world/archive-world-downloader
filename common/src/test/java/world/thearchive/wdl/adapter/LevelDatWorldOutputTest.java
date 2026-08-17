@@ -17,7 +17,6 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.level.GameRules;
-import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.junit.jupiter.api.Test;
 
@@ -61,10 +60,12 @@ class LevelDatWorldOutputTest {
         return WorldOutputConfig.parse(properties);
     }
 
-    private WorldGenSettings worldGen(LevelDataWriter.LevelData built) {
-        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, built.registries());
-        return WorldGenSettings.CODEC.parse(ops, dataTag(built).getCompound("WorldGenSettings"))
-                .getOrThrow(false, s -> {});
+    // Read the encoded WorldGenSettings tag directly rather than decoding through WorldGenSettings.CODEC. That codec
+    // resolves its dimension types and noise settings through a datapack-backed RegistryOps, which the headless suite
+    // has no resource manager to supply; the on-disk seed, structure toggle and generator type are what the writer's
+    // output is being asserted against anyway.
+    private CompoundTag worldGenTag(LevelDataWriter.LevelData built) {
+        return dataTag(built).getCompound("WorldGenSettings");
     }
 
     @Test
@@ -72,7 +73,7 @@ class LevelDatWorldOutputTest {
         LevelDataWriter.LevelData built = build(
                 with("worldType", "DEFAULT", "worldSeed", Long.toString(Long.MIN_VALUE)));
 
-        assertEquals(Long.MIN_VALUE, worldGen(built).options().seed(),
+        assertEquals(Long.MIN_VALUE, worldGenTag(built).getLong("seed"),
                 "the full signed-long seed lands in level.dat, not an int-capped value");
     }
 
@@ -80,24 +81,24 @@ class LevelDatWorldOutputTest {
     void defaultGeneratorWritesHashedStringSeed() {
         LevelDataWriter.LevelData built = build(with("worldType", "DEFAULT", "worldSeed", "hello"));
 
-        assertEquals("hello".hashCode(), worldGen(built).options().seed(),
+        assertEquals("hello".hashCode(), worldGenTag(built).getLong("seed"),
                 "a non-numeric seed lands as the same long vanilla would hash it to");
     }
 
     @Test
     void generateFeaturesTogglesStructureGeneration() {
-        assertTrue(worldGen(build(with("worldType", "DEFAULT", "generateFeatures", "true"))).options()
-                .generateStructures());
-        assertFalse(worldGen(build(with("worldType", "DEFAULT"))).options().generateStructures(),
+        assertTrue(worldGenTag(build(with("worldType", "DEFAULT", "generateFeatures", "true")))
+                .getBoolean("generate_features"));
+        assertFalse(worldGenTag(build(with("worldType", "DEFAULT"))).getBoolean("generate_features"),
                 "structures default off");
     }
 
     @Test
     void voidGeneratorKeepsSeedZeroAndStaysStructureless() {
-        WorldGenSettings voidSettings = worldGen(build(WorldOutputConfig.DEFAULTS));
+        CompoundTag voidSettings = worldGenTag(build(WorldOutputConfig.DEFAULTS));
 
-        assertEquals(0L, voidSettings.options().seed(), "the default void world keeps seed 0 (byte-unchanged)");
-        assertFalse(voidSettings.options().generateStructures(), "the void world generates no structures");
+        assertEquals(0L, voidSettings.getLong("seed"), "the default void world keeps seed 0 (byte-unchanged)");
+        assertFalse(voidSettings.getBoolean("generate_features"), "the void world generates no structures");
     }
 
     @Test
@@ -112,9 +113,9 @@ class LevelDatWorldOutputTest {
 
     @Test
     void flatGeneratorBuildsAndRoundTripsItsSeed() {
-        WorldGenSettings flat = worldGen(build(with("worldType", "FLAT", "worldSeed", "777")));
+        CompoundTag flat = worldGenTag(build(with("worldType", "FLAT", "worldSeed", "777")));
 
-        assertEquals(777L, flat.options().seed(), "the FLAT generator builds and its seed lands in level.dat");
+        assertEquals(777L, flat.getLong("seed"), "the FLAT generator builds and its seed lands in level.dat");
     }
 
     private static Lifecycle lifecycle(LevelDataWriter.LevelData built) {

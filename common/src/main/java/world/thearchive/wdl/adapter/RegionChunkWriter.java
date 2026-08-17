@@ -4,7 +4,7 @@
 package world.thearchive.wdl.adapter;
 
 import com.mojang.logging.LogUtils;
-import java.util.Optional;
+import java.io.IOException;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.IOWorker;
@@ -67,9 +67,8 @@ final class RegionChunkWriter {
         @Nullable
         CompoundTag onDisk;
         try {
-            Optional<CompoundTag> read = storage.loadAsync(pos).join();
-            onDisk = read.orElse(null);
-        } catch (RuntimeException e) {
+            onDisk = storage.load(pos);
+        } catch (IOException | RuntimeException e) {
             LOGGER.warn("preserving chunk {}: on-disk read failed", pos, e);
             return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
         }
@@ -107,9 +106,8 @@ final class RegionChunkWriter {
     public static int rewriteExisting(IOWorker storage, ChunkPos pos, ChunkRewrite rewrite) {
         CompoundTag onDisk;
         try {
-            Optional<CompoundTag> read = storage.loadAsync(pos).join();
-            onDisk = read.orElse(null);
-        } catch (RuntimeException e) {
+            onDisk = storage.load(pos);
+        } catch (IOException | RuntimeException e) {
             LOGGER.warn("orphaned-content merge for chunk {}: on-disk read failed; its captured contents are lost",
                     pos, e);
             return 0;

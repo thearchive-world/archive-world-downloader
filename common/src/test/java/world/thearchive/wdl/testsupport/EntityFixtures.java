@@ -6,13 +6,12 @@ package world.thearchive.wdl.testsupport;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.phys.Vec3;
 
 import world.thearchive.wdl.adapter.impl.EntitySinkImpl;
 
@@ -37,18 +36,22 @@ public final class EntityFixtures {
     /** An entity tag carrying the {@code id} and {@code "UUID"} a merge matches on, and nothing else. */
     public static CompoundTag entity(String id, UUID uuid) {
         CompoundTag tag = entityTag(id);
-        tag.put("UUID", UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
+        tag.put("UUID", SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
         return tag;
     }
 
     /**
-     * An entity carrying the {@code "Pos"} vanilla's own {@code Vec3.CODEC} writes, the three-double list a chunk
-     * locator reads. Built through the codec rather than as a hand-assembled list so a locator that reads the axes in
-     * the wrong order still misses rather than landing on the fixture.
+     * An entity carrying the {@code "Pos"} three-double list a chunk locator reads. Built through the codec rather than
+     * as a hand-assembled list so a locator that reads the axes in the wrong order still misses rather than landing on
+     * the fixture.
      */
     public static CompoundTag entityAt(String id, UUID uuid, double x, double y, double z) {
         CompoundTag tag = entity(id, uuid);
-        tag.put("Pos", Vec3.CODEC.encodeStart(NbtOps.INSTANCE, new Vec3(x, y, z)).getOrThrow(false, s -> {}));
+        ListTag pos = new ListTag();
+        pos.add(DoubleTag.valueOf(x));
+        pos.add(DoubleTag.valueOf(y));
+        pos.add(DoubleTag.valueOf(z));
+        tag.put("Pos", pos);
         return tag;
     }
 
