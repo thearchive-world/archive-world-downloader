@@ -205,5 +205,5 @@ Authorship is recorded in the git history, not in the header, so there is no per
 You author under your own identity, and squash-merge keeps you as the author of the merged commit.
 
 The mod icon is a vector drawing, `art/logo.svg`. To change it, edit that file and re-export
-`common/src/main/resources/assets/wdl/icon.png` at 512x512; do not paint over the PNG, or the two
+`common/src/main/resources/icon.png` at 512x512; do not paint over the PNG, or the two
 drift apart and the source stops being the source.
