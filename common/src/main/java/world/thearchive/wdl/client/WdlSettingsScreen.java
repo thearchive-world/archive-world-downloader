@@ -100,7 +100,7 @@ public final class WdlSettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        int listHeight = Math.max(this.height - LIST_TOP - FOOTER_HEIGHT, ROW_HEIGHT * 3);
+        int listHeight = Math.max(this.height - LIST_TOP - FOOTER_HEIGHT, 0);
         SettingsList settingsList = new SettingsList(Minecraft.getInstance(), this.width, listHeight, LIST_TOP,
                 ROW_HEIGHT);
         populate(settingsList);
