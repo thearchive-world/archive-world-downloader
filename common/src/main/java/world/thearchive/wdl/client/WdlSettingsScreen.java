@@ -100,14 +100,13 @@ public final class WdlSettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        buildTabStrip();
-
         int listHeight = Math.max(this.height - LIST_TOP - FOOTER_HEIGHT, ROW_HEIGHT * 3);
         SettingsList settingsList = new SettingsList(Minecraft.getInstance(), this.width, listHeight, LIST_TOP,
                 ROW_HEIGHT);
         populate(settingsList);
         addRenderableWidget(settingsList);
 
+        buildTabStrip();
         buildFooter();
     }
 
