@@ -23,9 +23,9 @@ spotless {
 }
 
 // --- Minecraft toolchain: NeoGradle vanilla, not ModDevGradle Vanilla mode ---
-// NeoForm has no 1.20.1 release: NeoForged forked from Forge at 1.20.2, so net.neoforged:neoform starts there,
+// NeoForm has no 1.19.4 release: NeoForged forked from Forge at 1.20.2, so net.neoforged:neoform starts there,
 // and ModDevGradle Vanilla mode (which resolves that coordinate) cannot target this band. NeoGradle's vanilla
-// plugin builds the same Mojmap (official) Minecraft on Gradle 9 by deriving it from mcp_config 1.20.1 instead,
+// plugin builds the same Mojmap (official) Minecraft on Gradle 9 by deriving it from mcp_config 1.19.4 instead,
 // the exact namespace common is written in, with no intermediary remap. The net.minecraft:client distribution
 // carries the shared and server-side classes the codec reads plus the bundled vanilla data pack, and an
 // implementation dependency is inherited by the test source set, so the headless JUnit suite boots the vanilla
@@ -363,9 +363,9 @@ repositories {
 
 dependencies {
     // XaeroPlus public API for the overlay binding (compat/xaeroplus), compile-only (never a runtime require).
-    // common is Mojmap here (NeoGradle vanilla), so it needs a Mojmapped flavor. XaeroPlus 2.35.1 publishes no
-    // separate +neoforge-1.20.1 file at this band; its +forge-1.20.1 file declares both the forge and neoforge
-    // loaders, and the binding uses only XaeroPlus's own API types, so it matches this classpath.
+    // common is Mojmap here (NeoGradle vanilla), so it needs a Mojmapped flavor, which XaeroPlus 2.29.1's
+    // +forge-1.19.4 file provides; no NeoForge exists at this band, so there is no +neoforge flavor, and the
+    // binding uses only XaeroPlus's own API types, so it matches this classpath.
     compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+forge-${property("minecraft_version")}")
 
     // JourneyMap public API for the overlay binding (compat/journeymap), compile-only (never a runtime require).

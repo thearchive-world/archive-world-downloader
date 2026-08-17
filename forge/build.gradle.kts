@@ -29,7 +29,7 @@ val band = Properties().apply {
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.20.1.
+// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.19.4.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
