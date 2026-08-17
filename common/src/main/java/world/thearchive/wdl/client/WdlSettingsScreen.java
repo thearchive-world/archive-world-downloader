@@ -169,6 +169,7 @@ public final class WdlSettingsScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        this.renderBackground(guiGraphics);
         // The Defaults button would only revert to a state the draft is already in, so it grays out (never
         // hides, keeping the footer stable and the feature discoverable) while the draft equals defaults, and
         // a tooltip on the gray state says why. Kept current with live edits by resolving before the widgets
