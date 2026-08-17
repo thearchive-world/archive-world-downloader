@@ -100,9 +100,8 @@ public final class WdlSettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        int listHeight = Math.max(this.height - LIST_TOP - FOOTER_HEIGHT, ROW_HEIGHT * 3);
-        SettingsList settingsList = new SettingsList(Minecraft.getInstance(), this.width, listHeight, LIST_TOP,
-                ROW_HEIGHT);
+        SettingsList settingsList = new SettingsList(Minecraft.getInstance(), this.width, this.height, LIST_TOP,
+                this.height - FOOTER_HEIGHT, ROW_HEIGHT);
         populate(settingsList);
         addRenderableWidget(settingsList);
 
@@ -448,8 +447,8 @@ public final class WdlSettingsScreen extends Screen {
 
     /** The scrollable list of rows for the active tab; rebuilt whole on a tab switch or resize. */
     private final class SettingsList extends ContainerObjectSelectionList<SettingsEntry> {
-        SettingsList(Minecraft minecraft, int width, int height, int top, int itemHeight) {
-            super(minecraft, width, height, top, top + height, itemHeight);
+        SettingsList(Minecraft minecraft, int width, int height, int top, int bottom, int itemHeight) {
+            super(minecraft, width, height, top, bottom, itemHeight);
         }
 
         void add(SettingsEntry entry) {
