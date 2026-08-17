@@ -3,7 +3,7 @@
   "id": "wdl",
   "version": "${version}",
   "name": "Archive World Downloader",
-  "icon": "assets/wdl/icon.png",
+  "icon": "icon.png",
   "description": "Keep the multiplayer worlds you visit. As you explore, the mod saves the terrain, mobs, and maps around you into a singleplayer world you can open offline, and containers save their contents when you open them. Everything comes from your own game, so nothing runs on the server.",
   "authors": [
     "terbin"

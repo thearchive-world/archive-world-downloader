@@ -19,7 +19,7 @@ displayName = "Archive World Downloader"
 authors = "terbin"
 displayURL = "https://modrinth.com/mod/${mod_id}"
 description = "Keep the multiplayer worlds you visit. As you explore, the mod saves the terrain, mobs, and maps around you into a singleplayer world you can open offline, and containers save their contents when you open them. Everything comes from your own game, so nothing runs on the server."
-logoFile = "assets/wdl/icon.png"
+logoFile = "icon.png"
 logoBlur = false
 
 # Loader floor = gradle.properties neoforge_version_min (a deliberate value, not the build coordinate);
