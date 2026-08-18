@@ -28,12 +28,12 @@ import org.jspecify.annotations.Nullable;
  * actually emits.
  *
  * <p>The property gated is a fixed point of vanilla's own decode then encode. A block-entity tag is fed to
- * {@link BlockEntity#loadStatic} and saved back through {@link BlockEntity#saveWithFullMetadata}; an {@code "Items"}
- * holder is fed to {@link ContainerHelper#loadAllItems} and saved back through {@link ContainerHelper#saveAllItems}. A
- * fixture built from a mental model rather than from the producer differs from its own round trip, because vanilla
- * writes keys unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "Count"} on every item entry, and
- * each block entity's own always-written state). Such a fixture collapses the cases a test means to distinguish, so the
- * test passes for a reason unrelated to the behavior it names.
+ * {@link BlockEntity#loadStatic} and saved back through {@link BlockEntity#save}; an {@code "Items"} holder is fed to
+ * {@link ContainerHelper#loadAllItems} and saved back through {@link ContainerHelper#saveAllItems}. A fixture built
+ * from a mental model rather than from the producer differs from its own round trip, because vanilla writes keys
+ * unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "Count"} on every item entry, and each block
+ * entity's own always-written state). Such a fixture collapses the cases a test means to distinguish, so the test
+ * passes for a reason unrelated to the behavior it names.
  *
  * <p>Nothing here is a key list to maintain. The producer is called, so the expected shape follows the band the tests
  * compile against.
@@ -64,7 +64,7 @@ public final class FixtureFidelity {
 
     /** What vanilla writes for {@code blockEntity}, the same call the chunk save makes. */
     public static CompoundTag save(BlockEntity blockEntity) {
-        return blockEntity.saveWithFullMetadata();
+        return blockEntity.save(new CompoundTag());
     }
 
     /**
@@ -93,7 +93,7 @@ public final class FixtureFidelity {
                     + " does not load as a block entity: " + subject);
         }
 
-        CompoundTag produced = blockEntity.saveWithFullMetadata();
+        CompoundTag produced = blockEntity.save(new CompoundTag());
         List<String> divergences = new ArrayList<>();
         diff("", produced, subject, divergences);
         if (!divergences.isEmpty()) {

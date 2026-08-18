@@ -65,7 +65,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * sharply a passenger that boarded since, which reaches disk nowhere but nested in its vehicle.
  */
 class EntityVehicleRelocationTest {
-    private static RegistryAccess.Frozen registries;
+    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     // Instance fields, not constants: ChunkPos's own class initializer reaches a built-in registry, so touching

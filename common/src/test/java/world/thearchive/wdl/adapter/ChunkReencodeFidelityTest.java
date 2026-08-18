@@ -38,7 +38,7 @@ class ChunkReencodeFidelityTest {
 
     @Test
     void aPopulatedClientHeldBlockEntitySurvivesReencode() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
 
         CompoundTag tag = codec.encode(
                 SyntheticChunks.fullWithMalformedBlockEntities(registries, false, List.of(sign(2, 64, 2, "hello"))),
@@ -53,7 +53,7 @@ class ChunkReencodeFidelityTest {
 
     @Test
     void reencodeReflectsAnEditedBlockEntity() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
 
         CompoundTag before = codec.encode(
                 SyntheticChunks.fullWithMalformedBlockEntities(registries, false, List.of(sign(2, 64, 2, "hello"))),
@@ -71,7 +71,7 @@ class ChunkReencodeFidelityTest {
 
     @Test
     void aRemovedBlockEntityIsGoneFromTheReencodedTag() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
 
         CompoundTag withSign = codec.encode(
                 SyntheticChunks.fullWithMalformedBlockEntities(registries, false, List.of(sign(2, 64, 2, "hello"))),

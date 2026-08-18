@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -41,6 +40,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CaptureToggles;
@@ -75,7 +75,7 @@ public final class OutlineTracker {
     private static final long[] NO_CELLS = new long[0];
     // A reused scratch position for the seal-test neighbor reads, so no probe allocates. Client thread only.
     private static final BlockPos.MutableBlockPos neighbor = new BlockPos.MutableBlockPos();
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(OutlineTracker.class);
     private static final int TIMING_WINDOW_TICKS = 100;
 
     // Re-scan a cached chunk's block entities at most this often: the enumeration is the dominant tick cost on

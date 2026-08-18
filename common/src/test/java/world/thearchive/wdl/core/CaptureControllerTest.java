@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.Set;
@@ -283,7 +283,7 @@ class CaptureControllerTest {
     void capturedContainersDelegateToSessionWhileRecording() {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
-        session.capturedContainers = new CapturedContainers(LongSet.of(99L), Set.of(), false);
+        session.capturedContainers = new CapturedContainers(new LongOpenHashSet(new long[] { 99L }), Set.of(), false);
         controller.start(() -> session);
 
         assertTrue(controller.capturedContainers().containsBlock(99L));
@@ -298,7 +298,7 @@ class CaptureControllerTest {
     void recoveredCoverageDelegatesToSessionWhileRecording() {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
-        session.recoveredCoverage = new RecoveredCoverage(LongSet.of(42L));
+        session.recoveredCoverage = new RecoveredCoverage(new LongOpenHashSet(new long[] { 42L }));
         controller.start(() -> session);
 
         assertTrue(controller.recoveredCoverage().contains(42L));

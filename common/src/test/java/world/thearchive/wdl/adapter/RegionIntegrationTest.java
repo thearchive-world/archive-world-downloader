@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
-import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -70,7 +70,7 @@ class RegionIntegrationTest {
 
     @Test
     void multiChunkAndRegionBoundaryRoundTrip(@TempDir Path save) {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         WorldPaths paths = new WorldPathsImpl(save);
         Path region = paths.regionDirectory(Level.OVERWORLD);
 
@@ -140,7 +140,7 @@ class RegionIntegrationTest {
 
     @Test
     void writeMergingReadsThePriorChunkAndReportsNewVersusRecaptured(@TempDir Path save) throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         WorldPaths paths = new WorldPathsImpl(save);
         Path region = paths.regionDirectory(Level.OVERWORLD);
         int[] mergeCalls = { 0 };
@@ -177,7 +177,7 @@ class RegionIntegrationTest {
      */
     @Test
     void aReWalkedChestKeepsWhatAnEarlierFlushWroteIntoTheRegionFile(@TempDir Path save) throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         WorldPaths paths = new WorldPathsImpl(save);
         Path region = paths.regionDirectory(Level.OVERWORLD);
         ChunkPos pos = new ChunkPos(0, 0);
@@ -186,12 +186,12 @@ class RegionIntegrationTest {
         try (IOWorker out = storage(paths, region)) {
             ChunkSnapshotSource captured = chestSnapshot(registries, chestPos, "minecraft:diamond");
             RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, registries, false),
-                    ChunkFlushPlan.readMerge(captured, List.of(), LongSet.of()));
+                    ChunkFlushPlan.readMerge(captured, List.of(), LongSets.EMPTY_SET));
             out.synchronize(true).join();
 
             ChunkSnapshotSource reWalked = chestSnapshot(registries, chestPos);
             RegionChunkWriter.writeMerging(out, pos, codec.encode(reWalked, registries, false),
-                    ChunkFlushPlan.readMerge(reWalked, List.of(), LongSet.of()));
+                    ChunkFlushPlan.readMerge(reWalked, List.of(), LongSets.EMPTY_SET));
             out.synchronize(true).join();
         }
 
@@ -210,7 +210,7 @@ class RegionIntegrationTest {
      */
     @Test
     void aChestOpenedAndFoundEmptyIsWrittenEmptyIntoTheRegionFile(@TempDir Path save) throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         WorldPaths paths = new WorldPathsImpl(save);
         Path region = paths.regionDirectory(Level.OVERWORLD);
         ChunkPos pos = new ChunkPos(0, 0);
@@ -219,7 +219,7 @@ class RegionIntegrationTest {
         try (IOWorker out = storage(paths, region)) {
             ChunkSnapshotSource captured = chestSnapshot(registries, chestPos, "minecraft:diamond");
             RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, registries, false),
-                    ChunkFlushPlan.readMerge(captured, List.of(), LongSet.of()));
+                    ChunkFlushPlan.readMerge(captured, List.of(), LongSets.EMPTY_SET));
             out.synchronize(true).join();
 
             ChunkSnapshotSource emptied = chestSnapshot(registries, chestPos);
@@ -231,7 +231,7 @@ class RegionIntegrationTest {
                     Map.of(), Map.of());
             assertEquals(1, folded.merged(), "the open-time holder landed, so the fresh side is what the open saw");
             RegionChunkWriter.MergeWriteResult written = RegionChunkWriter.writeMerging(out, pos, fresh,
-                    ChunkFlushPlan.readMerge(emptied, landing, LongSet.of()));
+                    ChunkFlushPlan.readMerge(emptied, landing, LongSets.EMPTY_SET));
             out.synchronize(true).join();
 
             // Without these the case cannot tell the skip firing from the merge never running at all, which is
@@ -252,7 +252,7 @@ class RegionIntegrationTest {
     }
 
     /** A captured chunk snapshot whose one chest at {@code pos} holds each named item. */
-    private static ChunkSnapshotSource chestSnapshot(RegistryAccess.Frozen registries, BlockPos pos,
+    private static ChunkSnapshotSource chestSnapshot(RegistryAccess registries, BlockPos pos,
             String... itemIds) {
         CompoundTag chest = blockEntity("minecraft:chest", pos.getX(), pos.getY(), pos.getZ());
         chest.put("Items", ItemFixtures.items(itemIds));

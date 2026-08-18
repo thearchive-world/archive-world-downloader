@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -22,6 +21,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.core.SaveProgress;
 
@@ -47,7 +47,7 @@ import world.thearchive.wdl.core.SaveProgress;
  * failure, so the caller polls it with one branch.
  */
 final class AsyncSaveWriter {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(AsyncSaveWriter.class);
 
     /**
      * Lazily opens a region storage on the writer thread; called once per (target, dimension) on its first tag. The
@@ -112,7 +112,7 @@ final class AsyncSaveWriter {
         ENTITIES
     }
 
-    private sealed interface Task permits WriteTask, RewriteTask, ScanTask, RunTask, MapBatchTask, FinalizeTask {}
+    private interface Task {}
 
     private record WriteTask(Target target, ResourceKey<Level> dimension, ChunkPos pos,
             Supplier<CompoundTag> encode, RegionChunkWriter.ChunkReadMerge merge) implements Task {}

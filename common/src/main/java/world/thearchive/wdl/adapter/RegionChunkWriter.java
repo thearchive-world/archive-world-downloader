@@ -3,20 +3,20 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The per-chunk discipline for region writes: a read, merge, or write that throws for one chunk is logged, that chunk
  * is skipped, and the save continues.
  */
 final class RegionChunkWriter {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(RegionChunkWriter.class);
 
     private RegionChunkWriter() {}
 

@@ -17,7 +17,7 @@ import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 
 /**
  * Shared block-entity NBT fixtures for the merge tests: the tag vanilla writes for a block entity, a chunk tag wrapping
- * a {@code "block_entities"} list, and by-position lookups into that list. Hoisted here so the
+ * a {@code Level.TileEntities} list, and by-position lookups into that list. Hoisted here so the
  * container/lectern/interaction merge tests share one copy rather than each carrying its own.
  *
  * <p>{@link #blockEntity} is the producer's own output rather than a hand-listed set of keys, and {@link #chunkTagWith}
@@ -105,8 +105,8 @@ public final class BlockEntityFixtures {
     }
 
     /**
-     * A chunk tag whose {@code "block_entities"} list holds {@code blockEntities}, the post-1.18 flat layout, each
-     * carrying the {@code keepPacked} the chunk layer writes around a live block entity.
+     * A chunk tag whose {@code Level.TileEntities} list holds {@code blockEntities}, the pre-1.18 layout, each carrying
+     * the {@code keepPacked} the chunk layer writes around a live block entity.
      *
      * <p>Every tag is checked against its producer's shape first. This is the choke point: a fixture assembled anywhere
      * and handed to a chunk merge passes through here, so an omitted key fails the build at the test that would
@@ -118,7 +118,9 @@ public final class BlockEntityFixtures {
         for (CompoundTag blockEntity : blockEntities) {
             list.add(savedBlockEntity(blockEntity));
         }
-        chunkTag.put("block_entities", list);
+        CompoundTag level = new CompoundTag();
+        level.put("TileEntities", list);
+        chunkTag.put("Level", level);
         return chunkTag;
     }
 
@@ -136,7 +138,9 @@ public final class BlockEntityFixtures {
             saved.putBoolean(FixtureFidelity.KEEP_PACKED, false);
             list.add(saved);
         }
-        chunkTag.put("block_entities", list);
+        CompoundTag level = new CompoundTag();
+        level.put("TileEntities", list);
+        chunkTag.put("Level", level);
         return chunkTag;
     }
 
@@ -165,12 +169,12 @@ public final class BlockEntityFixtures {
 
     /** The block-entity tag in {@code chunkTag} at {@code x/y/z}, or an {@link AssertionError} when none matches. */
     public static CompoundTag findByPos(CompoundTag chunkTag, int x, int y, int z) {
-        return findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), x, y, z);
+        return findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), x, y, z);
     }
 
     /** The block-entity tag in {@code chunkTag} at {@code x/y/z}, or {@code null} when none matches. */
     public static @Nullable CompoundTag findByPosOrNull(CompoundTag chunkTag, int x, int y, int z) {
-        ListTag list = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
+        ListTag list = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag tag = list.getCompound(i);
             if (tag.getInt("x") == x && tag.getInt("y") == y && tag.getInt("z") == z) {

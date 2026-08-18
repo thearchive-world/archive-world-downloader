@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
 public interface ChunkSnapshotSource {
     ChunkPos chunkPos();
 
-    /** Index of the lowest section (vanilla {@code yPos}); e.g. -4 for a -64..384 overworld. */
+    /** Index of the lowest section (vanilla {@code yPos}); e.g. 0 for a 0..256 overworld. */
     int minSectionY();
 
     /** Game time stamped as {@code LastUpdate}. */
@@ -55,6 +55,11 @@ public interface ChunkSnapshotSource {
 
     /** Block-entity NBT in saved form (empty for synthetic terrain fixtures). */
     List<CompoundTag> blockEntities();
+
+    /**
+     * Per-chunk biome registry ids (vanilla {@code Level.Biomes}); below 1.18 biomes are per chunk, not per section.
+     */
+    int[] biomes();
 
     /**
      * One captured section: its {@code Y} index, a detached section copy (null for a light-only section outside the

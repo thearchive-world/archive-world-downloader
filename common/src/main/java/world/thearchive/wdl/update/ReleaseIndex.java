@@ -59,7 +59,7 @@ final class ReleaseIndex {
     private static List<Release> parseRows(String body) {
         JsonElement root;
         try {
-            root = JsonParser.parseString(body);
+            root = new JsonParser().parse(body);
         } catch (RuntimeException e) {
             return List.of();
         }

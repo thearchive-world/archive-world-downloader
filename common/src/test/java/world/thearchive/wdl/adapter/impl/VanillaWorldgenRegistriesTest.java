@@ -24,7 +24,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * reset seam, since the real decode can neither be made to throw nor be stalled mid-flight.
  */
 class VanillaWorldgenRegistriesTest {
-    private static RegistryAccess.Frozen real;
+    private static RegistryAccess real;
 
     @BeforeAll
     static void reconstructOnce() {
@@ -48,10 +48,10 @@ class VanillaWorldgenRegistriesTest {
 
     @Test
     void firstGetLoadsOnceAndLaterGetsCache() {
-        RegistryAccess.Frozen first = VanillaWorldgenRegistries.get();
+        RegistryAccess first = VanillaWorldgenRegistries.get();
         assertEquals(1, VanillaWorldgenRegistries.loadCountForTesting(), "the cold memo loads on the first get");
 
-        RegistryAccess.Frozen second = VanillaWorldgenRegistries.get();
+        RegistryAccess second = VanillaWorldgenRegistries.get();
         assertEquals(1, VanillaWorldgenRegistries.loadCountForTesting(), "a warm memo never re-loads");
         assertSame(first, second);
     }
@@ -66,7 +66,7 @@ class VanillaWorldgenRegistriesTest {
             return real;
         });
 
-        AtomicReference<RegistryAccess.Frozen> onWorker = new AtomicReference<>();
+        AtomicReference<RegistryAccess> onWorker = new AtomicReference<>();
         Thread worker = new Thread(() -> onWorker.set(VanillaWorldgenRegistries.get()), "warm-under-test");
         worker.start();
         inLoad.await(); // the worker now holds the memo monitor, stalled mid-load
@@ -79,7 +79,7 @@ class VanillaWorldgenRegistriesTest {
         }, "warm-release");
         releaser.start();
 
-        RegistryAccess.Frozen onMain = VanillaWorldgenRegistries.get();
+        RegistryAccess onMain = VanillaWorldgenRegistries.get();
         worker.join();
         releaser.join();
 
@@ -101,7 +101,7 @@ class VanillaWorldgenRegistriesTest {
         assertThrows(IllegalStateException.class, VanillaWorldgenRegistries::get);
         assertEquals(1, VanillaWorldgenRegistries.loadCountForTesting());
 
-        RegistryAccess.Frozen recovered = VanillaWorldgenRegistries.get();
+        RegistryAccess recovered = VanillaWorldgenRegistries.get();
         assertSame(real, recovered, "a failed load never poisons the memo; the next get re-attempts cleanly");
         assertEquals(2, VanillaWorldgenRegistries.loadCountForTesting());
     }

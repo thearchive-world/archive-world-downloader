@@ -23,12 +23,12 @@ import org.junit.jupiter.api.Test;
 class RegistriesSmokeTest {
     @Test
     void buildsBiomeRegistryAndSection() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
 
         // PLAINS present in the dynamic BIOME registry, else getOrThrow throws.
         assertNotNull(registries.registryOrThrow(Registry.BIOME_REGISTRY).getOrThrow(Biomes.PLAINS));
 
-        // The biome-registry read the chunk codec makes when it builds a section.
-        assertNotNull(new LevelChunkSection(0, registries.registryOrThrow(Registry.BIOME_REGISTRY)));
+        // A section builds from the reconstructed registries; below 1.18 the biome axis is per-chunk, not per-section.
+        assertNotNull(new LevelChunkSection(0));
     }
 }

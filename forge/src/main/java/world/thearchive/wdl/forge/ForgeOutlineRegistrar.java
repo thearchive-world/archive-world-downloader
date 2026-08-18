@@ -6,7 +6,7 @@ package world.thearchive.wdl.forge;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.common.MinecraftForge;
 
 import world.thearchive.wdl.adapter.RimRenderer;
@@ -14,24 +14,22 @@ import world.thearchive.wdl.adapter.impl.RimRendererImpl;
 import world.thearchive.wdl.client.WdlOutlineRenderer;
 
 /**
- * The Forge half of the outline render seam, the analog of {@code FabricOutlineRegistrar}. It draws after the
- * translucent-blocks stage, mixin-free, on the game event bus, reading the view frustum straight off the stage
- * event. The lines batch is flushed explicitly, since nothing after this stage flushes it.
+ * The Forge half of the outline render seam, the analog of {@code FabricOutlineRegistrar}. It draws at the end of
+ * level rendering, mixin-free, on the game event bus. Forge 37's RenderWorldLastEvent exposes no frustum, so the
+ * shared renderer's null-frustum path draws every section and lets the GPU clip. The lines batch is flushed
+ * explicitly, since nothing after this event flushes it.
  */
 final class ForgeOutlineRegistrar {
     private final RimRenderer rimRenderer = new RimRendererImpl();
 
     void register() {
-        MinecraftForge.EVENT_BUS.addListener((RenderLevelStageEvent event) -> {
-            if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
-                draw(event);
-            }
-        });
+        MinecraftForge.EVENT_BUS.addListener((RenderWorldLastEvent event) -> draw(event));
     }
 
-    private void draw(RenderLevelStageEvent event) {
+    private void draw(RenderWorldLastEvent event) {
         MultiBufferSource.BufferSource consumers = Minecraft.getInstance().renderBuffers().bufferSource();
-        WdlOutlineRenderer.render(event.getPoseStack(), consumers, event.getFrustum(), rimRenderer);
+        // Forge 37's RenderWorldLastEvent has no frustum, so the null path draws every section and lets the GPU clip.
+        WdlOutlineRenderer.render(event.getMatrixStack(), consumers, null, rimRenderer);
         consumers.endBatch(RenderType.lines());
     }
 }

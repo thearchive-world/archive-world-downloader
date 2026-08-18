@@ -48,7 +48,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * is the one axis the site reads.
  */
 class RiddenMountContentsFoldTest {
-    private static RegistryAccess.Frozen registries;
+    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     private static final UUID CARRIER = UUID.fromString("6b1d5f2c-9a30-4e11-b8c7-5d0e3a71f402");

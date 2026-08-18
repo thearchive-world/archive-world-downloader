@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -40,6 +39,7 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The MC-typed, loader-agnostic recognizer for interaction-prediction capture: content the chunk packet and an opened
@@ -60,7 +60,7 @@ import org.slf4j.Logger;
  * {@code ListTag} copy under {@code "Bees"}).
  */
 public final class InteractionCapture {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(InteractionCapture.class);
 
     private static volatile @Nullable InteractionCapture active;
 
@@ -228,7 +228,7 @@ public final class InteractionCapture {
     }
 
     /** A predicted interaction awaiting the reconcile gate. */
-    sealed interface Candidate permits HolderCandidate {}
+    interface Candidate {}
 
     /**
      * A jukebox disc, placed shulker, or placed beehive: one merge-ready single-key holder
@@ -334,7 +334,7 @@ public final class InteractionCapture {
         // Keyed by the (block-entity-NBT key, block) pairing: key presence alone does not imply this block saves
         // under the mapped key, and an unrecognized pairing has no general block-to-key mapping, so it drops.
         if (block instanceof ShulkerBoxBlock) {
-            CompoundTag blockEntityTag = BlockItem.getBlockEntityData(stack);
+            CompoundTag blockEntityTag = stack.getTagElement("BlockEntityTag");
             if (blockEntityTag != null && blockEntityTag.contains("Items", 9)) {
                 NonNullList<ItemStack> items = NonNullList.withSize(ShulkerBoxBlockEntity.CONTAINER_SIZE,
                         ItemStack.EMPTY);
@@ -344,7 +344,7 @@ public final class InteractionCapture {
                 placedContainerSink.containerCaptured(placedPos.asLong(), shulkerBlockEntityId());
             }
         } else if (block instanceof BeehiveBlock) {
-            CompoundTag blockEntityTag = BlockItem.getBlockEntityData(stack);
+            CompoundTag blockEntityTag = stack.getTagElement("BlockEntityTag");
             if (blockEntityTag != null) {
                 ListTag beesList = blockEntityTag.getList("Bees", 10);
                 if (!beesList.isEmpty()) {

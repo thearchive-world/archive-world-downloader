@@ -56,7 +56,7 @@ class ContainerRecaptureSynergyTest {
     }
 
     private static ItemStack mergedItemAt(ContainerSink sink, CompoundTag chunkTag, int slot) {
-        ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
+        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
         CompoundTag chest = blockEntities.getCompound(0);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(chest, back);

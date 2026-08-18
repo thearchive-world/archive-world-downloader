@@ -93,7 +93,7 @@ public final class RenderSurfaceImpl implements RenderSurface {
     @Override
     public void blitFavicon(ResourceLocation icon, int x, int y, int size) {
         RenderSystem.setShaderTexture(0, icon);
-        // A selected list row leaves the shader color at black (the 1.18.2 AbstractSelectionList highlight sets it and
+        // A selected list row leaves the shader color at black (the 1.17.1 AbstractSelectionList highlight sets it and
         // never resets it), and GuiComponent.blit does not set its own, so without this reset the selected row's icon
         // multiplies to black. Vanilla's own world-selection list resets to white here for the same reason.
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);

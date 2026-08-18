@@ -60,7 +60,7 @@ class PriorPlayerReadRoundTripTest {
     }
 
     private Path saveDownload(Path saves, String name, ListTag enderItems) throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
         CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(enderItems), BlockPos.ZERO, 0.0F, 0.0F,
                 Level.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);

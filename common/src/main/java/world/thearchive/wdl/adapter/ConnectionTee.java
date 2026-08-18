@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -16,6 +15,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The shared connection packet tee: a Netty handler inserted before the connection's {@code "packet_handler"} so it
@@ -40,7 +40,7 @@ import org.slf4j.Logger;
  * per-loader plug supplies them: the connection's channel and the relative-move packet's entity id.
  */
 public abstract class ConnectionTee extends ChannelDuplexHandler {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionTee.class);
     private static final String NAME = "wdl_connection_tee";
 
     private static volatile boolean transferSignal;

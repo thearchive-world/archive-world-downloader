@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.DirectoryStream;
@@ -20,16 +19,17 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * 1.18.2 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
+ * 1.17.1 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
  * pre-creates {@code region/} + {@code entities/} so the region writer never sees a missing {@code externalFileDir}
  * (vanilla {@code RegionFile} throws otherwise).
  */
 public final class WorldPathsImpl implements WorldPaths {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(WorldPathsImpl.class);
 
     private final Path saveRoot;
 
@@ -130,7 +130,7 @@ public final class WorldPathsImpl implements WorldPaths {
 
     /** Vanilla layout: overworld at the save root, Nether=DIM-1, End=DIM1, custom={@code dimensions/<ns>/<path>}. */
     private Path dimensionRoot(ResourceKey<Level> dimension) {
-        return DimensionType.getStorageFolder(dimension, saveRoot);
+        return DimensionType.getStorageFolder(dimension, saveRoot.toFile()).toPath();
     }
 
     private static Path ensureDirectory(Path directory) {
@@ -145,7 +145,7 @@ public final class WorldPathsImpl implements WorldPaths {
     /** IOWorker's constructor is protected, so this subclass is how the plug opens one. */
     private static final class WdlRegionStorage extends IOWorker {
         private WdlRegionStorage(Path directory, boolean sync, String name) {
-            super(directory, sync, name);
+            super(directory.toFile(), sync, name);
         }
     }
 }

@@ -6,24 +6,18 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.mojang.serialization.Codec;
 import java.nio.file.Path;
-import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -44,7 +38,7 @@ class ChunkRoundTripTest {
 
     @Test
     void chunkRoundTripsSelfConsistently(@TempDir Path directory) {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
 
         CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
         CompoundTag back = RegionRoundTrip.writeThenRead(directory, new ChunkPos(0, 0), tag);
@@ -58,7 +52,7 @@ class ChunkRoundTripTest {
         // OCEAN_FLOOR (LIVE_WORLD, never sent to a client) is omitted so vanilla read() re-primes it;
         // the three CLIENT-usage heightmaps are kept. (Re-prime itself is ServerLevel-only, not exercised
         // headless; this asserts the omission.)
-        CompoundTag heightmaps = back.getCompound("Heightmaps");
+        CompoundTag heightmaps = back.getCompound("Level").getCompound("Heightmaps");
         assertFalse(heightmaps.contains("OCEAN_FLOOR"), "OCEAN_FLOOR must be dropped from the written tag");
         assertTrue(heightmaps.contains("WORLD_SURFACE"), "client-sent heightmaps must be kept");
 
@@ -67,25 +61,25 @@ class ChunkRoundTripTest {
 
     @Test
     void isLightOnTracksCapturedLightNotHardcoded() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
 
         CompoundTag lit = codec.encode(SyntheticChunks.full(registries, true), registries, false);
         CompoundTag dark = codec.encode(SyntheticChunks.full(registries, false), registries, false);
 
-        assertTrue(lit.getBoolean("isLightOn"), "lightCorrect chunk -> isLightOn=true");
-        assertFalse(dark.getBoolean("isLightOn"), "non-lightCorrect chunk -> isLightOn omitted");
+        assertTrue(lit.getCompound("Level").getBoolean("isLightOn"), "lightCorrect chunk -> isLightOn=true");
+        assertFalse(dark.getCompound("Level").getBoolean("isLightOn"), "non-lightCorrect chunk -> isLightOn omitted");
     }
 
     @Test
     void capturedLightRoundTripsInVanillaShape(@TempDir Path directory) {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         LevelHeightAccessor heightAccessor = SyntheticChunks.heightAccessor();
         int minSectionY = heightAccessor.getMinSection();
 
         CompoundTag tag = codec.encode(SyntheticChunks.fullWithLight(registries), registries, false);
         CompoundTag back = RegionRoundTrip.writeThenRead(directory, new ChunkPos(0, 0), tag);
 
-        assertTrue(back.getBoolean("isLightOn"), "lit snapshot -> isLightOn=true");
+        assertTrue(back.getCompound("Level").getBoolean("isLightOn"), "lit snapshot -> isLightOn=true");
 
         CompoundTag bottom = sectionAt(back, minSectionY);
         assertArrayEquals(SyntheticChunks.lightFill(SyntheticChunks.BLOCK_LIGHT_FILL),
@@ -96,14 +90,14 @@ class ChunkRoundTripTest {
         CompoundTag padding = sectionAt(back, minSectionY - 1);
         assertArrayEquals(SyntheticChunks.lightFill(SyntheticChunks.SKY_LIGHT_FILL),
                 padding.getByteArray("SkyLight"), "below-chunk padding sky light survives");
-        assertFalse(padding.contains("block_states"), "padding section carries no block states");
+        assertFalse(padding.contains("BlockStates"), "padding section carries no block states");
 
         assertSectionsDecode(back, registries);
     }
 
     /** The written section tag with the given Y, failing the test if absent. */
     private static CompoundTag sectionAt(CompoundTag chunkTag, int sectionY) {
-        return chunkTag.getList("sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+        return chunkTag.getCompound("Level").getList("Sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
                 .filter(section -> (section.contains("Y") ? section.getByte("Y") : Byte.MIN_VALUE) == sectionY)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no written section at Y=" + sectionY));
@@ -116,20 +110,19 @@ class ChunkRoundTripTest {
      */
     private static void assertSectionsDecode(CompoundTag chunkTag, RegistryAccess registries) {
         Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
-        Codec<PalettedContainer<BlockState>> blockStateCodec = PalettedContainer.codec(
-                Block.BLOCK_STATE_REGISTRY, BlockState.CODEC, PalettedContainer.Strategy.SECTION_STATES,
-                Blocks.AIR.defaultBlockState());
-        Codec<PalettedContainer<Holder<Biome>>> biomeCodec = PalettedContainer.codec(
-                biomeRegistry.asHolderIdMap(), biomeRegistry.holderByNameCodec(),
-                PalettedContainer.Strategy.SECTION_BIOMES, biomeRegistry.getHolderOrThrow(Biomes.PLAINS));
-        for (Tag sectionTag : chunkTag.getList("sections", Tag.TAG_COMPOUND)) {
+        CompoundTag level = chunkTag.getCompound("Level");
+        for (Tag sectionTag : level.getList("Sections", Tag.TAG_COMPOUND)) {
             CompoundTag section = (CompoundTag) sectionTag;
-            if (section.contains("block_states")) {
-                assertTrue(blockStateCodec.parse(NbtOps.INSTANCE, section.get("block_states")).result().isPresent(),
-                        "block_states must decode");
-                assertTrue(biomeCodec.parse(NbtOps.INSTANCE, section.get("biomes")).result().isPresent(),
-                        "biomes must decode");
+            if (section.contains("BlockStates", Tag.TAG_LONG_ARRAY)) {
+                // read() throws on malformed palette or block-state data, so reaching the next line proves decode.
+                new LevelChunkSection(section.getByte("Y")).getStates()
+                        .read(section.getList("Palette", Tag.TAG_COMPOUND), section.getLongArray("BlockStates"));
             }
+        }
+        int[] biomeIds = level.getIntArray("Biomes");
+        assertEquals(16 * ((SyntheticChunks.HEIGHT + 3) / 4), biomeIds.length, "biomes cover the whole column");
+        for (int id : biomeIds) {
+            assertNotNull(biomeRegistry.byId(id), "every written biome id resolves to a registered biome");
         }
     }
 }

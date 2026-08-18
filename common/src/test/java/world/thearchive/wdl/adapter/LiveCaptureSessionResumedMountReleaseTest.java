@@ -87,7 +87,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
     private static final double MOUNT_Y = 71.0;
     private static final double MOUNT_Z = 487.5;
 
-    private static RegistryAccess.Frozen registries;
+    private static RegistryAccess registries;
 
     @BeforeAll
     static void bootstrapVanilla() {

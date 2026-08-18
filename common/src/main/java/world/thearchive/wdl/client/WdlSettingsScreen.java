@@ -198,7 +198,7 @@ public final class WdlSettingsScreen extends Screen {
         super.render(poseStack, mouseX, mouseY, partialTick);
         // The recorded hover tooltips are drawn here, unclipped, after the list.
         for (Map.Entry<AbstractWidget, Component> tip : this.hoverTooltips) {
-            if (tip.getKey().isHoveredOrFocused()) {
+            if (tip.getKey().isHovered()) {
                 this.renderTooltip(poseStack, this.font.split(tip.getValue(), 200), mouseX, mouseY);
                 break;
             }

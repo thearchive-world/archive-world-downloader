@@ -67,7 +67,7 @@ class ContainerTypeGateMergeTest {
         assertEquals(0, merged, "a barrel's items must not merge onto a chest at the same pos");
         assertFalse(stash.containsKey(pos), "the stale entry is still drained as the chunk leaves memory");
         assertTrue(
-                findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 10, 70, 20)
+                findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 10, 70, 20)
                         .getList("Items", Tag.TAG_COMPOUND).isEmpty(),
                 "the replacement chest keeps its own (empty) contents, not the barrel's");
     }
@@ -83,7 +83,8 @@ class ContainerTypeGateMergeTest {
         int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
 
         assertEquals(1, merged, "a barrel holder merges onto a barrel at the same pos");
-        CompoundTag barrel = findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 10, 70, 20);
+        CompoundTag barrel = findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 10, 70,
+                20);
         assertFalse(barrel.getList("Items", Tag.TAG_COMPOUND).isEmpty(), "the barrel gains its captured contents");
         assertFalse(barrel.contains("wdl_block_entity_id"),
                 "the type marker rides only on the holder, never onto disk");
@@ -100,7 +101,7 @@ class ContainerTypeGateMergeTest {
         int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
 
         assertEquals(1, merged, "a holder that makes no type claim overlays as before the gate");
-        assertFalse(findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 10, 70, 20)
+        assertFalse(findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 10, 70, 20)
                 .getList("Items", Tag.TAG_COMPOUND).isEmpty());
     }
 
@@ -118,7 +119,7 @@ class ContainerTypeGateMergeTest {
         assertEquals(0, merged, "no block entity at the pos (broken to air) -> nothing merges");
         assertFalse(stash.containsKey(pos), "still drained as the chunk leaves memory");
         assertTrue(
-                findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 11, 70, 20)
+                findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 11, 70, 20)
                         .getList("Items", Tag.TAG_COMPOUND).isEmpty(),
                 "the unrelated chest is left untouched");
     }

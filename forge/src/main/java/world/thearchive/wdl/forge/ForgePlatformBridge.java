@@ -4,7 +4,6 @@
 package world.thearchive.wdl.forge;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.brigadier.CommandDispatcher;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,18 +14,15 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.commands.Commands;
-import net.minecraftforge.client.ClientRegistry;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.client.event.RegisterClientCommandsEvent;
-import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.loading.FMLPaths;
+import net.minecraftforge.fmlclient.registry.ClientRegistry;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
@@ -68,14 +64,14 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     @Override
     public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
             Runnable onPrimary, Runnable onConfig) {
-        // ScreenEvent.InitScreenEvent.Post fires on the game bus for every screen, and a Button is a renderable
+        // GuiScreenEvent.InitGuiEvent.Post fires on the game bus for every screen, and a Button is a renderable
         // GuiEventListener, so the pause-menu buttons inject as screen listeners with no mixin.
-        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.InitScreenEvent.Post event) -> {
-            if (!(event.getScreen() instanceof PauseScreen)) {
+        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Post event) -> {
+            if (!(event.getGui() instanceof PauseScreen)) {
                 return;
             }
             List<AbstractWidget> widgets = new ArrayList<>();
-            for (GuiEventListener listener : event.getScreen().children()) {
+            for (GuiEventListener listener : event.getGui().children()) {
                 if (listener instanceof AbstractWidget widget) {
                     widgets.add(widget);
                 }
@@ -85,7 +81,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
                 return;
             }
             buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
-                    .forEach(event::addListener);
+                    .forEach(event::addWidget);
         });
     }
 
@@ -166,14 +162,11 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     }
 
     /**
-     * {@link RegisterClientCommandsEvent} fires on the GAME bus, so register it on {@link MinecraftForge#EVENT_BUS},
-     * the same bus this bridge already uses for ticks and disconnect.
+     * The /wdl client command is unavailable on this band's Forge jar: Forge 37 has no client-command event
+     * (RegisterClientCommandsEvent is a 1.18.2 addition), and the server-side RegisterCommandsEvent cannot register a
+     * command against a remote server. The command's actions are reached through the peek keybind and the pause-menu
+     * buttons instead.
      */
     @Override
-    public void registerCommands(WdlCommands commands) {
-        MinecraftForge.EVENT_BUS.addListener((RegisterClientCommandsEvent event) -> {
-            CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
-            dispatcher.register(wdlCommandTree(commands, Commands::literal, Commands::argument));
-        });
-    }
+    public void registerCommands(WdlCommands commands) {}
 }

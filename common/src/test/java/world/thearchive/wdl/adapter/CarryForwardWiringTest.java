@@ -57,7 +57,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * forward throughout, so a suppression widened to everything is as red as one that suppresses nothing.
  */
 class CarryForwardWiringTest {
-    private static RegistryAccess.Frozen registries;
+    private static RegistryAccess registries;
 
     private final BlockPos chest = new BlockPos(6, 64, 11);
 

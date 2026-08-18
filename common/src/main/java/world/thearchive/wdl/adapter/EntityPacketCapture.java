@@ -160,7 +160,7 @@ final class EntityPacketCapture
             enterDimension(respawn.getDimension().location().toString());
             sampler.onRespawn();
         } else if (packet instanceof ClientboundLoginPacket login) {
-            enterDimension(login.dimension().location().toString());
+            enterDimension(login.getDimension().location().toString());
             sampler.onRespawn();
         } else if (packet instanceof ClientboundSetCameraPacket) {
             sampler.onSetCamera();
@@ -230,7 +230,7 @@ final class EntityPacketCapture
         if (distanceBlocks == SendRangeSampler.NO_SAMPLE) {
             return;
         }
-        int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(minecraft.options.getEffectiveRenderDistance());
+        int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(minecraft.options.renderDistance);
         if (distanceBlocks > plausibleMaxBlocks) {
             return;
         }
@@ -267,7 +267,7 @@ final class EntityPacketCapture
         if (player == null || level == null) {
             return;
         }
-        int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(minecraft.options.getEffectiveRenderDistance());
+        int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(minecraft.options.renderDistance);
         String dimensionId = level.dimension().location().toString();
         IntList ids = packet.getEntityIds();
         for (int i = 0; i < ids.size(); i++) {

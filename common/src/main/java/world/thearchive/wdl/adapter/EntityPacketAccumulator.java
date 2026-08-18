@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -20,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The inbound entity packet state accumulator: holds each entity's synced packet state independent of whether the
@@ -61,7 +61,7 @@ import org.slf4j.Logger;
  * drain observing a concurrent update, which the accepted-ghosting trade already covers.
  */
 class EntityPacketAccumulator<P, V, E> {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(EntityPacketAccumulator.class);
 
     /**
      * The tracked-entity ceiling. There is deliberately no eviction (a client removal is ambiguous), and a stationary

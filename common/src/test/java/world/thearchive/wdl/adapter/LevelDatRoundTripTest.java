@@ -33,7 +33,7 @@ class LevelDatRoundTripTest {
 
     @Test
     void levelDatRoundTripsVoidDimensionsSeedAndDataVersion(@TempDir Path directory) throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
 
         CompoundTag dataTag = built.worldData().createTag(built.registries(), null);
@@ -61,7 +61,7 @@ class LevelDatRoundTripTest {
 
     @Test
     void buildsFromClientRegistryWithoutLevelStem() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         // Precondition mirrors a real multiplayer client: dimension types + biomes synced, no LEVEL_STEM.
         assertTrue(registries.registry(Registry.LEVEL_STEM_REGISTRY).isEmpty(),
                 "precondition: client-like reg has no LEVEL_STEM");
@@ -71,7 +71,7 @@ class LevelDatRoundTripTest {
 
     @Test
     void savesLevelDatThroughTheProductionLevelStorageAccess(@TempDir Path saves) throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
 
         // Drive the REAL production save (LevelStorageAccess.saveDataTag) rather than a hand-rolled NbtIo write,
@@ -97,7 +97,7 @@ class LevelDatRoundTripTest {
 
     @Test
     void levelDatCarriesTheGivenWorldName(@TempDir Path saves) throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("named")) {
             writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, "My Base"), null);
@@ -107,7 +107,7 @@ class LevelDatRoundTripTest {
 
     @Test
     void levelDatDefaultsTheWorldNameWhenAbsent(@TempDir Path saves) throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("unnamed")) {
             writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null), null);

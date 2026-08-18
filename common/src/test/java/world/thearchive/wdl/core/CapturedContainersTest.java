@@ -12,7 +12,8 @@ import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,8 @@ class CapturedContainersTest {
 
     @Test
     void reportsBlockMembership() {
-        CapturedContainers captured = new CapturedContainers(LongSet.of(7L, 9L), Set.of(), false);
+        CapturedContainers captured = new CapturedContainers(new LongOpenHashSet(new long[] { 7L, 9L }), Set.of(),
+                false);
         assertTrue(captured.containsBlock(7L));
         assertTrue(captured.containsBlock(9L));
         assertFalse(captured.containsBlock(8L));
@@ -39,22 +41,22 @@ class CapturedContainersTest {
 
     @Test
     void reportsEntityMembership() {
-        CapturedContainers captured = new CapturedContainers(LongSet.of(), Set.of(PRESENT), false);
+        CapturedContainers captured = new CapturedContainers(LongSets.EMPTY_SET, Set.of(PRESENT), false);
         assertTrue(captured.containsEntity(PRESENT));
         assertFalse(captured.containsEntity(ABSENT));
     }
 
     @Test
     void reportsEnderFlag() {
-        assertTrue(new CapturedContainers(LongSet.of(), Set.of(), true).enderCaptured());
-        assertFalse(new CapturedContainers(LongSet.of(), Set.of(), false).enderCaptured());
+        assertTrue(new CapturedContainers(LongSets.EMPTY_SET, Set.of(), true).enderCaptured());
+        assertFalse(new CapturedContainers(LongSets.EMPTY_SET, Set.of(), false).enderCaptured());
     }
 
     @Test
     void reportsBookshelfCapturedSlots() {
         Long2IntMap masks = new Long2IntOpenHashMap();
         masks.put(7L, 0b101);
-        CapturedContainers captured = new CapturedContainers(LongSet.of(), Set.of(), false, masks,
+        CapturedContainers captured = new CapturedContainers(LongSets.EMPTY_SET, Set.of(), false, masks,
                 new Long2ObjectOpenHashMap<>());
         assertEquals(0b101, captured.bookshelfCapturedSlots(7L));
         assertEquals(0, captured.bookshelfCapturedSlots(8L));
@@ -69,7 +71,7 @@ class CapturedContainersTest {
     void reportsCapturedBlockType() {
         Long2ObjectMap<String> types = new Long2ObjectOpenHashMap<>();
         types.put(7L, "minecraft:barrel");
-        CapturedContainers captured = new CapturedContainers(LongSet.of(7L), Set.of(), false,
+        CapturedContainers captured = new CapturedContainers(new LongOpenHashSet(new long[] { 7L }), Set.of(), false,
                 new Long2IntOpenHashMap(), types);
         assertEquals("minecraft:barrel", captured.capturedBlockType(7L));
         assertNull(captured.capturedBlockType(8L));

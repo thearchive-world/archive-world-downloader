@@ -4,7 +4,6 @@
 package world.thearchive.wdl.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.logging.LogUtils;
 import java.util.OptionalLong;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -16,6 +15,7 @@ import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.util.Mth;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.RenderSurface;
@@ -63,7 +63,7 @@ public final class WdlHudOverlay {
     private static final String GLYPH_SAVING = "●";
     private static final String GLYPH_DONE = "✔";
 
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(WdlHudOverlay.class);
     private static boolean errorLogged;
 
     private enum Phase {

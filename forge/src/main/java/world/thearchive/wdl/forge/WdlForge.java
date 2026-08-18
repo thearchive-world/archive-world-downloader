@@ -5,8 +5,6 @@ package world.thearchive.wdl.forge;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
-import net.minecraftforge.client.ClientRegistry;
-import net.minecraftforge.client.ConfigGuiHandler;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.gui.OverlayRegistry;
 import net.minecraftforge.common.MinecraftForge;
@@ -16,6 +14,8 @@ import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fmlclient.ConfigGuiHandler;
+import net.minecraftforge.fmlclient.registry.ClientRegistry;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.Wdl;
@@ -43,7 +43,7 @@ public final class WdlForge {
                 () -> new ConfigGuiHandler.ConfigGuiFactory(
                         (minecraft, modListScreen) -> Wdl.createSettingsScreen(modListScreen)));
         MinecraftForge.EVENT_BUS.addListener(
-                (ClientPlayerNetworkEvent.LoggedInEvent event) -> ForgeConnectionTee.install(event.getConnection()));
+                (ClientPlayerNetworkEvent.LoggedInEvent event) -> ForgeConnectionTee.install(event.getNetworkManager()));
         MinecraftForge.EVENT_BUS.addListener((PlayerInteractEvent.RightClickBlock event) -> {
             InteractionCapture.dispatchUseBlock(
                     event.getPlayer(), event.getWorld(), event.getHand(), event.getHitVec());

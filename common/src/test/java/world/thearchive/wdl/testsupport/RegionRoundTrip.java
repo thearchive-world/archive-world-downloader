@@ -43,7 +43,7 @@ public final class RegionRoundTrip {
 
     private static final class TestRegionStorage extends IOWorker {
         private TestRegionStorage(Path directory, boolean sync, String name) {
-            super(directory, sync, name);
+            super(directory.toFile(), sync, name);
         }
     }
 }

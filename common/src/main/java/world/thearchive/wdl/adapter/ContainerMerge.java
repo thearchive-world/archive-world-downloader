@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -14,6 +13,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Merges captured open-time block-entity data into the matching captured block-entity tag, keyed by {@link BlockPos},
@@ -24,15 +24,15 @@ import org.slf4j.Logger;
  * own keys (a jukebox disc's {@code "RecordItem"}, a beehive's {@code "bees"}) onto its block entity. The streaming
  * capture calls each per chunk, just before that chunk is flushed to disk.
  *
- * <p>Portable across the <em>post-1.18</em> chunk format: the flat {@code "block_entities"} list and a block entity's
- * {@code x/y/z} metadata are vanilla-stable there, so only the per-band {@code "Items"} serialization (behind
+ * <p>Portable across the pre-1.18 chunk format: the {@code Level.TileEntities} list and a block entity's {@code x/y/z}
+ * metadata are vanilla-stable there, so only the per-band {@code "Items"} serialization (behind
  * {@link ContainerSink#merge}) differs. A pre-1.18 band would swap the key (block entities live under
  * {@code "TileEntities"} inside a {@code "Level"} wrapper), so this file is not byte-identical below 1.18. The
  * block-entity tag is replaced in place inside the captured chunk tag, so the merged contents are written by the
  * regular chunk write that follows.
  */
 final class ContainerMerge {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(ContainerMerge.class);
 
     private ContainerMerge() {}
 
@@ -158,11 +158,11 @@ final class ContainerMerge {
 
     private static boolean mergeOne(BiFunction<CompoundTag, CompoundTag, CompoundTag> merge,
             CompoundTag chunkTag, BlockPos pos, CompoundTag holder) {
-        // Use only NBT ops stable across the post-1.18 chunk format (get(String)/get(int)/instanceof/set plus
-        // an IntTag value compare) so this file stays byte-identical across that range. The getXxxOr accessors
-        // are 1.21.10+ only; the ListTag/CompoundTag/IntTag basics are older still. (The "block_entities" key
-        // itself is post-1.18: see the class Javadoc.)
-        if (!(chunkTag.get("block_entities") instanceof ListTag blockEntities)) {
+        // Use only NBT ops stable across the pre-1.18 chunk format (get(String)/get(int)/instanceof/set plus
+        // an IntTag value compare). The getXxxOr accessors are 1.21.10+ only; the ListTag/CompoundTag/IntTag
+        // basics are older still. This band reads the pre-1.18 Level.TileEntities chunk layout (see the class
+        // Javadoc), where higher bands read the flattened root block_entities.
+        if (!(chunkTag.getCompound("Level").get("TileEntities") instanceof ListTag blockEntities)) {
             return false; // no block entities captured for this chunk
         }
         for (int i = 0; i < blockEntities.size(); i++) {

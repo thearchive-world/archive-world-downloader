@@ -3,11 +3,11 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.nio.file.Path;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.core.AtomicFileWrite;
 
@@ -22,7 +22,7 @@ import world.thearchive.wdl.core.AtomicFileWrite;
  * is a no-op (the disconnect-flush path).
  */
 final class PlayerProgressWriter {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(PlayerProgressWriter.class);
 
     private PlayerProgressWriter() {}
 

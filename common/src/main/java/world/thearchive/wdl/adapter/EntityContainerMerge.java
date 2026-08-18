@@ -3,23 +3,23 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Merges captured open-time container-vehicle items into the matching captured entity tag, keyed by entity
  * {@link UUID}, with per-entry failure isolation that mirrors {@link ContainerMerge}: a merge that throws is logged and
  * skipped so one bad entity can never abort the whole save. It is the {@code entities/}-region sibling of
- * {@link ContainerMerge}: that class locates a block entity by its {@code x/y/z} in the {@code "block_entities"} list,
- * this one locates a container holder by its {@code "UUID"} across the {@code "Entities"} tree, each record and every
- * node beneath its {@code "Passengers"} ({@link EntityTreeWalk}). The {@code "Items"} write itself is reused verbatim
- * from {@link ContainerSink#merge} (a chest minecart / boat persists its contents under {@code "Items"} via the exact
- * call the sink makes), so the two classes share the serialize and differ only in the locator.
+ * {@link ContainerMerge}: that class locates a block entity by its {@code x/y/z} in the {@code Level.TileEntities}
+ * list, this one locates a container holder by its {@code "UUID"} across the {@code "Entities"} tree, each record and
+ * every node beneath its {@code "Passengers"} ({@link EntityTreeWalk}). The {@code "Items"} write itself is reused
+ * verbatim from {@link ContainerSink#merge} (a chest minecart / boat persists its contents under {@code "Items"} via
+ * the exact call the sink makes), so the two classes share the serialize and differ only in the locator.
  *
  * <p>The same UUID locator also folds a villager's captured trades ({@link #mergeMerchantStash} and its refold): those
  * set {@code "Offers"} and {@code "Xp"} from a holder the tick already serialized, a plain tag copy with no sink and no
@@ -32,7 +32,7 @@ import org.slf4j.Logger;
  * entity write that follows.
  */
 final class EntityContainerMerge {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(EntityContainerMerge.class);
 
     private EntityContainerMerge() {}
 

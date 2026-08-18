@@ -123,7 +123,7 @@ class LiveCaptureSessionLossTallyTest {
     private static final UUID VEHICLE = UUID.fromString("6b1d5f2c-9a30-4e11-b8c7-5d0e3a71f402");
     private static final UUID FRAME = UUID.fromString("2f9c4b18-7d60-4a35-9e21-0c7b6d5a3e14");
 
-    private static RegistryAccess.Frozen registries;
+    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
     // Instance fields, not constants: ChunkPos's own class initializer reaches a built-in registry, so touching
     // one before the bootstrap in @BeforeAll fails the whole class with "Not bootstrapped".

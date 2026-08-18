@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.compat.journeymap;
 
-import com.mojang.logging.LogUtils;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -20,6 +19,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.core.CaptureState;
@@ -41,7 +41,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
  * and disconnect callbacks run on the client thread as well, so the overlay removals they issue are safe.
  */
 public final class JourneyMapOverlayDriver {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(JourneyMapOverlayDriver.class);
 
     private static final String MOD_ID = "wdl";
 

@@ -58,7 +58,7 @@ class EntitySinkRootVehicleTest {
 
     @Test
     void captureRootVehicleSerializesTheOnePlayerVehicleTheChunkPathDrops() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         RiddenVehicleEntity vehicle = new RiddenVehicleEntity();
         assertFalse(vehicle.shouldBeSaved(), "precondition: a one-player vehicle the entities region refuses");
 
@@ -73,7 +73,7 @@ class EntitySinkRootVehicleTest {
 
     @Test
     void capturedContentsFoldIntoTheMountTagUnderItems() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         RiddenVehicleEntity vehicle = new RiddenVehicleEntity();
 
         CompoundTag tag = sink.captureRootVehicle(vehicle, registries, false);
@@ -98,7 +98,7 @@ class EntitySinkRootVehicleTest {
 
     @Test
     void namedRootMountKeepsTheServerPersistenceTheClientNeverCarries() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         RiddenMountMob mount = new RiddenMountMob();
         mount.setCustomName(new TextComponent("Rocinante"));
 
@@ -111,7 +111,7 @@ class EntitySinkRootVehicleTest {
 
     @Test
     void unnamedRootMountKeepsVanillaDespawnBehavior() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         RiddenMountMob mount = new RiddenMountMob();
 
         CompoundTag tag = sink.captureRootVehicle(mount, registries, false);
@@ -122,7 +122,7 @@ class EntitySinkRootVehicleTest {
 
     @Test
     void unnamedRootMountPersistsUnderTheForceKnob() {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         RiddenMountMob mount = new RiddenMountMob();
 
         CompoundTag tag = sink.captureRootVehicle(mount, registries, true);

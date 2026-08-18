@@ -15,7 +15,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
+import net.minecraft.resources.RegistryWriteOps;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class LevelDatWorldOutputTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
     private LevelDataWriter.LevelData build(WorldOutputConfig worldOutput) {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         return writer.buildLevelData(registries, worldOutput, null);
     }
 
@@ -43,7 +43,7 @@ class LevelDatWorldOutputTest {
     }
 
     private GameRules gameRules(LevelDataWriter.LevelData built) {
-        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, built.registries());
+        DynamicOps<Tag> ops = RegistryWriteOps.create(NbtOps.INSTANCE, built.registries());
         return new GameRules(new Dynamic<>(ops, dataTag(built).getCompound("GameRules")));
     }
 
@@ -61,9 +61,9 @@ class LevelDatWorldOutputTest {
     }
 
     // Read the encoded WorldGenSettings tag directly rather than decoding through WorldGenSettings.CODEC. That codec
-    // resolves its dimension types and noise settings through a datapack-backed RegistryOps, which the headless suite
-    // has no resource manager to supply; the on-disk seed, structure toggle and generator type are what the writer's
-    // output is being asserted against anyway.
+    // resolves its dimension types and noise settings through a datapack-backed registry ops, which the headless
+    // suite has no resource manager to supply; the on-disk seed, structure toggle and generator type are what the
+    // writer's output is being asserted against anyway.
     private CompoundTag worldGenTag(LevelDataWriter.LevelData built) {
         return dataTag(built).getCompound("WorldGenSettings");
     }

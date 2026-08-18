@@ -7,6 +7,7 @@ import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import java.util.Collection;
 import java.util.OptionalLong;
 import net.minecraft.core.BlockPos;
@@ -34,7 +35,7 @@ import org.jspecify.annotations.Nullable;
  * <p>The on-disk layer beside {@link ContainerMerge}'s in-session stash merge: where {@link ContainerMerge} folds an
  * open-time stash holder into the fresh chunk on the main thread before the tag is queued, this folds the prior on-disk
  * chunk into the fresh one on the writer thread after the on-disk read. Pure {@code CompoundTag} in/out and
- * band-agnostic over the post-1.18 {@code "block_entities"} layout: both tags are already in the region's own
+ * band-agnostic over the pre-1.18 {@code Level.TileEntities} layout: both tags are already in the region's own
  * serialized form, so a carry-forward is a direct tag copy with no per-band serialize. The fields carried are
  * {@link CapturedBlockField}, the same list the open-time write reads, so a datum this mod writes on one visit cannot
  * be dropped by the next.
@@ -77,11 +78,11 @@ final class ChunkMerge {
 
     /**
      * Carry forward the on-disk chunk's interaction-captured block-entity contents into {@code fresh}, in place,
-     * returning how many block entities received a carry-forward. A fresh chunk with no {@code "block_entities"} list,
-     * or an on-disk chunk with none, is a no-op.
+     * returning how many block entities received a carry-forward. A fresh chunk with no {@code Level.TileEntities}
+     * list, or an on-disk chunk with none, is a no-op.
      */
     public static int merge(CompoundTag onDisk, CompoundTag fresh) {
-        return merge(onDisk, fresh, NO_OCCUPANCY, LongSet.of(), LongSet.of());
+        return merge(onDisk, fresh, NO_OCCUPANCY, LongSets.EMPTY_SET, LongSets.EMPTY_SET);
     }
 
     /**
@@ -97,8 +98,8 @@ final class ChunkMerge {
      */
     public static int merge(CompoundTag onDisk, CompoundTag fresh, Long2IntMap occupancyByPos,
             LongSet openTimeCaptured, LongSet replaced) {
-        if (!(fresh.get("block_entities") instanceof ListTag freshBlockEntities)
-                || !(onDisk.get("block_entities") instanceof ListTag diskBlockEntities)) {
+        if (!(fresh.getCompound("Level").get("TileEntities") instanceof ListTag freshBlockEntities)
+                || !(onDisk.getCompound("Level").get("TileEntities") instanceof ListTag diskBlockEntities)) {
             return 0;
         }
         int merged = 0;

@@ -4,7 +4,6 @@
 package world.thearchive.wdl.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -16,6 +15,7 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.world.phys.AABB;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.OutlineDrawSet;
@@ -41,7 +41,7 @@ import world.thearchive.wdl.core.TimingWindow;
  * for the frustum test. Runs on the render thread, the vanilla client thread.
  */
 public final class WdlOutlineRenderer {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(WdlOutlineRenderer.class);
 
     // The outlineDebugTiming window, in frames: the rolling render-thread cost is read from here.
     private static final int TIMING_WINDOW_FRAMES = 200;

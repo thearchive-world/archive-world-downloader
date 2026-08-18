@@ -69,7 +69,7 @@ class OrphanedContainerSweepTest {
      */
     private static final class TestRegionStorage extends IOWorker {
         private TestRegionStorage(Path directory, boolean sync, String name) {
-            super(directory, sync, name);
+            super(directory.toFile(), sync, name);
         }
     }
 
@@ -90,7 +90,7 @@ class OrphanedContainerSweepTest {
     }
 
     private static @Nullable CompoundTag blockEntityAt(CompoundTag chunkTag, int x, int y, int z) {
-        ListTag list = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
+        ListTag list = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag blockEntity = list.getCompound(i);
             if (blockEntity.getInt("x") == x && blockEntity.getInt("y") == y
@@ -130,7 +130,7 @@ class OrphanedContainerSweepTest {
 
     @Test
     void orphanedContainerContentsAreFoldedOntoTheFlushedOnDiskChest(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos chunk = new ChunkPos(0, 0);
@@ -162,7 +162,7 @@ class OrphanedContainerSweepTest {
 
     @Test
     void orphanedLecternBookIsFoldedOntoTheFlushedOnDiskLectern(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         LecternSink sink = new LecternSinkImpl();
         ChunkPos chunk = new ChunkPos(0, 0);
@@ -194,7 +194,7 @@ class OrphanedContainerSweepTest {
         // A double chest straddling a chunk boundary keys each half by its own pos into its own chunk (the split
         // anomaly: the server sends both halves together, so one half saved and one lost is a mod-side loss). When
         // both halves' chunks are orphaned, the sweep folds each half onto its own on-disk chest.
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos rightChunk = new ChunkPos(0, 0);
@@ -230,7 +230,7 @@ class OrphanedContainerSweepTest {
         // The chunk-not-on-disk edge: a chunk whose original write failed or was skipped has no prior to fold
         // into. The rewrite finds nothing, logs the loss, and completes without aborting the save or writing a
         // partial chunk (in practice the writer's FIFO order guarantees an orphaned chunk was written first).
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos missing = new ChunkPos(5, 5);
@@ -256,7 +256,7 @@ class OrphanedContainerSweepTest {
         // must return the earlier write from the region IOWorker's pending writes, not a synced-and-reopened file.
         // Drive that exact single-writer timing, and assert the merge is counted (the loss it fixes read zero on
         // every counter).
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos chunk = new ChunkPos(0, 0);

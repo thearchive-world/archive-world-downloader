@@ -31,7 +31,7 @@ class PlayerProgressSerializerTest {
     }
 
     private static JsonObject parse(byte[] json) {
-        return JsonParser.parseString(new String(json, StandardCharsets.UTF_8)).getAsJsonObject();
+        return new JsonParser().parse(new String(json, StandardCharsets.UTF_8)).getAsJsonObject();
     }
 
     @Test

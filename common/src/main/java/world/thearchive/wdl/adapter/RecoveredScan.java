@@ -75,7 +75,7 @@ final class RecoveredScan {
      * Writer thread: collect every prior-captured container position in {@code onDiskChunkTag} for {@code dimension}.
      */
     void record(ResourceKey<Level> dimension, CompoundTag onDiskChunkTag) {
-        if (!(onDiskChunkTag.get("block_entities") instanceof ListTag blockEntities)) {
+        if (!(onDiskChunkTag.getCompound("Level").get("TileEntities") instanceof ListTag blockEntities)) {
             return;
         }
         LongOpenHashSet recovered = recoveredByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());

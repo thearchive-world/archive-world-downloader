@@ -70,7 +70,7 @@ class LecternRecaptureSynergyTest {
     }
 
     private static String mergedTitle(CompoundTag chunkTag) {
-        ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
+        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
         CompoundTag lectern = blockEntities.getCompound(0);
         ItemStack back = ItemStack.of(lectern.getCompound("Book"));
         assertTrue(!back.isEmpty(), "the re-captured lectern carries a decodable Book");

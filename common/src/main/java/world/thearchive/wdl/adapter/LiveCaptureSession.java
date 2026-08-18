@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -97,6 +96,7 @@ import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.phys.AABB;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
@@ -157,7 +157,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
  * writes level.dat, and reports the saved world when the background drain completes; none of it on the render thread.
  */
 public final class LiveCaptureSession implements CaptureController.Session {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(LiveCaptureSession.class);
 
     /** Sentinel for {@link #openContainerId} when no container menu is currently open. */
     private static final int NO_MENU = -1;
@@ -1129,7 +1129,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             lastTickPlayerX = player.getX();
             lastTickPlayerZ = player.getZ();
             tickBaselineValid = true;
-            int capChunks = Math.max(minecraft.options.getEffectiveRenderDistance(), 2);
+            int capChunks = Math.max(minecraft.options.renderDistance, 2);
             recordCoveredDisc(hotCenter, capChunks);
             if (capture != null) {
                 SendRangeSampler sampler = capture.sampler();
@@ -1371,7 +1371,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * still-hot chunk is left to the hot re-capture path.
      */
     private void captureSquareAround(Minecraft minecraft, LocalPlayer player, ChunkPos center) {
-        int radius = minecraft.options.getEffectiveRenderDistance();
+        int radius = minecraft.options.renderDistance;
         int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(radius);
         ClientChunkCache chunkSource = level().getChunkSource();
         ChunkCodec codec = adapter.chunkCodec();
@@ -1483,8 +1483,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // An entity resting on the topmost placeable block has its box bottom exactly where a build-height bound
         // stops, and the intersection test is strict, so such a bound misses it. Y carries nothing here anyway: the
         // result is narrowed to the chunk's own column below, and vanilla keys a saved entity by that column alone.
-        AABB bounds = new AABB(pos.getMinBlockX(), DimensionType.WAY_BELOW_MIN_Y, pos.getMinBlockZ(),
-                pos.getMaxBlockX() + 1, DimensionType.WAY_ABOVE_MAX_Y, pos.getMaxBlockZ() + 1);
+        AABB bounds = new AABB(pos.getMinBlockX(), DimensionType.MIN_Y << 4, pos.getMinBlockZ(),
+                pos.getMaxBlockX() + 1, DimensionType.MAX_Y << 4, pos.getMaxBlockZ() + 1);
         for (Entity entity : level().getEntitiesOfClass(Entity.class, bounds)) {
             // Under the default recapture config (EVERYWHERE) a revisited chunk re-primes once it leaves the
             // hot buffer, so returning through a portal to captured terrain re-seeds; only the OFF and NEARBY
@@ -2330,7 +2330,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             flushBuffer(activeWriter, true, 0, 0, 0);
             return;
         }
-        int keepHot = Minecraft.getInstance().options.getEffectiveRenderDistance() + KEEP_HOT_MARGIN;
+        int keepHot = Minecraft.getInstance().options.renderDistance + KEEP_HOT_MARGIN;
         flushBuffer(activeWriter, false, hotCenter.x, hotCenter.z, keepHot);
     }
 
@@ -3840,7 +3840,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private static boolean hasNonAirBlocks(ChunkSnapshotSource snapshot) {
         for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
             LevelChunkSection chunkSection = section.chunkSection();
-            if (chunkSection != null && !chunkSection.hasOnlyAir()) {
+            if (chunkSection != null && !chunkSection.isEmpty()) {
                 return true;
             }
         }
@@ -4597,7 +4597,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (player != null && player.getServerBrand() != null) {
             brand = player.getServerBrand();
         }
-        return new ReportEnvironment(brand, level().getServerSimulationDistance(),
+        // 1.17.1 has no server simulation distance (a 1.18 addition), so render distance stands in for the report.
+        return new ReportEnvironment(brand, minecraft.options.renderDistance,
                 targetDimension.location().toString(), Wdl.mcVersion(), bridge.modVersion());
     }
 

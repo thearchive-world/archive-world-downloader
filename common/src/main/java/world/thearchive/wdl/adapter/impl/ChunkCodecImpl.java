@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import com.mojang.serialization.Codec;
 import it.unimi.dsi.fastutil.shorts.ShortList;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -12,27 +11,21 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.LongArrayTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkBiomeContainer;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.storage.ChunkSerializer;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.lighting.LevelLightEngine;
@@ -42,7 +35,7 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.18.2 chunk codec: replicates the minimal client-safe slice of vanilla
+ * 1.17.1 chunk codec: replicates the minimal client-safe slice of vanilla
  * {@code ChunkSerializer.write(ServerLevel, ChunkAccess)} to NBT. Below the 1.21.2 cut the chunk write is a static
  * method that reads from a {@code ServerLevel} a multiplayer client never has, so {@link #encode} rebuilds the tag
  * field by field from the captured snapshot rather than calling vanilla.
@@ -55,12 +48,16 @@ public final class ChunkCodecImpl implements ChunkCodec {
     /** Client chunks have no post-processing (a worldgen artifact). */
     private static final ShortList[] NO_POST_PROCESSING = new ShortList[0];
 
-    /** Vanilla full-height overworld: min block -64, height 384; the range BlendingDataFix marks as old generation. */
-    private static final int OVERWORLD_MIN_Y = -64;
-    private static final int OVERWORLD_HEIGHT = 384;
+    // A 1.17.1 world is 0..256: block sections 0..15, with a light-only pad one section below and above. A taller
+    // source (a 26.x server reached through a downgrade proxy) sends sections beyond that range; a section carrying
+    // block data outside 0..15 would crash vanilla's unchecked sections[index] on load, so its block data is dropped
+    // and the biome column is re-sliced to 0..256. Entities above or below are unaffected (a separate save axis).
+    private static final int MIN_BLOCK_SECTION = 0;
+    private static final int MAX_BLOCK_SECTION = 15;
+    private static final int BIOME_QUART_LAYERS = 64;
 
     /**
-     * Snapshot a live client chunk on the main thread (block-state/biome section copies, cloned heightmaps,
+     * Snapshot a live client chunk on the main thread (block-state section copies, per-chunk biomes, cloned heightmaps,
      * block-entity NBT), everything detached so only immutable data crosses to the async IO worker. The server-only
      * structure call is dropped here and reproduced as empty maps in
      * {@link #encode(ChunkSnapshotSource, RegistryAccess, boolean)}.
@@ -97,9 +94,11 @@ public final class ChunkCodecImpl implements ChunkCodec {
                 skyLight = copyNonEmpty(lightEngine.getLayerListener(LightLayer.SKY)
                         .getDataLayerData(SectionPos.of(pos, sectionY)));
             }
-            if (inChunk || blockLight != null || skyLight != null) {
+            // Below 1.18 an all-air or untransmitted section slot is null, so guard before copying.
+            LevelChunkSection live = inChunk ? sections[index] : null;
+            if (live != null || blockLight != null || skyLight != null) {
                 sectionData.add(new ChunkSnapshotSource.SectionData(sectionY,
-                        inChunk ? copySection(sectionY, sections[index]) : null, blockLight, skyLight));
+                        live != null ? copySection(sectionY, live) : null, blockLight, skyLight));
             }
         }
 
@@ -116,54 +115,36 @@ public final class ChunkCodecImpl implements ChunkCodec {
             }
         }
 
+        int[] biomes = clampedBiomes(chunk, registries);
+
         return new CapturedChunkSnapshot(pos, minSectionY, level.getGameTime(),
                 chunk.getInhabitedTime(), chunk.getStatus(), lightCorrect,
-                heightmaps, sectionData, blockEntities);
+                heightmaps, sectionData, blockEntities, biomes);
     }
 
     @Override
     public CompoundTag encode(ChunkSnapshotSource snapshot, RegistryAccess registries, boolean synthesizeBlending) {
-        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
-        Codec<PalettedContainer<Holder<Biome>>> biomeCodec = PalettedContainer.codec(
-                biomeRegistry.asHolderIdMap(), biomeRegistry.holderByNameCodec(),
-                PalettedContainer.Strategy.SECTION_BIOMES, biomeRegistry.getOrCreateHolder(Biomes.PLAINS));
-        // Built per encode, not as a static field: a static initializer here would touch the block registry at class
-        // load, before the headless test harness bootstraps the registries.
-        Codec<PalettedContainer<BlockState>> blockStateCodec = PalettedContainer.codec(
-                Block.BLOCK_STATE_REGISTRY, BlockState.CODEC, PalettedContainer.Strategy.SECTION_STATES,
-                Blocks.AIR.defaultBlockState());
-
         ChunkPos pos = snapshot.chunkPos();
         CompoundTag tag = new CompoundTag();
         tag.putInt("DataVersion", SharedConstants.getCurrentVersion().getWorldVersion());
-        tag.putInt("xPos", pos.x);
-        tag.putInt("yPos", snapshot.minSectionY());
-        tag.putInt("zPos", pos.z);
-        tag.putLong("LastUpdate", snapshot.gameTime());
-        tag.putLong("InhabitedTime", snapshot.inhabitedTime());
-        tag.putString("Status", Registry.CHUNK_STATUS.getKey(snapshot.status()).toString());
-
-        if (synthesizeBlending) {
-            // The blending_data MC's BlendingDataFix would inject for the overworld: the section bounds marking this
-            // chunk as old generation so a freshly generated neighbor blends against it instead of forming a boundary
-            // wall. Heights are omitted; MC fills them lazily on the first neighbor-generation call. Written directly
-            // as the tag BlendingData.CODEC produces, since below 1.21.2 there is no BlendingData.Packed carrier.
-            CompoundTag blending = new CompoundTag();
-            blending.putInt("min_section", SectionPos.blockToSectionCoord(OVERWORLD_MIN_Y));
-            blending.putInt("max_section", SectionPos.blockToSectionCoord(OVERWORLD_MIN_Y + OVERWORLD_HEIGHT));
-            tag.put("blending_data", blending);
-        }
+        // Below 1.18 the chunk NBT nests everything under a Level compound; only DataVersion sits at the root.
+        CompoundTag levelTag = new CompoundTag();
+        tag.put("Level", levelTag);
+        levelTag.putInt("xPos", pos.x);
+        levelTag.putInt("zPos", pos.z);
+        levelTag.putLong("LastUpdate", snapshot.gameTime());
+        levelTag.putLong("InhabitedTime", snapshot.inhabitedTime());
+        levelTag.putString("Status", snapshot.status().getName());
 
         ListTag sectionsTag = new ListTag();
         for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
+            if (section.y() < MIN_BLOCK_SECTION - 1 || section.y() > MAX_BLOCK_SECTION + 1) {
+                continue; // outside the 1.17.1 section column (block range plus the one-section light pad); dropped
+            }
             CompoundTag sectionTag = new CompoundTag();
             LevelChunkSection chunkSection = section.chunkSection();
-            if (chunkSection != null) {
-                sectionTag.put("block_states",
-                        blockStateCodec.encodeStart(NbtOps.INSTANCE, chunkSection.getStates()).getOrThrow(false,
-                                s -> {}));
-                sectionTag.put("biomes",
-                        biomeCodec.encodeStart(NbtOps.INSTANCE, chunkSection.getBiomes()).getOrThrow(false, s -> {}));
+            if (chunkSection != null && section.y() >= MIN_BLOCK_SECTION && section.y() <= MAX_BLOCK_SECTION) {
+                chunkSection.getStates().write(sectionTag, "Palette", "BlockStates");
             }
             DataLayer blockLight = section.blockLight();
             if (blockLight != null && !blockLight.isEmpty()) {
@@ -178,41 +159,67 @@ public final class ChunkCodecImpl implements ChunkCodec {
                 sectionsTag.add(sectionTag);
             }
         }
-        tag.put("sections", sectionsTag);
+        levelTag.put("Sections", sectionsTag);
+        levelTag.putIntArray("Biomes", snapshot.biomes());
 
         if (snapshot.lightCorrect()) {
-            tag.putBoolean("isLightOn", true);
+            levelTag.putBoolean("isLightOn", true);
         }
 
         ListTag blockEntitiesTag = new ListTag();
         blockEntitiesTag.addAll(snapshot.blockEntities());
-        tag.put("block_entities", blockEntitiesTag);
+        levelTag.put("TileEntities", blockEntitiesTag);
 
         // A captured chunk is a FULL LevelChunk, never a ProtoChunk, so the entities/CarvingMasks branch is dropped.
         // Client chunks carry no scheduled ticks (those are server state), so both tick lists save empty.
-        tag.put("block_ticks", new ListTag());
-        tag.put("fluid_ticks", new ListTag());
-        tag.put("PostProcessing", ChunkSerializer.packOffsets(NO_POST_PROCESSING));
+        levelTag.put("TileTicks", new ListTag());
+        levelTag.put("LiquidTicks", new ListTag());
+        levelTag.put("PostProcessing", ChunkSerializer.packOffsets(NO_POST_PROCESSING));
 
         CompoundTag heightmapsTag = new CompoundTag();
         clientHeightmaps(snapshot)
                 .forEach((type, data) -> heightmapsTag.put(type.getSerializationKey(), new LongArrayTag(data)));
-        tag.put("Heightmaps", heightmapsTag);
+        levelTag.put("Heightmaps", heightmapsTag);
 
-        tag.put("structures", emptyStructureData());
+        levelTag.put("Structures", emptyStructureData());
         return tag;
     }
 
     /**
-     * A detached copy of a live section. Below 1.21.2 LevelChunkSection has no copy() and its returned biome view has
-     * no copy() either, but a live client section always backs its biomes with a mutable PalettedContainer, so the copy
-     * goes through that concrete type. Post-capture edits mutate the block states, so those are copied outright. Below
-     * 1.20 the constructor also takes the section y-index, so the caller threads it through.
+     * A detached copy of a live section. Below 1.18 LevelChunkSection has no copy(), so the copy reconstructs a fresh
+     * section and replays the block states into it; below 1.20 the constructor also takes the section y-index. Biomes
+     * live per-chunk here, not on the section.
      */
-    @SuppressWarnings("unchecked")
     private static LevelChunkSection copySection(int sectionY, LevelChunkSection section) {
-        PalettedContainer<Holder<Biome>> biomes = (PalettedContainer<Holder<Biome>>) section.getBiomes();
-        return new LevelChunkSection(sectionY, section.getStates().copy(), biomes.copy());
+        LevelChunkSection copy = new LevelChunkSection(sectionY);
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    copy.setBlockState(x, y, z, section.getBlockState(x, y, z), false);
+                }
+            }
+        }
+        return copy;
+    }
+
+    /**
+     * The per-chunk biome ids for the 1.17.1 column, always the 0..256 grid a 1.17.1 save expects. A taller source's
+     * container spans a wider height, so each cell is read through the container's world-Y-aware accessor and re-sliced
+     * to the 1024-cell shape rather than writing the container's own longer array.
+     */
+    private static int[] clampedBiomes(LevelChunk chunk, RegistryAccess registries) {
+        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
+        ChunkBiomeContainer container = chunk.getBiomes();
+        int[] biomes = new int[16 * BIOME_QUART_LAYERS];
+        for (int quartY = 0; quartY < BIOME_QUART_LAYERS; quartY++) {
+            for (int quartZ = 0; quartZ < 4; quartZ++) {
+                for (int quartX = 0; quartX < 4; quartX++) {
+                    biomes[quartY << 4 | quartZ << 2 | quartX] = biomeRegistry
+                            .getId(container.getNoiseBiome(quartX, quartY, quartZ));
+                }
+            }
+        }
+        return biomes;
     }
 
     /** A detached copy of a stored layer, or null when the engine holds none (empty layers are omitted). */
@@ -240,14 +247,14 @@ public final class ChunkCodecImpl implements ChunkCodec {
     }
 
     /**
-     * The structure tag for a client chunk: {@code {starts:{}, References:{}}}, exactly what vanilla
+     * The structure tag for a client chunk: {@code {Starts:{}, References:{}}}, exactly what vanilla
      * {@code packStructureData} emits for empty start/reference maps (client chunks always carry empty ones). Built
      * directly so we never call {@code StructurePieceSerializationContext.fromLevel(serverLevel)}, which dereferences
      * {@code level.getServer()} and NPEs on a client.
      */
     private static CompoundTag emptyStructureData() {
         CompoundTag structures = new CompoundTag();
-        structures.put("starts", new CompoundTag());
+        structures.put("Starts", new CompoundTag());
         structures.put("References", new CompoundTag());
         return structures;
     }
@@ -262,5 +269,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
             boolean lightCorrect,
             Map<Heightmap.Types, long[]> heightmaps,
             List<ChunkSnapshotSource.SectionData> sections,
-            List<CompoundTag> blockEntities) implements ChunkSnapshotSource {}
+            List<CompoundTag> blockEntities,
+            int[] biomes) implements ChunkSnapshotSource {}
 }

@@ -3,9 +3,9 @@
 
 package world.thearchive.wdl.compat.bobby;
 
-import com.mojang.logging.LogUtils;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.platform.PlatformBridge;
 
@@ -18,7 +18,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
  * reference, the only mention is the class-name string, resolved reflectively.
  */
 public final class BobbyChunkFilter {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(BobbyChunkFilter.class);
 
     private static final String BOBBY_MOD_ID = "bobby";
 

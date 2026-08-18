@@ -12,6 +12,7 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -126,9 +127,10 @@ class ChunkFlushPlanTest {
         CompoundTag freshRewalked = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
         LongSet openTimeCaptured = ChunkMerge.capturedPositions(List.of(new BlockPos(6, 64, 6)));
 
-        int withPosition = ChunkFlushPlan.readMerge(ChunkMerge.occupancyMap(), openTimeCaptured, LongSet.of())
+        int withPosition = ChunkFlushPlan.readMerge(ChunkMerge.occupancyMap(), openTimeCaptured, LongSets.EMPTY_SET)
                 .merge(onDisk.copy(), freshReopened);
-        int withoutPosition = ChunkFlushPlan.readMerge(ChunkMerge.occupancyMap(), LongSet.of(), LongSet.of())
+        int withoutPosition = ChunkFlushPlan
+                .readMerge(ChunkMerge.occupancyMap(), LongSets.EMPTY_SET, LongSets.EMPTY_SET)
                 .merge(onDisk.copy(), freshRewalked);
 
         assertEquals(0, withPosition,
@@ -150,9 +152,10 @@ class ChunkFlushPlanTest {
         CompoundTag freshReopened = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
         CompoundTag freshRewalked = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
 
-        int landed = ChunkFlushPlan.readMerge(snapshot, List.of(pos), LongSet.of())
+        int landed = ChunkFlushPlan.readMerge(snapshot, List.of(pos), LongSets.EMPTY_SET)
                 .merge(onDisk.copy(), freshReopened);
-        int none = ChunkFlushPlan.readMerge(snapshot, List.of(), LongSet.of()).merge(onDisk.copy(), freshRewalked);
+        int none = ChunkFlushPlan.readMerge(snapshot, List.of(), LongSets.EMPTY_SET).merge(onDisk.copy(),
+                freshRewalked);
 
         assertEquals(0, landed, "a position named as landing captured its own state, so nothing carries back");
         assertEquals(1, none, "and one not named carries the prior state forward");

@@ -6,16 +6,17 @@ package world.thearchive.wdl.testsupport;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.TagContainer;
 import net.minecraft.util.profiling.InactiveProfiler;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.TickList;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -26,7 +27,6 @@ import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.scores.Scoreboard;
-import net.minecraft.world.ticks.LevelTickAccess;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -41,7 +41,7 @@ public final class HeadlessLevel extends Level {
     private HeadlessLevel(RegistryAccess registries) {
         super(null, Level.OVERWORLD,
                 registries.registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY)
-                        .getOrCreateHolder(DimensionType.OVERWORLD_LOCATION),
+                        .getOrThrow(DimensionType.OVERWORLD_LOCATION),
                 () -> InactiveProfiler.INSTANCE, true, false, 0L);
         this.registries = registries;
     }
@@ -71,12 +71,17 @@ public final class HeadlessLevel extends Level {
     }
 
     @Override
-    public @Nullable LevelTickAccess<Block> getBlockTicks() {
+    public TagContainer getTagManager() {
+        return TagContainer.EMPTY;
+    }
+
+    @Override
+    public @Nullable TickList<Block> getBlockTicks() {
         return null;
     }
 
     @Override
-    public @Nullable LevelTickAccess<Fluid> getFluidTicks() {
+    public @Nullable TickList<Fluid> getLiquidTicks() {
         return null;
     }
 
@@ -91,7 +96,7 @@ public final class HeadlessLevel extends Level {
     }
 
     @Override
-    public @Nullable Holder<Biome> getUncachedNoiseBiome(int quartX, int quartY, int quartZ) {
+    public @Nullable Biome getUncachedNoiseBiome(int quartX, int quartY, int quartZ) {
         return null;
     }
 

@@ -32,7 +32,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for the save-time lectern-book injection: {@link ContainerMerge#mergeLecternChunkStash} locates a
  * stashed book's lectern block entity inside the captured chunk tag by {@code BlockPos} (matching the
- * {@code "block_entities"} list's {@code x/y/z}) and sets its {@code "Book"}/{@code "Page"}, touching no other block
+ * {@code Level.TileEntities} list's {@code x/y/z}) and sets its {@code "Book"}/{@code "Page"}, touching no other block
  * entity, then drains the merged entry as the chunk is flushed. This is the part that must never mis-target (writing
  * the wrong block's book corrupts the archive), so it is proven headless with hand-built chunk tags (no live client, no
  * {@code Level}).
@@ -89,7 +89,7 @@ class LecternStashMergeTest {
                 "the flushed chunk's stash entry is drained as the tag leaves memory");
         assertTrue(stash.containsKey(elsewhere), "another chunk's stash entry is left until its own flush");
 
-        ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
+        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
         CompoundTag lectern = findByPos(blockEntities, 10, 70, 20);
         assertEquals("Bound Here", titleAt(registries, lectern), "the lectern gains exactly the captured book");
         assertEquals(2, (lectern.contains("Page") ? lectern.getInt("Page") : -1), "the reading page lands too");
@@ -109,7 +109,9 @@ class LecternStashMergeTest {
         assertEquals(0, merged, "no captured block entity at the stashed pos -> nothing merges");
         assertFalse(stash.containsKey(pos),
                 "the entry is still drained: the chunk is leaving memory, so it cannot wait");
-        assertFalse(findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 2, 64, 1).contains("Book"),
+        assertFalse(
+                findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 2, 64, 1)
+                        .contains("Book"),
                 "the unrelated lectern is left alone");
     }
 }

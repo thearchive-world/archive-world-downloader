@@ -50,7 +50,7 @@ class LevelDatPlayerRoundTripTest {
 
     private CompoundTag saveAndReadBack(Path saves, String name, @Nullable CapturedPlayer player)
             throws IOException {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess(name)) {

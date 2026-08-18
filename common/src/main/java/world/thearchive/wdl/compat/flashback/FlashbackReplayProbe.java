@@ -3,9 +3,9 @@
 
 package world.thearchive.wdl.compat.flashback;
 
-import com.mojang.logging.LogUtils;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Identifies Flashback's replay server, so the activation gate can admit that one local-server case while still
@@ -20,7 +20,7 @@ import org.slf4j.Logger;
  * reference, the only mention is the class-name string, resolved reflectively.
  */
 public final class FlashbackReplayProbe {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(FlashbackReplayProbe.class);
 
     /** Flashback's mod id, for the caller's loader mod-list query. */
     public static final String MOD_ID = "flashback";

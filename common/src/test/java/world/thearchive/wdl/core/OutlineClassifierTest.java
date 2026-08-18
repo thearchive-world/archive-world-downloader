@@ -8,7 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -27,19 +28,20 @@ class OutlineClassifierTest {
     private static CapturedContainers capturedType(long posKey, String typeId) {
         Long2ObjectMap<String> types = new Long2ObjectOpenHashMap<>();
         types.put(posKey, typeId);
-        return new CapturedContainers(LongSet.of(posKey), Set.of(), false, new Long2IntOpenHashMap(), types);
+        return new CapturedContainers(new LongOpenHashSet(new long[] { posKey }), Set.of(), false,
+                new Long2IntOpenHashMap(), types);
     }
 
     @Test
     void capturedByBlockMembership() {
-        CapturedContainers captured = new CapturedContainers(LongSet.of(5L), Set.of(), false);
+        CapturedContainers captured = new CapturedContainers(new LongOpenHashSet(new long[] { 5L }), Set.of(), false);
         assertEquals(OutlineClass.CAPTURED,
                 OutlineClassifier.classify(new long[] { 5L }, null, null, false, captured, RecoveredCoverage.EMPTY));
     }
 
     @Test
     void capturedByEnderFlag() {
-        CapturedContainers captured = new CapturedContainers(LongSet.of(), Set.of(), true);
+        CapturedContainers captured = new CapturedContainers(LongSets.EMPTY_SET, Set.of(), true);
         assertEquals(OutlineClass.CAPTURED,
                 OutlineClassifier.classify(new long[] { 9L }, null, null, true, captured, RecoveredCoverage.EMPTY));
     }
@@ -69,14 +71,14 @@ class OutlineClassifierTest {
 
     @Test
     void capturedByEntityMembership() {
-        CapturedContainers captured = new CapturedContainers(LongSet.of(), Set.of(CART), false);
+        CapturedContainers captured = new CapturedContainers(LongSets.EMPTY_SET, Set.of(CART), false);
         assertEquals(OutlineClass.CAPTURED,
                 OutlineClassifier.classify(new long[] {}, null, CART, false, captured, RecoveredCoverage.EMPTY));
     }
 
     @Test
     void recoveredWhenPriorSessionCoveredIt() {
-        RecoveredCoverage recovered = new RecoveredCoverage(LongSet.of(7L));
+        RecoveredCoverage recovered = new RecoveredCoverage(new LongOpenHashSet(new long[] { 7L }));
         assertEquals(OutlineClass.RECOVERED, OutlineClassifier.classify(new long[] { 7L }, null, null, false,
                 CapturedContainers.EMPTY, recovered));
     }
@@ -89,7 +91,7 @@ class OutlineClassifierTest {
 
     @Test
     void recoveredWhenPriorSessionCoveredTheEntity() {
-        RecoveredCoverage recovered = new RecoveredCoverage(LongSet.of(), new Long2IntOpenHashMap(), Set.of(CART),
+        RecoveredCoverage recovered = new RecoveredCoverage(LongSets.EMPTY_SET, new Long2IntOpenHashMap(), Set.of(CART),
                 false);
         assertEquals(OutlineClass.RECOVERED, OutlineClassifier.classify(new long[] {}, null, CART, false,
                 CapturedContainers.EMPTY, recovered));
@@ -97,8 +99,8 @@ class OutlineClassifierTest {
 
     @Test
     void capturedEntityTakesPrecedenceOverRecoveredEntity() {
-        CapturedContainers captured = new CapturedContainers(LongSet.of(), Set.of(CART), false);
-        RecoveredCoverage recovered = new RecoveredCoverage(LongSet.of(), new Long2IntOpenHashMap(), Set.of(CART),
+        CapturedContainers captured = new CapturedContainers(LongSets.EMPTY_SET, Set.of(CART), false);
+        RecoveredCoverage recovered = new RecoveredCoverage(LongSets.EMPTY_SET, new Long2IntOpenHashMap(), Set.of(CART),
                 false);
         assertEquals(OutlineClass.CAPTURED,
                 OutlineClassifier.classify(new long[] {}, null, CART, false, captured, recovered));
@@ -112,22 +114,22 @@ class OutlineClassifierTest {
 
     @Test
     void capturedTakesPrecedenceOverRecovered() {
-        CapturedContainers captured = new CapturedContainers(LongSet.of(4L), Set.of(), false);
-        RecoveredCoverage recovered = new RecoveredCoverage(LongSet.of(4L));
+        CapturedContainers captured = new CapturedContainers(new LongOpenHashSet(new long[] { 4L }), Set.of(), false);
+        RecoveredCoverage recovered = new RecoveredCoverage(new LongOpenHashSet(new long[] { 4L }));
         assertEquals(OutlineClass.CAPTURED,
                 OutlineClassifier.classify(new long[] { 4L }, null, null, false, captured, recovered));
     }
 
     @Test
     void doubleChestCapturedWhenEitherHalfIsCaptured() {
-        CapturedContainers captured = new CapturedContainers(LongSet.of(11L), Set.of(), false);
+        CapturedContainers captured = new CapturedContainers(new LongOpenHashSet(new long[] { 11L }), Set.of(), false);
         assertEquals(OutlineClass.CAPTURED, OutlineClassifier.classify(new long[] { 11L, 12L }, null, null, false,
                 captured, RecoveredCoverage.EMPTY));
     }
 
     @Test
     void doubleChestRecoveredWhenEitherHalfIsRecovered() {
-        RecoveredCoverage recovered = new RecoveredCoverage(LongSet.of(12L));
+        RecoveredCoverage recovered = new RecoveredCoverage(new LongOpenHashSet(new long[] { 12L }));
         assertEquals(OutlineClass.RECOVERED, OutlineClassifier.classify(new long[] { 11L, 12L }, null, null, false,
                 CapturedContainers.EMPTY, recovered));
     }
@@ -151,7 +153,7 @@ class OutlineClassifierTest {
     @Test
     void replacedCapturedBlockStillFallsToRecoveredWhenPriorSessionCoveredIt() {
         CapturedContainers captured = capturedType(5L, "minecraft:barrel");
-        RecoveredCoverage recovered = new RecoveredCoverage(LongSet.of(5L));
+        RecoveredCoverage recovered = new RecoveredCoverage(new LongOpenHashSet(new long[] { 5L }));
         assertEquals(OutlineClass.RECOVERED, OutlineClassifier.classify(new long[] { 5L }, "minecraft:chest", null,
                 false, captured, recovered));
     }
@@ -160,7 +162,7 @@ class OutlineClassifierTest {
     void capturedBlockWithNoRecordedTypeFallsBackToBareMembership() {
         // A captured key with no recorded type stays captured regardless of live type, so the gate only ever
         // adds precision and never re-rims a validly captured container.
-        CapturedContainers captured = new CapturedContainers(LongSet.of(5L), Set.of(), false);
+        CapturedContainers captured = new CapturedContainers(new LongOpenHashSet(new long[] { 5L }), Set.of(), false);
         assertEquals(OutlineClass.CAPTURED, OutlineClassifier.classify(new long[] { 5L }, "minecraft:chest", null,
                 false, captured, RecoveredCoverage.EMPTY));
     }

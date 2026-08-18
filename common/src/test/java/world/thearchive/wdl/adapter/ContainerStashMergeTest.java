@@ -33,7 +33,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for the save-time container injection: {@link ContainerMerge#mergeChunkStash} locates a stashed
- * container's block entity inside the captured chunk tag by {@code BlockPos} (matching the {@code "block_entities"}
+ * container's block entity inside the captured chunk tag by {@code BlockPos} (matching the {@code Level.TileEntities}
  * list's {@code x/y/z}) and sets its {@code "Items"}, touching no other block entity, then drains the merged entry as
  * the chunk is flushed. This is the part that must never mis-target (writing the wrong block's items corrupts the
  * archive), so it is proven headless with hand-built chunk tags (no live client, no {@code Level}).
@@ -90,7 +90,7 @@ class ContainerStashMergeTest {
         assertFalse(stash.containsKey(chestPos), "the flushed chunk's stash entry is drained as the tag leaves memory");
         assertTrue(stash.containsKey(elsewhere), "another chunk's stash entry is left until its own flush");
 
-        ListTag blockEntities = chunkTag.getList("block_entities", Tag.TAG_COMPOUND);
+        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(findByPos(blockEntities, 10, 70, 20), back);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest gains exactly the captured stack");
@@ -113,7 +113,7 @@ class ContainerStashMergeTest {
         assertFalse(stash.containsKey(pos),
                 "the entry is still drained: the chunk is leaving memory, so it cannot wait");
         assertTrue(
-                findByPos(chunkTag.getList("block_entities", Tag.TAG_COMPOUND), 2, 64, 1)
+                findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 2, 64, 1)
                         .getList("Items", Tag.TAG_COMPOUND).isEmpty(),
                 "the unrelated chest is left alone");
     }

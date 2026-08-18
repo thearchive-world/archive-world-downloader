@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import com.mojang.logging.LogUtils;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.Lifecycle;
@@ -18,8 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import net.minecraft.core.Holder;
-import net.minecraft.core.HolderSet;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -27,7 +24,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
+import net.minecraft.resources.RegistryWriteOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.DataPackConfig;
@@ -39,13 +36,15 @@ import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.FlatLevelSource;
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
+import net.minecraft.world.level.levelgen.StructureSettings;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
-import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.adapter.CapturedPlayer;
 import world.thearchive.wdl.adapter.LevelDataWriter;
@@ -56,14 +55,14 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.18.2 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
+ * 1.17.1 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
  * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
  * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
  * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
  * server's actual land (the server's seed is not recoverable from a client).
  */
 public final class LevelDataWriterImpl implements LevelDataWriter {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(LevelDataWriterImpl.class);
 
     private static final String LEVEL_NAME = "Archive World Downloader";
 
@@ -76,7 +75,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /**
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.18.2 id and carries no spec.
+     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.17.1 id and carries no spec.
      * The user's gamerule.* overrides, keyed by band id, are validated and applied on top of this (see
      * {@link WorldOutputConfig}).
      */
@@ -101,7 +100,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
         long seed = worldType == WorldType.VOID ? PLACEHOLDER_SEED : worldOutput.worldSeed();
         boolean generateFeatures = worldType != WorldType.VOID && worldOutput.generateFeatures();
-        Registry<LevelStem> dimensions = buildDimensions(worldType, registries, seed);
+        MappedRegistry<LevelStem> dimensions = buildDimensions(worldType, registries, seed);
         WorldGenSettings worldGenSettings = new WorldGenSettings(seed, generateFeatures, false, dimensions);
 
         GameRules gameRules = new GameRules();
@@ -117,7 +116,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
         // Fail loud: PrimaryLevelData.setTagData silently omits WorldGenSettings if its encode errors, yielding an
         // unopenable world. Pre-encode and reject any error/partial result first.
-        DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+        DynamicOps<Tag> ops = RegistryWriteOps.create(NbtOps.INSTANCE, registries);
         DataResult<Tag> worldGen = WorldGenSettings.CODEC.encodeStart(ops, worldGenSettings);
         if (worldGen.error().isPresent()) {
             throw new IllegalStateException(
@@ -241,8 +240,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are dev's band-neutral keys; each maps to its 1.18.2 vanilla rule id here, and the newer bands'
-    // fire rule is dropped by omitting its spec, since 1.18.2 has no equivalent.
+    // The WDL names are dev's band-neutral keys; each maps to its 1.17.1 vanilla rule id here, and the newer bands'
+    // fire rule is dropped by omitting its spec, since 1.17.1 has no equivalent.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
@@ -296,41 +295,43 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
      * supply the real terrain; the generator only governs the un-captured surroundings, which for DEFAULT/FLAT are
      * freshly generated and not the server's actual land (the server seed is not recoverable).
      */
-    private static Registry<LevelStem> buildDimensions(WorldType worldType, RegistryAccess registries, long seed) {
+    private static MappedRegistry<LevelStem> buildDimensions(WorldType worldType, RegistryAccess registries,
+            long seed) {
         Registry<DimensionType> dimensionTypes = registries.registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY);
         return switch (worldType) {
-            case DEFAULT -> WorldGenSettings.withOverworld(dimensionTypes,
-                    DimensionType.defaultDimensions(registries, seed),
-                    WorldGenSettings.makeDefaultOverworld(registries, seed));
+            case DEFAULT -> {
+                Registry<Biome> biomes = registries.registryOrThrow(Registry.BIOME_REGISTRY);
+                Registry<NoiseGeneratorSettings> noiseSettings = registries
+                        .registryOrThrow(Registry.NOISE_GENERATOR_SETTINGS_REGISTRY);
+                yield WorldGenSettings.withOverworld(dimensionTypes,
+                        DimensionType.defaultDimensions(dimensionTypes, biomes, noiseSettings, seed),
+                        WorldGenSettings.makeDefaultOverworld(biomes, noiseSettings, seed));
+            }
             case FLAT -> {
                 Registry<Biome> biomes = registries.registryOrThrow(Registry.BIOME_REGISTRY);
-                Registry<StructureSet> structureSets = registries.registryOrThrow(Registry.STRUCTURE_SET_REGISTRY);
-                FlatLevelSource flat = new FlatLevelSource(
-                        structureSets, FlatLevelGeneratorSettings.getDefault(biomes, structureSets));
+                Registry<NoiseGeneratorSettings> noiseSettings = registries
+                        .registryOrThrow(Registry.NOISE_GENERATOR_SETTINGS_REGISTRY);
+                FlatLevelSource flat = new FlatLevelSource(FlatLevelGeneratorSettings.getDefault(biomes));
                 yield WorldGenSettings.withOverworld(dimensionTypes,
-                        DimensionType.defaultDimensions(registries, seed), flat);
+                        DimensionType.defaultDimensions(dimensionTypes, biomes, noiseSettings, seed), flat);
             }
             case VOID -> voidDimensions(registries);
         };
     }
 
-    private static Registry<LevelStem> voidDimensions(RegistryAccess registries) {
+    private static MappedRegistry<LevelStem> voidDimensions(RegistryAccess registries) {
         Registry<Biome> biomes = registries.registryOrThrow(Registry.BIOME_REGISTRY);
         Registry<DimensionType> dimensionTypes = registries.registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY);
         ResourceKey<Biome> biomeKey = biomes.containsKey(Biomes.THE_VOID) ? Biomes.THE_VOID : Biomes.PLAINS;
-        Holder<Biome> voidBiome = biomes.getOrCreateHolder(biomeKey);
 
-        // A void world places no structures, and a multiplayer client is never sent the structure-set registry, so
-        // the generator carries an empty one rather than resolving one it does not have.
-        MappedRegistry<StructureSet> structureSets = new MappedRegistry<>(Registry.STRUCTURE_SET_REGISTRY,
-                Lifecycle.stable(), null);
-        FlatLevelGeneratorSettings flat = new FlatLevelGeneratorSettings(Optional.of(HolderSet.<StructureSet>direct()),
-                biomes);
-        flat.setBiome(voidBiome);
+        // A void world places no structures: an empty StructureSettings carries no stronghold and no structure configs.
+        FlatLevelGeneratorSettings flat = new FlatLevelGeneratorSettings(
+                new StructureSettings(Optional.empty(), new HashMap<>()), biomes);
+        flat.setBiome(() -> biomes.getOrThrow(biomeKey));
         flat.updateLayers(); // no layers -> all air
-        FlatLevelSource generator = new FlatLevelSource(structureSets, flat);
+        FlatLevelSource generator = new FlatLevelSource(flat);
 
-        MappedRegistry<LevelStem> stems = new MappedRegistry<>(Registry.LEVEL_STEM_REGISTRY, Lifecycle.stable(), null);
+        MappedRegistry<LevelStem> stems = new MappedRegistry<>(Registry.LEVEL_STEM_REGISTRY, Lifecycle.stable());
         stems.register(LevelStem.OVERWORLD, voidStem(dimensionTypes, DimensionType.OVERWORLD_LOCATION, generator),
                 Lifecycle.stable());
         stems.register(LevelStem.NETHER, voidStem(dimensionTypes, DimensionType.NETHER_LOCATION, generator),
@@ -342,6 +343,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
     private static LevelStem voidStem(
             Registry<DimensionType> dimensionTypes, ResourceKey<DimensionType> type, FlatLevelSource generator) {
-        return new LevelStem(dimensionTypes.getOrCreateHolder(type), generator);
+        return new LevelStem(() -> dimensionTypes.getOrThrow(type), generator);
     }
 }

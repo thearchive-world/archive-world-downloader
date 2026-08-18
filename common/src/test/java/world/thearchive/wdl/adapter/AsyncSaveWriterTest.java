@@ -70,13 +70,13 @@ class AsyncSaveWriterTest {
      */
     private static class TestRegionStorage extends IOWorker {
         private TestRegionStorage(Path directory, boolean sync, String name) {
-            super(directory, sync, name);
+            super(directory.toFile(), sync, name);
         }
     }
 
     @Test
     void drainsSubmittedChunksOnTheWriterThreadAndReportsTallies(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean finalized = new AtomicBoolean(false);
 
@@ -118,7 +118,7 @@ class AsyncSaveWriterTest {
      */
     @Test
     void countsEveryChunkOfAnUnopenableDimensionAndStillFinalizes(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
         AtomicInteger finalizedEntityChunksFailed = new AtomicInteger(-1);
@@ -251,7 +251,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void reportsTheChunkDrainPhaseToTheProgressSink(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         SaveProgress progress = new SaveProgress();
 
@@ -278,7 +278,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void reportsTheMapWritePhaseOverTheBatchAfterTheChunkDrain(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         SaveProgress progress = new SaveProgress();
         List<String> order = new ArrayList<>(); // appended only from the writer thread, so it needs no locking
@@ -348,7 +348,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void skipsTheMapPhaseWhenNothingWasBatched(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         SaveProgress progress = new SaveProgress();
 
@@ -373,7 +373,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void drainsChunksAndEntitiesToSeparateStoragesTalliedApart(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         Path entities = Files.createDirectories(save.resolve("entities"));
 
@@ -404,7 +404,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void routesEachDimensionToItsOwnStorage(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path overworldRegion = Files.createDirectories(save.resolve("region"));
         Path netherRegion = Files.createDirectories(save.resolve("DIM-1").resolve("region"));
 
@@ -440,7 +440,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void offThreadChunkEncodeIsByteIdenticalToOnThreadEncode(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path overworldRegion = Files.createDirectories(save.resolve("region"));
         Path netherRegion = Files.createDirectories(save.resolve("DIM-1").resolve("region"));
 
@@ -484,7 +484,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void aThrowingEncodeThunkIsIsolatedToItsChunk(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean finalized = new AtomicBoolean(false);
 
@@ -527,7 +527,7 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aChunkWhoseStorageWriteThrowsIsCountedFailed(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -596,7 +596,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void theWriterThreadFoldMergesContainerItemsIntoTheChunk(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
 
@@ -640,7 +640,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void theWriterThreadFoldMergesLecternBookIntoTheChunk(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         LecternSink sink = new LecternSinkImpl();
 
@@ -678,7 +678,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void preflightRunsBeforeAnyChunkReachesStorage(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicInteger order = new AtomicInteger();
         AtomicInteger preflightAt = new AtomicInteger(-1);
@@ -709,7 +709,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void outputsRunAfterTheStoragesAndAccessAreClosed(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicInteger order = new AtomicInteger();
         AtomicInteger finalizerAt = new AtomicInteger(-1);
@@ -741,7 +741,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void reportsTheWrittenZipFileNameFromTheOutputsStep(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -765,7 +765,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void aThrowingOutputsHookNeverFailsTheOpenableSave(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -791,7 +791,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void aThrowingPreflightHookNeverAbortsTheDrain(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -819,7 +819,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void outputsDoNotRunWhenTheSaveFailed(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean outputsRan = new AtomicBoolean(false);
 
@@ -849,7 +849,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void resumeScanReportsThePriorOnDiskChunkToTheObserver(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
 
@@ -990,7 +990,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void aResumedChunkLandsInTheRecapturedBucketApartFromNew(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter first = new AsyncSaveWriter(
@@ -1023,7 +1023,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void aChunkRewriteFoldsIntoThePriorOnDiskChunkAndTalliesMergedContainers(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter first = new AsyncSaveWriter(
@@ -1054,14 +1054,14 @@ class AsyncSaveWriterTest {
             CompoundTag onDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
             assertEquals("contents", onDisk.getString("wdl_test_folded"),
                     "the folded chunk was written back to region/");
-            assertFalse(onDisk.getList("sections", Tag.TAG_COMPOUND).isEmpty(),
+            assertFalse(onDisk.getCompound("Level").getList("Sections", Tag.TAG_COMPOUND).isEmpty(),
                     "the prior terrain survived the read-modify-write");
         }
     }
 
     @Test
     void anOffThreadTaskThrowIsSwallowedAndTheSaveCompletes(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean ran = new AtomicBoolean(false);
 
@@ -1143,7 +1143,7 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aChunkPreservedWhenTheReadFailsIsCountedLost(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         List<BlockPos> chests = List.of(new BlockPos(2, 64, 2));
         ChunkSnapshotSource snapshot = chunkWithChests(registries, chests);
@@ -1249,7 +1249,7 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aChunkWhoseCarryForwardThrowsPartWayKeepsTheWholeOnDiskCopy(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         BlockPos carried = new BlockPos(2, 64, 2);
         BlockPos unreached = new BlockPos(3, 64, 3);
@@ -1296,7 +1296,7 @@ class AsyncSaveWriterTest {
     }
 
     /** A chunk snapshot carrying an empty chest block entity at each of {@code chests}. */
-    private static ChunkSnapshotSource chunkWithChests(RegistryAccess.Frozen registries, List<BlockPos> chests) {
+    private static ChunkSnapshotSource chunkWithChests(RegistryAccess registries, List<BlockPos> chests) {
         List<CompoundTag> blockEntities = new ArrayList<>();
         for (BlockPos chest : chests) {
             blockEntities.add(blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()));
@@ -1309,7 +1309,7 @@ class AsyncSaveWriterTest {
      * the cases built on it rest on: the stack reached the region file, and a fresh encode of the same snapshot does
      * not carry it, so a revisit re-captures the chests empty.
      */
-    private void writeOpenedChests(Path region, RegistryAccess.Frozen registries, ChunkSnapshotSource snapshot,
+    private void writeOpenedChests(Path region, RegistryAccess registries, ChunkSnapshotSource snapshot,
             List<BlockPos> chests) throws Exception {
         ContainerSink sink = new ContainerSinkImpl();
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
@@ -1360,7 +1360,7 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aStorageThatCannotBeFlushedIsNotCountedAndTheSaveStillFinalizes(@TempDir Path save) throws Exception {
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
 
@@ -1401,7 +1401,7 @@ class AsyncSaveWriterTest {
         // the per-chunk merge being ignored. Production's only merge is a closure built per chunk, carrying the
         // bookshelf occupancy and the open-time positions; if it were dropped the carry-forward would silently
         // fall back to its unknown-everything behavior and no test would move.
-        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         int[] applied = { 0 };
         RegionChunkWriter.ChunkReadMerge recording = (onDisk, fresh) -> {

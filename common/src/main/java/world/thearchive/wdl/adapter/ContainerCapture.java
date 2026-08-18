@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.logging.LogUtils;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -32,6 +31,7 @@ import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.core.ContainerAssociation;
 import world.thearchive.wdl.core.OpenClickIntent;
@@ -50,7 +50,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
  * packages, which does not apply here. Main-thread only, like the rest of capture.
  */
 final class ContainerCapture {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(ContainerCapture.class);
 
     // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the
     // body-armor on every band. Vanilla names the same 2 in AbstractMountInventoryMenu.SLOT_INVENTORY_START

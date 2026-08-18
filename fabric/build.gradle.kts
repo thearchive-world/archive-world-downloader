@@ -118,10 +118,10 @@ dependencies {
     // never queried. The pinned version supplies only the stable ModMenuApi; the player's own ModMenu runs.
     modCompileOnly("maven.modrinth:modmenu:${property("modmenu_version")}")
 
-    // JourneyMap API for the source-merged overlay binding (compat/journeymap) and the journeymap entrypoint
-    // (WdlJourneyMapPlugin), compile-only. Loom remaps the fabric flavor to Mojmap for the compile; there is no
-    // runtime require, so JourneyMap's absence just means the entrypoint is never queried.
-    modCompileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-fabric-SNAPSHOT")
+    // JourneyMap API for the source-merged overlay binding (compat/journeymap), compile-only. JourneyMap ships no
+    // Fabric build at this band, so there is no -fabric-SNAPSHOT flavor and no runtime JourneyMap to query on
+    // Fabric; the plain Mojmap API here only satisfies the merged binding's compile, and it stays inert at runtime.
+    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
 
     // JSpecify on the gametest source set so its package-info @NullMarked resolves; compileOnly is not
     // transitive across source sets. NullAway does not run here (test-scope, disabled above), so the marking

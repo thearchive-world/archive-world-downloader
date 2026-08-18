@@ -11,6 +11,7 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.chunkTagWith;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
 import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -27,7 +28,7 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
  * a beehive's {@code "Bees"}) from the on-disk chunk into a freshly re-captured one, preferring non-empty wherever the
  * write captured nothing of its own there, so a re-walk live-updates the terrain without wiping a chest an earlier
  * write archived, while a container this write captured is left exactly as that capture saw it. Pure
- * {@code CompoundTag} in/out, band-agnostic over the post-1.18 {@code "block_entities"} layout, matched by
+ * {@code CompoundTag} in/out, band-agnostic over the pre-1.18 {@code Level.TileEntities} layout, matched by
  * {@code x/y/z}.
  */
 class ChunkMergeTest {
@@ -111,7 +112,7 @@ class ChunkMergeTest {
         CompoundTag fresh = chunkTagWith(chest(3, 64, 7));
         LongSet replaced = ChunkMerge.capturedPositions(List.of(new BlockPos(3, 64, 7)));
 
-        assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSet.of(), replaced),
+        assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSets.EMPTY_SET, replaced),
                 "the block on disk is the one the placement replaced, so none of it is this block's");
         assertEquals(0, itemCount(findByPos(fresh, 3, 64, 7)),
                 "and the chest now standing there stays as empty as the client saw it");
@@ -124,7 +125,7 @@ class ChunkMergeTest {
         CompoundTag fresh = chunkTagWith(chest(3, 64, 7));
         LongSet replaced = ChunkMerge.capturedPositions(List.of(new BlockPos(9, 64, 9)));
 
-        assertEquals(1, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSet.of(), replaced),
+        assertEquals(1, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSets.EMPTY_SET, replaced),
                 "a placement elsewhere in the chunk says nothing about this position");
         assertEquals(1, itemCount(findByPos(fresh, 3, 64, 7)),
                 "so a re-walk keeps what an earlier visit archived here");
@@ -160,7 +161,8 @@ class ChunkMergeTest {
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
         assertEquals(0, mergeBacks);
-        assertTrue(((ListTag) fresh.get("block_entities")).isEmpty(), "a removed container is not resurrected");
+        assertTrue(((ListTag) fresh.getCompound("Level").get("TileEntities")).isEmpty(),
+                "a removed container is not resurrected");
     }
 
     @Test
@@ -366,7 +368,7 @@ class ChunkMergeTest {
         CompoundTag fresh = BlockEntityFixtures.malformedChunkTagWith(positionless);
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh), "no position, no carry-forward");
-        assertEquals(0, itemCount(((ListTag) fresh.get("block_entities")).getCompound(0)),
+        assertEquals(0, itemCount(((ListTag) fresh.getCompound("Level").get("TileEntities")).getCompound(0)),
                 "and the on-disk contents are not written onto it");
     }
 
@@ -389,7 +391,7 @@ class ChunkMergeTest {
         CompoundTag fresh = chunkTagWith(chest(10, 70, 20));
         LongSet opened = ChunkMerge.capturedPositions(List.of(new BlockPos(10, 70, 20)));
 
-        assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), opened, LongSet.of()),
+        assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), opened, LongSets.EMPTY_SET),
                 "an opened menu is ground truth for every slot, so nothing carries back over it");
         CompoundTag merged = findByPos(fresh, 10, 70, 20);
         assertTrue(merged.get("Items") instanceof ListTag items && items.isEmpty(),
@@ -407,7 +409,7 @@ class ChunkMergeTest {
         CompoundTag fresh = chunkTagWith(chest(1, 64, 1), chest(2, 64, 2));
         LongSet opened = ChunkMerge.capturedPositions(List.of(new BlockPos(1, 64, 1)));
 
-        assertEquals(1, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), opened, LongSet.of()),
+        assertEquals(1, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), opened, LongSets.EMPTY_SET),
                 "one carry-forward, and it is the neighbor's rather than the opened chest's");
         assertEquals(0, itemCount(findByPos(fresh, 1, 64, 1)), "the chest this write saw empty stays empty");
         assertEquals(1, itemCount(findByPos(fresh, 2, 64, 2)),
@@ -423,7 +425,7 @@ class ChunkMergeTest {
         CompoundTag fresh = chunkTagWith(brewingStand(6, 64, 6, (short) 60, (byte) 0));
         LongSet reopened = ChunkMerge.capturedPositions(List.of(new BlockPos(6, 64, 6)));
 
-        assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), reopened, LongSet.of()),
+        assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), reopened, LongSets.EMPTY_SET),
                 "the fresh open is authoritative");
         CompoundTag merged = findByPos(fresh, 6, 64, 6);
         assertEquals((short) 60, merged.getShort("BrewTime"));
@@ -453,7 +455,8 @@ class ChunkMergeTest {
         CompoundTag onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
         CompoundTag fresh = chunkTagWith(brewingStand(6, 64, 6, (short) 180, (byte) 7));
 
-        assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSet.of(), LongSet.of()),
+        assertEquals(0,
+                ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSets.EMPTY_SET, LongSets.EMPTY_SET),
                 "a block entity whose every field is its own capture is not a carry-forward");
 
         CompoundTag merged = findByPos(fresh, 6, 64, 6);

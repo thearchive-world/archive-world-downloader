@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl;
 
-import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +31,7 @@ import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.world.level.storage.LevelResource;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.adapter.CompletionMarshal;
 import world.thearchive.wdl.adapter.ConnectionTee;
@@ -78,7 +78,7 @@ import world.thearchive.wdl.update.UpdateCheck;
  * starts/stops a {@link LiveCaptureSession}, the client tick advances capture, and disconnect auto-saves.
  */
 public final class Wdl {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(Wdl.class);
 
     // Set once by initialize() from the loader entrypoint before any hook can fire; never null in operation,
     // a lifecycle NullAway cannot model, so its uninitialized-field check is suppressed on these two.

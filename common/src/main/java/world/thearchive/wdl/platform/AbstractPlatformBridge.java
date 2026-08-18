@@ -9,7 +9,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -32,6 +31,7 @@ import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.compat.flashback.FlashbackReplayProbe;
 import world.thearchive.wdl.core.ChatCopy;
@@ -46,15 +46,15 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
  * per-loader subclass.
  */
 public abstract class AbstractPlatformBridge implements PlatformBridge {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractPlatformBridge.class);
 
     // Below 1.20.3 SystemToast has no custom-id class, so these reuse two distinct vanilla toast categories
-    // (PERIODIC_NOTIFICATION for job-done, TUTORIAL_HINT for refusals), which keep the vanilla default display
+    // (WORLD_BACKUP for job-done, TUTORIAL_HINT for refusals), which keep the vanilla default display
     // time (which the accessibility notification-time multiplier scales). Job-done toasts are always constructed
     // fresh, never addOrUpdate-reset, so each event surfaces its own toast. Refusals use their own category so a
     // repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message, and
     // vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body unwrapped).
-    private static final SystemToast.SystemToastIds TOAST_ID = SystemToast.SystemToastIds.PERIODIC_NOTIFICATION;
+    private static final SystemToast.SystemToastIds TOAST_ID = SystemToast.SystemToastIds.WORLD_BACKUP;
     private static final SystemToast.SystemToastIds REFUSAL_TOAST_ID = SystemToast.SystemToastIds.TUTORIAL_HINT;
 
     // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
