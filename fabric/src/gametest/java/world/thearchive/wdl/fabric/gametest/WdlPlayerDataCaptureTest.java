@@ -5,6 +5,7 @@ package world.thearchive.wdl.fabric.gametest;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -39,11 +40,12 @@ public class WdlPlayerDataCaptureTest implements FabricClientGameTest {
             Check.that(!player.isEmpty(), "level.dat has no Player data");
             Check.that(player.contains("Pos", Tag.TAG_LIST), "the captured Player has no Pos in level.dat");
             List<CompoundTag> inventory = player.getList("Inventory", Tag.TAG_COMPOUND).stream()
-                    .map(t -> (CompoundTag) t).toList();
+                    .map(t -> (CompoundTag) t).collect(Collectors.toList());
             boolean hasDiamond = inventory.stream()
                     .anyMatch(item -> item.getString("id").equals("minecraft:diamond"));
             Check.that(hasDiamond, "the given diamond is absent from the captured Player Inventory: "
-                    + inventory.stream().map(item -> (item.contains("id") ? item.getString("id") : "?")).toList());
+                    + inventory.stream().map(item -> (item.contains("id") ? item.getString("id") : "?"))
+                            .collect(Collectors.toList()));
         }
     }
 }

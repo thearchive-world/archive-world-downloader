@@ -8,4 +8,20 @@ package world.thearchive.wdl.adapter;
  * lost to a throwing merge ({@code failed}). A no-match is neither, so it counts in neither field. Shared by
  * {@link ContainerMerge} and {@link EntityContainerMerge}.
  */
-record MergeTally(int merged, int failed) {}
+final class MergeTally {
+    private final int merged;
+    private final int failed;
+
+    MergeTally(int merged, int failed) {
+        this.merged = merged;
+        this.failed = failed;
+    }
+
+    int merged() {
+        return merged;
+    }
+
+    int failed() {
+        return failed;
+    }
+}

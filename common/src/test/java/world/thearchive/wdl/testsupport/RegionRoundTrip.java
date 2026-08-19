@@ -29,7 +29,7 @@ public final class RegionRoundTrip {
     public static CompoundTag writeThenRead(Path directory, ChunkPos pos, CompoundTag tag) {
         try (IOWorker writer = open(directory)) {
             writer.store(pos, tag).join();
-            writer.synchronize(true).join();
+            writer.synchronize().join();
         } catch (IOException e) {
             throw new RuntimeException("failed writing region chunk " + pos, e);
         }

@@ -6,6 +6,7 @@ package world.thearchive.wdl.fabric.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
@@ -382,9 +383,11 @@ public class RestoreFlowTest implements FabricClientGameTest {
      */
     private static void focusNameField(ClientGameTestContext context) {
         context.runOnClient(client -> {
-            if (client.screen instanceof WdlDownloadsScreen screen) {
+            if (client.screen instanceof WdlDownloadsScreen) {
+                WdlDownloadsScreen screen = (WdlDownloadsScreen) client.screen;
                 for (GuiEventListener child : screen.children()) {
-                    if (child instanceof EditBox box) {
+                    if (child instanceof EditBox) {
+                        EditBox box = (EditBox) child;
                         screen.setFocused(box);
                         return;
                     }
@@ -396,11 +399,13 @@ public class RestoreFlowTest implements FabricClientGameTest {
     /** The value in the open download screen's name field, or null when no name field is on screen. */
     private static @Nullable String nameFieldValue(ClientGameTestContext context) {
         return context.computeOnClient(client -> {
-            if (!(client.screen instanceof WdlDownloadsScreen screen)) {
+            if (!(client.screen instanceof WdlDownloadsScreen)) {
                 return null;
             }
+            WdlDownloadsScreen screen = (WdlDownloadsScreen) client.screen;
             for (GuiEventListener child : screen.children()) {
-                if (child instanceof EditBox box) {
+                if (child instanceof EditBox) {
+                    EditBox box = (EditBox) child;
                     return box.getValue();
                 }
             }
@@ -561,7 +566,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
         Path path = FabricLoader.getInstance().getConfigDir().resolve("wdl.properties");
         try {
             Files.createDirectories(path.getParent());
-            Files.writeString(path, "appendDateSuffix=false\n" + configLines);
+            Files.write(path, "appendDateSuffix=false\n" + configLines.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

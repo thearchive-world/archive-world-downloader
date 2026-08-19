@@ -27,7 +27,8 @@ final class MapIdCollector {
      * missing or non-list {@code listKey} is a no-op. {@code holder} is not mutated.
      */
     public static void collectFromItemList(CompoundTag holder, String listKey, Set<Integer> out) {
-        if (holder.get(listKey) instanceof ListTag list) {
+        if (holder.get(listKey) instanceof ListTag) {
+            ListTag list = (ListTag) holder.get(listKey);
             ItemTreeWalk.walkList(list, tag -> collectMapId(tag, out));
         }
     }

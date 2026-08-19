@@ -5,11 +5,11 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static world.thearchive.wdl.testsupport.MapHolderFixtures.bundleHolding;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.filledMap;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderOf;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.shulkerHolding;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -47,12 +47,12 @@ class MapIdCollectorTest {
     }
 
     @Test
-    void collectsTopLevelNestedShulkerAndBundleMapIdsSkippingNonMaps() {
+    void collectsTopLevelAndNestedShulkerMapIdsSkippingNonMaps() {
         CompoundTag holder = holderOf(sink, registries, filledMap(5), shulkerHolding(filledMap(7)),
-                bundleHolding(filledMap(9)), new ItemStack(Items.DIAMOND, 3));
+                new ItemStack(Items.DIAMOND, 3));
 
-        assertEquals(Set.of(5, 7, 9), collect(holder),
-                "exactly the three referenced map ids (top-level, nested in a shulker, nested in a bundle); "
+        assertEquals(ImmutableSet.of(5, 7), collect(holder),
+                "exactly the two referenced map ids (top-level and nested in a shulker); "
                         + "the non-map item contributes none");
     }
 
@@ -63,7 +63,7 @@ class MapIdCollectorTest {
         // (hence the idcounts floor = max) must include 50, not stop at the imaged max of 2.
         Set<Integer> ids = collect(holderOf(sink, registries, filledMap(1), filledMap(2), filledMap(50)));
 
-        assertEquals(Set.of(1, 2, 50), ids);
+        assertEquals(ImmutableSet.of(1, 2, 50), ids);
         assertEquals(50, Collections.max(ids), "idcounts floors at the max referenced candidate id");
     }
 

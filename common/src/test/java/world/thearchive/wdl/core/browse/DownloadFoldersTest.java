@@ -9,10 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -97,7 +97,7 @@ class DownloadFoldersTest {
         markManaged(saves.resolve("complete-2026-06-22"));
         markRecoverable(saves.resolve("crashed-2026-06-22"));
         Files.createDirectories(saves.resolve("vanilla-save"));
-        assertEquals(List.of("complete-2026-06-22", "crashed-2026-06-22"), DownloadFolders.listManaged(saves),
+        assertEquals(ImmutableList.of("complete-2026-06-22", "crashed-2026-06-22"), DownloadFolders.listManaged(saves),
                 "a recoverable folder is included, a plain vanilla save is excluded");
     }
 

@@ -20,9 +20,9 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.loading.FMLPaths;
-import net.minecraftforge.fmlclient.registry.ClientRegistry;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
@@ -72,7 +72,8 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
             }
             List<AbstractWidget> widgets = new ArrayList<>();
             for (GuiEventListener listener : event.getGui().children()) {
-                if (listener instanceof AbstractWidget widget) {
+                if (listener instanceof AbstractWidget) {
+                    AbstractWidget widget = (AbstractWidget) listener;
                     widgets.add(widget);
                 }
             }

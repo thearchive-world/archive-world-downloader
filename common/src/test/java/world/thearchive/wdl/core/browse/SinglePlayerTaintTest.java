@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.Set;
@@ -98,10 +99,10 @@ class SinglePlayerTaintTest {
                 ? SinglePlayerTaint.Presence.HAS_ENTRY
                 : SinglePlayerTaint.Presence.UNREADABLE;
         assertEquals(SinglePlayerTaint.TaintState.TAINTED,
-                SinglePlayerTaint.classify(Path.of("save"), playerdataUnreadable),
+                SinglePlayerTaint.classify(Paths.get("save"), playerdataUnreadable),
                 "a definite entry after an unreadable directory still classifies as tainted");
         assertEquals(SinglePlayerTaint.TaintState.TAINTED,
-                SinglePlayerTaint.classify(Path.of("save"), playerdataTainted),
+                SinglePlayerTaint.classify(Paths.get("save"), playerdataTainted),
                 "a definite entry short-circuits before an unreadable directory is reached");
     }
 

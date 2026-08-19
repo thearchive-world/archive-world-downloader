@@ -9,11 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
+import com.google.common.collect.ImmutableList;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
@@ -36,16 +35,16 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for the ridden-vehicle RootVehicle capture. A vehicle carrying exactly one player is refused by
- * {@code Entity.shouldBeSaved()} (vanilla persists it in the player's own {@code RootVehicle}, not the entities
- * region), so the chunk path drops it. {@link EntitySink#captureRootVehicle} is the sibling that serializes it anyway,
- * the way {@code ServerPlayer.saveParentVehicle} does with {@code root.save}, and the captured chest-boat contents fold
- * into it by {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone entity path's
+ * the entities region (vanilla persists it in the player's own {@code RootVehicle}, not the entities region), so the
+ * chunk path drops it. {@link EntitySink#captureRootVehicle} is the sibling that serializes it anyway, the way
+ * {@code ServerPlayer.saveParentVehicle} does with {@code root.save}, and the captured chest-boat contents fold into it
+ * by {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone entity path's
  * {@code applyMobPersistence} seam: {@code PersistenceRequired} is server-authoritative and arrives false on the
  * client, so a name-tagged mount, and any mount under {@code forceMobPersistence}, keeps the stamp or it despawns once
  * the player dismounts in the downloaded world.
  *
- * <p>Uses two headless doubles: an {@link Entity} whose {@code shouldBeSaved()} is forced false (a real player
- * passenger cannot be built headless), and a {@link Mob} for the branch the restoration is gated on.
+ * <p>Uses two headless doubles: an {@link Entity} that reports as a one-player vehicle (a real player passenger cannot
+ * be built headless), and a {@link Mob} for the branch the restoration is gated on.
  */
 class EntitySinkRootVehicleTest {
     private final EntitySink sink = new EntitySinkImpl();
@@ -60,9 +59,10 @@ class EntitySinkRootVehicleTest {
     void captureRootVehicleSerializesTheOnePlayerVehicleTheChunkPathDrops() {
         RegistryAccess registries = TestRegistries.frozen();
         RiddenVehicleEntity vehicle = new RiddenVehicleEntity();
-        assertFalse(vehicle.shouldBeSaved(), "precondition: a one-player vehicle the entities region refuses");
+        assertTrue(vehicle.isVehicle() && vehicle.hasOnePlayerPassenger(),
+                "precondition: a one-player vehicle the entities region refuses");
 
-        assertNull(sink.encodeChunk(List.of(vehicle), new ChunkPos(0, 0), registries, false),
+        assertNull(sink.encodeChunk(ImmutableList.of(vehicle), new ChunkPos(0, 0), registries, false),
                 "the chunk path drops it, exactly the loss the RootVehicle capture fixes");
 
         CompoundTag tag = sink.captureRootVehicle(vehicle, registries, false);
@@ -78,7 +78,7 @@ class EntitySinkRootVehicleTest {
 
         CompoundTag tag = sink.captureRootVehicle(vehicle, registries, false);
         assertNotNull(tag);
-        assertEquals(0, tag.getList("Items", Tag.TAG_COMPOUND).size(),
+        assertEquals(0, tag.getList("Items", 10).size(),
                 "the captured mount serializes no Items of its own, so the fold is required");
 
         NonNullList<ItemStack> contents = NonNullList.withSize(27, ItemStack.EMPTY);
@@ -89,7 +89,7 @@ class EntitySinkRootVehicleTest {
 
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         CompoundTag probe = new CompoundTag();
-        probe.put("Items", folded.getList("Items", Tag.TAG_COMPOUND));
+        probe.put("Items", folded.getList("Items", 10));
         ContainerHelper.loadAllItems(probe, back);
         assertEquals(Items.DIAMOND, back.get(3).getItem(),
                 "the captured chest-boat loot lands at its slot in the mount");
@@ -143,9 +143,17 @@ class EntitySinkRootVehicleTest {
             return new ClientboundAddEntityPacket(this);
         }
 
+        // 1.16.5 has no Entity.shouldBeSaved; a one-player vehicle is refused by the isVehicle and
+        // hasOnePlayerPassenger primitives EntitySinkImpl reproduces that predicate from, forced true here since a
+        // real player passenger cannot be built headless.
         @Override
-        public boolean shouldBeSaved() {
-            return false; // a vehicle carrying exactly one player, the state saveParentVehicle owns
+        public boolean isVehicle() {
+            return true;
+        }
+
+        @Override
+        public boolean hasOnePlayerPassenger() {
+            return true;
         }
 
         @Override

@@ -138,9 +138,11 @@ final class ContainerDriver {
     private static String describeAim(Minecraft client) {
         HitResult hit = client.hitResult;
         String where;
-        if (hit instanceof BlockHitResult blockHit) {
+        if (hit instanceof BlockHitResult) {
+            BlockHitResult blockHit = (BlockHitResult) hit;
             where = "BLOCK@" + blockHit.getBlockPos();
-        } else if (hit instanceof EntityHitResult entityHit) {
+        } else if (hit instanceof EntityHitResult) {
+            EntityHitResult entityHit = (EntityHitResult) hit;
             where = "ENTITY@" + entityHit.getEntity().getType();
         } else {
             where = hit == null ? "null" : String.valueOf(hit.getType());

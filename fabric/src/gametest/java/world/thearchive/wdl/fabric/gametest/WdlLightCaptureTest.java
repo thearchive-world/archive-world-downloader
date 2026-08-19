@@ -82,7 +82,7 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
             BlockPos lamp2 = new BlockPos(playerChunk.getMinBlockX() + 2, 80, playerChunk.getMinBlockZ() + 2);
             int snapshotLevel = context.computeOnClient(client -> {
                 ChunkCodec codec = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
-                        .findFirst().orElseThrow().chunkCodec();
+                        .findFirst().get().chunkCodec();
                 client.level.setBlock(lamp2, Blocks.GLOWSTONE.defaultBlockState(), 3);
                 LevelChunk liveChunk = client.level.getChunk(playerChunk.x, playerChunk.z);
                 ChunkSnapshotSource snapshot = codec.capture(liveChunk, client.level.registryAccess());
@@ -96,7 +96,7 @@ public class WdlLightCaptureTest implements FabricClientGameTest {
             // no layers, lightCorrect=false. Restore the bit afterward.
             boolean gateFellBack = context.computeOnClient(client -> {
                 ChunkCodec codec = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
-                        .findFirst().orElseThrow().chunkCodec();
+                        .findFirst().get().chunkCodec();
                 LevelLightEngine engine = client.level.getChunkSource().getLightEngine();
                 engine.setLightEnabled(playerChunk, false);
                 try {

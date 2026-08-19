@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import net.fabricmc.fabric.api.client.command.v1.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v1.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -125,8 +126,10 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public void registerCommands(WdlCommands commands) {
-        // The 1.18.2 client-command API is v1: a static DISPATCHER registered at construction.
+        // The 1.16.5 client-command API is v1: a static DISPATCHER registered at construction. The Java 8 compiler
+        // cannot infer the source type through register(), so the command-source type is witnessed explicitly.
         ClientCommandManager.DISPATCHER.register(
-                wdlCommandTree(commands, ClientCommandManager::literal, ClientCommandManager::argument));
+                AbstractPlatformBridge.<FabricClientCommandSource>wdlCommandTree(
+                        commands, ClientCommandManager::literal, ClientCommandManager::argument));
     }
 }

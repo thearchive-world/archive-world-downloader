@@ -8,8 +8,8 @@ import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Merges captured open-time container-vehicle items into the matching captured entity tag, keyed by entity
@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * entity write that follows.
  */
 final class EntityContainerMerge {
-    private static final Logger LOGGER = LoggerFactory.getLogger(EntityContainerMerge.class);
+    private static final Logger LOGGER = LogManager.getLogger(EntityContainerMerge.class);
 
     private EntityContainerMerge() {}
 
@@ -58,15 +58,19 @@ final class EntityContainerMerge {
      */
     static MergeTally refoldFlushedContainers(ContainerSink sink, CompoundTag entitiesChunkTag,
             Map<UUID, CompoundTag> folded, Map<UUID, CompoundTag> stash) {
-        if (folded.isEmpty() || !(entitiesChunkTag.get("Entities") instanceof ListTag entities)) {
+        ListTag entities = entitiesChunkTag.get("Entities") instanceof ListTag
+                ? (ListTag) entitiesChunkTag.get("Entities")
+                : null;
+        if (folded.isEmpty() || entities == null) {
             return new MergeTally(0, 0);
         }
         int merged = 0;
         int failed = 0;
         for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag entityTag)) {
+            if (!(entities.get(i) instanceof CompoundTag)) {
                 continue;
             }
+            CompoundTag entityTag = (CompoundTag) entities.get(i);
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 UUID uuid = node.getKey();
                 CompoundTag holder = stash.containsKey(uuid) ? null : folded.get(uuid);
@@ -97,15 +101,19 @@ final class EntityContainerMerge {
      */
     static MergeTally mergeEntityStash(ContainerSink sink, CompoundTag entitiesChunkTag,
             Map<UUID, CompoundTag> stash) {
-        if (stash.isEmpty() || !(entitiesChunkTag.get("Entities") instanceof ListTag entities)) {
+        ListTag entities = entitiesChunkTag.get("Entities") instanceof ListTag
+                ? (ListTag) entitiesChunkTag.get("Entities")
+                : null;
+        if (stash.isEmpty() || entities == null) {
             return new MergeTally(0, 0);
         }
         int merged = 0;
         int failed = 0;
         for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag entityTag)) {
+            if (!(entities.get(i) instanceof CompoundTag)) {
                 continue;
             }
+            CompoundTag entityTag = (CompoundTag) entities.get(i);
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 CompoundTag holder = stash.remove(node.getKey());
                 if (holder == null) {
@@ -124,7 +132,7 @@ final class EntityContainerMerge {
     }
 
     private static void foldItems(ContainerSink sink, CompoundTag entityTag, CompoundTag holder) {
-        entityTag.put("Items", sink.merge(entityTag, holder).getList("Items", Tag.TAG_COMPOUND));
+        entityTag.put("Items", sink.merge(entityTag, holder).getList("Items", 10));
     }
 
     /**
@@ -137,14 +145,18 @@ final class EntityContainerMerge {
      * malformed holder merely skips a key. Returns how many nodes gained their trades.
      */
     static MergeTally mergeMerchantStash(CompoundTag entitiesChunkTag, Map<UUID, CompoundTag> stash) {
-        if (stash.isEmpty() || !(entitiesChunkTag.get("Entities") instanceof ListTag entities)) {
+        ListTag entities = entitiesChunkTag.get("Entities") instanceof ListTag
+                ? (ListTag) entitiesChunkTag.get("Entities")
+                : null;
+        if (stash.isEmpty() || entities == null) {
             return new MergeTally(0, 0);
         }
         int merged = 0;
         for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag entityTag)) {
+            if (!(entities.get(i) instanceof CompoundTag)) {
                 continue;
             }
+            CompoundTag entityTag = (CompoundTag) entities.get(i);
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 CompoundTag holder = stash.remove(node.getKey());
                 if (holder == null) {
@@ -166,14 +178,18 @@ final class EntityContainerMerge {
      */
     static MergeTally refoldFlushedMerchants(CompoundTag entitiesChunkTag, Map<UUID, CompoundTag> folded,
             Map<UUID, CompoundTag> stash) {
-        if (folded.isEmpty() || !(entitiesChunkTag.get("Entities") instanceof ListTag entities)) {
+        ListTag entities = entitiesChunkTag.get("Entities") instanceof ListTag
+                ? (ListTag) entitiesChunkTag.get("Entities")
+                : null;
+        if (folded.isEmpty() || entities == null) {
             return new MergeTally(0, 0);
         }
         int merged = 0;
         for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag entityTag)) {
+            if (!(entities.get(i) instanceof CompoundTag)) {
                 continue;
             }
+            CompoundTag entityTag = (CompoundTag) entities.get(i);
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 UUID uuid = node.getKey();
                 CompoundTag holder = stash.containsKey(uuid) ? null : folded.get(uuid);
@@ -192,7 +208,8 @@ final class EntityContainerMerge {
      * none).
      */
     private static void foldOffers(CompoundTag entityTag, CompoundTag holder) {
-        if (holder.get("Offers") instanceof CompoundTag offers) {
+        if (holder.get("Offers") instanceof CompoundTag) {
+            CompoundTag offers = (CompoundTag) holder.get("Offers");
             entityTag.put("Offers", offers.copy());
         }
         Tag experience = holder.get("Xp");

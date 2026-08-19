@@ -11,7 +11,6 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.namedBlockEnt
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -97,7 +96,7 @@ class ContainerMergeRoundTripTest {
         CompoundTag blockEntity = chestTag(0, 0, 0);
         sink.merge(blockEntity, holder);
 
-        assertTrue(blockEntity.getList("Items", Tag.TAG_COMPOUND).isEmpty(),
+        assertTrue(blockEntity.getList("Items", 10).isEmpty(),
                 "merge must write a copy, never mutate the input BE tag");
     }
 

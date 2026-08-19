@@ -18,18 +18,19 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * 1.17.1 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
- * pre-creates {@code region/} + {@code entities/} so the region writer never sees a missing {@code externalFileDir}
- * (vanilla {@code RegionFile} throws otherwise).
+ * 1.16.5 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
+ * pre-creates {@code region/} so the region writer never sees a missing {@code externalFileDir} (vanilla
+ * {@code RegionFile} throws otherwise). There is no {@code entities/} region at this band: entities live inside the
+ * {@code region/} chunk under {@code Level.Entities}.
  */
 public final class WorldPathsImpl implements WorldPaths {
-    private static final Logger LOGGER = LoggerFactory.getLogger(WorldPathsImpl.class);
+    private static final Logger LOGGER = LogManager.getLogger(WorldPathsImpl.class);
 
     private final Path saveRoot;
 
@@ -43,19 +44,8 @@ public final class WorldPathsImpl implements WorldPaths {
     }
 
     @Override
-    public Path entitiesDirectory(ResourceKey<Level> dimension) {
-        return ensureDirectory(dimensionRoot(dimension).resolve("entities"));
-    }
-
-    @Override
     public IOWorker openRegionStorage(ResourceKey<Level> dimension) {
         return new WdlRegionStorage(regionDirectory(dimension), false, "chunk");
-    }
-
-    @Override
-    public IOWorker openEntitiesStorage(ResourceKey<Level> dimension) {
-        // Vanilla EntityStorage uses the "entities" name for the entities/ region.
-        return new WdlRegionStorage(entitiesDirectory(dimension), false, "entities");
     }
 
     @Override

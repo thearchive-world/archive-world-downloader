@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -40,7 +41,7 @@ class DownloadReportLogTest {
     void completedLineRoundTripsEveryField(@TempDir Path directory) throws IOException {
         Path jsonl = directory.resolve("download.jsonl");
         DownloadReportLog.append(jsonl, DownloadReportLog.completedLine(identity("a"), environment(),
-                settings(), FINISHED, new DownloadCounts(421, 367, 0), new SaveChunks(421, List.of()), true));
+                settings(), FINISHED, new DownloadCounts(421, 367, 0), new SaveChunks(421, ImmutableList.of()), true));
 
         List<DownloadSession> downloads = DownloadReportLog.readDownloads(jsonl, null);
         assertEquals(1, downloads.size());
@@ -64,9 +65,9 @@ class DownloadReportLogTest {
     void completedLineRoundTripsThePerDimensionBreakdown(@TempDir Path directory) throws IOException {
         Path jsonl = directory.resolve("download.jsonl");
         DownloadCounts counts = new DownloadCounts(430, 12, 3,
-                List.of(new DimensionChunks("overworld", 400), new DimensionChunks("the_nether", 30)));
+                ImmutableList.of(new DimensionChunks("overworld", 400), new DimensionChunks("the_nether", 30)));
         DownloadReportLog.append(jsonl, DownloadReportLog.completedLine(identity("a"), environment(),
-                settings(), FINISHED, counts, new SaveChunks(430, List.of()), true));
+                settings(), FINISHED, counts, new SaveChunks(430, ImmutableList.of()), true));
 
         DownloadCounts readCounts = DownloadReportLog.readDownloads(jsonl, null).get(0).counts();
         assertNotNull(readCounts);
@@ -84,7 +85,7 @@ class DownloadReportLogTest {
     void aPartialCompletionReadsBackNotClean(@TempDir Path directory) throws IOException {
         Path jsonl = directory.resolve("download.jsonl");
         DownloadReportLog.append(jsonl, DownloadReportLog.completedLine(identity("a"), environment(),
-                settings(), FINISHED, new DownloadCounts(10, 1, 0), new SaveChunks(10, List.of()), false));
+                settings(), FINISHED, new DownloadCounts(10, 1, 0), new SaveChunks(10, ImmutableList.of()), false));
 
         DownloadSession session = DownloadReportLog.readDownloads(jsonl, null).get(0);
         assertTrue(session.isComplete());
@@ -95,9 +96,10 @@ class DownloadReportLogTest {
     void anUnparseableFinishedAtReadsBackAsTheEpoch(@TempDir Path directory) throws IOException {
         Path jsonl = directory.resolve("download.jsonl");
         DownloadReportLog.append(jsonl, DownloadReportLog.completedLine(identity("a"), environment(),
-                settings(), FINISHED, new DownloadCounts(1, 1, 0), new SaveChunks(1, List.of()), true));
-        String corrupted = Files.readString(jsonl).replace("2026-06-22T07:14:05Z", "not-a-time");
-        Files.writeString(jsonl, corrupted);
+                settings(), FINISHED, new DownloadCounts(1, 1, 0), new SaveChunks(1, ImmutableList.of()), true));
+        String corrupted = new String(Files.readAllBytes(jsonl), StandardCharsets.UTF_8).replace("2026-06-22T07:14:05Z",
+                "not-a-time");
+        Files.write(jsonl, corrupted.getBytes(StandardCharsets.UTF_8));
 
         DownloadSession session = DownloadReportLog.readDownloads(jsonl, null).get(0);
         assertTrue(session.isComplete(), "a bad timestamp does not demote the record to interrupted");
@@ -122,7 +124,7 @@ class DownloadReportLogTest {
         Path jsonl = directory.resolve("download.jsonl");
         Path pending = directory.resolve("download.pending");
         DownloadReportLog.append(jsonl, DownloadReportLog.completedLine(identity("a"), environment(),
-                settings(), FINISHED, new DownloadCounts(1, 1, 0), new SaveChunks(1, List.of()), true));
+                settings(), FINISHED, new DownloadCounts(1, 1, 0), new SaveChunks(1, ImmutableList.of()), true));
         Files.write(pending, (DownloadReportLog.pendingLine(identity("a"), environment(), settings())
                 + "\n").getBytes(StandardCharsets.UTF_8));
 
@@ -135,7 +137,7 @@ class DownloadReportLogTest {
     void aTornTrailingLineIsSkipped(@TempDir Path directory) throws IOException {
         Path jsonl = directory.resolve("download.jsonl");
         DownloadReportLog.append(jsonl, DownloadReportLog.completedLine(identity("a"), environment(),
-                settings(), FINISHED, new DownloadCounts(1, 1, 0), new SaveChunks(1, List.of()), true));
+                settings(), FINISHED, new DownloadCounts(1, 1, 0), new SaveChunks(1, ImmutableList.of()), true));
         Files.write(jsonl, "{\"v\":1,\"id\":\"b\"".getBytes(StandardCharsets.UTF_8),
                 StandardOpenOption.APPEND); // a half-written crash tail, no newline
 
@@ -162,7 +164,7 @@ class DownloadReportLogTest {
                 "Terbin", "uuid", "", "", "", "NeoForge", "21.11.42", "replay", "unidentified");
 
         DownloadReportLog.append(jsonl, DownloadReportLog.completedLine(replaySourced, environment(),
-                settings(), FINISHED, new DownloadCounts(9, 9, 0), new SaveChunks(9, List.of()), true));
+                settings(), FINISHED, new DownloadCounts(9, 9, 0), new SaveChunks(9, ImmutableList.of()), true));
 
         List<DownloadSession> downloads = DownloadReportLog.readDownloads(jsonl, null);
         assertEquals("unidentified", downloads.get(0).identity().sourceKind(),
@@ -173,9 +175,9 @@ class DownloadReportLogTest {
     void completedLineRoundTripsTheSaveChunkTotals(@TempDir Path directory) throws IOException {
         Path jsonl = directory.resolve("download.jsonl");
         DownloadCounts counts = new DownloadCounts(10, 5, 2,
-                List.of(new DimensionChunks("minecraft:overworld", 10)));
+                ImmutableList.of(new DimensionChunks("minecraft:overworld", 10)));
         SaveChunks saveChunks = new SaveChunks(1000,
-                List.of(new DimensionChunks("minecraft:overworld", 800),
+                ImmutableList.of(new DimensionChunks("minecraft:overworld", 800),
                         new DimensionChunks("minecraft:the_nether", 200)));
         DownloadReportLog.append(jsonl, DownloadReportLog.completedLine(identity("a"), environment(),
                 settings(), FINISHED, counts, saveChunks, true));

@@ -7,7 +7,6 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.item.ItemStack;
@@ -49,7 +48,7 @@ public final class BlockEntityFixtures {
 
     /** The custom name a {@link #namedBlockEntity} tag carries, or {@code ""} when it carries none. */
     public static String customNameOf(CompoundTag blockEntityTag) {
-        if (!blockEntityTag.contains("CustomName", Tag.TAG_STRING)) {
+        if (!blockEntityTag.contains("CustomName", 8)) {
             return "";
         }
         Component name = Component.Serializer.fromJson(blockEntityTag.getString("CustomName"));
@@ -169,12 +168,12 @@ public final class BlockEntityFixtures {
 
     /** The block-entity tag in {@code chunkTag} at {@code x/y/z}, or an {@link AssertionError} when none matches. */
     public static CompoundTag findByPos(CompoundTag chunkTag, int x, int y, int z) {
-        return findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), x, y, z);
+        return findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), x, y, z);
     }
 
     /** The block-entity tag in {@code chunkTag} at {@code x/y/z}, or {@code null} when none matches. */
     public static @Nullable CompoundTag findByPosOrNull(CompoundTag chunkTag, int x, int y, int z) {
-        ListTag list = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
+        ListTag list = chunkTag.getCompound("Level").getList("TileEntities", 10);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag tag = list.getCompound(i);
             if (tag.getInt("x") == x && tag.getInt("y") == y && tag.getInt("z") == z) {

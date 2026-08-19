@@ -5,11 +5,12 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static world.thearchive.wdl.testsupport.MapHolderFixtures.bundleHolding;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.filledMap;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderOf;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.shulkerHolding;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -49,24 +50,23 @@ class MapIdRemapTest {
     @Test
     void remapsEveryReferencedIdAcrossAllSurfacesSkippingNonMaps() {
         CompoundTag holder = holderOf(sink, registries, filledMap(5), shulkerHolding(filledMap(7)),
-                bundleHolding(filledMap(9)), new ItemStack(Items.DIAMOND, 3));
+                new ItemStack(Items.DIAMOND, 3));
 
         MapIdRemap.remapFromItemList(holder, "Items", id -> id + 100);
 
-        assertEquals(Set.of(105, 107, 109), collect(holder),
+        assertEquals(ImmutableSet.of(105, 107), collect(holder),
                 "every referenced id, nested or not, is rewritten by the resolver; the diamond is untouched");
     }
 
     @Test
     void remapTouchesExactlyTheIdsTheCollectorReads() {
-        CompoundTag holder = holderOf(sink, registries, filledMap(5), shulkerHolding(filledMap(7)),
-                bundleHolding(filledMap(9)));
-        assertEquals(Set.of(5, 7, 9), collect(holder), "the pre-remap oracle");
+        CompoundTag holder = holderOf(sink, registries, filledMap(5), shulkerHolding(filledMap(7)));
+        assertEquals(ImmutableSet.of(5, 7), collect(holder), "the pre-remap oracle");
 
-        Map<Integer, Integer> table = Map.of(5, 0, 7, 1, 9, 2);
+        Map<Integer, Integer> table = ImmutableMap.of(5, 0, 7, 1);
         MapIdRemap.remapFromItemList(holder, "Items", table::get);
 
-        assertEquals(Set.of(0, 1, 2), collect(holder), "collect after remap equals the resolver applied");
+        assertEquals(ImmutableSet.of(0, 1), collect(holder), "collect after remap equals the resolver applied");
     }
 
     @Test
@@ -75,7 +75,7 @@ class MapIdRemapTest {
 
         MapIdRemap.remapFromItemList(holder, "Items", id -> id + 100);
 
-        assertEquals(Set.of(142), collect(holder), "both references resolve to the one archive id");
+        assertEquals(ImmutableSet.of(142), collect(holder), "both references resolve to the one archive id");
     }
 
     @Test
@@ -86,7 +86,7 @@ class MapIdRemapTest {
 
         MapIdRemap.remapItem(item, id -> id + 100);
 
-        assertEquals(Set.of(105), collect(holder), "the single-item remap rewrote the id in place");
+        assertEquals(ImmutableSet.of(105), collect(holder), "the single-item remap rewrote the id in place");
     }
 
     @Test

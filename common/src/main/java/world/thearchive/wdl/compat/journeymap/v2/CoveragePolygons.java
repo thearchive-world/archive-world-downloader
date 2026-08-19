@@ -1,14 +1,16 @@
 // Copyright (C) Archive World Downloader contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-package world.thearchive.wdl.compat.journeymap;
+package world.thearchive.wdl.compat.journeymap.v2;
 
 import java.util.ArrayList;
 import java.util.List;
-import journeymap.client.api.model.MapPolygon;
-import journeymap.client.api.model.MapPolygonWithHoles;
-import journeymap.client.api.model.ShapeProperties;
+import journeymap.api.v2.client.model.MapPolygon;
+import journeymap.api.v2.client.model.MapPolygonWithHoles;
+import journeymap.api.v2.client.model.ShapeProperties;
 import net.minecraft.core.BlockPos;
+
+import world.thearchive.wdl.compat.journeymap.CoveragePolygonTracer;
 
 /**
  * Turns chunk-space coverage rectangles into JourneyMap polygon hulls and builds the fill-only shape style for a

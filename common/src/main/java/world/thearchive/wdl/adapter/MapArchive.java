@@ -157,9 +157,10 @@ final class MapArchive {
      * band-agnostically through {@code Codec}/{@code NbtOps}; {@code locked} and the centers are excluded.
      */
     static String hashOf(Tag dataTag) {
-        if (!(dataTag instanceof CompoundTag data)) {
+        if (!(dataTag instanceof CompoundTag)) {
             return MapHash.of(new byte[0], 0, "");
         }
+        CompoundTag data = (CompoundTag) dataTag;
         return MapHash.of(readColors(data), readByte(data, "scale"), readString(data, "dimension"));
     }
 

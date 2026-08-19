@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPosOrNull;
 
-import java.util.List;
+import com.google.common.collect.ImmutableList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import org.junit.jupiter.api.Test;
@@ -41,7 +41,8 @@ class ChunkReencodeFidelityTest {
         RegistryAccess registries = TestRegistries.frozen();
 
         CompoundTag tag = codec.encode(
-                SyntheticChunks.fullWithMalformedBlockEntities(registries, false, List.of(sign(2, 64, 2, "hello"))),
+                SyntheticChunks.fullWithMalformedBlockEntities(registries, false,
+                        ImmutableList.of(sign(2, 64, 2, "hello"))),
                 registries,
                 false);
 
@@ -56,11 +57,13 @@ class ChunkReencodeFidelityTest {
         RegistryAccess registries = TestRegistries.frozen();
 
         CompoundTag before = codec.encode(
-                SyntheticChunks.fullWithMalformedBlockEntities(registries, false, List.of(sign(2, 64, 2, "hello"))),
+                SyntheticChunks.fullWithMalformedBlockEntities(registries, false,
+                        ImmutableList.of(sign(2, 64, 2, "hello"))),
                 registries,
                 false);
         CompoundTag after = codec.encode(
-                SyntheticChunks.fullWithMalformedBlockEntities(registries, false, List.of(sign(2, 64, 2, "world"))),
+                SyntheticChunks.fullWithMalformedBlockEntities(registries, false,
+                        ImmutableList.of(sign(2, 64, 2, "world"))),
                 registries,
                 false);
 
@@ -74,11 +77,12 @@ class ChunkReencodeFidelityTest {
         RegistryAccess registries = TestRegistries.frozen();
 
         CompoundTag withSign = codec.encode(
-                SyntheticChunks.fullWithMalformedBlockEntities(registries, false, List.of(sign(2, 64, 2, "hello"))),
+                SyntheticChunks.fullWithMalformedBlockEntities(registries, false,
+                        ImmutableList.of(sign(2, 64, 2, "hello"))),
                 registries,
                 false);
         CompoundTag withoutSign = codec.encode(
-                SyntheticChunks.fullWithBlockEntities(registries, false, List.of()), registries, false);
+                SyntheticChunks.fullWithBlockEntities(registries, false, ImmutableList.of()), registries, false);
 
         assertNotNull(findByPosOrNull(withSign, 2, 64, 2), "captured while present");
         assertNull(findByPosOrNull(withoutSign, 2, 64, 2),

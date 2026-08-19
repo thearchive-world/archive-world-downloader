@@ -10,6 +10,8 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.chunkTagWith;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
@@ -20,7 +22,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
@@ -125,7 +126,7 @@ class ChunkFlushPlanTest {
         CompoundTag onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
         CompoundTag freshReopened = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
         CompoundTag freshRewalked = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
-        LongSet openTimeCaptured = ChunkMerge.capturedPositions(List.of(new BlockPos(6, 64, 6)));
+        LongSet openTimeCaptured = ChunkMerge.capturedPositions(ImmutableList.of(new BlockPos(6, 64, 6)));
 
         int withPosition = ChunkFlushPlan.readMerge(ChunkMerge.occupancyMap(), openTimeCaptured, LongSets.EMPTY_SET)
                 .merge(onDisk.copy(), freshReopened);
@@ -152,9 +153,9 @@ class ChunkFlushPlanTest {
         CompoundTag freshReopened = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
         CompoundTag freshRewalked = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
 
-        int landed = ChunkFlushPlan.readMerge(snapshot, List.of(pos), LongSets.EMPTY_SET)
+        int landed = ChunkFlushPlan.readMerge(snapshot, ImmutableList.of(pos), LongSets.EMPTY_SET)
                 .merge(onDisk.copy(), freshReopened);
-        int none = ChunkFlushPlan.readMerge(snapshot, List.of(), LongSets.EMPTY_SET).merge(onDisk.copy(),
+        int none = ChunkFlushPlan.readMerge(snapshot, ImmutableList.of(), LongSets.EMPTY_SET).merge(onDisk.copy(),
                 freshRewalked);
 
         assertEquals(0, landed, "a position named as landing captured its own state, so nothing carries back");
@@ -176,7 +177,7 @@ class ChunkFlushPlanTest {
 
         List<BlockPos> landing = ChunkFlushPlan.landingHolderPositions(snapshot, holders);
 
-        assertEquals(List.of(new BlockPos(6, 64, 6)), landing,
+        assertEquals(ImmutableList.of(new BlockPos(6, 64, 6)), landing,
                 "the position with no captured block entity is not a landing holder");
     }
 
@@ -205,7 +206,7 @@ class ChunkFlushPlanTest {
 
         assertEquals(3, tally.merged(), "each of the three stashes folded its own block entity");
         assertEquals(0, tally.failed());
-        assertFalse(findByPos(chunkTag, 1, 64, 1).getList("Items", Tag.TAG_COMPOUND).isEmpty(),
+        assertFalse(findByPos(chunkTag, 1, 64, 1).getList("Items", 10).isEmpty(),
                 "the chest gained its items");
         assertTrue(findByPos(chunkTag, 2, 64, 2).contains("Book"), "the lectern gained its book");
         assertTrue(findByPos(chunkTag, 3, 64, 3).contains("RecordItem"), "the jukebox gained its disc");
@@ -237,7 +238,7 @@ class ChunkFlushPlanTest {
                 itemsHolder("minecraft:diamond"));
 
         MergeTally tally = ChunkFlushPlan.foldChunkStashes(chunkTag, origin(), containerSink, lecternSink,
-                containers, Map.of(), Map.of());
+                containers, ImmutableMap.of(), ImmutableMap.of());
 
         assertEquals(0, tally.merged());
         assertFalse(containers.isEmpty(), "a holder in another chunk waits for that chunk's own flush");
@@ -256,7 +257,7 @@ class ChunkFlushPlanTest {
 
         assertEquals(2, tally.merged(), "both the container and the lectern rewrite land");
         assertEquals(0, tally.failed());
-        assertFalse(findByPos(onDisk, 1, 64, 1).getList("Items", Tag.TAG_COMPOUND).isEmpty());
+        assertFalse(findByPos(onDisk, 1, 64, 1).getList("Items", 10).isEmpty());
         assertTrue(findByPos(onDisk, 2, 64, 2).contains("Book"));
     }
 
@@ -292,12 +293,12 @@ class ChunkFlushPlanTest {
 
         List<BlockPos> landing = ChunkFlushPlan.landingHolderPositions(snapshot, holders);
 
-        assertEquals(List.of(new BlockPos(1, 64, 1)), landing,
+        assertEquals(ImmutableList.of(new BlockPos(1, 64, 1)), landing,
                 "a type-changed position and a position with no captured block entity both drop out");
     }
 
     /** A snapshot whose block-entity list is {@code blockEntities}, with no block states behind them. */
     private static ChunkSnapshotSource snapshotOf(CompoundTag... blockEntities) {
-        return SyntheticChunks.fullWithBlockEntities(registries, true, List.of(blockEntities));
+        return SyntheticChunks.fullWithBlockEntities(registries, true, ImmutableList.copyOf(blockEntities));
     }
 }

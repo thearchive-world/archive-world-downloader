@@ -50,7 +50,8 @@ final class ItemLocationScrub {
      * missing or non-list {@code listKey} is a no-op. The holder is mutated in place.
      */
     public static void scrub(CompoundTag holder, String listKey) {
-        if (holder.get(listKey) instanceof ListTag list) {
+        if (holder.get(listKey) instanceof ListTag) {
+            ListTag list = (ListTag) holder.get(listKey);
             ItemTreeWalk.walkList(list, ItemLocationScrub::scrubItemTag);
         }
     }
@@ -65,9 +66,11 @@ final class ItemLocationScrub {
     public static void scrubBlockEntity(CompoundTag blockEntity) {
         for (String key : blockEntity.getAllKeys()) {
             Tag value = blockEntity.get(key);
-            if (value instanceof ListTag list) {
+            if (value instanceof ListTag) {
+                ListTag list = (ListTag) value;
                 ItemTreeWalk.walkList(list, ItemLocationScrub::scrubItemTag);
-            } else if (value instanceof CompoundTag compound) {
+            } else if (value instanceof CompoundTag) {
+                CompoundTag compound = (CompoundTag) value;
                 ItemTreeWalk.walkItem(compound, ItemLocationScrub::scrubItemTag);
             }
         }
@@ -84,22 +87,28 @@ final class ItemLocationScrub {
     public static void scrubEntity(CompoundTag entity) {
         for (String key : entity.getAllKeys()) {
             Tag value = entity.get(key);
-            if (value instanceof ListTag list) {
+            if (value instanceof ListTag) {
+                ListTag list = (ListTag) value;
                 ItemTreeWalk.walkList(list, ItemLocationScrub::scrubItemTag);
-            } else if (value instanceof CompoundTag compound) {
+            } else if (value instanceof CompoundTag) {
+                CompoundTag compound = (CompoundTag) value;
                 ItemTreeWalk.walkItem(compound, ItemLocationScrub::scrubItemTag);
             }
         }
-        if (entity.get(EQUIPMENT) instanceof CompoundTag equipment) {
+        if (entity.get(EQUIPMENT) instanceof CompoundTag) {
+            CompoundTag equipment = (CompoundTag) entity.get(EQUIPMENT);
             for (String slot : equipment.getAllKeys()) {
-                if (equipment.get(slot) instanceof CompoundTag item) {
+                if (equipment.get(slot) instanceof CompoundTag) {
+                    CompoundTag item = (CompoundTag) equipment.get(slot);
                     ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
                 }
             }
         }
-        if (entity.get(PASSENGERS) instanceof ListTag passengers) {
+        if (entity.get(PASSENGERS) instanceof ListTag) {
+            ListTag passengers = (ListTag) entity.get(PASSENGERS);
             for (int i = 0; i < passengers.size(); i++) {
-                if (passengers.get(i) instanceof CompoundTag passenger) {
+                if (passengers.get(i) instanceof CompoundTag) {
+                    CompoundTag passenger = (CompoundTag) passengers.get(i);
                     scrubEntity(passenger);
                 }
             }
@@ -119,12 +128,15 @@ final class ItemLocationScrub {
     private static void scrubItemTag(CompoundTag tag) {
         tag.remove(LODESTONE_POS);
         tag.remove(LODESTONE_DIMENSION);
-        if (tag.get(BLOCK_ENTITY_TAG) instanceof CompoundTag blockEntityTag) {
+        if (tag.get(BLOCK_ENTITY_TAG) instanceof CompoundTag) {
+            CompoundTag blockEntityTag = (CompoundTag) tag.get(BLOCK_ENTITY_TAG);
             blockEntityTag.remove(FLOWER_POS);
-            if (blockEntityTag.get(BEES) instanceof ListTag bees) {
+            if (blockEntityTag.get(BEES) instanceof ListTag) {
+                ListTag bees = (ListTag) blockEntityTag.get(BEES);
                 for (int i = 0; i < bees.size(); i++) {
-                    if (bees.get(i) instanceof CompoundTag occupant
-                            && occupant.get(ENTITY_DATA) instanceof CompoundTag entityData) {
+                    CompoundTag occupant = bees.get(i) instanceof CompoundTag ? (CompoundTag) bees.get(i) : null;
+                    if (occupant != null && occupant.get(ENTITY_DATA) instanceof CompoundTag) {
+                        CompoundTag entityData = (CompoundTag) occupant.get(ENTITY_DATA);
                         entityData.remove(FLOWER_POS);
                     }
                 }

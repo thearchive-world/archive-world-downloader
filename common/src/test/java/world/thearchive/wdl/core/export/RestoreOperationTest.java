@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.channels.FileChannel;
@@ -22,7 +23,6 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -423,7 +423,7 @@ class RestoreOperationTest {
         }
         // Never a relocation under a live session: the disposition defers and the notice names the aside.
         assertEquals(RestoreOperation.Outcome.SWAP_FAILED, result.outcome());
-        assertEquals(List.of(aside), result.survivingPaths());
+        assertEquals(ImmutableList.of(aside), result.survivingPaths());
         assertFalse(Files.exists(saves.resolve("World_(2)")));
         assertTrue(RestoreOperation.attemptReferences(saves, "World"));
     }
@@ -439,7 +439,7 @@ class RestoreOperationTest {
         }));
         RestoreOperation.Result result = operation.run();
         assertEquals(RestoreOperation.Outcome.SWAP_FAILED, result.outcome());
-        assertEquals(List.of(aside), result.survivingPaths());
+        assertEquals(ImmutableList.of(aside), result.survivingPaths());
         assertTrue(RestoreOperation.attemptReferences(saves, "World"));
     }
 

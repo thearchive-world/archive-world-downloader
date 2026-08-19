@@ -5,6 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,7 @@ class DimensionRebindTest {
 
         rebind.rebind(NETHER);
 
-        assertEquals(List.of("drain-registered-last", "swap-registered-first", "clear"), order,
+        assertEquals(ImmutableList.of("drain-registered-last", "swap-registered-first", "clear"), order,
                 "the behavior a store registers under decides when it runs, not the line it registered on");
     }
 
@@ -48,7 +49,7 @@ class DimensionRebindTest {
 
         rebind.rebind(NETHER);
 
-        assertEquals(List.of("drain-a", "drain-b", "swap"), order,
+        assertEquals(ImmutableList.of("drain-a", "drain-b", "swap"), order,
                 "the second drain writes into the dimension being left, which the swap has not yet retargeted");
     }
 
@@ -63,7 +64,7 @@ class DimensionRebindTest {
 
         rebind.rebind(NETHER);
 
-        assertEquals(List.of("promote", "flush"), order);
+        assertEquals(ImmutableList.of("promote", "flush"), order);
     }
 
     @Test
@@ -75,7 +76,7 @@ class DimensionRebindTest {
 
         rebind.rebind(NETHER);
 
-        assertEquals(List.of(NETHER, NETHER + "-again"), bound,
+        assertEquals(ImmutableList.of(NETHER, NETHER + "-again"), bound,
                 "the entered dimension arrives as the argument, so no swap reads a field mid-rebind");
     }
 
@@ -91,6 +92,6 @@ class DimensionRebindTest {
 
         rebind.bind(OVERWORLD);
 
-        assertEquals(List.of(OVERWORLD), order, "the swaps alone");
+        assertEquals(ImmutableList.of(OVERWORLD), order, "the swaps alone");
     }
 }

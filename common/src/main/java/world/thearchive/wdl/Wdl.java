@@ -3,11 +3,13 @@
 
 package world.thearchive.wdl;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -29,9 +31,9 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.world.level.storage.LevelResource;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.adapter.CompletionMarshal;
 import world.thearchive.wdl.adapter.ConnectionTee;
@@ -78,7 +80,7 @@ import world.thearchive.wdl.update.UpdateCheck;
  * starts/stops a {@link LiveCaptureSession}, the client tick advances capture, and disconnect auto-saves.
  */
 public final class Wdl {
-    private static final Logger LOGGER = LoggerFactory.getLogger(Wdl.class);
+    private static final Logger LOGGER = LogManager.getLogger(Wdl.class);
 
     // Set once by initialize() from the loader entrypoint before any hook can fire; never null in operation,
     // a lifecycle NullAway cannot model, so its uninitialized-field check is suppressed on these two.
@@ -179,9 +181,12 @@ public final class Wdl {
         bridge = platformBridge;
         bobbyFilter = BobbyChunkFilter.resolve(bridge);
         outlineTracker.useBobbyFilter(bobbyFilter);
-        adapter = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No VersionAdapter service is registered"));
+        Iterator<VersionAdapter> adapters = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
+                .iterator();
+        if (!adapters.hasNext()) {
+            throw new IllegalStateException("No VersionAdapter service is registered");
+        }
+        adapter = adapters.next();
 
         LOGGER.info("loaded on Minecraft {}: adapter={}, bridge={}",
                 mcVersion(), adapter.getClass().getSimpleName(), bridge.getClass().getSimpleName());
@@ -298,7 +303,7 @@ public final class Wdl {
         String runningRaw = bridge.modVersion();
         Optional<SemVer> running = SemVer.parse(runningRaw);
         String modrinthId = modrinthId();
-        if (running.isEmpty() || modrinthId.isEmpty()) {
+        if (!running.isPresent() || modrinthId.isEmpty()) {
             return;
         }
         RuntimeInfo info = new RuntimeInfo(bridge.loaderName().toLowerCase(Locale.ROOT), mcVersion(),
@@ -336,7 +341,7 @@ public final class Wdl {
      */
     private static void onUpdateAvailableJoin() {
         Optional<UpdateAvailable> available = updateCheck.available();
-        if (available.isEmpty()) {
+        if (!available.isPresent()) {
             return;
         }
         if (!updateCheck.consumeChatPending(WdlConfig.load(configPath()).showChatMessages())) {
@@ -557,7 +562,7 @@ public final class Wdl {
                 return DownloadCatalog.list(savesDirectory, loadedWorld);
             } catch (IOException | RuntimeException e) {
                 LOGGER.warn("failed to list the downloads for the screen", e);
-                return List.of();
+                return ImmutableList.of();
             }
         };
         WdlConfig config = WdlConfig.load(configPath());
@@ -637,29 +642,57 @@ public final class Wdl {
     /** The outcome-to-copy table for a finished restore; every cause surfaces as a toast or a log line. */
     private static void surfaceRestoreOutcome(RestoreOperation.Result result, String folderName) {
         switch (result.outcome()) {
-            case RESTORED -> bridge.sendToast(ToastCopy.restored(folderName));
-            case RESTORED_WITH_REMNANTS -> {
+            case RESTORED:
+                bridge.sendToast(ToastCopy.restored(folderName));
+                break;
+            case RESTORED_WITH_REMNANTS:
                 LOGGER.warn("restore of {} left remnants under {}; the next sweep cleans them up",
                         folderName, RestoreOperation.TEMPORARY_ROOT);
                 bridge.sendToast(ToastCopy.restored(folderName));
-            }
-            case RELOCATED -> {
+                break;
+            case RELOCATED: {
                 Path sibling = Objects.requireNonNull(result.relocatedTo(), "RELOCATED names its sibling");
                 bridge.sendToast(ToastCopy.restoreRefusedRelocated(folderLabel(sibling)));
+                break;
             }
-            case ABORTED -> LOGGER.info("restore of {} aborted by shutdown", folderName);
-            case NOT_MANAGED, FILE_OCCUPANT -> bridge.sendToast(ToastCopy.refuseOccupant(folderName, false));
-            case FOLDER_MISSING -> bridge.sendToast(ToastCopy.refuseFolderMissing(folderName));
-            case NOT_TAINTED -> bridge.sendToast(ToastCopy.restoreRefusedNotTainted());
-            case TAINT_UNKNOWN -> bridge.sendToast(ToastCopy.restoreRefusedTaintUnknown());
-            case SOURCE_CHANGED -> bridge.sendToast(ToastCopy.restoreRefusedSourceChanged());
-            case WORLD_IN_USE -> bridge.sendToast(ToastCopy.restoreRefusedWorldInUse());
-            case SNAPSHOT_FAILED -> bridge.sendToast(ToastCopy.restoreRefusedSnapshotFailed());
-            case DISK_FULL -> bridge.sendToast(ToastCopy.restoreRefusedDiskFull());
-            case EXTRACT_REFUSED -> bridge.sendToast(ToastCopy.restoreRefusedExtractRefused());
-            case SWAP_FAILED -> bridge.sendToast(ToastCopy.restoreRefusedSwapFailed(
-                    describeSurvivingPaths(result.survivingPaths())));
-            default -> LOGGER.error("unexpected restore outcome {} for {}", result.outcome(), folderName);
+            case ABORTED:
+                LOGGER.info("restore of {} aborted by shutdown", folderName);
+                break;
+            case NOT_MANAGED:
+            case FILE_OCCUPANT:
+                bridge.sendToast(ToastCopy.refuseOccupant(folderName, false));
+                break;
+            case FOLDER_MISSING:
+                bridge.sendToast(ToastCopy.refuseFolderMissing(folderName));
+                break;
+            case NOT_TAINTED:
+                bridge.sendToast(ToastCopy.restoreRefusedNotTainted());
+                break;
+            case TAINT_UNKNOWN:
+                bridge.sendToast(ToastCopy.restoreRefusedTaintUnknown());
+                break;
+            case SOURCE_CHANGED:
+                bridge.sendToast(ToastCopy.restoreRefusedSourceChanged());
+                break;
+            case WORLD_IN_USE:
+                bridge.sendToast(ToastCopy.restoreRefusedWorldInUse());
+                break;
+            case SNAPSHOT_FAILED:
+                bridge.sendToast(ToastCopy.restoreRefusedSnapshotFailed());
+                break;
+            case DISK_FULL:
+                bridge.sendToast(ToastCopy.restoreRefusedDiskFull());
+                break;
+            case EXTRACT_REFUSED:
+                bridge.sendToast(ToastCopy.restoreRefusedExtractRefused());
+                break;
+            case SWAP_FAILED:
+                bridge.sendToast(ToastCopy.restoreRefusedSwapFailed(
+                        describeSurvivingPaths(result.survivingPaths())));
+                break;
+            default:
+                LOGGER.error("unexpected restore outcome {} for {}", result.outcome(), folderName);
+                break;
         }
     }
 
@@ -771,12 +804,18 @@ public final class Wdl {
      * saving): the button stays an open-screen affordance during a restore.
      */
     private static String pausePrimaryLabelKey() {
-        return switch (controller.state()) {
-            case IDLE -> "wdl.screen.downloads.open";
-            case RECORDING -> "wdl.screen.downloads.stop_download";
-            case SAVING -> "wdl.screen.downloads.saving";
-            case RESTORING -> "wdl.screen.downloads.open";
-        };
+        switch (controller.state()) {
+            case IDLE:
+                return "wdl.screen.downloads.open";
+            case RECORDING:
+                return "wdl.screen.downloads.stop_download";
+            case SAVING:
+                return "wdl.screen.downloads.saving";
+            case RESTORING:
+                return "wdl.screen.downloads.open";
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 
     /** The primary button is inert only while a save drains; recording offers Stop, idle and restoring open. */
@@ -790,16 +829,21 @@ public final class Wdl {
      */
     private static void onPausePrimary() {
         switch (controller.state()) {
-            case RECORDING -> {
+            case RECORDING:
                 if (currentConfig.showChatMessages()) {
                     bridge.sendChat(ChatCopy.saving());
                 }
                 controller.stop();
                 Minecraft.getInstance().setScreen(null);
-            }
-            case SAVING -> {} // active == false makes this unreachable by click; the branch is defense in depth
-            case RESTORING -> openDownloadsScreenNow();
-            default -> openDownloadsScreenNow();
+                break;
+            case SAVING:
+                break; // active == false makes this unreachable by click; the branch is defense in depth
+            case RESTORING:
+                openDownloadsScreenNow();
+                break;
+            default:
+                openDownloadsScreenNow();
+                break;
         }
     }
 
@@ -812,7 +856,7 @@ public final class Wdl {
     /** The in-capture screen label's fallback name: the current server's name, else a generic default. */
     private static String defaultDownloadName(Minecraft minecraft) {
         ServerData server = minecraft.getCurrentServer();
-        return server != null && server.name != null && !server.name.isBlank() ? server.name : "download";
+        return server != null && server.name != null && !server.name.trim().isEmpty() ? server.name : "download";
     }
 
     /**

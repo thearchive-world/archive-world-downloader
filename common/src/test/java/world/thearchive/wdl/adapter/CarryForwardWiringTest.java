@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
+import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -81,7 +82,7 @@ class CarryForwardWiringTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "the drain hit no hard error");
-        assertEquals(List.of("minecraft:diamond"), itemsOnDisk(paths, pos),
+        assertEquals(ImmutableList.of("minecraft:diamond"), itemsOnDisk(paths, pos),
                 "a re-walk through this world's own chunk carries its captured contents forward as before");
     }
 
@@ -102,7 +103,7 @@ class CarryForwardWiringTest {
         AsyncSaveWriter first = saveWriter(paths);
         session.flushBuffer(first, true, 0, 0, 0);
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed(), "the first flush landed");
-        assertEquals(List.of(), itemsOnDisk(paths, pos),
+        assertEquals(ImmutableList.of(), itemsOnDisk(paths, pos),
                 "the block on disk was the one the placement replaced, so nothing of it carries");
 
         writePrior(paths, pos, chestHolding("minecraft:emerald"));
@@ -110,7 +111,7 @@ class CarryForwardWiringTest {
         AsyncSaveWriter second = saveWriter(paths);
         session.flushBuffer(second, true, 0, 0, 0);
         assertFalse(second.finish().get(30, TimeUnit.SECONDS).failed(), "the second flush landed");
-        assertEquals(List.of("minecraft:emerald"), itemsOnDisk(paths, pos),
+        assertEquals(ImmutableList.of("minecraft:emerald"), itemsOnDisk(paths, pos),
                 "and the visit after it carries forward what this download archived for the new block");
     }
 
@@ -135,7 +136,7 @@ class CarryForwardWiringTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "the drain hit no hard error");
-        assertEquals(List.of(), itemsOnDisk(paths, pos),
+        assertEquals(ImmutableList.of(), itemsOnDisk(paths, pos),
                 "the open saw an empty chest, so the flush must leave it empty rather than restore what the "
                         + "earlier write archived there");
     }
@@ -210,7 +211,7 @@ class CarryForwardWiringTest {
         CompoundTag chunk = BlockEntityFixtures.chunkTagWith(blockEntity);
         try (IOWorker storage = regionStorage(paths)) {
             storage.store(pos, chunk).join();
-            storage.synchronize(true).join();
+            storage.synchronize().join();
         }
     }
 
@@ -220,7 +221,8 @@ class CarryForwardWiringTest {
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             CompoundTag written = findByPos(chunk, chest.getX(), chest.getY(), chest.getZ());
             List<String> ids = new ArrayList<>();
-            if (written.get("Items") instanceof ListTag items) {
+            if (written.get("Items") instanceof ListTag) {
+                ListTag items = (ListTag) written.get("Items");
                 for (int i = 0; i < items.size(); i++) {
                     ids.add(((CompoundTag) items.get(i)).getString("id"));
                 }
@@ -247,14 +249,12 @@ class CarryForwardWiringTest {
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
         Files.createDirectories(paths.regionDirectory(Level.OVERWORLD));
-        Files.createDirectories(paths.entitiesDirectory(Level.OVERWORLD));
         return paths;
     }
 
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
                 dimension -> regionStorage(paths),
-                paths::openEntitiesStorage,
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
     }
 

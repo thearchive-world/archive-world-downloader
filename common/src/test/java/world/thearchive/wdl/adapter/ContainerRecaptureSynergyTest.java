@@ -7,15 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 
+import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -56,7 +55,7 @@ class ContainerRecaptureSynergyTest {
     }
 
     private static ItemStack mergedItemAt(ContainerSink sink, CompoundTag chunkTag, int slot) {
-        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
+        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", 10);
         CompoundTag chest = blockEntities.getCompound(0);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(chest, back);
@@ -81,7 +80,7 @@ class ContainerRecaptureSynergyTest {
     void reCapturingThePlacedChestLetsTheStashMergeOntoIt() {
         // After re-capture the chunk's block entities include the placed chest, so the merge lands.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, false,
-                List.of(blockEntity("minecraft:chest", CHEST_X, CHEST_Y, CHEST_Z)));
+                ImmutableList.of(blockEntity("minecraft:chest", CHEST_X, CHEST_Y, CHEST_Z)));
         CompoundTag recapturedTag = codec.encode(snapshot, registries, false);
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
@@ -104,7 +103,7 @@ class ContainerRecaptureSynergyTest {
         CompoundTag latestRecapture = null;
         for (int reencode = 0; reencode < 3; reencode++) {
             ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, false,
-                    List.of(blockEntity("minecraft:chest", CHEST_X, CHEST_Y, CHEST_Z)));
+                    ImmutableList.of(blockEntity("minecraft:chest", CHEST_X, CHEST_Y, CHEST_Z)));
             latestRecapture = codec.encode(snapshot, registries, false);
         }
 

@@ -40,9 +40,11 @@ final class EntityTreeWalk {
         if (uuid != null) {
             nodes.put(uuid, node);
         }
-        if (node.get("Passengers") instanceof ListTag passengers) {
+        if (node.get("Passengers") instanceof ListTag) {
+            ListTag passengers = (ListTag) node.get("Passengers");
             for (int i = 0; i < passengers.size(); i++) {
-                if (passengers.get(i) instanceof CompoundTag passenger) {
+                if (passengers.get(i) instanceof CompoundTag) {
+                    CompoundTag passenger = (CompoundTag) passengers.get(i);
                     index(passenger, nodes);
                 }
             }

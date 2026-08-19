@@ -6,6 +6,7 @@ package world.thearchive.wdl.adapter.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,7 +29,7 @@ class WorldPathsImplTest {
         Map<String, Path> directories = new WorldPathsImpl(saveRoot).onDiskRegionDirectories();
 
         List<String> names = new ArrayList<>(directories.keySet());
-        assertEquals(List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end",
+        assertEquals(ImmutableList.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end",
                 "ans:deep/mine", "myns:void"), names, "vanilla first, then customs sorted by name");
         assertEquals(saveRoot.resolve("DIM-1").resolve("region"), directories.get("minecraft:the_nether"));
         assertEquals(saveRoot.resolve("dimensions").resolve("myns").resolve("void").resolve("region"),
@@ -45,7 +46,7 @@ class WorldPathsImplTest {
 
         Map<String, Path> directories = new WorldPathsImpl(saveRoot).onDiskRegionDirectories();
 
-        assertEquals(List.of("myns:region"), new ArrayList<>(directories.keySet()));
+        assertEquals(ImmutableList.of("myns:region"), new ArrayList<>(directories.keySet()));
     }
 
     @Test
@@ -57,7 +58,7 @@ class WorldPathsImplTest {
 
         Map<String, Path> directories = new WorldPathsImpl(saveRoot).onDiskRegionDirectories();
 
-        assertEquals(List.of("minecraft:overworld"), new ArrayList<>(directories.keySet()));
+        assertEquals(ImmutableList.of("minecraft:overworld"), new ArrayList<>(directories.keySet()));
         assertTrue(Files.notExists(saveRoot.resolve("DIM-1")), "enumeration must not create directories");
     }
 

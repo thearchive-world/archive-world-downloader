@@ -10,21 +10,16 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
 
 /**
- * Per-band save-layout axis: maps a dimension to its on-disk {@code region/} and {@code entities/} directories and
- * opens the vanilla region storage rooted at each.
+ * Per-band save-layout axis: maps a dimension to its on-disk {@code region/} directory and opens the vanilla region
+ * storage rooted at it. At 1.16.5 entities live inside the {@code region/} chunk, so there is no separate
+ * {@code entities/} region to map or open (that is 1.17 and above).
  *
- * <p>The per-band implementation pre-creates the {@code region/} and {@code entities/} directories before any region
- * write.
+ * <p>The per-band implementation pre-creates the {@code region/} directory before any region write.
  */
 public interface WorldPaths {
     Path regionDirectory(ResourceKey<Level> dimension);
 
-    Path entitiesDirectory(ResourceKey<Level> dimension);
-
     IOWorker openRegionStorage(ResourceKey<Level> dimension);
-
-    /** Like {@link #openRegionStorage} but rooted at the {@code entities/} region. */
-    IOWorker openEntitiesStorage(ResourceKey<Level> dimension);
 
     /**
      * The global {@code data/} directory (the SavedData surface: the map files and the map-id index), which lives under

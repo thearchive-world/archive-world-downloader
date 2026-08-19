@@ -28,7 +28,8 @@ final class MapIdRemap {
      * bundles. A missing or non-list {@code listKey} is a no-op. {@code holder} is mutated in place.
      */
     public static void remapFromItemList(CompoundTag holder, String listKey, IntUnaryOperator resolver) {
-        if (holder.get(listKey) instanceof ListTag list) {
+        if (holder.get(listKey) instanceof ListTag) {
+            ListTag list = (ListTag) holder.get(listKey);
             ItemTreeWalk.walkList(list, tag -> remapMapId(tag, resolver));
         }
     }

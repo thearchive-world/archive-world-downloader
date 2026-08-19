@@ -8,10 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
@@ -83,7 +84,7 @@ class EntityBufferTest {
         buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("old"));
         buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("new"));
 
-        assertEquals(Set.of(new ChunkPos(5, 5)), buffer.bufferedChunks(),
+        assertEquals(ImmutableSet.of(new ChunkPos(5, 5)), buffer.bufferedChunks(),
                 "the chunk the entity left holds nothing, so it is not a buffered chunk");
     }
 
@@ -103,8 +104,8 @@ class EntityBufferTest {
         buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
         buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("a-moved"));
 
-        assertEquals(Set.of(new ChunkPos(0, 0), new ChunkPos(5, 5)), buffer.bufferedChunks());
-        assertEquals(List.of("b"), markersOf(buffer.drainChunk(new ChunkPos(0, 0))),
+        assertEquals(ImmutableSet.of(new ChunkPos(0, 0), new ChunkPos(5, 5)), buffer.bufferedChunks());
+        assertEquals(ImmutableList.of("b"), markersOf(buffer.drainChunk(new ChunkPos(0, 0))),
                 "the entity that stayed behind is still buffered in the old chunk");
     }
 
@@ -114,7 +115,7 @@ class EntityBufferTest {
         buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("old"));
         buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("new"));
 
-        assertEquals(List.of("new"), markersOf(buffer.drainChunk(new ChunkPos(0, 0))));
+        assertEquals(ImmutableList.of("new"), markersOf(buffer.drainChunk(new ChunkPos(0, 0))));
         assertTrue(buffer.isEmpty(), "the replaced copy left no residue");
     }
 
@@ -141,7 +142,7 @@ class EntityBufferTest {
         buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
         buffer.accumulate(UUID_B, new ChunkPos(1, 1), tag("b"));
 
-        assertEquals(Set.of(new ChunkPos(0, 0), new ChunkPos(1, 1)), buffer.bufferedChunks());
+        assertEquals(ImmutableSet.of(new ChunkPos(0, 0), new ChunkPos(1, 1)), buffer.bufferedChunks());
     }
 
     @Test
@@ -150,11 +151,12 @@ class EntityBufferTest {
         buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
         buffer.accumulate(UUID_B, new ChunkPos(1, 1), tag("b"));
 
-        assertEquals(List.of("a"), markersOf(buffer.drainChunk(new ChunkPos(0, 0))));
+        assertEquals(ImmutableList.of("a"), markersOf(buffer.drainChunk(new ChunkPos(0, 0))));
 
-        assertEquals(Set.of(new ChunkPos(1, 1)), buffer.bufferedChunks(), "the undrained chunk is still reported");
+        assertEquals(ImmutableSet.of(new ChunkPos(1, 1)), buffer.bufferedChunks(),
+                "the undrained chunk is still reported");
         assertEquals(new ChunkPos(1, 1), buffer.chunkOf(UUID_B));
-        assertEquals(List.of("b"), markersOf(buffer.drainChunk(new ChunkPos(1, 1))));
+        assertEquals(ImmutableList.of("b"), markersOf(buffer.drainChunk(new ChunkPos(1, 1))));
         assertTrue(buffer.isEmpty());
     }
 
@@ -169,7 +171,7 @@ class EntityBufferTest {
             markers.addAll(markersOf(buffer.drainChunk(pos))); // the flush loop drains inside the iteration
         }
 
-        assertEquals(Set.of("a", "b"), new HashSet<>(markers));
+        assertEquals(ImmutableSet.of("a", "b"), new HashSet<>(markers));
         assertTrue(buffer.isEmpty());
     }
 
@@ -190,7 +192,7 @@ class EntityBufferTest {
             markers.addAll(markersOf(drained));
         }
 
-        assertEquals(Set.of("a-moved", "b-moved", "c", "d"), new HashSet<>(markers));
+        assertEquals(ImmutableSet.of("a-moved", "b-moved", "c", "d"), new HashSet<>(markers));
         assertEquals(4, markers.size(), "no entity drains twice");
         assertTrue(buffer.isEmpty(), "every buffered entity was reachable through the reported chunks");
     }
@@ -208,7 +210,7 @@ class EntityBufferTest {
         buffer.drainChunk(new ChunkPos(0, 0));
 
         assertTrue(buffer.drainChunk(new ChunkPos(0, 0)).isEmpty());
-        assertEquals(Set.of(), buffer.bufferedChunks());
+        assertEquals(ImmutableSet.of(), buffer.bufferedChunks());
     }
 
     @Test
@@ -220,6 +222,6 @@ class EntityBufferTest {
         List<CompoundTag> drained = buffer.drainChunk(new ChunkPos(0, 0));
         drained.removeIf(tag -> "a".equals(tag.getString("id"))); // the caller filters the drain in place
 
-        assertEquals(List.of("b"), markersOf(drained));
+        assertEquals(ImmutableList.of("b"), markersOf(drained));
     }
 }

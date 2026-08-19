@@ -6,12 +6,13 @@ package world.thearchive.wdl.adapter.impl;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
 import world.thearchive.wdl.adapter.MapSink;
 
 /**
- * 1.17.1 map sink: serializes a client {@code MapItemSavedData} via vanilla's own {@code MapItemSavedData.save} (the
+ * 1.16.5 map sink: serializes a client {@code MapItemSavedData} via vanilla's own {@code MapItemSavedData.save} (the
  * pre-1.21.5 {@code SavedData} write), so the captured inner {@code "data"} tag is byte-for-byte what a vanilla
  * {@code data/map_<id>.dat} would hold.
  *
@@ -23,6 +24,18 @@ public final class MapSinkImpl implements MapSink {
     public Tag serializeMap(MapItemSavedData saved, RegistryAccess registries) {
         // save writes the inner map "data" compound the band-agnostic MapDataWriter then wraps as
         // {data, DataVersion} and gzips.
-        return saved.save(new CompoundTag());
+        if (saved.dimension != null) {
+            return saved.save(new CompoundTag());
+        }
+        // A version-bridging proxy (ViaVersion/ViaBackwards fronting a newer server) can relay a filled map to the
+        // client with a null dimension, which save dereferences (this.dimension.location()). Stand in the overworld
+        // key for the serialize so the image still writes, then restore so the live client map is left as received,
+        // the way the session leaves its locked flag alone.
+        saved.dimension = Level.OVERWORLD;
+        try {
+            return saved.save(new CompoundTag());
+        } finally {
+            saved.dimension = null;
+        }
     }
 }

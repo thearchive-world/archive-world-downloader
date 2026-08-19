@@ -15,7 +15,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import org.junit.jupiter.api.Test;
@@ -73,8 +72,7 @@ class ChunkRoundTripTest {
     @Test
     void capturedLightRoundTripsInVanillaShape(@TempDir Path directory) {
         RegistryAccess registries = TestRegistries.frozen();
-        LevelHeightAccessor heightAccessor = SyntheticChunks.heightAccessor();
-        int minSectionY = heightAccessor.getMinSection();
+        int minSectionY = SyntheticChunks.MIN_Y;
 
         CompoundTag tag = codec.encode(SyntheticChunks.fullWithLight(registries), registries, false);
         CompoundTag back = RegionRoundTrip.writeThenRead(directory, new ChunkPos(0, 0), tag);
@@ -97,7 +95,7 @@ class ChunkRoundTripTest {
 
     /** The written section tag with the given Y, failing the test if absent. */
     private static CompoundTag sectionAt(CompoundTag chunkTag, int sectionY) {
-        return chunkTag.getCompound("Level").getList("Sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+        return chunkTag.getCompound("Level").getList("Sections", 10).stream().map(t -> (CompoundTag) t)
                 .filter(section -> (section.contains("Y") ? section.getByte("Y") : Byte.MIN_VALUE) == sectionY)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no written section at Y=" + sectionY));
@@ -111,12 +109,12 @@ class ChunkRoundTripTest {
     private static void assertSectionsDecode(CompoundTag chunkTag, RegistryAccess registries) {
         Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
         CompoundTag level = chunkTag.getCompound("Level");
-        for (Tag sectionTag : level.getList("Sections", Tag.TAG_COMPOUND)) {
+        for (Tag sectionTag : level.getList("Sections", 10)) {
             CompoundTag section = (CompoundTag) sectionTag;
-            if (section.contains("BlockStates", Tag.TAG_LONG_ARRAY)) {
+            if (section.contains("BlockStates", 12)) {
                 // read() throws on malformed palette or block-state data, so reaching the next line proves decode.
                 new LevelChunkSection(section.getByte("Y")).getStates()
-                        .read(section.getList("Palette", Tag.TAG_COMPOUND), section.getLongArray("BlockStates"));
+                        .read(section.getList("Palette", 10), section.getLongArray("BlockStates"));
             }
         }
         int[] biomeIds = level.getIntArray("Biomes");

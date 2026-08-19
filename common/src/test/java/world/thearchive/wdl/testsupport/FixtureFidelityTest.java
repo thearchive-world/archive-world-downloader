@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -153,7 +152,7 @@ class FixtureFidelityTest {
         CompoundTag vehicle = new CompoundTag();
         vehicle.putString("id", "minecraft:chest_minecart");
         vehicle.put("Items",
-                holderOf(handBuiltEntry("minecraft:diamond", false, true)).getList("Items", Tag.TAG_COMPOUND));
+                holderOf(handBuiltEntry("minecraft:diamond", false, true)).getList("Items", 10));
 
         reject(() -> EntityFixtures.entityChunkTagWith(vehicle));
     }

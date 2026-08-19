@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.adapter;
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
@@ -54,7 +55,7 @@ enum CapturedBlockField {
      * Iterating this instead of {@code values()} keeps the per-block-entity loops from cloning the backing array on
      * every call; the carry-forward runs them once per block entity of every re-written chunk.
      */
-    private static final List<CapturedBlockField> FIELDS = List.of(values());
+    private static final List<CapturedBlockField> FIELDS = ImmutableList.copyOf(values());
 
     /** How a field's tag is compared and copied, which is what decides its carry-forward rule. */
     private enum Shape {
@@ -124,11 +125,16 @@ enum CapturedBlockField {
      * false for open-time state, which accompanies content but is not content itself.
      */
     boolean holdsContent(CompoundTag blockEntity) {
-        return switch (shape) {
-            case LIST -> NbtMerge.isNonEmptyList(blockEntity, key);
-            case COMPOUND -> blockEntity.get(key) instanceof CompoundTag;
-            case VALUE -> false;
-        };
+        switch (shape) {
+            case LIST:
+                return NbtMerge.isNonEmptyList(blockEntity, key);
+            case COMPOUND:
+                return blockEntity.get(key) instanceof CompoundTag;
+            case VALUE:
+                return false;
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 
     /**
@@ -141,10 +147,15 @@ enum CapturedBlockField {
         if (this == ITEMS && itemsBySlot) {
             return NbtMerge.carryListBySlot(disk, fresh, key, occupiedSlots);
         }
-        return switch (shape) {
-            case LIST -> NbtMerge.carryList(disk, fresh, key);
-            case COMPOUND -> NbtMerge.carryCompound(disk, fresh, key, sidecarKey);
-            case VALUE -> NbtMerge.carryValue(disk, fresh, key, clientDefault);
-        };
+        switch (shape) {
+            case LIST:
+                return NbtMerge.carryList(disk, fresh, key);
+            case COMPOUND:
+                return NbtMerge.carryCompound(disk, fresh, key, sidecarKey);
+            case VALUE:
+                return NbtMerge.carryValue(disk, fresh, key, clientDefault);
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 }

@@ -35,7 +35,7 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.17.1 chunk codec: replicates the minimal client-safe slice of vanilla
+ * 1.16.5 chunk codec: replicates the minimal client-safe slice of vanilla
  * {@code ChunkSerializer.write(ServerLevel, ChunkAccess)} to NBT. Below the 1.21.2 cut the chunk write is a static
  * method that reads from a {@code ServerLevel} a multiplayer client never has, so {@link #encode} rebuilds the tag
  * field by field from the captured snapshot rather than calling vanilla.
@@ -48,7 +48,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
     /** Client chunks have no post-processing (a worldgen artifact). */
     private static final ShortList[] NO_POST_PROCESSING = new ShortList[0];
 
-    // A 1.17.1 world is 0..256: block sections 0..15, with a light-only pad one section below and above. A taller
+    // A 1.16.5 world is 0..256: block sections 0..15, with a light-only pad one section below and above. A taller
     // source (a 26.x server reached through a downgrade proxy) sends sections beyond that range; a section carrying
     // block data outside 0..15 would crash vanilla's unchecked sections[index] on load, so its block data is dropped
     // and the biome column is re-sliced to 0..256. Entities above or below are unaffected (a separate save axis).
@@ -81,10 +81,10 @@ public final class ChunkCodecImpl implements ChunkCodec {
         boolean lightCorrect = chunk.isLightCorrect();
 
         LevelChunkSection[] sections = chunk.getSections();
-        int minSectionY = chunk.getMinSection();
+        int minSectionY = 0;
         List<ChunkSnapshotSource.SectionData> sectionData = new ArrayList<>(sections.length + 2);
-        for (int sectionY = lightEngine.getMinLightSection(); sectionY < lightEngine.getMaxLightSection(); sectionY++) {
-            int index = chunk.getSectionIndexFromSectionY(sectionY);
+        for (int sectionY = -1; sectionY < 17; sectionY++) {
+            int index = sectionY;
             boolean inChunk = index >= 0 && index < sections.length;
             DataLayer blockLight = null;
             DataLayer skyLight = null;
@@ -139,7 +139,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
         ListTag sectionsTag = new ListTag();
         for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
             if (section.y() < MIN_BLOCK_SECTION - 1 || section.y() > MAX_BLOCK_SECTION + 1) {
-                continue; // outside the 1.17.1 section column (block range plus the one-section light pad); dropped
+                continue; // outside the 1.16.5 section column (block range plus the one-section light pad); dropped
             }
             CompoundTag sectionTag = new CompoundTag();
             LevelChunkSection chunkSection = section.chunkSection();
@@ -203,7 +203,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
     }
 
     /**
-     * The per-chunk biome ids for the 1.17.1 column, always the 0..256 grid a 1.17.1 save expects. A taller source's
+     * The per-chunk biome ids for the 1.16.5 column, always the 0..256 grid a 1.16.5 save expects. A taller source's
      * container spans a wider height, so each cell is read through the container's world-Y-aware accessor and re-sliced
      * to the 1024-cell shape rather than writing the container's own longer array.
      */
@@ -260,15 +260,81 @@ public final class ChunkCodecImpl implements ChunkCodec {
     }
 
     /** Immutable snapshot of a captured live chunk (only {@link CompoundTag}s and copies cross threads). */
-    private record CapturedChunkSnapshot(
-            ChunkPos chunkPos,
-            int minSectionY,
-            long gameTime,
-            long inhabitedTime,
-            ChunkStatus status,
-            boolean lightCorrect,
-            Map<Heightmap.Types, long[]> heightmaps,
-            List<ChunkSnapshotSource.SectionData> sections,
-            List<CompoundTag> blockEntities,
-            int[] biomes) implements ChunkSnapshotSource {}
+    private static final class CapturedChunkSnapshot implements ChunkSnapshotSource {
+        private final ChunkPos chunkPos;
+        private final int minSectionY;
+        private final long gameTime;
+        private final long inhabitedTime;
+        private final ChunkStatus status;
+        private final boolean lightCorrect;
+        private final Map<Heightmap.Types, long[]> heightmaps;
+        private final List<ChunkSnapshotSource.SectionData> sections;
+        private final List<CompoundTag> blockEntities;
+        private final int[] biomes;
+
+        CapturedChunkSnapshot(ChunkPos chunkPos, int minSectionY, long gameTime, long inhabitedTime,
+                ChunkStatus status, boolean lightCorrect, Map<Heightmap.Types, long[]> heightmaps,
+                List<ChunkSnapshotSource.SectionData> sections, List<CompoundTag> blockEntities, int[] biomes) {
+            this.chunkPos = chunkPos;
+            this.minSectionY = minSectionY;
+            this.gameTime = gameTime;
+            this.inhabitedTime = inhabitedTime;
+            this.status = status;
+            this.lightCorrect = lightCorrect;
+            this.heightmaps = heightmaps;
+            this.sections = sections;
+            this.blockEntities = blockEntities;
+            this.biomes = biomes;
+        }
+
+        @Override
+        public ChunkPos chunkPos() {
+            return chunkPos;
+        }
+
+        @Override
+        public int minSectionY() {
+            return minSectionY;
+        }
+
+        @Override
+        public long gameTime() {
+            return gameTime;
+        }
+
+        @Override
+        public long inhabitedTime() {
+            return inhabitedTime;
+        }
+
+        @Override
+        public ChunkStatus status() {
+            return status;
+        }
+
+        @Override
+        public boolean lightCorrect() {
+            return lightCorrect;
+        }
+
+        @Override
+        public Map<Heightmap.Types, long[]> heightmaps() {
+            return heightmaps;
+        }
+
+        @Override
+        public List<ChunkSnapshotSource.SectionData> sections() {
+            return sections;
+        }
+
+        @Override
+        public List<CompoundTag> blockEntities() {
+            return blockEntities;
+        }
+
+        @Override
+        public int[] biomes() {
+            return biomes;
+        }
+    }
 }

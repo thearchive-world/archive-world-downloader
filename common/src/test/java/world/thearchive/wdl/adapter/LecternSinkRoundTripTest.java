@@ -14,7 +14,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.item.ItemStack;
@@ -118,7 +117,7 @@ class LecternSinkRoundTripTest {
         CompoundTag content = back.getTag();
         assertEquals("The Title", content.getString("title"), "the book title survives the round-trip");
         assertEquals("An Author", content.getString("author"));
-        ListTag pages = content.getList("pages", Tag.TAG_STRING);
+        ListTag pages = content.getList("pages", 8);
         assertEquals(2, pages.size(), "both pages survive");
         assertEquals("Page one", Component.Serializer.fromJson(pages.getString(0)).getString());
         assertEquals("Page two", Component.Serializer.fromJson(pages.getString(1)).getString());
@@ -132,7 +131,7 @@ class LecternSinkRoundTripTest {
         assertEquals(0, (merged.contains("Page") ? merged.getInt("Page") : -1));
         ItemStack back = readBackBook(merged);
         assertEquals(Items.WRITABLE_BOOK, back.getItem(), "an unsigned writable book is a valid lectern content");
-        ListTag pages = back.getTag().getList("pages", Tag.TAG_STRING);
+        ListTag pages = back.getTag().getList("pages", 8);
         assertEquals(2, pages.size());
         assertEquals("draft page one", pages.getString(0));
         assertEquals("draft page two", pages.getString(1));

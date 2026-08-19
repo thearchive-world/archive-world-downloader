@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.adapter;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -19,9 +20,9 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.core.SaveProgress;
 
@@ -35,19 +36,19 @@ import world.thearchive.wdl.core.SaveProgress;
  *
  * <p>That invariant is this class's own, not one vanilla imposes: the region {@code IOWorker} is safe to call from any
  * thread, because it queues onto a concurrent queue and serializes execution by a status compare-and-set rather than by
- * caller identity. What needs the single thread is here. The two per-dimension {@link Storages} are unsynchronized and
- * open lazily by get-then-put, so a second writer could open two storages over one directory. The merge and rewrite
- * paths are read-modify-write per {@link ChunkPos} and would lose a merge if interleaved. And the finalize order is
- * fixed.
+ * caller identity. What needs the single thread is here. The per-dimension {@link Storages} are unsynchronized and open
+ * lazily by get-then-put, so a second writer could open two storages over one directory. The merge, rewrite and
+ * entity-fold paths are read-modify-write per {@link ChunkPos} and would lose a merge if interleaved. And the finalize
+ * order is fixed.
  *
- * <p>{@link #finish()} enqueues an end-of-stream marker; the writer drains the remaining tags,
- * {@code synchronize(true)}s and closes each storage, runs the {@link Finalizer} (the band's level.dat write), closes
- * the supplied {@link AutoCloseable} (the {@code LevelStorageAccess} holding the session lock), and completes the
- * returned future with the per-target tallies (or the error that aborted it). The future is completed normally even on
- * failure, so the caller polls it with one branch.
+ * <p>{@link #finish()} enqueues an end-of-stream marker; the writer drains the remaining tags, {@code synchronize()}s
+ * and closes each storage, runs the {@link Finalizer} (the band's level.dat write), closes the supplied
+ * {@link AutoCloseable} (the {@code LevelStorageAccess} holding the session lock), and completes the returned future
+ * with the per-target tallies (or the error that aborted it). The future is completed normally even on failure, so the
+ * caller polls it with one branch.
  */
 final class AsyncSaveWriter {
-    private static final Logger LOGGER = LoggerFactory.getLogger(AsyncSaveWriter.class);
+    private static final Logger LOGGER = LogManager.getLogger(AsyncSaveWriter.class);
 
     /**
      * Lazily opens a region storage on the writer thread; called once per (target, dimension) on its first tag. The
@@ -94,9 +95,69 @@ final class AsyncSaveWriter {
      * saved-world message reports. {@code zipFileName} is the export zip actually written on a clean save, or null
      * (knob off, zip failed, or the save failed), so a completion surface never names a zip that is not on disk.
      */
-    record SaveResult(int chunksNew, int chunksRecaptured, int mergedContainers, int chunksFailed,
-            int entityChunksWritten, int entityChunksFailed, int entitiesCarriedForward,
-            @Nullable String zipFileName, @Nullable Throwable error) {
+    static final class SaveResult {
+        private final int chunksNew;
+        private final int chunksRecaptured;
+        private final int mergedContainers;
+        private final int chunksFailed;
+        private final int entityChunksWritten;
+        private final int entityChunksFailed;
+        private final int entitiesCarriedForward;
+        private final @Nullable String zipFileName;
+        private final @Nullable Throwable error;
+
+        SaveResult(int chunksNew, int chunksRecaptured, int mergedContainers, int chunksFailed,
+                int entityChunksWritten, int entityChunksFailed, int entitiesCarriedForward,
+                @Nullable String zipFileName, @Nullable Throwable error) {
+            this.chunksNew = chunksNew;
+            this.chunksRecaptured = chunksRecaptured;
+            this.mergedContainers = mergedContainers;
+            this.chunksFailed = chunksFailed;
+            this.entityChunksWritten = entityChunksWritten;
+            this.entityChunksFailed = entityChunksFailed;
+            this.entitiesCarriedForward = entitiesCarriedForward;
+            this.zipFileName = zipFileName;
+            this.error = error;
+        }
+
+        int chunksNew() {
+            return chunksNew;
+        }
+
+        int chunksRecaptured() {
+            return chunksRecaptured;
+        }
+
+        int mergedContainers() {
+            return mergedContainers;
+        }
+
+        int chunksFailed() {
+            return chunksFailed;
+        }
+
+        int entityChunksWritten() {
+            return entityChunksWritten;
+        }
+
+        int entityChunksFailed() {
+            return entityChunksFailed;
+        }
+
+        int entitiesCarriedForward() {
+            return entitiesCarriedForward;
+        }
+
+        @Nullable
+        String zipFileName() {
+            return zipFileName;
+        }
+
+        @Nullable
+        Throwable error() {
+            return error;
+        }
+
         public boolean failed() {
             return error != null;
         }
@@ -114,24 +175,122 @@ final class AsyncSaveWriter {
 
     private interface Task {}
 
-    private record WriteTask(Target target, ResourceKey<Level> dimension, ChunkPos pos,
-            Supplier<CompoundTag> encode, RegionChunkWriter.ChunkReadMerge merge) implements Task {}
+    private static final class WriteTask implements Task {
+        private final Target target;
+        private final ResourceKey<Level> dimension;
+        private final ChunkPos pos;
+        private final Supplier<CompoundTag> encode;
+        private final RegionChunkWriter.ChunkReadMerge merge;
 
-    private record RewriteTask(ResourceKey<Level> dimension, ChunkPos pos,
-            RegionChunkWriter.ChunkRewrite rewrite) implements Task {}
+        WriteTask(Target target, ResourceKey<Level> dimension, ChunkPos pos, Supplier<CompoundTag> encode,
+                RegionChunkWriter.ChunkReadMerge merge) {
+            this.target = target;
+            this.dimension = dimension;
+            this.pos = pos;
+            this.encode = encode;
+            this.merge = merge;
+        }
 
-    private record ScanTask(Target target, ResourceKey<Level> dimension, ChunkPos pos) implements Task {}
+        Target target() {
+            return target;
+        }
 
-    private record RunTask(Runnable action) implements Task {}
+        ResourceKey<Level> dimension() {
+            return dimension;
+        }
 
-    private record MapBatchTask(List<Runnable> writes) implements Task {}
+        ChunkPos pos() {
+            return pos;
+        }
 
-    private record FinalizeTask() implements Task {
+        Supplier<CompoundTag> encode() {
+            return encode;
+        }
+
+        RegionChunkWriter.ChunkReadMerge merge() {
+            return merge;
+        }
+    }
+
+    private static final class RewriteTask implements Task {
+        private final ResourceKey<Level> dimension;
+        private final ChunkPos pos;
+        private final RegionChunkWriter.ChunkRewrite rewrite;
+
+        RewriteTask(ResourceKey<Level> dimension, ChunkPos pos, RegionChunkWriter.ChunkRewrite rewrite) {
+            this.dimension = dimension;
+            this.pos = pos;
+            this.rewrite = rewrite;
+        }
+
+        ResourceKey<Level> dimension() {
+            return dimension;
+        }
+
+        ChunkPos pos() {
+            return pos;
+        }
+
+        RegionChunkWriter.ChunkRewrite rewrite() {
+            return rewrite;
+        }
+    }
+
+    private static final class ScanTask implements Task {
+        private final Target target;
+        private final ResourceKey<Level> dimension;
+        private final ChunkPos pos;
+
+        ScanTask(Target target, ResourceKey<Level> dimension, ChunkPos pos) {
+            this.target = target;
+            this.dimension = dimension;
+            this.pos = pos;
+        }
+
+        Target target() {
+            return target;
+        }
+
+        ResourceKey<Level> dimension() {
+            return dimension;
+        }
+
+        ChunkPos pos() {
+            return pos;
+        }
+    }
+
+    private static final class RunTask implements Task {
+        private final Runnable action;
+
+        RunTask(Runnable action) {
+            this.action = action;
+        }
+
+        Runnable action() {
+            return action;
+        }
+    }
+
+    private static final class MapBatchTask implements Task {
+        private final List<Runnable> writes;
+
+        MapBatchTask(List<Runnable> writes) {
+            this.writes = writes;
+        }
+
+        List<Runnable> writes() {
+            return writes;
+        }
+    }
+
+    private static final class FinalizeTask implements Task {
         static final FinalizeTask INSTANCE = new FinalizeTask();
+
+        FinalizeTask() {}
     }
 
     private final StorageOpener regionOpener;
-    private final StorageOpener entitiesOpener;
     private final Preflight preflight;
     private final Finalizer finalizer;
     private final OutputFinalizer outputs;
@@ -150,8 +309,9 @@ final class AsyncSaveWriter {
     // Set on the main thread before the first submit, read on the writer thread.
     private volatile @Nullable BiConsumer<ResourceKey<Level>, CompoundTag> resumeReadObserver;
 
-    // The entities-store recovered observer, the entity sibling of resumeReadObserver: fed the prior on-disk
-    // entity chunk by an entities-targeted resume scan, off the chunk write path. Same threading discipline.
+    // The entity-part recovered observer, the entity sibling of resumeReadObserver: fed the prior on-disk region
+    // chunk by an entity-targeted resume scan, and reads its Level.Entities part, off the chunk write path. Same
+    // threading discipline.
     private volatile @Nullable BiConsumer<ResourceKey<Level>, CompoundTag> resumeEntityReadObserver;
 
     /**
@@ -162,10 +322,9 @@ final class AsyncSaveWriter {
      * failing the save, so a zip failure can never endanger the openable folder. A {@code finalizer} throw aborts the
      * save the usual way (it is the level.dat write).
      */
-    public AsyncSaveWriter(StorageOpener regionOpener, StorageOpener entitiesOpener, Preflight preflight,
+    public AsyncSaveWriter(StorageOpener regionOpener, Preflight preflight,
             Finalizer finalizer, OutputFinalizer outputs, AutoCloseable access, SaveProgress progress) {
         this.regionOpener = regionOpener;
-        this.entitiesOpener = entitiesOpener;
         this.preflight = preflight;
         this.finalizer = finalizer;
         this.outputs = outputs;
@@ -186,8 +345,9 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * Set the observer each {@link #submitEntityResumeScan} hands its on-disk entity chunk and dimension, for the
-     * outline's recovered-entity scan. The entity sibling of {@link #observeResumeReads}; same threading rules.
+     * Set the observer each {@link #submitEntityResumeScan} hands its on-disk {@code region/} chunk and dimension, for
+     * the outline's recovered-entity scan; the observer reads the chunk's {@code Level.Entities} part. The entity
+     * sibling of {@link #observeResumeReads}; same threading rules.
      */
     public void observeEntityResumeReads(BiConsumer<ResourceKey<Level>, CompoundTag> observer) {
         this.resumeEntityReadObserver = observer;
@@ -205,10 +365,10 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * Enqueue a read-only scan of {@code dimension}'s on-disk entity chunk at {@code pos} for recovered coverage, the
-     * entity sibling of {@link #submitResumeScan}: the writer reads the prior entities chunk it owns and reports it to
-     * the entity observer without writing. Call on the main thread; a no-op when no entity observer is set, and the
-     * read returns empty for any chunk with no prior.
+     * Enqueue a read-only scan of {@code dimension}'s on-disk {@code region/} chunk at {@code pos} for recovered
+     * coverage, the entity sibling of {@link #submitResumeScan}: the writer reads the prior chunk it owns and reports
+     * it to the entity observer, which reads the {@code Level.Entities} part, without writing. Call on the main thread;
+     * a no-op when no entity observer is set, and the read returns empty for any chunk with no prior.
      */
     public void submitEntityResumeScan(ResourceKey<Level> dimension, ChunkPos pos) {
         queue.add(new ScanTask(Target.ENTITIES, dimension, pos));
@@ -240,7 +400,7 @@ final class AsyncSaveWriter {
         if (writes.isEmpty()) {
             return;
         }
-        queue.add(new MapBatchTask(List.copyOf(writes)));
+        queue.add(new MapBatchTask(ImmutableList.copyOf(writes)));
     }
 
     /**
@@ -269,11 +429,14 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * Enqueue an encoded entity-chunk tag for {@code dimension}'s {@code entities/} storage (main thread). The writer
-     * thread owns {@code tag} after this call; the caller must not mutate it afterward.
+     * Enqueue an encoded entity carrier to fold into {@code dimension}'s {@code region/} chunk at {@code pos} under
+     * {@code Level.Entities} (main thread). The writer thread owns {@code tag} after this call; the caller must not
+     * mutate it afterward.
      */
     public void submitEntity(ResourceKey<Level> dimension, ChunkPos pos, CompoundTag tag) {
         submitted++;
+        // The merge argument is inert for an entity task: the drain routes it through foldEntitiesIntoRegion, which
+        // applies EntityMerge.merge against the host chunk's Level.Entities itself. WriteTask still requires one.
         queue.add(new WriteTask(Target.ENTITIES, dimension, pos, () -> tag, EntityMerge::merge));
     }
 
@@ -296,7 +459,6 @@ final class AsyncSaveWriter {
         // One storage per dimension, opened on demand: a session that follows the player across a portal writes
         // each dimension's chunks/entities to its own vanilla folder (overworld region/, nether DIM-1/, ...).
         Storages regions = new Storages(regionOpener, "region");
-        Storages entities = new Storages(entitiesOpener, "entities");
         int chunksNew = 0;
         int chunksRecaptured = 0;
         int mergedContainers = 0;
@@ -313,11 +475,13 @@ final class AsyncSaveWriter {
             long drained = 0;
             Task next;
             while (!((next = queue.take()) instanceof FinalizeTask)) {
-                if (next instanceof ScanTask scan) {
-                    scanResumeChunk(scan, regions, entities);
+                if (next instanceof ScanTask) {
+                    ScanTask scan = (ScanTask) next;
+                    scanResumeChunk(scan, regions);
                     continue;
                 }
-                if (next instanceof RunTask run) {
+                if (next instanceof RunTask) {
+                    RunTask run = (RunTask) next;
                     try {
                         run.action().run();
                     } catch (RuntimeException e) {
@@ -325,11 +489,13 @@ final class AsyncSaveWriter {
                     }
                     continue;
                 }
-                if (next instanceof MapBatchTask maps) {
+                if (next instanceof MapBatchTask) {
+                    MapBatchTask maps = (MapBatchTask) next;
                     writeMapBatch(maps.writes());
                     continue;
                 }
-                if (next instanceof RewriteTask rewrite) {
+                if (next instanceof RewriteTask) {
+                    RewriteTask rewrite = (RewriteTask) next;
                     progress.chunks(++drained, submitted);
                     IOWorker region = regions.storageFor(rewrite.dimension());
                     // An unopenable dimension leaves no on-disk chunk to fold the orphaned contents onto, the
@@ -372,41 +538,54 @@ final class AsyncSaveWriter {
                     RegionChunkWriter.MergeWriteResult merged = RegionChunkWriter.writeMerging(region, task.pos(), tag,
                             task.merge());
                     switch (merged.outcome()) {
-                        case WRITTEN_NEW -> chunksNew++;
-                        case WRITTEN_RECAPTURED -> {
+                        case WRITTEN_NEW:
+                            chunksNew++;
+                            break;
+                        case WRITTEN_RECAPTURED:
                             chunksRecaptured++;
                             mergedContainers += merged.mergeBacks();
-                        }
+                            break;
                         // A preserve wrote nothing, so this session's capture of the chunk went nowhere, which
                         // is what the failed term counts. Nothing to write is the other thing entirely, a
                         // chunk with no content of its own.
-                        case FAILED, PRESERVED -> chunksFailed++;
-                        case NOTHING_TO_WRITE -> {}
+                        case FAILED:
+                        case PRESERVED:
+                            chunksFailed++;
+                            break;
+                        case NOTHING_TO_WRITE:
+                            break;
                     }
                 } else {
-                    IOWorker entityStore = entities.storageFor(task.dimension());
-                    if (entityStore == null) {
+                    IOWorker region = regions.storageFor(task.dimension());
+                    if (region == null) {
                         entityChunksFailed++; // per chunk, as above
                         continue;
                     }
-                    // The entities target read-merges too: a re-captured entity-chunk carries forward each on-disk
-                    // vehicle's contents AND every on-disk entity the fresh capture lacks (EntityMerge unions, so
-                    // a partial re-flush adds to rather than overwrites the prior set). Counted separately from
-                    // block containers: a non-zero tally means chunks were re-flushed with partial sets.
-                    RegionChunkWriter.MergeWriteResult merged = RegionChunkWriter.writeMerging(entityStore,
-                            task.pos(), tag, task.merge());
+                    // At 1.16.5 entities live inside the region/ chunk under Level.Entities, so the entity write is a
+                    // fold into the host chunk, not a separate entities/ store. The fold read-merges too: a
+                    // re-captured host carries forward each on-disk vehicle's contents AND every on-disk entity the
+                    // fresh capture lacks (EntityMerge unions, so a partial re-flush adds to rather than overwrites
+                    // the prior set). Counted separately from block containers: a non-zero tally means chunks were
+                    // re-flushed with partial sets. A host chunk that never reached disk is a lost fold (FAILED),
+                    // since an entity cannot live without its terrain at this band.
+                    RegionChunkWriter.MergeWriteResult merged = RegionChunkWriter.foldEntitiesIntoRegion(region,
+                            task.pos(), tag);
                     switch (merged.outcome()) {
-                        case WRITTEN_NEW, WRITTEN_RECAPTURED -> {
+                        case WRITTEN_NEW:
+                        case WRITTEN_RECAPTURED:
                             entityChunksWritten++;
                             entitiesCarriedForward += merged.mergeBacks();
-                        }
-                        case FAILED, PRESERVED -> entityChunksFailed++; // as above
-                        case NOTHING_TO_WRITE -> {}
+                            break;
+                        case FAILED:
+                        case PRESERVED:
+                            entityChunksFailed++; // as above
+                            break;
+                        case NOTHING_TO_WRITE:
+                            break;
                     }
                 }
             }
             regions.synchronizeAll();
-            entities.synchronizeAll();
             finalizer.run(chunksFailed, entityChunksFailed); // level.dat, idcounts, and the completion record
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -415,7 +594,6 @@ final class AsyncSaveWriter {
             error = e;
         } finally {
             regions.closeAll();
-            entities.closeAll();
             closeQuietly(access);
         }
         // The finalize-time output (the export zip) runs only after the folder is fully written and closed, and
@@ -450,17 +628,18 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * Writer thread: read {@code scan}'s on-disk chunk from the target storage this writer owns (region/ or entities/)
-     * and hand it to that target's recovered-coverage observer without writing. Isolated: a failure is logged and never
-     * touches a chunk write.
+     * Writer thread: read {@code scan}'s on-disk {@code region/} chunk this writer owns and hand it to the target's
+     * recovered-coverage observer without writing. Both targets scan the same {@code region/} chunk at this band (block
+     * entities and entities are siblings inside it); the observer reads its own part (terrain or
+     * {@code Level.Entities}). Isolated: a failure is logged and never touches a chunk write.
      */
-    private void scanResumeChunk(ScanTask scan, Storages regions, Storages entities) {
+    private void scanResumeChunk(ScanTask scan, Storages regions) {
         boolean region = scan.target() == Target.REGION;
         BiConsumer<ResourceKey<Level>, CompoundTag> observer = region ? resumeReadObserver : resumeEntityReadObserver;
         if (observer == null) {
             return;
         }
-        IOWorker storage = (region ? regions : entities).storageFor(scan.dimension());
+        IOWorker storage = regions.storageFor(scan.dimension());
         if (storage == null) {
             return; // the dimension logged its own open failure; a scan reads nothing and loses nothing
         }
@@ -563,7 +742,7 @@ final class AsyncSaveWriter {
         private void synchronizeAll() {
             for (Map.Entry<ResourceKey<Level>, IOWorker> entry : open.entrySet()) {
                 try {
-                    entry.getValue().synchronize(true).join();
+                    entry.getValue().synchronize().join();
                 } catch (RuntimeException e) {
                     LOGGER.warn("cannot flush the {} storage for {}; its chunks may not survive a power loss",
                             target, entry.getKey().location(), e);

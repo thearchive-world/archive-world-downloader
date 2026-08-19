@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.List;
@@ -23,7 +24,6 @@ import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
@@ -100,6 +100,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.OVERWORLD);
         writePriorLevelDat(session, save, Level.NETHER, mount());
         WorldPaths paths = paths(save);
+        seedHost(paths, Level.NETHER, mountChunk()); // the prior download had already written the mount's chunk
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
@@ -123,6 +124,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.OVERWORLD);
         writePriorLevelDat(session, save, Level.OVERWORLD, mount());
         WorldPaths paths = paths(save);
+        seedHost(paths, Level.OVERWORLD, mountChunk()); // the prior download had already written the mount's chunk
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
@@ -217,7 +219,10 @@ class LiveCaptureSessionResumedMountReleaseTest {
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
-        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
+        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
+        assertFalse(result.failed(), "the release must not fail the save");
+        assertEquals(0, result.entityChunksWritten() + result.entityChunksFailed(),
+                "the release submitted no mount to the writer, so a wrong submit cannot hide behind a missing host");
 
         assertNull(entityChunk(paths, Level.NETHER, mountChunk()),
                 "a download that is not a resume carries nothing forward from the folder it overwrites");
@@ -237,7 +242,10 @@ class LiveCaptureSessionResumedMountReleaseTest {
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
-        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
+        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
+        assertFalse(result.failed(), "the release must not fail the save");
+        assertEquals(0, result.entityChunksWritten() + result.entityChunksFailed(),
+                "the release submitted no mount to the writer, so a wrong submit cannot hide behind a missing host");
 
         assertNull(entityChunk(paths, Level.NETHER, mountChunk()), "the fresh RootVehicle is the mount's copy");
         assertEquals(0, losses(session), "nothing was lost, so nothing may be counted");
@@ -254,6 +262,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         // seated on SOMETHING is not the same question as being seated on THAT mount.
         seatedOn(session, otherMount(), OTHER_MOUNT);
         WorldPaths paths = paths(save);
+        seedHost(paths, Level.NETHER, mountChunk()); // the prior download had already written the mount's chunk
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
@@ -278,7 +287,10 @@ class LiveCaptureSessionResumedMountReleaseTest {
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
-        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
+        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
+        assertFalse(result.failed(), "the release must not fail the save");
+        assertEquals(0, result.entityChunksWritten() + result.entityChunksFailed(),
+                "the release submitted no mount to the writer, so a wrong submit cannot hide behind a missing host");
 
         assertNull(entityChunk(paths, Level.NETHER, mountChunk()),
                 "a mount the player is still on must not also be written standalone");
@@ -297,6 +309,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Set<UUID> excluded = state(session, "excludedRootVehicleUuids");
         excluded.add(MOUNT);
         WorldPaths paths = paths(save);
+        seedHost(paths, Level.NETHER, mountChunk()); // the prior download had already written the mount's chunk
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
@@ -398,7 +411,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         set(session, "capturedPlayer", new CapturedPlayer(playerTag, BlockPos.ZERO, 0f, 0f, Level.NETHER,
                 GameType.SURVIVAL, Difficulty.NORMAL));
         Set<UUID> excluded = state(session, "excludedRootVehicleUuids");
-        excluded.addAll(List.of(capturedTree));
+        excluded.addAll(ImmutableList.copyOf(capturedTree));
     }
 
     /**
@@ -429,11 +442,10 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return new VersionAdapterImpl().worldPaths(save);
     }
 
-    /** A writer over real storages, so which dimension a submit routed to is answerable off disk. */
+    /** A writer over the real region storage, so which dimension a submit routed to is answerable off disk. */
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
                 paths::openRegionStorage,
-                paths::openEntitiesStorage,
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -441,25 +453,39 @@ class LiveCaptureSessionResumedMountReleaseTest {
                 new SaveProgress());
     }
 
-    /** The entities-region chunk at {@code pos} in {@code dimension}, or null when none was written. */
+    /**
+     * Seed a host region chunk at {@code pos} in {@code dimension} (the chunk a prior download had already written).
+     */
+    private static void seedHost(WorldPaths paths, ResourceKey<Level> dimension, ChunkPos pos) throws Exception {
+        try (IOWorker region = paths.openRegionStorage(dimension)) {
+            CompoundTag host = new CompoundTag();
+            host.put("Level", new CompoundTag());
+            region.store(pos, host).join();
+        }
+    }
+
+    /**
+     * The region chunk at {@code pos} in {@code dimension} whose {@code Level.Entities} the release folded the mount
+     * into, or null when nothing was written there (no host chunk exists until the seed above writes one).
+     */
     private static @Nullable CompoundTag entityChunk(WorldPaths paths, ResourceKey<Level> dimension, ChunkPos pos)
             throws Exception {
-        try (IOWorker storage = paths.openEntitiesStorage(dimension)) {
+        try (IOWorker storage = paths.openRegionStorage(dimension)) {
             Optional<CompoundTag> read = Optional.ofNullable(storage.load(pos));
             return read.orElse(null);
         }
     }
 
-    /** The one entity an entities-region chunk holds, so both its identity and its contents can be read. */
+    /** The one entity a region chunk's {@code Level.Entities} holds, so both its identity and contents can be read. */
     private static CompoundTag soleEntity(CompoundTag entityChunk) {
-        ListTag entities = entityChunk.getList("Entities", Tag.TAG_COMPOUND);
+        ListTag entities = entityChunk.getCompound("Level").getList("Entities", 10);
         assertEquals(1, entities.size(), "the release writes exactly the one mount");
         return entities.getCompound(0);
     }
 
-    /** The UUID of the one entity an entities-region chunk holds, which is how a mount is told from a stray. */
+    /** The UUID of the one entity a region chunk's {@code Level.Entities} holds, telling a mount from a stray. */
     private static String soleEntityUuid(CompoundTag entityChunk) {
-        ListTag entities = entityChunk.getList("Entities", Tag.TAG_COMPOUND);
+        ListTag entities = entityChunk.getCompound("Level").getList("Entities", 10);
         assertEquals(1, entities.size(), "the release writes exactly the one mount");
         UUID uuid = EntityMerge.readUuid(entities.getCompound(0));
         assertNotNull(uuid, "the written mount keeps the identity the prior tag recorded");
@@ -468,7 +494,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
     /** The item id of the one stack an entity's container holds. */
     private static String soleItemId(CompoundTag entity) {
-        ListTag items = entity.getList("Items", Tag.TAG_COMPOUND);
+        ListTag items = entity.getList("Items", 10);
         assertEquals(1, items.size(), "the fixture archives exactly one stack");
         return items.getCompound(0).getString("id");
     }

@@ -6,14 +6,18 @@ package world.thearchive.wdl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
@@ -28,13 +32,13 @@ import org.junit.jupiter.api.Test;
 class UiLiteralEnrollmentTest {
     private static final String NEEDLE = "new TextComponent(";
 
-    private static final List<Path> VIEW_ROOTS = List.of(
-            Path.of("src/main/java/world/thearchive/wdl"),
-            Path.of("../fabric/src/main/java/world/thearchive/wdl"),
-            Path.of("../neoforge/src/main/java/world/thearchive/wdl"));
+    private static final List<Path> VIEW_ROOTS = ImmutableList.of(
+            Paths.get("src/main/java/world/thearchive/wdl"),
+            Paths.get("../fabric/src/main/java/world/thearchive/wdl"),
+            Paths.get("../neoforge/src/main/java/world/thearchive/wdl"));
 
     // File to number of new TextComponent(...) calls, each one data or a glyph, never user-facing prose.
-    private static final Map<String, Integer> ACKNOWLEDGED_UI_LITERALS = Map.of(
+    private static final Map<String, Integer> ACKNOWLEDGED_UI_LITERALS = ImmutableMap.of(
             // the one amber-argument helper every confirm body's data insert (folder, backup or source zip
             // name, snapshot name) routes through
             "ResumeConfirm.java", 1,
@@ -75,7 +79,7 @@ class UiLiteralEnrollmentTest {
                         String name = path.getFileName().toString();
                         return name.endsWith(".java") && !name.equals("package-info.java");
                     })
-                    .toList();
+                    .collect(Collectors.toList());
         } catch (IOException e) {
             throw new UncheckedIOException("cannot walk " + root.toAbsolutePath(), e);
         }
@@ -84,7 +88,7 @@ class UiLiteralEnrollmentTest {
     private static int literalCount(Path file) {
         String content;
         try {
-            content = Files.readString(file, StandardCharsets.UTF_8);
+            content = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("cannot read " + file.toAbsolutePath(), e);
         }

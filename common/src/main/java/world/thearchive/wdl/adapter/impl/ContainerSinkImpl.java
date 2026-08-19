@@ -6,14 +6,13 @@ package world.thearchive.wdl.adapter.impl;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
 /**
- * 1.17.1 container sink: serializes an open container's items via vanilla's own {@code ContainerHelper.saveAllItems}
+ * 1.16.5 container sink: serializes an open container's items via vanilla's own {@code ContainerHelper.saveAllItems}
  * and merges them into a captured block-entity tag.
  *
  * <p>Two steps (see {@link ContainerSink}): {@link #captureItems} serializes the live menu's container slots and
@@ -34,7 +33,7 @@ public final class ContainerSinkImpl implements ContainerSink {
         // Copy so the captured chunk tag's block entity is replaced wholesale, never mutated in place, and
         // set only "Items": id, x/y/z, CustomName and every other field are preserved (no clobber).
         CompoundTag merged = blockEntityTag.copy();
-        merged.put("Items", capturedItemsHolder.getList("Items", Tag.TAG_COMPOUND));
+        merged.put("Items", capturedItemsHolder.getList("Items", 10));
         return merged;
     }
 }

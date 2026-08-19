@@ -69,14 +69,20 @@ common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 # directly through ClientboundRespawnPacket.getDimension and the ClientboundLoginPacket dimension record accessor.
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 
+# The Java 8 floor has no records, so this MC-free packet-position carrier, accepted as a record on the higher bands
+# until the deep-band port, is a final class with explicit fields and accessors rather than a record.
+common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
+
 # Below 1.21.2 there is no chunk unsaved-listener, so re-capture polls isUnsaved over the keep-hot buffer here;
 # it also reads the band's ChunkSnapshotSource.SectionData and reconstructs entities via the pre-spawn-reason
 # EntityType.create(Level). Below the 1.21 update leash state lives on Mob rather than the Leashable interface, so
 # the reconstruct path rebinds a saved leash via Mob.setLeashedTo. Below 1.20.5 ChunkStatus is in
 # net.minecraft.world.level.chunk, not the .status subpackage, and Level.getMapData is keyed by the raw String
 # MapItem.makeKey returns rather than a MapId. Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer
-# opens the vanilla IOWorker through WorldPaths (openRegionStorage/openEntitiesStorage) rather than constructing
-# one directly. Below 1.20.3 there is no Crafter menu or block entity, so the crafter open-bind and stash legs are
+# opens the vanilla IOWorker through WorldPaths (openRegionStorage) rather than constructing one directly. Below 1.17
+# (era E3) entities live inside the region/ chunk, so the writer is built with the region opener alone (the
+# openEntitiesStorage argument is dropped) and the entity flush folds into the host chunk's Level.Entities.
+# Below 1.20.3 there is no Crafter menu or block entity, so the crafter open-bind and stash legs are
 # dropped; NbtIo.readCompressed takes a File with no NbtAccounter; and the world save root is read via
 # getLevelPath(LevelResource.ROOT).normalize(), the pre-getLevelDirectory form (normalized because ROOT's bare-dot
 # id would otherwise misplace the export zip). Below 1.20.2 ClientPacketListener has no serverBrand, so the
@@ -124,10 +130,12 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
 # SerializableChunkData.SectionData that exists only at 1.21.2 and above.
 common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkCodecImplTest.java
 
-# Below 1.21.2 there is no ChunkPos.CODEC, so the entities-region Position is read back as its {x, z} int array, the
-# pre-1.21.2 EntityStorage form the sink writes. Below the 1.20.6 cut there is no SimpleRegionStorage or
-# RegionStorageInfo, so the round trip opens the vanilla IOWorker through WorldPaths (store/loadAsync) rather than
-# constructing one directly.
+# Below the 1.20.6 cut there is no SimpleRegionStorage or RegionStorageInfo, so the round trip opens the vanilla
+# IOWorker through WorldPaths (store/load) rather than constructing one directly. Below 1.17 (era E3) there is no
+# separate entities/ region: entities live inside the region/ chunk, so the round trip seeds a host region chunk and
+# folds the entity carrier into its Level.Entities through RegionChunkWriter.foldEntitiesIntoRegion, then reads the
+# entity back from that chunk. The sink's carrier is a bare {Entities:[...]} with no DataVersion or Position (those
+# were the E2a entities-region self-description, dropped here).
 common/src/test/java/world/thearchive/wdl/adapter/EntityRoundTripTest.java
 
 # Constructs GameRules from a Dynamic via the pre-1.21.2 single-argument constructor (the feature-flag-filtered
@@ -160,6 +168,11 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 # shared overlay's render entry point takes a float on this band.
 common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
 
+# Below 1.17 there is no CycleButton widget (it arrived at 1.17 with the narration API), so this band-local cycle
+# button reproduces the value-cycling toggle the higher bands get from vanilla's CycleButton, without the 1.17
+# narration API this band lacks. New at this band.
+common/src/main/java/world/thearchive/wdl/client/WdlCycleButton.java
+
 # Below 1.20 there is no FaviconTexture (added by the 1.20 GUI overhaul), so the client draw seam's blitFavicon names
 # the world icon's registered ResourceLocation instead of the 1.20+ FaviconTexture handle it cannot reference on this
 # band. The draw surface itself (GuiGraphics, likewise 1.20+) is reimplemented in the plug, which the diff excludes.
@@ -177,7 +190,12 @@ common/src/main/java/world/thearchive/wdl/adapter/RenderSurface.java
 # widget's padding is built through LayoutSettings.defaults(), and EditBox.moveCursorToEnd takes no argument.
 # Below 1.20.2 AbstractSelectionList also fills tiled dirt above and below itself, sized as if its width and
 # height were the screen's, so the in-world download list calls setRenderTopAndBottom(false), a method the 1.20.2
-# list rewrite removed.
+# list rewrite removed. Below 1.17 the screen focus does not propagate into a widget (there is no
+# Screen.setInitialFocus below 1.17), so the name field is focused directly through EditBox.setFocus(true) at init,
+# not by the screen's setFocused alone, which the higher bands' focus rework handles. And below 1.17 there is no
+# per-entry updateNarration hook, so the download row narrates through the list's setSelected override calling
+# NarratorChatListener.INSTANCE.sayNow, the way vanilla WorldSelectionList narrates its rows; the shared lang key
+# wdl.screen.downloads.narration stays live and identical across all bands.
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 
 # The same getScrollbarPosition divergence reaches the settings list: this band's fixed width/2 + 124 assumes the
@@ -185,6 +203,10 @@ common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 # controls, so the list follows later bands and derives it from the row right edge. Below 1.20.3
 # AbstractSelectionList takes a six-argument (top, bottom, itemHeight) constructor and exposes the list left as the
 # protected x0 field, and MutableComponent has no withColor(int), so option labels are colored through withStyle.
+# Below 1.20.2 AbstractSelectionList fills tiled dirt above and below itself, which is the mechanism that hides its
+# unclipped row overflow at the top and bottom edges (the list does not scissor at this band), so the settings
+# screen paints the list before its own tab strip and footer buttons rather than after as on the higher bands: the
+# fill hides the row overflow while the buttons draw on top of it.
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the HUD-layer id is built with the
@@ -202,17 +224,27 @@ neoforge/src/main/resources/META-INF/mods.toml
 # META-INF/mods.toml name instead.
 neoforge/src/main/resources/META-INF/neoforge.mods.toml
 
-# JourneyMap 5.10.0 for this version uses the older 1.9 API generation (journeymap.client.api), so this plugin binds
-# the @ClientPlugin annotation and the IClientPlugin.onEvent push model rather than the journeymap.api.v2 forms.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
+# JourneyMap 6.x for 1.16.5 carries the 2.0 API (journeymap.api.v2), not the 1.x API (journeymap.client.api) the
+# higher bands' 5.x plugin binds, so the binding is dropped from compat/journeymap and re-homed under
+# compat/journeymap/v2, ported from the 1.20.1 branch's v2 plugin. This entry point implements
+# journeymap.api.v2.client.IClientPlugin under the journeymap.api.v2.common.JourneyMapPlugin annotation.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/WdlJourneyMapPlugin.java
 
-# The overlay driver binds the 1.9 JourneyMap API: it subscribes the mapping events through IClientAPI.subscribe and
-# handles them in onClientEvent, and builds each PolygonOverlay with the 1.9 display-id constructor.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDriver.java
+# The overlay driver binds the journeymap.api.v2 API: it subscribes the mapping events through
+# ClientEventRegistry.MAPPING_EVENT and shows each PolygonOverlay on the v2 IClientAPI, rather than the 1.x
+# IClientAPI.subscribe/onClientEvent push model the higher bands' driver uses.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/JourneyMapOverlayDriver.java
 
-# The polygon builder binds the 1.9 JourneyMap model package (journeymap.client.api.model) for MapPolygon,
-# MapPolygonWithHoles and ShapeProperties.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.java
+# The polygon builder binds the journeymap.api.v2.client.model package for MapPolygon, MapPolygonWithHoles and
+# ShapeProperties, the 2.0-API model rather than the 1.x journeymap.client.api.model the higher bands use.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/CoveragePolygons.java
+
+# The v2 plugin package's @NullMarked marker; new at this band with the journeymap.api.v2 binding.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/package-info.java
+
+# The shared coverage-polygon tracer is made public so the re-homed compat/journeymap/v2 plugin package can reach it
+# across the package boundary, and its JDK collection factory becomes a Guava ImmutableList for the Java 8 floor.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygonTracer.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
 # with the public ResourceLocation(String, String) constructor.
@@ -243,16 +275,26 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
 common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage or RegionStorageInfo, so the region storage this writer
-# drains against is the vanilla IOWorker (store/loadAsync/synchronize/close), opened per dimension through
-# WorldPaths.
+# drains against is the vanilla IOWorker (store/load/synchronize/close), opened per dimension through
+# WorldPaths. Below 1.17 (era E3) entities live inside the region/ chunk under Level.Entities, not in a separate
+# entities/ region, so the ENTITIES write task folds into the host region chunk through
+# RegionChunkWriter.foldEntitiesIntoRegion rather than draining a second entities/ storage: the entities opener
+# and Storages are dropped, the resume scan reads the same region/ chunk, and a fold with no host chunk is a
+# counted loss.
 common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the merge-write reads and writes through the vanilla
-# IOWorker's loadAsync and store rather than read and write.
+# IOWorker's load and store rather than read and write. Below 1.17 (era E3) entities live inside the region/ chunk,
+# so this carries foldEntitiesIntoRegion, the entity fold that unions a captured entity carrier into the host chunk's
+# Level.Entities through EntityMerge and writes the chunk back, the entity sibling of the container rewrite path; and
+# the terrain merge-write preserves the on-disk Level.Entities the fresh terrain tag lacks, so a routine terrain
+# re-flush of a revisited chunk does not drop the entities a prior fold saved there.
 common/src/main/java/world/thearchive/wdl/adapter/RegionChunkWriter.java
 
 # Below the 1.20.6 cut there is no RegionStorageInfo; instead of supplying one per dimension, this seam opens the
-# vanilla IOWorker directly (openRegionStorage/openEntitiesStorage).
+# vanilla IOWorker directly (openRegionStorage). Below 1.17 (era E3) there is no separate entities/ region:
+# entities live inside the region/ chunk, so the entitiesDirectory/openEntitiesStorage members the E2a parent
+# carries are dropped and this maps and opens only region/.
 common/src/main/java/world/thearchive/wdl/adapter/WorldPaths.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the drain is proven against the vanilla IOWorker (a
@@ -499,14 +541,14 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 # the map keys).
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
-# The Forge island's manifest carries loaderVersion [37,) at this band (Forge 37.x for 1.17.1) versus the [40,) of
-# the 1.18.2 mint parent. The rest of the forge/ tree diverges only in the loader entrypoint and platform bridge
-# listed above; forge/build.gradle.kts is excluded from the diff as a *.gradle.kts, and the shim, wrapper and access
-# transformer are byte-identical, the widened SRG field ids unchanged from 1.18.2, confirmed by ForgeGradle against
-# the official 1.17.1 mappings.
+# The Forge island's manifest carries loaderVersion [36,) at this band (Forge 36.x for 1.16.5). The forge/ tree
+# diverges per band across its shim, platform bridge, connection tee and mount reader; the access transformer is
+# re-pinned for this band to the classic SRG field_NNNNN_ member scheme (the 1.17-and-above bands use TSRGv2
+# f_NNNNN_) with the xa/ya/za move-delta widenings. forge/build.gradle.kts is excluded from the diff as a
+# *.gradle.kts.
 forge/src/main/resources/META-INF/mods.toml
 
-# The resource pack_format tracks this band's Minecraft version, 7 for 1.17.1 versus the parent's 8 for 1.18.2.
+# The resource pack_format tracks this band's Minecraft version, 6 for 1.16.5 versus 7 for 1.17.1.
 forge/src/main/resources/pack.mcmeta
 
 # Below the 1.19 registry split the code-defined registries are static fields on Registry (Registry.ENTITY_TYPE),
@@ -524,8 +566,10 @@ common/src/main/java/world/thearchive/wdl/adapter/VanillaDimensions.java
 # unused-but-compiling code, the way the crafter open-bind stays below 1.20.3.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
 
-# Below 1.19 the entity read-merge keys the entities/ target UUID through SerializableUUID.CODEC, the pre-1.19 name for
-# the four-int UUID codec that became UUIDUtil.CODEC at 1.19.
+# Below 1.19 the entity read-merge keys the captured-entity UUID through SerializableUUID.CODEC, the pre-1.19 name for
+# the four-int UUID codec that became UUIDUtil.CODEC at 1.19. Below 1.17 (era E3) the merge folds into the in-chunk
+# Level.Entities rather than a separate entities/ region (its {Entities:[...]} envelope in/out is band-agnostic, so
+# only the Javadoc naming the target diverges; the merge logic is unchanged and is reused by foldEntitiesIntoRegion).
 common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
 
 # XaeroPlus publishes no 1.18.x build for either loader, so the coverage overlay's XaeroPlus binding is dropped as a
@@ -603,27 +647,38 @@ common/src/test/java/world/thearchive/wdl/WorldgenWarmupTest.java
 common/src/main/java/world/thearchive/wdl/adapter/ChunkMerge.java
 
 # Below 1.18 the recovered-container scan reads block entities from Level.TileEntities, not the flat root block_entities.
+# Below 1.17 (era E3) the recovered-entity scan (recordEntities) likewise reads the in-chunk Level.Entities, the sibling
+# of that Level.TileEntities, rather than a separate entities/ region chunk's top-level Entities.
 common/src/main/java/world/thearchive/wdl/adapter/RecoveredScan.java
 
-# com.mojang.logging.LogUtils is a 1.18 addition; below it the per-class logger is acquired through slf4j LoggerFactory
-# directly (MC 1.17.1 bundles slf4j-api with a log4j binding).
+# com.mojang.logging.LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is
+# acquired through log4j2 LogManager directly.
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketAccumulator.java
 
-# LogUtils is a 1.18 addition; below it slf4j LoggerFactory acquires the per-class logger directly.
+# LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is acquired through
+# log4j2 LogManager directly.
 common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressWriter.java
 
-# LogUtils is a 1.18 addition; below it slf4j LoggerFactory acquires the per-class logger directly.
+# LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is acquired through
+# log4j2 LogManager directly.
 common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
 
-# LogUtils is a 1.18 addition; below it slf4j LoggerFactory acquires the per-class logger directly.
+# LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is acquired through
+# log4j2 LogManager directly.
 common/src/main/java/world/thearchive/wdl/compat/bobby/BobbyChunkFilter.java
 
-# LogUtils is a 1.18 addition; below it slf4j LoggerFactory acquires the per-class logger directly.
+# LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is acquired through
+# log4j2 LogManager directly.
 common/src/main/java/world/thearchive/wdl/compat/flashback/FlashbackReplayProbe.java
 
-# LogUtils is a 1.18 addition (slf4j LoggerFactory acquires the logger directly below it); and JsonParser.parseString is
-# gson 2.8.6+, so against the gson 2.8.0 bundled with 1.17.1 the release index parses through the instance parse.
+# JsonParser.parseString is a gson 2.8.6+ static, absent from the older gson bundled at 1.16.5, so the release index
+# parses through the instance form (new JsonParser().parse).
 common/src/main/java/world/thearchive/wdl/update/ReleaseIndex.java
+
+# The Java 8 floor has no java.net.http HTTP client (that is Java 11) nor its Flow-based reactive body subscribers, so
+# the update transport is rewritten off HttpClient/HttpResponse.BodySubscriber onto a java.net.HttpURLConnection with a
+# manual bounded read.
+common/src/main/java/world/thearchive/wdl/update/HttpTransport.java
 
 # Below 1.18 the test registries are plain RegistryAccess via builtin(); RegistryAccess.Frozen and builtinCopy().freeze()
 # are 1.18 additions.
@@ -665,3 +720,9 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkSectionClampTest.java
 # Below 1.18 a chunk's block entities nest under Level.TileEntities, not the flat root block_entities added at 1.18,
 # so the in-session stash merge locates a block entity by x/y/z through the Level compound.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+
+# The captureStatistics content toggle defaults off on this band, and carries a band-local config preamble saying
+# why. A 26.x server fronted by a version-bridging proxy (ViaVersion or ViaBackwards) drops the whole connection on
+# the statistics request, cutting the download off at its first tick; higher bands round-trip the request and keep
+# it on by default.
+common/src/main/java/world/thearchive/wdl/core/ConfigSchema.java

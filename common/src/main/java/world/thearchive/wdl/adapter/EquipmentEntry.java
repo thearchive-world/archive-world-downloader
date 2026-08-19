@@ -11,4 +11,20 @@ import net.minecraft.world.item.ItemStack;
  * stack per slot wins) and the reconstruct applies with {@code setItemSlot}. A dedicated record rather than a
  * {@code Pair} so the accumulator's bound type stays short and the slot travels with its stack.
  */
-record EquipmentEntry(EquipmentSlot slot, ItemStack stack) {}
+final class EquipmentEntry {
+    private final EquipmentSlot slot;
+    private final ItemStack stack;
+
+    EquipmentEntry(EquipmentSlot slot, ItemStack stack) {
+        this.slot = slot;
+        this.stack = stack;
+    }
+
+    EquipmentSlot slot() {
+        return slot;
+    }
+
+    ItemStack stack() {
+        return stack;
+    }
+}

@@ -5,10 +5,13 @@ package world.thearchive.wdl.testsupport;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -26,18 +29,18 @@ import org.junit.jupiter.api.Test;
  * nobody checked, so it fails here with the builder to use instead.
  */
 class HandBuiltFixtureGuardTest {
-    private static final Path TEST_SOURCE_ROOT = Path.of("src/test/java/world/thearchive/wdl");
+    private static final Path TEST_SOURCE_ROOT = Paths.get("src/test/java/world/thearchive/wdl");
     private static final Path FIXTURE_PACKAGE = TEST_SOURCE_ROOT.resolve("testsupport");
 
     /**
      * Every test tree that can hold a fixture, not just this subproject's. A loader subproject grows its own tests
      * later, and a scan that silently covers one module reads exactly like a scan that found nothing.
      */
-    private static final List<Path> SOURCE_ROOTS = List.of(
+    private static final List<Path> SOURCE_ROOTS = ImmutableList.of(
             TEST_SOURCE_ROOT,
-            Path.of("../fabric/src/test/java/world/thearchive/wdl"),
-            Path.of("../fabric/src/gametest/java/world/thearchive/wdl"),
-            Path.of("../neoforge/src/test/java/world/thearchive/wdl"));
+            Paths.get("../fabric/src/test/java/world/thearchive/wdl"),
+            Paths.get("../fabric/src/gametest/java/world/thearchive/wdl"),
+            Paths.get("../neoforge/src/test/java/world/thearchive/wdl"));
 
     /**
      * A write of one of the keys that decide a fixture's shape: {@code "id"} anchors both gated shapes (a block
@@ -50,7 +53,7 @@ class HandBuiltFixtureGuardTest {
      * {@code put} is matched only when its value is a Tag, because the same call on a plain {@code Map} is ordinary
      * code with nothing to do with a fixture.
      */
-    private static final List<Pattern> DECIDING_KEY_WRITES = List.of(
+    private static final List<Pattern> DECIDING_KEY_WRITES = ImmutableList.of(
             Pattern.compile("put\\w+\\(\\s*\"(id|Slot|Count)\""),
             Pattern.compile("put\\(\\s*\"(id|Slot|Count)\"\\s*,\\s*\\w*Tag\\."));
 
@@ -121,7 +124,7 @@ class HandBuiltFixtureGuardTest {
 
     private static String readString(Path file) {
         try {
-            return Files.readString(file);
+            return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("cannot read " + file.toAbsolutePath(), e);
         }

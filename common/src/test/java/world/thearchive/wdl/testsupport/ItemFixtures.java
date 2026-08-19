@@ -8,7 +8,6 @@ import net.minecraft.core.Registry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.resources.ResourceLocation;
@@ -73,7 +72,7 @@ public final class ItemFixtures {
 
     /** The {@code "Items"} list vanilla writes for one stack per named slot. */
     public static ListTag itemsAtSlots(int[] slots, ItemStack... stacks) {
-        return holder(slots, stacks).getList("Items", Tag.TAG_COMPOUND);
+        return holder(slots, stacks).getList("Items", 10);
     }
 
     /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code itemIds} at ascending slots from 0. */

@@ -18,6 +18,6 @@ final class ForgeMountMenuReader extends MountMenuReader {
     @Override
     protected @Nullable Entity mount(AbstractContainerMenu menu) {
         // access-transformed: net.minecraft.world.inventory.HorseInventoryMenu horse
-        return menu instanceof HorseInventoryMenu mountMenu ? mountMenu.horse : null;
+        return menu instanceof HorseInventoryMenu ? ((HorseInventoryMenu) menu).horse : null;
     }
 }

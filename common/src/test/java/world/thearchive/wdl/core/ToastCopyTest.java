@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.io.InputStream;
@@ -44,7 +46,7 @@ class ToastCopyTest {
         ToastCopy toast = ToastCopy.completion(true, 12345, 247_000, "base_20260702");
 
         assertNotNull(toast);
-        assertEquals(List.of("12345", "4:07", "base_20260702"), tintedTexts(toast, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("12345", "4:07", "base_20260702"), tintedTexts(toast, BrandColors.AMBER));
         assertEquals(3, tintedCount(toast), "the template text around the arguments stays default");
     }
 
@@ -67,7 +69,7 @@ class ToastCopyTest {
         assertNotNull(toast);
         assertEquals("Download complete", requireKey(toast.titleKey()));
         assertEquals("chunks 1 / 0:07\nSaved as base.zip", resolve(toast));
-        assertEquals(List.of("1", "0:07", "base.zip"), tintedTexts(toast, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("1", "0:07", "base.zip"), tintedTexts(toast, BrandColors.AMBER));
     }
 
     @Test
@@ -134,13 +136,13 @@ class ToastCopyTest {
         assertEquals("This world was opened in singleplayer and may contain generated (non-server) chunks. "
                 + "Start a fresh download instead of resuming.", resolve(toast));
         assertEquals(OptionalInt.of(BrandColors.RUST), toast.bodyColor());
-        assertEquals(List.of(), toast.arguments());
+        assertEquals(ImmutableList.of(), toast.arguments());
         assertTrue(toast.refusal());
     }
 
     @Test
     void refusalFactoriesShareTheNeutralTitleAndRustBody() {
-        List<ToastCopy> refusals = List.of(ToastCopy.refuseLoaded(), ToastCopy.alreadyDownloading(),
+        List<ToastCopy> refusals = ImmutableList.of(ToastCopy.refuseLoaded(), ToastCopy.alreadyDownloading(),
                 ToastCopy.joinMultiplayer());
 
         assertEquals("That world is currently open.", resolve(refusals.get(0)));
@@ -187,8 +189,8 @@ class ToastCopyTest {
         assertEquals(OptionalInt.of(BrandColors.RUST), sweep.bodyColor());
         assertTrue(restore.refusal());
         assertTrue(sweep.refusal());
-        assertEquals(List.of(), restore.arguments());
-        assertEquals(List.of(), sweep.arguments());
+        assertEquals(ImmutableList.of(), restore.arguments());
+        assertEquals(ImmutableList.of(), sweep.arguments());
     }
 
     @Test
@@ -197,27 +199,28 @@ class ToastCopyTest {
 
         assertEquals("Restore complete", requireKey(toast.titleKey()));
         assertEquals("Restored base_2026-07-01 from its backup.", resolve(toast));
-        assertEquals(List.of("base_2026-07-01"), tintedTexts(toast, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("base_2026-07-01"), tintedTexts(toast, BrandColors.AMBER));
         assertFalse(toast.refusal());
     }
 
     @Test
     void restoreRefusedCausesShareTheTitleAndResolvePerCauseBodies() {
-        Map<ToastCopy, String> expected = Map.of(
-                ToastCopy.restoreRefusedNotTainted(),
-                "This download is no longer marked as opened in singleplayer, so there is nothing to restore.",
-                ToastCopy.restoreRefusedTaintUnknown(),
-                "Couldn't tell whether this download was opened in singleplayer, so nothing was changed.",
-                ToastCopy.restoreRefusedSourceChanged(),
-                "The backup file changed on disk. Try the restore again.",
-                ToastCopy.restoreRefusedWorldInUse(),
-                "That world is currently open. Close it and try again.",
-                ToastCopy.restoreRefusedSnapshotFailed(),
-                "The safety backup could not be written, so nothing was changed.",
-                ToastCopy.restoreRefusedDiskFull(),
-                "Not enough disk space to restore.",
-                ToastCopy.restoreRefusedExtractRefused(),
-                "The backup could not be unpacked, so nothing was changed.");
+        Map<ToastCopy, String> expected = ImmutableMap.<ToastCopy, String>builder()
+                .put(ToastCopy.restoreRefusedNotTainted(),
+                        "This download is no longer marked as opened in singleplayer, so there is nothing to restore.")
+                .put(ToastCopy.restoreRefusedTaintUnknown(),
+                        "Couldn't tell whether this download was opened in singleplayer, so nothing was changed.")
+                .put(ToastCopy.restoreRefusedSourceChanged(),
+                        "The backup file changed on disk. Try the restore again.")
+                .put(ToastCopy.restoreRefusedWorldInUse(),
+                        "That world is currently open. Close it and try again.")
+                .put(ToastCopy.restoreRefusedSnapshotFailed(),
+                        "The safety backup could not be written, so nothing was changed.")
+                .put(ToastCopy.restoreRefusedDiskFull(),
+                        "Not enough disk space to restore.")
+                .put(ToastCopy.restoreRefusedExtractRefused(),
+                        "The backup could not be unpacked, so nothing was changed.")
+                .build();
         for (Map.Entry<ToastCopy, String> entry : expected.entrySet()) {
             ToastCopy toast = entry.getKey();
             assertEquals("Restore blocked", requireKey(toast.titleKey()));
@@ -262,7 +265,7 @@ class ToastCopyTest {
         assertEquals("Kept the previous download as base_(2).", resolve(relocated));
         assertEquals("base is still missing; it will be put back once it is no longer in use.",
                 resolve(missingDeferred));
-        for (ToastCopy notice : List.of(movedBack, relocated, missingDeferred)) {
+        for (ToastCopy notice : ImmutableList.of(movedBack, relocated, missingDeferred)) {
             assertEquals("Restore cleanup", requireKey(notice.titleKey()));
             assertEquals(OptionalInt.of(BrandColors.AMBER), notice.bodyColor());
             assertFalse(notice.refusal(), notice.bodyKey());
@@ -295,7 +298,7 @@ class ToastCopyTest {
         assertEquals("An earlier restore left unfinished cleanup for that name. "
                 + "Open the Downloads screen to finish it, or wait for the cleanup to complete.",
                 resolve(tornAttempt));
-        for (ToastCopy refusal : List.of(occupant, occupantAdvice, folderMissing, tornAttempt)) {
+        for (ToastCopy refusal : ImmutableList.of(occupant, occupantAdvice, folderMissing, tornAttempt)) {
             assertEquals(OptionalInt.of(BrandColors.RUST), refusal.bodyColor());
             assertTrue(refusal.refusal(), refusal.bodyKey());
         }

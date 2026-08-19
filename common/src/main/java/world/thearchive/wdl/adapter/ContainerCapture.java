@@ -29,9 +29,9 @@ import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.core.ContainerAssociation;
 import world.thearchive.wdl.core.OpenClickIntent;
@@ -50,7 +50,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
  * packages, which does not apply here. Main-thread only, like the rest of capture.
  */
 final class ContainerCapture {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ContainerCapture.class);
+    private static final Logger LOGGER = LogManager.getLogger(ContainerCapture.class);
 
     // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the
     // body-armor on every band. Vanilla names the same 2 in AbstractMountInventoryMenu.SLOT_INVENTORY_START
@@ -138,11 +138,12 @@ final class ContainerCapture {
             }
         }
         HitResult hit = minecraft.hitResult;
-        BlockHitResult blockHit = hit instanceof BlockHitResult block && block.getType() == HitResult.Type.BLOCK
-                ? block
+        BlockHitResult blockHit = hit instanceof BlockHitResult && hit.getType() == HitResult.Type.BLOCK
+                ? (BlockHitResult) hit
                 : null;
-        EntityHitResult entityHit = hit instanceof EntityHitResult entity
-                && entity.getType() == HitResult.Type.ENTITY ? entity : null;
+        EntityHitResult entityHit = hit instanceof EntityHitResult && hit.getType() == HitResult.Type.ENTITY
+                ? (EntityHitResult) hit
+                : null;
         // The provider read is gated on the gamemode here, not left to the rule below: Java evaluates
         // arguments eagerly, so passing it unguarded would run a mod-overridable getMenuProvider and an
         // on-demand getBlockEntity for every unattributed open in every gamemode, on a path with no catch
@@ -182,7 +183,31 @@ final class ContainerCapture {
      * rests on the intent chain's one-open-per-action assumption. It is what the ridden-vehicle bind claims on, so an
      * open with no target and no intent belongs to nobody.
      */
-    record OpenTarget(@Nullable BlockPos block, @Nullable Entity entity, boolean vehicleIntent) {}
+    static final class OpenTarget {
+        private final @Nullable BlockPos block;
+        private final @Nullable Entity entity;
+        private final boolean vehicleIntent;
+
+        OpenTarget(@Nullable BlockPos block, @Nullable Entity entity, boolean vehicleIntent) {
+            this.block = block;
+            this.entity = entity;
+            this.vehicleIntent = vehicleIntent;
+        }
+
+        @Nullable
+        BlockPos block() {
+            return block;
+        }
+
+        @Nullable
+        Entity entity() {
+            return entity;
+        }
+
+        boolean vehicleIntent() {
+            return vehicleIntent;
+        }
+    }
 
     /** Whether the open target is a block whose block entity is an ender chest (the ender discriminator). */
     boolean isEnderChestAt(ClientLevel level, @Nullable BlockPos target) {
@@ -198,7 +223,7 @@ final class ContainerCapture {
      * type itself, so the dispatch needs no second {@code instanceof}.
      */
     boolean isDoubleChestOpen(ClientLevel level, AbstractContainerMenu menu, @Nullable BlockPos target) {
-        return menu instanceof ChestMenu chestMenu && chestMenu.getRowCount() == 6
+        return menu instanceof ChestMenu && ((ChestMenu) menu).getRowCount() == 6
                 && isDoubleChestHalfAt(level, target);
     }
 
@@ -236,14 +261,16 @@ final class ContainerCapture {
      */
     @Nullable
     AbstractChestedHorse chestedAnimal(AbstractContainerMenu menu) {
-        return MountMenuReader.mountOf(menu) instanceof AbstractChestedHorse animal ? animal : null;
+        return MountMenuReader.mountOf(menu) instanceof AbstractChestedHorse
+                ? (AbstractChestedHorse) MountMenuReader.mountOf(menu)
+                : null;
     }
 
     /**
      * Count the menu's non-player slots: the block container's slots (the client backs them with a SimpleContainer).
      */
     static int countBlockSlots(AbstractContainerMenu menu, LocalPlayer player) {
-        Container playerInventory = player.getInventory();
+        Container playerInventory = player.inventory;
         int count = 0;
         for (Slot slot : menu.slots) {
             if (slot.container != playerInventory) {
@@ -259,7 +286,7 @@ final class ContainerCapture {
      * identity). Equals the animal's own chest size, the mis-bind guard.
      */
     static int countChestSlots(AbstractContainerMenu menu, LocalPlayer player) {
-        Container playerInventory = player.getInventory();
+        Container playerInventory = player.inventory;
         int count = 0;
         for (int i = SLOT_INVENTORY_START; i < menu.slots.size(); i++) {
             if (menu.slots.get(i).container != playerInventory) {
@@ -276,7 +303,7 @@ final class ContainerCapture {
      */
     @Nullable
     CompoundTag captureBlockSlots(AbstractContainerMenu menu, LocalPlayer player) {
-        Container playerInventory = player.getInventory();
+        Container playerInventory = player.inventory;
         Container blockContainer = null;
         for (Slot slot : menu.slots) {
             if (slot.container != playerInventory) {
@@ -289,14 +316,17 @@ final class ContainerCapture {
         }
         int size = blockContainer.getContainerSize();
         NonNullList<ItemStack> items = NonNullList.withSize(size, ItemStack.EMPTY);
+        // 1.16.5 Slot has no getContainerSlot accessor, so the container index is the menu order of the
+        // non-player slots: a client block container adds its slots consecutively in container-index order.
+        int index = 0;
         for (Slot slot : menu.slots) {
             if (slot.container == playerInventory) {
                 continue;
             }
-            int index = slot.getContainerSlot();
-            if (index >= 0 && index < size) {
+            if (index < size) {
                 items.set(index, slot.getItem());
             }
+            index++;
         }
         return adapter.containerSink().captureItems(items, registries);
     }
@@ -320,7 +350,7 @@ final class ContainerCapture {
      */
     @Nullable
     CompoundTag captureChestSlots(AbstractContainerMenu menu, LocalPlayer player) {
-        Container playerInventory = player.getInventory();
+        Container playerInventory = player.inventory;
         List<ItemStack> chest = new ArrayList<>();
         for (int i = SLOT_INVENTORY_START; i < menu.slots.size(); i++) {
             Slot slot = menu.slots.get(i);
@@ -352,23 +382,23 @@ final class ContainerCapture {
      */
     @Nullable
     CompoundTag captureHalfSlots(AbstractContainerMenu menu, LocalPlayer player, int low, int high) {
-        Container playerInventory = player.getInventory();
+        Container playerInventory = player.inventory;
         NonNullList<ItemStack> items = NonNullList.withSize(high - low, ItemStack.EMPTY);
         boolean any = false;
+        // 1.16.5 Slot has no getContainerSlot accessor, so the container index is the menu order of the
+        // non-player slots. The client double-chest menu is one SimpleContainer(54) with contiguous indices
+        // 0..53, so menu order equals the container index; do not unify this lift with captureChestSlots, whose
+        // menu-order numbering serves the same chest-relative role.
+        int index = 0;
         for (Slot slot : menu.slots) {
             if (slot.container == playerInventory) {
                 continue;
             }
-            // getContainerSlot() is safe here, unlike in captureChestSlots: the client double-chest menu is one
-            // SimpleContainer(54) with no offset, so getContainerSlot() equals menu order on every band (verified
-            // 1.21.11 and 1.21.4). Do not unify this lift with captureChestSlots, whose 0-based menu-order
-            // numbering absorbs the 1.21.4 saddle offset (container index 0); merging them would shift the 1.21.4
-            // chest by one.
-            int index = slot.getContainerSlot();
             if (index >= low && index < high) {
                 items.set(index - low, slot.getItem());
                 any = true;
             }
+            index++;
         }
         return any ? adapter.containerSink().captureItems(items, registries) : null;
     }

@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.fabric.gametest;
 
+import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,7 +104,7 @@ final class CaptureDriver {
                     + "fixture must be a real multiplayer connection, not a local server");
             Check.that(bridge.isRemoteWorld(), "activation gate failed: the fixture is not a remote world");
             VersionAdapter adapter = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
-                    .findFirst().orElseThrow();
+                    .findFirst().get();
             controller.start(() -> new LiveCaptureSession(adapter, bridge, config, client.level, target,
                     controller.savedChunks(), controller.coveredChunks(), controller.sendRange(), overlayActive,
                     client.getCameraEntity() != client.player, BobbyChunkFilter.resolve(bridge), poke));
@@ -152,7 +153,7 @@ final class CaptureDriver {
                     }
                 }
             }
-            return List.copyOf(boxes);
+            return ImmutableList.copyOf(boxes);
         });
     }
 

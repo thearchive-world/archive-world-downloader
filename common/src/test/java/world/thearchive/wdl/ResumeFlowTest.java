@@ -6,7 +6,9 @@ package world.thearchive.wdl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
@@ -32,7 +34,7 @@ class ResumeFlowTest {
 
         flow.startNamed("<>");
 
-        assertEquals(List.of("wdl.chat.start_needs_name"), bridge.chatKeys,
+        assertEquals(ImmutableList.of("wdl.chat.start_needs_name"), bridge.chatKeys,
                 "the name gate speaks before the remote-world guard; its refusal appearing here means the gate moved");
     }
 
@@ -43,7 +45,7 @@ class ResumeFlowTest {
 
         flow.startNamed("museum");
 
-        assertEquals(List.of("wdl.refuse.join_multiplayer.body"), bridge.chatKeys,
+        assertEquals(ImmutableList.of("wdl.refuse.join_multiplayer.body"), bridge.chatKeys,
                 "a usable name reaches the remote-world guard instead of the needs-name refusal");
     }
 
@@ -79,7 +81,7 @@ class ResumeFlowTest {
 
         @Override
         public Path configDirectory() {
-            return Path.of(".");
+            return Paths.get(".");
         }
 
         @Override

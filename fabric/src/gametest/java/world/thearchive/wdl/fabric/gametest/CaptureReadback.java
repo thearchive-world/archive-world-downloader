@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.fabric.gametest;
 
+import com.google.common.collect.ImmutableList;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
@@ -97,7 +99,8 @@ final class CaptureReadback {
 
     /** The entity tags stored in an entity-chunk tag (the packet-derived entity assertion target). */
     static List<CompoundTag> entities(CompoundTag entityChunkTag) {
-        return entityChunkTag.getList("Entities", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t).toList();
+        return entityChunkTag.getList("Entities", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
+                .collect(Collectors.toList());
     }
 
     /** The block-entity tag stored at {@code pos} in a chunk tag's {@code block_entities}, or empty if none. */
@@ -119,7 +122,7 @@ final class CaptureReadback {
     static List<String> itemIds(CompoundTag containerTag) {
         return containerTag.getList("Items", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
                 .map(item -> (item.contains("id") ? item.getString("id") : "?"))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /** The {@code Data} compound of {@code <save>/level.dat} (player, game rules, world settings live under it). */
@@ -136,13 +139,13 @@ final class CaptureReadback {
     static List<Path> mapDataFiles(Path saveRoot) {
         Path dataDirectory = saveRoot.resolve("data");
         if (!Files.isDirectory(dataDirectory)) {
-            return List.of();
+            return ImmutableList.of();
         }
         try (Stream<Path> files = Files.list(dataDirectory)) {
             return files.filter(file -> {
                 String name = file.getFileName().toString();
                 return name.startsWith("map_") && name.endsWith(".dat");
-            }).sorted().toList();
+            }).sorted().collect(Collectors.toList());
         } catch (IOException e) {
             throw new RuntimeException("failed listing data/ under " + saveRoot, e);
         }

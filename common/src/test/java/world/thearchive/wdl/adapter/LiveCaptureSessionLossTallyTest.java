@@ -15,6 +15,7 @@ import static world.thearchive.wdl.testsupport.MapHolderFixtures.filledMap;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderOf;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderReferencing;
 
+import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
@@ -187,23 +188,30 @@ class LiveCaptureSessionLossTallyTest {
         return SyntheticChunks.withBlockAt(registries, new BlockPos(0, 64, 0), Blocks.AIR.defaultBlockState());
     }
 
-    /** The save layout for a fresh folder, with both storage directories already present. */
+    /** The save layout for a fresh folder, with the region storage directory already present. */
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
         Files.createDirectories(paths.regionDirectory(Level.OVERWORLD));
-        Files.createDirectories(paths.entitiesDirectory(Level.OVERWORLD));
         return paths;
     }
 
+    /** Seed a host region chunk at {@code pos} so an entity fold has terrain to land inside. */
+    private static void seedHost(WorldPaths paths, ChunkPos pos) throws Exception {
+        try (IOWorker region = paths.openRegionStorage(Level.OVERWORLD)) {
+            CompoundTag host = new CompoundTag();
+            host.put("Level", new CompoundTag());
+            region.store(pos, host).join();
+        }
+    }
+
     /**
-     * A writer over real region and entities storages, which the block-container sites need: both are incremented
-     * inside a thunk the writer resolves, and the orphan sweep's thunk runs only after its chunk has been read back off
-     * disk, which a stub storage would never satisfy.
+     * A writer over the real region storage, which the block-container sites need: the tally is incremented inside a
+     * thunk the writer resolves, and the orphan sweep's thunk runs only after its chunk has been read back off disk,
+     * which a stub storage would never satisfy.
      */
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
                 paths::openRegionStorage,
-                paths::openEntitiesStorage,
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -424,7 +432,7 @@ class LiveCaptureSessionLossTallyTest {
     /** A captured chunk carrying a chest and a lectern block entity, the two folds' match targets. */
     private ChunkSnapshotSource chestChunk() {
         return SyntheticChunks.fullWithBlockEntities(registries, true,
-                List.of(blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()),
+                ImmutableList.of(blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()),
                         blockEntity("minecraft:lectern", lectern.getX(), lectern.getY(), lectern.getZ())));
     }
 
@@ -525,6 +533,7 @@ class LiveCaptureSessionLossTallyTest {
         WorldPaths paths = paths(temporary.resolve("save"));
         assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
         AsyncSaveWriter writer = session.bindWorldOpen(paths, throwingArchive(), () -> saveWriter(paths));
+        seedHost(paths, chunk); // the entity folds into its host chunk
         bufferEntity(session, FRAME, chunk, entityDisplaying(FRAME, filledMap(9)));
 
         session.flushEntityChunk(writer, chunk);
@@ -558,6 +567,7 @@ class LiveCaptureSessionLossTallyTest {
         Map<UUID, CompoundTag> merchantStash = state(session, "merchantStash");
         merchantStash.put(VEHICLE, merchantHolderSellingMap(9));
         bufferEntity(session, VEHICLE, chunk, entity(VEHICLE));
+        seedHost(paths, chunk); // the villager folds into its host chunk
 
         session.flushBuffer(writer, true, 0, 0, 0);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
@@ -641,6 +651,7 @@ class LiveCaptureSessionLossTallyTest {
         bufferEntity(session, VEHICLE, chunk, entity(VEHICLE));
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
         assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
+        seedHost(paths, chunk); // the vehicle folds into its host chunk
 
         session.flushEntityChunk(writer, chunk);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);

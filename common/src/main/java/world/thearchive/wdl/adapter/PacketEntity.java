@@ -15,5 +15,63 @@ import java.util.UUID;
  * equipment payload {@code E} so it stays MC-free and headless-testable; the production specialization binds the MC
  * packet types.
  */
-record PacketEntity<P, V, E>(int id, UUID uuid, long chunkPos, EntityPos pos, P spawn, List<V> synced,
-        List<E> equipment, int[] passengers, int leashHolderId) {}
+final class PacketEntity<P, V, E> {
+    private final int id;
+    private final UUID uuid;
+    private final long chunkPos;
+    private final EntityPos pos;
+    private final P spawn;
+    private final List<V> synced;
+    private final List<E> equipment;
+    private final int[] passengers;
+    private final int leashHolderId;
+
+    PacketEntity(int id, UUID uuid, long chunkPos, EntityPos pos, P spawn, List<V> synced, List<E> equipment,
+            int[] passengers, int leashHolderId) {
+        this.id = id;
+        this.uuid = uuid;
+        this.chunkPos = chunkPos;
+        this.pos = pos;
+        this.spawn = spawn;
+        this.synced = synced;
+        this.equipment = equipment;
+        this.passengers = passengers;
+        this.leashHolderId = leashHolderId;
+    }
+
+    int id() {
+        return id;
+    }
+
+    UUID uuid() {
+        return uuid;
+    }
+
+    long chunkPos() {
+        return chunkPos;
+    }
+
+    EntityPos pos() {
+        return pos;
+    }
+
+    P spawn() {
+        return spawn;
+    }
+
+    List<V> synced() {
+        return synced;
+    }
+
+    List<E> equipment() {
+        return equipment;
+    }
+
+    int[] passengers() {
+        return passengers;
+    }
+
+    int leashHolderId() {
+        return leashHolderId;
+    }
+}

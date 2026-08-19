@@ -6,10 +6,10 @@ package world.thearchive.wdl.core.report;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -28,7 +28,7 @@ class DownloadReportFormatterTest {
         DownloadIdentity identity = ReportFixtures.identity("a", "survival.thearchive.world",
                 "Updated to 26.1.2", "");
         return new DownloadSession(identity, settings, environment(), true, true, STARTED.plusSeconds(4),
-                new DownloadCounts(421, 367, 0, List.of(new DimensionChunks("overworld", 421))), null);
+                new DownloadCounts(421, 367, 0, ImmutableList.of(new DimensionChunks("overworld", 421))), null);
     }
 
     private static DownloadSession resumed(Instant startedAt, String id) {
@@ -36,8 +36,8 @@ class DownloadReportFormatterTest {
                 "survival.thearchive.world", "", "", "Fabric", "1", "", "");
         return new DownloadSession(identity, Collections.<String, String>emptyMap(), environment(), true,
                 true, startedAt.plusSeconds(4),
-                new DownloadCounts(421, 367, 0, List.of(new DimensionChunks("overworld", 421))),
-                new SaveChunks(1000, List.of(new DimensionChunks("overworld", 800),
+                new DownloadCounts(421, 367, 0, ImmutableList.of(new DimensionChunks("overworld", 421))),
+                new SaveChunks(1000, ImmutableList.of(new DimensionChunks("overworld", 800),
                         new DimensionChunks("the_nether", 200))));
     }
 
@@ -106,7 +106,7 @@ class DownloadReportFormatterTest {
         DownloadIdentity identity = ReportFixtures.identity("d", "survival.thearchive.world", "", "");
         DownloadSession session = new DownloadSession(identity, Collections.<String, String>emptyMap(),
                 environment(), true, true, STARTED.plusSeconds(3723),
-                new DownloadCounts(9, 9, 0, List.of(new DimensionChunks("overworld", 9))), null);
+                new DownloadCounts(9, 9, 0, ImmutableList.of(new DimensionChunks("overworld", 9))), null);
 
         String md = DownloadReportFormatter.render(
                 Collections.singletonList(session), false, UTC, Locale.ROOT);
@@ -123,7 +123,7 @@ class DownloadReportFormatterTest {
         DownloadSession newer = new DownloadSession(newerId, Collections.<String, String>emptyMap(), environment(),
                 true, true, Instant.parse("2026-06-22T09:00:30Z"), new DownloadCounts(9, 9, 0), null);
 
-        String md = DownloadReportFormatter.render(List.of(older, newer), false, UTC, Locale.ROOT);
+        String md = DownloadReportFormatter.render(ImmutableList.of(older, newer), false, UTC, Locale.ROOT);
 
         assertTrue(md.startsWith("# Download report: Newer"), "the most recent download is rendered");
     }
@@ -132,7 +132,7 @@ class DownloadReportFormatterTest {
     void rendersTheTrueDimensionCountAndPerDimensionChunks() {
         DownloadIdentity identity = ReportFixtures.identity("m", "survival.thearchive.world", "", "");
         DownloadCounts counts = new DownloadCounts(430, 12, 3,
-                List.of(new DimensionChunks("overworld", 400), new DimensionChunks("the_nether", 30)));
+                ImmutableList.of(new DimensionChunks("overworld", 400), new DimensionChunks("the_nether", 30)));
         DownloadSession session = new DownloadSession(identity, Collections.<String, String>emptyMap(),
                 environment(), true, true, STARTED.plusSeconds(4), counts, null);
 
@@ -150,7 +150,7 @@ class DownloadReportFormatterTest {
         DownloadIdentity identity = ReportFixtures.identity("p", "survival.thearchive.world", "", "");
         DownloadSession session = new DownloadSession(identity, Collections.<String, String>emptyMap(),
                 environment(), true, false, STARTED.plusSeconds(4),
-                new DownloadCounts(10, 1, 0, List.of(new DimensionChunks("overworld", 10))), null);
+                new DownloadCounts(10, 1, 0, ImmutableList.of(new DimensionChunks("overworld", 10))), null);
 
         String md = DownloadReportFormatter.render(
                 Collections.singletonList(session), false, UTC, Locale.ROOT);
@@ -205,8 +205,8 @@ class DownloadReportFormatterTest {
         DownloadIdentity identity = ReportFixtures.identity("a", "survival.thearchive.world", "", "");
         DownloadSession session = new DownloadSession(identity, Collections.<String, String>emptyMap(),
                 environment(), true, true, STARTED.plusSeconds(4),
-                new DownloadCounts(421, 367, 0, List.of(new DimensionChunks("overworld", 421))),
-                new SaveChunks(421, List.of(new DimensionChunks("overworld", 421))));
+                new DownloadCounts(421, 367, 0, ImmutableList.of(new DimensionChunks("overworld", 421))),
+                new SaveChunks(421, ImmutableList.of(new DimensionChunks("overworld", 421))));
         String md = DownloadReportFormatter.render(Collections.singletonList(session), false, UTC, Locale.ROOT);
         assertFalse(md.contains("### This download"), "matching totals render no tiers");
         assertFalse(md.contains("### In the save"));
@@ -262,7 +262,7 @@ class DownloadReportFormatterTest {
                 STARTED.minusSeconds(3600).plusSeconds(10),
                 new DownloadCounts(100, 50, 5, Collections.<DimensionChunks>emptyList()),
                 new SaveChunks(100, Collections.<DimensionChunks>emptyList()));
-        String md = DownloadReportFormatter.render(List.of(resumed(STARTED, "a"), older), false, UTC,
+        String md = DownloadReportFormatter.render(ImmutableList.of(resumed(STARTED, "a"), older), false, UTC,
                 Locale.ROOT);
         assertTrue(md.contains("## Downloads"));
         assertTrue(md.contains("| Finished | Duration | Chunks | Entities | Containers | Status |"));
@@ -290,7 +290,7 @@ class DownloadReportFormatterTest {
                 STARTED.minusSeconds(3600).plusSeconds(10),
                 new DownloadCounts(100, 50, 5, Collections.<DimensionChunks>emptyList()),
                 new SaveChunks(100, Collections.<DimensionChunks>emptyList()));
-        String md = DownloadReportFormatter.render(List.of(damaged, resumed(STARTED, "a"), older), false,
+        String md = DownloadReportFormatter.render(ImmutableList.of(damaged, resumed(STARTED, "a"), older), false,
                 UTC, Locale.ROOT);
         assertTrue(md.contains("## Downloads"), "the two intact rows still render");
         assertTrue(md.contains("| 421 | 367 | 0 | Clean |"));
@@ -310,7 +310,7 @@ class DownloadReportFormatterTest {
                 STARTED.minusSeconds(3600).plusSeconds(10),
                 new DownloadCounts(100, 50, 5, Collections.<DimensionChunks>emptyList()),
                 new SaveChunks(100, Collections.<DimensionChunks>emptyList()));
-        String md = DownloadReportFormatter.render(List.of(pending, resumed(STARTED, "a"), older), false,
+        String md = DownloadReportFormatter.render(ImmutableList.of(pending, resumed(STARTED, "a"), older), false,
                 UTC, Locale.ROOT);
         assertTrue(md.contains("- **Chunks**: Unknown"), "the interrupted latest renders the Unknown summary");
         assertFalse(md.contains("### In the save"), "no in-save tier while the latest is interrupted");

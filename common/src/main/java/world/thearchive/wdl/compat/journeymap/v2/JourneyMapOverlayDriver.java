@@ -1,25 +1,25 @@
 // Copyright (C) Archive World Downloader contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-package world.thearchive.wdl.compat.journeymap;
+package world.thearchive.wdl.compat.journeymap.v2;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import journeymap.client.api.IClientAPI;
-import journeymap.client.api.display.DisplayType;
-import journeymap.client.api.display.PolygonOverlay;
-import journeymap.client.api.event.ClientEvent;
-import journeymap.client.api.model.MapPolygonWithHoles;
-import journeymap.client.api.model.ShapeProperties;
+import journeymap.api.v2.client.IClientAPI;
+import journeymap.api.v2.client.display.DisplayType;
+import journeymap.api.v2.client.display.PolygonOverlay;
+import journeymap.api.v2.client.event.MappingEvent;
+import journeymap.api.v2.client.model.MapPolygonWithHoles;
+import journeymap.api.v2.client.model.ShapeProperties;
+import journeymap.api.v2.common.event.ClientEventRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.core.CaptureState;
@@ -41,7 +41,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
  * and disconnect callbacks run on the client thread as well, so the overlay removals they issue are safe.
  */
 public final class JourneyMapOverlayDriver {
-    private static final Logger LOGGER = LoggerFactory.getLogger(JourneyMapOverlayDriver.class);
+    private static final Logger LOGGER = LogManager.getLogger(JourneyMapOverlayDriver.class);
 
     private static final String MOD_ID = "wdl";
 
@@ -66,8 +66,8 @@ public final class JourneyMapOverlayDriver {
         return thread;
     });
 
-    private boolean wired;      // wireOnce guard
-    private boolean subscribed; // initialize subscribe guard
+    private boolean wired;             // wireOnce guard
+    private boolean mappingSubscribed; // subscribeMappingEvents guard
 
     // True between JourneyMap MAPPING_STARTED and MAPPING_STOPPED. The tick never rebuilds while false. Volatile
     // because it is set from the mapping callback and read from the tick.
@@ -106,13 +106,17 @@ public final class JourneyMapOverlayDriver {
     // read on the client thread. A batch whose layers are null means the build threw, and the map is left as is.
     private volatile @Nullable OverlayBatch pendingBatch;
 
-    void initialize(IClientAPI api) {
+    void setApi(IClientAPI api) {
         this.api = api;
-        if (subscribed) {
+    }
+
+    void subscribeMappingEvents() {
+        if (mappingSubscribed) {
             return;
         }
-        subscribed = true;
-        api.subscribe(MOD_ID, EnumSet.of(ClientEvent.Type.MAPPING_STARTED, ClientEvent.Type.MAPPING_STOPPED));
+        // MAPPING_EVENT.subscribe registers permanently with no unsubscribe, so a repeat init must not re-add.
+        mappingSubscribed = true;
+        ClientEventRegistry.MAPPING_EVENT.subscribe(MOD_ID, this::onMappingEvent);
     }
 
     void wireOnce() {
@@ -129,13 +133,13 @@ public final class JourneyMapOverlayDriver {
         bridge.onDisconnect(this::onDisconnect);
     }
 
-    void onClientEvent(ClientEvent event) {
-        if (event.type == ClientEvent.Type.MAPPING_STARTED) {
+    private void onMappingEvent(MappingEvent event) {
+        if (event.getStage() == MappingEvent.Stage.MAPPING_STARTED) {
             mapping = true;
             // Force the next tick to rebuild from scratch for the freshly mapped world.
             lastGeneration = NO_GENERATION;
             lastDimension = null;
-        } else if (event.type == ClientEvent.Type.MAPPING_STOPPED) {
+        } else {
             mapping = false;
             hideAll(api);
         }
@@ -229,8 +233,7 @@ public final class JourneyMapOverlayDriver {
         int count = 0;
         for (ToneLayer layer : layers) {
             for (MapPolygonWithHoles hull : layer.hulls()) {
-                showQuietly(localApi, new PolygonOverlay(MOD_ID, "wdl-coverage-" + count, resourceKey,
-                        layer.style(), hull));
+                showQuietly(localApi, new PolygonOverlay(MOD_ID, resourceKey, layer.style(), hull));
                 count++;
             }
         }
@@ -328,7 +331,23 @@ public final class JourneyMapOverlayDriver {
         lastDimension = null;
     }
 
-    private record ToneLayer(ShapeProperties style, List<MapPolygonWithHoles> hulls) {}
+    private static final class ToneLayer {
+        private final ShapeProperties style;
+        private final List<MapPolygonWithHoles> hulls;
+
+        ToneLayer(ShapeProperties style, List<MapPolygonWithHoles> hulls) {
+            this.style = style;
+            this.hulls = hulls;
+        }
+
+        ShapeProperties style() {
+            return style;
+        }
+
+        List<MapPolygonWithHoles> hulls() {
+            return hulls;
+        }
+    }
 
     private static final class OverlayBatch {
         private final long generation;

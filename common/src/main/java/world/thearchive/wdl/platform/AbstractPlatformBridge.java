@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.platform;
 
+import com.google.common.collect.ImmutableList;
 import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -27,11 +28,12 @@ import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.compat.flashback.FlashbackReplayProbe;
 import world.thearchive.wdl.core.ChatCopy;
@@ -46,7 +48,7 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
  * per-loader subclass.
  */
 public abstract class AbstractPlatformBridge implements PlatformBridge {
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractPlatformBridge.class);
+    private static final Logger LOGGER = LogManager.getLogger(AbstractPlatformBridge.class);
 
     // Below 1.20.3 SystemToast has no custom-id class, so these reuse two distinct vanilla toast categories
     // (WORLD_BACKUP for job-done, TUTORIAL_HINT for refusals), which keep the vanilla default display
@@ -131,7 +133,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                             ? new TranslatableComponent(argument.translationKey())
                             : new TranslatableComponent(argument.translationKey(), argument.text());
             if (argument.color().isPresent()) {
-                rendered = rendered.withStyle(style -> style.withColor(argument.color().getAsInt()));
+                rendered = rendered.withStyle(style -> style.withColor(TextColor.fromRgb(argument.color().getAsInt())));
             }
             ChatCopy.Click click = argument.click();
             if (click != null) {
@@ -147,7 +149,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         }
         MutableComponent rendered = new TranslatableComponent(line.translationKey(), renderedArguments);
         if (line.templateColor().isPresent()) {
-            rendered = rendered.withStyle(style -> style.withColor(line.templateColor().getAsInt()));
+            rendered = rendered.withStyle(style -> style.withColor(TextColor.fromRgb(line.templateColor().getAsInt())));
         }
         return rendered;
     }
@@ -163,13 +165,13 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                             ? new TranslatableComponent(argument.translationKey())
                             : new TranslatableComponent(argument.translationKey(), argument.text());
             if (argument.color().isPresent()) {
-                rendered = rendered.withStyle(style -> style.withColor(argument.color().getAsInt()));
+                rendered = rendered.withStyle(style -> style.withColor(TextColor.fromRgb(argument.color().getAsInt())));
             }
             renderedArguments[slot++] = rendered;
         }
         MutableComponent body = new TranslatableComponent(toast.bodyKey(), renderedArguments);
         if (toast.bodyColor().isPresent()) {
-            body = body.withStyle(style -> style.withColor(toast.bodyColor().getAsInt()));
+            body = body.withStyle(style -> style.withColor(TextColor.fromRgb(toast.bodyColor().getAsInt())));
         }
         Minecraft mc = Minecraft.getInstance();
         SystemToast.SystemToastIds id = toast.refusal() ? REFUSAL_TOAST_ID : TOAST_ID;
@@ -193,7 +195,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         // still reach the settings and downloads screens there, so the row is hidden rather than disabled.
         // Replay playback is a remote world, so the row is present there and its actions work.
         if (!isRemoteWorld()) {
-            return List.of();
+            return ImmutableList.of();
         }
         int x = anchor.x;
         int y = anchor.y;
@@ -210,7 +212,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                                 new TranslatableComponent("wdl.pause.settings.tooltip"), mouseX, mouseY);
                     }
                 });
-        return List.of(primary, config);
+        return ImmutableList.of(primary, config);
     }
 
     /** The lowest existing pause-menu button (Disconnect), the anchor to insert the wdl row above. */

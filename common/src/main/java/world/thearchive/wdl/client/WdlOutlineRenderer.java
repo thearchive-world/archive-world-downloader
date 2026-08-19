@@ -13,9 +13,9 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.phys.AABB;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.OutlineDrawSet;
@@ -41,7 +41,7 @@ import world.thearchive.wdl.core.TimingWindow;
  * for the frustum test. Runs on the render thread, the vanilla client thread.
  */
 public final class WdlOutlineRenderer {
-    private static final Logger LOGGER = LoggerFactory.getLogger(WdlOutlineRenderer.class);
+    private static final Logger LOGGER = LogManager.getLogger(WdlOutlineRenderer.class);
 
     // The outlineDebugTiming window, in frames: the rolling render-thread cost is read from here.
     private static final int TIMING_WINDOW_FRAMES = 200;

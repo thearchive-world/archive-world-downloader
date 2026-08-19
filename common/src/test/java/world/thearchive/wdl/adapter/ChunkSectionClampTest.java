@@ -5,6 +5,9 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -26,7 +29,7 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * A 26.x server reached through a downgrade proxy (ViaBackwards) sends a 1.17.1 client sections outside the 0..256
+ * A 26.x server reached through a downgrade proxy (ViaBackwards) sends a 1.16.5 client sections outside the 0..256
  * column. A block section outside 0..15 crashes vanilla's unchecked {@code sections[index]} on load, so the codec must
  * drop everything outside the -1..16 light column and keep block data only inside 0..15.
  */
@@ -48,7 +51,7 @@ class ChunkSectionClampTest {
 
         Set<Integer> writtenY = new HashSet<>();
         Set<Integer> withBlockData = new HashSet<>();
-        for (Tag sectionTag : level.getList("Sections", Tag.TAG_COMPOUND)) {
+        for (Tag sectionTag : level.getList("Sections", 10)) {
             CompoundTag section = (CompoundTag) sectionTag;
             int y = section.getByte("Y");
             writtenY.add(y);
@@ -56,8 +59,9 @@ class ChunkSectionClampTest {
                 withBlockData.add(y);
             }
         }
-        assertEquals(Set.of(-1, 0, 15, 16), writtenY, "only the -1..16 light column survives; -4 and 17 are dropped");
-        assertEquals(Set.of(0, 15), withBlockData, "block data is written only inside the 0..15 block range");
+        assertEquals(ImmutableSet.of(-1, 0, 15, 16), writtenY,
+                "only the -1..16 light column survives; -4 and 17 are dropped");
+        assertEquals(ImmutableSet.of(0, 15), withBlockData, "block data is written only inside the 0..15 block range");
     }
 
     private static LevelChunkSection blockSection(int sectionY) {
@@ -70,7 +74,18 @@ class ChunkSectionClampTest {
         return new DataLayer(SyntheticChunks.lightFill((byte) 15));
     }
 
-    private record ClampSnapshot(List<ChunkSnapshotSource.SectionData> sections) implements ChunkSnapshotSource {
+    private static final class ClampSnapshot implements ChunkSnapshotSource {
+        private final List<ChunkSnapshotSource.SectionData> sections;
+
+        ClampSnapshot(List<ChunkSnapshotSource.SectionData> sections) {
+            this.sections = sections;
+        }
+
+        @Override
+        public List<ChunkSnapshotSource.SectionData> sections() {
+            return sections;
+        }
+
         @Override
         public ChunkPos chunkPos() {
             return new ChunkPos(0, 0);
@@ -103,12 +118,12 @@ class ChunkSectionClampTest {
 
         @Override
         public Map<Heightmap.Types, long[]> heightmaps() {
-            return Map.of();
+            return ImmutableMap.of();
         }
 
         @Override
         public List<CompoundTag> blockEntities() {
-            return List.of();
+            return ImmutableList.of();
         }
 
         @Override

@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +52,7 @@ class EntityPacketAccumulatorTest {
         assertEquals(UUID_A, drained.get(0).uuid(), "the save-layer UUID rides from the spawn");
         assertEquals("spawn-packet", drained.get(0).spawn(), "the spawn payload is held for reconstruction");
         assertTrue(drained.get(0).synced().isEmpty(), "no SetEntityData seen yet");
-        assertEquals(Set.of(), accumulator.chunks(OVERWORLD), "drained entries leave the accumulator");
+        assertEquals(ImmutableSet.of(), accumulator.chunks(OVERWORLD), "drained entries leave the accumulator");
         assertFalse(accumulator.dropChunk(OVERWORLD, CHUNK).size() > 0, "a re-drain of the same chunk yields nothing");
     }
 
@@ -142,7 +142,7 @@ class EntityPacketAccumulatorTest {
 
         accumulator.reposition(7, FAR, new EntityPos(300.0, 70.0, 305.0, 90f, 5f));
 
-        assertEquals(Set.of(FAR), accumulator.chunks(OVERWORLD), "re-homed to the new chunk");
+        assertEquals(ImmutableSet.of(FAR), accumulator.chunks(OVERWORLD), "re-homed to the new chunk");
         assertTrue(accumulator.dropChunk(OVERWORLD, CHUNK).isEmpty(), "no longer drains from the old chunk");
         EntityPos pos = accumulator.dropChunk(OVERWORLD, FAR).get(0).pos();
         assertEquals(300.0, pos.x(), "the final position rides the drain record");
@@ -175,7 +175,7 @@ class EntityPacketAccumulatorTest {
         accumulator.recordLeash(7, 42);
         accumulator.reposition(7, FAR, new EntityPos(1, 1, 1, 0f, 0f));
 
-        assertEquals(Set.of(), accumulator.chunks(OVERWORLD), "no spawn, no entry");
+        assertEquals(ImmutableSet.of(), accumulator.chunks(OVERWORLD), "no spawn, no entry");
         assertNull(accumulator.positionOf(7));
     }
 
@@ -198,9 +198,9 @@ class EntityPacketAccumulatorTest {
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "in-chunk");
         accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "other-chunk");
 
-        assertEquals(Set.of(CHUNK, FAR), accumulator.chunks(OVERWORLD));
+        assertEquals(ImmutableSet.of(CHUNK, FAR), accumulator.chunks(OVERWORLD));
         assertEquals(1, accumulator.dropChunk(OVERWORLD, CHUNK).size(), "only the drained chunk");
-        assertEquals(Set.of(FAR), accumulator.chunks(OVERWORLD), "the other chunk is still held");
+        assertEquals(ImmutableSet.of(FAR), accumulator.chunks(OVERWORLD), "the other chunk is still held");
     }
 
     @Test
@@ -214,7 +214,7 @@ class EntityPacketAccumulatorTest {
 
         accumulator.recordPassengers(1, new int[] { 2 });
 
-        assertEquals(Set.of(CHUNK), accumulator.chunks(OVERWORLD), "the rider joined the vehicle's chunk");
+        assertEquals(ImmutableSet.of(CHUNK), accumulator.chunks(OVERWORLD), "the rider joined the vehicle's chunk");
         assertEquals(2, accumulator.dropChunk(OVERWORLD, CHUNK).size(), "vehicle and rider drain in one batch");
     }
 
@@ -229,7 +229,8 @@ class EntityPacketAccumulatorTest {
 
         accumulator.reposition(1, FAR, new EntityPos(300, 64, 305, 0f, 0f));
 
-        assertEquals(Set.of(FAR), accumulator.chunks(OVERWORLD), "the rider followed the vehicle to the new chunk");
+        assertEquals(ImmutableSet.of(FAR), accumulator.chunks(OVERWORLD),
+                "the rider followed the vehicle to the new chunk");
         assertEquals(2, accumulator.dropChunk(OVERWORLD, FAR).size(), "vehicle and rider still drain together");
     }
 
@@ -246,7 +247,7 @@ class EntityPacketAccumulatorTest {
         accumulator.recordPassengers(1, new int[] { 2 }); // rider id 2 not spawned yet: the re-home finds nothing
         accumulator.spawn(2, UUID_B, FAR, new EntityPos(0, 0, 0, 0f, 0f), "rider"); // arrives later, a different chunk
 
-        assertEquals(Set.of(CHUNK, FAR), accumulator.chunks(OVERWORLD),
+        assertEquals(ImmutableSet.of(CHUNK, FAR), accumulator.chunks(OVERWORLD),
                 "the late rider is not re-homed to the vehicle");
         assertEquals(1, accumulator.dropChunk(OVERWORLD, CHUNK).size(), "only the vehicle drains from its chunk");
         assertEquals(1, accumulator.dropChunk(OVERWORLD, FAR).size(), "the rider drains standalone from its own chunk");
@@ -262,7 +263,8 @@ class EntityPacketAccumulatorTest {
 
         accumulator.recordPassengers(1, new int[] { 2 });
 
-        assertEquals(Set.of(CHUNK), accumulator.chunks(OVERWORLD), "the whole stack joined the vehicle's chunk");
+        assertEquals(ImmutableSet.of(CHUNK), accumulator.chunks(OVERWORLD),
+                "the whole stack joined the vehicle's chunk");
         List<PacketEntity<String, String, String>> drained = accumulator.dropChunk(OVERWORLD, CHUNK);
         assertEquals(3, drained.size(), "so all three drain in one batch and nest");
         // Each list is one id long, which is the shape that lets a worklist wrapping the held array rather than
@@ -283,12 +285,12 @@ class EntityPacketAccumulatorTest {
 
         accumulator.recordPassengers(1, new int[] { 2 });
 
-        assertEquals(Set.of(CHUNK), accumulator.chunks(OVERWORLD), "both riders joined the vehicle's chunk");
+        assertEquals(ImmutableSet.of(CHUNK), accumulator.chunks(OVERWORLD), "both riders joined the vehicle's chunk");
         assertEquals(4, accumulator.dropChunk(OVERWORLD, CHUNK).size(), "so all four drain in one batch");
     }
 
     private static int[] passengersOf(List<PacketEntity<String, String, String>> drained, int id) {
-        return drained.stream().filter(entity -> entity.id() == id).findFirst().orElseThrow().passengers();
+        return drained.stream().filter(entity -> entity.id() == id).findFirst().get().passengers();
     }
 
     @Test
@@ -309,7 +311,8 @@ class EntityPacketAccumulatorTest {
         walk.join(10_000);
 
         assertFalse(walk.isAlive(), "each id is re-homed once and the walk ends");
-        assertEquals(Set.of(FAR), accumulator.chunks(OVERWORLD), "and the cycle re-homes to the vehicle's chunk");
+        assertEquals(ImmutableSet.of(FAR), accumulator.chunks(OVERWORLD),
+                "and the cycle re-homes to the vehicle's chunk");
         assertEquals(2, accumulator.dropChunk(OVERWORLD, FAR).size(), "both still drain together");
     }
 
@@ -392,7 +395,8 @@ class EntityPacketAccumulatorTest {
 
         assertEquals(1, entered.size(), "only the entity announced in the dimension being read");
         assertEquals(UUID_B, entered.get(0).uuid());
-        assertEquals(Set.of(CHUNK), accumulator.chunks(OVERWORLD), "the entity of the other dimension is held");
+        assertEquals(ImmutableSet.of(CHUNK), accumulator.chunks(OVERWORLD),
+                "the entity of the other dimension is held");
         assertEquals(UUID_A, accumulator.dropChunk(OVERWORLD, CHUNK).get(0).uuid(),
                 "and drains under the dimension it was announced in, which is the folder it belongs in");
     }
@@ -406,7 +410,7 @@ class EntityPacketAccumulatorTest {
 
         accumulator.enterDimension(OVERWORLD);
 
-        assertEquals(Set.of(CHUNK), accumulator.chunks(OVERWORLD), "the held entity is still this world's");
+        assertEquals(ImmutableSet.of(CHUNK), accumulator.chunks(OVERWORLD), "the held entity is still this world's");
         assertEquals(1, accumulator.dropChunk(OVERWORLD, CHUNK).size());
     }
 
@@ -421,12 +425,12 @@ class EntityPacketAccumulatorTest {
         accumulator.spawn(2, UUID_B, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "other-world");
         accumulator.spawn(3, new UUID(0, 3), FAR, new EntityPos(0, 0, 0, 0f, 0f), "other-world-elsewhere");
 
-        assertEquals(Set.of(OVERWORLD, NETHER), accumulator.heldDimensions(),
+        assertEquals(ImmutableSet.of(OVERWORLD, NETHER), accumulator.heldDimensions(),
                 "both worlds are named, so neither can be settled by the other's captured positions");
-        assertEquals(Set.of(CHUNK, FAR), accumulator.chunks(NETHER), "and each names only its own chunks");
+        assertEquals(ImmutableSet.of(CHUNK, FAR), accumulator.chunks(NETHER), "and each names only its own chunks");
         assertEquals(1, accumulator.dropChunk(NETHER, CHUNK).size(), "draining one leaves the other world alone");
-        assertEquals(Set.of(CHUNK), accumulator.chunks(OVERWORLD));
-        assertEquals(Set.of(OVERWORLD, NETHER), accumulator.heldDimensions(),
+        assertEquals(ImmutableSet.of(CHUNK), accumulator.chunks(OVERWORLD));
+        assertEquals(ImmutableSet.of(OVERWORLD, NETHER), accumulator.heldDimensions(),
                 "the nether still holds its other chunk, so it is still named");
     }
 
@@ -446,8 +450,9 @@ class EntityPacketAccumulatorTest {
 
         accumulator.recordPassengers(1, new int[] { 2 });
 
-        assertEquals(Set.of(FAR), accumulator.chunks(NETHER), "the entity of the other world kept its own chunk");
-        assertEquals(Set.of(CHUNK, ELSEWHERE), accumulator.chunks(OVERWORLD),
+        assertEquals(ImmutableSet.of(FAR), accumulator.chunks(NETHER),
+                "the entity of the other world kept its own chunk");
+        assertEquals(ImmutableSet.of(CHUNK, ELSEWHERE), accumulator.chunks(OVERWORLD),
                 "and the walk stopped at it rather than reaching through it");
         assertEquals(1, accumulator.dropChunk(OVERWORLD, CHUNK).size(), "so the vehicle drains alone");
     }

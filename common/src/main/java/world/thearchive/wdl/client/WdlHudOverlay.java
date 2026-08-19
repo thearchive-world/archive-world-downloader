@@ -13,9 +13,9 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.util.Mth;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.RenderSurface;
@@ -63,7 +63,7 @@ public final class WdlHudOverlay {
     private static final String GLYPH_SAVING = "●";
     private static final String GLYPH_DONE = "✔";
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(WdlHudOverlay.class);
+    private static final Logger LOGGER = LogManager.getLogger(WdlHudOverlay.class);
     private static boolean errorLogged;
 
     private enum Phase {
@@ -72,8 +72,47 @@ public final class WdlHudOverlay {
         DONE
     }
 
-    private record Frame(Phase phase, CaptureCounts counts, long elapsedMillis, SaveStage stage, float progress,
-            float alpha) {}
+    private static final class Frame {
+        private final Phase phase;
+        private final CaptureCounts counts;
+        private final long elapsedMillis;
+        private final SaveStage stage;
+        private final float progress;
+        private final float alpha;
+
+        Frame(Phase phase, CaptureCounts counts, long elapsedMillis, SaveStage stage, float progress, float alpha) {
+            this.phase = phase;
+            this.counts = counts;
+            this.elapsedMillis = elapsedMillis;
+            this.stage = stage;
+            this.progress = progress;
+            this.alpha = alpha;
+        }
+
+        Phase phase() {
+            return phase;
+        }
+
+        CaptureCounts counts() {
+            return counts;
+        }
+
+        long elapsedMillis() {
+            return elapsedMillis;
+        }
+
+        SaveStage stage() {
+            return stage;
+        }
+
+        float progress() {
+            return progress;
+        }
+
+        float alpha() {
+            return alpha;
+        }
+    }
 
     // The peek key, registered per loader and bound here, plus the toggle-mode latch the overlay flips per press.
     private static @Nullable KeyMapping peekKey;
@@ -135,7 +174,7 @@ public final class WdlHudOverlay {
 
     private static @Nullable Frame doneFrame(HudConfig config, CaptureCounts counts, long elapsed) {
         OptionalLong done = Wdl.doneElapsedMillis();
-        if (done.isEmpty()) {
+        if (!done.isPresent()) {
             return null;
         }
         long sinceDone = done.getAsLong();
@@ -305,44 +344,80 @@ public final class WdlHudOverlay {
     }
 
     private static MutableComponent phaseLabel(SaveStage stage) {
-        return switch (stage) {
-            case WRITING_CHUNKS -> new TranslatableComponent("wdl.hud.phase.chunks");
-            case WRITING_MAPS -> new TranslatableComponent("wdl.hud.phase.maps");
-            case COMPRESSING -> new TranslatableComponent("wdl.hud.phase.compressing");
-            case NONE -> new TextComponent("");
-        };
+        switch (stage) {
+            case WRITING_CHUNKS:
+                return new TranslatableComponent("wdl.hud.phase.chunks");
+            case WRITING_MAPS:
+                return new TranslatableComponent("wdl.hud.phase.maps");
+            case COMPRESSING:
+                return new TranslatableComponent("wdl.hud.phase.compressing");
+            case NONE:
+                return new TextComponent("");
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 
     private static String glyph(Phase phase) {
-        return switch (phase) {
-            case RECORDING -> GLYPH_RECORDING;
-            case SAVING -> GLYPH_SAVING;
-            case DONE -> GLYPH_DONE;
-        };
+        switch (phase) {
+            case RECORDING:
+                return GLYPH_RECORDING;
+            case SAVING:
+                return GLYPH_SAVING;
+            case DONE:
+                return GLYPH_DONE;
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 
     private static int glyphColor(Phase phase) {
-        return switch (phase) {
-            case RECORDING -> BrandColors.RECORDING_RED;
-            case SAVING -> BrandColors.SAVING_GRAY;
-            case DONE -> BrandColors.TEAL;
-        };
+        switch (phase) {
+            case RECORDING:
+                return BrandColors.RECORDING_RED;
+            case SAVING:
+                return BrandColors.SAVING_GRAY;
+            case DONE:
+                return BrandColors.TEAL;
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 
     private static int anchorX(HudAnchor anchor, int screenWidth, int boxWidth) {
-        return switch (anchor) {
-            case TOP_LEFT, MIDDLE_LEFT, BOTTOM_LEFT -> SCREEN_MARGIN;
-            case TOP_CENTER, MIDDLE_CENTER -> (screenWidth - boxWidth) / 2;
-            case TOP_RIGHT, MIDDLE_RIGHT, BOTTOM_RIGHT -> screenWidth - boxWidth - SCREEN_MARGIN;
-        };
+        switch (anchor) {
+            case TOP_LEFT:
+            case MIDDLE_LEFT:
+            case BOTTOM_LEFT:
+                return SCREEN_MARGIN;
+            case TOP_CENTER:
+            case MIDDLE_CENTER:
+                return (screenWidth - boxWidth) / 2;
+            case TOP_RIGHT:
+            case MIDDLE_RIGHT:
+            case BOTTOM_RIGHT:
+                return screenWidth - boxWidth - SCREEN_MARGIN;
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 
     private static int anchorY(HudAnchor anchor, int screenHeight, int boxHeight) {
-        return switch (anchor) {
-            case TOP_LEFT, TOP_CENTER, TOP_RIGHT -> SCREEN_MARGIN;
-            case MIDDLE_LEFT, MIDDLE_CENTER, MIDDLE_RIGHT -> (screenHeight - boxHeight) / 2;
-            case BOTTOM_LEFT, BOTTOM_RIGHT -> screenHeight - boxHeight - SCREEN_MARGIN;
-        };
+        switch (anchor) {
+            case TOP_LEFT:
+            case TOP_CENTER:
+            case TOP_RIGHT:
+                return SCREEN_MARGIN;
+            case MIDDLE_LEFT:
+            case MIDDLE_CENTER:
+            case MIDDLE_RIGHT:
+                return (screenHeight - boxHeight) / 2;
+            case BOTTOM_LEFT:
+            case BOTTOM_RIGHT:
+                return screenHeight - boxHeight - SCREEN_MARGIN;
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 
     private static int withAlpha(int rgb, float alpha) {

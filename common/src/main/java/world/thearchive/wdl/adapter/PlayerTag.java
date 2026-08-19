@@ -110,7 +110,8 @@ final class PlayerTag {
      * transplants directly). A holder with no {@code "Items"} list leaves the existing {@code "EnderItems"} untouched.
      */
     static void setEnderItems(CompoundTag raw, CompoundTag enderHolder) {
-        if (enderHolder.get("Items") instanceof ListTag items) {
+        if (enderHolder.get("Items") instanceof ListTag) {
+            ListTag items = (ListTag) enderHolder.get("Items");
             raw.put("EnderItems", items);
         }
     }
@@ -139,10 +140,13 @@ final class PlayerTag {
      * copied in. Returns whether a carry-forward happened.
      */
     static boolean carryForwardEnderItems(CompoundTag priorPlayer, CompoundTag freshRaw) {
-        if (freshRaw.get("EnderItems") instanceof ListTag fresh && !fresh.isEmpty()) {
+        if (freshRaw.get("EnderItems") instanceof ListTag && !((ListTag) freshRaw.get("EnderItems")).isEmpty()) {
             return false;
         }
-        if (!(priorPlayer.get("EnderItems") instanceof ListTag prior) || prior.isEmpty()) {
+        ListTag prior = priorPlayer.get("EnderItems") instanceof ListTag
+                ? (ListTag) priorPlayer.get("EnderItems")
+                : null;
+        if (prior == null || prior.isEmpty()) {
             return false;
         }
         freshRaw.put("EnderItems", prior.copy());
@@ -159,8 +163,13 @@ final class PlayerTag {
      * copy. Returns whether it restored.
      */
     static boolean restorePriorMountContents(CompoundTag priorPlayer, CompoundTag freshRaw) {
-        if (!(priorPlayer.get("RootVehicle") instanceof CompoundTag prior)
-                || !(freshRaw.get("RootVehicle") instanceof CompoundTag fresh)) {
+        CompoundTag prior = priorPlayer.get("RootVehicle") instanceof CompoundTag
+                ? (CompoundTag) priorPlayer.get("RootVehicle")
+                : null;
+        CompoundTag fresh = freshRaw.get("RootVehicle") instanceof CompoundTag
+                ? (CompoundTag) freshRaw.get("RootVehicle")
+                : null;
+        if (prior == null || fresh == null) {
             return false;
         }
         return restorePriorMountItems(prior, fresh);
@@ -176,8 +185,9 @@ final class PlayerTag {
      * contents of its own. Returns whether anything restored.
      */
     private static boolean restorePriorMountItems(CompoundTag prior, CompoundTag fresh) {
-        if (!(fresh.get("Entity") instanceof CompoundTag freshEntity)
-                || !(prior.get("Entity") instanceof CompoundTag priorEntity)) {
+        CompoundTag freshEntity = fresh.get("Entity") instanceof CompoundTag ? (CompoundTag) fresh.get("Entity") : null;
+        CompoundTag priorEntity = prior.get("Entity") instanceof CompoundTag ? (CompoundTag) prior.get("Entity") : null;
+        if (freshEntity == null || priorEntity == null) {
             return false;
         }
         Map<UUID, CompoundTag> freshNodes = EntityTreeWalk.byUuid(freshEntity);

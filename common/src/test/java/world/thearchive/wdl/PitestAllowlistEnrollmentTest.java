@@ -5,10 +5,13 @@ package world.thearchive.wdl;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -32,10 +35,10 @@ import org.junit.jupiter.api.Test;
  * covered yet never mutated) is caught too.
  */
 class PitestAllowlistEnrollmentTest {
-    private static final Path SOURCE_ROOT = Path.of("src/main/java/world/thearchive/wdl");
+    private static final Path SOURCE_ROOT = Paths.get("src/main/java/world/thearchive/wdl");
     private static final Path CORE_SOURCE = SOURCE_ROOT.resolve("core");
     private static final Path ADAPTER_SOURCE = SOURCE_ROOT.resolve("adapter");
-    private static final Path BUILD_SCRIPT = Path.of("build.gradle.kts");
+    private static final Path BUILD_SCRIPT = Paths.get("build.gradle.kts");
 
     private static final String CORE_PACKAGE = "world.thearchive.wdl.core";
     private static final String ADAPTER_PACKAGE = "world.thearchive.wdl.adapter";
@@ -55,7 +58,7 @@ class PitestAllowlistEnrollmentTest {
     // Classes that match the structural predicate but carry no cross-band fidelity contract, so they are
     // deliberately not mutated: SPI interfaces (no body to mutate), the IO/threading and packet/render/
     // tracker plumbing (effect-asserted, not value-asserted), and presentation/config/value types.
-    private static final Set<String> ACKNOWLEDGED_EXCLUDES = Set.of(
+    private static final Set<String> ACKNOWLEDGED_EXCLUDES = ImmutableSet.of(
             // core/ presentation, config, and value types (no fidelity contract):
             "world.thearchive.wdl.core.AtomicFileWrite",
             "world.thearchive.wdl.core.BrandColors",
@@ -178,7 +181,7 @@ class PitestAllowlistEnrollmentTest {
         Matcher matcher = anyDepthTargetClassFqnPattern.matcher(readString(BUILD_SCRIPT));
         while (matcher.find()) {
             String fqn = matcher.group(1);
-            if (!Files.isRegularFile(Path.of("src/main/java", fqn.replace('.', '/') + ".java"))) {
+            if (!Files.isRegularFile(Paths.get("src/main/java", fqn.replace('.', '/') + ".java"))) {
                 dead.add(fqn);
             }
         }
@@ -233,7 +236,7 @@ class PitestAllowlistEnrollmentTest {
     // Same net.minecraft import scan as the checkCoreImports build fence, so both read the tree identically.
     private static boolean importsMinecraft(Path javaFile) {
         for (String line : readAllLines(javaFile)) {
-            String trimmed = line.strip();
+            String trimmed = line.trim();
             if (trimmed.startsWith("import net.minecraft.") || trimmed.startsWith("import static net.minecraft.")) {
                 return true;
             }
@@ -270,7 +273,7 @@ class PitestAllowlistEnrollmentTest {
 
     private static String readString(Path file) {
         try {
-            return Files.readString(file);
+            return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("cannot read " + file.toAbsolutePath(), e);
         }

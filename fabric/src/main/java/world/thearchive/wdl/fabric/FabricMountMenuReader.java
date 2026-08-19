@@ -17,6 +17,6 @@ import world.thearchive.wdl.adapter.MountMenuReader;
 final class FabricMountMenuReader extends MountMenuReader {
     @Override
     protected @Nullable Entity mount(AbstractContainerMenu menu) {
-        return menu instanceof HorseInventoryMenu mountMenu ? mountMenu.horse : null; // widened
+        return menu instanceof HorseInventoryMenu ? ((HorseInventoryMenu) menu).horse : null; // widened
     }
 }

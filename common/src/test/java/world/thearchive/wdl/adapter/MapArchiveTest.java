@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderReferencing;
 
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -178,7 +179,7 @@ class MapArchiveTest {
 
         archive.remap(holder, "Items");
 
-        assertEquals(Set.of(archive.archiveIdFor(1988), archive.archiveIdFor(1993)), collect(holder));
+        assertEquals(ImmutableSet.of(archive.archiveIdFor(1988), archive.archiveIdFor(1993)), collect(holder));
     }
 
     @Test
@@ -219,7 +220,7 @@ class MapArchiveTest {
                 Files.readAllBytes(dataB.resolve("map_" + idOfQ + ".dat")), "picture Q data byte-identical");
         assertArrayEquals(Files.readAllBytes(manifestA), Files.readAllBytes(manifestB),
                 "the manifest grows the id space by zero across the resume");
-        assertEquals(Set.of(idOfP, idOfQ), collect(holderB), "B's remapped items carry A's archive ids");
+        assertEquals(ImmutableSet.of(idOfP, idOfQ), collect(holderB), "B's remapped items carry A's archive ids");
     }
 
     @Test

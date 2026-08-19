@@ -55,10 +55,13 @@ public final class FixtureFidelity {
         BlockPos pos = new BlockPos(x, y, z);
         BlockState state = representativeState(blockEntityId);
         EntityBlock block = (EntityBlock) state.getBlock();
-        BlockEntity blockEntity = block.newBlockEntity(pos, state);
+        BlockEntity blockEntity = block.newBlockEntity(null);
         if (blockEntity == null) {
             throw new AssertionError("Fixture fidelity: " + state.getBlock() + " hosts no block entity at " + pos);
         }
+        // 1.16.5 newBlockEntity takes no position (the 1.17 overload did), so the fresh block entity sits at the
+        // origin; set its position or save writes x/y/z of 0,0,0 instead of the requested cell.
+        blockEntity.setLevelAndPosition(null, pos);
         return blockEntity;
     }
 
@@ -87,7 +90,7 @@ public final class FixtureFidelity {
         BlockPos pos = new BlockPos(subject.getInt("x"), subject.getInt("y"), subject.getInt("z"));
         BlockState state = representativeState(id);
 
-        BlockEntity blockEntity = BlockEntity.loadStatic(pos, state, subject);
+        BlockEntity blockEntity = BlockEntity.loadStatic(state, subject);
         if (blockEntity == null) {
             throw new AssertionError("Fixture fidelity: the fixture at " + pos
                     + " does not load as a block entity: " + subject);
@@ -112,7 +115,7 @@ public final class FixtureFidelity {
             throw new AssertionError("Fixture fidelity: the holder's Items is " + rawItems
                     + ", which no producer writes; an empty read of it would pass this check silently");
         }
-        ListTag items = holderTag.getList("Items", Tag.TAG_COMPOUND);
+        ListTag items = holderTag.getList("Items", 10);
 
         NonNullList<ItemStack> stacks = NonNullList.withSize(containerSize(items), ItemStack.EMPTY);
         ContainerHelper.loadAllItems(holderTag, stacks);
@@ -120,7 +123,7 @@ public final class FixtureFidelity {
         CompoundTag output = ContainerHelper.saveAllItems(new CompoundTag(), stacks);
 
         List<String> divergences = new ArrayList<>();
-        diff("Items", output.getList("Items", Tag.TAG_COMPOUND), items, divergences);
+        diff("Items", output.getList("Items", 10), items, divergences);
         if (!divergences.isEmpty()) {
             throw new AssertionError(message("items holder", divergences, output, holderTag));
         }
@@ -156,13 +159,13 @@ public final class FixtureFidelity {
         }
         TestRegistries.frozen();
         Map<ResourceLocation, BlockState> states = new HashMap<>();
-        BlockPos probe = new BlockPos(0, 0, 0);
         for (Block block : Registry.BLOCK) {
-            if (!(block instanceof EntityBlock entityBlock)) {
+            if (!(block instanceof EntityBlock)) {
                 continue;
             }
+            EntityBlock entityBlock = (EntityBlock) block;
             BlockState state = block.defaultBlockState();
-            BlockEntity blockEntity = entityBlock.newBlockEntity(probe, state);
+            BlockEntity blockEntity = entityBlock.newBlockEntity(null);
             if (blockEntity == null) {
                 continue;
             }
@@ -178,7 +181,9 @@ public final class FixtureFidelity {
             divergences.add(path + ": the producer writes " + produced + ", the fixture omits it");
             return;
         }
-        if (produced instanceof CompoundTag producedCompound && fixture instanceof CompoundTag fixtureCompound) {
+        if (produced instanceof CompoundTag && fixture instanceof CompoundTag) {
+            CompoundTag producedCompound = (CompoundTag) produced;
+            CompoundTag fixtureCompound = (CompoundTag) fixture;
             for (String key : producedCompound.getAllKeys()) {
                 diff(child(path, key), producedCompound.get(key), fixtureCompound.get(key), divergences);
             }
@@ -190,7 +195,9 @@ public final class FixtureFidelity {
             }
             return;
         }
-        if (produced instanceof ListTag producedList && fixture instanceof ListTag fixtureList) {
+        if (produced instanceof ListTag && fixture instanceof ListTag) {
+            ListTag producedList = (ListTag) produced;
+            ListTag fixtureList = (ListTag) fixture;
             if (producedList.size() != fixtureList.size()) {
                 divergences.add(path + ": the producer writes " + producedList.size() + " element(s), the fixture "
                         + fixtureList.size());

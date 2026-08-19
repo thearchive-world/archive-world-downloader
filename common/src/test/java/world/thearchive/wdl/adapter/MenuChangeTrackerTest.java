@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -16,7 +15,6 @@ import net.minecraft.world.item.Items;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -74,26 +72,6 @@ class MenuChangeTrackerTest {
         stack.setCount(5);
 
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA), "an in-place count change is a change");
-        assertFalse(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
-    }
-
-    @Test
-    void inPlaceBundleContentMutationFires() {
-        // Below 1.20.5 BundleItem's click-prediction override mutates the slot-resident stack's "Items" tag in
-        // place: same object, same count, only the tag's Items list swapped. The gate must not read that as
-        // unchanged.
-        MenuChangeTracker tracker = new MenuChangeTracker();
-        SimpleContainer container = new SimpleContainer(1);
-        ItemStack bundle = new ItemStack(Items.BUNDLE);
-        bundle.getOrCreateTag().put("Items", new ListTag());
-        container.setItem(0, bundle);
-        List<Slot> slots = slotsOver(container);
-        assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
-
-        bundle.getTag().put("Items", ItemFixtures.items(new ItemStack(Items.DIAMOND)));
-
-        assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA),
-                "an in-place bundle contents swap is a change");
         assertFalse(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
     }
 

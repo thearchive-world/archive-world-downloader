@@ -121,12 +121,13 @@ public final class EntityFixtures {
     }
 
     /**
-     * An {@code entities/} chunk tag holding {@code entityTags}, each having its {@code "Items"} checked against the
-     * shape its producer emits first.
+     * An in-chunk entity carrier holding {@code entityTags} under {@code "Entities"}, each having its {@code "Items"}
+     * checked against the shape its producer emits first.
      *
-     * <p>The envelope comes from the real sink, which writes a {@code DataVersion} and a {@code Position} beside the
-     * entity list. The one carve-out is the empty case: the producer returns null there rather than an empty envelope,
-     * and a chunk whose fresh capture holds no entity is one of the cases under test.
+     * <p>The envelope comes from the real sink, which at this band writes only the {@code "Entities"} list (the writer
+     * folds it into the region chunk's {@code Level.Entities}). The one carve-out is the empty case: the producer
+     * returns null there rather than an empty envelope, and a chunk whose fresh capture holds no entity is one of the
+     * cases under test.
      */
     public static CompoundTag entityChunkTagWith(CompoundTag... entityTags) {
         return entityChunkTagAt(new ChunkPos(0, 0), entityTags);

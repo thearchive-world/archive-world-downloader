@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -74,7 +75,29 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
      * A villager kept standing after its trade menu was opened, reused by the tests here so none has to summon a second
      * villager under the crosshair.
      */
-    private record OpenedVillager(UUID id, ChunkPos chunk, Vec3 eyes) {}
+    private static final class OpenedVillager {
+        private final UUID id;
+        private final ChunkPos chunk;
+        private final Vec3 eyes;
+
+        OpenedVillager(UUID id, ChunkPos chunk, Vec3 eyes) {
+            this.id = id;
+            this.chunk = chunk;
+            this.eyes = eyes;
+        }
+
+        UUID id() {
+            return id;
+        }
+
+        ChunkPos chunk() {
+            return chunk;
+        }
+
+        Vec3 eyes() {
+            return eyes;
+        }
+    }
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -144,7 +167,7 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("the villager is absent from the entities region: "
                         + CaptureReadback.entities(entityChunk).stream()
-                                .map(entity -> entity.getString("id")).toList()));
+                                .map(entity -> entity.getString("id")).collect(Collectors.toList())));
 
         CompoundTag sell = villager.getCompound("Offers").getList("Recipes", 10).getCompound(0)
                 .getCompound("sell");
@@ -200,7 +223,8 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
         // resends the mutated offers to the trading player. A bare restock with no delta resends nothing new, which
         // would leave the broken version falsely green.
         server.runOnServer(minecraftServer -> {
-            if (minecraftServer.overworld().getEntity(villager.id()) instanceof Villager trader) {
+            if (minecraftServer.overworld().getEntity(villager.id()) instanceof Villager) {
+                Villager trader = (Villager) minecraftServer.overworld().getEntity(villager.id());
                 trader.getOffers().add(new MerchantOffer(new ItemCost(Items.EMERALD, 1),
                         new ItemStack(Items.DIAMOND), 12, 0, 0.0f));
                 trader.restock();
@@ -337,7 +361,8 @@ public class WdlMerchantCaptureTest implements FabricClientGameTest {
 
         float woundedHealth = originalHealth - 3.0f;
         server.runOnServer(minecraftServer -> {
-            if (minecraftServer.overworld().getEntity(cartographer.id()) instanceof Villager trader) {
+            if (minecraftServer.overworld().getEntity(cartographer.id()) instanceof Villager) {
+                Villager trader = (Villager) minecraftServer.overworld().getEntity(cartographer.id());
                 trader.setHealth(woundedHealth);
             }
         });

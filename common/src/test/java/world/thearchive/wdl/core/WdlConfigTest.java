@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -239,14 +241,30 @@ class WdlConfigTest {
 
         WdlConfig.load(file);
 
-        assertTrue(Files.readString(file).contains("showToasts=true"),
+        assertTrue(new String(Files.readAllBytes(file), StandardCharsets.UTF_8).contains("showToasts=true"),
                 "the materialized default file documents the toast toggle, default on");
     }
 
-    private record DefaultOnBoolean(String key, Predicate<WdlConfig> getter) {}
+    private static final class DefaultOnBoolean {
+        private final String key;
+        private final Predicate<WdlConfig> getter;
+
+        DefaultOnBoolean(String key, Predicate<WdlConfig> getter) {
+            this.key = key;
+            this.getter = getter;
+        }
+
+        String key() {
+            return key;
+        }
+
+        Predicate<WdlConfig> getter() {
+            return getter;
+        }
+    }
 
     // The default-on scalar booleans that share one parse, heal, report, and materialize shape below.
-    private static final List<DefaultOnBoolean> DEFAULT_ON_SCALAR_BOOLEANS = List.of(
+    private static final List<DefaultOnBoolean> DEFAULT_ON_SCALAR_BOOLEANS = ImmutableList.of(
             new DefaultOnBoolean("checkForUpdates", WdlConfig::checkForUpdates),
             new DefaultOnBoolean("showChatMessages", WdlConfig::showChatMessages),
             new DefaultOnBoolean("zipOnFinish", WdlConfig::zipOnFinish),
@@ -303,7 +321,7 @@ class WdlConfigTest {
 
         WdlConfig.load(file);
 
-        String written = Files.readString(file);
+        String written = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
         for (DefaultOnBoolean toggle : DEFAULT_ON_SCALAR_BOOLEANS) {
             assertTrue(written.contains(toggle.key() + "=true"),
                     "the materialized default file documents " + toggle.key() + ", default on");
@@ -332,7 +350,7 @@ class WdlConfigTest {
 
         WdlConfig.load(file);
 
-        assertTrue(Files.readString(file).contains("configVersion=1"),
+        assertTrue(new String(Files.readAllBytes(file), StandardCharsets.UTF_8).contains("configVersion=1"),
                 "the materialized default file stamps the schema version");
     }
 
@@ -342,7 +360,7 @@ class WdlConfigTest {
 
         WdlConfig.load(file);
 
-        assertTrue(Files.readString(file).contains("allowCommands=true"),
+        assertTrue(new String(Files.readAllBytes(file), StandardCharsets.UTF_8).contains("allowCommands=true"),
                 "the materialized default file documents the cheats knob, default on");
     }
 
@@ -439,7 +457,7 @@ class WdlConfigTest {
     @Test
     void loadParsesAnExistingHandEditedFile(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
-        Files.writeString(file, "captureEntities=false\nrecaptureSeconds=30\n");
+        Files.write(file, "captureEntities=false\nrecaptureSeconds=30\n".getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
 
@@ -470,7 +488,8 @@ class WdlConfigTest {
     @Test
     void loadHealsOnlyTheMalformedKeysAndKeepsValidEdits(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
-        Files.writeString(file, "overrideGamerules=ture\ncaptureEntities=false\ngamerule.spawn_mobs=false\n");
+        Files.write(file, "overrideGamerules=ture\ncaptureEntities=false\ngamerule.spawn_mobs=false\n"
+                .getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
 
@@ -478,7 +497,7 @@ class WdlConfigTest {
         assertFalse(config.captureEntities(), "a valid edit alongside the malformed one is preserved, not reset");
         assertEquals("false", config.worldOutput().gameRuleOverrides().get("spawn_mobs"),
                 "a valid gamerule override survives the per-key heal");
-        String rewritten = Files.readString(file);
+        String rewritten = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
         assertTrue(rewritten.contains("overrideGamerules=true"), "the healed key is rewritten valid");
         assertTrue(rewritten.contains("captureEntities=false"), "the preserved edit is written back");
         assertTrue(rewritten.contains("gamerule.spawn_mobs=false"), "the preserved override is written back");
@@ -488,19 +507,19 @@ class WdlConfigTest {
     @Test
     void loadRewritesTheFileWhenAnIntegerIsMalformed(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
-        Files.writeString(file, "recaptureSeconds=not-a-number\n");
+        Files.write(file, "recaptureSeconds=not-a-number\n".getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
 
         assertEquals(15, config.recaptureSeconds(), "a malformed int heals to its default");
-        assertTrue(Files.readString(file).contains("recaptureSeconds=15"),
+        assertTrue(new String(Files.readAllBytes(file), StandardCharsets.UTF_8).contains("recaptureSeconds=15"),
                 "the file on disk is rewritten to a valid default");
     }
 
     @Test
     void loadLeavesNoTempSiblingAfterRewriting(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
-        Files.writeString(file, "recaptureSeconds=not-a-number\n");
+        Files.write(file, "recaptureSeconds=not-a-number\n".getBytes(StandardCharsets.UTF_8));
 
         WdlConfig.load(file); // the heal rewrite goes through the staging-then-atomic-move writer
 
@@ -545,36 +564,39 @@ class WdlConfigTest {
     void loadLeavesValidHandEditedFileUntouched(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
         String original = "captureEntities=false\nrecaptureSeconds=30\n";
-        Files.writeString(file, original);
+        Files.write(file, original.getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
 
         assertFalse(config.captureEntities(), "a valid edit is honored");
         assertEquals(30, config.recaptureSeconds());
-        assertEquals(original, Files.readString(file), "a valid file is never rewritten (no spurious heal)");
+        assertEquals(original, new String(Files.readAllBytes(file), StandardCharsets.UTF_8),
+                "a valid file is never rewritten (no spurious heal)");
     }
 
     @Test
     void loadHealsAnEmptyBooleanValue(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
-        Files.writeString(file, "captureEntities=\n"); // present but empty: not a boolean literal
+        // present but empty: not a boolean literal
+        Files.write(file, "captureEntities=\n".getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
 
         assertTrue(config.captureEntities(),
                 "an empty value is malformed and heals to its default, not a silent false");
-        assertTrue(Files.readString(file).contains("captureEntities=true"), "the file on disk is rewritten valid");
+        assertTrue(new String(Files.readAllBytes(file), StandardCharsets.UTF_8).contains("captureEntities=true"),
+                "the file on disk is rewritten valid");
     }
 
     @Test
     void loadDoesNotHealGarbageConfigVersion(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
         String original = "configVersion=banana\n";
-        Files.writeString(file, original);
+        Files.write(file, original.getBytes(StandardCharsets.UTF_8));
 
         WdlConfig.load(file);
 
-        assertEquals(original, Files.readString(file),
+        assertEquals(original, new String(Files.readAllBytes(file), StandardCharsets.UTF_8),
                 "configVersion is metadata read outside parse(); a bad value keeps its silent fallback, no reset");
     }
 
@@ -582,11 +604,11 @@ class WdlConfigTest {
     void loadDoesNotHealGarbageGameRuleOverride(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
         String original = "gamerule.spawn_mobs=banana\n";
-        Files.writeString(file, original);
+        Files.write(file, original.getBytes(StandardCharsets.UTF_8));
 
         WdlConfig.load(file);
 
-        assertEquals(original, Files.readString(file),
+        assertEquals(original, new String(Files.readAllBytes(file), StandardCharsets.UTF_8),
                 "gamerule.* values are raw strings validated per band at write time, never healed at parse time");
     }
 
@@ -597,13 +619,13 @@ class WdlConfigTest {
         // every real user upgrades with is left byte-for-byte untouched (no spurious heal-rewrite).
         Path file = directory.resolve("wdl.properties");
         String original = "captureChunks=false\nsaveNamePrefix=museum\ncaptureEntities=false\n";
-        Files.writeString(file, original);
+        Files.write(file, original.getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
 
         assertFalse(config.captureEntities(), "a still-recognized edit alongside the retired keys is honored");
         assertTrue(config.captureContainers(), "a retired key does not disturb the other defaults");
-        assertEquals(original, Files.readString(file),
+        assertEquals(original, new String(Files.readAllBytes(file), StandardCharsets.UTF_8),
                 "a retired key is ignored, not malformed, so the file is never rewritten");
     }
 
@@ -621,19 +643,19 @@ class WdlConfigTest {
     }
 
     @Test
-    void advancementsAndStatisticsDefaultOn() {
+    void advancementsDefaultOnStatisticsOff() {
         assertTrue(WdlConfig.DEFAULTS.captureAdvancements(), "captureAdvancements defaults on");
-        assertTrue(WdlConfig.DEFAULTS.captureStatistics(), "captureStatistics defaults on");
+        assertFalse(WdlConfig.DEFAULTS.captureStatistics(), "captureStatistics defaults off on this band");
     }
 
     @Test
     void parsesTheTwoNewToggles() {
         Properties properties = new Properties();
         properties.setProperty("captureAdvancements", "false");
-        properties.setProperty("captureStatistics", "false");
+        properties.setProperty("captureStatistics", "true");
         WdlConfig config = WdlConfig.parse(properties);
         assertEquals(false, config.captureAdvancements());
-        assertEquals(false, config.captureStatistics());
+        assertEquals(true, config.captureStatistics());
     }
 
     @Test

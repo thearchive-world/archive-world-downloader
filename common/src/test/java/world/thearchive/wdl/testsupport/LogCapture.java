@@ -12,7 +12,6 @@ import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
-import org.apache.logging.log4j.core.config.Property;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -103,7 +102,7 @@ public final class LogCapture implements AutoCloseable {
         private final List<LogEvent> events = new CopyOnWriteArrayList<>();
 
         CollectingAppender(String name) {
-            super(name, null, null, false, Property.EMPTY_ARRAY);
+            super(name, null, null, false);
             start();
         }
 

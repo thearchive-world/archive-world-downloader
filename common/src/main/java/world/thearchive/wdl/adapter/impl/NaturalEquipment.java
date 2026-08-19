@@ -3,6 +3,9 @@
 
 package world.thearchive.wdl.adapter.impl;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,7 +30,7 @@ final class NaturalEquipment {
     private NaturalEquipment() {}
 
     /** The slots the generic pickup path equips (and thus can set persistence for); the offhand is excluded. */
-    static final List<EquipmentSlot> PICKUP_SLOTS = List.of(
+    static final List<EquipmentSlot> PICKUP_SLOTS = ImmutableList.of(
             EquipmentSlot.MAINHAND, EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
 
     /** Which armor family a type may naturally wear. */
@@ -35,7 +38,23 @@ final class NaturalEquipment {
         BASE, GOLDEN, NONE
     }
 
-    private record Profile(Set<Item> mainhand, ArmorKind armor) {}
+    private static final class Profile {
+        private final Set<Item> mainhand;
+        private final ArmorKind armor;
+
+        Profile(Set<Item> mainhand, ArmorKind armor) {
+            this.mainhand = mainhand;
+            this.armor = armor;
+        }
+
+        Set<Item> mainhand() {
+            return mainhand;
+        }
+
+        ArmorKind armor() {
+            return armor;
+        }
+    }
 
     /**
      * Non-armor head items a spawn may legitimately wear: the Halloween pumpkins (zombie/skeleton) and the raid or
@@ -45,45 +64,46 @@ final class NaturalEquipment {
      * head slot through a persistence-setting pickup, and a mob that did pick up a pumpkin is the accepted
      * invisible-ambiguous case.
      */
-    private static final Set<Item> NATURAL_HEAD_EXTRAS = Set.of(
+    private static final Set<Item> NATURAL_HEAD_EXTRAS = ImmutableSet.of(
             Items.CARVED_PUMPKIN, Items.JACK_O_LANTERN, Items.WHITE_BANNER);
 
-    private static final Map<EquipmentSlot, Set<Item>> BASE_ARMOR = Map.of(
-            EquipmentSlot.HEAD, Set.of(Items.LEATHER_HELMET, Items.GOLDEN_HELMET,
+    private static final Map<EquipmentSlot, Set<Item>> BASE_ARMOR = ImmutableMap.of(
+            EquipmentSlot.HEAD, ImmutableSet.of(Items.LEATHER_HELMET, Items.GOLDEN_HELMET,
                     Items.CHAINMAIL_HELMET, Items.IRON_HELMET, Items.DIAMOND_HELMET),
-            EquipmentSlot.CHEST, Set.of(Items.LEATHER_CHESTPLATE, Items.GOLDEN_CHESTPLATE,
+            EquipmentSlot.CHEST, ImmutableSet.of(Items.LEATHER_CHESTPLATE, Items.GOLDEN_CHESTPLATE,
                     Items.CHAINMAIL_CHESTPLATE, Items.IRON_CHESTPLATE, Items.DIAMOND_CHESTPLATE),
-            EquipmentSlot.LEGS, Set.of(Items.LEATHER_LEGGINGS, Items.GOLDEN_LEGGINGS,
+            EquipmentSlot.LEGS, ImmutableSet.of(Items.LEATHER_LEGGINGS, Items.GOLDEN_LEGGINGS,
                     Items.CHAINMAIL_LEGGINGS, Items.IRON_LEGGINGS, Items.DIAMOND_LEGGINGS),
-            EquipmentSlot.FEET, Set.of(Items.LEATHER_BOOTS, Items.GOLDEN_BOOTS,
+            EquipmentSlot.FEET, ImmutableSet.of(Items.LEATHER_BOOTS, Items.GOLDEN_BOOTS,
                     Items.CHAINMAIL_BOOTS, Items.IRON_BOOTS, Items.DIAMOND_BOOTS));
 
-    private static final Map<EquipmentSlot, Set<Item>> GOLDEN_ARMOR = Map.of(
-            EquipmentSlot.HEAD, Set.of(Items.GOLDEN_HELMET),
-            EquipmentSlot.CHEST, Set.of(Items.GOLDEN_CHESTPLATE),
-            EquipmentSlot.LEGS, Set.of(Items.GOLDEN_LEGGINGS),
-            EquipmentSlot.FEET, Set.of(Items.GOLDEN_BOOTS));
+    private static final Map<EquipmentSlot, Set<Item>> GOLDEN_ARMOR = ImmutableMap.of(
+            EquipmentSlot.HEAD, ImmutableSet.of(Items.GOLDEN_HELMET),
+            EquipmentSlot.CHEST, ImmutableSet.of(Items.GOLDEN_CHESTPLATE),
+            EquipmentSlot.LEGS, ImmutableSet.of(Items.GOLDEN_LEGGINGS),
+            EquipmentSlot.FEET, ImmutableSet.of(Items.GOLDEN_BOOTS));
 
-    private static final Map<EntityType<?>, Profile> PROFILES = Map.ofEntries(
-            Map.entry(EntityType.ZOMBIE,
-                    new Profile(Set.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE)),
-            Map.entry(EntityType.HUSK,
-                    new Profile(Set.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE)),
-            Map.entry(EntityType.ZOMBIE_VILLAGER,
-                    new Profile(Set.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE)),
-            Map.entry(EntityType.DROWNED,
-                    new Profile(Set.of(Items.TRIDENT, Items.FISHING_ROD), ArmorKind.NONE)),
-            Map.entry(EntityType.SKELETON, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
-            Map.entry(EntityType.STRAY, new Profile(Set.of(Items.BOW), ArmorKind.BASE)),
-            Map.entry(EntityType.WITHER_SKELETON, new Profile(Set.of(Items.STONE_SWORD), ArmorKind.NONE)),
-            Map.entry(EntityType.PIGLIN,
-                    new Profile(Set.of(Items.CROSSBOW, Items.GOLDEN_SWORD), ArmorKind.GOLDEN)),
-            Map.entry(EntityType.ZOMBIFIED_PIGLIN,
-                    new Profile(Set.of(Items.GOLDEN_SWORD), ArmorKind.NONE)),
-            Map.entry(EntityType.PIGLIN_BRUTE, new Profile(Set.of(Items.GOLDEN_AXE), ArmorKind.NONE)),
-            Map.entry(EntityType.PILLAGER, new Profile(Set.of(Items.CROSSBOW), ArmorKind.NONE)),
-            Map.entry(EntityType.VINDICATOR, new Profile(Set.of(Items.IRON_AXE), ArmorKind.NONE)),
-            Map.entry(EntityType.VEX, new Profile(Set.of(Items.IRON_SWORD), ArmorKind.NONE)));
+    private static final Map<EntityType<?>, Profile> PROFILES = ImmutableMap.<EntityType<?>, Profile>builder()
+            .put(EntityType.ZOMBIE,
+                    new Profile(ImmutableSet.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE))
+            .put(EntityType.HUSK,
+                    new Profile(ImmutableSet.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE))
+            .put(EntityType.ZOMBIE_VILLAGER,
+                    new Profile(ImmutableSet.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE))
+            .put(EntityType.DROWNED,
+                    new Profile(ImmutableSet.of(Items.TRIDENT, Items.FISHING_ROD), ArmorKind.NONE))
+            .put(EntityType.SKELETON, new Profile(ImmutableSet.of(Items.BOW), ArmorKind.BASE))
+            .put(EntityType.STRAY, new Profile(ImmutableSet.of(Items.BOW), ArmorKind.BASE))
+            .put(EntityType.WITHER_SKELETON, new Profile(ImmutableSet.of(Items.STONE_SWORD), ArmorKind.NONE))
+            .put(EntityType.PIGLIN,
+                    new Profile(ImmutableSet.of(Items.CROSSBOW, Items.GOLDEN_SWORD), ArmorKind.GOLDEN))
+            .put(EntityType.ZOMBIFIED_PIGLIN,
+                    new Profile(ImmutableSet.of(Items.GOLDEN_SWORD), ArmorKind.NONE))
+            .put(EntityType.PIGLIN_BRUTE, new Profile(ImmutableSet.of(Items.GOLDEN_AXE), ArmorKind.NONE))
+            .put(EntityType.PILLAGER, new Profile(ImmutableSet.of(Items.CROSSBOW), ArmorKind.NONE))
+            .put(EntityType.VINDICATOR, new Profile(ImmutableSet.of(Items.IRON_AXE), ArmorKind.NONE))
+            .put(EntityType.VEX, new Profile(ImmutableSet.of(Items.IRON_SWORD), ArmorKind.NONE))
+            .build();
 
     static boolean isGearedType(EntityType<?> type) {
         return PROFILES.containsKey(type);
@@ -103,11 +123,16 @@ final class NaturalEquipment {
         if (slot == EquipmentSlot.HEAD && NATURAL_HEAD_EXTRAS.contains(item.getItem())) {
             return true;
         }
-        return switch (profile.armor()) {
-            case BASE -> BASE_ARMOR.getOrDefault(slot, Set.of()).contains(item.getItem());
-            case GOLDEN -> GOLDEN_ARMOR.getOrDefault(slot, Set.of()).contains(item.getItem());
-            case NONE -> false;
-        };
+        switch (profile.armor()) {
+            case BASE:
+                return BASE_ARMOR.getOrDefault(slot, ImmutableSet.of()).contains(item.getItem());
+            case GOLDEN:
+                return GOLDEN_ARMOR.getOrDefault(slot, ImmutableSet.of()).contains(item.getItem());
+            case NONE:
+                return false;
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 
     static boolean wasLootEquipped(Mob mob) {

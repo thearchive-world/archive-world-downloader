@@ -42,9 +42,9 @@ import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.adapter.CapturedPlayer;
 import world.thearchive.wdl.adapter.LevelDataWriter;
@@ -55,14 +55,14 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.17.1 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
+ * 1.16.5 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
  * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
  * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
  * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
  * server's actual land (the server's seed is not recoverable from a client).
  */
 public final class LevelDataWriterImpl implements LevelDataWriter {
-    private static final Logger LOGGER = LoggerFactory.getLogger(LevelDataWriterImpl.class);
+    private static final Logger LOGGER = LogManager.getLogger(LevelDataWriterImpl.class);
 
     private static final String LEVEL_NAME = "Archive World Downloader";
 
@@ -75,14 +75,36 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /**
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.17.1 id and carries no spec.
+     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.16.5 id and carries no spec.
      * The user's gamerule.* overrides, keyed by band id, are validated and applied on top of this (see
      * {@link WorldOutputConfig}).
      */
     private static final List<CuratedSpec> CURATED_GAME_RULES = buildCuratedGameRules();
 
     /** One curated rule: its stable WDL name, the running band's id for it, and the curated raw value. */
-    private record CuratedSpec(String wdlId, String bandId, String curatedValue) {}
+    private static final class CuratedSpec {
+        private final String wdlId;
+        private final String bandId;
+        private final String curatedValue;
+
+        CuratedSpec(String wdlId, String bandId, String curatedValue) {
+            this.wdlId = wdlId;
+            this.bandId = bandId;
+            this.curatedValue = curatedValue;
+        }
+
+        String wdlId() {
+            return wdlId;
+        }
+
+        String bandId() {
+            return bandId;
+        }
+
+        String curatedValue() {
+            return curatedValue;
+        }
+    }
 
     @Override
     public LevelData buildLevelData(RegistryAccess clientRegistries, WorldOutputConfig worldOutput,
@@ -202,9 +224,11 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
     /** Set one validated rule on its offline GameRules value (no server, so the change-callback is skipped). */
     private static void setRule(GameRules.Value<?> rule, String rawValue) {
-        if (rule instanceof GameRules.BooleanValue booleanValue) {
+        if (rule instanceof GameRules.BooleanValue) {
+            GameRules.BooleanValue booleanValue = (GameRules.BooleanValue) rule;
             booleanValue.set(Boolean.parseBoolean(rawValue), null);
-        } else if (rule instanceof GameRules.IntegerValue integerValue) {
+        } else if (rule instanceof GameRules.IntegerValue) {
+            GameRules.IntegerValue integerValue = (GameRules.IntegerValue) rule;
             integerValue.tryDeserialize(rawValue);
         }
     }
@@ -240,8 +264,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are dev's band-neutral keys; each maps to its 1.17.1 vanilla rule id here, and the newer bands'
-    // fire rule is dropped by omitting its spec, since 1.17.1 has no equivalent.
+    // The WDL names are dev's band-neutral keys; each maps to its 1.16.5 vanilla rule id here, and the newer bands'
+    // fire rule is dropped by omitting its spec, since 1.16.5 has no equivalent.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
@@ -281,9 +305,10 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         }
         try {
             CompoundTag root = NbtIo.readCompressed(levelDatFile.toFile());
-            return root.get("Data") instanceof CompoundTag data && data.get("Player") instanceof CompoundTag player
-                    ? player
-                    : null;
+            return root.get("Data") instanceof CompoundTag
+                    && ((CompoundTag) root.get("Data")).get("Player") instanceof CompoundTag
+                            ? (CompoundTag) ((CompoundTag) root.get("Data")).get("Player")
+                            : null;
         } catch (IOException e) {
             throw new UncheckedIOException("failed to read the prior player data " + levelDatFile, e);
         }
@@ -298,31 +323,34 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     private static MappedRegistry<LevelStem> buildDimensions(WorldType worldType, RegistryAccess registries,
             long seed) {
         Registry<DimensionType> dimensionTypes = registries.registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY);
-        return switch (worldType) {
-            case DEFAULT -> {
+        switch (worldType) {
+            case DEFAULT: {
                 Registry<Biome> biomes = registries.registryOrThrow(Registry.BIOME_REGISTRY);
                 Registry<NoiseGeneratorSettings> noiseSettings = registries
                         .registryOrThrow(Registry.NOISE_GENERATOR_SETTINGS_REGISTRY);
-                yield WorldGenSettings.withOverworld(dimensionTypes,
+                return WorldGenSettings.withOverworld(dimensionTypes,
                         DimensionType.defaultDimensions(dimensionTypes, biomes, noiseSettings, seed),
                         WorldGenSettings.makeDefaultOverworld(biomes, noiseSettings, seed));
             }
-            case FLAT -> {
+            case FLAT: {
                 Registry<Biome> biomes = registries.registryOrThrow(Registry.BIOME_REGISTRY);
                 Registry<NoiseGeneratorSettings> noiseSettings = registries
                         .registryOrThrow(Registry.NOISE_GENERATOR_SETTINGS_REGISTRY);
                 FlatLevelSource flat = new FlatLevelSource(FlatLevelGeneratorSettings.getDefault(biomes));
-                yield WorldGenSettings.withOverworld(dimensionTypes,
+                return WorldGenSettings.withOverworld(dimensionTypes,
                         DimensionType.defaultDimensions(dimensionTypes, biomes, noiseSettings, seed), flat);
             }
-            case VOID -> voidDimensions(registries);
-        };
+            case VOID:
+                return voidDimensions(registries);
+            default:
+                throw new IncompatibleClassChangeError();
+        }
     }
 
     private static MappedRegistry<LevelStem> voidDimensions(RegistryAccess registries) {
         Registry<Biome> biomes = registries.registryOrThrow(Registry.BIOME_REGISTRY);
         Registry<DimensionType> dimensionTypes = registries.registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY);
-        ResourceKey<Biome> biomeKey = biomes.containsKey(Biomes.THE_VOID) ? Biomes.THE_VOID : Biomes.PLAINS;
+        ResourceKey<Biome> biomeKey = biomes.containsKey(Biomes.THE_VOID.location()) ? Biomes.THE_VOID : Biomes.PLAINS;
 
         // A void world places no structures: an empty StructureSettings carries no stronghold and no structure configs.
         FlatLevelGeneratorSettings flat = new FlatLevelGeneratorSettings(

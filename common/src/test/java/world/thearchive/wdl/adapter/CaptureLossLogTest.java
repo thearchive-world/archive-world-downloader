@@ -11,11 +11,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import org.apache.logging.log4j.LogManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.testsupport.LogCapture;
 
@@ -34,7 +34,7 @@ class CaptureLossLogTest {
 
     @BeforeEach
     void attachAppender(TestInfo info) {
-        loggerName = "world.thearchive.wdl.test.loss." + info.getTestMethod().orElseThrow().getName();
+        loggerName = "world.thearchive.wdl.test.loss." + info.getTestMethod().get().getName();
         captured = LogCapture.attach(loggerName);
     }
 
@@ -46,7 +46,7 @@ class CaptureLossLogTest {
     }
 
     private CaptureLossLog lossLog() {
-        return new CaptureLossLog(LoggerFactory.getLogger(loggerName), ACTION, CONSEQUENCE);
+        return new CaptureLossLog(LogManager.getLogger(loggerName), ACTION, CONSEQUENCE);
     }
 
     @Test
@@ -101,10 +101,10 @@ class CaptureLossLogTest {
     @Test
     void rejectsAnActionThatWouldMisalignItsArguments() {
         assertThrows(IllegalArgumentException.class,
-                () -> new CaptureLossLog(LoggerFactory.getLogger(loggerName), "lost {} of {}", CONSEQUENCE),
+                () -> new CaptureLossLog(LogManager.getLogger(loggerName), "lost {} of {}", CONSEQUENCE),
                 "a second placeholder would consume the throwable and silently drop every stack");
         assertThrows(IllegalArgumentException.class,
-                () -> new CaptureLossLog(LoggerFactory.getLogger(loggerName), "lost a map", CONSEQUENCE),
+                () -> new CaptureLossLog(LogManager.getLogger(loggerName), "lost a map", CONSEQUENCE),
                 "with no placeholder for the item the formatter fills the cause's slot with it instead, and the "
                         + "cause, which is what makes a stackless repeat diagnosable, is dropped");
     }
@@ -112,7 +112,7 @@ class CaptureLossLogTest {
     @Test
     void rejectsConsequencePlaceholdersThatWouldMisalignItsArguments() {
         assertThrows(IllegalArgumentException.class,
-                () -> new CaptureLossLog(LoggerFactory.getLogger(loggerName), ACTION, "its map {} renders blank"),
+                () -> new CaptureLossLog(LogManager.getLogger(loggerName), ACTION, "its map {} renders blank"),
                 "the formatter reads one assembled pattern, so a third placeholder consumes the throwable as "
                         + "text and no loss on this voice ever carries a stack again");
     }

@@ -98,17 +98,23 @@ final class ChunkMerge {
      */
     public static int merge(CompoundTag onDisk, CompoundTag fresh, Long2IntMap occupancyByPos,
             LongSet openTimeCaptured, LongSet replaced) {
-        if (!(fresh.getCompound("Level").get("TileEntities") instanceof ListTag freshBlockEntities)
-                || !(onDisk.getCompound("Level").get("TileEntities") instanceof ListTag diskBlockEntities)) {
+        ListTag freshBlockEntities = fresh.getCompound("Level").get("TileEntities") instanceof ListTag
+                ? (ListTag) fresh.getCompound("Level").get("TileEntities")
+                : null;
+        ListTag diskBlockEntities = onDisk.getCompound("Level").get("TileEntities") instanceof ListTag
+                ? (ListTag) onDisk.getCompound("Level").get("TileEntities")
+                : null;
+        if (freshBlockEntities == null || diskBlockEntities == null) {
             return 0;
         }
         int merged = 0;
         for (int i = 0; i < freshBlockEntities.size(); i++) {
-            if (!(freshBlockEntities.get(i) instanceof CompoundTag freshBlockEntity)) {
+            if (!(freshBlockEntities.get(i) instanceof CompoundTag)) {
                 continue;
             }
+            CompoundTag freshBlockEntity = (CompoundTag) freshBlockEntities.get(i);
             OptionalLong freshPos = packedPos(freshBlockEntity);
-            if (freshPos.isEmpty()) {
+            if (!freshPos.isPresent()) {
                 continue; // no complete position: it matches nothing on disk and names neither occupancy nor open
             }
             CompoundTag diskBlockEntity = matching(diskBlockEntities, freshBlockEntity);
@@ -167,8 +173,10 @@ final class ChunkMerge {
      * rather than an absence.
      */
     private static OptionalLong packedPos(CompoundTag blockEntity) {
-        if (!(blockEntity.get("x") instanceof IntTag x) || !(blockEntity.get("y") instanceof IntTag y)
-                || !(blockEntity.get("z") instanceof IntTag z)) {
+        IntTag x = blockEntity.get("x") instanceof IntTag ? (IntTag) blockEntity.get("x") : null;
+        IntTag y = blockEntity.get("y") instanceof IntTag ? (IntTag) blockEntity.get("y") : null;
+        IntTag z = blockEntity.get("z") instanceof IntTag ? (IntTag) blockEntity.get("z") : null;
+        if (x == null || y == null || z == null) {
             return OptionalLong.empty();
         }
         return OptionalLong.of(BlockPos.asLong(x.getAsInt(), y.getAsInt(), z.getAsInt()));
@@ -207,7 +215,10 @@ final class ChunkMerge {
             return null;
         }
         for (int i = 0; i < diskBlockEntities.size(); i++) {
-            if (diskBlockEntities.get(i) instanceof CompoundTag diskBlockEntity && id.equals(diskBlockEntity.get("id"))
+            CompoundTag diskBlockEntity = diskBlockEntities.get(i) instanceof CompoundTag
+                    ? (CompoundTag) diskBlockEntities.get(i)
+                    : null;
+            if (diskBlockEntity != null && id.equals(diskBlockEntity.get("id"))
                     && x.equals(diskBlockEntity.get("x")) && y.equals(diskBlockEntity.get("y"))
                     && z.equals(diskBlockEntity.get("z"))) {
                 return diskBlockEntity;

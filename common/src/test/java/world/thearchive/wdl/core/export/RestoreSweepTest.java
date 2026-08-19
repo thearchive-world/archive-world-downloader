@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -16,7 +17,6 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +70,7 @@ class RestoreSweepTest {
         // folder missing: an unlocked aside rolls back to the folder name.
         SweepResult result = RestoreSweep.run(saves);
         assertTrue(result.changedDisk());
-        assertEquals(List.of(saves.resolve("World")), result.movedBack());
+        assertEquals(ImmutableList.of(saves.resolve("World")), result.movedBack());
         assertTrue(result.relocated().isEmpty());
         assertTrue(result.missingDeferred().isEmpty());
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // aside moved back
@@ -85,7 +85,7 @@ class RestoreSweepTest {
         liveFolder("World", 5); // the name was reoccupied while the install was still staged
         SweepResult result = RestoreSweep.run(saves);
         assertTrue(result.changedDisk());
-        assertEquals(List.of(saves.resolve("World_(2)")), result.relocated());
+        assertEquals(ImmutableList.of(saves.resolve("World_(2)")), result.relocated());
         assertTrue(result.movedBack().isEmpty());
         assertTrue(Files.exists(saves.resolve("World_(2)/playerdata/u.dat"))); // aside relocated
         assertEquals(5, Files.readAllBytes(saves.resolve("World/level.dat"))[0]); // occupant untouched
@@ -176,7 +176,7 @@ class RestoreSweepTest {
         try (FileChannel channel = FileChannel.open(ghostLock, StandardOpenOption.WRITE);
                 FileLock held = channel.lock()) {
             SweepResult ghostDeferred = RestoreSweep.run(saves);
-            assertEquals(List.of(saves.resolve("Ghost")), ghostDeferred.missingDeferred());
+            assertEquals(ImmutableList.of(saves.resolve("Ghost")), ghostDeferred.missingDeferred());
             assertFalse(RestoreSweep.hasWork(saves)); // within the TTL, unchanged: quiet
             liveFolder("Ghost", 4); // the folder reappears: a folder-existence flip
             assertTrue(RestoreSweep.hasWork(saves)); // the transition re-arms within the TTL
@@ -233,7 +233,7 @@ class RestoreSweepTest {
         try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.WRITE);
                 FileLock held = channel.lock()) {
             SweepResult first = RestoreSweep.run(saves);
-            assertEquals(List.of(saves.resolve("World")), first.missingDeferred());
+            assertEquals(ImmutableList.of(saves.resolve("World")), first.missingDeferred());
             assertFalse(first.changedDisk());
             assertFalse(Files.exists(saves.resolve("World"))); // still missing (deferred)
             // Non-repeating per attempt per session: a second sweep does not re-name it.
@@ -262,7 +262,7 @@ class RestoreSweepTest {
             Assumptions.assumeTrue(!Files.isWritable(saves),
                     "this process can write the directory regardless of permissions (root?)");
             SweepResult first = RestoreSweep.run(saves);
-            assertEquals(List.of(saves.resolve("World")), first.missingDeferred());
+            assertEquals(ImmutableList.of(saves.resolve("World")), first.missingDeferred());
             assertFalse(first.changedDisk());
             assertFalse(Files.exists(saves.resolve("World"))); // still missing (move-back failed, deferred)
             // Non-repeating per attempt per session: a second sweep does not re-name it.
@@ -296,7 +296,7 @@ class RestoreSweepTest {
         putAside(moveBackBranch, "Third");
         putInstall(moveBackBranch, "Third");
         SweepResult result = RestoreSweep.run(saves);
-        assertEquals(List.of(saves.resolve("Third")), result.movedBack());
+        assertEquals(ImmutableList.of(saves.resolve("Third")), result.movedBack());
         assertEquals(3, Files.readAllBytes(saves.resolve("Third/level.dat"))[0]); // the aside's bytes
     }
 
@@ -356,7 +356,7 @@ class RestoreSweepTest {
         Files.setLastModifiedTime(attempt, FileTime.fromMillis(nowMs[0] - 65L * 60_000));
         // Folder missing: the normal torn roll-back owns it, never the lockless age gate.
         SweepResult result = RestoreSweep.run(saves);
-        assertEquals(List.of(saves.resolve("World")), result.movedBack());
+        assertEquals(ImmutableList.of(saves.resolve("World")), result.movedBack());
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // aside rolled back, not deleted
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
     }

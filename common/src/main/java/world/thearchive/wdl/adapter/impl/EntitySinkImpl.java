@@ -5,10 +5,8 @@ package world.thearchive.wdl.adapter.impl;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.SharedConstants;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntArrayTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
@@ -18,14 +16,23 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.EntitySink;
 
 /**
- * 1.17.1 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
+ * 1.16.5 entity sink: a client-safe per-entity serialize ({@code entity.save}), the write half of what vanilla's
+ * {@code ChunkSerializer} folds into a chunk's {@code Level.Entities}. There is no separate {@code entities/} region at
+ * this band (that is 1.17 and above), so the writer folds this sink's carrier into the region chunk.
  *
  * <p>Three members (see {@link EntitySink}): {@link #encodeChunk(List, ChunkPos, RegistryAccess, boolean)} serializes
- * the live client entities, {@link #encodeChunk(List, ChunkPos)} builds the entities-region envelope from
+ * the live client entities, {@link #encodeChunk(List, ChunkPos)} builds the in-chunk {@code Entities} carrier from
  * already-serialized tags (pure, so the headless round-trip guards it), plus
  * {@link #captureRootVehicle(Entity, RegistryAccess, boolean)}, a single-live gate-bypassing vehicle serialize.
  */
 public final class EntitySinkImpl implements EntitySink {
+    // 1.16.5 has no Entity.shouldBeSaved(); reproduce its predicate from the primitives it composes: a removed,
+    // riding, or single-player-vehicle entity is not written standalone.
+    private static boolean shouldSaveEntity(Entity entity) {
+        return !entity.removed && !entity.isPassenger()
+                && (!entity.isVehicle() || !entity.hasOnePlayerPassenger());
+    }
+
     @Override
     public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, RegistryAccess registries,
             boolean forceMobPersistence) {
@@ -33,7 +40,7 @@ public final class EntitySinkImpl implements EntitySink {
         // straight into a CompoundTag with no ServerLevel touch.
         List<CompoundTag> entityTags = new ArrayList<>();
         for (Entity entity : entities) {
-            if (!entity.shouldBeSaved()) {
+            if (!shouldSaveEntity(entity)) {
                 continue; // drops passengers (they also nest under their vehicle's Passengers list, so the flat
                          // list would otherwise write them twice), removed entities, and player-only vehicles
             }
@@ -87,7 +94,8 @@ public final class EntitySinkImpl implements EntitySink {
         boolean isMob = entity instanceof Mob;
         boolean namedMob = false;
         boolean derivedPickup = false;
-        if (entity instanceof Mob mob) {
+        if (entity instanceof Mob) {
+            Mob mob = (Mob) entity;
             namedMob = mob.hasCustomName();
             derivedPickup = NaturalEquipment.wasLootEquipped(mob);
         }
@@ -104,9 +112,7 @@ public final class EntitySinkImpl implements EntitySink {
             entities.add(entityTag);
         }
         CompoundTag tag = new CompoundTag();
-        tag.putInt("DataVersion", SharedConstants.getCurrentVersion().getWorldVersion());
         tag.put("Entities", entities);
-        tag.put("Position", new IntArrayTag(new int[] { pos.x, pos.z }));
         return tag;
     }
 }

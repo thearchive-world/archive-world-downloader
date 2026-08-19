@@ -67,9 +67,34 @@ public interface ChunkSnapshotSource {
      * Below the 1.21.2 chunk-serialization cut vanilla has no {@code SerializableChunkData.SectionData} record, so the
      * snapshot carries the band-stable section pieces the encoder writes directly.
      */
-    record SectionData(
-            int y,
-            @Nullable LevelChunkSection chunkSection,
-            @Nullable DataLayer blockLight,
-            @Nullable DataLayer skyLight) {}
+    static final class SectionData {
+        private final int y;
+        private final @Nullable LevelChunkSection chunkSection;
+        private final @Nullable DataLayer blockLight;
+        private final @Nullable DataLayer skyLight;
+
+        public SectionData(int y, @Nullable LevelChunkSection chunkSection, @Nullable DataLayer blockLight,
+                @Nullable DataLayer skyLight) {
+            this.y = y;
+            this.chunkSection = chunkSection;
+            this.blockLight = blockLight;
+            this.skyLight = skyLight;
+        }
+
+        public int y() {
+            return y;
+        }
+
+        public @Nullable LevelChunkSection chunkSection() {
+            return chunkSection;
+        }
+
+        public @Nullable DataLayer blockLight() {
+            return blockLight;
+        }
+
+        public @Nullable DataLayer skyLight() {
+            return skyLight;
+        }
+    }
 }

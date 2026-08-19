@@ -6,6 +6,9 @@ package world.thearchive.wdl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
@@ -13,6 +16,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +24,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
@@ -32,35 +37,37 @@ import org.junit.jupiter.api.Test;
  * <p>MC-free: source and resource reads off the module tree, the {@link UiLiteralEnrollmentTest} pattern.
  */
 class LangKeyCoverageTest {
-    private static final Path CATALOG = Path.of("src/main/resources/assets/wdl/lang/en_us.json");
+    private static final Path CATALOG = Paths.get("src/main/resources/assets/wdl/lang/en_us.json");
 
-    private static final List<Path> PRODUCTION_ROOTS = List.of(
-            Path.of("src/main/java/world/thearchive/wdl"),
-            Path.of("../fabric/src/main/java/world/thearchive/wdl"),
-            Path.of("../neoforge/src/main/java/world/thearchive/wdl"));
+    private static final List<Path> PRODUCTION_ROOTS = ImmutableList.of(
+            Paths.get("src/main/java/world/thearchive/wdl"),
+            Paths.get("../fabric/src/main/java/world/thearchive/wdl"),
+            Paths.get("../neoforge/src/main/java/world/thearchive/wdl"));
 
     // Anchored on both quotes so a log line that merely mentions wdl.properties is not read as a key, and narrowed
     // to the three shapes the project uses so vanilla's own key.* names cannot be swept in.
     private static final Pattern keyLiteral = Pattern
             .compile("\"((?:wdl|key\\.wdl|key\\.category\\.wdl)\\.[A-Za-z0-9_.]+)\"");
 
-    private static final List<String> RESUME_CONFIRM_SUFFIXES = List.of(".title", ".message", ".message_no_backup");
-    private static final List<String> SWEEP_NOTICE_SUFFIXES = List.of(".title", ".body");
-    private static final List<String> CAPTURE_CONFIRM_SUFFIXES = List.of(".title", ".confirm");
+    private static final List<String> RESUME_CONFIRM_SUFFIXES = ImmutableList.of(".title", ".message",
+            ".message_no_backup");
+    private static final List<String> SWEEP_NOTICE_SUFFIXES = ImmutableList.of(".title", ".body");
+    private static final List<String> CAPTURE_CONFIRM_SUFFIXES = ImmutableList.of(".title", ".confirm");
 
-    private static final Map<String, List<String>> COMPLETED_STEMS = Map.of(
-            "wdl.screen.downloads.confirm_restore", RESUME_CONFIRM_SUFFIXES,
-            "wdl.screen.downloads.confirm_restore_blocked", RESUME_CONFIRM_SUFFIXES,
-            "wdl.screen.downloads.confirm_tainted", RESUME_CONFIRM_SUFFIXES,
-            "wdl.screen.downloads.confirm_map_id_mismatch", RESUME_CONFIRM_SUFFIXES,
-            "wdl.screen.downloads.merge", RESUME_CONFIRM_SUFFIXES,
-            "wdl.toast.sweep_moved_back", SWEEP_NOTICE_SUFFIXES,
-            "wdl.toast.sweep_relocated", SWEEP_NOTICE_SUFFIXES,
-            "wdl.toast.sweep_missing_deferred", SWEEP_NOTICE_SUFFIXES,
-            "wdl.settings.confirm.capture", CAPTURE_CONFIRM_SUFFIXES);
+    private static final Map<String, List<String>> COMPLETED_STEMS = ImmutableMap.<String, List<String>>builder()
+            .put("wdl.screen.downloads.confirm_restore", RESUME_CONFIRM_SUFFIXES)
+            .put("wdl.screen.downloads.confirm_restore_blocked", RESUME_CONFIRM_SUFFIXES)
+            .put("wdl.screen.downloads.confirm_tainted", RESUME_CONFIRM_SUFFIXES)
+            .put("wdl.screen.downloads.confirm_map_id_mismatch", RESUME_CONFIRM_SUFFIXES)
+            .put("wdl.screen.downloads.merge", RESUME_CONFIRM_SUFFIXES)
+            .put("wdl.toast.sweep_moved_back", SWEEP_NOTICE_SUFFIXES)
+            .put("wdl.toast.sweep_relocated", SWEEP_NOTICE_SUFFIXES)
+            .put("wdl.toast.sweep_missing_deferred", SWEEP_NOTICE_SUFFIXES)
+            .put("wdl.settings.confirm.capture", CAPTURE_CONFIRM_SUFFIXES)
+            .build();
 
     // Safe only because SettingsLangTest asserts both directions over exactly these prefixes.
-    private static final Set<String> DELEGATED_STEMS = Set.of(
+    private static final Set<String> DELEGATED_STEMS = ImmutableSet.of(
             "wdl.settings.confirm.",
             "wdl.settings.gamerule.",
             "wdl.settings.option.",
@@ -69,12 +76,12 @@ class LangKeyCoverageTest {
 
     // The controls heading MC derives from the wdl:downloader category identifier, and the two entries
     // ModMenu reads off the mod id.
-    private static final Set<String> EXTERNAL_CONSUMERS = Set.of(
+    private static final Set<String> EXTERNAL_CONSUMERS = ImmutableSet.of(
             "key.categories.wdl.downloader",
             "modmenu.descriptionTranslation.wdl",
             "modmenu.summaryTranslation.wdl");
 
-    private static final Set<String> NOT_TRANSLATION_KEYS = Set.of("wdl.properties");
+    private static final Set<String> NOT_TRANSLATION_KEYS = ImmutableSet.of("wdl.properties");
 
     @Test
     void everyKeyTheCodeNamesIsCarriedByEnUs() {
@@ -86,7 +93,7 @@ class LangKeyCoverageTest {
         ambiguous.addAll(DELEGATED_STEMS);
         ambiguous.addAll(NOT_TRANSLATION_KEYS);
         ambiguous.retainAll(catalog.keySet());
-        assertEquals(Set.of(), ambiguous,
+        assertEquals(ImmutableSet.of(), ambiguous,
                 "An enrolled stem is also a key en_us carries, so it is being used two ways at once.\n"
                         + "Rename one of them: a stem names a family, a key names a string.");
 
@@ -107,7 +114,7 @@ class LangKeyCoverageTest {
                 missing.add(literal);
             }
         }
-        assertEquals(Set.of(), missing,
+        assertEquals(ImmutableSet.of(), missing,
                 "Production names a translation key en_us does not carry. Minecraft renders a\n"
                         + "missing key as the raw key string, and a tooltip behind I18n.exists renders\n"
                         + "nothing at all. Add the English string to en_us and mirror it across every\n"
@@ -119,7 +126,7 @@ class LangKeyCoverageTest {
         stale.addAll(DELEGATED_STEMS);
         stale.addAll(NOT_TRANSLATION_KEYS);
         stale.removeAll(literals);
-        assertEquals(Set.of(), stale,
+        assertEquals(ImmutableSet.of(), stale,
                 "An enrolled literal is no longer named in the production tree. Drop it from\n"
                         + "COMPLETED_STEMS, DELEGATED_STEMS or NOT_TRANSLATION_KEYS; a stale entry is an\n"
                         + "exemption nothing is checking.");
@@ -144,7 +151,7 @@ class LangKeyCoverageTest {
                 unreached.add(key);
             }
         }
-        assertEquals(Set.of(), unreached,
+        assertEquals(ImmutableSet.of(), unreached,
                 "en_us carries a key nothing reaches. Either a consumer names it in a shape this\n"
                         + "test cannot see, and the stem it completes belongs in COMPLETED_STEMS or the\n"
                         + "key in EXTERNAL_CONSUMERS if something outside this tree resolves it, or the\n"
@@ -170,7 +177,7 @@ class LangKeyCoverageTest {
             return entries
                     .filter(Files::isRegularFile)
                     .filter(path -> path.getFileName().toString().endsWith(".java"))
-                    .toList();
+                    .collect(Collectors.toList());
         } catch (IOException e) {
             throw new UncheckedIOException("cannot walk " + root.toAbsolutePath(), e);
         }
@@ -182,7 +189,7 @@ class LangKeyCoverageTest {
 
     private static String readString(Path path) {
         try {
-            return Files.readString(path, StandardCharsets.UTF_8);
+            return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("cannot read " + path.toAbsolutePath(), e);
         }

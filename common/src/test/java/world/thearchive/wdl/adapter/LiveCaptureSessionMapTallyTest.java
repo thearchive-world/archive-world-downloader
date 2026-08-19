@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
@@ -95,9 +96,6 @@ class LiveCaptureSessionMapTallyTest {
                 dimension -> {
                     throw new AssertionError("a map write must not open a region storage");
                 },
-                dimension -> {
-                    throw new AssertionError("a map write must not open an entities storage");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -108,7 +106,7 @@ class LiveCaptureSessionMapTallyTest {
     /** A regular file where the {@code data/} directory belongs, so every write under it fails at open. */
     private static Path unwritableDataRoot(Path save) throws Exception {
         Files.createDirectories(save);
-        Files.writeString(save.resolve("data"), "not a directory");
+        Files.write(save.resolve("data"), "not a directory".getBytes(StandardCharsets.UTF_8));
         return save;
     }
 
@@ -372,7 +370,7 @@ class LiveCaptureSessionMapTallyTest {
     /** A manifest path whose parent is a regular file, so staging the atomic write under it fails at open. */
     private static Path unwritableManifestFile(Path temporary) throws Exception {
         Path blocker = temporary.resolve("blocker");
-        Files.writeString(blocker, "not a directory");
+        Files.write(blocker, "not a directory".getBytes(StandardCharsets.UTF_8));
         return blocker.resolve("map-ids");
     }
 

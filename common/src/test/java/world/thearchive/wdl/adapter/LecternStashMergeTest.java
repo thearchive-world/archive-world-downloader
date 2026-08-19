@@ -17,7 +17,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.item.ItemStack;
@@ -89,7 +88,7 @@ class LecternStashMergeTest {
                 "the flushed chunk's stash entry is drained as the tag leaves memory");
         assertTrue(stash.containsKey(elsewhere), "another chunk's stash entry is left until its own flush");
 
-        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
+        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", 10);
         CompoundTag lectern = findByPos(blockEntities, 10, 70, 20);
         assertEquals("Bound Here", titleAt(registries, lectern), "the lectern gains exactly the captured book");
         assertEquals(2, (lectern.contains("Page") ? lectern.getInt("Page") : -1), "the reading page lands too");
@@ -110,7 +109,7 @@ class LecternStashMergeTest {
         assertFalse(stash.containsKey(pos),
                 "the entry is still drained: the chunk is leaving memory, so it cannot wait");
         assertFalse(
-                findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 2, 64, 1)
+                findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), 2, 64, 1)
                         .contains("Book"),
                 "the unrelated lectern is left alone");
     }

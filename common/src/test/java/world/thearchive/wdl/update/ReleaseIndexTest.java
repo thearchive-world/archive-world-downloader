@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -54,9 +55,9 @@ class ReleaseIndexTest {
         assertEquals(1, rows.size());
         Release row = rows.get(0);
         assertEquals("3.9.5+26.1-fabric", row.versionNumber());
-        assertEquals(0, row.version().compareTo(SemVer.parse("3.9.5").orElseThrow()));
-        assertEquals(List.of("fabric", "neoforge"), row.loaders());
-        assertEquals(List.of("1.21.11"), row.gameVersions());
+        assertEquals(0, row.version().compareTo(SemVer.parse("3.9.5").get()));
+        assertEquals(ImmutableList.of("fabric", "neoforge"), row.loaders());
+        assertEquals(ImmutableList.of("1.21.11"), row.gameVersions());
         assertEquals(Instant.parse("2026-06-01T00:00:00Z"), row.datePublished());
         assertEquals("listed", row.status());
         assertEquals("release", row.versionType());
@@ -64,14 +65,13 @@ class ReleaseIndexTest {
 
     @Test
     void dropsRowsMissingRequiredFields() {
-        String body = """
-                [{
-                  "version_type": "release",
-                  "status": "listed",
-                  "date_published": "2026-06-01T00:00:00Z",
-                  "loaders": ["fabric"],
-                  "game_versions": ["1.21.11"]
-                }]""";
+        String body = "[{\n"
+                + "  \"version_type\": \"release\",\n"
+                + "  \"status\": \"listed\",\n"
+                + "  \"date_published\": \"2026-06-01T00:00:00Z\",\n"
+                + "  \"loaders\": [\"fabric\"],\n"
+                + "  \"game_versions\": [\"1.21.11\"]\n"
+                + "}]";
 
         assertTrue(ReleaseIndex.fetch(UpdateFixtures.INFO,
                 new UpdateFixtures.RecordingTransport(new Transport.Result(200, body))).isEmpty(),

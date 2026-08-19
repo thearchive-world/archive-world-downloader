@@ -357,13 +357,11 @@ tasks.named("check") {
 
 repositories {
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
-    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
+    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
 }
 
 dependencies {
-    // JourneyMap public API for the overlay binding (compat/journeymap), compile-only (never a runtime require).
-    // The 1.19.4-1.9 stem (see gradle.properties) publishes no -neoforge-SNAPSHOT flavor, so common pulls the
-    // loader-suffixless -SNAPSHOT flavor; the 1.9 journeymap.client.api surface the binding compiles against is
-    // its own API types, not Minecraft signatures.
-    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
+    // JourneyMap 2.0 API for the overlay binding (compat/journeymap/v2), compile-only (never a runtime require;
+    // JourneyMap provides it jar-in-jar). The -common flavor carries official Mojang names, matching this build.
+    compileOnly("info.journeymap:journeymap-api-common:${property("journeymap_api_v2_coordinate")}")
 }

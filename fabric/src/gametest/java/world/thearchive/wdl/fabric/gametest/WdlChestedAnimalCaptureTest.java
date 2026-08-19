@@ -5,6 +5,7 @@ package world.thearchive.wdl.fabric.gametest;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -95,7 +96,8 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
                     .map(CaptureReadback::itemIds)
                     .orElseThrow(() -> new AssertionError("the donkey is absent from the entities region: "
                             + CaptureReadback.entities(entityChunk).stream()
-                                    .map(entity -> (entity.contains("id") ? entity.getString("id") : "?")).toList()));
+                                    .map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
+                                    .collect(Collectors.toList())));
             Check.that(animalItems.contains("minecraft:diamond"),
                     "the chested donkey's planted item is absent from its captured Items: " + animalItems);
 

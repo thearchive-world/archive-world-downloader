@@ -49,13 +49,19 @@ final class MerchantOfferCapture {
      * recipe with no {@code "sell"}, is skipped. Drain-time work: call once per holder before it merges.
      */
     static void scrubAndRemapOffers(CompoundTag holder, boolean scrubCoordinates, @Nullable MapArchive archive) {
-        if (!(holder.get("Offers") instanceof CompoundTag offers)
-                || !(offers.get("Recipes") instanceof ListTag recipes)) {
+        CompoundTag offers = holder.get("Offers") instanceof CompoundTag ? (CompoundTag) holder.get("Offers") : null;
+        ListTag recipes = offers != null && offers.get("Recipes") instanceof ListTag
+                ? (ListTag) offers.get("Recipes")
+                : null;
+        if (offers == null || recipes == null) {
             return;
         }
         for (int i = 0; i < recipes.size(); i++) {
-            if (!(recipes.get(i) instanceof CompoundTag recipe)
-                    || !(recipe.get("sell") instanceof CompoundTag sell)) {
+            CompoundTag recipe = recipes.get(i) instanceof CompoundTag ? (CompoundTag) recipes.get(i) : null;
+            CompoundTag sell = recipe != null && recipe.get("sell") instanceof CompoundTag
+                    ? (CompoundTag) recipe.get("sell")
+                    : null;
+            if (recipe == null || sell == null) {
                 continue;
             }
             if (scrubCoordinates) {

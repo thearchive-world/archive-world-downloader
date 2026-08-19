@@ -6,6 +6,7 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -65,7 +66,8 @@ class LevelDatCuratedGameRulesTest {
         }
         // At 1.18.2 three laid-out rows have no live rule: the band-neutral fire-spread row (no rule at any current
         // band) plus vine-spread and warden-spawn, both 1.19 additions.
-        Set<String> absentAtThisBand = Set.of("fire_spread_radius_around_player", "spread_vines", "spawn_wardens");
+        Set<String> absentAtThisBand = ImmutableSet.of("fire_spread_radius_around_player", "spread_vines",
+                "spawn_wardens");
         for (String id : SettingsLayout.GAME_RULE_ORDER) {
             if (!byId.containsKey(id)) {
                 assertTrue(absentAtThisBand.contains(id),

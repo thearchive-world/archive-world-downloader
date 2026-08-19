@@ -63,7 +63,7 @@ class LevelDatRoundTripTest {
     void buildsFromClientRegistryWithoutLevelStem() {
         RegistryAccess registries = TestRegistries.frozen();
         // Precondition mirrors a real multiplayer client: dimension types + biomes synced, no LEVEL_STEM.
-        assertTrue(registries.registry(Registry.LEVEL_STEM_REGISTRY).isEmpty(),
+        assertTrue(!registries.registry(Registry.LEVEL_STEM_REGISTRY).isPresent(),
                 "precondition: client-like reg has no LEVEL_STEM");
         assertDoesNotThrow(() -> writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null),
                 "must derive void dimensions, not fail");

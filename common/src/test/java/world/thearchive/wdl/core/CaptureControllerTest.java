@@ -10,10 +10,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.Arrays;
 import java.util.Properties;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -283,7 +283,8 @@ class CaptureControllerTest {
     void capturedContainersDelegateToSessionWhileRecording() {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
-        session.capturedContainers = new CapturedContainers(new LongOpenHashSet(new long[] { 99L }), Set.of(), false);
+        session.capturedContainers = new CapturedContainers(new LongOpenHashSet(new long[] { 99L }), ImmutableSet.of(),
+                false);
         controller.start(() -> session);
 
         assertTrue(controller.capturedContainers().containsBlock(99L));

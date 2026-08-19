@@ -3,6 +3,8 @@
 
 package world.thearchive.wdl.client;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import com.mojang.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import java.util.ArrayList;
@@ -19,15 +21,14 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
-import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import org.jspecify.annotations.Nullable;
@@ -80,6 +81,7 @@ public final class WdlSettingsScreen extends Screen {
 
     private int activeTab;
     private @Nullable Button defaults;
+    private @Nullable SettingsList list;
     // Below 1.19.3 there is no per-widget Tooltip, and a control's tooltip inside the scrolling list clips to the
     // list scissor, so hovered tooltips are recorded here and drawn screen-side after the list in render.
     private final List<Map.Entry<AbstractWidget, Component>> hoverTooltips = new ArrayList<>();
@@ -103,7 +105,8 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     private void rebuildWidgets() {
-        clearWidgets();
+        this.buttons.clear();
+        this.children.clear();
         init();
     }
 
@@ -113,7 +116,8 @@ public final class WdlSettingsScreen extends Screen {
         SettingsList settingsList = new SettingsList(Minecraft.getInstance(), this.width, this.height, LIST_TOP,
                 this.height - FOOTER_HEIGHT, ROW_HEIGHT);
         populate(settingsList);
-        addRenderableWidget(settingsList);
+        this.list = settingsList;
+        addWidget(settingsList);
 
         buildTabStrip();
         buildFooter();
@@ -131,7 +135,7 @@ public final class WdlSettingsScreen extends Screen {
             Component title = new TranslatableComponent(SettingsLayout.tabLabelKey(SettingsLayout.TABS.get(i).id()));
             Button tab = new Button(tabX, TAB_TOP, thisTabWidth, TAB_HEIGHT, title, button -> selectTab(index));
             tab.active = i != this.activeTab; // the active tab reads as pressed by being inert
-            addRenderableWidget(tab);
+            addButton(tab);
         }
     }
 
@@ -153,7 +157,23 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     /** The visible option column's horizontal bounds. */
-    private record ColumnBounds(int left, int right) {
+    private static final class ColumnBounds {
+        private final int left;
+        private final int right;
+
+        ColumnBounds(int left, int right) {
+            this.left = left;
+            this.right = right;
+        }
+
+        int left() {
+            return left;
+        }
+
+        int right() {
+            return right;
+        }
+
         int width() {
             return this.right - this.left;
         }
@@ -166,9 +186,9 @@ public final class WdlSettingsScreen extends Screen {
         int doneX = column.left();
         int defaultsX = doneX + buttonWidth + GAP;
         int discardX = defaultsX + buttonWidth + GAP;
-        addRenderableWidget(new Button(doneX, footerY, buttonWidth, 20, CommonComponents.GUI_DONE,
+        addButton(new Button(doneX, footerY, buttonWidth, 20, CommonComponents.GUI_DONE,
                 button -> onClose()));
-        this.defaults = addRenderableWidget(new Button(defaultsX, footerY, buttonWidth, 20,
+        this.defaults = addButton(new Button(defaultsX, footerY, buttonWidth, 20,
                 new TranslatableComponent("wdl.settings.defaults"), button -> onDefaults(),
                 (button, poseStack, mouseX, mouseY) -> {
                     if (this.draft.isAtDefaults()) {
@@ -178,7 +198,7 @@ public final class WdlSettingsScreen extends Screen {
                     }
                 }));
         // the last button absorbs the division remainder so the footer's right edge meets the control edge
-        addRenderableWidget(new Button(discardX, footerY, column.right() - discardX, 20,
+        addButton(new Button(discardX, footerY, column.right() - discardX, 20,
                 new TranslatableComponent("wdl.settings.discard"), button -> onDiscard()));
     }
 
@@ -194,6 +214,14 @@ public final class WdlSettingsScreen extends Screen {
             if (this.defaults.active == atDefaults) {
                 this.defaults.active = !atDefaults;
             }
+        }
+        // Below the 1.19.4 GUI additions Screen.render paints only its buttons, so the list added as a widget is
+        // drawn by hand. It draws before the buttons here, not after as the renderable order on the higher bands:
+        // below 1.20.2 this list fills tiled dirt above and below itself, which is what hides its unclipped row
+        // overflow at the top and bottom edges (it does not scissor), so drawing it first lets that fill hide the
+        // overflow while the tab strip and footer buttons paint on top of it. Drawing it after would bury both.
+        if (this.list != null) {
+            this.list.render(poseStack, mouseX, mouseY, partialTick);
         }
         super.render(poseStack, mouseX, mouseY, partialTick);
         // The recorded hover tooltips are drawn here, unclipped, after the list.
@@ -256,10 +284,10 @@ public final class WdlSettingsScreen extends Screen {
         ConfigOption option = ConfigSchema.option(key);
         switch (option.type()) {
             case BOOLEAN:
-                CycleButton<Boolean> toggle = CycleButton.onOffBuilder(this.draft.getBoolean(key))
-                        .displayOnlyValue()
-                        .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY,
-                                (button, value) -> onBoolChange(key, value));
+                WdlCycleButton<Boolean> toggle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
+                        ImmutableList.of(Boolean.TRUE, Boolean.FALSE), this.draft.getBoolean(key),
+                        value -> value ? CommonComponents.OPTION_ON : CommonComponents.OPTION_OFF,
+                        (button, value) -> onBoolChange(key, value));
                 return new Control(toggle, () -> toggle.setValue(this.draft.getBoolean(key)));
             case INTEGER:
                 IntSlider intSlider = new IntSlider(key, (int) option.min(), (int) option.max());
@@ -279,13 +307,13 @@ public final class WdlSettingsScreen extends Screen {
     private Control enumControl(String key) {
         switch (key) {
             case "hudAnchor":
-                return cycleControl(key, HudAnchor.class, List.of(HudAnchor.values()),
+                return cycleControl(key, HudAnchor.class, ImmutableList.copyOf(HudAnchor.values()),
                         this.draft.getEnum(key, HudAnchor.class));
             case "hudPeekMode":
-                return cycleControl(key, HudPeekMode.class, List.of(HudPeekMode.values()),
+                return cycleControl(key, HudPeekMode.class, ImmutableList.copyOf(HudPeekMode.values()),
                         this.draft.getEnum(key, HudPeekMode.class));
             case "worldType":
-                return cycleControl(key, WorldType.class, List.of(WorldType.values()),
+                return cycleControl(key, WorldType.class, ImmutableList.copyOf(WorldType.values()),
                         this.draft.getEnum(key, WorldType.class));
             case "recaptureChunks":
                 return recaptureControl(key);
@@ -312,23 +340,17 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     private <E extends Enum<E>> Control cycleControl(String key, Class<E> type, List<E> values, E initial) {
-        CycleButton<E> cycle = CycleButton.<E>builder(value -> new TranslatableComponent(valueLabelKey(value)))
-                .withInitialValue(initial)
-                .withValues(values)
-                .displayOnlyValue()
-                .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY,
-                        (button, value) -> this.draft.set(key, value.name()));
+        WdlCycleButton<E> cycle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, values, initial,
+                value -> new TranslatableComponent(valueLabelKey(value)),
+                (button, value) -> this.draft.set(key, value.name()));
         return new Control(cycle, () -> cycle.setValue(this.draft.getEnum(key, type)));
     }
 
     private Control recaptureControl(String key) {
-        CycleButton<RecaptureMode> cycle = CycleButton.<RecaptureMode>builder(
-                value -> new TranslatableComponent(valueLabelKey(value)))
-                .withInitialValue(this.draft.getEnum(key, RecaptureMode.class))
-                .withValues(List.of(RecaptureMode.values()))
-                .displayOnlyValue()
-                .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY,
-                        (button, value) -> onRecaptureChange(key, value));
+        WdlCycleButton<RecaptureMode> cycle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
+                ImmutableList.copyOf(RecaptureMode.values()), this.draft.getEnum(key, RecaptureMode.class),
+                value -> new TranslatableComponent(valueLabelKey(value)),
+                (button, value) -> onRecaptureChange(key, value));
         return new Control(cycle, () -> cycle.setValue(this.draft.getEnum(key, RecaptureMode.class)));
     }
 
@@ -362,7 +384,7 @@ public final class WdlSettingsScreen extends Screen {
         minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
                 new TranslatableComponent("wdl.settings.confirm.recapture.title",
                         new TranslatableComponent(valueLabelKey(value))
-                                .withStyle(style -> style.withColor(BrandColors.AMBER))),
+                                .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER)))),
                 new TranslatableComponent(messageKey),
                 new TranslatableComponent("wdl.settings.confirm.recapture.confirm"),
                 CommonComponents.GUI_CANCEL));
@@ -390,7 +412,7 @@ public final class WdlSettingsScreen extends Screen {
     private void applyTooltip(AbstractWidget widget, String key) {
         String tooltipKey = SettingsLayout.optionTooltipKey(key);
         if (I18n.exists(tooltipKey)) {
-            this.hoverTooltips.add(Map.entry(widget, new TranslatableComponent(tooltipKey)));
+            this.hoverTooltips.add(Maps.immutableEntry(widget, new TranslatableComponent(tooltipKey)));
         }
     }
 
@@ -420,7 +442,7 @@ public final class WdlSettingsScreen extends Screen {
         minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
                 new TranslatableComponent(base + ".title",
                         new TranslatableComponent(SettingsLayout.optionLabelKey(key))
-                                .withStyle(style -> style.withColor(BrandColors.AMBER))),
+                                .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER)))),
                 new TranslatableComponent(SettingsLayout.confirmMessageKey(key)),
                 new TranslatableComponent(base + ".confirm"),
                 CommonComponents.GUI_CANCEL));
@@ -436,7 +458,7 @@ public final class WdlSettingsScreen extends Screen {
         };
         minecraft.setScreen(new ConfirmScreen(choice,
                 new TranslatableComponent("wdl.settings.defaults.title")
-                        .withStyle(style -> style.withColor(BrandColors.AMBER)),
+                        .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER))),
                 new TranslatableComponent("wdl.settings.defaults.message"),
                 new TranslatableComponent("wdl.settings.defaults.confirm"),
                 CommonComponents.GUI_CANCEL));
@@ -447,7 +469,7 @@ public final class WdlSettingsScreen extends Screen {
         BooleanConsumer choice = confirmed -> minecraft.setScreen(confirmed ? this.parent : this);
         minecraft.setScreen(new ConfirmScreen(choice,
                 new TranslatableComponent("wdl.settings.discard.title")
-                        .withStyle(style -> style.withColor(BrandColors.AMBER)),
+                        .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER))),
                 new TranslatableComponent("wdl.settings.discard.message"),
                 new TranslatableComponent("wdl.settings.discard.confirm"),
                 CommonComponents.GUI_CANCEL));
@@ -464,7 +486,23 @@ public final class WdlSettingsScreen extends Screen {
         Minecraft.getInstance().setScreen(this.parent);
     }
 
-    private record Control(AbstractWidget widget, Runnable refresh) {}
+    private static final class Control {
+        private final AbstractWidget widget;
+        private final Runnable refresh;
+
+        Control(AbstractWidget widget, Runnable refresh) {
+            this.widget = widget;
+            this.refresh = refresh;
+        }
+
+        AbstractWidget widget() {
+            return widget;
+        }
+
+        Runnable refresh() {
+            return refresh;
+        }
+    }
 
     /** The scrollable list of rows for the active tab; rebuilt whole on a tab switch or resize. */
     private final class SettingsList extends ContainerObjectSelectionList<SettingsEntry> {
@@ -539,12 +577,7 @@ public final class WdlSettingsScreen extends Screen {
 
         @Override
         public List<? extends GuiEventListener> children() {
-            return List.of();
-        }
-
-        @Override
-        public List<? extends NarratableEntry> narratables() {
-            return List.of();
+            return ImmutableList.of();
         }
     }
 
@@ -562,7 +595,7 @@ public final class WdlSettingsScreen extends Screen {
                 refresh();
             });
             WdlSettingsScreen.this.hoverTooltips.add(
-                    Map.entry(this.revert, new TranslatableComponent("wdl.settings.defaults")));
+                    Maps.immutableEntry(this.revert, new TranslatableComponent("wdl.settings.defaults")));
         }
 
         abstract AbstractWidget control();
@@ -637,12 +670,7 @@ public final class WdlSettingsScreen extends Screen {
 
         @Override
         public List<? extends GuiEventListener> children() {
-            return List.of(control(), this.revert);
-        }
-
-        @Override
-        public List<? extends NarratableEntry> narratables() {
-            return List.of(control(), this.revert);
+            return ImmutableList.of(control(), this.revert);
         }
     }
 
@@ -689,15 +717,16 @@ public final class WdlSettingsScreen extends Screen {
     /** A curated game-rule row: a toggle over the sparse override map, reverting by deleting its entry. */
     private final class GameRuleRow extends ControlRow {
         private final CuratedGameRule rule;
-        private final CycleButton<Boolean> toggle;
+        private final WdlCycleButton<Boolean> toggle;
 
         GameRuleRow(CuratedGameRule rule) {
             super(new TranslatableComponent(SettingsLayout.gameRuleLabelKey(rule.id())), "overrideGamerules");
             this.rule = rule;
-            this.toggle = CycleButton.onOffBuilder(isOn()).displayOnlyValue()
-                    .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY,
-                            (button, value) -> draft.setGameRule(rule.bandId(),
-                                    value ? rule.enabledValue() : rule.disabledValue(), rule.curatedValue()));
+            this.toggle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
+                    ImmutableList.of(Boolean.TRUE, Boolean.FALSE), isOn(),
+                    value -> value ? CommonComponents.OPTION_ON : CommonComponents.OPTION_OFF,
+                    (button, value) -> draft.setGameRule(rule.bandId(),
+                            value ? rule.enabledValue() : rule.disabledValue(), rule.curatedValue()));
         }
 
         @Override

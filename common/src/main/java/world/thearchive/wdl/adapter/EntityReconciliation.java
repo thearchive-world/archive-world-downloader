@@ -48,9 +48,85 @@ package world.thearchive.wdl.adapter;
  * @param primedEncodeFailures  primed entities the encode or the re-offer destroyed; outside the packet arithmetic
  * @param primedFlushDrops      primed entities lost to a flush failure; likewise outside the packet arithmetic
  */
-record EntityReconciliation(long received, int reconstructedWritten, int nestedPassengers,
-        int droppedUncaptured, int sinkSkips, int createDrops, int encodeFailures, int flushDrops,
-        int abortDrops, int unboundDimensionDrops, int primedEncodeFailures, int primedFlushDrops) {
+final class EntityReconciliation {
+    private final long received;
+    private final int reconstructedWritten;
+    private final int nestedPassengers;
+    private final int droppedUncaptured;
+    private final int sinkSkips;
+    private final int createDrops;
+    private final int encodeFailures;
+    private final int flushDrops;
+    private final int abortDrops;
+    private final int unboundDimensionDrops;
+    private final int primedEncodeFailures;
+    private final int primedFlushDrops;
+
+    EntityReconciliation(long received, int reconstructedWritten, int nestedPassengers, int droppedUncaptured,
+            int sinkSkips, int createDrops, int encodeFailures, int flushDrops, int abortDrops,
+            int unboundDimensionDrops, int primedEncodeFailures, int primedFlushDrops) {
+        this.received = received;
+        this.reconstructedWritten = reconstructedWritten;
+        this.nestedPassengers = nestedPassengers;
+        this.droppedUncaptured = droppedUncaptured;
+        this.sinkSkips = sinkSkips;
+        this.createDrops = createDrops;
+        this.encodeFailures = encodeFailures;
+        this.flushDrops = flushDrops;
+        this.abortDrops = abortDrops;
+        this.unboundDimensionDrops = unboundDimensionDrops;
+        this.primedEncodeFailures = primedEncodeFailures;
+        this.primedFlushDrops = primedFlushDrops;
+    }
+
+    long received() {
+        return received;
+    }
+
+    int reconstructedWritten() {
+        return reconstructedWritten;
+    }
+
+    int nestedPassengers() {
+        return nestedPassengers;
+    }
+
+    int droppedUncaptured() {
+        return droppedUncaptured;
+    }
+
+    int sinkSkips() {
+        return sinkSkips;
+    }
+
+    int createDrops() {
+        return createDrops;
+    }
+
+    int encodeFailures() {
+        return encodeFailures;
+    }
+
+    int flushDrops() {
+        return flushDrops;
+    }
+
+    int abortDrops() {
+        return abortDrops;
+    }
+
+    int unboundDimensionDrops() {
+        return unboundDimensionDrops;
+    }
+
+    int primedEncodeFailures() {
+        return primedEncodeFailures;
+    }
+
+    int primedFlushDrops() {
+        return primedFlushDrops;
+    }
+
     /** The received spawns explained by a terminal outcome: a written root, a nested passenger, or a counted drop. */
     public long accounted() {
         return (long) reconstructedWritten + nestedPassengers + droppedUncaptured + sinkSkips + createDrops

@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.adapter;
 
+import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -17,9 +18,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The inbound entity packet state accumulator: holds each entity's synced packet state independent of whether the
@@ -61,7 +62,7 @@ import org.slf4j.LoggerFactory;
  * drain observing a concurrent update, which the accepted-ghosting trade already covers.
  */
 class EntityPacketAccumulator<P, V, E> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(EntityPacketAccumulator.class);
+    private static final Logger LOGGER = LogManager.getLogger(EntityPacketAccumulator.class);
 
     /**
      * The tracked-entity ceiling. There is deliberately no eviction (a client removal is ambiguous), and a stationary
@@ -279,7 +280,7 @@ class EntityPacketAccumulator<P, V, E> {
 
     private static <P, V, E> PacketEntity<P, V, E> snapshot(int id, Held<P, V, E> held) {
         return new PacketEntity<>(id, held.uuid, held.chunkPos, held.pos, held.spawn,
-                List.copyOf(held.synced.values()), List.copyOf(held.equipment.values()),
+                ImmutableList.copyOf(held.synced.values()), ImmutableList.copyOf(held.equipment.values()),
                 held.passengers.clone(), held.leashHolderId);
     }
 

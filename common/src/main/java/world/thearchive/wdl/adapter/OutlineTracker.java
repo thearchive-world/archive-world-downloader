@@ -38,9 +38,9 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CaptureToggles;
@@ -75,7 +75,7 @@ public final class OutlineTracker {
     private static final long[] NO_CELLS = new long[0];
     // A reused scratch position for the seal-test neighbor reads, so no probe allocates. Client thread only.
     private static final BlockPos.MutableBlockPos neighbor = new BlockPos.MutableBlockPos();
-    private static final Logger LOGGER = LoggerFactory.getLogger(OutlineTracker.class);
+    private static final Logger LOGGER = LogManager.getLogger(OutlineTracker.class);
     private static final int TIMING_WINDOW_TICKS = 100;
 
     // Re-scan a cached chunk's block entities at most this often: the enumeration is the dominant tick cost on
@@ -417,7 +417,7 @@ public final class OutlineTracker {
     private static boolean isContainerEntity(Entity entity) {
         // Below 1.21 getInventoryColumns is nonzero without a chest, so it cannot substitute for hasChest.
         return entity instanceof AbstractMinecartContainer
-                || (entity instanceof AbstractChestedHorse animal && animal.hasChest());
+                || (entity instanceof AbstractChestedHorse && ((AbstractChestedHorse) entity).hasChest());
     }
 
     /**
@@ -430,7 +430,8 @@ public final class OutlineTracker {
         if (entity instanceof WanderingTrader) {
             return true;
         }
-        if (entity instanceof Villager villager && !villager.isBaby()) {
+        if (entity instanceof Villager && !((Villager) entity).isBaby()) {
+            Villager villager = (Villager) entity;
             VillagerProfession profession = villager.getVillagerData().getProfession();
             return profession != VillagerProfession.NONE && profession != VillagerProfession.NITWIT;
         }

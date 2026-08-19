@@ -12,6 +12,7 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPosOrNull;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -32,7 +33,6 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
@@ -74,6 +74,18 @@ class AsyncSaveWriterTest {
         }
     }
 
+    /**
+     * Seed a host region chunk at {@code pos} so an entity fold has terrain to land inside: at this band entities live
+     * inside the {@code region/} chunk under {@code Level.Entities}, so a fold with no host chunk is a lost fold.
+     */
+    private static void seedHostChunk(Path region, ChunkPos pos) throws IOException {
+        CompoundTag host = new CompoundTag();
+        host.put("Level", new CompoundTag());
+        try (IOWorker in = storage(region, "chunk")) {
+            in.store(pos, host).join();
+        }
+    }
+
     @Test
     void drainsSubmittedChunksOnTheWriterThreadAndReportsTallies(@TempDir Path save) throws Exception {
         RegistryAccess registries = TestRegistries.frozen();
@@ -82,9 +94,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},                  // preflight: the resume backup
                 (chunksFailed, entityChunksFailed) -> finalized.set(true), // the level.dat write stand-in
                 () -> null,                  // outputs: export + size
@@ -132,9 +141,6 @@ class AsyncSaveWriterTest {
                     }
                     return storage(region, "chunk");
                 },
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {
                     finalizedChunksFailed.set(chunksFailed);
@@ -168,24 +174,24 @@ class AsyncSaveWriterTest {
         }
     }
 
-    /** The entities sibling of the same open, which counts into its own tally rather than the chunk one. */
+    /**
+     * The entity sibling of the same open: an entity fold reaches the region storage, so its open failure counts here.
+     */
     @Test
     void countsEveryEntityChunkOfAnUnopenableDimensionAndStillFinalizes(@TempDir Path save) throws Exception {
-        Path entities = Files.createDirectories(save.resolve("entities"));
+        Path region = Files.createDirectories(save.resolve("region"));
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
         AtomicInteger finalizedEntityChunksFailed = new AtomicInteger(-1);
         AtomicInteger netherOpens = new AtomicInteger();
+        seedHostChunk(region, new ChunkPos(2, 2)); // the overworld entity folds into its host chunk
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> {
-                    throw new AssertionError("no chunk was submitted, so the region storage must not open");
-                },
-                dimension -> {
                     if (Level.NETHER.equals(dimension)) {
                         netherOpens.incrementAndGet();
-                        throw new UncheckedIOException(new IOException("DIM-1/entities could not be created"));
+                        throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
                     }
-                    return storage(entities, "entities");
+                    return storage(region, "chunk");
                 },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {
@@ -208,7 +214,7 @@ class AsyncSaveWriterTest {
         assertFalse(result.failed(), "one dimension's folder is not the save, so the drain is not aborted");
         assertEquals(2, result.entityChunksFailed(), "both entity-chunks the unopenable dimension dropped are lost");
         assertEquals(0, result.chunksFailed(), "and neither is double-counted against the region tally");
-        assertEquals(1, result.entityChunksWritten(), "and the dimension that did open still wrote its own");
+        assertEquals(1, result.entityChunksWritten(), "and the dimension that did open still folded its own in");
         assertEquals(2, netherOpens.get(),
                 "the open is retried per entity-chunk rather than written off, since the failure can be of "
                         + "the moment");
@@ -226,9 +232,6 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> {
                     throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
-                },
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
                 },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalized.set(true),
@@ -257,9 +260,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -286,9 +286,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> order.add("finalize"),
                 () -> null,
@@ -299,7 +296,7 @@ class AsyncSaveWriterTest {
             order.add("chunk");
             return codec.encode(SyntheticChunks.full(registries, true), registries, false);
         }, ChunkMerge::merge);
-        writer.submitMapBatch(List.of(
+        writer.submitMapBatch(ImmutableList.of(
                 () -> {
                     stageAtFirstWrite.set(progress.stage());
                     order.add("map");
@@ -308,7 +305,7 @@ class AsyncSaveWriterTest {
                 () -> order.add("map")));
         writer.finish().get(30, TimeUnit.SECONDS);
 
-        assertEquals(List.of("chunk", "map", "map", "map", "finalize"), order,
+        assertEquals(ImmutableList.of("chunk", "map", "map", "map", "finalize"), order,
                 "the batch drains after every chunk write and before the finalize");
         assertEquals(SaveStage.WRITING_MAPS, stageAtFirstWrite.get(), "the phase is relabeled before the first write");
         assertEquals(SaveStage.WRITING_MAPS, progress.stage(), "the drain ends in the maps phase");
@@ -324,16 +321,13 @@ class AsyncSaveWriterTest {
                 dimension -> {
                     throw new AssertionError("no chunk was submitted, so the region storage must not open");
                 },
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {},
                 progress);
 
-        writer.submitMapBatch(List.of(
+        writer.submitMapBatch(ImmutableList.of(
                 () -> {
                     attempted.incrementAndGet();
                     throw new IllegalStateException("this map's write failed");
@@ -354,9 +348,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -365,40 +356,38 @@ class AsyncSaveWriterTest {
 
         writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        writer.submitMapBatch(List.of());
+        writer.submitMapBatch(ImmutableList.of());
         writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(SaveStage.WRITING_CHUNKS, progress.stage(), "an empty batch publishes no maps phase");
     }
 
     @Test
-    void drainsChunksAndEntitiesToSeparateStoragesTalliedApart(@TempDir Path save) throws Exception {
+    void drainsChunksAndEntityFoldsTalliedApartIntoTheRegionChunk(@TempDir Path save) throws Exception {
         RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
-        Path entities = Files.createDirectories(save.resolve("entities"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> storage(entities, "entities"),
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {}, new SaveProgress());
 
+        // Terrain flushes first, then the entity folds into the same region/ chunk under Level.Entities.
         writer.submitChunk(Level.OVERWORLD, new ChunkPos(2, 2),
                 () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        CompoundTag entityChunk = new CompoundTag();
-        entityChunk.putInt("DataVersion", 1);
-        writer.submitEntity(Level.OVERWORLD, new ChunkPos(2, 2), entityChunk);
+        writer.submitEntity(Level.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
         assertEquals(1, result.chunksWritten(), "the terrain chunk went to region/");
-        assertEquals(1, result.entityChunksWritten(), "the entity chunk went to entities/");
+        assertEquals(1, result.entityChunksWritten(), "the entity folded into its region/ chunk, tallied apart");
 
-        try (IOWorker in = storage(entities, "entities")) {
-            assertTrue(Optional.ofNullable(in.load(new ChunkPos(2, 2))).isPresent(),
-                    "the entity chunk reached entities/");
+        try (IOWorker in = storage(region, "chunk")) {
+            CompoundTag chunk = Optional.ofNullable(in.load(new ChunkPos(2, 2))).get();
+            assertFalse(chunk.getCompound("Level").getList("Entities", 10).isEmpty(),
+                    "the entity landed inside the region/ chunk's Level.Entities");
         }
     }
 
@@ -410,9 +399,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(dimension == Level.NETHER ? netherRegion : overworldRegion, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -446,9 +432,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(dimension == Level.NETHER ? netherRegion : overworldRegion, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -473,10 +456,10 @@ class AsyncSaveWriterTest {
         CompoundTag offThreadOnDisk;
         CompoundTag onThreadOnDisk;
         try (IOWorker in = storage(overworldRegion, "chunk")) {
-            offThreadOnDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
+            offThreadOnDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
         }
         try (IOWorker in = storage(netherRegion, "chunk")) {
-            onThreadOnDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
+            onThreadOnDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
         }
         assertEquals(onThreadOnDisk, offThreadOnDisk,
                 "the writer-thread encode is byte-identical to the main-thread encode");
@@ -490,9 +473,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalized.set(true),
                 () -> null,
@@ -537,9 +517,6 @@ class AsyncSaveWriterTest {
                         throw new IllegalStateException("the region store rejected the write");
                     }
                 },
-                dimension -> {
-                    throw new AssertionError("no entity chunk was submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -557,24 +534,22 @@ class AsyncSaveWriterTest {
     }
 
     /**
-     * The entities target's write-failure tally, which nothing else reaches. The encode-throw arm counted for a region
-     * chunk cannot happen for entities: {@link AsyncSaveWriter#submitEntity} wraps an already-built tag in a supplier
-     * that cannot throw, and it is the only place an entities write task is made. So the storage write is where an
-     * entity chunk is lost, and an uncounted loss there is a download missing a whole chunk's mobs that still reports
-     * itself complete.
+     * The entity fold's write-failure tally, which nothing else reaches. The encode-throw arm counted for a region
+     * chunk cannot happen for an entity: {@link AsyncSaveWriter#submitEntity} wraps an already-built tag in a supplier
+     * that cannot throw, and it is the only place an entity write task is made. So the fold's write-back to the region
+     * chunk is where an entity is lost, and an uncounted loss there is a download missing a whole chunk's mobs that
+     * still reports itself complete.
      */
     @Test
     void anEntityChunkWhoseStorageWriteThrowsIsCountedFailed(@TempDir Path save) throws Exception {
-        Path entities = Files.createDirectories(save.resolve("entities"));
+        Path region = Files.createDirectories(save.resolve("region"));
+        seedHostChunk(region, new ChunkPos(2, 2)); // a host chunk exists, so the fold reaches the write-back that fails
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
-                dimension -> {
-                    throw new AssertionError("no region chunk was submitted, so the region storage must not open");
-                },
-                dimension -> new TestRegionStorage(entities, false, "entities") {
+                dimension -> new TestRegionStorage(region, false, "chunk") {
                     @Override
                     public CompletableFuture<Void> store(ChunkPos pos, CompoundTag tag) {
-                        throw new IllegalStateException("the entities store rejected the write");
+                        throw new IllegalStateException("the region store rejected the write");
                     }
                 },
                 () -> {},
@@ -582,16 +557,14 @@ class AsyncSaveWriterTest {
                 () -> null,
                 () -> {}, new SaveProgress());
 
-        CompoundTag entityChunk = new CompoundTag();
-        entityChunk.putInt("DataVersion", 1);
-        writer.submitEntity(Level.OVERWORLD, new ChunkPos(2, 2), entityChunk);
+        writer.submitEntity(Level.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
-        assertFalse(result.failed(), "one entity chunk's write failing must not abort the save");
-        assertEquals(0, result.entityChunksWritten(), "nothing reached the entities store");
+        assertFalse(result.failed(), "one entity fold's write failing must not abort the save");
+        assertEquals(0, result.entityChunksWritten(), "nothing reached the region store");
         assertEquals(1, result.entityChunksFailed(),
                 "the lost entity chunk is counted, so the session's finish can read the save partial");
-        assertEquals(0, result.chunksFailed(), "and it is counted apart from the region tally");
+        assertEquals(0, result.chunksFailed(), "and it is counted apart from the region-terrain tally");
     }
 
     @Test
@@ -602,9 +575,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -613,7 +583,7 @@ class AsyncSaveWriterTest {
         // A captured chunk carrying an empty chest block entity, plus the open-time Items holder for that chest:
         // the fold runs inside the writer-thread thunk, on the freshly encoded tag.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
-                List.of(blockEntity("minecraft:chest", 2, 64, 2)));
+                ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
@@ -628,7 +598,7 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag back = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
+            CompoundTag back = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
             CompoundTag chest = findByPosOrNull(back, 2, 64, 2);
             assertNotNull(chest, "the chest block entity is on disk");
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
@@ -646,16 +616,13 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {}, new SaveProgress());
 
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
-                List.of(blockEntity("minecraft:lectern", 3, 64, 3)));
+                ImmutableList.of(blockEntity("minecraft:lectern", 3, 64, 3)));
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(3, 64, 3), sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 4, registries));
 
@@ -668,7 +635,7 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag back = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
+            CompoundTag back = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
             CompoundTag lectern = findByPosOrNull(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
             assertTrue(lectern.getCompound("Book").contains("id"), "the writer-thread fold merged the Book");
@@ -688,9 +655,6 @@ class AsyncSaveWriterTest {
                 dimension -> {
                     firstStorageOpenAt.set(order.getAndIncrement());
                     return storage(region, "chunk");
-                },
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
                 },
                 () -> preflightAt.set(order.getAndIncrement()), // preflight: the resume backup
                 (chunksFailed, entityChunksFailed) -> {},                                        // finalizer: level.dat
@@ -718,9 +682,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},                                          // preflight
                 (chunksFailed, entityChunksFailed) -> finalizerAt.set(order.getAndIncrement()), // finalizer
                 () -> {                                            // outputs: export + size
@@ -746,9 +707,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> "world.zip", // outputs: the export reports the zip it wrote
@@ -770,9 +728,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> {
@@ -796,9 +751,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {
                     throw new RuntimeException("the resume backup blew up");
                 },
@@ -825,9 +777,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {
                     throw new RuntimeException("the level.dat write failed"); // the finalizer fails -> the save fails
@@ -856,12 +805,9 @@ class AsyncSaveWriterTest {
         // Prior session: write a chunk carrying a filled chest to disk.
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
-                List.of(blockEntity("minecraft:chest", 2, 64, 2)));
+                ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
@@ -878,9 +824,6 @@ class AsyncSaveWriterTest {
         AtomicReference<CompoundTag> observed = new AtomicReference<>();
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         second.observeResumeReads((dimension, onDisk) -> {
             observedDimension.set(dimension);
@@ -894,33 +837,28 @@ class AsyncSaveWriterTest {
         assertNotNull(onDisk, "the scan handed the prior on-disk chunk to the observer");
         CompoundTag chest = findByPosOrNull(onDisk, 2, 64, 2);
         assertNotNull(chest, "the observer saw the prior chest block entity");
-        assertFalse(chest.getList("Items", Tag.TAG_COMPOUND).isEmpty(), "the prior chest carries the captured Items");
+        assertFalse(chest.getList("Items", 10).isEmpty(), "the prior chest carries the captured Items");
     }
 
     @Test
     void resumeEntityScanReportsThePriorOnDiskEntityChunkToTheObserver(@TempDir Path save) throws Exception {
         TestRegistries.frozen();
-        Path entities = Files.createDirectories(save.resolve("entities"));
+        Path region = Files.createDirectories(save.resolve("region"));
         UUID cart = new UUID(0x1234L, 0x5678L);
+        seedHostChunk(region, new ChunkPos(0, 0)); // the vehicle folds into its host chunk's Level.Entities
 
-        // Prior session: write an entity chunk carrying a filled chest minecart to the entities store.
+        // Prior session: fold an entity carrying a filled chest minecart into the region/ chunk.
         AsyncSaveWriter first = new AsyncSaveWriter(
-                dimension -> {
-                    throw new AssertionError("no chunks were submitted, so the region storage must not open");
-                },
-                dimension -> storage(entities, "entities"),
+                dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         first.submitEntity(Level.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(cart)));
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
-        // Resume: a read-only scan hands the prior on-disk entity chunk and its dimension to the entity observer.
+        // Resume: a read-only scan hands the prior on-disk region chunk and its dimension to the entity observer.
         AtomicReference<ResourceKey<Level>> observedDimension = new AtomicReference<>();
         AtomicReference<CompoundTag> observed = new AtomicReference<>();
         AsyncSaveWriter second = new AsyncSaveWriter(
-                dimension -> {
-                    throw new AssertionError("no chunks were submitted, so the region storage must not open");
-                },
-                dimension -> storage(entities, "entities"),
+                dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         second.observeEntityResumeReads((dimension, onDisk) -> {
             observedDimension.set(dimension);
@@ -929,12 +867,12 @@ class AsyncSaveWriterTest {
         second.submitEntityResumeScan(Level.OVERWORLD, new ChunkPos(0, 0));
         assertFalse(second.finish().get(30, TimeUnit.SECONDS).failed());
 
-        assertEquals(Level.OVERWORLD, observedDimension.get(), "the scan reported the entity chunk's dimension");
+        assertEquals(Level.OVERWORLD, observedDimension.get(), "the scan reported the chunk's dimension");
         CompoundTag onDisk = observed.get();
-        assertNotNull(onDisk, "the scan handed the prior on-disk entity chunk to the observer");
-        CompoundTag vehicle = onDisk.getList("Entities", Tag.TAG_COMPOUND).getCompound(0);
+        assertNotNull(onDisk, "the scan handed the prior on-disk region chunk to the observer");
+        CompoundTag vehicle = onDisk.getCompound("Level").getList("Entities", 10).getCompound(0);
         assertNotNull(vehicle.get("UUID"), "the prior container entity kept its UUID");
-        assertFalse(vehicle.getList("Items", Tag.TAG_COMPOUND).isEmpty(),
+        assertFalse(vehicle.getList("Items", 10).isEmpty(),
                 "the prior container entity carries the captured Items");
     }
 
@@ -944,7 +882,7 @@ class AsyncSaveWriterTest {
      * is tracking it, so a fresh AddEntity has re-accumulated it in the packet path (it left the tracking view when its
      * chunk left the keep-hot square, KEEP_HOT_MARGIN wider than the view), and its chunk flushes a second time. That
      * second write to an already-written entity chunk read-modifies the prior on disk
-     * ({@link AsyncSaveWriter#submitEntity} routes through {@link RegionChunkWriter#writeMerging} with
+     * ({@link AsyncSaveWriter#submitEntity} routes through {@link RegionChunkWriter#foldEntitiesIntoRegion} with
      * {@link EntityMerge}), so the opened contents survive in either order. Pinned here, at the real writer and
      * storage, because a change of that route to a plain overwrite would silently drop the contents and no
      * {@link EntityMerge} unit test would catch it.
@@ -952,15 +890,14 @@ class AsyncSaveWriterTest {
     @Test
     void aSecondEntityWriteToTheSameChunkReadMergesRatherThanOverwrites(@TempDir Path save) throws Exception {
         TestRegistries.frozen();
-        Path entities = Files.createDirectories(save.resolve("entities"));
+        Path region = Files.createDirectories(save.resolve("region"));
         UUID openedAfterFlush = new UUID(0xA1L, 0xB2L); // flushed empty, then re-flushed with the opened contents
         UUID openedBeforeFlush = new UUID(0xC3L, 0xD4L); // flushed with contents, then re-flushed empty on a revisit
+        seedHostChunk(region, new ChunkPos(0, 0)); // each vehicle folds into its host chunk's Level.Entities
+        seedHostChunk(region, new ChunkPos(0, 1));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
-                dimension -> {
-                    throw new AssertionError("no chunks were submitted, so the region storage must not open");
-                },
-                dimension -> storage(entities, "entities"),
+                dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
 
         // The open-after-flush recovery: the vehicle first flushed empty (seen but not opened), then the return
@@ -980,11 +917,44 @@ class AsyncSaveWriterTest {
         assertEquals(4, result.entityChunksWritten(), "every entity-chunk write landed, first and re-flush alike");
         assertEquals(1, result.entitiesCarriedForward(),
                 "exactly the one prior-contents carry (the revisit clobber case) reached the tally");
-        try (IOWorker in = storage(entities, "entities")) {
+        try (IOWorker in = storage(region, "chunk")) {
             assertFalse(vehicleItems(in, new ChunkPos(0, 0), openedAfterFlush).isEmpty(),
                     "the re-flush folded the opened contents onto the on-disk vehicle (open-after-flush recovers)");
             assertFalse(vehicleItems(in, new ChunkPos(0, 1), openedBeforeFlush).isEmpty(),
                     "the empty re-flush read-merged the prior on-disk items rather than overwriting them");
+        }
+    }
+
+    /**
+     * At this band entities live inside the region/ chunk under Level.Entities, so a terrain re-write (the default
+     * EVERYWHERE recapture mode re-flushes a revisited chunk) must not drop the entity sibling a prior fold saved
+     * there. Pinned at the real writer path, because the terrain codec never emits Entities and the block-entity
+     * read-merge carries only TileEntities, so a plain terrain store would silently wipe a captured vehicle that has
+     * since despawned and cannot be re-primed, and no EntityMerge unit test would catch it.
+     */
+    @Test
+    void aTerrainReWriteKeepsThePriorEntityFold(@TempDir Path save) throws Exception {
+        RegistryAccess registries = TestRegistries.frozen();
+        Path region = Files.createDirectories(save.resolve("region"));
+        ChunkPos pos = new ChunkPos(0, 0);
+        UUID cart = new UUID(0x11L, 0x22L);
+
+        try (IOWorker io = storage(region, "chunk")) {
+            // Terrain flushes, then a captured chest minecart folds into the chunk's Level.Entities.
+            io.store(pos, codec.encode(SyntheticChunks.full(registries, true), registries, false)).join();
+            RegionChunkWriter.foldEntitiesIntoRegion(io, pos, entityChunk(filledVehicle(cart)));
+            assertFalse(vehicleItems(io, pos, cart).isEmpty(), "the fold placed the vehicle in Level.Entities");
+
+            // A revisit re-flushes fresh terrain over the same chunk; the terrain tag carries no Entities of its own.
+            RegionChunkWriter.MergeWriteResult reWrite = RegionChunkWriter.writeMerging(io, pos,
+                    codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+            assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_RECAPTURED, reWrite.outcome(),
+                    "the terrain re-write recaptured the prior chunk");
+        }
+
+        try (IOWorker in = storage(region, "chunk")) {
+            assertFalse(vehicleItems(in, pos, cart).isEmpty(),
+                    "the terrain re-write preserved the folded vehicle in Level.Entities rather than dropping it");
         }
     }
 
@@ -995,9 +965,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         first.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
@@ -1005,9 +972,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         second.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
@@ -1028,9 +992,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         first.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
@@ -1038,9 +999,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         second.submitChunkRewrite(Level.OVERWORLD, new ChunkPos(0, 0), onDisk -> {
             onDisk.putString("wdl_test_folded", "contents");
@@ -1051,10 +1009,10 @@ class AsyncSaveWriterTest {
         assertFalse(result.failed());
         assertEquals(2, result.mergedContainers(), "the fold count reached the merged-containers tally");
         try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag onDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).orElseThrow();
+            CompoundTag onDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
             assertEquals("contents", onDisk.getString("wdl_test_folded"),
                     "the folded chunk was written back to region/");
-            assertFalse(onDisk.getCompound("Level").getList("Sections", Tag.TAG_COMPOUND).isEmpty(),
+            assertFalse(onDisk.getCompound("Level").getList("Sections", 10).isEmpty(),
                     "the prior terrain survived the read-modify-write");
         }
     }
@@ -1067,9 +1025,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
 
         writer.submit(() -> {
@@ -1094,12 +1049,12 @@ class AsyncSaveWriterTest {
     }
 
     private static ListTag vehicleItems(IOWorker storage, ChunkPos pos, UUID uuid) throws IOException {
-        CompoundTag chunk = Optional.ofNullable(storage.load(pos)).orElseThrow();
-        ListTag list = chunk.getList("Entities", Tag.TAG_COMPOUND);
+        CompoundTag chunk = Optional.ofNullable(storage.load(pos)).get();
+        ListTag list = chunk.getCompound("Level").getList("Entities", 10);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entity = list.getCompound(i);
             if (uuid.equals(EntityMerge.readUuid(entity))) {
-                return entity.getList("Items", Tag.TAG_COMPOUND);
+                return entity.getList("Items", 10);
             }
         }
         throw new AssertionError("no entity " + uuid + " in " + pos);
@@ -1121,17 +1076,21 @@ class AsyncSaveWriterTest {
         }
 
         @Override
-        protected CompletableFuture<CompoundTag> loadAsync(ChunkPos pos) {
-            return failRead
-                    ? CompletableFuture.failedFuture(new IOException("the region read failed"))
-                    : super.loadAsync(pos);
+        public CompoundTag load(ChunkPos pos) throws IOException {
+            if (failRead) {
+                throw new IOException("the region read failed");
+            }
+            return super.load(pos);
         }
 
         @Override
-        public CompletableFuture<Void> synchronize(boolean flush) {
-            return failFlush
-                    ? CompletableFuture.failedFuture(new IOException("the region flush failed"))
-                    : super.synchronize(flush);
+        public CompletableFuture<Void> synchronize() {
+            if (failFlush) {
+                CompletableFuture<Void> failed = new CompletableFuture<>();
+                failed.completeExceptionally(new IOException("the region flush failed"));
+                return failed;
+            }
+            return super.synchronize();
         }
     }
 
@@ -1145,16 +1104,13 @@ class AsyncSaveWriterTest {
     void aChunkPreservedWhenTheReadFailsIsCountedLost(@TempDir Path save) throws Exception {
         RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
-        List<BlockPos> chests = List.of(new BlockPos(2, 64, 2));
+        List<BlockPos> chests = ImmutableList.of(new BlockPos(2, 64, 2));
         ChunkSnapshotSource snapshot = chunkWithChests(registries, chests);
         writeOpenedChests(region, registries, snapshot, chests);
 
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> new FaultyStorage(region, "chunk", true, false),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
@@ -1186,9 +1142,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
@@ -1203,28 +1156,23 @@ class AsyncSaveWriterTest {
         assertEquals(0, finalizedChunksFailed.get(), "which is what the completion record is stamped with");
     }
 
-    /** The read-failure preserve on the entities target, whose switch charges it to its own failed term. */
+    /** The read-failure preserve on the entity fold, whose switch charges it to its own failed term. */
     @Test
     void anEntityChunkPreservedWhenTheReadFailsIsCountedLost(@TempDir Path save) throws Exception {
         TestRegistries.frozen();
-        Path entities = Files.createDirectories(save.resolve("entities"));
+        Path region = Files.createDirectories(save.resolve("region"));
         UUID parked = new UUID(0xE1L, 0xE2L);
+        seedHostChunk(region, new ChunkPos(0, 0)); // the prior vehicle folds into its host chunk
 
         AsyncSaveWriter first = new AsyncSaveWriter(
-                dimension -> {
-                    throw new AssertionError("no chunks were submitted, so the region storage must not open");
-                },
-                dimension -> storage(entities, "entities"),
+                dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         first.submitEntity(Level.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(parked)));
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AtomicInteger finalizedEntityChunksFailed = new AtomicInteger(-1);
         AsyncSaveWriter second = new AsyncSaveWriter(
-                dimension -> {
-                    throw new AssertionError("no chunks were submitted, so the region storage must not open");
-                },
-                dimension -> new FaultyStorage(entities, "entities", true, false),
+                dimension -> new FaultyStorage(region, "chunk", true, false),
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedEntityChunksFailed.set(entityChunksFailed),
                 () -> null,
@@ -1236,7 +1184,7 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.entityChunksFailed(), "the capture never reached the save, so it counts lost");
         assertEquals(0, result.entityChunksWritten(), "and it is not counted as written");
         assertEquals(1, finalizedEntityChunksFailed.get(), "the finalize sees it on its own target's term");
-        try (IOWorker in = storage(entities, "entities")) {
+        try (IOWorker in = storage(region, "chunk")) {
             assertFalse(vehicleItems(in, new ChunkPos(0, 0), parked).isEmpty(),
                     "the prior the writer refused to overwrite is still on disk");
         }
@@ -1253,7 +1201,7 @@ class AsyncSaveWriterTest {
         Path region = Files.createDirectories(save.resolve("region"));
         BlockPos carried = new BlockPos(2, 64, 2);
         BlockPos unreached = new BlockPos(3, 64, 3);
-        List<BlockPos> chests = List.of(carried, unreached);
+        List<BlockPos> chests = ImmutableList.of(carried, unreached);
         ChunkSnapshotSource snapshot = chunkWithChests(registries, chests);
         writeOpenedChests(region, registries, snapshot, chests);
 
@@ -1261,9 +1209,6 @@ class AsyncSaveWriterTest {
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
@@ -1276,7 +1221,7 @@ class AsyncSaveWriterTest {
                     merged.set(true);
                     findByPos(fresh, carried.getX(), carried.getY(), carried.getZ()).put("Items",
                             findByPos(onDisk, carried.getX(), carried.getY(), carried.getZ())
-                                    .getList("Items", Tag.TAG_COMPOUND).copy());
+                                    .getList("Items", 10).copy());
                     throw new IllegalStateException("a carry-forward that throws part-way through the chunk");
                 });
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
@@ -1332,7 +1277,7 @@ class AsyncSaveWriterTest {
                         chest.getY(), chest.getZ()).getItem(),
                         "the prior session's stack reached the region file at " + chest);
                 assertTrue(findByPos(revisit, chest.getX(), chest.getY(), chest.getZ())
-                        .getList("Items", Tag.TAG_COMPOUND).isEmpty(),
+                        .getList("Items", 10).isEmpty(),
                         "the fold must not write back into the snapshot at " + chest + ", or a revisit would "
                                 + "re-capture the prior's contents and every on-disk assertion here is vacuous");
             }
@@ -1342,7 +1287,7 @@ class AsyncSaveWriterTest {
     /** Slot 0 of the block entity saved at {@code x/y/z} in {@code pos}'s on-disk chunk. */
     private static ItemStack firstItemOf(IOWorker storage, RegistryAccess registries, ChunkPos pos,
             int x, int y, int z) throws IOException {
-        CompoundTag chunk = Optional.ofNullable(storage.load(pos)).orElseThrow();
+        CompoundTag chunk = Optional.ofNullable(storage.load(pos)).get();
         CompoundTag blockEntity = findByPosOrNull(chunk, x, y, z);
         assertNotNull(blockEntity, "no block entity at " + x + "/" + y + "/" + z + " in " + pos);
         NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
@@ -1366,9 +1311,6 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> new FaultyStorage(region, "chunk", false, true),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
@@ -1427,9 +1369,6 @@ class AsyncSaveWriterTest {
     private AsyncSaveWriter newWriter(Path region) {
         return new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted");
-                },
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
     }
 }

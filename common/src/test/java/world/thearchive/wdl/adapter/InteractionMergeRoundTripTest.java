@@ -17,7 +17,6 @@ import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
@@ -66,7 +65,7 @@ class InteractionMergeRoundTripTest {
 
     /** The ticksInHive of each occupant, in order, via vanilla {@code BeehiveBlockEntity.load}'s exact read. */
     private static List<Integer> readBees(CompoundTag beehiveBlockEntityTag) {
-        ListTag bees = beehiveBlockEntityTag.getList("Bees", Tag.TAG_COMPOUND);
+        ListTag bees = beehiveBlockEntityTag.getList("Bees", 10);
         List<Integer> ticksInHive = new ArrayList<>();
         for (int i = 0; i < bees.size(); i++) {
             ticksInHive.add(bees.getCompound(i).getInt("TicksInHive"));
@@ -93,7 +92,7 @@ class InteractionMergeRoundTripTest {
         assertFalse(stash.containsKey(jukeboxPos), "the flushed chunk's stash entry is drained");
         assertTrue(stash.containsKey(elsewhere), "another chunk's stash entry is left until its own flush");
 
-        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
+        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", 10);
         CompoundTag jukeboxBlockEntity = findByPos(blockEntities, 10, 70, 20);
         assertEquals("minecraft:jukebox", jukeboxBlockEntity.getString("id"), "id survives");
         assertEquals("keep-me", markerOf(jukeboxBlockEntity), "an unrelated field is not clobbered");
@@ -115,7 +114,7 @@ class InteractionMergeRoundTripTest {
         // Vanilla JukeboxBlockEntity.tick spawns the note particles only while IsPlaying is set and a disc is
         // present, so the captured holder marks the just-inserted disc playing.
         CompoundTag jukeboxBlockEntity = findByPos(
-                chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 10, 70, 20);
+                chunkTag.getCompound("Level").getList("TileEntities", 10), 10, 70, 20);
         assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"),
                 "the captured jukebox is marked playing so it shows note particles on load");
     }
@@ -136,7 +135,7 @@ class InteractionMergeRoundTripTest {
         assertEquals(1, merged, "the flushed chunk's beehive merges");
         assertFalse(stash.containsKey(hivePos), "the stash entry is drained as the tag leaves memory");
 
-        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
+        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", 10);
         CompoundTag hiveBlockEntity = findByPos(blockEntities, -3, 64, 7);
         assertEquals("keep-me", markerOf(hiveBlockEntity), "an unrelated field is not clobbered");
         List<Integer> back = readBees(hiveBlockEntity);
@@ -160,7 +159,7 @@ class InteractionMergeRoundTripTest {
         assertEquals(0, merged, "no captured block entity at the stashed pos -> nothing merges");
         assertFalse(stash.containsKey(pos), "the entry is still drained: the chunk is leaving memory");
         assertFalse(
-                findByPos(chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 2, 64, 1)
+                findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), 2, 64, 1)
                         .contains("RecordItem"),
                 "the unrelated jukebox is left alone");
     }

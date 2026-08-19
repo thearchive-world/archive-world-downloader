@@ -8,6 +8,9 @@ accessible	field	net/minecraft/network/Connection	channel	Lio/netty/channel/Chan
 # WDL: a relative-move packet (the common walk update) carries its entity id in a protected field with no public
 # getter, so the tee reads it to feed the move to the accumulator off the Netty thread. Read-only, so accessible.
 accessible	field	net/minecraft/network/protocol/game/ClientboundMoveEntityPacket	entityId	I
+accessible	field	net/minecraft/network/protocol/game/ClientboundMoveEntityPacket	xa	S
+accessible	field	net/minecraft/network/protocol/game/ClientboundMoveEntityPacket	ya	S
+accessible	field	net/minecraft/network/protocol/game/ClientboundMoveEntityPacket	za	S
 
 # WDL: a mount inventory menu names the animal the server opened it for in a non-public field with no getter, so
 # the open-container bind reads it rather than inferring the animal from the crosshair or the ridden vehicle.

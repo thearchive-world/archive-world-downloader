@@ -191,7 +191,10 @@ class RecoveredScanTest {
     }
 
     private static CompoundTag entityChunkWith(CompoundTag... entities) {
-        return EntityFixtures.entityChunkTagWith(entities);
+        // The scan reads the in-chunk Level.Entities at this band, so wrap the carrier in a Level compound.
+        CompoundTag chunk = new CompoundTag();
+        chunk.put("Level", EntityFixtures.entityChunkTagWith(entities));
+        return chunk;
     }
 
     private static CompoundTag filledChest(int x, int y, int z) {

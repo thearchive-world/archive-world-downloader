@@ -10,29 +10,29 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
+import org.apache.logging.log4j.LogManager;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.LoggerFactory;
 
 /**
- * Routes {@code core/}'s {@link java.util.logging} (JUL) records into the MC log (slf4j) once per loader.
+ * Routes {@code core/}'s {@link java.util.logging} (JUL) records into the MC log (log4j2) once per loader.
  *
  * <p>The {@code core/} layer is MC-free and compiles on the Java 8 floor so it can be cherry-picked to the deep bands,
  * which rules out {@code com.mojang.logging.LogUtils} (an MC type); it logs via the JDK logger instead. The MC runtime
- * forwards log4j/slf4j to {@code logs/latest.log} but does not forward JUL, so a fail-soft warning a {@code core/}
- * class emits (it catches an I/O failure, logs, and keeps the save openable) is invisible in the one place a user or
+ * forwards log4j2 to {@code logs/latest.log} but does not forward JUL, so a fail-soft warning a {@code core/} class
+ * emits (it catches an I/O failure, logs, and keeps the save openable) is invisible in the one place a user or
  * developer looks. {@link #install()} attaches a forwarding handler to the {@code world.thearchive.wdl} JUL namespace
  * (every {@code core/} logger is named under it), so those records reach {@code latest.log} without {@code core/}
- * taking any MC or slf4j dependency.
+ * taking any MC or log4j dependency.
  *
  * <p>Scoped on purpose: it forwards only our own namespace, never the JVM-global JUL stream, so it cannot capture
- * another mod's logging in the shared client and needs no new dependency (slf4j is already on this layer's classpath
- * via {@code LogUtils}).
+ * another mod's logging in the shared client and needs no new dependency (log4j2 is already on this layer's classpath
+ * via Minecraft).
  */
 final class CoreLogHandler extends Handler {
     /** The JUL namespace whose records are forwarded; every {@code core/} logger is named under it. */
     static final String NAMESPACE = "world.thearchive.wdl";
 
-    /** The slf4j severity a forwarded record maps to. */
+    /** The log4j2 severity a forwarded record maps to. */
     enum Severity {
         ERROR,
         WARN,
@@ -40,14 +40,14 @@ final class CoreLogHandler extends Handler {
         DEBUG
     }
 
-    /** Sink for a mapped record; production forwards through slf4j, tests capture. */
+    /** Sink for a mapped record; production forwards through log4j2, tests capture. */
     @FunctionalInterface
     interface Emitter {
         void emit(Severity severity, String loggerName, String message, @Nullable Throwable thrown);
     }
 
     // Substitutes any {0}-style parameters into the record's message exactly as JUL would, without the
-    // timestamp/level wrapper SimpleFormatter.format adds (which slf4j supplies on its own).
+    // timestamp/level wrapper SimpleFormatter.format adds (which log4j2 supplies on its own).
     private static final Formatter messageFormatter = new SimpleFormatter();
 
     // A strong reference to the namespace logger so the LogManager (which may hold loggers weakly) cannot
@@ -67,7 +67,7 @@ final class CoreLogHandler extends Handler {
             return;
         }
         Logger target = Logger.getLogger(NAMESPACE);
-        attach(target, CoreLogHandler::emitToSlf4j);
+        attach(target, CoreLogHandler::emitToLog4j);
         namespaceLogger = target;
     }
 
@@ -75,11 +75,11 @@ final class CoreLogHandler extends Handler {
     static CoreLogHandler attach(Logger target, Emitter emitter) {
         CoreLogHandler handler = new CoreLogHandler(emitter);
         handler.setLevel(Level.ALL);
-        // Forward every record under the namespace and let the slf4j/log4j backend own the render threshold,
+        // Forward every record under the namespace and let the log4j2 backend own the render threshold,
         // so a future sub-INFO core log is not silently swallowed by java.util.logging's own level gate.
         target.setLevel(Level.ALL);
         // Our handler is the sole destination for the namespace: the JDK's default console handler does not
-        // reach latest.log anyway, so routing only through slf4j avoids a stray duplicate on stderr.
+        // reach latest.log anyway, so routing only through log4j2 avoids a stray duplicate on stderr.
         target.setUseParentHandlers(false);
         target.addHandler(handler);
         return handler;
@@ -107,7 +107,7 @@ final class CoreLogHandler extends Handler {
     @Override
     public void close() {}
 
-    /** Map a JUL level to an slf4j severity by its standard threshold, so a custom level still maps sanely. */
+    /** Map a JUL level to a log4j2 severity by its standard threshold, so a custom level still maps sanely. */
     static Severity severityFor(Level level) {
         int value = level.intValue();
         if (value >= Level.SEVERE.intValue()) {
@@ -122,10 +122,10 @@ final class CoreLogHandler extends Handler {
         return Severity.DEBUG;
     }
 
-    /** Production sink: forward to the per-class slf4j logger so latest.log names the originating core class. */
-    private static void emitToSlf4j(Severity severity, String loggerName, String message,
+    /** Production sink: forward to the per-class log4j2 logger so latest.log names the originating core class. */
+    private static void emitToLog4j(Severity severity, String loggerName, String message,
             @Nullable Throwable thrown) {
-        org.slf4j.Logger log = LoggerFactory.getLogger(loggerName);
+        org.apache.logging.log4j.Logger log = LogManager.getLogger(loggerName);
         switch (severity) {
             case ERROR:
                 if (thrown != null) {

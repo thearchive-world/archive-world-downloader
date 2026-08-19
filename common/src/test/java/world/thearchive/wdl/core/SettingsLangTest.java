@@ -6,6 +6,8 @@ package world.thearchive.wdl.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.io.InputStream;
@@ -34,7 +36,7 @@ import org.junit.jupiter.api.Test;
 class SettingsLangTest {
     private static final Map<String, String> LANG = Collections.unmodifiableMap(loadLang());
 
-    private static final List<String> DERIVED_PREFIXES = List.of(
+    private static final List<String> DERIVED_PREFIXES = ImmutableList.of(
             "wdl.settings.confirm.",
             "wdl.settings.gamerule.",
             "wdl.settings.option.",
@@ -57,7 +59,7 @@ class SettingsLangTest {
                 undeclared.add(key);
             }
         }
-        assertEquals(Set.of(), undeclared,
+        assertEquals(ImmutableSet.of(), undeclared,
                 "en_us carries a key under a prefix this test claims to derive, and does not derive it.\n"
                         + "LangKeyCoverageTest skips these prefixes on the strength of that claim, so the key\n"
                         + "is checked by nothing. Either its producer is gone and the key is dead across every\n"

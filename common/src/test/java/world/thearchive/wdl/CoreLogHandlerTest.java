@@ -26,7 +26,36 @@ import world.thearchive.wdl.core.export.FinalizeOutputs;
 import world.thearchive.wdl.core.report.DownloadReportStore;
 
 class CoreLogHandlerTest {
-    private record Captured(Severity severity, String loggerName, String message, @Nullable Throwable thrown) {}
+    private static final class Captured {
+        private final Severity severity;
+        private final String loggerName;
+        private final String message;
+        private final @Nullable Throwable thrown;
+
+        Captured(Severity severity, String loggerName, String message, @Nullable Throwable thrown) {
+            this.severity = severity;
+            this.loggerName = loggerName;
+            this.message = message;
+            this.thrown = thrown;
+        }
+
+        Severity severity() {
+            return severity;
+        }
+
+        String loggerName() {
+            return loggerName;
+        }
+
+        String message() {
+            return message;
+        }
+
+        @Nullable
+        Throwable thrown() {
+            return thrown;
+        }
+    }
 
     private final List<Captured> captured = new ArrayList<>();
     private final CoreLogHandler.Emitter capturing = (severity, loggerName, message, thrown) -> {

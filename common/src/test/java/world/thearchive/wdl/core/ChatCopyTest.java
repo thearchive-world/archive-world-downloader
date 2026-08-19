@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.google.common.collect.ImmutableList;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.io.InputStream;
@@ -36,7 +37,7 @@ class ChatCopyTest {
 
         assertEquals("Downloading base_20260703.", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
-        assertEquals(List.of("base_20260703"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("base_20260703"), tintedTexts(line, BrandColors.AMBER));
         assertEquals(0, clickableCount(line));
     }
 
@@ -46,7 +47,7 @@ class ChatCopyTest {
 
         assertEquals("Resuming base_20260703.", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
-        assertEquals(List.of("base_20260703"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("base_20260703"), tintedTexts(line, BrandColors.AMBER));
         assertEquals(0, clickableCount(line));
     }
 
@@ -55,7 +56,7 @@ class ChatCopyTest {
         ChatCopy line = ChatCopy.downloadExists("museum");
 
         assertEquals("\"museum\" already exists. Use /wdl resume museum to continue it.", resolve(line));
-        assertEquals(List.of("museum", "museum"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("museum", "museum"), tintedTexts(line, BrandColors.AMBER));
     }
 
     @Test
@@ -64,7 +65,7 @@ class ChatCopyTest {
 
         assertEquals("A download needs a name. Use /wdl start <name> to begin.", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
-        assertEquals(List.of(), line.arguments());
+        assertEquals(ImmutableList.of(), line.arguments());
     }
 
     @Test
@@ -73,7 +74,7 @@ class ChatCopyTest {
 
         assertEquals("Saving...", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
-        assertEquals(List.of(), line.arguments());
+        assertEquals(ImmutableList.of(), line.arguments());
     }
 
     @Test
@@ -82,7 +83,7 @@ class ChatCopyTest {
 
         assertEquals("Still saving the download. Try again when it's done.", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
-        assertEquals(List.of(), line.arguments());
+        assertEquals(ImmutableList.of(), line.arguments());
     }
 
     @Test
@@ -105,8 +106,8 @@ class ChatCopyTest {
         assertEquals("wdl.chat.busy_restoring_sweep", sweep.translationKey());
         assertEquals(OptionalInt.of(BrandColors.IVORY), restore.templateColor());
         assertEquals(OptionalInt.of(BrandColors.IVORY), sweep.templateColor());
-        assertEquals(List.of(), restore.arguments());
-        assertEquals(List.of(), sweep.arguments());
+        assertEquals(ImmutableList.of(), restore.arguments());
+        assertEquals(ImmutableList.of(), sweep.arguments());
     }
 
     @Test
@@ -115,8 +116,8 @@ class ChatCopyTest {
 
         assertEquals("Downloaded w: chunks 1234, entities 56, containers 7 in 2:05.", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
-        assertEquals(List.of("w", "1234", "56", "7", "2:05"), tintedTexts(line, BrandColors.AMBER));
-        assertEquals(List.of(), tintedTexts(line, BrandColors.TEAL));
+        assertEquals(ImmutableList.of("w", "1234", "56", "7", "2:05"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of(), tintedTexts(line, BrandColors.TEAL));
         assertEquals(0, clickableCount(line));
     }
 
@@ -140,7 +141,7 @@ class ChatCopyTest {
 
         assertEquals("Note: this download is incomplete. 5 could not be saved; check the log.", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.AMBER), line.templateColor());
-        assertEquals(List.of("5"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("5"), tintedTexts(line, BrandColors.AMBER));
     }
 
     @Test
@@ -148,7 +149,7 @@ class ChatCopyTest {
         ChatCopy line = ChatCopy.savedTo("w", "/saves/w");
 
         assertEquals("Saved to w. (click to open save folder)", resolve(line));
-        assertEquals(List.of("w"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("w"), tintedTexts(line, BrandColors.AMBER));
         assertEquals(1, clickableCount(line));
         ChatCopy.Argument link = clickableArguments(line).get(0);
         assertEquals(OptionalInt.of(BrandColors.TEAL), link.color());
@@ -165,8 +166,8 @@ class ChatCopyTest {
         assertEquals("Archive World Downloader update available: 1.0.0-SNAPSHOT → 1.2.0. Modrinth CurseForge",
                 resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
-        assertEquals(List.of("1.0.0-SNAPSHOT", "1.2.0"), tintedTexts(line, BrandColors.AMBER));
-        assertEquals(List.of("Modrinth", "CurseForge"), tintedTexts(line, BrandColors.TEAL));
+        assertEquals(ImmutableList.of("1.0.0-SNAPSHOT", "1.2.0"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("Modrinth", "CurseForge"), tintedTexts(line, BrandColors.TEAL));
     }
 
     @Test
@@ -175,7 +176,7 @@ class ChatCopyTest {
 
         assertEquals("Downloading: chunks 580, entities 341, containers 7.", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
-        assertEquals(List.of("580", "341", "7"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("580", "341", "7"), tintedTexts(line, BrandColors.AMBER));
     }
 
     @Test
@@ -212,7 +213,7 @@ class ChatCopyTest {
 
     @Test
     void noticesResolveAsIvoryTemplates() {
-        List<ChatCopy> notices = List.of(ChatCopy.alreadyDownloading(), ChatCopy.notDownloading(),
+        List<ChatCopy> notices = ImmutableList.of(ChatCopy.alreadyDownloading(), ChatCopy.notDownloading(),
                 ChatCopy.joinMultiplayer(), ChatCopy.resumeCancelled(), ChatCopy.nothingCaptured(),
                 ChatCopy.worldNameFallback(), ChatCopy.refuseTainted(), ChatCopy.refuseLoaded());
 
@@ -248,14 +249,14 @@ class ChatCopyTest {
         assertEquals("An earlier restore left unfinished cleanup for that name. "
                 + "Open the Downloads screen to finish it, or wait for the cleanup to complete.",
                 resolve(tornAttempt));
-        for (ChatCopy refusal : List.of(occupant, occupantAdvice, folderMissing, tornAttempt)) {
+        for (ChatCopy refusal : ImmutableList.of(occupant, occupantAdvice, folderMissing, tornAttempt)) {
             assertEquals(OptionalInt.of(BrandColors.IVORY), refusal.templateColor(), refusal.translationKey());
         }
-        for (ChatCopy named : List.of(occupant, occupantAdvice, folderMissing)) {
+        for (ChatCopy named : ImmutableList.of(occupant, occupantAdvice, folderMissing)) {
             assertEquals("base", named.arguments().get(0).text(), named.translationKey());
             assertEquals(OptionalInt.of(BrandColors.AMBER), named.arguments().get(0).color());
         }
-        assertEquals(List.of(), tornAttempt.arguments());
+        assertEquals(ImmutableList.of(), tornAttempt.arguments());
     }
 
     @Test
@@ -263,7 +264,7 @@ class ChatCopyTest {
         ChatCopy line = ChatCopy.noSuchDownload("w");
 
         assertEquals("No download named \"w\". Use /wdl start <name> to begin a new one.", resolve(line));
-        assertEquals(List.of("w"), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("w"), tintedTexts(line, BrandColors.AMBER));
     }
 
     @Test
@@ -273,7 +274,7 @@ class ChatCopyTest {
         assertEquals("Some game-rule overrides don't apply to this Minecraft version and were skipped: "
                 + "doFoo, doBar", resolve(line));
         assertEquals(OptionalInt.of(BrandColors.IVORY), line.templateColor());
-        assertEquals(List.of(), tintedTexts(line, BrandColors.AMBER));
+        assertEquals(ImmutableList.of(), tintedTexts(line, BrandColors.AMBER));
     }
 
     @Test
@@ -284,7 +285,7 @@ class ChatCopyTest {
                 resolve(line));
         assertEquals(OptionalInt.of(BrandColors.AMBER), line.templateColor(),
                 "the caution rides the amber template, not the ivory notice template");
-        assertEquals(List.of(), line.arguments());
+        assertEquals(ImmutableList.of(), line.arguments());
         assertEquals(0, clickableCount(line));
     }
 
@@ -303,7 +304,7 @@ class ChatCopyTest {
         ChatCopy values = ChatCopy.data("captureEntities=true");
 
         assertEquals("Config file: /config/wdl.properties", resolve(file));
-        assertEquals(List.of("/config/wdl.properties"), tintedTexts(file, BrandColors.AMBER));
+        assertEquals(ImmutableList.of("/config/wdl.properties"), tintedTexts(file, BrandColors.AMBER));
         assertEquals("captureEntities=true", resolve(values));
         assertEquals(OptionalInt.of(BrandColors.IVORY), values.templateColor());
     }
@@ -344,7 +345,8 @@ class ChatCopyTest {
             } else {
                 String pattern = requireKey(argument.translationKey());
                 resolvedArguments
-                        .add(argument.text().isEmpty() ? pattern : substitute(pattern, List.of(argument.text())));
+                        .add(argument.text().isEmpty() ? pattern
+                                : substitute(pattern, ImmutableList.of(argument.text())));
             }
         }
         return substitute(requireKey(line.translationKey()), resolvedArguments);

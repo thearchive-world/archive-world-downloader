@@ -6,6 +6,7 @@ package world.thearchive.wdl.fabric.gametest;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -47,7 +48,8 @@ public class WdlEntityCaptureTest implements FabricClientGameTest {
             boolean foundArmorStand = entities.stream()
                     .anyMatch(entity -> entity.getString("id").equals("minecraft:armor_stand"));
             Check.that(foundArmorStand, "the spawned armor stand is absent from the entities/ region: "
-                    + entities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?")).toList());
+                    + entities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
+                            .collect(Collectors.toList()));
         }
     }
 }

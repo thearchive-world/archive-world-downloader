@@ -14,6 +14,7 @@ import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderReferenci
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
@@ -106,9 +107,6 @@ class LiveCaptureSessionLossLogWiringTest {
                 dimension -> {
                     throw new AssertionError("a map write must not open a region storage");
                 },
-                dimension -> {
-                    throw new AssertionError("a map write must not open an entities storage");
-                },
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -119,7 +117,7 @@ class LiveCaptureSessionLossLogWiringTest {
     /** A regular file where the {@code data/} directory belongs, so createDirectories throws for every write. */
     private static Path unwritableDataRoot(Path save) throws Exception {
         Files.createDirectories(save);
-        Files.writeString(save.resolve("data"), "not a directory");
+        Files.write(save.resolve("data"), "not a directory".getBytes(StandardCharsets.UTF_8));
         return save;
     }
 

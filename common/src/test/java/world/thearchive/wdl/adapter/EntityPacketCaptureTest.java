@@ -5,7 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.Set;
+import com.google.common.collect.ImmutableSet;
 import java.util.UUID;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
@@ -44,9 +44,10 @@ class EntityPacketCaptureTest {
         capture.recordPassengers(1, new int[] { 2 });
         capture.reposition(1, farChunk, entityPos(72.0, 64.0, 8.0));
 
-        capture.onMove(2, new ClientboundMoveEntityPacket.Rot(2, (byte) 64, (byte) 0, true));
+        capture.onMove(2, (short) 0, (short) 0, (short) 0,
+                new ClientboundMoveEntityPacket.Rot(2, (byte) 64, (byte) 0, true));
 
-        assertEquals(Set.of(farChunk), capture.chunks(OVERWORLD),
+        assertEquals(ImmutableSet.of(farChunk), capture.chunks(OVERWORLD),
                 "a head turn must not move the rider back to the chunk it boarded in");
         assertEquals(90f, position(capture, 2).yRot(),
                 "the new rotation still has to be recorded, unpacked from the packet's byte turn");
@@ -60,11 +61,12 @@ class EntityPacketCaptureTest {
 
         // A relative move is a delta in 1/4096 of a block off the held position, so this walks seven blocks east,
         // across the chunk border at x=16.
-        capture.onMove(1, new ClientboundMoveEntityPacket.PosRot(1, (short) (7 * 4096), (short) 0, (short) 0,
-                (byte) 0, (byte) 0, true));
+        capture.onMove(1, (short) (7 * 4096), (short) 0, (short) 0,
+                new ClientboundMoveEntityPacket.PosRot(1, (short) (7 * 4096), (short) 0, (short) 0,
+                        (byte) 0, (byte) 0, true));
 
         assertEquals(19.0, position(capture, 1).x(), "the delta resolves against the held position");
-        assertEquals(Set.of(ChunkPos.asLong(1, 0)), capture.chunks(OVERWORLD),
+        assertEquals(ImmutableSet.of(ChunkPos.asLong(1, 0)), capture.chunks(OVERWORLD),
                 "a move that carries a position re-homes the entity to the chunk it ends in");
     }
 

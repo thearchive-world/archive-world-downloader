@@ -24,12 +24,13 @@ final class NbtMerge {
 
     /** Whether {@code tag}'s value at {@code key} is a non-empty list. */
     static boolean isNonEmptyList(CompoundTag tag, String key) {
-        return tag.get(key) instanceof ListTag list && !list.isEmpty();
+        return tag.get(key) instanceof ListTag && !((ListTag) tag.get(key)).isEmpty();
     }
 
     /** Copy {@code key}'s list from {@code disk} when {@code fresh}'s is absent or empty; true if a copy happened. */
     static boolean carryList(CompoundTag disk, CompoundTag fresh, String key) {
-        if (isNonEmptyList(fresh, key) || !(disk.get(key) instanceof ListTag diskList) || diskList.isEmpty()) {
+        ListTag diskList = disk.get(key) instanceof ListTag ? (ListTag) disk.get(key) : null;
+        if (isNonEmptyList(fresh, key) || diskList == null || diskList.isEmpty()) {
             return false;
         }
         fresh.put(key, diskList.copy());
@@ -47,21 +48,24 @@ final class NbtMerge {
      * therefore ground truth: a union there would resurrect items the player watched leave.
      */
     static boolean carryListBySlot(CompoundTag disk, CompoundTag fresh, String key, int occupiedSlots) {
-        if (!(disk.get(key) instanceof ListTag diskList) || diskList.isEmpty()) {
+        ListTag diskList = disk.get(key) instanceof ListTag ? (ListTag) disk.get(key) : null;
+        if (diskList == null || diskList.isEmpty()) {
             return false;
         }
-        ListTag freshList = fresh.get(key) instanceof ListTag list ? list : new ListTag();
+        ListTag freshList = fresh.get(key) instanceof ListTag ? (ListTag) fresh.get(key) : new ListTag();
         Set<Integer> slots = new HashSet<>();
         for (int i = 0; i < freshList.size(); i++) {
-            if (freshList.get(i) instanceof CompoundTag entry) {
+            if (freshList.get(i) instanceof CompoundTag) {
+                CompoundTag entry = (CompoundTag) freshList.get(i);
                 slots.add(slotOf(entry));
             }
         }
         boolean carried = false;
         for (int i = 0; i < diskList.size(); i++) {
-            if (!(diskList.get(i) instanceof CompoundTag entry)) {
+            if (!(diskList.get(i) instanceof CompoundTag)) {
                 continue;
             }
+            CompoundTag entry = (CompoundTag) diskList.get(i);
             int slot = slotOf(entry);
             // The authoritative block-state says whether a slot still holds anything. Carrying an entry for a
             // slot that now reads empty would put an item into the save that its own saved block-state denies:
@@ -85,7 +89,7 @@ final class NbtMerge {
      * not read as a distinct slot from the same number written as a byte.
      */
     private static int slotOf(CompoundTag entry) {
-        return entry.get("Slot") instanceof NumericTag slot ? slot.getAsByte() & 0xFF : 0;
+        return entry.get("Slot") instanceof NumericTag ? ((NumericTag) entry.get("Slot")).getAsByte() & 0xFF : 0;
     }
 
     /**
@@ -94,7 +98,8 @@ final class NbtMerge {
      * {@code "Book"}/{@code "Page"} and a jukebox's {@code "RecordItem"}/{@code "ticks_since_song_started"} share it.
      */
     static boolean carryCompound(CompoundTag disk, CompoundTag fresh, String key, @Nullable String sidecarKey) {
-        if (fresh.get(key) instanceof CompoundTag || !(disk.get(key) instanceof CompoundTag diskCompound)) {
+        CompoundTag diskCompound = disk.get(key) instanceof CompoundTag ? (CompoundTag) disk.get(key) : null;
+        if (fresh.get(key) instanceof CompoundTag || diskCompound == null) {
             return false;
         }
         fresh.put(key, diskCompound.copy());

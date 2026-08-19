@@ -5,8 +5,8 @@ package world.thearchive.wdl.adapter;
 
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
 
 /**
  * The log voice for one kind of per-item capture loss. Every lost item gets its own line naming the item and its cause;

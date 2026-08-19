@@ -39,7 +39,30 @@ final class OnDiskSizeScanner implements AutoCloseable {
      * One finished request for {@code folder}: a size walk's on-disk total ({@linkplain OptionalLong#empty() empty} if
      * it failed) with no source, or an availability probe's clean source zip (null when none qualifies) with no size.
      */
-    record Result(Path folder, OptionalLong size, @Nullable Path restoreSource) {}
+    static final class Result {
+        private final Path folder;
+        private final OptionalLong size;
+        private final @Nullable Path restoreSource;
+
+        Result(Path folder, OptionalLong size, @Nullable Path restoreSource) {
+            this.folder = folder;
+            this.size = size;
+            this.restoreSource = restoreSource;
+        }
+
+        Path folder() {
+            return folder;
+        }
+
+        OptionalLong size() {
+            return size;
+        }
+
+        @Nullable
+        Path restoreSource() {
+            return restoreSource;
+        }
+    }
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "wdl-size-scanner");

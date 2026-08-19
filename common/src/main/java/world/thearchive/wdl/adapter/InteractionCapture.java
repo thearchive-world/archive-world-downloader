@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.adapter;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -33,13 +34,12 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.BlockHitResult;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The MC-typed, loader-agnostic recognizer for interaction-prediction capture: content the chunk packet and an opened
@@ -60,7 +60,7 @@ import org.slf4j.LoggerFactory;
  * {@code ListTag} copy under {@code "Bees"}).
  */
 public final class InteractionCapture {
-    private static final Logger LOGGER = LoggerFactory.getLogger(InteractionCapture.class);
+    private static final Logger LOGGER = LogManager.getLogger(InteractionCapture.class);
 
     private static volatile @Nullable InteractionCapture active;
 
@@ -235,7 +235,23 @@ public final class InteractionCapture {
      * ({@code "RecordItem"}/{@code "Items"}/{@code "Bees"}). The gate keeps it whole only when the authoritative
      * block-state confirms the content is present (HAS_RECORD, or the expected placed block type).
      */
-    record HolderCandidate(InteractionKind kind, CompoundTag holder) implements Candidate {}
+    static final class HolderCandidate implements Candidate {
+        private final InteractionKind kind;
+        private final CompoundTag holder;
+
+        HolderCandidate(InteractionKind kind, CompoundTag holder) {
+            this.kind = kind;
+            this.holder = holder;
+        }
+
+        InteractionKind kind() {
+            return kind;
+        }
+
+        CompoundTag holder() {
+            return holder;
+        }
+    }
 
     /**
      * A chunk's confirmed holders, split by merge path: {@code items} folds through the open-time container
@@ -243,7 +259,23 @@ public final class InteractionCapture {
      * field-copy merge (jukebox disc under {@code "RecordItem"}, beehive occupants under {@code "Bees"}), each holder
      * already carrying exactly the key its block entity reads. One bundle drains per chunk.
      */
-    record ChunkBundles(Map<BlockPos, CompoundTag> items, Map<BlockPos, CompoundTag> holders) {}
+    static final class ChunkBundles {
+        private final Map<BlockPos, CompoundTag> items;
+        private final Map<BlockPos, CompoundTag> holders;
+
+        ChunkBundles(Map<BlockPos, CompoundTag> items, Map<BlockPos, CompoundTag> holders) {
+            this.items = items;
+            this.holders = holders;
+        }
+
+        Map<BlockPos, CompoundTag> items() {
+            return items;
+        }
+
+        Map<BlockPos, CompoundTag> holders() {
+            return holders;
+        }
+    }
 
     /**
      * Observe one local-player right-click (client main thread). Recognize an insert into an existing jukebox or a
@@ -336,8 +368,7 @@ public final class InteractionCapture {
         if (block instanceof ShulkerBoxBlock) {
             CompoundTag blockEntityTag = stack.getTagElement("BlockEntityTag");
             if (blockEntityTag != null && blockEntityTag.contains("Items", 9)) {
-                NonNullList<ItemStack> items = NonNullList.withSize(ShulkerBoxBlockEntity.CONTAINER_SIZE,
-                        ItemStack.EMPTY);
+                NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
                 ContainerHelper.loadAllItems(blockEntityTag, items);
                 CompoundTag holder = containerSink.captureItems(items, registries);
                 placeStash.put(placedPos, new HolderCandidate(InteractionKind.SHULKER, holder));
@@ -394,7 +425,8 @@ public final class InteractionCapture {
      */
     ChunkBundles drainChunk(ChunkPos chunk, ChunkSnapshotSource snapshot) {
         if (insertStash.isEmpty() && placeStash.isEmpty()) {
-            return new ChunkBundles(Map.of(), Map.of()); // the common no-interaction flush: skip the per-chunk maps
+            // the common no-interaction flush: skip the per-chunk maps
+            return new ChunkBundles(ImmutableMap.of(), ImmutableMap.of());
         }
         Map<BlockPos, Candidate> chunkCandidates = new LinkedHashMap<>();
         drainInto(insertStash, chunk, chunkCandidates);
@@ -435,7 +467,7 @@ public final class InteractionCapture {
         // The descriptor decides the merge path, so a new content type adds an InteractionKind constant, never a
         // case here: a holder kind not bound to the "Items" bundle takes the generic field-copy merge, while a
         // shulker confirms to an open-time "Items" holder.
-        if (candidate instanceof HolderCandidate held && !held.kind().itemsBundle()) {
+        if (candidate instanceof HolderCandidate && !((HolderCandidate) candidate).kind().itemsBundle()) {
             bundles.holders().put(pos, holder);
         } else {
             bundles.items().put(pos, holder);
@@ -454,7 +486,8 @@ public final class InteractionCapture {
      * prediction, not a fixable case: there is no client-side signal that distinguishes it from a confirmed placement.
      */
     static Optional<CompoundTag> confirm(BlockState authoritative, Candidate candidate) {
-        if (candidate instanceof HolderCandidate held) {
+        if (candidate instanceof HolderCandidate) {
+            HolderCandidate held = (HolderCandidate) candidate;
             return held.kind().confirms(authoritative) ? Optional.of(held.holder()) : Optional.empty();
         }
         throw new IllegalStateException("unhandled candidate: " + candidate);

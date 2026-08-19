@@ -6,6 +6,7 @@ package world.thearchive.wdl.fabric.gametest;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -70,7 +71,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
             CompoundTag player = CaptureReadback.levelData(saveRoot).getCompound("Player");
             List<String> enderItems = player.getList("EnderItems", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
                     .map(item -> (item.contains("id") ? item.getString("id") : "?"))
-                    .toList();
+                    .collect(Collectors.toList());
             Check.that(enderItems.contains("minecraft:diamond"),
                     "the planted item is absent from the captured Player.EnderItems: " + enderItems);
 
@@ -123,7 +124,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
         List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompound("Player")
                 .getList("EnderItems", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
                 .map(item -> (item.contains("id") ? item.getString("id") : "?"))
-                .toList();
+                .collect(Collectors.toList());
         Check.that(enderItems.isEmpty(),
                 "savePlayerEnderChest off must leave no EnderItems in the save: " + enderItems);
     }
@@ -196,7 +197,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
         List<String> enderItems = CaptureReadback.levelData(saveRoot).getCompound("Player")
                 .getList("EnderItems", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
                 .map(item -> (item.contains("id") ? item.getString("id") : "?"))
-                .toList();
+                .collect(Collectors.toList());
         // Not an emptiness check: the raw player tag carries the live client's own ender inventory whatever
         // the bind does, so the diamond the first scenario planted is legitimately still here. What must be
         // absent is the MINECART's item, which can only reach EnderItems through an ender bind that the

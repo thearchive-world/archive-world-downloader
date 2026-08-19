@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -112,7 +113,7 @@ public class WdlCustomLevelKeyRoutingTest implements FabricClientGameTest {
                 + saveRoot.resolve("entities") + ", so nothing it held was written under its dimension type");
         List<String> ids = CaptureReadback.entities(entityChunk.get()).stream()
                 .map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
-                .toList();
+                .collect(Collectors.toList());
         Check.that(ids.contains("minecraft:armor_stand"),
                 "the stand summoned in the custom-key world is absent from its entities region: " + ids);
     }

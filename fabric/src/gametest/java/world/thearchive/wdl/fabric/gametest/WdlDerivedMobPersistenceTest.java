@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -94,7 +95,7 @@ public class WdlDerivedMobPersistenceTest implements FabricClientGameTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no captured zombie with " + slot + "=" + itemId + " in: "
                         + entities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
-                                .toList()));
+                                .collect(Collectors.toList())));
     }
 
     private static CompoundTag findZombieByName(List<CompoundTag> entities, String customName) {
@@ -104,7 +105,7 @@ public class WdlDerivedMobPersistenceTest implements FabricClientGameTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no captured zombie named " + customName + " in: "
                         + entities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
-                                .toList()));
+                                .collect(Collectors.toList())));
     }
 
     /** The custom name of a captured entity: pre-1.21.5 writes CustomName as a serialized JSON text component. */

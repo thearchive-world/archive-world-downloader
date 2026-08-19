@@ -6,6 +6,7 @@ package world.thearchive.wdl.adapter.impl;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -96,13 +97,13 @@ class NaturalEquipmentTest {
 
     @Test
     void lootScanFlagsUnnaturalItemsInPickupSlots() {
-        Mob zombie = new GearedMob(EntityType.ZOMBIE, Map.of(EquipmentSlot.MAINHAND, of(Items.DIAMOND_SWORD)));
+        Mob zombie = new GearedMob(EntityType.ZOMBIE, ImmutableMap.of(EquipmentSlot.MAINHAND, of(Items.DIAMOND_SWORD)));
         assertTrue(NaturalEquipment.wasLootEquipped(zombie), "an out-of-pool mainhand proves the pickup ran");
     }
 
     @Test
     void lootScanAcceptsAllNaturalGear() {
-        Mob zombie = new GearedMob(EntityType.ZOMBIE, Map.of(
+        Mob zombie = new GearedMob(EntityType.ZOMBIE, ImmutableMap.of(
                 EquipmentSlot.MAINHAND, of(Items.IRON_SWORD),
                 EquipmentSlot.HEAD, of(Items.IRON_HELMET)));
         assertFalse(NaturalEquipment.wasLootEquipped(zombie), "in-pool gear stays ambiguous, never inferred");
@@ -110,13 +111,13 @@ class NaturalEquipmentTest {
 
     @Test
     void lootScanIgnoresEmptySlots() {
-        Mob zombie = new GearedMob(EntityType.ZOMBIE, Map.of());
+        Mob zombie = new GearedMob(EntityType.ZOMBIE, ImmutableMap.of());
         assertFalse(NaturalEquipment.wasLootEquipped(zombie), "empty slots are no evidence of a pickup");
     }
 
     @Test
     void lootScanNeverInfersAgainstUngearedTypes() {
-        Mob pig = new GearedMob(EntityType.PIG, Map.of(EquipmentSlot.MAINHAND, of(Items.DIAMOND_SWORD)));
+        Mob pig = new GearedMob(EntityType.PIG, ImmutableMap.of(EquipmentSlot.MAINHAND, of(Items.DIAMOND_SWORD)));
         assertFalse(NaturalEquipment.wasLootEquipped(pig), "a type with no spawn-gear profile is never inferred");
     }
 

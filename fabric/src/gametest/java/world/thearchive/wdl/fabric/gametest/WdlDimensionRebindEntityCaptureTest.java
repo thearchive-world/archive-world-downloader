@@ -3,9 +3,11 @@
 
 package world.thearchive.wdl.fabric.gametest;
 
+import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -95,7 +97,7 @@ public class WdlDimensionRebindEntityCaptureTest implements FabricClientGameTest
             Check.that(overworld.isEmpty() || !hasArmorStand(overworld.get()),
                     "the nether's armor stand was written into the OVERWORLD's entities region at the same chunk "
                             + "key, where the reopened save shows it standing in a world it was never in: "
-                            + overworld.map(WdlDimensionRebindEntityCaptureTest::ids).orElse(List.of()));
+                            + overworld.map(WdlDimensionRebindEntityCaptureTest::ids).orElse(ImmutableList.of()));
         }
     }
 
@@ -107,7 +109,7 @@ public class WdlDimensionRebindEntityCaptureTest implements FabricClientGameTest
     private static List<String> ids(CompoundTag entityChunkTag) {
         return CaptureReadback.entities(entityChunkTag).stream()
                 .map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**

@@ -3,8 +3,8 @@
 
 package world.thearchive.wdl.adapter;
 
+import com.google.common.collect.ImmutableSet;
 import com.mojang.datafixers.util.Pair;
-import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.List;
 import java.util.Set;
@@ -75,8 +75,8 @@ final class EntityPacketCapture
      * The four static decoration types the covered overlay reports on. A decoration always qualifies for range
      * sampling, independent of the range-10 rule and the exclusion list.
      */
-    private static final Set<EntityType<?>> DECORATION_TYPES = Set.of(
-            EntityType.ITEM_FRAME, EntityType.GLOW_ITEM_FRAME, EntityType.PAINTING, EntityType.ARMOR_STAND);
+    private static final Set<EntityType<?>> DECORATION_TYPES = ImmutableSet.of(
+            EntityType.ITEM_FRAME, EntityType.PAINTING, EntityType.ARMOR_STAND);
 
     /**
      * Range-10 types excluded from range sampling, for two reasons. The player-mountables: a riding player raises their
@@ -92,7 +92,7 @@ final class EntityPacketCapture
      * frameworks that teleport interaction and display pairs to follow players, the hazard profile that excluded the
      * Displays.
      */
-    private static final Set<EntityType<?>> RANGE_SAMPLING_EXCLUSIONS = Set.of(
+    private static final Set<EntityType<?>> RANGE_SAMPLING_EXCLUSIONS = ImmutableSet.of(
             EntityType.BOAT,
             EntityType.HORSE, EntityType.DONKEY, EntityType.SKELETON_HORSE, EntityType.ZOMBIE_HORSE,
             EntityType.LLAMA, EntityType.TRADER_LLAMA,
@@ -150,29 +150,38 @@ final class EntityPacketCapture
      * names, vehicle or passenger; empty outside a bundle.
      */
     public void accept(Packet<?> packet, IntSet bundleNamedIds) {
-        if (packet instanceof ClientboundAddEntityPacket add) {
+        if (packet instanceof ClientboundAddEntityPacket) {
+            ClientboundAddEntityPacket add = (ClientboundAddEntityPacket) packet;
             onAdd(add, bundleNamedIds);
-        } else if (packet instanceof ClientboundRemoveEntitiesPacket remove) {
+        } else if (packet instanceof ClientboundRemoveEntitiesPacket) {
+            ClientboundRemoveEntitiesPacket remove = (ClientboundRemoveEntitiesPacket) packet;
             onRemove(remove);
         } else if (packet instanceof ClientboundPlayerPositionPacket) {
             sampler.onAnomalyPacket();
-        } else if (packet instanceof ClientboundRespawnPacket respawn) {
+        } else if (packet instanceof ClientboundRespawnPacket) {
+            ClientboundRespawnPacket respawn = (ClientboundRespawnPacket) packet;
             enterDimension(respawn.getDimension().location().toString());
             sampler.onRespawn();
-        } else if (packet instanceof ClientboundLoginPacket login) {
+        } else if (packet instanceof ClientboundLoginPacket) {
+            ClientboundLoginPacket login = (ClientboundLoginPacket) packet;
             enterDimension(login.getDimension().location().toString());
             sampler.onRespawn();
         } else if (packet instanceof ClientboundSetCameraPacket) {
             sampler.onSetCamera();
-        } else if (packet instanceof ClientboundSetEntityDataPacket synced) {
+        } else if (packet instanceof ClientboundSetEntityDataPacket) {
+            ClientboundSetEntityDataPacket synced = (ClientboundSetEntityDataPacket) packet;
             onSetData(synced);
-        } else if (packet instanceof ClientboundSetEquipmentPacket equip) {
+        } else if (packet instanceof ClientboundSetEquipmentPacket) {
+            ClientboundSetEquipmentPacket equip = (ClientboundSetEquipmentPacket) packet;
             onSetEquipment(equip);
-        } else if (packet instanceof ClientboundSetPassengersPacket passengers) {
+        } else if (packet instanceof ClientboundSetPassengersPacket) {
+            ClientboundSetPassengersPacket passengers = (ClientboundSetPassengersPacket) packet;
             onSetPassengers(passengers);
-        } else if (packet instanceof ClientboundSetEntityLinkPacket link) {
+        } else if (packet instanceof ClientboundSetEntityLinkPacket) {
+            ClientboundSetEntityLinkPacket link = (ClientboundSetEntityLinkPacket) packet;
             onSetLink(link);
-        } else if (packet instanceof ClientboundTeleportEntityPacket teleport) {
+        } else if (packet instanceof ClientboundTeleportEntityPacket) {
+            ClientboundTeleportEntityPacket teleport = (ClientboundTeleportEntityPacket) packet;
             onTeleport(teleport);
         }
     }
@@ -186,7 +195,7 @@ final class EntityPacketCapture
                 decodeAngle((byte) add.getyRot()), decodeAngle((byte) add.getxRot()));
         spawn(add.getId(), add.getUUID(), chunkKey(add.getX(), add.getZ()), pos, add);
         if (dumpReceivedFrames
-                && (add.getType() == EntityType.ITEM_FRAME || add.getType() == EntityType.GLOW_ITEM_FRAME)) {
+                && add.getType() == EntityType.ITEM_FRAME) {
             // Diagnostic key for the received-frame diff: block_pos = floor(spawn pos), Facing = the data int
             // (the frame's get3DDataValue, which is also what it saves). floor recovers the block whether the
             // packet carries the block pos or the entity pos (the offset is in [0,1)).
@@ -269,9 +278,9 @@ final class EntityPacketCapture
         }
         int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(minecraft.options.renderDistance);
         String dimensionId = level.dimension().location().toString();
-        IntList ids = packet.getEntityIds();
-        for (int i = 0; i < ids.size(); i++) {
-            int distanceBlocks = sampler.removalSample(ids.getInt(i), player.getX(), player.getZ());
+        int[] ids = packet.getEntityIds();
+        for (int i = 0; i < ids.length; i++) {
+            int distanceBlocks = sampler.removalSample(ids[i], player.getX(), player.getZ());
             if (distanceBlocks != SendRangeSampler.NO_SAMPLE && distanceBlocks <= plausibleMaxBlocks) {
                 sendRange.observe(dimensionId, distanceBlocks);
             }
@@ -343,9 +352,8 @@ final class EntityPacketCapture
      * boarded; a chunk home derived from them would revert the re-home onto its vehicle and split the pair across two
      * drain batches. A rotation-only update therefore leaves the home alone.
      */
-    public void onMove(int id, ClientboundMoveEntityPacket move) {
-        sampler.markMovedRelative(id, move.hasPosition()
-                && (move.getXa() != 0 || move.getYa() != 0 || move.getZa() != 0));
+    public void onMove(int id, short xa, short ya, short za, ClientboundMoveEntityPacket move) {
+        sampler.markMovedRelative(id, move.hasPosition() && (xa != 0 || ya != 0 || za != 0));
         EntityPos current = positionOf(id);
         if (current == null) {
             return;
@@ -356,9 +364,9 @@ final class EntityPacketCapture
             recordRotation(id, yRot, xRot);
             return;
         }
-        double x = decodeAxis(current.x(), move.getXa());
-        double y = decodeAxis(current.y(), move.getYa());
-        double z = decodeAxis(current.z(), move.getZa());
+        double x = decodeAxis(current.x(), xa);
+        double y = decodeAxis(current.y(), ya);
+        double z = decodeAxis(current.z(), za);
         reposition(id, chunkKey(x, z), new EntityPos(x, y, z, yRot, xRot));
     }
 

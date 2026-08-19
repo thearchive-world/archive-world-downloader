@@ -6,6 +6,7 @@ package world.thearchive.wdl.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,7 +36,7 @@ class SettingsLayoutTest {
         for (SettingsLayout.Tab tab : SettingsLayout.TABS) {
             ids.add(tab.id());
         }
-        assertEquals(List.of("interface", "world", "download"), ids);
+        assertEquals(ImmutableList.of("interface", "world", "download"), ids);
     }
 
     @Test

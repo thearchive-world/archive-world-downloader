@@ -1,3 +1,4 @@
+import org.gradle.api.plugins.quality.Checkstyle
 import wdl.buildlogic.registerCheckLicenseHeader
 
 // Shared JVM baseline for every wdl subproject: the Java toolchain, the lint-only Checkstyle pass,
@@ -32,6 +33,19 @@ checkstyle {
     toolVersion = "10.20.2"
     configFile = rootProject.file("config/checkstyle/checkstyle.xml")
     maxWarnings = 0
+}
+
+// Checkstyle 10.x requires Java 11+ to run, which the deep Java-8 bands cannot host on their own toolchain.
+// Checkstyle analyzes source text, so its runner JVM is independent of the Java-8 language level the sources
+// compile at; point the Checkstyle tasks at a modern launcher there while the compile stays on the band toolchain.
+if (providers.gradleProperty("java_version").get().toInt() < 11) {
+    val checkstyleLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(17)
+        vendor = JvmVendorSpec.ADOPTIUM
+    }
+    tasks.withType<Checkstyle>().configureEach {
+        javaLauncher = checkstyleLauncher
+    }
 }
 
 // JUnit 5 for the subprojects that have tests (common, neoforge); applied uniformly here, so it is

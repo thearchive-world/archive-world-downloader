@@ -9,16 +9,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
+import org.apache.logging.log4j.LogManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.testsupport.LogCapture;
 import world.thearchive.wdl.testsupport.TestRegistries;
@@ -37,7 +38,7 @@ class MapWriteTaskTest {
     }
 
     private static CaptureLossLog lossLog() {
-        return new CaptureLossLog(LoggerFactory.getLogger(MapWriteTaskTest.class),
+        return new CaptureLossLog(LogManager.getLogger(MapWriteTaskTest.class),
                 "failed to write map data {}", "it renders blank in the reopened world");
     }
 
@@ -66,7 +67,7 @@ class MapWriteTaskTest {
         // createDirectories throws FileAlreadyExistsException when a regular file sits at the directory path:
         // the deterministic IO failure this task must absorb and count rather than propagate.
         Path dataDirectory = save.resolve("data");
-        Files.writeString(dataDirectory, "not a directory");
+        Files.write(dataDirectory, "not a directory".getBytes(StandardCharsets.UTF_8));
         AtomicInteger failures = new AtomicInteger();
         CaptureLossLog loss = lossLog();
 
@@ -79,7 +80,7 @@ class MapWriteTaskTest {
     @Test
     void namesEveryLostMapThroughTheVoiceItWasHanded(@TempDir Path save) throws Exception {
         Path dataDirectory = save.resolve("data");
-        Files.writeString(dataDirectory, "not a directory");
+        Files.write(dataDirectory, "not a directory".getBytes(StandardCharsets.UTF_8));
         AtomicInteger failures = new AtomicInteger();
         try (LogCapture captured = LogCapture.attach(MapWriteTaskTest.class.getName())) {
             CaptureLossLog loss = lossLog();

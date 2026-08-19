@@ -169,9 +169,6 @@ class LiveCaptureSessionFailSoftTest {
                 dimension -> {
                     throw new AssertionError("no chunk was submitted, so the region storage must not open");
                 },
-                dimension -> {
-                    throw new AssertionError("no entity was submitted, so the entities storage must not open");
-                },
                 () -> {},
                 finalizer,
                 () -> null,

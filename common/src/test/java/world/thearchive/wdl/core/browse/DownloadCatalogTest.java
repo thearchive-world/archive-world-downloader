@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.PngFixtures.png;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -293,7 +294,7 @@ class DownloadCatalogTest {
     }
 
     private static DownloadEntry entryFor(List<DownloadEntry> entries, String folderName) {
-        return entries.stream().filter(entry -> entry.folderName().equals(folderName)).findFirst().orElseThrow();
+        return entries.stream().filter(entry -> entry.folderName().equals(folderName)).findFirst().get();
     }
 
     private static DownloadIdentity identity(String id, String name) {
@@ -308,14 +309,14 @@ class DownloadCatalogTest {
             DownloadCounts counts) throws IOException {
         DownloadReportLog.append(DownloadReportStore.machineFile(folder), DownloadReportLog.completedLine(
                 identity(id, name), environment(), Collections.<String, String>emptyMap(), finished, counts,
-                new SaveChunks(0, List.of()), true));
+                new SaveChunks(0, ImmutableList.of()), true));
     }
 
     private static void writePartial(Path folder, String id, String name, Instant finished,
             DownloadCounts counts) throws IOException {
         DownloadReportLog.append(DownloadReportStore.machineFile(folder), DownloadReportLog.completedLine(
                 identity(id, name), environment(), Collections.<String, String>emptyMap(), finished, counts,
-                new SaveChunks(0, List.of()), false));
+                new SaveChunks(0, ImmutableList.of()), false));
     }
 
     private static void writePending(Path folder, String id, String name) throws IOException {

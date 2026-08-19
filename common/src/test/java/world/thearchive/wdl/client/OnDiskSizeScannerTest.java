@@ -51,7 +51,7 @@ class OnDiskSizeScannerTest {
         try {
             scanner.submit(missing, false);
             OnDiskSizeScanner.Result result = awaitOne(scanner, missing);
-            assertTrue(result.size().isEmpty(), "a failed walk delivers no size, so the row shows none");
+            assertTrue(!result.size().isPresent(), "a failed walk delivers no size, so the row shows none");
         } finally {
             scanner.close();
         }
@@ -66,7 +66,7 @@ class OnDiskSizeScannerTest {
             scanner.submit(saves.resolve("World"), true);
             OnDiskSizeScanner.Result result = awaitOne(scanner, saves.resolve("World"));
             assertEquals(zip, result.restoreSource(), "the probe delivers the qualifying source zip");
-            assertTrue(result.size().isEmpty(), "an availability probe never carries a size");
+            assertTrue(!result.size().isPresent(), "an availability probe never carries a size");
         } finally {
             scanner.close();
         }
@@ -79,7 +79,7 @@ class OnDiskSizeScannerTest {
             scanner.submit(saves.resolve("World"), true);
             OnDiskSizeScanner.Result result = awaitOne(scanner, saves.resolve("World"));
             assertNull(result.restoreSource(), "no qualifying zip means no source, and the chip stays hidden");
-            assertTrue(result.size().isEmpty(), "an availability probe never carries a size");
+            assertTrue(!result.size().isPresent(), "an availability probe never carries a size");
         } finally {
             scanner.close();
         }

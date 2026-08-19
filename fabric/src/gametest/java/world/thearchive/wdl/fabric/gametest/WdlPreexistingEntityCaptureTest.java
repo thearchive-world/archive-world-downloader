@@ -6,6 +6,7 @@ package world.thearchive.wdl.fabric.gametest;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -88,7 +89,8 @@ public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
                     .anyMatch(entity -> entity.getString("id").equals("minecraft:oak_boat"));
             Check.that(foundBoat, "the boat the player was sitting in when the download started is absent from "
                     + "the entities region: "
-                    + entities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?")).toList());
+                    + entities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
+                            .collect(Collectors.toList()));
 
             Optional<CompoundTag> standEntityChunk = CaptureReadback.readEntityChunk(saveRoot, standChunk);
             Check.that(standEntityChunk.isPresent(), "entity chunk " + standChunk
@@ -99,7 +101,7 @@ public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
             Check.that(foundStand, "the armor stand resting on the topmost placeable block is absent from the "
                     + "entities region: "
                     + standEntities.stream().map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
-                            .toList());
+                            .collect(Collectors.toList()));
         }
     }
 

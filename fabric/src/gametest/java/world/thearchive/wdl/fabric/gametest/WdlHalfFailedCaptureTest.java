@@ -3,10 +3,12 @@
 
 package world.thearchive.wdl.fabric.gametest;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -202,8 +204,8 @@ public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
         return CaptureReadback.readEntityChunk(saveRoot, chunk)
                 .map(tag -> CaptureReadback.entities(tag).stream()
                         .map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
-                        .toList())
-                .orElse(List.of());
+                        .collect(Collectors.toList()))
+                .orElse(ImmutableList.of());
     }
 
     /** How many cows reached the entities region for {@code chunk}. */
@@ -228,11 +230,12 @@ public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
                     String message = event.getMessage().getFormattedMessage();
                     return message.contains(DROP_WARNING) && message.contains(CAPTURE_FAILED);
                 })
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /** The captured logger messages, for an assertion-failure diagnostic. */
     private static String describe(LogCapture logs) {
-        return logs.events().stream().map(event -> event.getMessage().getFormattedMessage()).toList().toString();
+        return logs.events().stream().map(event -> event.getMessage().getFormattedMessage())
+                .collect(Collectors.toList()).toString();
     }
 }

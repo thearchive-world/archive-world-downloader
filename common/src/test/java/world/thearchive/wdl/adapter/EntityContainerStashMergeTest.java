@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.NonNullList;
@@ -17,7 +17,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -78,7 +77,7 @@ class EntityContainerStashMergeTest {
 
     /** Build the {@code entities/} chunk envelope via the real sink, so the merge runs against the live shape. */
     private CompoundTag entitiesChunkTag(CompoundTag... entityTags) {
-        return entitySink.encodeChunk(List.of(entityTags), new ChunkPos(0, 0));
+        return entitySink.encodeChunk(ImmutableList.copyOf(entityTags), new ChunkPos(0, 0));
     }
 
     private static CompoundTag findByUuid(ListTag entities, UUID uuid) {
@@ -113,7 +112,7 @@ class EntityContainerStashMergeTest {
         assertFalse(stash.containsKey(UUID_A), "the merged entry is drained");
         assertTrue(stash.containsKey(UUID_C), "an unmatched stash entry is left undrained (the lost-items edge)");
 
-        ListTag entities = chunkTag.getList("Entities", Tag.TAG_COMPOUND);
+        ListTag entities = chunkTag.getList("Entities", 10);
         CompoundTag mergedEntity = findByUuid(entities, UUID_A);
         assertEquals("minecraft:chest_minecart", mergedEntity.getString("id"),
                 "the id is preserved (no clobber)");
@@ -141,10 +140,10 @@ class EntityContainerStashMergeTest {
         assertEquals(1, tally.merged(), "the nested chested mule gains its captured contents");
         assertFalse(stash.containsKey(UUID_B), "and its stash entry is drained");
 
-        ListTag entities = chunkTag.getList("Entities", Tag.TAG_COMPOUND);
+        ListTag entities = chunkTag.getList("Entities", 10);
         CompoundTag minecart = findByUuid(entities, UUID_A);
         assertFalse(minecart.contains("Items"), "the plain minecart it was pushed under carries no contents");
-        CompoundTag nestedMule = minecart.getList("Passengers", Tag.TAG_COMPOUND).getCompound(0);
+        CompoundTag nestedMule = minecart.getList("Passengers", 10).getCompound(0);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(nestedMule, back);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the nested mule carries exactly the captured stack");
@@ -233,7 +232,7 @@ class EntityContainerStashMergeTest {
         assertTrue(folded.containsKey(UUID_A), "the holder stays for any later chunk the vehicle reaches");
         assertTrue(folded.containsKey(UUID_B));
 
-        ListTag entities = chunkTag.getList("Entities", Tag.TAG_COMPOUND);
+        ListTag entities = chunkTag.getList("Entities", 10);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(findByUuid(entities, UUID_A), back);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "this copy carries the loot rather than being empty");

@@ -30,4 +30,19 @@ final class FabricConnectionTee extends ConnectionTee {
     protected int entityId(ClientboundMoveEntityPacket move) {
         return move.entityId; // widened in the access widener
     }
+
+    @Override
+    protected short moveDeltaX(ClientboundMoveEntityPacket move) {
+        return move.xa; // widened in the access widener
+    }
+
+    @Override
+    protected short moveDeltaY(ClientboundMoveEntityPacket move) {
+        return move.ya; // widened in the access widener
+    }
+
+    @Override
+    protected short moveDeltaZ(ClientboundMoveEntityPacket move) {
+        return move.za; // widened in the access widener
+    }
 }

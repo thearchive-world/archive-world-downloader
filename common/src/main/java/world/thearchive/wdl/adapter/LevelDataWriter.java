@@ -95,5 +95,27 @@ public interface LevelDataWriter {
      * A built {@code WorldData} paired with the registries needed to serialize it, plus the game-rule resolution (the
      * effective rules were already applied to the world data; the diagnostics are for the caller to log and surface).
      */
-    record LevelData(WorldData worldData, RegistryAccess registries, GameRuleResolution gameRules) {}
+    static final class LevelData {
+        private final WorldData worldData;
+        private final RegistryAccess registries;
+        private final GameRuleResolution gameRules;
+
+        public LevelData(WorldData worldData, RegistryAccess registries, GameRuleResolution gameRules) {
+            this.worldData = worldData;
+            this.registries = registries;
+            this.gameRules = gameRules;
+        }
+
+        public WorldData worldData() {
+            return worldData;
+        }
+
+        public RegistryAccess registries() {
+            return registries;
+        }
+
+        public GameRuleResolution gameRules() {
+            return gameRules;
+        }
+    }
 }

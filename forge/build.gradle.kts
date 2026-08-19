@@ -1,25 +1,17 @@
-import net.minecraftforge.gradle.userdev.UserDevExtension
 import java.util.Properties
 
-// The non-Fabric jar for this deep band, built on the ForgeGradle 6 toolchain against real Forge. FG6 is
-// Gradle-8-only, so this is a separate Gradle-8 island beside the band's Gradle-9 root (common + fabric); the
-// two builds have two wrappers. ForgeGradle publishes no plugin marker, so it is applied from the buildscript
-// classpath rather than the plugins block.
-buildscript {
-    repositories {
-        maven("https://maven.minecraftforge.net/")
-        mavenCentral()
-    }
-    dependencies {
-        classpath("net.minecraftforge.gradle:ForgeGradle:6.0.54")
-    }
-}
-
+// The non-Fabric jar for this deep band. ForgeGradle 6 cannot build it at 1.16.5: below the 1.17 Great Rename it
+// serves the frozen mcp_config SRG package layout (net.minecraft.network.play.server) and its official channel
+// overlays only member names, so the mod's Mojang-official source (net.minecraft.network.protocol.game) resolves
+// to nothing. This island builds on Architectury Loom instead, which puts officialMojangMappings on the dev
+// classpath, the exact namespace common/ and the Fabric island compile against, and reobfuscates the jar to SRG
+// for the Forge runtime. The island stays a separate build beside the band's Gradle-9 root (common + fabric)
+// because it runs a different Loom fork than the root's Fabric Loom and carries a build-wide loom.platform=forge
+// switch, not because of any Gradle-version limit; two wrappers, one set of coordinates read from the root
+// gradle.properties.
 plugins {
-    java
+    id("dev.architectury.loom") version "1.14.476"
 }
-
-apply(plugin = "net.minecraftforge.gradle")
 
 // Single source of coordinates: the island reads the band's gradle.properties from the sibling Gradle-9 root
 // rather than duplicating the version, MC pin, and compat coordinates. Two wrappers, one set of coordinates.
@@ -29,7 +21,7 @@ val band = Properties().apply {
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.18.2.
+// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.16.5.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
@@ -44,33 +36,40 @@ java {
 repositories {
     mavenCentral()
     maven("https://maven.minecraftforge.net/")
-    maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
-    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
+    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
 }
 
-configure<UserDevExtension> {
-    // Forge's Mojang-official mappings put Mojmap net.minecraft on the classpath directly, the exact namespace
-    // common/ is written in, with no intermediary remap layer.
-    mappings("official", band("minecraft_version"))
-    // Widen at compile the three read-only vanilla fields the tee and the mount-menu read reach, the Forge
-    // analog of the Fabric access widener; the same file is auto-loaded at runtime from META-INF.
-    accessTransformer(file("src/main/resources/META-INF/accesstransformer.cfg"))
+loom {
+    silentMojangMappingsLicense()
+    forge {
+        // Widen at compile the read-only vanilla fields the tee and the mount-menu bind reach, the Forge analog of
+        // the Fabric access widener. The file is the classic Forge 1.16.x form (MCP class names, SRG member ids):
+        // Loom remaps it onto the named dev classpath and ships it verbatim, and Forge auto-loads it at runtime
+        // from META-INF/accesstransformer.cfg where the vanilla classes are SRG-named.
+        accessTransformer(file("src/main/resources/META-INF/accesstransformer.cfg"))
+    }
 }
 
 dependencies {
-    "minecraft"("net.minecraftforge:forge:${band("forge_version")}")
+    minecraft("com.mojang:minecraft:${band("minecraft_version")}")
+    // Mojang-official names on the dev classpath, the exact namespace common/ is written in, with no intermediary
+    // remap layer. remapJar reobfuscates the compiled output, including the source-merged common, to SRG.
+    mappings(loom.officialMojangMappings())
+    // The forge configuration has no generated Kotlin DSL accessor, so it is invoked by name.
+    "forge"("net.minecraftforge:forge:${band("forge_version")}")
 
     // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
     // shim are null-marked. NullAway itself does not run on this island (it is a Gradle-9 build-logic pass over
     // common + fabric); here the annotations only need to resolve so the marked source compiles.
     compileOnly("org.jspecify:jspecify:1.0.0")
 
-    // JourneyMap public API for the source-merged binding (compat/journeymap), compile-only, never a runtime
-    // require. FG6 compiles against Mojmap (official mappings); at this band there is no -neoforge-SNAPSHOT
-    // JourneyMap flavor, so this uses the same loader-suffixless 1.9 API coordinate :common resolves. reobfJar
-    // maps WDL's calls to SRG for the shipped Forge jar. No XaeroPlus binding on this band: XaeroPlus ships no
-    // 1.18.x build, so the overlay is dropped as a disclosed limit, matching :common.
-    compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
+    // JourneyMap 2.0 API for the source-merged binding (compat/journeymap/v2), compile-only, never a runtime
+    // require (JourneyMap provides it jar-in-jar). The island compiles under officialMojangMappings, so it takes
+    // the -common flavor, not -forge: at this band the -forge flavor carries MCP names that would not resolve,
+    // while -common carries the official names the merged source uses; remapJar maps the calls to SRG for the
+    // shipped jar. No XaeroPlus binding on this band: XaeroPlus ships no 1.16.x build, so the overlay is dropped as
+    // a disclosed limit, matching :common.
+    compileOnly("info.journeymap:journeymap-api-common:${band("journeymap_api_v2_coordinate")}")
 }
 
 // Source-merge :common the way wdl.common-merge does for the Gradle-9 loaders, but by direct path since the

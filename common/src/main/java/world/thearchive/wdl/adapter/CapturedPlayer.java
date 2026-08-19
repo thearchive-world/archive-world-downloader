@@ -28,5 +28,51 @@ import net.minecraft.world.level.Level;
  *                   opt-out)
  * @param difficulty the captured client difficulty for the level.dat {@code Difficulty}
  */
-public record CapturedPlayer(CompoundTag playerTag, BlockPos spawnPos, float yaw, float pitch,
-        ResourceKey<Level> dimension, GameType gameType, Difficulty difficulty) {}
+public final class CapturedPlayer {
+    private final CompoundTag playerTag;
+    private final BlockPos spawnPos;
+    private final float yaw;
+    private final float pitch;
+    private final ResourceKey<Level> dimension;
+    private final GameType gameType;
+    private final Difficulty difficulty;
+
+    CapturedPlayer(CompoundTag playerTag, BlockPos spawnPos, float yaw, float pitch, ResourceKey<Level> dimension,
+            GameType gameType, Difficulty difficulty) {
+        this.playerTag = playerTag;
+        this.spawnPos = spawnPos;
+        this.yaw = yaw;
+        this.pitch = pitch;
+        this.dimension = dimension;
+        this.gameType = gameType;
+        this.difficulty = difficulty;
+    }
+
+    public CompoundTag playerTag() {
+        return playerTag;
+    }
+
+    public BlockPos spawnPos() {
+        return spawnPos;
+    }
+
+    public float yaw() {
+        return yaw;
+    }
+
+    public float pitch() {
+        return pitch;
+    }
+
+    public ResourceKey<Level> dimension() {
+        return dimension;
+    }
+
+    public GameType gameType() {
+        return gameType;
+    }
+
+    public Difficulty difficulty() {
+        return difficulty;
+    }
+}

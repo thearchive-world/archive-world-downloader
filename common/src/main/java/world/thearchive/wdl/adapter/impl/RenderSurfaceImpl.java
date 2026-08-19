@@ -83,20 +83,21 @@ public final class RenderSurfaceImpl implements RenderSurface {
         // This band has no GUI sprite atlas (blitSprite is 1.20.2 and later), so the sprite is drawn from its
         // texture file directly; the ARGB color is applied as a draw-color multiplier around the blit, since the
         // pre-1.20 blit likewise takes no tint argument. The sole wdl sprite is the 10 by 10 revert icon.
-        RenderSystem.setShaderTexture(0, new ResourceLocation("wdl", "textures/gui/sprites/" + sprite + ".png"));
-        RenderSystem.setShaderColor((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
+        Minecraft.getInstance().getTextureManager()
+                .bind(new ResourceLocation("wdl", "textures/gui/sprites/" + sprite + ".png"));
+        RenderSystem.color4f((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
                 (color & 0xFF) / 255.0F, (color >>> 24) / 255.0F);
         GuiComponent.blit(poseStack, x, y, width, height, 0.0F, 0.0F, 10, 10, 10, 10);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     @Override
     public void blitFavicon(ResourceLocation icon, int x, int y, int size) {
-        RenderSystem.setShaderTexture(0, icon);
-        // A selected list row leaves the shader color at black (the 1.17.1 AbstractSelectionList highlight sets it and
+        Minecraft.getInstance().getTextureManager().bind(icon);
+        // A selected list row leaves the shader color at black (the 1.16.5 AbstractSelectionList highlight sets it and
         // never resets it), and GuiComponent.blit does not set its own, so without this reset the selected row's icon
         // multiplies to black. Vanilla's own world-selection list resets to white here for the same reason.
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.enableBlend();
         GuiComponent.blit(poseStack, x, y, 0.0F, 0.0F, size, size, size, size);
         RenderSystem.disableBlend();

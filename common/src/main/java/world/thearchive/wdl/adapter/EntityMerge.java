@@ -16,8 +16,10 @@ import net.minecraft.nbt.NbtOps;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The read-merge for the {@code entities/} target, UUID-keyed ({@code SerializableUUID.CODEC}, band-stable post-1.16).
- * Two carry-forwards, both so a re-write of an entity-chunk adds to, never overwrites, what is already on disk:
+ * The read-merge for a chunk's captured entities, UUID-keyed ({@code SerializableUUID.CODEC}, band-stable post-1.16).
+ * At 1.16.5 the entities live inside the {@code region/} chunk under {@code Level.Entities} (there is no separate
+ * {@code entities/} region until 1.17), and the writer folds the fresh capture in through this merge. Two
+ * carry-forwards, both so a re-write of an entity-chunk adds to, never overwrites, what is already on disk:
  *
  * <ul>
  * <li>Container contents: a container vehicle's or chested animal's on-disk {@code "Items"}, and a villager's trade
@@ -32,10 +34,11 @@ import org.jspecify.annotations.Nullable;
  * entity that has since despawned.</li>
  * </ul>
  *
- * <p>Pure {@code CompoundTag} in/out and band-agnostic over the post-1.17 {@code entities/} layout. The UUID-keyed
- * sibling of {@link ChunkMerge}. The 1.21.4-only saddle ({@code "SaddleItem"}, an inventory slot below the 1.21.5
- * equipment-slot cut) is an additional content carry-forward key the 1.21.4 port adds here; on this band the saddle is
- * a synced equipment slot and needs no guard, so only {@code "Items"} carries forward.
+ * <p>Pure {@code CompoundTag} in/out, operating on a {@code {Entities:[...]}} envelope regardless of where the chunk
+ * stores it (the {@code region/} {@code Level.Entities} at this band, a separate {@code entities/} region above it).
+ * The UUID-keyed sibling of {@link ChunkMerge}. The 1.21.4-only saddle ({@code "SaddleItem"}, an inventory slot below
+ * the 1.21.5 equipment-slot cut) is an additional content carry-forward key the 1.21.4 port adds here; on this band the
+ * saddle is a synced equipment slot and needs no guard, so only {@code "Items"} carries forward.
  */
 final class EntityMerge {
     private EntityMerge() {}
@@ -47,22 +50,25 @@ final class EntityMerge {
      * no-op.
      */
     static int merge(CompoundTag onDisk, CompoundTag fresh) {
-        if (!(fresh.get("Entities") instanceof ListTag freshEntities)
-                || !(onDisk.get("Entities") instanceof ListTag diskEntities)) {
+        if (!(fresh.get("Entities") instanceof ListTag) || !(onDisk.get("Entities") instanceof ListTag)) {
             return 0;
         }
+        ListTag freshEntities = (ListTag) fresh.get("Entities");
+        ListTag diskEntities = (ListTag) onDisk.get("Entities");
         Map<UUID, CompoundTag> diskNodes = new LinkedHashMap<>();
         for (int i = 0; i < diskEntities.size(); i++) {
-            if (diskEntities.get(i) instanceof CompoundTag diskEntity) {
+            if (diskEntities.get(i) instanceof CompoundTag) {
+                CompoundTag diskEntity = (CompoundTag) diskEntities.get(i);
                 diskNodes.putAll(EntityTreeWalk.byUuid(diskEntity));
             }
         }
         Set<UUID> freshUuids = new HashSet<>();
         int merged = 0;
         for (int i = 0; i < freshEntities.size(); i++) {
-            if (!(freshEntities.get(i) instanceof CompoundTag freshEntity)) {
+            if (!(freshEntities.get(i) instanceof CompoundTag)) {
                 continue;
             }
+            CompoundTag freshEntity = (CompoundTag) freshEntities.get(i);
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(freshEntity).entrySet()) {
                 freshUuids.add(node.getKey());
                 CompoundTag diskNode = diskNodes.get(node.getKey());
@@ -89,9 +95,10 @@ final class EntityMerge {
         // would silently lose existing world data. A keyed one is carried only when the fresh set lacks it, matched
         // against the whole fresh tree so an entity that moved into or out of a vehicle is deduped, not duplicated.
         for (int i = 0; i < diskEntities.size(); i++) {
-            if (!(diskEntities.get(i) instanceof CompoundTag diskEntity)) {
+            if (!(diskEntities.get(i) instanceof CompoundTag)) {
                 continue;
             }
+            CompoundTag diskEntity = (CompoundTag) diskEntities.get(i);
             UUID uuid = readUuid(diskEntity);
             if (uuid == null || !freshUuids.contains(uuid)) {
                 freshEntities.add(diskEntity.copy());
@@ -113,7 +120,8 @@ final class EntityMerge {
     }
 
     private static boolean hasCapturedOffers(CompoundTag entity) {
-        return entity.get("Offers") instanceof CompoundTag offers && NbtMerge.isNonEmptyList(offers, "Recipes");
+        return entity.get("Offers") instanceof CompoundTag
+                && NbtMerge.isNonEmptyList((CompoundTag) entity.get("Offers"), "Recipes");
     }
 
     /**

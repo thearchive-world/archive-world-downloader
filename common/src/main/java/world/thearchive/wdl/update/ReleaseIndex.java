@@ -3,17 +3,19 @@
 
 package world.thearchive.wdl.update;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.core.update.Release;
@@ -29,9 +31,9 @@ final class ReleaseIndex {
     private ReleaseIndex() {}
 
     public static List<Release> fetch(RuntimeInfo info, Transport transport) {
-        Transport.Result result = transport.fetch(requestUri(info), Map.of("User-Agent", userAgent(info)));
+        Transport.Result result = transport.fetch(requestUri(info), ImmutableMap.of("User-Agent", userAgent(info)));
         if (result.status() / 100 != 2) {
-            return List.of();
+            return ImmutableList.of();
         }
         return parseRows(result.body());
     }
@@ -44,7 +46,11 @@ final class ReleaseIndex {
     }
 
     private static String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        try {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException("UTF-8 is always available", e);
+        }
     }
 
     private static String userAgent(RuntimeInfo info) {
@@ -61,10 +67,10 @@ final class ReleaseIndex {
         try {
             root = new JsonParser().parse(body);
         } catch (RuntimeException e) {
-            return List.of();
+            return ImmutableList.of();
         }
         if (!root.isJsonArray()) {
-            return List.of();
+            return ImmutableList.of();
         }
         List<Release> rows = new ArrayList<>();
         for (JsonElement element : root.getAsJsonArray()) {

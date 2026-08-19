@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -78,7 +79,7 @@ class PriorPlayerReadRoundTripTest {
         CompoundTag prior = writer.readPriorPlayer(levelDat);
 
         assertNotNull(prior, "the resume read finds the captured player from this band's own player home");
-        assertEquals(List.of("minecraft:diamond", "minecraft:emerald"), enderIds(prior),
+        assertEquals(ImmutableList.of("minecraft:diamond", "minecraft:emerald"), enderIds(prior),
                 "the recovered player still carries the ender chest the download captured");
     }
 
@@ -94,7 +95,7 @@ class PriorPlayerReadRoundTripTest {
         boolean carried = PlayerTag.carryForwardEnderItems(prior, fresh);
 
         assertTrue(carried, "the prior ender chest is carried into the fresh empty player");
-        assertEquals(List.of("minecraft:diamond"), enderIds(fresh),
+        assertEquals(ImmutableList.of("minecraft:diamond"), enderIds(fresh),
                 "the carried-forward ender chest still holds the prior download's contents");
     }
 
@@ -106,7 +107,8 @@ class PriorPlayerReadRoundTripTest {
 
     private static List<String> enderIds(CompoundTag player) {
         List<String> ids = new ArrayList<>();
-        if (player.get("EnderItems") instanceof ListTag items) {
+        if (player.get("EnderItems") instanceof ListTag) {
+            ListTag items = (ListTag) player.get("EnderItems");
             for (int i = 0; i < items.size(); i++) {
                 ids.add(((CompoundTag) items.get(i)).getString("id"));
             }

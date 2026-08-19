@@ -649,21 +649,21 @@ class ContainerAssociationTest {
     @Test
     void crafterOpenDropsWithoutBlockHit() {
         ContainerAssociation association = new ContainerAssociation();
-        assertTrue(association.openCrafter(false, 42L, true, true, CRAFTER, CRAFTER).isEmpty());
+        assertTrue(!association.openCrafter(false, 42L, true, true, CRAFTER, CRAFTER).isPresent());
     }
 
     /** The open menu is not a crafter menu -> DROP. */
     @Test
     void crafterOpenDropsOnNonCrafterMenu() {
         ContainerAssociation association = new ContainerAssociation();
-        assertTrue(association.openCrafter(true, 42L, false, true, CRAFTER, CRAFTER).isEmpty());
+        assertTrue(!association.openCrafter(true, 42L, false, true, CRAFTER, CRAFTER).isPresent());
     }
 
     /** The looked-at block is not a crafter -> DROP. */
     @Test
     void crafterOpenDropsOnNonCrafterBlock() {
         ContainerAssociation association = new ContainerAssociation();
-        assertTrue(association.openCrafter(true, 42L, true, false, CRAFTER, CRAFTER).isEmpty());
+        assertTrue(!association.openCrafter(true, 42L, true, false, CRAFTER, CRAFTER).isPresent());
     }
 
     /**
@@ -673,14 +673,14 @@ class ContainerAssociationTest {
     @Test
     void crafterOpenDropsWhenCraftingSlotCountDiffersFromTheBlockSize() {
         ContainerAssociation association = new ContainerAssociation();
-        assertTrue(association.openCrafter(true, 42L, true, true, CRAFTER + 1, CRAFTER).isEmpty());
+        assertTrue(!association.openCrafter(true, 42L, true, true, CRAFTER + 1, CRAFTER).isPresent());
     }
 
     /** A zero-sized pair must not bind on the equality alone: the size floor is what rejects it. */
     @Test
     void crafterOpenDropsWhenNeitherSideReportsSlots() {
         ContainerAssociation association = new ContainerAssociation();
-        assertTrue(association.openCrafter(true, 42L, true, true, 0, 0).isEmpty());
+        assertTrue(!association.openCrafter(true, 42L, true, true, 0, 0).isPresent());
     }
 
     /** A dropped crafter open must not leave a prior binding live. */
@@ -689,7 +689,7 @@ class ContainerAssociationTest {
         ContainerAssociation association = new ContainerAssociation();
         association.openCrafter(true, 42L, true, true, CRAFTER, CRAFTER);
         association.openCrafter(true, 43L, true, false, CRAFTER, CRAFTER);
-        assertTrue(association.boundPos().isEmpty());
+        assertTrue(!association.boundPos().isPresent());
     }
 
     // --- openMerchant: the merchant sibling. A MerchantMenu is villager-exclusive in vanilla, and its offers

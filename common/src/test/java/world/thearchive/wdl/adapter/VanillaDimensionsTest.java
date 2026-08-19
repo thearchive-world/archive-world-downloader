@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
+import com.google.common.collect.ImmutableList;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
@@ -69,7 +69,7 @@ class VanillaDimensionsTest {
     void everyRoutedDimensionReadsBackFromTheIdItWrites() {
         // The round trip is what a resume depends on: the prior level.dat records the routed dimension as a
         // plain id string, and reading it back wrong sends a write into another dimension's folder.
-        for (ResourceKey<Level> routed : List.of(Level.OVERWORLD, Level.NETHER, Level.END)) {
+        for (ResourceKey<Level> routed : ImmutableList.of(Level.OVERWORLD, Level.NETHER, Level.END)) {
             assertEquals(routed, VanillaDimensions.forId(routed.location().toString()),
                     routed + " must survive the id round trip");
         }

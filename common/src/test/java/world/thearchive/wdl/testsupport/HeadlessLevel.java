@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.testsupport;
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -22,8 +23,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkSource;
 import net.minecraft.world.level.dimension.DimensionType;
-import net.minecraft.world.level.entity.LevelEntityGetter;
-import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.scores.Scoreboard;
@@ -60,9 +59,6 @@ public final class HeadlessLevel extends Level {
     public void sendBlockUpdated(BlockPos pos, BlockState oldState, BlockState newState, int flags) {}
 
     @Override
-    public void gameEvent(@Nullable Entity entity, GameEvent event, BlockPos pos) {}
-
-    @Override
     public void levelEvent(@Nullable Player player, int type, BlockPos pos, int data) {}
 
     @Override
@@ -87,7 +83,7 @@ public final class HeadlessLevel extends Level {
 
     @Override
     public List<? extends Player> players() {
-        return List.of();
+        return ImmutableList.of();
     }
 
     @Override
@@ -129,7 +125,7 @@ public final class HeadlessLevel extends Level {
     }
 
     @Override
-    public void setMapData(String id, MapItemSavedData data) {}
+    public void setMapData(MapItemSavedData data) {}
 
     @Override
     public int getFreeMapId() {
@@ -146,11 +142,6 @@ public final class HeadlessLevel extends Level {
 
     @Override
     public @Nullable RecipeManager getRecipeManager() {
-        return null;
-    }
-
-    @Override
-    protected @Nullable LevelEntityGetter<Entity> getEntities() {
         return null;
     }
 }

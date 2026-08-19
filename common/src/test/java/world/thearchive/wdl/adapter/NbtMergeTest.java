@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Arrays;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -58,7 +57,7 @@ class NbtMergeTest {
         CompoundTag fresh = withBooks(1);
 
         assertTrue(NbtMerge.carryListBySlot(disk, fresh, "Items", ALL_SLOTS));
-        assertEquals(3, fresh.getList("Items", Tag.TAG_COMPOUND).size(), "both disk slots joined the fresh one");
+        assertEquals(3, fresh.getList("Items", 10).size(), "both disk slots joined the fresh one");
     }
 
     @Test

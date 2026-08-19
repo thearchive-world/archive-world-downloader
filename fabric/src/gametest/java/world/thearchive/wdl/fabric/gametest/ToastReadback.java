@@ -60,13 +60,15 @@ final class ToastReadback {
         SystemToast newest = null;
         for (Object visible : visibleInstances(manager)) {
             Toast toast = toastOfInstance(visible);
-            if (toast instanceof SystemToast systemToast) {
+            if (toast instanceof SystemToast) {
+                SystemToast systemToast = (SystemToast) toast;
                 newest = systemToast;
             }
         }
         // The queue holds the freshly added, not-yet-promoted toasts; the last one added is the newest.
         for (Object queued : queued(manager)) {
-            if (queued instanceof SystemToast systemToast) {
+            if (queued instanceof SystemToast) {
+                SystemToast systemToast = (SystemToast) queued;
                 newest = systemToast;
             }
         }
@@ -85,7 +87,8 @@ final class ToastReadback {
             return rendered;
         }
         for (Object line : collection) {
-            if (line instanceof FormattedCharSequence sequence) {
+            if (line instanceof FormattedCharSequence) {
+                FormattedCharSequence sequence = (FormattedCharSequence) line;
                 StringBuilder builder = new StringBuilder();
                 sequence.accept((index, style, codePoint) -> {
                     builder.appendCodePoint(codePoint);

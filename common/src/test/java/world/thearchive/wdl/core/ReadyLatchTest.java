@@ -5,6 +5,7 @@ package world.thearchive.wdl.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,6 +41,6 @@ class ReadyLatchTest {
         latch.runWhenReady(() -> order.add(1));
         latch.runWhenReady(() -> order.add(2));
         latch.markReadyAndDrain();
-        assertEquals(List.of(1, 2), order, "callbacks drain in the order they were stashed");
+        assertEquals(ImmutableList.of(1, 2), order, "callbacks drain in the order they were stashed");
     }
 }

@@ -12,17 +12,16 @@ import world.thearchive.wdl.core.update.SemVer;
 /** Shared fixtures for the update package tests: runtime info, a well-formed body, and a recording transport. */
 final class UpdateFixtures {
     static final RuntimeInfo INFO = new RuntimeInfo("fabric", "1.21.11",
-            SemVer.parse("1.0.0-SNAPSHOT").orElseThrow(), "1.0.0-SNAPSHOT+1.21.11", "x6JOJ1sf");
+            SemVer.parse("1.0.0-SNAPSHOT").get(), "1.0.0-SNAPSHOT+1.21.11", "x6JOJ1sf");
 
-    static final String WELL_FORMED_BODY = """
-            [{
-              "version_number": "3.9.5+26.1-fabric",
-              "version_type": "release",
-              "status": "listed",
-              "date_published": "2026-06-01T00:00:00Z",
-              "loaders": ["fabric", "neoforge"],
-              "game_versions": ["1.21.11"]
-            }]""";
+    static final String WELL_FORMED_BODY = "[{\n"
+            + "  \"version_number\": \"3.9.5+26.1-fabric\",\n"
+            + "  \"version_type\": \"release\",\n"
+            + "  \"status\": \"listed\",\n"
+            + "  \"date_published\": \"2026-06-01T00:00:00Z\",\n"
+            + "  \"loaders\": [\"fabric\", \"neoforge\"],\n"
+            + "  \"game_versions\": [\"1.21.11\"]\n"
+            + "}]";
 
     private UpdateFixtures() {}
 

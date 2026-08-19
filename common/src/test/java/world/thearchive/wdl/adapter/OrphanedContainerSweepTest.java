@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,7 +26,6 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -76,9 +77,6 @@ class OrphanedContainerSweepTest {
     private static AsyncSaveWriter regionWriter(Path region) {
         return new AsyncSaveWriter(
                 dimension -> storage(region),
-                dimension -> {
-                    throw new AssertionError("no entities were submitted, so the entities storage must not open");
-                },
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
     }
 
@@ -90,7 +88,7 @@ class OrphanedContainerSweepTest {
     }
 
     private static @Nullable CompoundTag blockEntityAt(CompoundTag chunkTag, int x, int y, int z) {
-        ListTag list = chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND);
+        ListTag list = chunkTag.getCompound("Level").getList("TileEntities", 10);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag blockEntity = list.getCompound(i);
             if (blockEntity.getInt("x") == x && blockEntity.getInt("y") == y
@@ -138,7 +136,7 @@ class OrphanedContainerSweepTest {
 
         // The chunk is flushed carrying an empty chest, then leaves the keep-hot buffer: the client chunk packet
         // never carries container contents, so a not-yet-opened chest is on disk structurally present but empty.
-        flushEmptyChunk(region, chunk, registries, List.of(blockEntity("minecraft:chest", 2, 64, 2)));
+        flushEmptyChunk(region, chunk, registries, ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
         assertTrue(itemsOnDisk(region, chunk, 2, 64, 2, registries).get(0).isEmpty(),
                 "the flushed chunk's chest starts empty, before the container is opened");
 
@@ -168,7 +166,7 @@ class OrphanedContainerSweepTest {
         ChunkPos chunk = new ChunkPos(0, 0);
         BlockPos lecternPos = new BlockPos(3, 64, 3);
 
-        flushEmptyChunk(region, chunk, registries, List.of(blockEntity("minecraft:lectern", 3, 64, 3)));
+        flushEmptyChunk(region, chunk, registries, ImmutableList.of(blockEntity("minecraft:lectern", 3, 64, 3)));
 
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
         holders.put(lecternPos, sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 7, registries));
@@ -202,8 +200,8 @@ class OrphanedContainerSweepTest {
         BlockPos rightHalf = new BlockPos(15, 64, 4); // last column of chunk (0,0)
         BlockPos leftHalf = new BlockPos(16, 64, 4);  // first column of chunk (1,0), the connected partner
 
-        flushEmptyChunk(region, rightChunk, registries, List.of(blockEntity("minecraft:chest", 15, 64, 4)));
-        flushEmptyChunk(region, leftChunk, registries, List.of(blockEntity("minecraft:chest", 16, 64, 4)));
+        flushEmptyChunk(region, rightChunk, registries, ImmutableList.of(blockEntity("minecraft:chest", 15, 64, 4)));
+        flushEmptyChunk(region, leftChunk, registries, ImmutableList.of(blockEntity("minecraft:chest", 16, 64, 4)));
 
         NonNullList<ItemStack> rightItems = NonNullList.withSize(27, ItemStack.EMPTY);
         rightItems.set(0, new ItemStack(Items.EMERALD, 3));
@@ -244,7 +242,7 @@ class OrphanedContainerSweepTest {
                 "a rewrite for a chunk with no on-disk prior does not fail the save");
 
         try (IOWorker in = storage(region)) {
-            assertTrue(Optional.ofNullable(in.load(missing)).isEmpty(),
+            assertTrue(!Optional.ofNullable(in.load(missing)).isPresent(),
                     "no partial chunk is written when there is no prior");
         }
     }
@@ -267,7 +265,7 @@ class OrphanedContainerSweepTest {
         AsyncSaveWriter writer = regionWriter(region);
         writer.submitChunk(Level.OVERWORLD, chunk, () -> codec.encode(
                 SyntheticChunks.fullWithBlockEntities(registries, true,
-                        List.of(blockEntity("minecraft:chest", 2, 64, 2))),
+                        ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2))),
                 registries, false), ChunkMerge::merge);
         writer.submitChunkRewrite(Level.OVERWORLD, chunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, chunk, holders).merged());
@@ -283,17 +281,17 @@ class OrphanedContainerSweepTest {
     void residualHolderChunksGroupsBothStashesByChunkListingEachOnce() {
         // The orphan-selection reduction the session sweep runs over its two stashes: both stashes contribute, and
         // several holders sharing a chunk collapse to a single rewrite target.
-        Set<BlockPos> containers = new LinkedHashSet<>(List.of(
+        Set<BlockPos> containers = new LinkedHashSet<>(ImmutableList.of(
                 new BlockPos(2, 64, 2),     // chunk (0,0)
                 new BlockPos(15, 70, 15),   // chunk (0,0) too
                 new BlockPos(16, 64, 3)));  // chunk (1,0)
-        Set<BlockPos> lecterns = new LinkedHashSet<>(List.of(
+        Set<BlockPos> lecterns = new LinkedHashSet<>(ImmutableList.of(
                 new BlockPos(1, 65, 1),     // chunk (0,0)
                 new BlockPos(40, 64, 8)));  // chunk (2,0)
 
         Set<ChunkPos> chunks = ChunkFlushPlan.residualHolderChunks(containers, lecterns);
 
-        assertEquals(Set.of(new ChunkPos(0, 0), new ChunkPos(1, 0), new ChunkPos(2, 0)), chunks,
+        assertEquals(ImmutableSet.of(new ChunkPos(0, 0), new ChunkPos(1, 0), new ChunkPos(2, 0)), chunks,
                 "both stashes contribute and holders sharing a chunk collapse to one target");
     }
 }

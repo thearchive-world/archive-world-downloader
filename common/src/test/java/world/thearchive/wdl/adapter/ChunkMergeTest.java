@@ -10,13 +10,12 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.chunkTagWith;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
+import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
-import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.BlockEntityFixtures;
@@ -56,7 +55,7 @@ class ChunkMergeTest {
     }
 
     private static int itemCount(CompoundTag blockEntity) {
-        return blockEntity.get("Items") instanceof ListTag items ? items.size() : 0;
+        return blockEntity.get("Items") instanceof ListTag ? ((ListTag) blockEntity.get("Items")).size() : 0;
     }
 
     private static CompoundTag jukebox(int x, int y, int z) {
@@ -93,11 +92,13 @@ class ChunkMergeTest {
     }
 
     private static String discId(CompoundTag blockEntity) {
-        return blockEntity.get("RecordItem") instanceof CompoundTag record ? record.getString("id") : "";
+        return blockEntity.get("RecordItem") instanceof CompoundTag
+                ? ((CompoundTag) blockEntity.get("RecordItem")).getString("id")
+                : "";
     }
 
     private static int beeCount(CompoundTag blockEntity) {
-        return blockEntity.get("Bees") instanceof ListTag bees ? bees.size() : 0;
+        return blockEntity.get("Bees") instanceof ListTag ? ((ListTag) blockEntity.get("Bees")).size() : 0;
     }
 
     /**
@@ -110,7 +111,7 @@ class ChunkMergeTest {
     void aPositionThatWasReplacedCarriesNothingForward() {
         CompoundTag onDisk = chunkTagWith(chest(3, 64, 7, "minecraft:diamond"));
         CompoundTag fresh = chunkTagWith(chest(3, 64, 7));
-        LongSet replaced = ChunkMerge.capturedPositions(List.of(new BlockPos(3, 64, 7)));
+        LongSet replaced = ChunkMerge.capturedPositions(ImmutableList.of(new BlockPos(3, 64, 7)));
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSets.EMPTY_SET, replaced),
                 "the block on disk is the one the placement replaced, so none of it is this block's");
@@ -123,7 +124,7 @@ class ChunkMergeTest {
     void aPositionNoPlacementTouchedStillCarriesForward() {
         CompoundTag onDisk = chunkTagWith(chest(3, 64, 7, "minecraft:diamond"));
         CompoundTag fresh = chunkTagWith(chest(3, 64, 7));
-        LongSet replaced = ChunkMerge.capturedPositions(List.of(new BlockPos(9, 64, 9)));
+        LongSet replaced = ChunkMerge.capturedPositions(ImmutableList.of(new BlockPos(9, 64, 9)));
 
         assertEquals(1, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSets.EMPTY_SET, replaced),
                 "a placement elsewhere in the chunk says nothing about this position");
@@ -252,7 +253,8 @@ class ChunkMergeTest {
         CompoundTag fresh = chunkTagWith(chest(1, 64, 1));
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh));
-        assertFalse(findByPos(fresh, 1, 64, 1).get("Items") instanceof ListTag list && !list.isEmpty());
+        assertFalse(findByPos(fresh, 1, 64, 1).get("Items") instanceof ListTag
+                && !((ListTag) findByPos(fresh, 1, 64, 1).get("Items")).isEmpty());
     }
 
     @Test
@@ -277,7 +279,8 @@ class ChunkMergeTest {
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
         assertEquals(0, mergeBacks, "the chest's items must not ghost into a barrel at the same position");
-        assertFalse(findByPos(fresh, 10, 70, 20).get("Items") instanceof ListTag list && !list.isEmpty(),
+        assertFalse(findByPos(fresh, 10, 70, 20).get("Items") instanceof ListTag
+                && !((ListTag) findByPos(fresh, 10, 70, 20).get("Items")).isEmpty(),
                 "the replacement barrel stays empty, not the chest's 27 slots");
     }
 
@@ -303,7 +306,8 @@ class ChunkMergeTest {
 
         assertEquals(1, mergeBacks, "only the surviving chest carries forward");
         assertEquals(1, itemCount(findByPos(fresh, 10, 70, 20)), "the chest keeps its earlier-saved diamond");
-        assertFalse(findByPos(fresh, 11, 70, 20).get("Items") instanceof ListTag list && !list.isEmpty(),
+        assertFalse(findByPos(fresh, 11, 70, 20).get("Items") instanceof ListTag
+                && !((ListTag) findByPos(fresh, 11, 70, 20).get("Items")).isEmpty(),
                 "the newly placed barrel is present and empty (the revisit change is reflected)");
     }
 
@@ -332,9 +336,9 @@ class ChunkMergeTest {
         assertEquals(1, mergeBacks, "the chest must carry forward, proving merge ran its real path");
         assertFalse(fresh.getBoolean("isLightOn"),
                 "on-disk isLightOn must not carry onto a gate-false fresh chunk");
-        assertTrue(fresh.getList("sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
-                .noneMatch(section -> section.contains("BlockLight", Tag.TAG_BYTE_ARRAY)
-                        || section.contains("SkyLight", Tag.TAG_BYTE_ARRAY)),
+        assertTrue(fresh.getList("sections", 10).stream().map(t -> (CompoundTag) t)
+                .noneMatch(section -> section.contains("BlockLight", 7)
+                        || section.contains("SkyLight", 7)),
                 "on-disk light layers must not carry onto fresh sections");
     }
 
@@ -389,12 +393,12 @@ class ChunkMergeTest {
         // serialize identically, and only the position set says the emptiness was seen rather than never captured.
         CompoundTag onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond", "minecraft:gold_ingot"));
         CompoundTag fresh = chunkTagWith(chest(10, 70, 20));
-        LongSet opened = ChunkMerge.capturedPositions(List.of(new BlockPos(10, 70, 20)));
+        LongSet opened = ChunkMerge.capturedPositions(ImmutableList.of(new BlockPos(10, 70, 20)));
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), opened, LongSets.EMPTY_SET),
                 "an opened menu is ground truth for every slot, so nothing carries back over it");
         CompoundTag merged = findByPos(fresh, 10, 70, 20);
-        assertTrue(merged.get("Items") instanceof ListTag items && items.isEmpty(),
+        assertTrue(merged.get("Items") instanceof ListTag && ((ListTag) merged.get("Items")).isEmpty(),
                 "the chest is written with the present-but-empty list vanilla's own chest writer emits, so the "
                         + "items the player watched leave stay gone");
     }
@@ -407,7 +411,7 @@ class ChunkMergeTest {
                 chest(1, 64, 1, "minecraft:diamond"),
                 chest(2, 64, 2, "minecraft:emerald"));
         CompoundTag fresh = chunkTagWith(chest(1, 64, 1), chest(2, 64, 2));
-        LongSet opened = ChunkMerge.capturedPositions(List.of(new BlockPos(1, 64, 1)));
+        LongSet opened = ChunkMerge.capturedPositions(ImmutableList.of(new BlockPos(1, 64, 1)));
 
         assertEquals(1, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), opened, LongSets.EMPTY_SET),
                 "one carry-forward, and it is the neighbor's rather than the opened chest's");
@@ -423,7 +427,7 @@ class ChunkMergeTest {
         // the merge cannot tell a captured zero from a never-captured one and would carry the stale value.
         CompoundTag onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
         CompoundTag fresh = chunkTagWith(brewingStand(6, 64, 6, (short) 60, (byte) 0));
-        LongSet reopened = ChunkMerge.capturedPositions(List.of(new BlockPos(6, 64, 6)));
+        LongSet reopened = ChunkMerge.capturedPositions(ImmutableList.of(new BlockPos(6, 64, 6)));
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), reopened, LongSets.EMPTY_SET),
                 "the fresh open is authoritative");

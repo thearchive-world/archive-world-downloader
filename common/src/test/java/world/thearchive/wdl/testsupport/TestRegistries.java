@@ -29,7 +29,7 @@ public final class TestRegistries {
         if (frozen != null) {
             return frozen;
         }
-        SharedConstants.tryDetectVersion();
+        SharedConstants.getCurrentVersion();
         Bootstrap.bootStrap();
         frozen = RegistryAccess.builtin();
         return frozen;

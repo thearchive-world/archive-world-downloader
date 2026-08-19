@@ -52,7 +52,7 @@ class EntityMergeTest {
         for (int i = 0; i < list.size(); i++) {
             CompoundTag tag = (CompoundTag) list.get(i);
             if (matches(tag, uuid)) {
-                return tag.get("Items") instanceof ListTag items ? items.size() : 0;
+                return tag.get("Items") instanceof ListTag ? ((ListTag) tag.get("Items")).size() : 0;
             }
         }
         throw new AssertionError("no entity " + uuid);
@@ -62,13 +62,14 @@ class EntityMergeTest {
         ListTag list = (ListTag) chunk.get("Entities");
         for (int i = 0; i < list.size(); i++) {
             CompoundTag root = (CompoundTag) list.get(i);
-            if (!matches(root, rootUuid) || !(root.get("Passengers") instanceof ListTag passengers)) {
+            if (!matches(root, rootUuid) || !(root.get("Passengers") instanceof ListTag)) {
                 continue;
             }
+            ListTag passengers = (ListTag) root.get("Passengers");
             for (int j = 0; j < passengers.size(); j++) {
                 CompoundTag passenger = (CompoundTag) passengers.get(j);
                 if (matches(passenger, nestedUuid)) {
-                    return passenger.get("Items") instanceof ListTag items ? items.size() : 0;
+                    return passenger.get("Items") instanceof ListTag ? ((ListTag) passenger.get("Items")).size() : 0;
                 }
             }
         }
@@ -240,8 +241,10 @@ class EntityMergeTest {
         CompoundTag fresh = entities(vehicle(UUID_A));
 
         assertEquals(0, EntityMerge.merge(onDisk, fresh));
-        assertFalse(fresh.get("Entities") instanceof ListTag list
-                && ((CompoundTag) list.get(0)).get("Items") instanceof ListTag items && !items.isEmpty());
+        ListTag list = fresh.get("Entities") instanceof ListTag ? (ListTag) fresh.get("Entities") : null;
+        assertFalse(list != null
+                && ((CompoundTag) list.get(0)).get("Items") instanceof ListTag
+                && !((ListTag) ((CompoundTag) list.get(0)).get("Items")).isEmpty());
     }
 
     @Test

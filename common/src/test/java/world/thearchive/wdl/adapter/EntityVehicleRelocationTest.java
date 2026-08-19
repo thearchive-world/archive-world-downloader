@@ -57,9 +57,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * loads first. The remedy pinned here is that the retained holder is re-folded into every later copy, so which one
  * survives stops mattering.
  *
- * <p>Asserted against the bytes in {@code entities/} rather than against a counter or a log line, because that is the
- * only place the second copy is visible: every write succeeds, all are ordinary, and no tally moves. Each case reads
- * every entity-chunk the flushes could have touched and inspects the UUID in all of them.
+ * <p>Asserted against the region chunk's {@code Level.Entities} bytes rather than against a counter or a log line,
+ * because that is the only place the second copy is visible: every write succeeds, all are ordinary, and no tally
+ * moves. Each case reads every chunk the flushes could have touched and inspects the UUID in all of them.
  *
  * <p>Suppressing the second write instead was tried and rejected: it dropped whatever else the later tag carried, most
  * sharply a passenger that boarded since, which reaches disk nowhere but nested in its vehicle.
@@ -85,6 +85,7 @@ class EntityVehicleRelocationTest {
             throws Exception {
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
+        seedHosts(paths, opened, drifted); // entities fold into their host chunks
         AsyncSaveWriter writer = saveWriter(paths);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
@@ -106,6 +107,7 @@ class EntityVehicleRelocationTest {
     void aReFlushOfTheSameChunkStillWritesAndKeepsTheContents(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
+        seedHosts(paths, opened, drifted); // entities fold into their host chunks
         AsyncSaveWriter writer = saveWriter(paths);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
@@ -131,6 +133,7 @@ class EntityVehicleRelocationTest {
             throws Exception {
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
+        seedHosts(paths, opened, drifted); // entities fold into their host chunks
         AsyncSaveWriter writer = saveWriter(paths);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
@@ -160,6 +163,7 @@ class EntityVehicleRelocationTest {
         // passenger aboard with it. The retained holder is exactly what that path was missing.
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
+        seedHosts(paths, opened, drifted); // entities fold into their host chunks
         AsyncSaveWriter writer = saveWriter(paths);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
@@ -181,6 +185,7 @@ class EntityVehicleRelocationTest {
         // defeats it, and level.dat is where the damage lands.
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
+        seedHosts(paths, opened, drifted); // entities fold into their host chunks
         AsyncSaveWriter writer = saveWriter(paths);
         bindArchive(session, new MapArchive(MapManifest.empty(), id -> null, (archiveId, dataTag) -> {}));
         stashEntityContainer(session, VEHICLE, holderReferencing(sink, registries, 4242));
@@ -221,7 +226,8 @@ class EntityVehicleRelocationTest {
     /** The item ids of an entity tag's container contents, for telling one capture of a vehicle from another. */
     private static Set<String> itemIds(CompoundTag entity) {
         Set<String> ids = new HashSet<>();
-        if (entity.get("Items") instanceof ListTag items) {
+        if (entity.get("Items") instanceof ListTag) {
+            ListTag items = (ListTag) entity.get("Items");
             for (int i = 0; i < items.size(); i++) {
                 ids.add(((CompoundTag) items.get(i)).getString("id"));
             }
@@ -229,18 +235,22 @@ class EntityVehicleRelocationTest {
         return ids;
     }
 
-    /** Every on-disk entity tag carrying {@code uuid}, across each entity-chunk the flushes could have reached. */
+    /**
+     * Every on-disk entity tag carrying {@code uuid}, across each region chunk's Level.Entities the flushes reached.
+     */
     private static List<CompoundTag> entitiesOnDisk(WorldPaths paths, UUID uuid, ChunkPos... positions)
             throws Exception {
         List<CompoundTag> found = new ArrayList<>();
-        try (IOWorker storage = paths.openEntitiesStorage(Level.OVERWORLD)) {
+        try (IOWorker storage = paths.openRegionStorage(Level.OVERWORLD)) {
             for (ChunkPos pos : positions) {
                 CompoundTag chunkTag = Optional.ofNullable(storage.load(pos)).orElse(null);
-                if (chunkTag == null || !(chunkTag.get("Entities") instanceof ListTag entities)) {
+                if (chunkTag == null || !(chunkTag.getCompound("Level").get("Entities") instanceof ListTag)) {
                     continue;
                 }
+                ListTag entities = (ListTag) chunkTag.getCompound("Level").get("Entities");
                 for (int i = 0; i < entities.size(); i++) {
-                    if (entities.get(i) instanceof CompoundTag entity && uuid.equals(EntityMerge.readUuid(entity))) {
+                    CompoundTag entity = entities.get(i) instanceof CompoundTag ? (CompoundTag) entities.get(i) : null;
+                    if (entity != null && uuid.equals(EntityMerge.readUuid(entity))) {
                         found.add(entity);
                     }
                 }
@@ -271,15 +281,24 @@ class EntityVehicleRelocationTest {
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
         Files.createDirectories(paths.regionDirectory(Level.OVERWORLD));
-        Files.createDirectories(paths.entitiesDirectory(Level.OVERWORLD));
         return paths;
     }
 
-    /** A writer over real region and entities storages, since the duplicate is only visible in the written bytes. */
+    /** Seed a host region chunk at each position so the entity folds have terrain to land inside. */
+    private static void seedHosts(WorldPaths paths, ChunkPos... positions) throws Exception {
+        try (IOWorker region = paths.openRegionStorage(Level.OVERWORLD)) {
+            for (ChunkPos pos : positions) {
+                CompoundTag host = new CompoundTag();
+                host.put("Level", new CompoundTag());
+                region.store(pos, host).join();
+            }
+        }
+    }
+
+    /** A writer over the real region storage, since the duplicate is only visible in the written bytes. */
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
                 paths::openRegionStorage,
-                paths::openEntitiesStorage,
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,

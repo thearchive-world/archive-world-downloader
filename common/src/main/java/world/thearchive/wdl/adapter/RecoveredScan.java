@@ -26,17 +26,18 @@ import world.thearchive.wdl.core.RecoveredCoverage;
  * unsaved (relaxed). Two inputs, both reusing the writer's own on-disk read so no second storage opens (the
  * single-owner hazard the design forbids): {@link #record} takes each region chunk (the {@link ChunkMerge} read-merge)
  * and collects the captured block positions, sharing {@link ChunkMerge#hasCapturedContent}; {@link #recordEntities}
- * takes each entities chunk (the {@link EntityMerge} read-merge) and collects the captured container-entity UUIDs,
- * sharing {@link EntityMerge#hasCapturedContent}. A coverage set tracks what its merge preserves, and {@link #record}
- * marks a position from its on-disk content alone, which leaves three edges on the block side, each a position marked
- * recovered whose next write does not carry it forward. A position whose block-entity type changed since the prior
- * session (a chest replaced by a barrel) is marked recovered even though {@link ChunkMerge}'s id gate then carries
- * nothing forward and writes it new-and-empty; the live {@code capturedBlockTypes} gate re-rims that rare resume case.
- * A container this session captures is written as the capture saw it rather than carried forward, so a recovered
- * container re-opened and found empty saves empty, and its rim comes from the capture, which the outline ranks ahead of
- * recovered. A position a block placement replaced carries nothing: a content-bearing placement re-rims itself through
- * its own optimistic captured mark, while an ordinary one does not, so a plain chest built over a prior-saved container
- * keeps the recovered rim its predecessor earned. The entity set has none of the three.
+ * reads that same region chunk's {@code Level.Entities} part (the {@link EntityMerge} read-merge) and collects the
+ * captured container-entity UUIDs, sharing {@link EntityMerge#hasCapturedContent}. A coverage set tracks what its merge
+ * preserves, and {@link #record} marks a position from its on-disk content alone, which leaves three edges on the block
+ * side, each a position marked recovered whose next write does not carry it forward. A position whose block-entity type
+ * changed since the prior session (a chest replaced by a barrel) is marked recovered even though {@link ChunkMerge}'s
+ * id gate then carries nothing forward and writes it new-and-empty; the live {@code capturedBlockTypes} gate re-rims
+ * that rare resume case. A container this session captures is written as the capture saw it rather than carried
+ * forward, so a recovered container re-opened and found empty saves empty, and its rim comes from the capture, which
+ * the outline ranks ahead of recovered. A position a block placement replaced carries nothing: a content-bearing
+ * placement re-rims itself through its own optimistic captured mark, while an ordinary one does not, so a plain chest
+ * built over a prior-saved container keeps the recovered rim its predecessor earned. The entity set has none of the
+ * three.
  *
  * <p>An ender chest never enters the per-position coverage: its contents persist to player data, not the chunk block
  * entity, so {@code hasCapturedContent} cannot see them. Instead the shared ender inventory is a single global fact set
@@ -75,15 +76,19 @@ final class RecoveredScan {
      * Writer thread: collect every prior-captured container position in {@code onDiskChunkTag} for {@code dimension}.
      */
     void record(ResourceKey<Level> dimension, CompoundTag onDiskChunkTag) {
-        if (!(onDiskChunkTag.getCompound("Level").get("TileEntities") instanceof ListTag blockEntities)) {
+        if (!(onDiskChunkTag.getCompound("Level").get("TileEntities") instanceof ListTag)) {
             return;
         }
+        ListTag blockEntities = (ListTag) onDiskChunkTag.getCompound("Level").get("TileEntities");
         LongOpenHashSet recovered = recoveredByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
         Long2IntOpenHashMap bookshelves = bookshelfSlotsByDimension.computeIfAbsent(dimension,
                 key -> new Long2IntOpenHashMap());
         boolean grew = false;
         for (int i = 0; i < blockEntities.size(); i++) {
-            if (!(blockEntities.get(i) instanceof CompoundTag blockEntity) || !hasCoordinates(blockEntity)) {
+            CompoundTag blockEntity = blockEntities.get(i) instanceof CompoundTag
+                    ? (CompoundTag) blockEntities.get(i)
+                    : null;
+            if (blockEntity == null || !hasCoordinates(blockEntity)) {
                 continue;
             }
             long pos = BlockPos.asLong(blockEntity.getInt("x"), blockEntity.getInt("y"),
@@ -103,19 +108,22 @@ final class RecoveredScan {
     }
 
     /**
-     * Writer thread: collect every prior-captured container-entity UUID in {@code onDiskEntityChunkTag}. Keyed by the
-     * dimension being scanned so the current dimension's snapshot is republished with the new ids; the ids themselves
-     * are globally unique, so the accumulator behind them is flat.
+     * Writer thread: collect every prior-captured container-entity UUID in {@code onDiskChunkTag}'s
+     * {@code Level.Entities} (the 1.16.5 in-chunk entity location, sibling of the {@code Level.TileEntities} that
+     * {@link #record} reads). Keyed by the dimension being scanned so the current dimension's snapshot is republished
+     * with the new ids; the ids themselves are globally unique, so the accumulator behind them is flat.
      */
-    void recordEntities(ResourceKey<Level> dimension, CompoundTag onDiskEntityChunkTag) {
-        if (!(onDiskEntityChunkTag.get("Entities") instanceof ListTag entities)) {
+    void recordEntities(ResourceKey<Level> dimension, CompoundTag onDiskChunkTag) {
+        if (!(onDiskChunkTag.getCompound("Level").get("Entities") instanceof ListTag)) {
             return;
         }
+        ListTag entities = (ListTag) onDiskChunkTag.getCompound("Level").get("Entities");
         boolean grew = false;
         for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag entity)) {
+            if (!(entities.get(i) instanceof CompoundTag)) {
                 continue;
             }
+            CompoundTag entity = (CompoundTag) entities.get(i);
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entity).entrySet()) {
                 if (EntityMerge.hasCapturedContent(node.getValue())) {
                     grew |= recoveredEntities.add(node.getKey());
@@ -140,12 +148,14 @@ final class RecoveredScan {
 
     /** The mask of occupied slots a chiseled bookshelf saved on disk (bit n = slot n) from its {@code "Items"}. */
     private static int bookshelfSavedSlotMask(CompoundTag blockEntity) {
-        if (!(blockEntity.get("Items") instanceof ListTag items)) {
+        if (!(blockEntity.get("Items") instanceof ListTag)) {
             return 0;
         }
+        ListTag items = (ListTag) blockEntity.get("Items");
         int mask = 0;
         for (int i = 0; i < items.size(); i++) {
-            if (items.get(i) instanceof CompoundTag entry) {
+            if (items.get(i) instanceof CompoundTag) {
+                CompoundTag entry = (CompoundTag) items.get(i);
                 // 0xFF default, not 0: a malformed entry with no Slot must drop on the range check below, not
                 // phantom-mark slot 0. The range check also blocks a corrupt out-of-range Slot from 1 << 31.
                 int slot = (entry.contains("Slot") ? entry.getByte("Slot") : (byte) 0xFF) & 0xFF;

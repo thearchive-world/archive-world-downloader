@@ -16,7 +16,6 @@ import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.ContainerHelper;
@@ -156,7 +155,7 @@ class PlayerTagTest {
 
         assertTrue(tag.get("EnderItems") instanceof ListTag, "EnderItems is now the captured list");
         CompoundTag probe = new CompoundTag();
-        probe.put("Items", tag.getList("EnderItems", Tag.TAG_COMPOUND)); // read the remapped list via the same codec
+        probe.put("Items", tag.getList("EnderItems", 10)); // read the remapped list via the same codec
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(probe, back);
         assertEquals(Items.ENDER_PEARL, back.get(5).getItem(), "the captured ender item lands at its EnderItems slot");
@@ -254,7 +253,7 @@ class PlayerTagTest {
     }
 
     private static ListTag mountItems(CompoundTag player) {
-        return player.getCompound("RootVehicle").getCompound("Entity").getList("Items", Tag.TAG_COMPOUND);
+        return player.getCompound("RootVehicle").getCompound("Entity").getList("Items", 10);
     }
 
     @Test
@@ -325,7 +324,7 @@ class PlayerTagTest {
 
     private static ListTag nestedMountItems(CompoundTag player) {
         return player.getCompound("RootVehicle").getCompound("Entity")
-                .getList("Passengers", Tag.TAG_COMPOUND).getCompound(0).getList("Items", Tag.TAG_COMPOUND);
+                .getList("Passengers", 10).getCompound(0).getList("Items", 10);
     }
 
     @Test
@@ -376,7 +375,7 @@ class PlayerTagTest {
         boolean carried = PlayerTag.carryForwardEnderItems(prior, fresh);
 
         assertTrue(carried, "the prior ender chest carried forward on the resume");
-        assertEquals(2, fresh.getList("EnderItems", Tag.TAG_COMPOUND).size(), "the prior contents survive the resume");
+        assertEquals(2, fresh.getList("EnderItems", 10).size(), "the prior contents survive the resume");
     }
 
     @Test
@@ -387,7 +386,7 @@ class PlayerTagTest {
         boolean carried = PlayerTag.carryForwardEnderItems(prior, fresh);
 
         assertFalse(carried, "the re-captured ender chest is authoritative, nothing carried back");
-        assertEquals(2, fresh.getList("EnderItems", Tag.TAG_COMPOUND).size(), "the fresh contents win");
+        assertEquals(2, fresh.getList("EnderItems", 10).size(), "the fresh contents win");
     }
 
     @Test

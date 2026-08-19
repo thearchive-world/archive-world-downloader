@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 
@@ -62,7 +63,8 @@ public final class ResumeConfirm {
             }
         };
         return new ConfirmScreen(onChoice,
-                new TranslatableComponent(keyPrefix + ".title").withStyle(style -> style.withColor(BrandColors.AMBER)),
+                new TranslatableComponent(keyPrefix + ".title")
+                        .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER))),
                 message,
                 yesLabel, noLabel);
     }
@@ -108,6 +110,6 @@ public final class ResumeConfirm {
     }
 
     private static Component amber(String text) {
-        return new TextComponent(text).withStyle(style -> style.withColor(BrandColors.AMBER));
+        return new TextComponent(text).withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER)));
     }
 }

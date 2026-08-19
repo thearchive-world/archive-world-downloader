@@ -4,15 +4,15 @@
 package world.thearchive.wdl.update;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Flow;
 import org.junit.jupiter.api.Test;
 
 /** The production transport's failure mapping and its bounded-body guard. */
@@ -20,71 +20,66 @@ class HttpTransportTest {
     @Test
     void mapsConnectionFailuresToTheFailureSentinel() {
         // Port 1 on loopback refuses immediately, so the transport sees a connect failure with no network.
-        Transport.Result result = new HttpTransport().fetch(URI.create("http://127.0.0.1:1/"), Map.of());
+        Transport.Result result = new HttpTransport().fetch(URI.create("http://127.0.0.1:1/"), ImmutableMap.of());
 
         assertEquals(Transport.Result.FAILURE, result);
     }
 
     @Test
-    void aBodyWithinTheCapIsReturnedVerbatim() {
-        HttpTransport.BoundedBodySubscriber subscriber = new HttpTransport.BoundedBodySubscriber(16);
-        subscriber.onSubscribe(noOpSubscription());
-        subscriber.onNext(List.of(ByteBuffer.wrap("hello".getBytes(StandardCharsets.UTF_8))));
-        subscriber.onComplete();
-
-        assertEquals("hello", subscriber.getBody().toCompletableFuture().join());
+    void aBodyWithinTheCapIsReturnedVerbatim() throws IOException {
+        assertEquals("hello", HttpTransport.readCapped(
+                new ByteArrayInputStream("hello".getBytes(StandardCharsets.UTF_8)), 16));
     }
 
     @Test
     void anOversizedBodyFailsInsteadOfBuffering() {
-        HttpTransport.BoundedBodySubscriber subscriber = new HttpTransport.BoundedBodySubscriber(4);
-        subscriber.onSubscribe(noOpSubscription());
-        subscriber.onNext(List.of(ByteBuffer.wrap(new byte[] { 1, 2, 3, 4, 5 })));
-
-        CompletableFuture<String> body = subscriber.getBody().toCompletableFuture();
-        assertTrue(body.isCompletedExceptionally(), "a body past the cap fails the exchange rather than buffering");
+        assertThrows(IOException.class, () -> HttpTransport.readCapped(
+                new ByteArrayInputStream(new byte[] { 1, 2, 3, 4, 5 }), 4));
     }
 
     @Test
-    void anOversizedBodyCancelsTheSubscription() {
-        RecordingSubscription subscription = new RecordingSubscription();
-        HttpTransport.BoundedBodySubscriber subscriber = new HttpTransport.BoundedBodySubscriber(4);
-        subscriber.onSubscribe(subscription);
-        subscriber.onNext(List.of(ByteBuffer.wrap(new byte[] { 1, 2, 3, 4, 5 })));
-
-        assertTrue(subscription.canceled, "overflow stops pulling further bytes from the network");
+    void anOversizedBodyStopsReadingInsteadOfDraining() {
+        ChunkedStream stream = new ChunkedStream(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 }, 2);
+        assertThrows(IOException.class, () -> HttpTransport.readCapped(stream, 4));
+        assertTrue(stream.remaining() > 0, "overflow stops pulling further bytes rather than draining the source");
     }
 
     @Test
-    void bytesAreSummedAcrossChunksNotCheckedPerChunk() {
-        HttpTransport.BoundedBodySubscriber subscriber = new HttpTransport.BoundedBodySubscriber(6);
-        subscriber.onSubscribe(noOpSubscription());
-        subscriber.onNext(List.of(ByteBuffer.wrap(new byte[] { 1, 2, 3 })));
-        subscriber.onNext(List.of(ByteBuffer.wrap(new byte[] { 4, 5, 6, 7 })));
-
-        assertTrue(subscriber.getBody().toCompletableFuture().isCompletedExceptionally(),
-                "two under-cap chunks that together exceed the cap still fail");
+    void bytesAreSummedAcrossReadsNotCheckedPerRead() {
+        // Three-byte reads each stay under the six-byte cap, but their running total crosses it.
+        assertThrows(IOException.class, () -> HttpTransport.readCapped(
+                new ChunkedStream(new byte[] { 1, 2, 3, 4, 5, 6, 7 }, 3), 6));
     }
 
-    private static Flow.Subscription noOpSubscription() {
-        return new Flow.Subscription() {
-            @Override
-            public void request(long count) {}
+    /** An input stream that hands back at most {@code chunk} bytes per read, so cross-read summing is exercised. */
+    private static final class ChunkedStream extends InputStream {
+        private final byte[] data;
+        private final int chunk;
+        private int pos;
 
-            @Override
-            public void cancel() {}
-        };
-    }
+        ChunkedStream(byte[] data, int chunk) {
+            this.data = data;
+            this.chunk = chunk;
+        }
 
-    private static final class RecordingSubscription implements Flow.Subscription {
-        private boolean canceled;
+        int remaining() {
+            return this.data.length - this.pos;
+        }
 
         @Override
-        public void request(long count) {}
+        public int read() {
+            return this.pos < this.data.length ? this.data[this.pos++] & 0xFF : -1;
+        }
 
         @Override
-        public void cancel() {
-            this.canceled = true;
+        public int read(byte[] destination, int offset, int length) {
+            if (this.pos >= this.data.length) {
+                return -1;
+            }
+            int count = Math.min(Math.min(length, this.chunk), this.data.length - this.pos);
+            System.arraycopy(this.data, this.pos, destination, offset, count);
+            this.pos += count;
+            return count;
         }
     }
 }

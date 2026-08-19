@@ -174,7 +174,23 @@ final class ResumeFlow {
     }
 
     /** A resolved NEW target paired with its on-disk classification, the shared result of {@link #classifyNewStart}. */
-    private record NewStart(DownloadTarget target, TargetClassification classification) {}
+    private static final class NewStart {
+        private final DownloadTarget target;
+        private final TargetClassification classification;
+
+        NewStart(DownloadTarget target, TargetClassification classification) {
+            this.target = target;
+            this.classification = classification;
+        }
+
+        DownloadTarget target() {
+            return target;
+        }
+
+        TargetClassification classification() {
+            return classification;
+        }
+    }
 
     /**
      * The command, keybind, and auto-download resume junction: the tainted decision (fresh disk read) is the outermost

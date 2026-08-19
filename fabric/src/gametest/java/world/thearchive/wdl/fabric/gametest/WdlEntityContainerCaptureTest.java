@@ -3,10 +3,12 @@
 
 package world.thearchive.wdl.fabric.gametest;
 
+import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -98,7 +100,8 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
                     .map(CaptureReadback::itemIds)
                     .orElseThrow(() -> new AssertionError("the chest minecart is absent from the entities region: "
                             + CaptureReadback.entities(entityChunk).stream()
-                                    .map(entity -> (entity.contains("id") ? entity.getString("id") : "?")).toList()));
+                                    .map(entity -> (entity.contains("id") ? entity.getString("id") : "?"))
+                                    .collect(Collectors.toList())));
             Check.that(cartItems.contains("minecraft:diamond"),
                     "the opened chest minecart's planted item is absent from its captured Items: " + cartItems);
 
@@ -139,11 +142,11 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
         Path saveRoot = run.stopAndAwaitSave();
         List<String> cartItems = CaptureReadback.readEntityChunk(saveRoot, cartChunk)
                 .map(CaptureReadback::entities)
-                .orElse(List.of()).stream()
+                .orElse(ImmutableList.of()).stream()
                 .filter(entity -> CaptureReadback.entityUuid(entity).filter(cartId::equals).isPresent())
                 .findFirst()
                 .map(CaptureReadback::itemIds)
-                .orElse(List.of());
+                .orElse(ImmutableList.of());
         Check.that(!cartItems.contains("minecraft:diamond"),
                 "an unattributed open reached disk on the crosshair's vehicle: " + cartItems);
     }
@@ -171,7 +174,7 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
         // interact then lands on the minecart, which opens rather than boards. The run dies later on an
         // anonymous timeout that reads as infrastructure flake rather than as a mis-aimed drive.
         context.waitFor(client -> nearbyChestBoat(client).isPresent());
-        UUID boatId = context.computeOnClient(client -> nearbyChestBoat(client).orElseThrow().getUUID());
+        UUID boatId = context.computeOnClient(client -> nearbyChestBoat(client).get().getUUID());
         ContainerDriver.aimEyesAt(context, new Vec3(boatX, stand.getY() + 0.3, boatZ));
         ContainerDriver.awaitCrosshair(context, client -> isLookingAt(client, boatId), "chest boat " + boatId);
         // Not sneaking, so the interact boards the boat rather than opening its chest.

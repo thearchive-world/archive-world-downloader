@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.testsupport;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -13,7 +14,6 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Blocks;
@@ -32,7 +32,7 @@ import world.thearchive.wdl.adapter.ChunkSnapshotSource;
  * {@code LevelChunk} cannot avoid, so the round-trip exercises the mod's encode slice.
  */
 public final class SyntheticChunks {
-    /** A standard 1.17.1 overworld column: 0..256, so {@code minSectionY == 0}. */
+    /** A standard 1.16.5 overworld column: 0..256, so {@code minSectionY == 0}. */
     public static final int MIN_Y = 0;
     public static final int HEIGHT = 256;
     public static final long GAME_TIME = 1234L;
@@ -51,22 +51,6 @@ public final class SyntheticChunks {
 
     private SyntheticChunks() {}
 
-    /** The height accessor matching {@link #full}: the min-section and height the round-trip decodes against. */
-    public static LevelHeightAccessor heightAccessor() {
-        // Below 1.18 LevelHeightAccessor has no create(int, int) factory, so the fixed 1.17.1 column is inlined.
-        return new LevelHeightAccessor() {
-            @Override
-            public int getHeight() {
-                return HEIGHT;
-            }
-
-            @Override
-            public int getMinBuildHeight() {
-                return MIN_Y;
-            }
-        };
-    }
-
     /**
      * A FULL chunk at (0,0): a single stone block in the bottom section, the rest air, PLAINS biomes. Its heightmap set
      * deliberately includes {@code OCEAN_FLOOR} (Usage.LIVE_WORLD, never sent to a client) alongside the three
@@ -74,7 +58,7 @@ public final class SyntheticChunks {
      * caller-controlled so a test can prove {@code isLightOn} tracks the flag rather than being hardcoded.
      */
     public static ChunkSnapshotSource full(RegistryAccess registries, boolean lightCorrect) {
-        return fullWithBlockEntities(registries, lightCorrect, List.of());
+        return fullWithBlockEntities(registries, lightCorrect, ImmutableList.of());
     }
 
     /**
@@ -98,7 +82,7 @@ public final class SyntheticChunks {
 
     private static ChunkSnapshotSource fullWithBlockEntities(RegistryAccess registries, boolean lightCorrect,
             List<CompoundTag> blockEntities, boolean checkShape) {
-        int minSectionY = heightAccessor().getMinSection();
+        int minSectionY = MIN_Y;
 
         LevelChunkSection bottom = new LevelChunkSection(minSectionY);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
@@ -131,7 +115,7 @@ public final class SyntheticChunks {
             copy.putBoolean(FixtureFidelity.KEEP_PACKED, false);
             stamped.add(copy);
         }
-        return List.copyOf(stamped);
+        return ImmutableList.copyOf(stamped);
     }
 
     /** The standard heightmap set: OCEAN_FLOOR (must be dropped by the codec) + the three CLIENT-usage maps. */
@@ -152,11 +136,11 @@ public final class SyntheticChunks {
     public static ChunkSnapshotSource withBlockAt(RegistryAccess registries, BlockPos worldPos, BlockState state) {
         LevelChunkSection section = new LevelChunkSection(worldPos.getY() >> 4);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
-        List<ChunkSnapshotSource.SectionData> sections = List
+        List<ChunkSnapshotSource.SectionData> sections = ImmutableList
                 .of(new ChunkSnapshotSource.SectionData(worldPos.getY() >> 4, section, null, null));
         return new Snapshot(
-                new ChunkPos(worldPos), heightAccessor().getMinSection(), GAME_TIME, 0L, ChunkStatus.FULL,
-                true, new EnumMap<>(Heightmap.Types.class), sections, List.of(), plainsBiomes(registries));
+                new ChunkPos(worldPos), MIN_Y, GAME_TIME, 0L, ChunkStatus.FULL,
+                true, new EnumMap<>(Heightmap.Types.class), sections, ImmutableList.of(), plainsBiomes(registries));
     }
 
     /**
@@ -181,11 +165,11 @@ public final class SyntheticChunks {
             BlockState state, CompoundTag blockEntity, boolean checkShape) {
         LevelChunkSection section = new LevelChunkSection(worldPos.getY() >> 4);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
-        List<ChunkSnapshotSource.SectionData> sections = List
+        List<ChunkSnapshotSource.SectionData> sections = ImmutableList
                 .of(new ChunkSnapshotSource.SectionData(worldPos.getY() >> 4, section, null, null));
         return new Snapshot(
-                new ChunkPos(worldPos), heightAccessor().getMinSection(), GAME_TIME, 0L, ChunkStatus.FULL,
-                true, new EnumMap<>(Heightmap.Types.class), sections, saved(List.of(blockEntity), checkShape),
+                new ChunkPos(worldPos), MIN_Y, GAME_TIME, 0L, ChunkStatus.FULL,
+                true, new EnumMap<>(Heightmap.Types.class), sections, saved(ImmutableList.of(blockEntity), checkShape),
                 plainsBiomes(registries));
     }
 
@@ -196,7 +180,7 @@ public final class SyntheticChunks {
      * {@code SectionData} survives write and parse.
      */
     public static ChunkSnapshotSource fullWithLight(RegistryAccess registries) {
-        int minSectionY = heightAccessor().getMinSection();
+        int minSectionY = MIN_Y;
 
         LevelChunkSection bottom = new LevelChunkSection(minSectionY);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
@@ -211,7 +195,8 @@ public final class SyntheticChunks {
                 new DataLayer(lightFill(SKY_LIGHT_FILL))));
 
         return new Snapshot(new ChunkPos(0, 0), minSectionY, GAME_TIME, 0L, ChunkStatus.FULL,
-                true, standardHeightmaps(), List.copyOf(sections), List.of(), plainsBiomes(registries));
+                true, standardHeightmaps(), ImmutableList.copyOf(sections), ImmutableList.of(),
+                plainsBiomes(registries));
     }
 
     /** A 2048-byte nibble array with every cell at {@code level} (both nibbles of each byte). */
@@ -227,7 +212,7 @@ public final class SyntheticChunks {
         return data;
     }
 
-    /** PLAINS-filled per-chunk biome ids sized to the 1.17.1 column: 16 * ceilDiv(HEIGHT, 4) = 1024 for 0..256. */
+    /** PLAINS-filled per-chunk biome ids sized to the 1.16.5 column: 16 * ceilDiv(HEIGHT, 4) = 1024 for 0..256. */
     private static int[] plainsBiomes(RegistryAccess registries) {
         Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
         int plainsId = biomeRegistry.getId(biomeRegistry.getOrThrow(Biomes.PLAINS));
@@ -236,15 +221,81 @@ public final class SyntheticChunks {
         return biomes;
     }
 
-    private record Snapshot(
-            ChunkPos chunkPos,
-            int minSectionY,
-            long gameTime,
-            long inhabitedTime,
-            ChunkStatus status,
-            boolean lightCorrect,
-            Map<Heightmap.Types, long[]> heightmaps,
-            List<ChunkSnapshotSource.SectionData> sections,
-            List<CompoundTag> blockEntities,
-            int[] biomes) implements ChunkSnapshotSource {}
+    private static final class Snapshot implements ChunkSnapshotSource {
+        private final ChunkPos chunkPos;
+        private final int minSectionY;
+        private final long gameTime;
+        private final long inhabitedTime;
+        private final ChunkStatus status;
+        private final boolean lightCorrect;
+        private final Map<Heightmap.Types, long[]> heightmaps;
+        private final List<ChunkSnapshotSource.SectionData> sections;
+        private final List<CompoundTag> blockEntities;
+        private final int[] biomes;
+
+        Snapshot(ChunkPos chunkPos, int minSectionY, long gameTime, long inhabitedTime, ChunkStatus status,
+                boolean lightCorrect, Map<Heightmap.Types, long[]> heightmaps,
+                List<ChunkSnapshotSource.SectionData> sections, List<CompoundTag> blockEntities, int[] biomes) {
+            this.chunkPos = chunkPos;
+            this.minSectionY = minSectionY;
+            this.gameTime = gameTime;
+            this.inhabitedTime = inhabitedTime;
+            this.status = status;
+            this.lightCorrect = lightCorrect;
+            this.heightmaps = heightmaps;
+            this.sections = sections;
+            this.blockEntities = blockEntities;
+            this.biomes = biomes;
+        }
+
+        @Override
+        public ChunkPos chunkPos() {
+            return chunkPos;
+        }
+
+        @Override
+        public int minSectionY() {
+            return minSectionY;
+        }
+
+        @Override
+        public long gameTime() {
+            return gameTime;
+        }
+
+        @Override
+        public long inhabitedTime() {
+            return inhabitedTime;
+        }
+
+        @Override
+        public ChunkStatus status() {
+            return status;
+        }
+
+        @Override
+        public boolean lightCorrect() {
+            return lightCorrect;
+        }
+
+        @Override
+        public Map<Heightmap.Types, long[]> heightmaps() {
+            return heightmaps;
+        }
+
+        @Override
+        public List<ChunkSnapshotSource.SectionData> sections() {
+            return sections;
+        }
+
+        @Override
+        public List<CompoundTag> blockEntities() {
+            return blockEntities;
+        }
+
+        @Override
+        public int[] biomes() {
+            return biomes;
+        }
+    }
 }

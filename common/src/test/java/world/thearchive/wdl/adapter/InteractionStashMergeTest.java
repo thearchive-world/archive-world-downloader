@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -146,9 +147,9 @@ class InteractionStashMergeTest {
                 InteractionCapture.InteractionKind.SHULKER, holder);
 
         // The server refused the placement (or it was rolled back): the authoritative block is not a shulker.
-        assertTrue(InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isEmpty(),
+        assertTrue(!InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isPresent(),
                 "a prediction the synced block-state never confirms is discarded, never persisted");
-        assertTrue(InteractionCapture.confirm(Blocks.AIR.defaultBlockState(), candidate).isEmpty(),
+        assertTrue(!InteractionCapture.confirm(Blocks.AIR.defaultBlockState(), candidate).isPresent(),
                 "an air block at the pos (the placement never landed) also discards");
     }
 
@@ -159,7 +160,7 @@ class InteractionStashMergeTest {
                 InteractionCapture.InteractionKind.JUKEBOX, holder);
 
         BlockState noRecord = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
-        assertTrue(InteractionCapture.confirm(noRecord, candidate).isEmpty(),
+        assertTrue(!InteractionCapture.confirm(noRecord, candidate).isPresent(),
                 "HAS_RECORD false (the disc was ejected or never accepted) discards the disc");
     }
 
@@ -169,7 +170,7 @@ class InteractionStashMergeTest {
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.BEEHIVE, holder);
 
-        assertTrue(InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isEmpty(),
+        assertTrue(!InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isPresent(),
                 "no beehive at the pos discards the predicted occupants");
     }
 
@@ -181,7 +182,7 @@ class InteractionStashMergeTest {
 
         // The block at the pos is not a jukebox, so the instanceof short-circuits before reading HAS_RECORD: the
         // candidate is discarded rather than throwing on a property the block does not have.
-        assertTrue(InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isEmpty(),
+        assertTrue(!InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isPresent(),
                 "a jukebox prediction against a non-jukebox block discards, it does not throw");
     }
     // Per-slot gate independence: one slot survives while another is dropped.
@@ -443,7 +444,7 @@ class InteractionStashMergeTest {
         // and the caller counts what it drops, since none of it was written.
         List<BlockPos> dropped = capture.drainResidualPositions();
 
-        assertEquals(List.of(pos), dropped, "the residual names the position whose content is missing");
+        assertEquals(ImmutableList.of(pos), dropped, "the residual names the position whose content is missing");
         assertTrue(capture.pendingCandidateChunks().isEmpty(), "and leaves nothing stashed");
     }
 

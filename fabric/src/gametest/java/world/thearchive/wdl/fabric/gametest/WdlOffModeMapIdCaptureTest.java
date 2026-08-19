@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.fabric.gametest;
 
+import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
@@ -81,7 +82,7 @@ public class WdlOffModeMapIdCaptureTest implements FabricClientGameTest {
 
             // The original server id is the data-file name verbatim, not densified to 0.
             List<Integer> capturedIds = CaptureReadback.mapDataIds(saveRoot);
-            Check.that(capturedIds.equals(List.of(ORIGINAL_MAP_ID)),
+            Check.that(capturedIds.equals(ImmutableList.of(ORIGINAL_MAP_ID)),
                     "off-mode must keep the original server id as data/map_" + ORIGINAL_MAP_ID + ".dat, not re-key "
                             + "it to a dense id; got " + capturedIds);
 

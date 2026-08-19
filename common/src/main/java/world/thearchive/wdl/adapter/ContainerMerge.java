@@ -12,8 +12,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Merges captured open-time block-entity data into the matching captured block-entity tag, keyed by {@link BlockPos},
@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * regular chunk write that follows.
  */
 final class ContainerMerge {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ContainerMerge.class);
+    private static final Logger LOGGER = LogManager.getLogger(ContainerMerge.class);
 
     private ContainerMerge() {}
 
@@ -162,12 +162,15 @@ final class ContainerMerge {
         // an IntTag value compare). The getXxxOr accessors are 1.21.10+ only; the ListTag/CompoundTag/IntTag
         // basics are older still. This band reads the pre-1.18 Level.TileEntities chunk layout (see the class
         // Javadoc), where higher bands read the flattened root block_entities.
-        if (!(chunkTag.getCompound("Level").get("TileEntities") instanceof ListTag blockEntities)) {
+        if (!(chunkTag.getCompound("Level").get("TileEntities") instanceof ListTag)) {
             return false; // no block entities captured for this chunk
         }
+        ListTag blockEntities = (ListTag) chunkTag.getCompound("Level").get("TileEntities");
         for (int i = 0; i < blockEntities.size(); i++) {
-            if (blockEntities.get(i) instanceof CompoundTag blockEntityTag
-                    && NbtMerge.isBlockEntityAt(blockEntityTag, pos)) {
+            CompoundTag blockEntityTag = blockEntities.get(i) instanceof CompoundTag
+                    ? (CompoundTag) blockEntities.get(i)
+                    : null;
+            if (blockEntityTag != null && NbtMerge.isBlockEntityAt(blockEntityTag, pos)) {
                 if (!recordedTypeMatches(holder, blockEntityTag)) {
                     return false; // the block here changed identity since capture; drop the stale overlay (Gate 1)
                 }

@@ -19,4 +19,26 @@ import org.jspecify.annotations.Nullable;
  * @param advancementsJson the {@code advancements/<uuid>.json} bytes, or null to skip that file
  * @param statsJson        the {@code stats/<uuid>.json} bytes, or null to skip that file
  */
-record CapturedProgress(UUID playerUuid, byte @Nullable [] advancementsJson, byte @Nullable [] statsJson) {}
+final class CapturedProgress {
+    private final UUID playerUuid;
+    private final byte @Nullable [] advancementsJson;
+    private final byte @Nullable [] statsJson;
+
+    CapturedProgress(UUID playerUuid, byte @Nullable [] advancementsJson, byte @Nullable [] statsJson) {
+        this.playerUuid = playerUuid;
+        this.advancementsJson = advancementsJson;
+        this.statsJson = statsJson;
+    }
+
+    UUID playerUuid() {
+        return playerUuid;
+    }
+
+    byte @Nullable [] advancementsJson() {
+        return advancementsJson;
+    }
+
+    byte @Nullable [] statsJson() {
+        return statsJson;
+    }
+}

@@ -24,7 +24,7 @@
       "world.thearchive.wdl.fabric.WdlFabricModMenu"
     ],
     "journeymap": [
-      "world.thearchive.wdl.compat.journeymap.WdlJourneyMapPlugin"
+      "world.thearchive.wdl.compat.journeymap.v2.WdlJourneyMapPlugin"
     ]
   },
   "depends": {

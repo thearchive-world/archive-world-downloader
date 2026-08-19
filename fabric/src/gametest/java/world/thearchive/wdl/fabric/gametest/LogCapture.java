@@ -3,6 +3,7 @@
 
 package world.thearchive.wdl.fabric.gametest;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -61,7 +62,7 @@ final class LogCapture implements AutoCloseable {
     /** A snapshot of the events captured so far, safe to iterate while logging continues. */
     List<LogEvent> events() {
         synchronized (events) {
-            return List.copyOf(events);
+            return ImmutableList.copyOf(events);
         }
     }
 

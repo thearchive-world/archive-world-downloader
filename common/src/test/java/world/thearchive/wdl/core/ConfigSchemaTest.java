@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -47,7 +48,10 @@ class ConfigSchemaTest {
             + "# Player advancements and statistics, written as advancements/<uuid>.json and stats/<uuid>.json.\n"
             + "# Tied to your account's UUID, so opening on a different account does not auto-inherit them.\n"
             + "captureAdvancements=true\n"
-            + "captureStatistics=true\n"
+            + "# Off by default on this Minecraft version: on a server reached through a version-bridging proxy such\n"
+            + "# as ViaVersion or ViaBackwards, requesting statistics can drop the whole connection and cut the\n"
+            + "# download off at its first tick. Safe to turn on when you connect straight to a 1.16.5 server.\n"
+            + "captureStatistics=false\n"
             + "\n"
             + "# How current the download keeps the world as you explore (a lower mode costs less per tick).\n"
             + "# OFF: Download each area once and keep it as you first saw it.\n"
@@ -373,7 +377,7 @@ class ConfigSchemaTest {
         properties.setProperty("captureEntities", "false");
         properties.setProperty("captureContainers", "false");
         properties.setProperty("captureAdvancements", "false");
-        properties.setProperty("captureStatistics", "false");
+        properties.setProperty("captureStatistics", "true");
         properties.setProperty("openInCreative", "false");
         properties.setProperty("recaptureChunks", "OFF");
         properties.setProperty("recaptureSeconds", "30");
@@ -433,7 +437,7 @@ class ConfigSchemaTest {
         values.put("captureEntities", "false");
         values.put("captureContainers", "false");
         values.put("captureAdvancements", "false");
-        values.put("captureStatistics", "false");
+        values.put("captureStatistics", "true");
         values.put("recaptureChunks", "OFF");
         values.put("recaptureSeconds", "30");
         values.put("encodeBudgetMillis", "5");
@@ -509,7 +513,7 @@ class ConfigSchemaTest {
                     moved.add(key);
                 }
             }
-            assertEquals(Set.of(option.key), moved,
+            assertEquals(ImmutableSet.of(option.key), moved,
                     option.key + " must move exactly its own projection entry; a swap of two same-typed reads in "
                             + "parse() lands the change on the wrong key and trips here");
         }
