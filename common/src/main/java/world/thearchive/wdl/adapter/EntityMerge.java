@@ -8,17 +8,15 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The read-merge for a chunk's captured entities, UUID-keyed ({@code SerializableUUID.CODEC}, band-stable post-1.16).
- * At 1.16.5 the entities live inside the {@code region/} chunk under {@code Level.Entities} (there is no separate
- * {@code entities/} region until 1.17), and the writer folds the fresh capture in through this merge. Two
+ * The read-merge for a chunk's captured entities, UUID-keyed (the pre-1.16 {@code UUIDMost}/{@code UUIDLeast} long
+ * pair). At 1.15.2 the entities live inside the {@code region/} chunk under {@code Level.Entities} (there is no
+ * separate {@code entities/} region until 1.17), and the writer folds the fresh capture in through this merge. Two
  * carry-forwards, both so a re-write of an entity-chunk adds to, never overwrites, what is already on disk:
  *
  * <ul>
@@ -125,10 +123,10 @@ final class EntityMerge {
     }
 
     /**
-     * Decode an entity tag's {@code "UUID"} (the {@code SerializableUUID.CODEC} 4-int array), or null if
-     * absent/malformed.
+     * Decode an entity tag's {@code "UUID"} (the pre-1.16 {@code UUIDMost}/{@code UUIDLeast} long pair), or null when
+     * absent.
      */
     static @Nullable UUID readUuid(CompoundTag entityTag) {
-        return SerializableUUID.CODEC.parse(NbtOps.INSTANCE, entityTag.get("UUID")).result().orElse(null);
+        return entityTag.hasUUID("UUID") ? entityTag.getUUID("UUID") : null;
     }
 }

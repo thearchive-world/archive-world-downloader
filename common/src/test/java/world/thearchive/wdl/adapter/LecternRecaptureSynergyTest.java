@@ -11,7 +11,6 @@ import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -41,13 +40,12 @@ class LecternRecaptureSynergyTest {
     private static final int LECTERN_Y = 65;
     private static final int LECTERN_Z = 6;
 
-    private static RegistryAccess registries;
     private final ChunkCodec codec = new ChunkCodecImpl();
     private final LecternSink sink = new LecternSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** A written book with a custom {@code title}, below 1.20.5's pre-component {@code title}/{@code pages} NBT. */
@@ -65,7 +63,7 @@ class LecternRecaptureSynergyTest {
     }
 
     private CompoundTag stashBook(String title, int page) {
-        return sink.captureBook(writtenBook(title), page, registries);
+        return sink.captureBook(writtenBook(title), page);
     }
 
     private static String mergedTitle(CompoundTag chunkTag) {
@@ -79,7 +77,7 @@ class LecternRecaptureSynergyTest {
     @Test
     void withoutRecaptureNothingMergesOntoTheMissingLectern() {
         // The snapshot-once gap: the chunk was captured before the lectern was placed, so its tag has none.
-        CompoundTag snapshotOnceTag = codec.encode(SyntheticChunks.full(registries, false), registries, false);
+        CompoundTag snapshotOnceTag = codec.encode(SyntheticChunks.full(false), false);
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z), stashBook("Placed Late", 0));
@@ -93,9 +91,9 @@ class LecternRecaptureSynergyTest {
     @Test
     void reCapturingThePlacedLecternLetsTheStashMergeOntoIt() {
         // After re-capture the chunk's block entities include the placed lectern, so the merge lands.
-        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, false,
+        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(false,
                 ImmutableList.of(blockEntity("minecraft:lectern", LECTERN_X, LECTERN_Y, LECTERN_Z)));
-        CompoundTag recapturedTag = codec.encode(snapshot, registries, false);
+        CompoundTag recapturedTag = codec.encode(snapshot, false);
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(new BlockPos(LECTERN_X, LECTERN_Y, LECTERN_Z), stashBook("Recaptured", 2));
@@ -114,9 +112,9 @@ class LecternRecaptureSynergyTest {
         // count and contents are stable no matter how many re-encodes preceded it.
         CompoundTag latestRecapture = null;
         for (int reencode = 0; reencode < 3; reencode++) {
-            ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, false,
+            ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(false,
                     ImmutableList.of(blockEntity("minecraft:lectern", LECTERN_X, LECTERN_Y, LECTERN_Z)));
-            latestRecapture = codec.encode(snapshot, registries, false);
+            latestRecapture = codec.encode(snapshot, false);
         }
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();

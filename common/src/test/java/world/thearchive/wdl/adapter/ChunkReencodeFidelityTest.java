@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPosOrNull;
 
 import com.google.common.collect.ImmutableList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import org.junit.jupiter.api.Test;
 
@@ -38,12 +37,11 @@ class ChunkReencodeFidelityTest {
 
     @Test
     void aPopulatedClientHeldBlockEntitySurvivesReencode() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
 
         CompoundTag tag = codec.encode(
-                SyntheticChunks.fullWithMalformedBlockEntities(registries, false,
+                SyntheticChunks.fullWithMalformedBlockEntities(false,
                         ImmutableList.of(sign(2, 64, 2, "hello"))),
-                registries,
                 false);
 
         CompoundTag blockEntity = findByPosOrNull(tag, 2, 64, 2);
@@ -54,17 +52,15 @@ class ChunkReencodeFidelityTest {
 
     @Test
     void reencodeReflectsAnEditedBlockEntity() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
 
         CompoundTag before = codec.encode(
-                SyntheticChunks.fullWithMalformedBlockEntities(registries, false,
+                SyntheticChunks.fullWithMalformedBlockEntities(false,
                         ImmutableList.of(sign(2, 64, 2, "hello"))),
-                registries,
                 false);
         CompoundTag after = codec.encode(
-                SyntheticChunks.fullWithMalformedBlockEntities(registries, false,
+                SyntheticChunks.fullWithMalformedBlockEntities(false,
                         ImmutableList.of(sign(2, 64, 2, "world"))),
-                registries,
                 false);
 
         assertEquals("hello", findByPosOrNull(before, 2, 64, 2).getString("wdl_test_text"));
@@ -74,15 +70,14 @@ class ChunkReencodeFidelityTest {
 
     @Test
     void aRemovedBlockEntityIsGoneFromTheReencodedTag() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
 
         CompoundTag withSign = codec.encode(
-                SyntheticChunks.fullWithMalformedBlockEntities(registries, false,
+                SyntheticChunks.fullWithMalformedBlockEntities(false,
                         ImmutableList.of(sign(2, 64, 2, "hello"))),
-                registries,
                 false);
         CompoundTag withoutSign = codec.encode(
-                SyntheticChunks.fullWithBlockEntities(registries, false, ImmutableList.of()), registries, false);
+                SyntheticChunks.fullWithBlockEntities(false, ImmutableList.of()), false);
 
         assertNotNull(findByPosOrNull(withSign, 2, 64, 2), "captured while present");
         assertNull(findByPosOrNull(withoutSign, 2, 64, 2),

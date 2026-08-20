@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
@@ -25,5 +24,5 @@ public interface MapSink {
      * the band's own codec. Lock-agnostic: it encodes whatever map the session hands it, and the auto-lock decision
      * lives in the session.
      */
-    Tag serializeMap(MapItemSavedData saved, RegistryAccess registries);
+    Tag serializeMap(MapItemSavedData saved);
 }

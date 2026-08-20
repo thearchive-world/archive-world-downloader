@@ -29,7 +29,7 @@ class EntityPacketCaptureTest {
 
     @BeforeAll
     static void bootstrapVanillaStatics() {
-        TestRegistries.frozen(); // the spawn payload names an EntityType, which needs the vanilla statics
+        TestRegistries.bootstrap(); // the spawn payload names an EntityType, which needs the vanilla statics
     }
 
     @Test

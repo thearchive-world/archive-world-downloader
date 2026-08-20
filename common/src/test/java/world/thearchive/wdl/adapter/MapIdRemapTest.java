@@ -14,7 +14,6 @@ import com.google.common.collect.ImmutableSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.item.ItemStack;
@@ -33,12 +32,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * touches exactly the ids the collector reads.
  */
 class MapIdRemapTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static Set<Integer> collect(CompoundTag holder) {
@@ -49,7 +47,7 @@ class MapIdRemapTest {
 
     @Test
     void remapsEveryReferencedIdAcrossAllSurfacesSkippingNonMaps() {
-        CompoundTag holder = holderOf(sink, registries, filledMap(5), shulkerHolding(filledMap(7)),
+        CompoundTag holder = holderOf(sink, filledMap(5), shulkerHolding(filledMap(7)),
                 new ItemStack(Items.DIAMOND, 3));
 
         MapIdRemap.remapFromItemList(holder, "Items", id -> id + 100);
@@ -60,7 +58,7 @@ class MapIdRemapTest {
 
     @Test
     void remapTouchesExactlyTheIdsTheCollectorReads() {
-        CompoundTag holder = holderOf(sink, registries, filledMap(5), shulkerHolding(filledMap(7)));
+        CompoundTag holder = holderOf(sink, filledMap(5), shulkerHolding(filledMap(7)));
         assertEquals(ImmutableSet.of(5, 7), collect(holder), "the pre-remap oracle");
 
         Map<Integer, Integer> table = ImmutableMap.of(5, 0, 7, 1);
@@ -71,7 +69,7 @@ class MapIdRemapTest {
 
     @Test
     void theSameIdInTwoPlacesRemapsConsistently() {
-        CompoundTag holder = holderOf(sink, registries, filledMap(42), shulkerHolding(filledMap(42)));
+        CompoundTag holder = holderOf(sink, filledMap(42), shulkerHolding(filledMap(42)));
 
         MapIdRemap.remapFromItemList(holder, "Items", id -> id + 100);
 
@@ -81,7 +79,7 @@ class MapIdRemapTest {
     @Test
     void remapItemRewritesSingleItemInPlace() {
         // The entry point the entity path uses for an item frame's single "Item" (not a list).
-        CompoundTag holder = holderOf(sink, registries, filledMap(5));
+        CompoundTag holder = holderOf(sink, filledMap(5));
         CompoundTag item = (CompoundTag) ((ListTag) holder.get("Items")).get(0);
 
         MapIdRemap.remapItem(item, id -> id + 100);
@@ -98,7 +96,7 @@ class MapIdRemapTest {
 
     @Test
     void aHolderWithNoMapReferencesIsLeftAlone() {
-        CompoundTag holder = holderOf(sink, registries, new ItemStack(Items.DIAMOND), new ItemStack(Items.STICK, 2));
+        CompoundTag holder = holderOf(sink, new ItemStack(Items.DIAMOND), new ItemStack(Items.STICK, 2));
 
         MapIdRemap.remapFromItemList(holder, "Items", id -> id + 100);
 

@@ -9,6 +9,7 @@ import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.chunk.storage.WdlRegionStorage;
 
 /**
  * Drives a chunk NBT tag through vanilla's real region pipeline ({@link IOWorker}, the async region-file worker below
@@ -41,9 +42,9 @@ public final class RegionRoundTrip {
         }
     }
 
-    private static final class TestRegionStorage extends IOWorker {
+    private static final class TestRegionStorage extends WdlRegionStorage {
         private TestRegionStorage(Path directory, boolean sync, String name) {
-            super(directory.toFile(), sync, name);
+            super(directory.toFile(), name);
         }
     }
 }

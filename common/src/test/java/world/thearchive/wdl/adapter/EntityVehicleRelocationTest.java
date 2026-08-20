@@ -21,16 +21,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -65,7 +62,6 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * sharply a passenger that boarded since, which reaches disk nowhere but nested in its vehicle.
  */
 class EntityVehicleRelocationTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     // Instance fields, not constants: ChunkPos's own class initializer reaches a built-in registry, so touching
@@ -77,7 +73,7 @@ class EntityVehicleRelocationTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     @Test
@@ -188,7 +184,7 @@ class EntityVehicleRelocationTest {
         seedHosts(paths, opened, drifted); // entities fold into their host chunks
         AsyncSaveWriter writer = saveWriter(paths);
         bindArchive(session, new MapArchive(MapManifest.empty(), id -> null, (archiveId, dataTag) -> {}));
-        stashEntityContainer(session, VEHICLE, holderReferencing(sink, registries, 4242));
+        stashEntityContainer(session, VEHICLE, holderReferencing(sink, 4242));
         bufferEntity(session, VEHICLE, opened, entity(VEHICLE));
 
         session.flushEntityChunk(writer, opened); // remaps once and retains the holder
@@ -241,7 +237,7 @@ class EntityVehicleRelocationTest {
     private static List<CompoundTag> entitiesOnDisk(WorldPaths paths, UUID uuid, ChunkPos... positions)
             throws Exception {
         List<CompoundTag> found = new ArrayList<>();
-        try (IOWorker storage = paths.openRegionStorage(Level.OVERWORLD)) {
+        try (IOWorker storage = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             for (ChunkPos pos : positions) {
                 CompoundTag chunkTag = Optional.ofNullable(storage.load(pos)).orElse(null);
                 if (chunkTag == null || !(chunkTag.getCompound("Level").get("Entities") instanceof ListTag)) {
@@ -272,7 +268,7 @@ class EntityVehicleRelocationTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -280,13 +276,13 @@ class EntityVehicleRelocationTest {
 
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
-        Files.createDirectories(paths.regionDirectory(Level.OVERWORLD));
+        Files.createDirectories(paths.regionDirectory(DimensionType.OVERWORLD));
         return paths;
     }
 
     /** Seed a host region chunk at each position so the entity folds have terrain to land inside. */
     private static void seedHosts(WorldPaths paths, ChunkPos... positions) throws Exception {
-        try (IOWorker region = paths.openRegionStorage(Level.OVERWORLD)) {
+        try (IOWorker region = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             for (ChunkPos pos : positions) {
                 CompoundTag host = new CompoundTag();
                 host.put("Level", new CompoundTag());
@@ -302,14 +298,13 @@ class EntityVehicleRelocationTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {},
                 new SaveProgress());
     }
 
     /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
     private static CompoundTag entity(UUID uuid) {
         CompoundTag entity = new CompoundTag();
-        entity.put("UUID", SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
+        entity.putUUID("UUID", uuid);
         return entity;
     }
 
@@ -323,7 +318,7 @@ class EntityVehicleRelocationTest {
     private CompoundTag capturedItems(ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, stack);
-        return sink.captureItems(items, registries);
+        return sink.captureItems(items);
     }
 
     private static void stashEntityContainer(LiveCaptureSession session, UUID uuid, CompoundTag holder)

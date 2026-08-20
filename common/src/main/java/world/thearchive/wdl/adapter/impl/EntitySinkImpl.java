@@ -5,7 +5,6 @@ package world.thearchive.wdl.adapter.impl;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.entity.Entity;
@@ -16,14 +15,14 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.EntitySink;
 
 /**
- * 1.16.5 entity sink: a client-safe per-entity serialize ({@code entity.save}), the write half of what vanilla's
+ * 1.15.2 entity sink: a client-safe per-entity serialize ({@code entity.save}), the write half of what vanilla's
  * {@code ChunkSerializer} folds into a chunk's {@code Level.Entities}. There is no separate {@code entities/} region at
  * this band (that is 1.17 and above), so the writer folds this sink's carrier into the region chunk.
  *
- * <p>Three members (see {@link EntitySink}): {@link #encodeChunk(List, ChunkPos, RegistryAccess, boolean)} serializes
- * the live client entities, {@link #encodeChunk(List, ChunkPos)} builds the in-chunk {@code Entities} carrier from
- * already-serialized tags (pure, so the headless round-trip guards it), plus
- * {@link #captureRootVehicle(Entity, RegistryAccess, boolean)}, a single-live gate-bypassing vehicle serialize.
+ * <p>Three members (see {@link EntitySink}): {@link #encodeChunk(List, ChunkPos, boolean)} serializes the live client
+ * entities, {@link #encodeChunk(List, ChunkPos)} builds the in-chunk {@code Entities} carrier from already-serialized
+ * tags (pure, so the headless round-trip guards it), plus {@link #captureRootVehicle(Entity, boolean)}, a single-live
+ * gate-bypassing vehicle serialize.
  */
 public final class EntitySinkImpl implements EntitySink {
     // 1.16.5 has no Entity.shouldBeSaved(); reproduce its predicate from the primitives it composes: a removed,
@@ -34,8 +33,7 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     @Override
-    public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, RegistryAccess registries,
-            boolean forceMobPersistence) {
+    public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, boolean forceMobPersistence) {
         // Lift of EntityStorage.storeEntities' write branch, server-free: entity.save writes the entity NBT
         // straight into a CompoundTag with no ServerLevel touch.
         List<CompoundTag> entityTags = new ArrayList<>();
@@ -54,8 +52,7 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     @Override
-    public @Nullable CompoundTag captureRootVehicle(Entity vehicle, RegistryAccess registries,
-            boolean forceMobPersistence) {
+    public @Nullable CompoundTag captureRootVehicle(Entity vehicle, boolean forceMobPersistence) {
         // Vanilla saveParentVehicle serializes the root vehicle via root.save, id-bearing and passenger-recursing,
         // bypassing shouldBeSaved (a one-player vehicle fails it). A ridden mount that finishes then gets dismounted
         // in the downloaded world despawns exactly like any other captured mob, so it gets the same server-side

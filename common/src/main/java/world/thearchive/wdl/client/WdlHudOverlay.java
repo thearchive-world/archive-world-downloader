@@ -3,13 +3,11 @@
 
 package world.thearchive.wdl.client;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.OptionalLong;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.util.Mth;
@@ -126,7 +124,7 @@ public final class WdlHudOverlay {
     }
 
     /** Draw one frame; called per render from each loader's registered HUD element/layer. */
-    public static void render(PoseStack poseStack, float partialTick) {
+    public static void render(float partialTick) {
         try {
             Minecraft minecraft = Minecraft.getInstance();
             HudConfig config = Wdl.config().hud();
@@ -139,7 +137,7 @@ public final class WdlHudOverlay {
                 return; // idle, or past the done linger: the overlay draws nothing
             }
             boolean detailed = config.detailed() || isPeeking(config);
-            draw(new RenderSurfaceImpl(poseStack), minecraft.font, config, frame, detailed);
+            draw(new RenderSurfaceImpl(), minecraft.font, config, frame, detailed);
         } catch (RuntimeException e) {
             // A per-frame draw must never crash the HUD pass or spam the log; surface the first failure only.
             if (!errorLogged) {
@@ -290,7 +288,7 @@ public final class WdlHudOverlay {
         surface.text(font, phaseLabel(stage), x + 2, textY, textColor, true);
         int percent = Math.round(Mth.clamp(fraction, 0.0f, 1.0f) * 100.0f);
         Component percentText = new TranslatableComponent("wdl.hud.percent", percent);
-        surface.text(font, percentText, x + width - font.width(percentText) - 1, textY, textColor, true);
+        surface.text(font, percentText, x + width - font.width(percentText.getString()) - 1, textY, textColor, true);
     }
 
     private static void drawDetailed(RenderSurface surface, Font font, Frame frame,
@@ -322,7 +320,7 @@ public final class WdlHudOverlay {
             surface.text(font, new TranslatableComponent("wdl.hud.label.stage"), rowX, rowY, textColor, shadow);
             Component stageValue = new TranslatableComponent("wdl.hud.stage_percent", phaseLabel(frame.stage()),
                     percent);
-            surface.text(font, stageValue, rowX + rowWidth - font.width(stageValue), rowY,
+            surface.text(font, stageValue, rowX + rowWidth - font.width(stageValue.getString()), rowY,
                     withAlpha(BrandColors.SAVING_GRAY, alpha), shadow);
             fillBar(surface, rowX, rowY + LINE_HEIGHT - 1, rowWidth, BAR_HEIGHT, frame.progress(), alpha);
         }
@@ -343,7 +341,7 @@ public final class WdlHudOverlay {
         }
     }
 
-    private static MutableComponent phaseLabel(SaveStage stage) {
+    private static Component phaseLabel(SaveStage stage) {
         switch (stage) {
             case WRITING_CHUNKS:
                 return new TranslatableComponent("wdl.hud.phase.chunks");

@@ -26,7 +26,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class MenuChangeTrackerTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static List<Slot> slotsOver(SimpleContainer container) {

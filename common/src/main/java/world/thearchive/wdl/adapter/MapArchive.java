@@ -3,13 +3,10 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.serialization.Codec;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import java.nio.ByteBuffer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import org.jspecify.annotations.Nullable;
 
@@ -29,9 +26,8 @@ import world.thearchive.wdl.core.MapManifest;
  * to the content-dedup archive id, so a carried map always renders. The remap rewrite is single-pass: each captured
  * holder is a fresh serialized copy and is remapped exactly once, at the point it is consumed.
  *
- * <p>Band-agnostic: the three hashed fields are read off the serialized inner {@code "data"} tag through the
- * band-stable {@code Codec}/{@code NbtOps} pattern ({@link MapIdCollector}'s precedent), so hashing adds no per-band
- * coupling across the 1.21.5 codec cut. {@code locked} and the centers are excluded from the hash.
+ * <p>The three hashed fields are read off the serialized inner {@code "data"} tag with the plain NBT getters; at 1.15.2
+ * the dimension is an int id, hashed by its string form. {@code locked} and the centers are excluded from the hash.
  */
 final class MapArchive {
     /** Resolves a session-local map id to its serialized inner data tag, or null if the colors were not received. */
@@ -153,45 +149,16 @@ final class MapArchive {
     }
 
     /**
-     * The content hash of a serialized inner map data tag: SHA-256 over the colors, scale and dimension read
-     * band-agnostically through {@code Codec}/{@code NbtOps}; {@code locked} and the centers are excluded.
+     * The content hash of a serialized inner map data tag: SHA-256 over the colors, scale and dimension; {@code locked}
+     * and the centers are excluded. At 1.15.2 the map data stores its dimension as an int id, so it is hashed by its
+     * string form.
      */
     static String hashOf(Tag dataTag) {
         if (!(dataTag instanceof CompoundTag)) {
             return MapHash.of(new byte[0], 0, "");
         }
         CompoundTag data = (CompoundTag) dataTag;
-        return MapHash.of(readColors(data), readByte(data, "scale"), readString(data, "dimension"));
-    }
-
-    private static byte[] readColors(CompoundTag data) {
-        Tag tag = data.get("colors");
-        if (tag == null) {
-            return new byte[0];
-        }
-        return Codec.BYTE_BUFFER.parse(NbtOps.INSTANCE, tag).result().map(MapArchive::toArray).orElse(new byte[0]);
-    }
-
-    private static byte[] toArray(ByteBuffer buffer) {
-        ByteBuffer view = buffer.duplicate();
-        byte[] out = new byte[view.remaining()];
-        view.get(out);
-        return out;
-    }
-
-    private static int readByte(CompoundTag data, String key) {
-        Tag tag = data.get(key);
-        if (tag == null) {
-            return 0; // the 1.21.5 codec form omits a defaulted scale
-        }
-        return Codec.BYTE.parse(NbtOps.INSTANCE, tag).result().map(Byte::intValue).orElse(0);
-    }
-
-    private static String readString(CompoundTag data, String key) {
-        Tag tag = data.get(key);
-        if (tag == null) {
-            return "";
-        }
-        return Codec.STRING.parse(NbtOps.INSTANCE, tag).result().orElse("");
+        return MapHash.of(data.getByteArray("colors"), data.getByte("scale"),
+                String.valueOf(data.getInt("dimension")));
     }
 }

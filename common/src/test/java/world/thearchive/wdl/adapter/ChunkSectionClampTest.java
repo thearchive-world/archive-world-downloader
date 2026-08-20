@@ -13,7 +13,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
@@ -38,7 +37,7 @@ class ChunkSectionClampTest {
 
     @Test
     void sectionsOutsideThe117ColumnAreDroppedSoTheSaveLoads() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         List<ChunkSnapshotSource.SectionData> sections = new ArrayList<>();
         sections.add(new ChunkSnapshotSource.SectionData(-4, blockSection(-4), null, null)); // below the pad, dropped
         sections.add(new ChunkSnapshotSource.SectionData(-1, null, null, filledLight())); // light pad, kept
@@ -47,7 +46,7 @@ class ChunkSectionClampTest {
         sections.add(new ChunkSnapshotSource.SectionData(16, null, null, filledLight())); // light pad, kept
         sections.add(new ChunkSnapshotSource.SectionData(17, blockSection(17), null, null)); // above the pad, dropped
 
-        CompoundTag level = codec.encode(new ClampSnapshot(sections), registries, false).getCompound("Level");
+        CompoundTag level = codec.encode(new ClampSnapshot(sections), false).getCompound("Level");
 
         Set<Integer> writtenY = new HashSet<>();
         Set<Integer> withBlockData = new HashSet<>();

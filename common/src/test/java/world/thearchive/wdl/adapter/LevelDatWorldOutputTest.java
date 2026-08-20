@@ -7,17 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.mojang.serialization.Dynamic;
-import com.mojang.serialization.DynamicOps;
-import com.mojang.serialization.Lifecycle;
 import java.util.Properties;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryWriteOps;
 import net.minecraft.world.level.GameRules;
-import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
@@ -25,7 +17,7 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The 1.21.11 world-output writes: the curated safe game rules and the world-open state land in the level.dat Data tag.
+ * The 1.15.2 world-output writes: the curated safe game rules and the world-open state land in the level.dat Data tag.
  * Noon and clear weather are fixed invariants applied regardless of the world-defaults master, the game-rule master
  * gates the curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it
  * against the real {@code GameRules}.
@@ -34,17 +26,18 @@ class LevelDatWorldOutputTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
     private LevelDataWriter.LevelData build(WorldOutputConfig worldOutput) {
-        RegistryAccess registries = TestRegistries.frozen();
-        return writer.buildLevelData(registries, worldOutput, null);
+        TestRegistries.bootstrap();
+        return writer.buildLevelData(worldOutput, null);
     }
 
     private CompoundTag dataTag(LevelDataWriter.LevelData built) {
-        return built.worldData().createTag(built.registries(), null);
+        return built.worldData().createTag(null);
     }
 
     private GameRules gameRules(LevelDataWriter.LevelData built) {
-        DynamicOps<Tag> ops = RegistryWriteOps.create(NbtOps.INSTANCE, built.registries());
-        return new GameRules(new Dynamic<>(ops, dataTag(built).getCompound("GameRules")));
+        GameRules rules = new GameRules();
+        rules.loadFromTag(dataTag(built).getCompound("GameRules"));
+        return rules;
     }
 
     private static WorldOutputConfig with(String key, String value) {
@@ -60,12 +53,10 @@ class LevelDatWorldOutputTest {
         return WorldOutputConfig.parse(properties);
     }
 
-    // Read the encoded WorldGenSettings tag directly rather than decoding through WorldGenSettings.CODEC. That codec
-    // resolves its dimension types and noise settings through a datapack-backed registry ops, which the headless
-    // suite has no resource manager to supply; the on-disk seed, structure toggle and generator type are what the
-    // writer's output is being asserted against anyway.
+    // At 1.15.2 the generator seed and structure toggle live directly in the Data tag (RandomSeed, MapFeatures),
+    // not in a WorldGenSettings compound (that is 1.16 and later).
     private CompoundTag worldGenTag(LevelDataWriter.LevelData built) {
-        return dataTag(built).getCompound("WorldGenSettings");
+        return dataTag(built);
     }
 
     @Test
@@ -73,7 +64,7 @@ class LevelDatWorldOutputTest {
         LevelDataWriter.LevelData built = build(
                 with("worldType", "DEFAULT", "worldSeed", Long.toString(Long.MIN_VALUE)));
 
-        assertEquals(Long.MIN_VALUE, worldGenTag(built).getLong("seed"),
+        assertEquals(Long.MIN_VALUE, worldGenTag(built).getLong("RandomSeed"),
                 "the full signed-long seed lands in level.dat, not an int-capped value");
     }
 
@@ -81,15 +72,15 @@ class LevelDatWorldOutputTest {
     void defaultGeneratorWritesHashedStringSeed() {
         LevelDataWriter.LevelData built = build(with("worldType", "DEFAULT", "worldSeed", "hello"));
 
-        assertEquals("hello".hashCode(), worldGenTag(built).getLong("seed"),
+        assertEquals("hello".hashCode(), worldGenTag(built).getLong("RandomSeed"),
                 "a non-numeric seed lands as the same long vanilla would hash it to");
     }
 
     @Test
     void generateFeaturesTogglesStructureGeneration() {
         assertTrue(worldGenTag(build(with("worldType", "DEFAULT", "generateFeatures", "true")))
-                .getBoolean("generate_features"));
-        assertFalse(worldGenTag(build(with("worldType", "DEFAULT"))).getBoolean("generate_features"),
+                .getBoolean("MapFeatures"));
+        assertFalse(worldGenTag(build(with("worldType", "DEFAULT"))).getBoolean("MapFeatures"),
                 "structures default off");
     }
 
@@ -97,29 +88,15 @@ class LevelDatWorldOutputTest {
     void voidGeneratorKeepsSeedZeroAndStaysStructureless() {
         CompoundTag voidSettings = worldGenTag(build(WorldOutputConfig.DEFAULTS));
 
-        assertEquals(0L, voidSettings.getLong("seed"), "the default void world keeps seed 0 (byte-unchanged)");
-        assertFalse(voidSettings.getBoolean("generate_features"), "the void world generates no structures");
-    }
-
-    @Test
-    void aDefaultWorldIsStableWhileVoidStaysExperimental() {
-        // A DEFAULT world is the three vanilla generators, so its re-derived lifecycle is stable and it opens
-        // without the experimental-world warning; the void world's flat nether/end are inherently experimental.
-        // The lifecycle is re-derived from the baked generators at load, never read from level.dat, so no
-        // level.dat write can suppress the void world's warning.
-        assertEquals(Lifecycle.stable(), lifecycle(build(with("worldType", "DEFAULT"))));
-        assertEquals(Lifecycle.experimental(), lifecycle(build(WorldOutputConfig.DEFAULTS)));
+        assertEquals(0L, voidSettings.getLong("RandomSeed"), "the default void world keeps seed 0 (byte-unchanged)");
+        assertFalse(voidSettings.getBoolean("MapFeatures"), "the void world generates no structures");
     }
 
     @Test
     void flatGeneratorBuildsAndRoundTripsItsSeed() {
         CompoundTag flat = worldGenTag(build(with("worldType", "FLAT", "worldSeed", "777")));
 
-        assertEquals(777L, flat.getLong("seed"), "the FLAT generator builds and its seed lands in level.dat");
-    }
-
-    private static Lifecycle lifecycle(LevelDataWriter.LevelData built) {
-        return ((PrimaryLevelData) built.worldData()).worldGenSettingsLifecycle();
+        assertEquals(777L, flat.getLong("RandomSeed"), "the FLAT generator builds and its seed lands in level.dat");
     }
 
     @Test

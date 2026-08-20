@@ -29,14 +29,10 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -45,9 +41,9 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -124,7 +120,6 @@ class LiveCaptureSessionLossTallyTest {
     private static final UUID VEHICLE = UUID.fromString("6b1d5f2c-9a30-4e11-b8c7-5d0e3a71f402");
     private static final UUID FRAME = UUID.fromString("2f9c4b18-7d60-4a35-9e21-0c7b6d5a3e14");
 
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
     // Instance fields, not constants: ChunkPos's own class initializer reaches a built-in registry, so touching
     // one before the bootstrap in @BeforeAll fails the whole class with "Not bootstrapped".
@@ -139,7 +134,7 @@ class LiveCaptureSessionLossTallyTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen(); // vanilla statics, which a chunk encode and an item capture both need
+        TestRegistries.bootstrap(); // vanilla statics, which a chunk encode and an item capture both need
     }
 
     /**
@@ -157,7 +152,7 @@ class LiveCaptureSessionLossTallyTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(adapter, new HeadlessPlatformBridge(configDirectory), config, null,
-                Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW),
                 new SavedChunkIndex(), new CoveredChunkIndex(), new SendRangeEstimator(), false, false,
                 BobbyChunkFilter.INACTIVE, () -> {});
@@ -177,7 +172,7 @@ class LiveCaptureSessionLossTallyTest {
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         assertTrue(config.worldOutput().skipVoidChunks(), "the void skip is the whole subject, so it must be on");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -185,19 +180,19 @@ class LiveCaptureSessionLossTallyTest {
 
     /** A captured chunk carrying nothing: all air, no block entities, the void-skip's own subject. */
     private ChunkSnapshotSource voidChunk() {
-        return SyntheticChunks.withBlockAt(registries, new BlockPos(0, 64, 0), Blocks.AIR.defaultBlockState());
+        return SyntheticChunks.withBlockAt(new BlockPos(0, 64, 0), Blocks.AIR.defaultBlockState());
     }
 
     /** The save layout for a fresh folder, with the region storage directory already present. */
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
-        Files.createDirectories(paths.regionDirectory(Level.OVERWORLD));
+        Files.createDirectories(paths.regionDirectory(DimensionType.OVERWORLD));
         return paths;
     }
 
     /** Seed a host region chunk at {@code pos} so an entity fold has terrain to land inside. */
     private static void seedHost(WorldPaths paths, ChunkPos pos) throws Exception {
-        try (IOWorker region = paths.openRegionStorage(Level.OVERWORLD)) {
+        try (IOWorker region = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             CompoundTag host = new CompoundTag();
             host.put("Level", new CompoundTag());
             region.store(pos, host).join();
@@ -215,7 +210,6 @@ class LiveCaptureSessionLossTallyTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {},
                 new SaveProgress());
     }
 
@@ -277,8 +271,8 @@ class LiveCaptureSessionLossTallyTest {
             private final ContainerSink real = new ContainerSinkImpl();
 
             @Override
-            public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess itemRegistries) {
-                return real.captureItems(items, itemRegistries);
+            public CompoundTag captureItems(NonNullList<ItemStack> items) {
+                return real.captureItems(items);
             }
 
             @Override
@@ -297,7 +291,7 @@ class LiveCaptureSessionLossTallyTest {
     private static final class ThrowingLecternMergeAdapter extends DelegatingAdapter {
         private final LecternSink throwingSink = new LecternSink() {
             @Override
-            public CompoundTag captureBook(ItemStack book, int page, RegistryAccess bookRegistries) {
+            public CompoundTag captureBook(ItemStack book, int page) {
                 throw new AssertionError("the fold path captures no book");
             }
 
@@ -321,7 +315,7 @@ class LiveCaptureSessionLossTallyTest {
         private final EntitySink nullEnvelopeSink = new EntitySink() {
             @Override
             public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos,
-                    RegistryAccess entityRegistries, boolean forceMobPersistence) {
+                    boolean forceMobPersistence) {
                 throw new AssertionError("a headless drain has no live entity to serialize");
             }
 
@@ -331,7 +325,7 @@ class LiveCaptureSessionLossTallyTest {
             }
 
             @Override
-            public @Nullable CompoundTag captureRootVehicle(Entity vehicle, RegistryAccess vehicleRegistries,
+            public @Nullable CompoundTag captureRootVehicle(Entity vehicle,
                     boolean forceMobPersistence) {
                 throw new AssertionError("a headless drain has no ridden vehicle to serialize");
             }
@@ -348,7 +342,7 @@ class LiveCaptureSessionLossTallyTest {
         private final EntitySink throwingSink = new EntitySink() {
             @Override
             public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos,
-                    RegistryAccess entityRegistries, boolean forceMobPersistence) {
+                    boolean forceMobPersistence) {
                 throw new IllegalStateException("the vanilla save codec rejected this entity");
             }
 
@@ -358,7 +352,7 @@ class LiveCaptureSessionLossTallyTest {
             }
 
             @Override
-            public @Nullable CompoundTag captureRootVehicle(Entity vehicle, RegistryAccess vehicleRegistries,
+            public @Nullable CompoundTag captureRootVehicle(Entity vehicle,
                     boolean forceMobPersistence) {
                 throw new AssertionError("this fixture drives no ridden vehicle");
             }
@@ -378,7 +372,7 @@ class LiveCaptureSessionLossTallyTest {
         private final EntitySink refusingSink = new EntitySink() {
             @Override
             public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos,
-                    RegistryAccess entityRegistries, boolean forceMobPersistence) {
+                    boolean forceMobPersistence) {
                 return null;
             }
 
@@ -388,7 +382,7 @@ class LiveCaptureSessionLossTallyTest {
             }
 
             @Override
-            public @Nullable CompoundTag captureRootVehicle(Entity vehicle, RegistryAccess vehicleRegistries,
+            public @Nullable CompoundTag captureRootVehicle(Entity vehicle,
                     boolean forceMobPersistence) {
                 throw new AssertionError("this fixture drives no ridden vehicle");
             }
@@ -431,7 +425,7 @@ class LiveCaptureSessionLossTallyTest {
 
     /** A captured chunk carrying a chest and a lectern block entity, the two folds' match targets. */
     private ChunkSnapshotSource chestChunk() {
-        return SyntheticChunks.fullWithBlockEntities(registries, true,
+        return SyntheticChunks.fullWithBlockEntities(true,
                 ImmutableList.of(blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()),
                         blockEntity("minecraft:lectern", lectern.getX(), lectern.getY(), lectern.getZ())));
     }
@@ -439,7 +433,7 @@ class LiveCaptureSessionLossTallyTest {
     /** The block entity of the given type in the chunk written to {@code paths}, or null when absent. */
     private static @Nullable CompoundTag blockEntityOnDisk(WorldPaths paths, ChunkPos pos, BlockPos at)
             throws Exception {
-        try (IOWorker storage = paths.openRegionStorage(Level.OVERWORLD)) {
+        try (IOWorker storage = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             CompoundTag chunkTag = Optional.ofNullable(storage.load(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             return findByPosOrNull(chunkTag, at.getX(), at.getY(), at.getZ());
@@ -450,20 +444,20 @@ class LiveCaptureSessionLossTallyTest {
     private CompoundTag capturedItems(ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, stack);
-        return sink.captureItems(items, registries);
+        return sink.captureItems(items);
     }
 
     /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
     private static CompoundTag entity(UUID uuid) {
         CompoundTag entity = new CompoundTag();
-        entity.put("UUID", SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
+        entity.putUUID("UUID", uuid);
         return entity;
     }
 
     /** A serialized entity tag whose displayed {@code "Item"} is {@code stack} (a framed or dropped item). */
     private CompoundTag entityDisplaying(UUID uuid, ItemStack stack) {
         CompoundTag tag = entity(uuid);
-        tag.put("Item", (CompoundTag) ((ListTag) holderOf(sink, registries, stack).get("Items")).get(0));
+        tag.put("Item", (CompoundTag) ((ListTag) holderOf(sink, stack).get("Items")).get(0));
         return tag;
     }
 
@@ -497,8 +491,8 @@ class LiveCaptureSessionLossTallyTest {
      */
     private static void assertBoundToStartingDimension(LiveCaptureSession session, String store,
             String byDimension) throws Exception {
-        Map<ResourceKey<Level>, ?> perDimension = state(session, byDimension);
-        Object bound = perDimension.get(Level.OVERWORLD);
+        Map<DimensionType, ?> perDimension = state(session, byDimension);
+        Object bound = perDimension.get(DimensionType.OVERWORLD);
         assertNotNull(bound, byDimension + " must hold an instance for the bound dimension");
         assertSame(bound, state(session, store),
                 store + " must be the instance " + byDimension + " holds for the bound dimension, or everything"
@@ -512,7 +506,7 @@ class LiveCaptureSessionLossTallyTest {
         assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
         AsyncSaveWriter writer = session.bindWorldOpen(paths, throwingArchive(), () -> saveWriter(paths));
         captureChunk(session, chunk, chestChunk());
-        stashContainer(session, chest, holderReferencing(sink, registries, 5));
+        stashContainer(session, chest, holderReferencing(sink, 5));
 
         session.flushBuffer(writer, true, 0, 0, 0);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
@@ -997,8 +991,8 @@ class LiveCaptureSessionLossTallyTest {
             throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
-        captureTerrain(session, Level.NETHER, chunk); // captured THERE, deliberately not in the bound dimension
-        capture.enterDimension(Level.NETHER.location().toString());
+        captureTerrain(session, DimensionType.NETHER, chunk); // captured THERE, deliberately not in the bound dimension
+        capture.enterDimension(DimensionType.getName(DimensionType.NETHER).toString());
         spawn(capture, 1, VEHICLE, chunk);
         spawn(capture, 2, FRAME, chunk);
         assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
@@ -1028,7 +1022,7 @@ class LiveCaptureSessionLossTallyTest {
     void aFrameHeldForAnotherDimensionOnUncapturedTerrainStaysBenign(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
-        capture.enterDimension(Level.NETHER.location().toString());
+        capture.enterDimension(DimensionType.getName(DimensionType.NETHER).toString());
         spawn(capture, 1, VEHICLE, chunk);
         spawn(capture, 2, FRAME, chunk);
 
@@ -1054,7 +1048,7 @@ class LiveCaptureSessionLossTallyTest {
             throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
-        String bound = Level.OVERWORLD.location().toString();
+        String bound = DimensionType.getName(DimensionType.OVERWORLD).toString();
         // Terrain deliberately NOT captured for this chunk, which is the whole subject: the gate refuses it.
         spawn(capture, 1, VEHICLE, chunk);
 
@@ -1090,7 +1084,8 @@ class LiveCaptureSessionLossTallyTest {
         Field field = LiveCaptureSession.class.getDeclaredField("packetCapture");
         field.setAccessible(true);
         EntityPacketCapture capture = new EntityPacketCapture(false, new SendRangeEstimator(),
-                new SendRangeSampler(System::nanoTime, false), Level.OVERWORLD.location().toString());
+                new SendRangeSampler(System::nanoTime, false),
+                DimensionType.getName(DimensionType.OVERWORLD).toString());
         field.set(session, capture);
         return capture;
     }
@@ -1125,9 +1120,9 @@ class LiveCaptureSessionLossTallyTest {
      * consults for a frame held for another world, and it is a different set from the bound dimension's, which is the
      * whole distinction the two sweeps turn on.
      */
-    private static void captureTerrain(LiveCaptureSession session, ResourceKey<Level> dimension, ChunkPos pos)
+    private static void captureTerrain(LiveCaptureSession session, DimensionType dimension, ChunkPos pos)
             throws Exception {
-        Map<ResourceKey<Level>, LongOpenHashSet> byDimension = state(session, "capturedByDimension");
+        Map<DimensionType, LongOpenHashSet> byDimension = state(session, "capturedByDimension");
         byDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet()).add(pos.toLong());
     }
 
@@ -1138,7 +1133,7 @@ class LiveCaptureSessionLossTallyTest {
     private void flushPriorChunk(WorldPaths paths) throws Exception {
         AsyncSaveWriter prior = saveWriter(paths);
         ChunkCodec codec = new VersionAdapterImpl().chunkCodec();
-        prior.submitChunk(Level.OVERWORLD, chunk, () -> codec.encode(chestChunk(), registries, false),
+        prior.submitChunk(DimensionType.OVERWORLD, chunk, () -> codec.encode(chestChunk(), false),
                 ChunkMerge::merge);
         assertFalse(prior.finish().get(30, TimeUnit.SECONDS).failed(), "the prior chunk reached disk");
     }

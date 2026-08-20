@@ -357,11 +357,12 @@ tasks.named("check") {
 
 repositories {
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
-    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
+    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
 }
 
 dependencies {
-    // JourneyMap 2.0 API for the overlay binding (compat/journeymap/v2), compile-only (never a runtime require;
-    // JourneyMap provides it jar-in-jar). The -common flavor carries official Mojang names, matching this build.
-    compileOnly("info.journeymap:journeymap-api-common:${property("journeymap_api_v2_coordinate")}")
+    // JourneyMap public API for the overlay binding (compat/journeymap), compile-only (never a runtime require).
+    // The binding compiles against the journeymap.client.api 1.8 surface, its own API types rather than Minecraft
+    // signatures; the -SNAPSHOT suffix is appended here.
+    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
 }

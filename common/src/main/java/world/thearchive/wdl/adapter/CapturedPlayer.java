@@ -5,10 +5,9 @@ package world.thearchive.wdl.adapter;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 
 /**
  * The immutable finish-snapshot of the local player, assembled on the client main thread in {@code finish()} and read
@@ -33,11 +32,11 @@ public final class CapturedPlayer {
     private final BlockPos spawnPos;
     private final float yaw;
     private final float pitch;
-    private final ResourceKey<Level> dimension;
+    private final DimensionType dimension;
     private final GameType gameType;
     private final Difficulty difficulty;
 
-    CapturedPlayer(CompoundTag playerTag, BlockPos spawnPos, float yaw, float pitch, ResourceKey<Level> dimension,
+    CapturedPlayer(CompoundTag playerTag, BlockPos spawnPos, float yaw, float pitch, DimensionType dimension,
             GameType gameType, Difficulty difficulty) {
         this.playerTag = playerTag;
         this.spawnPos = spawnPos;
@@ -64,7 +63,7 @@ public final class CapturedPlayer {
         return pitch;
     }
 
-    public ResourceKey<Level> dimension() {
+    public DimensionType dimension() {
         return dimension;
     }
 

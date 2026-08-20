@@ -9,9 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -20,57 +17,47 @@ import world.thearchive.wdl.core.WorldType;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The captured dimension is routed to a vanilla single-player folder by its TYPE, not its level key, so a server whose
- * level keys are non-standard (e.g. Multiverse's {@code minecraft:worlds/2b2t/2b2t_1}) still lands in {@code ./region}
- * / {@code DIM-1} / {@code DIM1} rather than a nested {@code dimensions/<ns>/<path>} folder.
+ * The captured dimension is routed to a vanilla single-player folder by its TYPE. At 1.15.2 the dimension key IS the
+ * {@link DimensionType}, so a server whose level keys are non-standard (e.g. Multiverse's
+ * {@code minecraft:worlds/2b2t/2b2t_1}) still lands in {@code ./region} / {@code DIM-1} / {@code DIM1} by the vanilla
+ * type it carries rather than a nested folder.
  */
 class VanillaDimensionsTest {
-    /** Vanilla bootstrap so the {@code Level} / {@code BuiltinDimensionTypes} static keys initialize. */
+    /** Vanilla bootstrap so the built-in {@link DimensionType} static values initialize. */
     @BeforeAll
     static void bootstrap() {
-        TestRegistries.frozen();
-    }
-
-    /** The built-in dimension type value for a key; forType classifies the value, not the key. */
-    private static DimensionType type(ResourceKey<DimensionType> key) {
-        return TestRegistries.frozen().registryOrThrow(Registry.DIMENSION_TYPE_REGISTRY).getOrThrow(key);
+        TestRegistries.bootstrap();
     }
 
     @Test
     void netherTypeMapsToNether() {
-        assertEquals(Level.NETHER, VanillaDimensions.forType(type(DimensionType.NETHER_LOCATION)));
+        assertEquals(DimensionType.NETHER, VanillaDimensions.forType(DimensionType.NETHER));
     }
 
     @Test
     void endTypeMapsToEnd() {
-        assertEquals(Level.END, VanillaDimensions.forType(type(DimensionType.END_LOCATION)));
+        assertEquals(DimensionType.THE_END, VanillaDimensions.forType(DimensionType.THE_END));
     }
 
     @Test
     void overworldTypeMapsToOverworld() {
-        assertEquals(Level.OVERWORLD, VanillaDimensions.forType(type(DimensionType.OVERWORLD_LOCATION)));
-    }
-
-    @Test
-    void overworldVariantTypeMapsToOverworld() {
-        // The caves variant is a distinct dimension type but carries the overworld effects id, so it routes to the
-        // overworld: forType classifies by effects, since the 1.18.2 client's type holder carries no registry key.
-        assertEquals(Level.OVERWORLD, VanillaDimensions.forType(type(DimensionType.OVERWORLD_CAVES_LOCATION)));
+        assertEquals(DimensionType.OVERWORLD, VanillaDimensions.forType(DimensionType.OVERWORLD));
     }
 
     @Test
     void unknownOrUnregisteredTypeFallsBackToOverworld() {
         // A null type (a holder that resolved to no value) opens as the overworld so the capture is still a loadable
         // vanilla single-player world.
-        assertEquals(Level.OVERWORLD, VanillaDimensions.forType(null));
+        assertEquals(DimensionType.OVERWORLD, VanillaDimensions.forType(null));
     }
 
     @Test
     void everyRoutedDimensionReadsBackFromTheIdItWrites() {
         // The round trip is what a resume depends on: the prior level.dat records the routed dimension as a
         // plain id string, and reading it back wrong sends a write into another dimension's folder.
-        for (ResourceKey<Level> routed : ImmutableList.of(Level.OVERWORLD, Level.NETHER, Level.END)) {
-            assertEquals(routed, VanillaDimensions.forId(routed.location().toString()),
+        for (DimensionType routed : ImmutableList.of(DimensionType.OVERWORLD, DimensionType.NETHER,
+                DimensionType.THE_END)) {
+            assertEquals(routed, VanillaDimensions.forId(DimensionType.getName(routed).toString()),
                     routed + " must survive the id round trip");
         }
     }
@@ -90,23 +77,23 @@ class VanillaDimensionsTest {
         // overworld TYPE. Routing by TYPE lands it on OVERWORLD, so the DEFAULT generator blends its edge; a gate
         // keyed on the raw level key would not match minecraft:overworld and would wall instead. The call site
         // (LiveCaptureSession) is what feeds forType's routed key, not the raw key, into this predicate.
-        ResourceKey<Level> routedByType = VanillaDimensions.forType(type(DimensionType.OVERWORLD_LOCATION));
-        assertEquals(Level.OVERWORLD, routedByType);
+        DimensionType routedByType = VanillaDimensions.forType(DimensionType.OVERWORLD);
+        assertEquals(DimensionType.OVERWORLD, routedByType);
         assertTrue(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, routedByType));
     }
 
     @Test
     void onlyTheDefaultGeneratorBlendsTheOverworld() {
-        assertTrue(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, Level.OVERWORLD));
-        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.FLAT, Level.OVERWORLD),
+        assertTrue(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, DimensionType.OVERWORLD));
+        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.FLAT, DimensionType.OVERWORLD),
                 "flat writes fixed layers and discards the blender, so its marker would be inert");
-        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.VOID, Level.OVERWORLD),
+        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.VOID, DimensionType.OVERWORLD),
                 "a void world has no terrain to blend, so its output stays byte-unchanged");
     }
 
     @Test
     void netherAndEndAreNeverBlended() {
-        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, Level.NETHER));
-        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, Level.END));
+        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, DimensionType.NETHER));
+        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, DimensionType.THE_END));
     }
 }

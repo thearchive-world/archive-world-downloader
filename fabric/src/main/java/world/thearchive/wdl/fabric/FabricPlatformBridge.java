@@ -5,20 +5,18 @@ package world.thearchive.wdl.fabric;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.function.Supplier;
-import net.fabricmc.fabric.api.client.command.v1.ClientCommandManager;
-import net.fabricmc.fabric.api.client.command.v1.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
-import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.screens.PauseScreen;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
@@ -32,6 +30,12 @@ import world.thearchive.wdl.platform.WdlCommands;
  * the constructor.
  */
 public final class FabricPlatformBridge extends AbstractPlatformBridge {
+    // This band's fabric-api ships no fabric-screen-api-v1 (ScreenEvents), so the pause-menu row has no non-mixin
+    // screen hook; PauseScreenMixin injects it at the tail of PauseScreen.init() and reads this factory, which
+    // addPauseMenuButtons binds to the live callbacks once at startup. Set on the client thread before any pause
+    // screen opens and read on that same thread, so no synchronization is needed.
+    private static @Nullable Function<List<AbstractWidget>, List<AbstractWidget>> pauseMenuRowFactory;
+
     @Override
     protected void registerKeybind(String keyId, Runnable onPress) {
         KeyMapping key = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -46,17 +50,21 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
     @Override
     public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
             Runnable onPrimary, Runnable onConfig) {
-        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
-            if (!(screen instanceof PauseScreen)) {
-                return;
-            }
-            List<AbstractWidget> buttons = Screens.getButtons(screen);
+        pauseMenuRowFactory = buttons -> {
             AbstractWidget anchor = lowest(buttons);
-            if (anchor == null) {
-                return;
-            }
-            buttons.addAll(buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig));
-        });
+            return anchor == null ? Collections.emptyList()
+                    : buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig);
+        };
+    }
+
+    /**
+     * The wdl pause-menu row for {@code PauseScreenMixin} to add at the tail of {@code PauseScreen.init()}, built from
+     * the callbacks {@link #addPauseMenuButtons} stored above {@code existingButtons}. Empty before that runs, and in
+     * the user's own local world, where the row is hidden.
+     */
+    public static List<AbstractWidget> pauseMenuRow(List<AbstractWidget> existingButtons) {
+        Function<List<AbstractWidget>, List<AbstractWidget>> factory = pauseMenuRowFactory;
+        return factory == null ? Collections.emptyList() : factory.apply(existingButtons);
     }
 
     @Override
@@ -126,10 +134,8 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public void registerCommands(WdlCommands commands) {
-        // The 1.16.5 client-command API is v1: a static DISPATCHER registered at construction. The Java 8 compiler
-        // cannot infer the source type through register(), so the command-source type is witnessed explicitly.
-        ClientCommandManager.DISPATCHER.register(
-                AbstractPlatformBridge.<FabricClientCommandSource>wdlCommandTree(
-                        commands, ClientCommandManager::literal, ClientCommandManager::argument));
+        // No-op on this band: the Fabric client-command API (fabric-command-api-v1, ClientCommandManager) postdates
+        // 1.15, so the /wdl command tree cannot be registered without a mixin, and none ship. The keybinds and the
+        // ModMenu config button remain the entry points here.
     }
 }

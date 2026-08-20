@@ -13,12 +13,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,7 +46,6 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * is the one axis the site reads.
  */
 class RiddenMountContentsFoldTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     private static final UUID CARRIER = UUID.fromString("6b1d5f2c-9a30-4e11-b8c7-5d0e3a71f402");
@@ -55,7 +53,7 @@ class RiddenMountContentsFoldTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     @Test
@@ -115,7 +113,7 @@ class RiddenMountContentsFoldTest {
     private CompoundTag capturedItems(ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, stack);
-        return sink.captureItems(items, registries);
+        return sink.captureItems(items);
     }
 
     private static void stashEntityContainer(LiveCaptureSession session, UUID uuid, CompoundTag holder)
@@ -144,7 +142,7 @@ class RiddenMountContentsFoldTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});

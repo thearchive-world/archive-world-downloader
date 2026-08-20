@@ -224,26 +224,25 @@ neoforge/src/main/resources/META-INF/mods.toml
 # META-INF/mods.toml name instead.
 neoforge/src/main/resources/META-INF/neoforge.mods.toml
 
-# JourneyMap 6.x for 1.16.5 carries the 2.0 API (journeymap.api.v2), not the 1.x API (journeymap.client.api) the
-# higher bands' 5.x plugin binds, so the binding is dropped from compat/journeymap and re-homed under
-# compat/journeymap/v2, ported from the 1.20.1 branch's v2 plugin. This entry point implements
-# journeymap.api.v2.client.IClientPlugin under the journeymap.api.v2.common.JourneyMapPlugin annotation.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/WdlJourneyMapPlugin.java
+# The 1.15.2 JourneyMap (5.7.0) is Forge-only and ships the 1.8 API generation (journeymap.client.api), not the 2.0
+# API (journeymap.api.v2) the 1.16.5 band binds, so the overlay binding is the old-API form ported from the 1.17.1
+# branch, back under compat/journeymap. This entry point implements journeymap.client.api.IClientPlugin under the
+# journeymap.client.api.ClientPlugin annotation, discovered by JourneyMap's annotation scan on Forge; the Fabric jar
+# carries no journeymap entrypoint, as no Fabric JourneyMap exists at this band.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
 
-# The overlay driver binds the journeymap.api.v2 API: it subscribes the mapping events through
-# ClientEventRegistry.MAPPING_EVENT and shows each PolygonOverlay on the v2 IClientAPI, rather than the 1.x
-# IClientAPI.subscribe/onClientEvent push model the higher bands' driver uses.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/JourneyMapOverlayDriver.java
+# The overlay driver binds the journeymap.client.api 1.8 surface, and because the pinned 1.16.5-1.8 API jar's
+# MapPolygon and PolygonOverlay constructors name Minecraft types that differ under 1.15.2 Mojmap, it constructs them
+# reflectively against the live 5.7.0 shapes (an int dimension from DimensionType.getId, holes as a trailing List).
+common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDriver.java
 
-# The polygon builder binds the journeymap.api.v2.client.model package for MapPolygon, MapPolygonWithHoles and
-# ShapeProperties, the 2.0-API model rather than the 1.x journeymap.client.api.model the higher bands use.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/CoveragePolygons.java
+# The polygon builder targets the journeymap.client.api.model package. MapPolygonWithHoles is absent from JourneyMap
+# 5.7.0, so a local HoledPolygon holder carries the hull and holes to the reflected multi-argument PolygonOverlay
+# constructor instead.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.java
 
-# The v2 plugin package's @NullMarked marker; new at this band with the journeymap.api.v2 binding.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/package-info.java
-
-# The shared coverage-polygon tracer is made public so the re-homed compat/journeymap/v2 plugin package can reach it
-# across the package boundary, and its JDK collection factory becomes a Guava ImmutableList for the Java 8 floor.
+# The shared coverage-polygon tracer keeps the public visibility it took on the parent band, and its JDK collection
+# factory is a Guava ImmutableList for the Java 8 floor.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygonTracer.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
@@ -720,9 +719,3 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkSectionClampTest.java
 # Below 1.18 a chunk's block entities nest under Level.TileEntities, not the flat root block_entities added at 1.18,
 # so the in-session stash merge locates a block entity by x/y/z through the Level compound.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
-
-# The captureStatistics content toggle defaults off on this band, and carries a band-local config preamble saying
-# why. A 26.x server fronted by a version-bridging proxy (ViaVersion or ViaBackwards) drops the whole connection on
-# the statistics request, cutting the download off at its first tick; higher bands round-trip the request and keep
-# it on by default.
-common/src/main/java/world/thearchive/wdl/core/ConfigSchema.java

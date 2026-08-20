@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
@@ -26,20 +25,19 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for chunk capture: the mod's
- * {@link ChunkCodec#encode(ChunkSnapshotSource, RegistryAccess, boolean)} slice, written through vanilla's real region
- * pipeline and read back, is self-consistent. Every section's block-state and biome container decodes,
- * {@code OCEAN_FLOOR} is dropped, and {@code isLightOn} tracks the captured light flag (not a hardcoded {@code true}).
- * Full game-load validity is not exercised headless.
+ * The automated guard for chunk capture: the mod's {@link ChunkCodec#encode(ChunkSnapshotSource, boolean)} slice,
+ * written through vanilla's real region pipeline and read back, is self-consistent. Every section's block-state and
+ * biome container decodes, {@code OCEAN_FLOOR} is dropped, and {@code isLightOn} tracks the captured light flag (not a
+ * hardcoded {@code true}). Full game-load validity is not exercised headless.
  */
 class ChunkRoundTripTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
 
     @Test
     void chunkRoundTripsSelfConsistently(@TempDir Path directory) {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
 
-        CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
+        CompoundTag tag = codec.encode(SyntheticChunks.full(true), false);
         CompoundTag back = RegionRoundTrip.writeThenRead(directory, new ChunkPos(0, 0), tag);
 
         // write() stamps DataVersion, and it survives the on-disk region round-trip.
@@ -55,15 +53,15 @@ class ChunkRoundTripTest {
         assertFalse(heightmaps.contains("OCEAN_FLOOR"), "OCEAN_FLOOR must be dropped from the written tag");
         assertTrue(heightmaps.contains("WORLD_SURFACE"), "client-sent heightmaps must be kept");
 
-        assertSectionsDecode(back, registries);
+        assertSectionsDecode(back);
     }
 
     @Test
     void isLightOnTracksCapturedLightNotHardcoded() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
 
-        CompoundTag lit = codec.encode(SyntheticChunks.full(registries, true), registries, false);
-        CompoundTag dark = codec.encode(SyntheticChunks.full(registries, false), registries, false);
+        CompoundTag lit = codec.encode(SyntheticChunks.full(true), false);
+        CompoundTag dark = codec.encode(SyntheticChunks.full(false), false);
 
         assertTrue(lit.getCompound("Level").getBoolean("isLightOn"), "lightCorrect chunk -> isLightOn=true");
         assertFalse(dark.getCompound("Level").getBoolean("isLightOn"), "non-lightCorrect chunk -> isLightOn omitted");
@@ -71,10 +69,10 @@ class ChunkRoundTripTest {
 
     @Test
     void capturedLightRoundTripsInVanillaShape(@TempDir Path directory) {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         int minSectionY = SyntheticChunks.MIN_Y;
 
-        CompoundTag tag = codec.encode(SyntheticChunks.fullWithLight(registries), registries, false);
+        CompoundTag tag = codec.encode(SyntheticChunks.fullWithLight(), false);
         CompoundTag back = RegionRoundTrip.writeThenRead(directory, new ChunkPos(0, 0), tag);
 
         assertTrue(back.getCompound("Level").getBoolean("isLightOn"), "lit snapshot -> isLightOn=true");
@@ -90,7 +88,7 @@ class ChunkRoundTripTest {
                 padding.getByteArray("SkyLight"), "below-chunk padding sky light survives");
         assertFalse(padding.contains("BlockStates"), "padding section carries no block states");
 
-        assertSectionsDecode(back, registries);
+        assertSectionsDecode(back);
     }
 
     /** The written section tag with the given Y, failing the test if absent. */
@@ -106,8 +104,8 @@ class ChunkRoundTripTest {
      * vanilla codecs the codec encoded them with. Below 1.21.2 the full {@code ChunkSerializer.read} needs a
      * {@code ServerLevel} the headless test has none of, so the section containers are decoded directly instead.
      */
-    private static void assertSectionsDecode(CompoundTag chunkTag, RegistryAccess registries) {
-        Registry<Biome> biomeRegistry = registries.registryOrThrow(Registry.BIOME_REGISTRY);
+    private static void assertSectionsDecode(CompoundTag chunkTag) {
+        Registry<Biome> biomeRegistry = Registry.BIOME;
         CompoundTag level = chunkTag.getCompound("Level");
         for (Tag sectionTag : level.getList("Sections", 10)) {
             CompoundTag section = (CompoundTag) sectionTag;

@@ -19,18 +19,16 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.storage.LevelStorage;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -87,33 +85,31 @@ class LiveCaptureSessionResumedMountReleaseTest {
     private static final double MOUNT_Y = 71.0;
     private static final double MOUNT_Z = 487.5;
 
-    private static RegistryAccess registries;
-
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     @Test
     void aMountParkedInAnotherDimensionIsReleasedIntoThatDimension(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.OVERWORLD);
-        writePriorLevelDat(session, save, Level.NETHER, mount());
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD);
+        writePriorLevelDat(session, save, DimensionType.NETHER, mount());
         WorldPaths paths = paths(save);
-        seedHost(paths, Level.NETHER, mountChunk()); // the prior download had already written the mount's chunk
+        seedHost(paths, DimensionType.NETHER, mountChunk()); // the prior download already wrote the mount's chunk
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
 
-        CompoundTag released = entityChunk(paths, Level.NETHER, mountChunk());
+        CompoundTag released = entityChunk(paths, DimensionType.NETHER, mountChunk());
         assertNotNull(released, "the mount belongs in the dimension the previous download parked it in");
         CompoundTag mount = soleEntity(released);
         assertEquals(MOUNT.toString(), EntityMerge.readUuid(mount).toString(),
                 "and it is the mount, not something else");
         assertEquals(MOUNT_LOOT, soleItemId(mount),
                 "carrying the loot the previous download archived in it, which is what its loss costs");
-        assertNull(entityChunk(paths, Level.OVERWORLD, mountChunk()),
+        assertNull(entityChunk(paths, DimensionType.OVERWORLD, mountChunk()),
                 "and nowhere else: the dimension this session finished in never held it");
         assertFalse(session.isPartialSave(0, 0), "a released mount is not a loss");
     }
@@ -121,16 +117,16 @@ class LiveCaptureSessionResumedMountReleaseTest {
     @Test
     void aMountParkedInThisDimensionIsStillReleasedHere(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.OVERWORLD);
-        writePriorLevelDat(session, save, Level.OVERWORLD, mount());
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD);
+        writePriorLevelDat(session, save, DimensionType.OVERWORLD, mount());
         WorldPaths paths = paths(save);
-        seedHost(paths, Level.OVERWORLD, mountChunk()); // the prior download had already written the mount's chunk
+        seedHost(paths, DimensionType.OVERWORLD, mountChunk()); // the prior download already wrote the mount's chunk
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
 
-        CompoundTag released = entityChunk(paths, Level.OVERWORLD, mountChunk());
+        CompoundTag released = entityChunk(paths, DimensionType.OVERWORLD, mountChunk());
         assertNotNull(released, "routing by the prior tag must not break the case where the two agree");
         assertEquals(MOUNT.toString(), soleEntityUuid(released), "and it is the mount");
         assertFalse(session.isPartialSave(0, 0), "a released mount is not a loss");
@@ -139,11 +135,11 @@ class LiveCaptureSessionResumedMountReleaseTest {
     @Test
     void aMountWhoseDimensionThisDownloadCannotRouteCountsAsLost(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.OVERWORLD);
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD);
         // A prior tag naming a dimension no download of ours writes. Writing it into the dimension this
         // session finished in is exactly the wrong-target write the routing exists to stop, so the mount is
         // reported lost rather than put somewhere plausible.
-        CompoundTag prior = priorPlayerTag(Level.NETHER, mount());
+        CompoundTag prior = priorPlayerTag(DimensionType.NETHER, mount());
         prior.putString("Dimension", "examplepack:skylands");
         writePriorPlayerTag(session, save, prior);
         WorldPaths paths = paths(save);
@@ -154,15 +150,15 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
         assertEquals(1, losses(session), "the mount is gone and the download has to say so");
         assertTrue(session.isPartialSave(0, 0), "so the finish verdict reads partial");
-        assertNull(entityChunk(paths, Level.OVERWORLD, mountChunk()),
+        assertNull(entityChunk(paths, DimensionType.OVERWORLD, mountChunk()),
                 "and nothing is written into the dimension this session merely happened to end in");
     }
 
     @Test
     void aMountWithNoReadablePositionCountsAsLost(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
-        writePriorLevelDat(session, save, Level.NETHER,
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
+        writePriorLevelDat(session, save, DimensionType.NETHER,
                 EntityFixtures.entityWithShortPos("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y));
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
@@ -177,8 +173,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
     @Test
     void aMountTheEntitySinkRefusesCountsAsLost(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new RefusingEntitySinkAdapter(), temporary, Level.NETHER);
-        writePriorLevelDat(session, save, Level.NETHER, mount());
+        LiveCaptureSession session = resumingSession(new RefusingEntitySinkAdapter(), temporary, DimensionType.NETHER);
+        writePriorLevelDat(session, save, DimensionType.NETHER, mount());
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
 
@@ -187,14 +183,14 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
         assertEquals(1, losses(session), "an envelope that never came back is a mount that never reached disk");
         assertTrue(session.isPartialSave(0, 0), "so the finish verdict reads partial");
-        assertNull(entityChunk(paths, Level.NETHER, mountChunk()), "and the chunk stays empty");
+        assertNull(entityChunk(paths, DimensionType.NETHER, mountChunk()), "and the chunk stays empty");
     }
 
     @Test
     void aMountTheEncodeThrowsOnCountsAsLost(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new ThrowingEntitySinkAdapter(), temporary, Level.NETHER);
-        writePriorLevelDat(session, save, Level.NETHER, mount());
+        LiveCaptureSession session = resumingSession(new ThrowingEntitySinkAdapter(), temporary, DimensionType.NETHER);
+        writePriorLevelDat(session, save, DimensionType.NETHER, mount());
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
 
@@ -209,12 +205,12 @@ class LiveCaptureSessionResumedMountReleaseTest {
     @Test
     void aFreshDownloadReleasesNothingFromTheLevelDatItIsAboutToReplace(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = session(new VersionAdapterImpl(), temporary, Level.OVERWORLD,
+        LiveCaptureSession session = session(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD,
                 DownloadMode.NEW);
         // A level.dat is present because the target folder is being written over. It belongs to a world this
         // download is replacing rather than continuing, so reading a mount out of it would put an entity from
         // some other capture into a save that never held it.
-        writePriorLevelDat(session, save, Level.NETHER, mount());
+        writePriorLevelDat(session, save, DimensionType.NETHER, mount());
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
 
@@ -224,7 +220,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         assertEquals(0, result.entityChunksWritten() + result.entityChunksFailed(),
                 "the release submitted no mount to the writer, so a wrong submit cannot hide behind a missing host");
 
-        assertNull(entityChunk(paths, Level.NETHER, mountChunk()),
+        assertNull(entityChunk(paths, DimensionType.NETHER, mountChunk()),
                 "a download that is not a resume carries nothing forward from the folder it overwrites");
         assertEquals(0, losses(session), "and it lost nothing, since it had nothing to release");
         assertFalse(session.isPartialSave(0, 0), "so nothing may stamp it partial");
@@ -233,8 +229,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
     @Test
     void aResumeThatFinishedOnTheSameMountReportsNoLoss(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
-        writePriorLevelDat(session, save, Level.NETHER, mount());
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
+        writePriorLevelDat(session, save, DimensionType.NETHER, mount());
         // Still riding the SAME mount at the finish, so this session's own level.dat carries it and releasing
         // it as a standalone entity would write a second copy of a mount that was never dropped.
         seatedOn(session, mount(), MOUNT);
@@ -247,7 +243,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         assertEquals(0, result.entityChunksWritten() + result.entityChunksFailed(),
                 "the release submitted no mount to the writer, so a wrong submit cannot hide behind a missing host");
 
-        assertNull(entityChunk(paths, Level.NETHER, mountChunk()), "the fresh RootVehicle is the mount's copy");
+        assertNull(entityChunk(paths, DimensionType.NETHER, mountChunk()), "the fresh RootVehicle is the mount's copy");
         assertEquals(0, losses(session), "nothing was lost, so nothing may be counted");
         assertFalse(session.isPartialSave(0, 0), "so the finish verdict stays clean");
     }
@@ -255,20 +251,20 @@ class LiveCaptureSessionResumedMountReleaseTest {
     @Test
     void aResumeThatFinishedOnAnotherMountStillReleasesThePriorOne(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.OVERWORLD);
-        writePriorLevelDat(session, save, Level.NETHER, mount());
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD);
+        writePriorLevelDat(session, save, DimensionType.NETHER, mount());
         // Rode a donkey in the previous download, rode a boat in this one. The fresh record replaces the prior
         // one in the Player slot, so the donkey is preserved by nothing unless it is released here, and being
         // seated on SOMETHING is not the same question as being seated on THAT mount.
         seatedOn(session, otherMount(), OTHER_MOUNT);
         WorldPaths paths = paths(save);
-        seedHost(paths, Level.NETHER, mountChunk()); // the prior download had already written the mount's chunk
+        seedHost(paths, DimensionType.NETHER, mountChunk()); // the prior download already wrote the mount's chunk
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
 
-        CompoundTag released = entityChunk(paths, Level.NETHER, mountChunk());
+        CompoundTag released = entityChunk(paths, DimensionType.NETHER, mountChunk());
         assertNotNull(released, "the mount ridden away from is a world entity and belongs where it was left");
         assertEquals(MOUNT.toString(), soleEntityUuid(released), "and it is the prior mount, not the fresh one");
         assertFalse(session.isPartialSave(0, 0), "a released mount is not a loss");
@@ -277,8 +273,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
     @Test
     void aPriorMountNestedInsideThisFinishesMountIsNotReleasedAgain(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
-        writePriorLevelDat(session, save, Level.NETHER, mount());
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
+        writePriorLevelDat(session, save, DimensionType.NETHER, mount());
         // The player is riding the prior mount, but that mount is itself in a boat, so the RootVehicle record
         // holds the OUTER boat with the mount nested under it. The mount is still under the player and still
         // saved by this finish, so releasing it would put a second copy of it in the world.
@@ -292,7 +288,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         assertEquals(0, result.entityChunksWritten() + result.entityChunksFailed(),
                 "the release submitted no mount to the writer, so a wrong submit cannot hide behind a missing host");
 
-        assertNull(entityChunk(paths, Level.NETHER, mountChunk()),
+        assertNull(entityChunk(paths, DimensionType.NETHER, mountChunk()),
                 "a mount the player is still on must not also be written standalone");
         assertEquals(0, losses(session), "nothing was lost, so nothing may be counted");
         assertFalse(session.isPartialSave(0, 0), "so the finish verdict stays clean");
@@ -301,21 +297,21 @@ class LiveCaptureSessionResumedMountReleaseTest {
     @Test
     void aFinishWhosePlayerAssemblyFailedStillReleasesThePriorMount(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
-        writePriorLevelDat(session, save, Level.NETHER, mount());
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
+        writePriorLevelDat(session, save, DimensionType.NETHER, mount());
         // The capture ran and filled the exclusion set, then the whole player assembly threw, so level.dat
         // takes its no-player arm and carries no RootVehicle at all. The mount is already held back from the
         // standalone write by that same set, so the release is the only thing left that can save it.
         Set<UUID> excluded = state(session, "excludedRootVehicleUuids");
         excluded.add(MOUNT);
         WorldPaths paths = paths(save);
-        seedHost(paths, Level.NETHER, mountChunk()); // the prior download had already written the mount's chunk
+        seedHost(paths, DimensionType.NETHER, mountChunk()); // the prior download already wrote the mount's chunk
         AsyncSaveWriter writer = saveWriter(paths);
 
         session.releaseResumedDismountedMount(writer);
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
 
-        CompoundTag released = entityChunk(paths, Level.NETHER, mountChunk());
+        CompoundTag released = entityChunk(paths, DimensionType.NETHER, mountChunk());
         assertNotNull(released, "a void-world level.dat leaves the release as the mount's only rescue");
         assertEquals(MOUNT.toString(), soleEntityUuid(released), "and it is the prior mount");
         assertFalse(session.isPartialSave(0, 0), "a released mount is not a loss");
@@ -324,8 +320,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
     @Test
     void aResumeWhosePriorSessionParkedNoMountReportsNoLoss(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
-        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.OVERWORLD);
-        writePriorPlayerTag(session, save, priorPlayerTag(Level.NETHER, null));
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD);
+        writePriorPlayerTag(session, save, priorPlayerTag(DimensionType.NETHER, null));
         AsyncSaveWriter writer = saveWriter(paths(save));
 
         session.releaseResumedDismountedMount(writer);
@@ -359,12 +355,11 @@ class LiveCaptureSessionResumedMountReleaseTest {
     }
 
     /** A prior level.dat player tag: the dimension it finished in, and the mount it was riding if any. */
-    private static CompoundTag priorPlayerTag(ResourceKey<Level> dimension, @Nullable CompoundTag mount) {
+    private static CompoundTag priorPlayerTag(DimensionType dimension, @Nullable CompoundTag mount) {
         CompoundTag player = new CompoundTag();
         // The band's save keys the player file on its UUID (players/data/<uuid>.dat at 26.x), so a prior written
         // through it must carry one; a client saveWithoutId always does.
-        player.put("UUID",
-                SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, PRIOR_PLAYER).getOrThrow(false, s -> {}));
+        player.putUUID("UUID", PRIOR_PLAYER);
         PlayerTag.setDimension(player, dimension);
         if (mount != null) {
             CompoundTag root = new CompoundTag();
@@ -374,7 +369,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return player;
     }
 
-    private static void writePriorLevelDat(LiveCaptureSession session, Path save, ResourceKey<Level> dimension,
+    private static void writePriorLevelDat(LiveCaptureSession session, Path save, DimensionType dimension,
             CompoundTag mount) throws Exception {
         writePriorPlayerTag(session, save, priorPlayerTag(dimension, mount));
     }
@@ -388,13 +383,12 @@ class LiveCaptureSessionResumedMountReleaseTest {
     private static void writePriorPlayerTag(LiveCaptureSession session, Path save, CompoundTag player)
             throws Exception {
         LevelDataWriter writer = new LevelDataWriterImpl();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
-        CapturedPlayer captured = new CapturedPlayer(player, BlockPos.ZERO, 0.0F, 0.0F, Level.OVERWORLD,
+        LevelDataWriter.LevelData built = writer.buildLevelData(WorldOutputConfig.DEFAULTS, null);
+        CapturedPlayer captured = new CapturedPlayer(player, BlockPos.ZERO, 0.0F, 0.0F, DimensionType.OVERWORLD,
                 GameType.SURVIVAL, Difficulty.NORMAL);
-        LevelStorageSource source = LevelStorageSource.createDefault(save.getParent());
-        try (LevelStorageSource.LevelStorageAccess access = source.createAccess(save.getFileName().toString())) {
-            writer.save(access, built, captured);
-        }
+        LevelStorage storage = new LevelStorageSource(save.getParent(), save.getParent().resolve("backups"),
+                DataFixers.getDataFixer()).selectLevel(save.getFileName().toString(), null);
+        writer.save(storage, built, captured);
         set(session, "levelDatFile", save.resolve("level.dat"));
     }
 
@@ -408,7 +402,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
             throws Exception {
         CompoundTag playerTag = new CompoundTag();
         PlayerTag.setRootVehicle(playerTag, capturedTree[0], root); // the tree's root; nothing here reads Attach
-        set(session, "capturedPlayer", new CapturedPlayer(playerTag, BlockPos.ZERO, 0f, 0f, Level.NETHER,
+        set(session, "capturedPlayer", new CapturedPlayer(playerTag, BlockPos.ZERO, 0f, 0f, DimensionType.NETHER,
                 GameType.SURVIVAL, Difficulty.NORMAL));
         Set<UUID> excluded = state(session, "excludedRootVehicleUuids");
         excluded.addAll(ImmutableList.copyOf(capturedTree));
@@ -420,7 +414,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
      * clears; the toggles are asserted rather than assumed, since an unrecognized key falls back to on.
      */
     private static LiveCaptureSession session(VersionAdapter adapter, Path configDirectory,
-            ResourceKey<Level> finishedIn, DownloadMode mode) {
+            DimensionType finishedIn, DownloadMode mode) {
         Properties properties = new Properties();
         properties.setProperty("captureEntities", "false");
         properties.setProperty("captureContainers", "false");
@@ -428,13 +422,13 @@ class LiveCaptureSessionResumedMountReleaseTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(adapter, new HeadlessPlatformBridge(configDirectory), config, null,
-                finishedIn, finishedIn, registries, new DownloadTarget("headless", null, mode), new SavedChunkIndex(),
+                finishedIn, finishedIn, new DownloadTarget("headless", null, mode), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
     }
 
     private static LiveCaptureSession resumingSession(VersionAdapter adapter, Path configDirectory,
-            ResourceKey<Level> finishedIn) {
+            DimensionType finishedIn) {
         return session(adapter, configDirectory, finishedIn, DownloadMode.RESUME);
     }
 
@@ -449,14 +443,13 @@ class LiveCaptureSessionResumedMountReleaseTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {},
                 new SaveProgress());
     }
 
     /**
      * Seed a host region chunk at {@code pos} in {@code dimension} (the chunk a prior download had already written).
      */
-    private static void seedHost(WorldPaths paths, ResourceKey<Level> dimension, ChunkPos pos) throws Exception {
+    private static void seedHost(WorldPaths paths, DimensionType dimension, ChunkPos pos) throws Exception {
         try (IOWorker region = paths.openRegionStorage(dimension)) {
             CompoundTag host = new CompoundTag();
             host.put("Level", new CompoundTag());
@@ -468,7 +461,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
      * The region chunk at {@code pos} in {@code dimension} whose {@code Level.Entities} the release folded the mount
      * into, or null when nothing was written there (no host chunk exists until the seed above writes one).
      */
-    private static @Nullable CompoundTag entityChunk(WorldPaths paths, ResourceKey<Level> dimension, ChunkPos pos)
+    private static @Nullable CompoundTag entityChunk(WorldPaths paths, DimensionType dimension, ChunkPos pos)
             throws Exception {
         try (IOWorker storage = paths.openRegionStorage(dimension)) {
             Optional<CompoundTag> read = Optional.ofNullable(storage.load(pos));
@@ -598,13 +591,13 @@ class LiveCaptureSessionResumedMountReleaseTest {
     private abstract static class StubEntitySink implements EntitySink {
         @Override
         public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos,
-                RegistryAccess entityRegistries, boolean forceMobPersistence) {
+                boolean forceMobPersistence) {
             throw new AssertionError("the release encodes an already-serialized tag, never a live entity");
         }
 
         @Override
         public @Nullable CompoundTag captureRootVehicle(Entity vehicle,
-                RegistryAccess vehicleRegistries, boolean forceMobPersistence) {
+                boolean forceMobPersistence) {
             throw new AssertionError("the release reads the prior tag, it does not capture a live mount");
         }
     }

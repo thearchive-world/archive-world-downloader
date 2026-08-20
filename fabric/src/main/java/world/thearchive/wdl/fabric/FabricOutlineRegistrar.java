@@ -3,27 +3,14 @@
 
 package world.thearchive.wdl.fabric;
 
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-
-import world.thearchive.wdl.adapter.RimRenderer;
-import world.thearchive.wdl.adapter.impl.RimRendererImpl;
-import world.thearchive.wdl.client.WdlOutlineRenderer;
-
 /**
- * The Fabric half of the outline render seam. It draws on the post-terrain debug-render event, mixin-free, handing the
- * band-agnostic {@link WdlOutlineRenderer} the render context's pose, buffers and view frustum and the band
- * {@link RimRenderer} it constructs. The frustum is read straight off the context, which carries it from AFTER_SETUP
- * onward, so the draw needs no per-frame stash at this band.
+ * The Fabric half of the in-world outline render seam. On this band it does nothing: the Fabric world-render event API
+ * (fabric-rendering-v1, {@code WorldRenderEvents}/{@code WorldRenderContext}) postdates 1.15, so a mixin-free draw hook
+ * is unavailable and none ship. The unsaved-container outline therefore does not draw on 1.15.2 Fabric; the HUD overlay
+ * and the JourneyMap coverage overlay remain.
  */
 final class FabricOutlineRegistrar {
-    private final RimRenderer rimRenderer = new RimRendererImpl();
-
     void register() {
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::draw);
-    }
-
-    private void draw(WorldRenderContext context) {
-        WdlOutlineRenderer.render(context.matrixStack(), context.consumers(), context.frustum(), rimRenderer);
+        // No world-render event to subscribe to at this band.
     }
 }

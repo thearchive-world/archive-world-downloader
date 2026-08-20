@@ -4,7 +4,6 @@
 package world.thearchive.wdl.testsupport;
 
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -41,20 +40,20 @@ public final class MapHolderFixtures {
     }
 
     /** The captured {@code Items} holder tag for {@code stacks}, serialized through {@code sink}. */
-    public static CompoundTag holderOf(ContainerSink sink, RegistryAccess registries, ItemStack... stacks) {
+    public static CompoundTag holderOf(ContainerSink sink, ItemStack... stacks) {
         NonNullList<ItemStack> items = NonNullList.withSize(stacks.length, ItemStack.EMPTY);
         for (int i = 0; i < stacks.length; i++) {
             items.set(i, stacks[i]);
         }
-        return sink.captureItems(items, registries);
+        return sink.captureItems(items);
     }
 
     /** A holder whose items are filled maps referencing {@code mapIds}, in order. */
-    public static CompoundTag holderReferencing(ContainerSink sink, RegistryAccess registries, int... mapIds) {
+    public static CompoundTag holderReferencing(ContainerSink sink, int... mapIds) {
         ItemStack[] maps = new ItemStack[mapIds.length];
         for (int i = 0; i < mapIds.length; i++) {
             maps[i] = filledMap(mapIds[i]);
         }
-        return holderOf(sink, registries, maps);
+        return holderOf(sink, maps);
     }
 }

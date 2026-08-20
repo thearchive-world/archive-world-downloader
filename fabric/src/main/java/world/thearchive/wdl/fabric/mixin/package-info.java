@@ -2,6 +2,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 @NullMarked
-package world.thearchive.wdl.compat.journeymap.v2;
+package world.thearchive.wdl.fabric.mixin;
 
 import org.jspecify.annotations.NullMarked;

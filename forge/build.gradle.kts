@@ -36,7 +36,7 @@ java {
 repositories {
     mavenCentral()
     maven("https://maven.minecraftforge.net/")
-    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
+    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
 }
 
 loom {
@@ -63,13 +63,13 @@ dependencies {
     // common + fabric); here the annotations only need to resolve so the marked source compiles.
     compileOnly("org.jspecify:jspecify:1.0.0")
 
-    // JourneyMap 2.0 API for the source-merged binding (compat/journeymap/v2), compile-only, never a runtime
-    // require (JourneyMap provides it jar-in-jar). The island compiles under officialMojangMappings, so it takes
-    // the -common flavor, not -forge: at this band the -forge flavor carries MCP names that would not resolve,
-    // while -common carries the official names the merged source uses; remapJar maps the calls to SRG for the
-    // shipped jar. No XaeroPlus binding on this band: XaeroPlus ships no 1.16.x build, so the overlay is dropped as
-    // a disclosed limit, matching :common.
-    compileOnly("info.journeymap:journeymap-api-common:${band("journeymap_api_v2_coordinate")}")
+    // JourneyMap public API for the source-merged binding (compat/journeymap), compile-only, never a runtime
+    // require. The 1.15.2 JourneyMap (5.7.0) is Forge-only and bundles the 1.8 API generation
+    // (journeymap.client.api); the island compiles under officialMojangMappings, matching the plain
+    // loader-suffixless 1.8 jar :common resolves, and remapJar maps WDL's calls to SRG for the shipped jar.
+    // JourneyMap discovers the plugin here by annotation scan. No XaeroPlus binding on this band: XaeroPlus ships
+    // no 1.15.x build, so the overlay is dropped as a disclosed limit, matching :common.
+    compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
 }
 
 // Source-merge :common the way wdl.common-merge does for the Gradle-9 loaders, but by direct path since the

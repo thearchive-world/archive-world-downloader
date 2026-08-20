@@ -20,15 +20,14 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -58,13 +57,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * forward throughout, so a suppression widened to everything is as red as one that suppresses nothing.
  */
 class CarryForwardWiringTest {
-    private static RegistryAccess registries;
-
     private final BlockPos chest = new BlockPos(6, 64, 11);
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** An ordinary revisit must still keep what this download captured at that position. */
@@ -197,7 +194,7 @@ class CarryForwardWiringTest {
 
     /** A captured chunk holding one chest exactly as the client saves it, which is with no contents. */
     private ChunkSnapshotSource snapshotWithEmptyChest() {
-        return SyntheticChunks.withBlockEntityAt(registries, chest, Blocks.CHEST.defaultBlockState(),
+        return SyntheticChunks.withBlockEntityAt(chest, Blocks.CHEST.defaultBlockState(),
                 blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()));
     }
 
@@ -232,7 +229,7 @@ class CarryForwardWiringTest {
     }
 
     private static IOWorker regionStorage(WorldPaths paths) {
-        return paths.openRegionStorage(Level.OVERWORLD);
+        return paths.openRegionStorage(DimensionType.OVERWORLD);
     }
 
     private static LiveCaptureSession session(Path configDirectory) {
@@ -240,7 +237,7 @@ class CarryForwardWiringTest {
         properties.setProperty("captureEntities", "false");
         WdlConfig config = WdlConfig.parse(properties);
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -248,14 +245,14 @@ class CarryForwardWiringTest {
 
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
-        Files.createDirectories(paths.regionDirectory(Level.OVERWORLD));
+        Files.createDirectories(paths.regionDirectory(DimensionType.OVERWORLD));
         return paths;
     }
 
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
                 dimension -> regionStorage(paths),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
     }
 
     @SuppressWarnings("unchecked")

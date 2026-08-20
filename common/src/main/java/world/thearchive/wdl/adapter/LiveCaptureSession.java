@@ -13,6 +13,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,7 +49,6 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -57,7 +57,6 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
@@ -79,7 +78,6 @@ import net.minecraft.world.item.MapItem;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -91,8 +89,9 @@ import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
-import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.world.level.storage.LevelStorage;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.phys.AABB;
 import org.apache.logging.log4j.LogManager;
@@ -241,22 +240,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // dimension's TYPE so non-standard server level keys (e.g. Multiverse's minecraft:worlds/2b2t/2b2t_1)
     // still write to the vanilla dimension's own folder, not one derived from the custom level key.
     // Non-final: rebound on a dimension change to lay the new dimension out under its own folder.
-    private ResourceKey<Level> targetDimension;
+    private DimensionType targetDimension;
     // The server's OWN key for the dimension being captured, as the id string the packet-side per-dimension
     // stores share, which on a Multiverse/Paper server is not the vanilla-mapped targetDimension above. It is
     // the identity the inbound tee stamps each held entity with, so the promote gate compares a held frame
     // against the world it was announced in rather than against a position set from another world. Rebound on
     // a dimension change, like targetDimension.
     private String liveDimensionId;
-    // Connection-global (ClientLevel takes it from the packet listener, shared across a respawn's new level),
-    // so it stays final and correct across a dimension rebind.
-    private final RegistryAccess registries;
 
     /**
      * What a dimension change does to every store whose contents belong to one dimension. The stores register with it
      * at construction and it owns the order they are drained, swapped, and cleared in.
      */
-    private final DimensionRebind<ResourceKey<Level>> dimensionRebind = new DimensionRebind<>();
+    private final DimensionRebind<DimensionType> dimensionRebind = new DimensionRebind<>();
 
     /**
      * The bounded keep-hot working buffer: captured chunk snapshots not yet flushed to disk, keyed by position
@@ -272,7 +268,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * a portal must not let one dimension's captures dedup the other's. {@link #allCaptured} references the current
      * dimension's set; this map backs the per-dimension chunk count at finish.
      */
-    private final Map<ResourceKey<Level>, LongOpenHashSet> capturedByDimension = new LinkedHashMap<>();
+    private final Map<DimensionType, LongOpenHashSet> capturedByDimension = new LinkedHashMap<>();
 
     /**
      * The current dimension's captured-position set (a reference into {@link #capturedByDimension}, swapped on a
@@ -374,7 +370,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * post-placement, so the visit after it carries forward this download's own capture; keeping the position would
      * instead erase that capture on every later pass, which is the shape a permanent refusal always has.
      */
-    private final Map<ResourceKey<Level>, LongOpenHashSet> replacedBlockKeysByDimension = new LinkedHashMap<>();
+    private final Map<DimensionType, LongOpenHashSet> replacedBlockKeysByDimension = new LinkedHashMap<>();
     private LongOpenHashSet replacedBlockKeys = new LongOpenHashSet();
 
     /**
@@ -391,7 +387,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * staying session-wide, and every ender chest is derived from {@link #enderChestStash} (one shared capture).
      * Main-thread only, like the rest of capture; the cross-seam view contract is {@link CapturedContainers}.
      */
-    private final Map<ResourceKey<Level>, LongOpenHashSet> capturedBlockKeysByDimension = new LinkedHashMap<>();
+    private final Map<DimensionType, LongOpenHashSet> capturedBlockKeysByDimension = new LinkedHashMap<>();
     private LongOpenHashSet capturedBlockKeys = new LongOpenHashSet();
     // The block-entity registry id recorded per captured pos, the one id both staleness gates compare against:
     // each compares it against a like-for-like id to catch a same-position block replacement. Gate 1 rides
@@ -399,13 +395,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // the outline.
     // Held per dimension and swapped on a portal like capturedBlockKeys so one dimension's pos never shadows
     // another's, last-recorded-wins on re-open.
-    private final Map<ResourceKey<Level>, Long2ObjectMap<String>> capturedBlockTypesByDimension = new LinkedHashMap<>();
+    private final Map<DimensionType, Long2ObjectMap<String>> capturedBlockTypesByDimension = new LinkedHashMap<>();
     private Long2ObjectMap<String> capturedBlockTypes = new Long2ObjectOpenHashMap<>();
     // The chiseled-bookshelf captured-slot masks the outline reads (per pos, bit n = slot n): a bookshelf is
     // captured one slot at a time, so a whole-block flag in capturedBlockKeys cannot express it. Held per
     // dimension and swapped on a portal like capturedBlockKeys, OR-updated when the interaction recognizer
     // records a book insert.
-    private final Map<ResourceKey<Level>, Long2IntOpenHashMap> bookshelfSlotsByDimension = new LinkedHashMap<>();
+    private final Map<DimensionType, Long2IntOpenHashMap> bookshelfSlotsByDimension = new LinkedHashMap<>();
     private Long2IntOpenHashMap bookshelfSlots = new Long2IntOpenHashMap();
     private final Set<UUID> capturedEntityIds = new HashSet<>();
 
@@ -786,7 +782,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * dimension-local, so one dimension's failing position must not dedup another's. Held as a plain map rather than a
      * swapped current-dimension reference like {@link #allCaptured}, because nothing reads it per tick.
      */
-    private final Map<ResourceKey<Level>, LongOpenHashSet> captureFailedByDimension = new LinkedHashMap<>();
+    private final Map<DimensionType, LongOpenHashSet> captureFailedByDimension = new LinkedHashMap<>();
 
     /**
      * The per-download report writer (the sentinel at world-open, the rendering from the writer preflight after the
@@ -835,8 +831,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             SendRangeEstimator sendRange, boolean overlayActive, boolean cameraDetachedAtStart,
             BobbyChunkFilter bobbyFilter, Runnable saveCompletePoke) {
         this(adapter, bridge, config, level,
-                VanillaDimensions.forType(level.dimensionType()),
-                level.dimension(), level.registryAccess(), target, overlayIndex, coveredIndex, sendRange,
+                VanillaDimensions.forType(level.getDimension().getType()),
+                level.getDimension().getType(), target, overlayIndex, coveredIndex, sendRange,
                 overlayActive, cameraDetachedAtStart, bobbyFilter, saveCompletePoke);
     }
 
@@ -849,8 +845,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * on a server that names its worlds itself.
      */
     LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config,
-            @Nullable ClientLevel level, ResourceKey<Level> targetDimension, ResourceKey<Level> liveDimension,
-            RegistryAccess registries, DownloadTarget target, SavedChunkIndex overlayIndex,
+            @Nullable ClientLevel level, DimensionType targetDimension, DimensionType liveDimension,
+            DownloadTarget target, SavedChunkIndex overlayIndex,
             CoveredChunkIndex coveredIndex, SendRangeEstimator sendRange, boolean overlayActive,
             boolean cameraDetachedAtStart, BobbyChunkFilter bobbyFilter, Runnable saveCompletePoke) {
         this.adapter = adapter;
@@ -866,8 +862,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         this.saveName = target.folderName();
         this.level = level;
         this.targetDimension = targetDimension;
-        this.liveDimensionId = liveDimension.location().toString();
-        this.registries = registries;
+        this.liveDimensionId = DimensionType.getName(liveDimension).toString();
         registerDimensionScopedStores();
         dimensionRebind.bind(targetDimension);
         // The packet accumulator is the authoritative source for every non-player entity; publish it
@@ -881,7 +876,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             EntityPacketCapture.activate(this.packetCapture);
         }
         this.interactionCapture = config.captureContainers()
-                ? new InteractionCapture(adapter.containerSink(), registries,
+                ? new InteractionCapture(adapter.containerSink(),
                         config.recaptureChunks().refreshesHotChunks(), this::isInteractionChunkCapturable,
                         this::onBookshelfSlotCaptured, this::onPlacedContainerCaptured, this::onBlockPlacedAt)
                 : null;
@@ -892,7 +887,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (this.openClickTracker != null) {
             OpenClickTracker.activate(this.openClickTracker);
         }
-        this.containerCapture = new ContainerCapture(adapter, bridge, registries, openClickTracker);
+        this.containerCapture = new ContainerCapture(adapter, bridge, openClickTracker);
     }
 
     /**
@@ -909,27 +904,27 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /** The captured-position set for {@code dimension}, created empty on first use (the per-dimension dedup). */
-    private LongOpenHashSet capturedFor(ResourceKey<Level> dimension) {
+    private LongOpenHashSet capturedFor(DimensionType dimension) {
         return capturedByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
     }
 
     /** The placement-replaced position set for {@code dimension}, created empty on first use. */
-    private LongOpenHashSet replacedBlockKeysFor(ResourceKey<Level> dimension) {
+    private LongOpenHashSet replacedBlockKeysFor(DimensionType dimension) {
         return replacedBlockKeysByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
     }
 
     /** The outline captured-block set for {@code dimension}, created empty on first use (the per-dimension dedup). */
-    private LongOpenHashSet capturedBlockKeysFor(ResourceKey<Level> dimension) {
+    private LongOpenHashSet capturedBlockKeysFor(DimensionType dimension) {
         return capturedBlockKeysByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
     }
 
     /** The outline bookshelf captured-slot masks for {@code dimension}, created empty on first use. */
-    private Long2IntOpenHashMap bookshelfSlotsFor(ResourceKey<Level> dimension) {
+    private Long2IntOpenHashMap bookshelfSlotsFor(DimensionType dimension) {
         return bookshelfSlotsByDimension.computeIfAbsent(dimension, key -> new Long2IntOpenHashMap());
     }
 
     /** The captured block-entity type ids for {@code dimension}, created empty on first use (the staleness gate). */
-    private Long2ObjectMap<String> capturedBlockTypesFor(ResourceKey<Level> dimension) {
+    private Long2ObjectMap<String> capturedBlockTypesFor(DimensionType dimension) {
         return capturedBlockTypesByDimension.computeIfAbsent(dimension, key -> new Long2ObjectOpenHashMap<>());
     }
 
@@ -1115,7 +1110,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         @Nullable
         ChunkPos hotCenter = null;
         if (player != null && minecraft.level == level()) {
-            hotCenter = new ChunkPos(anchorEntity(minecraft, player).blockPosition());
+            hotCenter = new ChunkPos(new BlockPos(anchorEntity(minecraft, player)));
             capturedThisTick.clear();
             // Gate-arm before anything samples this tick: the speed gate must see the teleport
             // displacement before the prime loop can seed against un-pruned far entities.
@@ -1139,7 +1134,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     // The start-window (and every re-arm's) one-shot seed sweep: window-suppressed primes
                     // registered without sampling; replay the book against the current player position.
                     // Ids gone from the live level are Respawn-race orphans and never sample.
-                    String dimensionId = level().dimension().location().toString();
+                    String dimensionId = DimensionType.getName(level().getDimension().getType()).toString();
                     int boundBlocks = capChunks * 16;
                     boolean aborted = false;
                     for (int id : sampler.sweepIds()) {
@@ -1227,7 +1222,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * read hides by mirroring the saved set until the range is measured.
      */
     private void recordCoveredDisc(ChunkPos hotCenter, int capChunks) {
-        String dimensionId = level().dimension().location().toString();
+        String dimensionId = DimensionType.getName(level().getDimension().getType()).toString();
         int radius = sendRange.radiusChunks(dimensionId, capChunks);
         if (radius != lastCoveredRadius) {
             coveredIndex.recompute(dimensionId, radius); // the range changed: rebuild covered over the whole trail
@@ -1278,12 +1273,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Follow the player into a new dimension: hand every dimension-scoped store to {@link #dimensionRebind}, whose
      * drains land the old dimension's held entities, buffers and stashes in its own folder before its swaps retarget to
      * the new one. The bound level, writer target and live dimension key advance after that call, since the drains
-     * write through them and must reach the dimension being left. The registries are connection-global, so they need no
-     * rebind; the open menu closes on a dimension change, so the menu-bound stashes reset on the next tick. Capture
-     * resumes this same tick in the new dimension.
+     * write through them and must reach the dimension being left. The open menu closes on a dimension change, so the
+     * menu-bound stashes reset on the next tick. Capture resumes this same tick in the new dimension.
      */
     private void rebindDimension(ClientLevel newLevel) {
-        rebindDimension(VanillaDimensions.forType(newLevel.dimensionType()), newLevel.dimension());
+        rebindDimension(VanillaDimensions.forType(newLevel.getDimension().getType()),
+                newLevel.getDimension().getType());
         this.level = newLevel;
     }
 
@@ -1291,10 +1286,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * The rebind a headless test can drive: the keys the session takes from its {@link ClientLevel} arrive directly,
      * and the bound level stays the caller's to advance.
      */
-    void rebindDimension(ResourceKey<Level> newTarget, ResourceKey<Level> liveDimension) {
+    void rebindDimension(DimensionType newTarget, DimensionType liveDimension) {
         dimensionRebind.rebind(newTarget);
         this.targetDimension = newTarget;
-        this.liveDimensionId = liveDimension.location().toString();
+        this.liveDimensionId = DimensionType.getName(liveDimension).toString();
     }
 
     /**
@@ -1353,7 +1348,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     private void captureLoadedChunks(Minecraft minecraft, LocalPlayer player, ChunkPos anchor) {
         captureSquareAround(minecraft, player, anchor);
-        ChunkPos playerChunk = new ChunkPos(player.blockPosition());
+        ChunkPos playerChunk = new ChunkPos(new BlockPos(player));
         // One square is retained by ClientChunkCache at a time, so once the camera is more than
         // renderDistance + 3 chunks away the player square lies outside it and this pass returns null
         // everywhere, costing only the probes. While the two squares still overlap during the handoff it
@@ -1380,7 +1375,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // The live client dimension id: on a Multiverse/Paper server this is the server's custom id
         // (e.g. minecraft:worlds/2b2t/2b2t_1), which is what the overlay providers query the overlay under, so
         // the overlay index keys by this rather than the vanilla-mapped disk key. Same for every chunk this call.
-        String overlayDimension = level().dimension().location().toString();
+        String overlayDimension = DimensionType.getName(level().getDimension().getType()).toString();
 
         // Nearest-to-player first (by Chebyshev ring), so when the encode budget spills the square across ticks
         // the visible area fills first and the lag never concentrates on one side.
@@ -1418,7 +1413,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // different count.
             ChunkSnapshotSource snapshot;
             try {
-                snapshot = codec.capture(chunk, registries);
+                snapshot = codec.capture(chunk);
             } catch (RuntimeException e) {
                 recordChunkCaptureLoss(pos, e);
                 continue;
@@ -1493,7 +1488,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // mods, a mod-compat over-claim edge with no vanilla instance, accepted.
             capture.primeSeed(entity, player.getX(), player.getZ(), plausibleMaxBlocks, overlayDimensionId);
             if (entity instanceof Player || capture.tracks(entity.getId())
-                    || !new ChunkPos(entity.blockPosition()).equals(pos)) {
+                    || !new ChunkPos(new BlockPos(entity)).equals(pos)) {
                 continue; // players are not saved as entities; a tracked entity is the packet path's; a straddling
                          // entity is buffered only by the chunk it sits in (so it is saved exactly once)
             }
@@ -1568,7 +1563,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     // Asked again here: one prime pass can reach a passenger before the vehicle whose tag nests it.
                     continue;
                 }
-                ChunkPos pos = new ChunkPos(entity.blockPosition());
+                ChunkPos pos = new ChunkPos(new BlockPos(entity));
                 if (!allCaptured.contains(pos.toLong())) {
                     continue; // the captured-chunk privacy gate, which the prime got from the chunk it ran for
                 }
@@ -1733,7 +1728,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // real singleplayer save. The chunk is fetched from the bound level's own source, so this holds.
         assert chunk.getLevel() == level : "re-capture touched a chunk outside the bound ClientLevel";
         try {
-            captured.put(pos, codec.capture(chunk, registries));
+            captured.put(pos, codec.capture(chunk));
             reencodedThisTick.add(key);
             dirtyRemove(key);
             chunk.setUnsaved(false); // re-arm the unsaved flag so the next block-state change re-flags this chunk
@@ -2333,7 +2328,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             capturedBlockKeys.remove(posKey);
             return;
         }
-        CompoundTag holder = adapter.lecternSink().captureBook(book, menu.getPage(), registries);
+        CompoundTag holder = adapter.lecternSink().captureBook(book, menu.getPage());
         stashBlockHolder(lecternStash, pos, holder);
     }
 
@@ -2383,7 +2378,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (config.recaptureChunks().refreshesHotChunks() && player != null && minecraft.level == level()) {
             capturedThisTick.clear(); // finish() is its own moment: the burst refreshes the area unconditionally
             LongOpenHashSet reencodedThisTick = new LongOpenHashSet();
-            ChunkPos anchor = new ChunkPos(anchorEntity(minecraft, player).blockPosition());
+            ChunkPos anchor = new ChunkPos(new BlockPos(anchorEntity(minecraft, player)));
             recaptureEditZone(anchor, adapter.chunkCodec(), level().getChunkSource(), reencodedThisTick);
             // Close the interaction staleness window: re-encode any still-loaded pending-candidate chunk
             // outside the edit zone before the dirty set is dropped, so the reconcile gate reads a post-ack
@@ -2739,7 +2734,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * nothing, which is an empty set rather than an absent one.
      */
     private @Nullable LongOpenHashSet capturedPositionsOf(String dimensionId) {
-        ResourceKey<Level> target = VanillaDimensions.forId(dimensionId);
+        DimensionType target = VanillaDimensions.forId(dimensionId);
         if (target == null) {
             return null;
         }
@@ -2855,8 +2850,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     excluded.add(entity.getUUID());
                 }
             });
-            CompoundTag entityTag = adapter.entitySink().captureRootVehicle(root, registries,
-                    config.forceMobPersistence());
+            CompoundTag entityTag = adapter.entitySink().captureRootVehicle(root, config.forceMobPersistence());
             if (entityTag == null) {
                 return;
             }
@@ -2942,7 +2936,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private CapturedPlayer assembleCapturedPlayer(LocalPlayer player, Minecraft minecraft) {
         Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
-        CompoundTag raw = adapter.playerSink().capturePlayer(player, registries);
+        CompoundTag raw = adapter.playerSink().capturePlayer(player);
         PlayerTag.applyStripKnobs(raw, config.savePlayerInventory(), config.savePlayerEnderChest());
         PlayerTag.stripDeathLocation(raw);
         if (!config.saveItemCoordinates()) {
@@ -2967,7 +2961,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
         }
         PlayerTag.setDimension(raw, targetDimension);
-        PlayerTag.setPosition(raw, anchor.blockPosition(), anchor.yRot, anchor.xRot);
+        PlayerTag.setPosition(raw, new BlockPos(anchor), anchor.yRot, anchor.xRot);
         if (config.savePlayerEnderChest()) {
             if (enderChestStash != null) {
                 if (!config.saveItemCoordinates()) {
@@ -2997,14 +2991,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
             gameType = gameMode != null ? gameMode.getPlayerMode() : GameType.SURVIVAL;
             if (gameType == GameType.SPECTATOR) {
                 // Vanilla applies the saved game type to every opener, so a spectator stamp opens the world in
-                // spectator, and on a world shipped without cheats there is no way back out. Fall back to the
-                // mode the viewer held before spectating, or survival when that is unknown or itself spectator.
-                GameType previous = gameMode != null ? gameMode.getPreviousPlayerMode() : null;
-                gameType = previous != null && previous != GameType.SPECTATOR ? previous : GameType.SURVIVAL;
+                // spectator, and on a world shipped without cheats there is no way back out. At 1.15.2 the client
+                // tracks no mode held before spectating, so fall back to survival.
+                gameType = GameType.SURVIVAL;
             }
         }
         Difficulty difficulty = level().getLevelData().getDifficulty();
-        return new CapturedPlayer(raw, anchor.blockPosition(), anchor.yRot, anchor.xRot,
+        return new CapturedPlayer(raw, new BlockPos(anchor), anchor.yRot, anchor.xRot,
                 targetDimension, gameType, difficulty);
     }
 
@@ -3021,10 +3014,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
         CompoundTag raw = new CompoundTag();
         PlayerTag.setDimension(raw, targetDimension);
-        PlayerTag.setPosition(raw, anchor.blockPosition(), anchor.yRot, anchor.xRot);
+        PlayerTag.setPosition(raw, new BlockPos(anchor), anchor.yRot, anchor.xRot);
         PlayerTag.setRootVehicle(raw, attach, mountTag);
         Difficulty difficulty = level().getLevelData().getDifficulty();
-        return new CapturedPlayer(raw, anchor.blockPosition(), anchor.yRot, anchor.xRot,
+        return new CapturedPlayer(raw, new BlockPos(anchor), anchor.yRot, anchor.xRot,
                 targetDimension, GameType.SURVIVAL, difficulty);
     }
 
@@ -3156,7 +3149,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         try {
-            ResourceKey<Level> priorDimension = PlayerTag.dimensionOf(priorPlayer);
+            DimensionType priorDimension = PlayerTag.dimensionOf(priorPlayer);
             if (priorDimension == null) {
                 recordResumedMountLoss("its prior level.dat names no dimension this download writes");
                 return;
@@ -3227,8 +3220,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (file == null || !Files.exists(file)) {
             return null;
         }
-        CompoundTag root = NbtIo.readCompressed(file.toFile());
-        return root.get("Data") instanceof CompoundTag ? (CompoundTag) root.get("Data") : null;
+        // 1.15.2 NbtIo.readCompressed takes an InputStream, not a File.
+        try (InputStream input = Files.newInputStream(file)) {
+            CompoundTag root = NbtIo.readCompressed(input);
+            return root.get("Data") instanceof CompoundTag ? (CompoundTag) root.get("Data") : null;
+        }
     }
 
     /**
@@ -3318,7 +3314,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (saved == null) {
             return null; // colors never received (imageless): skipped, never fabricated
         }
-        Tag mapTag = adapter.mapSink().serializeMap(saved, registries);
+        Tag mapTag = adapter.mapSink().serializeMap(saved);
         // 1.16.5 MapItemSavedData has no locked() copy method, and mutating the live client map's locked flag would
         // freeze its tracking, so the archived lock is set on the serialized tag instead, leaving the live map alone.
         if (config.lockDownloadedMaps() && mapTag instanceof CompoundTag) {
@@ -3559,12 +3555,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Open the world for writing once and start the background {@link AsyncSaveWriter} (the writer owns the
-     * {@link LevelStorageSource.LevelStorageAccess} session lock from here, and releases it when the save finishes).
-     * Lazy so a never-captured session creates nothing; idempotent so the flush pump and {@code finish()} share one
-     * writer. Returns null (and records {@link #startError}) if the world cannot be opened; that failure is logged once
-     * where it is surfaced (reportSaveFailure at finish), not here, so a deferred open error is not dumped to the log
-     * twice.
+     * Open the world for writing once and start the background {@link AsyncSaveWriter}. Lazy so a never-captured
+     * session creates nothing; idempotent so the flush pump and {@code finish()} share one writer. Returns null (and
+     * records {@link #startError}) if the world cannot be opened; that failure is logged once where it is surfaced
+     * (reportSaveFailure at finish), not here, so a deferred open error is not dumped to the log twice.
      */
     private @Nullable AsyncSaveWriter ensureWriter() {
         if (writer != null) {
@@ -3575,12 +3569,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         Minecraft minecraft = Minecraft.getInstance();
         LevelStorageSource source = minecraft.getLevelSource();
-        LevelStorageSource.LevelStorageAccess access;
+        LevelStorage storage;
         try {
-            // Path containment: assert the resolved level root stays under the saves base before createAccess.
-            // createAccess does no validation (validateAndCreateAccess only checks symlinks on this band) and it
-            // creates the folder plus its session.lock, so the check must run first or an escape touches disk.
-            // toRealPath canonicalizes the base so a symlinked saves directory cannot defeat the lexical check.
+            // Path containment: assert the resolved level root stays under the saves base before selectLevel, which
+            // creates the folder plus its advisory session.lock, so the check must run first or an escape touches
+            // disk. toRealPath canonicalizes the base so a symlinked saves directory cannot defeat the lexical check.
             Path savesBase = source.getBaseDir().toRealPath();
             Path resolved = savesBase.resolve(saveName).normalize();
             // A download folder is a single component directly under saves; requiring the parent to be exactly
@@ -3590,25 +3583,18 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (!resolved.startsWith(savesBase) || !savesBase.equals(resolved.getParent())) {
                 throw new IOException("the download folder escapes the saves directory: " + saveName);
             }
-            access = source.createAccess(saveName);
+            storage = source.selectLevel(saveName, null);
         } catch (IOException | RuntimeException e) {
             startError = e;
             return null;
         }
         try {
-            // level.dat: a superflat VOID world derived from the client reg. The version-coupled saveDataTag
-            // call lives behind LevelDataWriter.save() (its vanilla signature drifts across bands: it drops
-            // RegistryAccess at 26.1.2), so this shared session stays cherry-pickable. Built here on the main
-            // thread; the writer thread only writes the finished data.
-            // The save root is the level directory, not the overworld storage folder. They are the same path only
-            // where the overworld sits at the save root (1.21.11 and earlier); at 26.x DimensionType
-            // .getStorageFolder puts every dimension under dimensions/minecraft/<name>, so getDimensionPath here
-            // would root WorldPaths, the map manifest and the export zip one dimension too deep.
-            // getLevelDirectory does not exist, so the level directory is taken from getLevelPath(ROOT) here.
-            // LevelResource.ROOT's id is a bare dot, so that path ends in a dot component; normalize it, or the
-            // export derives its zip name and parent directory from getFileName and getParent on the dot and lands
-            // the archive inside the save folder it is zipping.
-            Path saveRoot = access.getLevelPath(LevelResource.ROOT).normalize();
+            // level.dat: a superflat VOID world. The version-coupled saveLevelData call lives behind
+            // LevelDataWriter.save() (its vanilla signature drifts across bands), so this shared session stays
+            // cherry-pickable. Built here on the main thread; the writer thread only writes the finished data.
+            // At 1.15.2 the level directory is the LevelStorage folder, which roots WorldPaths, the map manifest and
+            // the export zip.
+            Path saveRoot = storage.getFolder().toPath();
             WorldPaths paths = adapter.worldPaths(saveRoot);
             this.worldPaths = paths;
             this.mapIdsFile = MapManifest.pathIn(saveRoot);
@@ -3632,7 +3618,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
             beginReport(minecraft, saveRoot);
             LevelDataWriter levelDataWriter = adapter.levelDataWriter();
-            LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(registries, config.worldOutput(),
+            LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(config.worldOutput(),
                     resolveWorldName());
             surfaceGameRuleOverrideLoss(levelData.gameRules());
             writer = new AsyncSaveWriter(
@@ -3654,18 +3640,18 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     // each write caught, so a map IO failure never aborts before level.dat (an unopenable save) or
                     // fails it.
                     (chunksFailed, entityChunksFailed) -> {
-                        levelDataWriter.save(access, levelData, capturedPlayer);
+                        levelDataWriter.save(storage, levelData, capturedPlayer);
                         PlayerProgressWriter.write(saveRoot, capturedProgress);
                         writeIdCounts(paths);
                         saveMapManifest(); // after the data/ files, so a torn write never precedes them
-                        // the finish marker, just before the storages/access close; carries the writer's soft
+                        // the finish marker, just before the storages close; carries the writer's soft
                         // tally so the record stamps the real clean-or-partial status
                         writeReportCompletion(chunksFailed, entityChunksFailed);
                     },
                     // Finish-time output after the folder is fully written and closed: the export zip
                     // when zipOnFinish is on. The download screen reads each row's size by walking the folder.
                     () -> FinalizeOutputs.exportZip(saveRoot, config.zipOnFinish(), progress),
-                    access, progress);
+                    progress);
             // Observe each carried-forward on-disk chunk for the outline's recovered-coverage scan.
             // Self-gating: the writer reads the prior chunk only when one exists, so this is a no-op on a fresh
             // download and runs only on a resume, reusing the writer's own read rather than a second region store.
@@ -3677,7 +3663,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             markPriorEnderRecovered();
             return writer;
         } catch (RuntimeException e) {
-            closeQuietly(access); // never handed to a writer, so release the session lock here
+            // Nothing to close: the vanilla LevelStorage holds no OS lock at this band (session.lock is advisory).
             startError = e;
             return null;
         }
@@ -3709,11 +3695,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (!overlayActive || target.mode() != DownloadMode.RESUME || paths == null) {
             return;
         }
-        String dimensionId = level().dimension().location().toString();
+        String dimensionId = DimensionType.getName(level().getDimension().getType()).toString();
         if (!overlaySeededDimensions.add(dimensionId)) {
             return;
         }
-        ResourceKey<Level> diskDimension = targetDimension;
+        DimensionType diskDimension = targetDimension;
         activeWriter.submit(() -> {
             long[] priors = RegionChunkScan.presentChunks(paths.regionDirectory(diskDimension));
             overlayIndex.addAll(dimensionId, priors);
@@ -3825,9 +3811,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
             mergedLecterns += ChunkFlushPlan.landingHolderPositions(snapshot, lecterns).size();
             mergedContainers += ChunkFlushPlan.landingHolderPositions(snapshot, holders).size();
             // Defer the heavy serialize plus the pure container/lectern fold to the writer thread:
-            // the thunk closes over the detached snapshot, the drained holders, the per-band codec/sinks, and the
-            // frozen registries, all immutable, so the render thread never runs SerializableChunkData.write. The
-            // target dimension is read here on main (submit time), not in the thunk, so a rebind cannot misroute.
+            // the thunk closes over the detached snapshot, the drained holders, and the per-band codec/sinks, all
+            // immutable, so the render thread never runs ChunkSerializer.write. The target dimension is read here on
+            // main (submit time), not in the thunk, so a rebind cannot misroute.
             boolean synthesizeBlending = VanillaDimensions.shouldSynthesizeBlending(config.worldOutput().worldType(),
                     targetDimension);
             // Blank any item-borne coordinate riding a block entity's own NBT (a compass in a decorated pot or on a
@@ -3852,7 +3838,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             replacedBlockKeys.removeAll(replacedHere);
             activeWriter.submitChunk(targetDimension, pos,
                     () -> {
-                        CompoundTag tag = codec.encode(snapshot, registries, synthesizeBlending);
+                        CompoundTag tag = codec.encode(snapshot, synthesizeBlending);
                         blockContainersFailed += ChunkFlushPlan.foldChunkStashes(tag, pos, containerSink,
                                 lecternSink, containers, lecterns, holders).failed();
                         return tag;
@@ -3951,7 +3937,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         ContainerSink containerSink = adapter.containerSink();
         LecternSink lecternSink = adapter.lecternSink();
-        ResourceKey<Level> dimension = targetDimension;
+        DimensionType dimension = targetDimension;
         for (ChunkPos pos : ChunkFlushPlan.residualHolderChunks(containerStash.keySet(),
                 lecternStash.keySet())) {
             Map<BlockPos, CompoundTag> containers = drainChunkHolders(containerStash, pos);
@@ -4239,7 +4225,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     CompoundTag encodeSingleEntity(Entity entity, ChunkPos pos, EntitySource source) {
         CompoundTag envelope;
         try {
-            envelope = adapter.entitySink().encodeChunk(ImmutableList.of(entity), pos, registries,
+            envelope = adapter.entitySink().encodeChunk(ImmutableList.of(entity), pos,
                     config.forceMobPersistence());
         } catch (RuntimeException e) {
             recordEntityEncodeFailure(source);
@@ -4637,14 +4623,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    private static void closeQuietly(AutoCloseable resource) {
-        try {
-            resource.close();
-        } catch (Exception e) {
-            LOGGER.warn("failed to close the world save access", e);
-        }
-    }
-
     /**
      * Stamp the download report's identity and settings diff into the save folder before the save begins, marking the
      * folder as wdl-managed. Runs once at world-open ({@link #ensureWriter}) and writes only the crash sentinel; the
@@ -4669,7 +4647,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         // 1.16.5 has no server simulation distance (a 1.18 addition), so render distance stands in for the report.
         return new ReportEnvironment(brand, minecraft.options.renderDistance,
-                targetDimension.location().toString(), Wdl.mcVersion(), bridge.modVersion());
+                DimensionType.getName(targetDimension).toString(), Wdl.mcVersion(), bridge.modVersion());
     }
 
     /** Read the few MC-side identity facts (downloader, source, loader) into the MC-free report identity. */
@@ -4689,7 +4667,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (server != null) {
             address = server.ip;
             sourceName = server.name;
-            motd = server.motd.getString();
+            motd = server.motd;
             sourceKind = "";
         }
         String worldName = target.worldName();
@@ -4712,13 +4690,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return; // the report never began (defensive: ensureWriter stamps it before finish reaches here)
         }
         // Build the per-dimension breakdown straight from the already-deduped position sets: each dimension
-        // keeps its own ResourceKey identity and its own count, so a shared packed position in two dimensions
+        // keeps its own DimensionType identity and its own count, so a shared packed position in two dimensions
         // counts once in each, as it should.
         List<DimensionChunks> dimensions = new ArrayList<>();
         int chunkTotal = 0;
-        for (Map.Entry<ResourceKey<Level>, LongOpenHashSet> dimension : capturedByDimension.entrySet()) {
+        for (Map.Entry<DimensionType, LongOpenHashSet> dimension : capturedByDimension.entrySet()) {
             int chunks = dimension.getValue().size();
-            dimensions.add(new DimensionChunks(dimension.getKey().location().toString(), chunks));
+            dimensions.add(new DimensionChunks(DimensionType.getName(dimension.getKey()).toString(), chunks));
             chunkTotal += chunks;
         }
         this.pendingReport = new PendingReport(root, identity, environment,

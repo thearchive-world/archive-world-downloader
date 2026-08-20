@@ -6,7 +6,6 @@ package world.thearchive.wdl.client;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.vertex.PoseStack;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,9 +37,8 @@ import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
@@ -246,10 +244,10 @@ public final class WdlDownloadsScreen extends Screen {
         field.setMaxLength(NAME_MAX_LENGTH);
         field.setValue(name);
         field.setResponder(this::onNameTyped);
-        centerTopWidget(field);
+        centerTopWidget(field, FIELD_HEIGHT);
         this.nameField = addButton(field);
 
-        int buttonRowY = field.y + field.getHeight() + 6;
+        int buttonRowY = field.y + FIELD_HEIGHT + 6;
         Component primaryLabel = this.selectedEntry != null ? resumeLabel() : downloadLabel();
         boolean primaryActive = this.selectedEntry != null || TargetResolver.hasUsableName(name);
         addButtonRow(buttonRowY, primaryLabel, button -> onPrimary(), primaryActive);
@@ -274,7 +272,7 @@ public final class WdlDownloadsScreen extends Screen {
         downloadList.populate(this.entries);
         this.list = downloadList;
         if (!listCollapsed && !this.entries.isEmpty()) {
-            addWidget(downloadList);
+            this.children.add(downloadList);
         }
         // removed() closes the scanner when a screen is pushed on top, so a re-open recreates it and lets the
         // visible rows re-submit; the walked overlay persists, so nothing already walked is re-walked.
@@ -299,13 +297,12 @@ public final class WdlDownloadsScreen extends Screen {
         this.selectedEntry = null;
 
         String name = this.activeDownloadName != null ? this.activeDownloadName : this.defaultName;
-        Component labelText = new TranslatableComponent("wdl.screen.downloads.downloading", name)
-                .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER)));
-        StringLabel label = new StringLabel(labelText, this.font.width(labelText), FIELD_HEIGHT);
-        centerTopWidget(label);
+        Component labelText = amberComponent(new TranslatableComponent("wdl.screen.downloads.downloading", name));
+        StringLabel label = new StringLabel(labelText, this.font.width(labelText.getString()), FIELD_HEIGHT);
+        centerTopWidget(label, FIELD_HEIGHT);
         addButton(label);
 
-        int buttonRowY = label.y + label.getHeight() + 6;
+        int buttonRowY = label.y + FIELD_HEIGHT + 6;
         boolean recording = state == CaptureState.RECORDING;
         // a finishing save shows a disabled Saving label, not an actionable Stop
         Button primary = addButtonRow(buttonRowY, recording ? stopLabel() : savingLabel(),
@@ -327,42 +324,42 @@ public final class WdlDownloadsScreen extends Screen {
         this.selectedEntry = null;
 
         String name = Wdl.restoringFolderName();
-        Component labelText = (name != null
+        Component labelText = amberComponent(name != null
                 ? new TranslatableComponent("wdl.screen.downloads.restoring", name)
-                : new TranslatableComponent("wdl.screen.downloads.restoring_sweep"))
-                        .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER)));
-        StringLabel label = new StringLabel(labelText, this.font.width(labelText), FIELD_HEIGHT);
-        centerTopWidget(label);
+                : new TranslatableComponent("wdl.screen.downloads.restoring_sweep"));
+        StringLabel label = new StringLabel(labelText, this.font.width(labelText.getString()), FIELD_HEIGHT);
+        centerTopWidget(label, FIELD_HEIGHT);
         addButton(label);
 
-        int buttonRowY = label.y + label.getHeight() + 6;
+        int buttonRowY = label.y + FIELD_HEIGHT + 6;
         addButton(new Button((this.width - BUTTON_WIDTH) / 2, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
-                CommonComponents.GUI_DONE, button -> onClose()));
+                I18n.get("gui.done"), button -> onClose()));
         addUpdateBanner(buttonRowY + BUTTON_HEIGHT + 8);
     }
 
-    private void centerTopWidget(AbstractWidget widget) {
+    private void centerTopWidget(AbstractWidget widget, int height) {
         widget.x = (this.width - widget.getWidth()) / 2;
-        widget.y = TOP_Y + 4 + Math.round(0.05f * Math.max(0, this.height - TOP_Y - widget.getHeight() - 8));
+        widget.y = TOP_Y + 4 + Math.round(0.05f * Math.max(0, this.height - TOP_Y - height - 8));
     }
 
     private Button addButtonRow(int buttonRowY, Component primaryLabel, Button.OnPress onPrimary,
             boolean primaryActive) {
         int total = BUTTON_WIDTH * 2 + BUTTON_GAP;
         int startX = (this.width - total) / 2;
-        Button primary = new Button(startX, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT, primaryLabel, onPrimary,
-                (button, poseStack, mouseX, mouseY) -> {
-                    if (!button.active) {
-                        this.renderTooltip(poseStack, this.font.split(
-                                new TranslatableComponent("wdl.screen.downloads.download.tooltip"), 200),
-                                mouseX, mouseY);
-                    }
-                });
+        // 1.15.2 Button carries no hover-tooltip parameter, so the disabled-primary explanation is not shown on hover.
+        Button primary = new Button(startX, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT, primaryLabel.getString(),
+                onPrimary);
         primary.active = primaryActive;
         this.primaryButton = addButton(primary);
         addButton(new Button(startX + BUTTON_WIDTH + BUTTON_GAP, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
-                CommonComponents.GUI_DONE, button -> onClose()));
+                I18n.get("gui.done"), button -> onClose()));
         return primary;
+    }
+
+    /** Tint {@code component} the nearest vanilla color to the brand amber (gold), mutating its style in place. */
+    private static Component amberComponent(Component component) {
+        component.getStyle().setColor(ChatFormatting.GOLD);
+        return component;
     }
 
     /** The centered band the existing-worlds list and the update banner both span. */
@@ -389,7 +386,7 @@ public final class WdlDownloadsScreen extends Screen {
         int modrinthWidth = this.font.width("Modrinth");
         int curseforgeWidth = this.font.width("CurseForge");
         int dismissWidth = this.font.width(DISMISS_GLYPH);
-        int leftWidth = this.font.width(WARNING_GLYPH) + this.font.width(prose);
+        int leftWidth = this.font.width(WARNING_GLYPH) + this.font.width(prose.getString());
         // A row too wide for the list band drops the lower-priority CurseForge label rather than
         // overflowing the box.
         boolean curseforgeFits = leftWidth + BANNER_GAP + modrinthWidth + BANNER_GAP + curseforgeWidth
@@ -424,7 +421,7 @@ public final class WdlDownloadsScreen extends Screen {
             return y;
         }
         Component text = new TranslatableComponent("wdl.screen.downloads.capture_disabled");
-        int width = this.font.width(WARNING_GLYPH) + this.font.width(text);
+        int width = this.font.width(WARNING_GLYPH) + this.font.width(text.getString());
         addButton(new CaptureWarningWidget((this.width - width) / 2, y, width, text));
         return y + HEADER_ROW_HEIGHT + 6;
     }
@@ -477,7 +474,7 @@ public final class WdlDownloadsScreen extends Screen {
         // Editing the name is a fresh download: drop any selected row and relabel the primary action.
         this.selectedEntry = null;
         if (this.primaryButton != null) {
-            this.primaryButton.setMessage(downloadLabel());
+            this.primaryButton.setMessage(downloadLabel().getString());
         }
         setPrimaryActive(TargetResolver.hasUsableName(text));
     }
@@ -500,7 +497,7 @@ public final class WdlDownloadsScreen extends Screen {
             setFocused(this.nameField);
         }
         if (this.primaryButton != null) {
-            this.primaryButton.setMessage(resumeLabel());
+            this.primaryButton.setMessage(resumeLabel().getString());
         }
         setPrimaryActive(true); // a selected row resumes its folder verbatim, so the name gate does not apply
     }
@@ -713,31 +710,31 @@ public final class WdlDownloadsScreen extends Screen {
         private final Component text;
 
         StringLabel(Component text, int width, int height) {
-            super(0, 0, width, height, text);
+            super(0, 0, width, height, text.getString());
             this.text = text;
             this.active = false;
         }
 
         @Override
-        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-            new RenderSurfaceImpl(poseStack).text(font, this.text, this.x,
-                    this.y + (getHeight() - font.lineHeight) / 2, NAME_ARGB);
+        public void renderButton(int mouseX, int mouseY, float partialTick) {
+            new RenderSurfaceImpl().text(font, this.text, this.x,
+                    this.y + (this.height - font.lineHeight) / 2, NAME_ARGB);
         }
     }
 
     private final class DisclosureWidget extends AbstractWidget {
         DisclosureWidget(int x, int y, int width) {
             super(x, y, width, HEADER_ROW_HEIGHT, new TranslatableComponent("wdl.screen.downloads.existing",
-                    entries.size()));
+                    entries.size()).getString());
         }
 
         @Override
-        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(poseStack);
+        public void renderButton(int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl();
             String triangle = listCollapsed ? TRIANGLE_COLLAPSED : TRIANGLE_EXPANDED;
             Component header = new TextComponent(triangle)
                     .append(new TranslatableComponent("wdl.screen.downloads.existing", entries.size()));
-            surface.text(font, header, this.x + 4, this.y + (getHeight() - font.lineHeight) / 2,
+            surface.text(font, header, this.x + 4, this.y + (this.height - font.lineHeight) / 2,
                     HEADER_ARGB);
         }
 
@@ -750,15 +747,16 @@ public final class WdlDownloadsScreen extends Screen {
     /** The "Open Saves Folder" link: a focusable, narratable control that opens the saves directory. */
     private final class OpenSavesWidget extends AbstractWidget {
         OpenSavesWidget(int x, int y, int width) {
-            super(x, y, width, HEADER_ROW_HEIGHT, new TranslatableComponent("wdl.screen.downloads.open_saves"));
+            super(x, y, width, HEADER_ROW_HEIGHT,
+                    new TranslatableComponent("wdl.screen.downloads.open_saves").getString());
         }
 
         @Override
-        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(poseStack);
+        public void renderButton(int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl();
             int color = isHovered ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             surface.text(font, openSavesText(), this.x + 4,
-                    this.y + (getHeight() - font.lineHeight) / 2, color);
+                    this.y + (this.height - font.lineHeight) / 2, color);
         }
 
         @Override
@@ -772,17 +770,17 @@ public final class WdlDownloadsScreen extends Screen {
         private final Component prose;
 
         BannerPanelWidget(int x, int y, int width, Component prose) {
-            super(x, y, width, BANNER_HEIGHT, prose);
+            super(x, y, width, BANNER_HEIGHT, prose.getString());
             this.prose = prose;
             this.active = false; // decorative and inert, like a vanilla StringWidget
         }
 
         @Override
-        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(poseStack);
-            surface.fill(this.x, this.y, this.x + getWidth(), this.y + getHeight(), BANNER_FILL_ARGB);
-            surface.outline(this.x, this.y, getWidth(), getHeight(), BANNER_OUTLINE_ARGB);
-            int textY = this.y + (getHeight() - font.lineHeight) / 2;
+        public void renderButton(int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl();
+            surface.fill(this.x, this.y, this.x + getWidth(), this.y + this.height, BANNER_FILL_ARGB);
+            surface.outline(this.x, this.y, getWidth(), this.height, BANNER_OUTLINE_ARGB);
+            int textY = this.y + (this.height - font.lineHeight) / 2;
             surface.text(font, WARNING_GLYPH, this.x + BANNER_GAP, textY, BANNER_GLYPH_ARGB);
             surface.text(font, this.prose, this.x + BANNER_GAP + font.width(WARNING_GLYPH), textY,
                     BANNER_TEXT_ARGB);
@@ -795,18 +793,18 @@ public final class WdlDownloadsScreen extends Screen {
         private final String url;
 
         BannerLinkWidget(int x, int y, int width, String label, String url) {
-            super(x, y, width, BANNER_HEIGHT, new TextComponent(label));
-            this.label = new TextComponent(label).withStyle(ChatFormatting.UNDERLINE);
+            super(x, y, width, BANNER_HEIGHT, label);
+            this.label = new TextComponent(label);
             this.url = url;
         }
 
         @Override
-        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(poseStack);
+        public void renderButton(int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl();
             int color = isHovered ? BANNER_LINK_HOVER_ARGB : BANNER_LINK_ARGB;
-            surface.text(font, this.label, this.x, this.y + (getHeight() - font.lineHeight) / 2, color);
+            surface.text(font, this.label, this.x, this.y + (this.height - font.lineHeight) / 2, color);
             if (this.isHovered) {
-                WdlDownloadsScreen.this.renderTooltip(poseStack, new TextComponent(this.url), mouseX, mouseY);
+                WdlDownloadsScreen.this.renderTooltip(this.url, mouseX, mouseY);
             }
         }
 
@@ -820,17 +818,17 @@ public final class WdlDownloadsScreen extends Screen {
     private final class BannerDismissWidget extends AbstractWidget {
         BannerDismissWidget(int x, int y, int width) {
             super(x, y, width, BANNER_HEIGHT,
-                    new TranslatableComponent("wdl.screen.downloads.update_dismiss"));
+                    new TranslatableComponent("wdl.screen.downloads.update_dismiss").getString());
         }
 
         @Override
-        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(poseStack);
+        public void renderButton(int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl();
             int color = isHovered ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             // The glyph comes from the fallback font, whose ink sits high in its line box, so the shared
             // centering formula reads a pixel high without the nudge.
             surface.text(font, DISMISS_GLYPH, this.x,
-                    this.y + (getHeight() - font.lineHeight) / 2 + 1, color);
+                    this.y + (this.height - font.lineHeight) / 2 + 1, color);
         }
 
         @Override
@@ -845,20 +843,20 @@ public final class WdlDownloadsScreen extends Screen {
         private final Component text;
 
         CaptureWarningWidget(int x, int y, int width, Component text) {
-            super(x, y, width, HEADER_ROW_HEIGHT, text);
+            super(x, y, width, HEADER_ROW_HEIGHT, text.getString());
             this.text = text;
             this.active = false; // a passive indicator, like the update banner's panel, not a control
         }
 
         @Override
-        public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(poseStack);
-            int textY = this.y + (getHeight() - font.lineHeight) / 2;
+        public void renderButton(int mouseX, int mouseY, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl();
+            int textY = this.y + (this.height - font.lineHeight) / 2;
             surface.text(font, WARNING_GLYPH, this.x, textY, BANNER_GLYPH_ARGB);
             surface.text(font, this.text, this.x + font.width(WARNING_GLYPH), textY, NAME_ARGB);
             if (this.isHovered) {
-                WdlDownloadsScreen.this.renderTooltip(poseStack, font.split(
-                        new TranslatableComponent("wdl.screen.downloads.capture_disabled.tooltip"), 200),
+                WdlDownloadsScreen.this.renderTooltip(font.split(
+                        new TranslatableComponent("wdl.screen.downloads.capture_disabled.tooltip").getString(), 200),
                         mouseX, mouseY);
             }
         }
@@ -872,7 +870,7 @@ public final class WdlDownloadsScreen extends Screen {
         if (listCollapsed) {
             this.children.remove(this.list);
         } else {
-            addWidget(this.list);
+            this.children.add(this.list);
         }
     }
 
@@ -884,12 +882,16 @@ public final class WdlDownloadsScreen extends Screen {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-        super.render(poseStack, mouseX, mouseY, partialTick);
+    public void render(int mouseX, int mouseY, float partialTick) {
+        // At 1.15.2 the screen paints its own background each frame; without it the widgets render in the world
+        // render's leftover GL state and stay invisible, leaving only the list's own dirt fill (the settings screen
+        // needs the same, and the higher bands did not).
+        this.renderBackground();
+        super.render(mouseX, mouseY, partialTick);
         // Below the 1.19.4 GUI additions Screen.render paints only its buttons, so the list added as a widget is
         // drawn by hand here, in the same paint order the renderable list gave it on the higher bands.
         if (this.list != null && !listCollapsed && !this.entries.isEmpty()) {
-            this.list.render(poseStack, mouseX, mouseY, partialTick);
+            this.list.render(mouseX, mouseY, partialTick);
         }
         // Drawing a tooltip during the row render leaves it clipped or painted over by the list; deferring it to
         // after the list draws it cleanly on top.
@@ -970,7 +972,7 @@ public final class WdlDownloadsScreen extends Screen {
     /** The name field; Enter submits the primary action (download or resume) only while the button is enabled. */
     private final class NameField extends EditBox {
         NameField(Font font, int x, int y, int width, int height, Component message) {
-            super(font, x, y, width, height, message);
+            super(font, x, y, width, height, message.getString());
         }
 
         @Override
@@ -991,10 +993,13 @@ public final class WdlDownloadsScreen extends Screen {
 
         DownloadList(Minecraft minecraft, int width, int height, int y, int itemHeight) {
             super(minecraft, width, height, y, y + height, itemHeight);
-            // Below 1.20.2 the list fills tiled dirt above and below itself, sized as if width and height were
-            // the screen's; this in-world list passes its own dimensions, so the fill would paint dirt from the
-            // screen top down to the list. The 1.20.2 list rewrite dropped that fill.
-            setRenderTopAndBottom(false);
+        }
+
+        @Override
+        protected void renderHoleBackground(int top, int bottom, int alphaTop, int alphaBottom) {
+            // No-op: the vanilla top and bottom fill paints opaque dirt from the screen edges in to the list bounds,
+            // burying the controls above the list. The higher bands drop it with setRenderTopAndBottom(false), absent
+            // before 1.17, so this band suppresses the fill here instead; the list's own in-bounds background renders.
         }
 
         @Override
@@ -1087,8 +1092,9 @@ public final class WdlDownloadsScreen extends Screen {
                 try {
                     // Below 1.20 there is no FaviconTexture; the world icon is managed by hand as vanilla's list does.
                     DynamicTexture texture = new DynamicTexture(NativeImage.read(new ByteArrayInputStream(bytes)));
+                    // The sha1 hex is always a valid ResourceLocation path and uniquely names the folder, so it
+                    // stands in for the pre-1.16 missing Util.sanitizeName folder-name segment.
                     ResourceLocation location = new ResourceLocation("wdl", "world/"
-                            + Util.sanitizeName(entry.folderName(), ResourceLocation::validPathChar) + "/"
                             + Hashing.sha1().hashUnencodedChars(entry.folderName()) + "/icon");
                     minecraft.getTextureManager().register(location, texture);
                     this.iconLocation = location;
@@ -1099,12 +1105,12 @@ public final class WdlDownloadsScreen extends Screen {
             }
 
             @Override
-            public void render(PoseStack poseStack, int index, int top, int left, int width, int height,
+            public void render(int index, int top, int left, int width, int height,
                     int mouseX, int mouseY, boolean hovering, float partialTick) {
                 this.contentX = left;
                 this.contentY = top;
                 this.contentWidth = width;
-                renderContent(poseStack, mouseX, mouseY, hovering, partialTick);
+                renderContent(mouseX, mouseY, hovering, partialTick);
             }
 
             private int getContentX() {
@@ -1119,9 +1125,8 @@ public final class WdlDownloadsScreen extends Screen {
                 return contentWidth;
             }
 
-            private void renderContent(PoseStack poseStack, int mouseX, int mouseY, boolean hovering,
-                    float partialTick) {
-                RenderSurface surface = new RenderSurfaceImpl(poseStack, WdlDownloadsScreen.this);
+            private void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick) {
+                RenderSurface surface = new RenderSurfaceImpl(WdlDownloadsScreen.this);
                 // Probe or walk only visible rows, on disjoint domains: a tainted row is availability-probed
                 // for its restore chip and never walked, a complete row is walked for its size.
                 if (this.entry.isTainted()) {
@@ -1288,8 +1293,8 @@ public final class WdlDownloadsScreen extends Screen {
                     if (size.isPresent()) {
                         SizeFormatter.Size formatted = SizeFormatter.format(size.getAsLong());
                         Component text = new TranslatableComponent(formatted.unitKey(), formatted.number());
-                        surface.text(font, text, slotRight - font.width(text), y, GRAY_ARGB);
-                        slotLeft = slotRight - font.width(text);
+                        surface.text(font, text, slotRight - font.width(text.getString()), y, GRAY_ARGB);
+                        slotLeft = slotRight - font.width(text.getString());
                     }
                 }
 

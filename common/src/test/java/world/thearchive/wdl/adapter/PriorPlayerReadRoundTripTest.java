@@ -15,14 +15,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
+import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.storage.LevelStorage;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -49,26 +48,25 @@ class PriorPlayerReadRoundTripTest {
     // resource reload TestRegistries.frozen drives, not in Bootstrap, so an EnderItems stack built first throws.
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static CompoundTag capturedPlayerTag(ListTag enderItems) {
         CompoundTag tag = new CompoundTag();
-        tag.put("UUID", SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, PLAYER_UUID).getOrThrow(false, s -> {}));
+        tag.putUUID("UUID", PLAYER_UUID);
         tag.put("Inventory", new ListTag());
         tag.put("EnderItems", enderItems);
         return tag;
     }
 
     private Path saveDownload(Path saves, String name, ListTag enderItems) throws IOException {
-        RegistryAccess registries = TestRegistries.frozen();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
+        TestRegistries.bootstrap();
+        LevelDataWriter.LevelData built = writer.buildLevelData(WorldOutputConfig.DEFAULTS, null);
         CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(enderItems), BlockPos.ZERO, 0.0F, 0.0F,
-                Level.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);
-        LevelStorageSource source = LevelStorageSource.createDefault(saves);
-        try (LevelStorageSource.LevelStorageAccess access = source.createAccess(name)) {
-            writer.save(access, built, captured);
-        }
+                DimensionType.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);
+        LevelStorage storage = new LevelStorageSource(saves, saves.resolve("backups"), DataFixers.getDataFixer())
+                .selectLevel(name, null);
+        writer.save(storage, built, captured);
         return saves.resolve(name).resolve("level.dat");
     }
 

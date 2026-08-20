@@ -6,11 +6,9 @@ package world.thearchive.wdl.testsupport;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.level.ChunkPos;
 
 import world.thearchive.wdl.adapter.impl.EntitySinkImpl;
@@ -36,7 +34,7 @@ public final class EntityFixtures {
     /** An entity tag carrying the {@code id} and {@code "UUID"} a merge matches on, and nothing else. */
     public static CompoundTag entity(String id, UUID uuid) {
         CompoundTag tag = entityTag(id);
-        tag.put("UUID", SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, uuid).getOrThrow(false, s -> {}));
+        tag.putUUID("UUID", uuid);
         return tag;
     }
 

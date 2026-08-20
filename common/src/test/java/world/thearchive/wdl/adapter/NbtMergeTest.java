@@ -26,7 +26,7 @@ class NbtMergeTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static CompoundTag withBooks(int... slots) {

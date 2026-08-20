@@ -15,7 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -39,14 +38,13 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * archive), so it is proven headless with hand-built chunk tags (no live client, no {@code Level}).
  */
 class ContainerStashMergeTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     // A sink that merges ONLY the holder's "Items", so the state-key tests prove the whitelist copy happens
     // beside the sink rather than inside it.
     private static final ContainerSink ITEMS_ONLY_SINK = new ContainerSink() {
         @Override
-        public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
+        public CompoundTag captureItems(NonNullList<ItemStack> items) {
             throw new AssertionError("not used in merge tests");
         }
 
@@ -63,13 +61,13 @@ class ContainerStashMergeTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private CompoundTag holderWith(int slot, ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(slot, stack);
-        return sink.captureItems(items, registries);
+        return sink.captureItems(items);
     }
 
     @Test
@@ -125,7 +123,7 @@ class ContainerStashMergeTest {
         // partial save honestly instead of a clean one.
         ContainerSink throwingSink = new ContainerSink() {
             @Override
-            public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
+            public CompoundTag captureItems(NonNullList<ItemStack> items) {
                 throw new AssertionError("the failure path never serializes items");
             }
 

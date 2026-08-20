@@ -18,10 +18,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.ByteArrayTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,12 +37,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * is needed.
  */
 class MapArchiveTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /**
@@ -50,13 +49,13 @@ class MapArchiveTest {
      * {@code "locked"} and the {@code "xCenter"}/{@code "zCenter"} vanilla always writes, so a fixture that varies
      * either one is comparing realistic tags.
      */
-    private static CompoundTag mapData(int colorFill, int scale, String dimension, boolean locked) {
+    private static CompoundTag mapData(int colorFill, int scale, DimensionType dimension, boolean locked) {
         byte[] colors = new byte[16384];
         Arrays.fill(colors, (byte) colorFill);
         CompoundTag data = new CompoundTag();
         data.put("colors", new ByteArrayTag(colors));
         data.putByte("scale", (byte) scale);
-        data.putString("dimension", dimension);
+        data.putInt("dimension", dimension.getId()); // at 1.15.2 vanilla writes the map dimension as an int id
         data.putBoolean("locked", locked);
         data.putInt("xCenter", 0);
         data.putInt("zCenter", 0);
@@ -64,7 +63,7 @@ class MapArchiveTest {
     }
 
     private static CompoundTag picture(int colorFill) {
-        return mapData(colorFill, 0, "minecraft:overworld", true);
+        return mapData(colorFill, 0, DimensionType.OVERWORLD, true);
     }
 
     private static Set<Integer> collect(CompoundTag holder) {
@@ -106,16 +105,16 @@ class MapArchiveTest {
 
     @Test
     void hashIgnoresLockedAndCentersButTracksColorsScaleDimension() {
-        String base = MapArchive.hashOf(mapData(7, 1, "minecraft:overworld", true));
-        assertEquals(base, MapArchive.hashOf(mapData(7, 1, "minecraft:overworld", false)),
+        String base = MapArchive.hashOf(mapData(7, 1, DimensionType.OVERWORLD, true));
+        assertEquals(base, MapArchive.hashOf(mapData(7, 1, DimensionType.OVERWORLD, false)),
                 "a lock-state flip resolves to the same id");
-        CompoundTag recentered = mapData(7, 1, "minecraft:overworld", true);
+        CompoundTag recentered = mapData(7, 1, DimensionType.OVERWORLD, true);
         recentered.putInt("xCenter", 512);
         recentered.putInt("zCenter", -512);
         assertEquals(base, MapArchive.hashOf(recentered), "a recentered map resolves to the same id");
-        assertNotEquals(base, MapArchive.hashOf(mapData(8, 1, "minecraft:overworld", true)), "colors matter");
-        assertNotEquals(base, MapArchive.hashOf(mapData(7, 2, "minecraft:overworld", true)), "scale matters");
-        assertNotEquals(base, MapArchive.hashOf(mapData(7, 1, "minecraft:the_nether", true)), "dimension matters");
+        assertNotEquals(base, MapArchive.hashOf(mapData(8, 1, DimensionType.OVERWORLD, true)), "colors matter");
+        assertNotEquals(base, MapArchive.hashOf(mapData(7, 2, DimensionType.OVERWORLD, true)), "scale matters");
+        assertNotEquals(base, MapArchive.hashOf(mapData(7, 1, DimensionType.NETHER, true)), "dimension matters");
     }
 
     @Test
@@ -175,7 +174,7 @@ class MapArchiveTest {
     void remapRewritesHolderItemsToArchiveIds() {
         CollectingSink stream = new CollectingSink();
         MapArchive archive = new MapArchive(MapManifest.empty(), id -> id == 1988 ? picture(1) : picture(2), stream);
-        CompoundTag holder = holderReferencing(sink, registries, 1988, 1993);
+        CompoundTag holder = holderReferencing(sink, 1988, 1993);
 
         archive.remap(holder, "Items");
 
@@ -195,7 +194,7 @@ class MapArchiveTest {
         CollectingSink sinkA = new CollectingSink();
         MapArchive archiveA = new MapArchive(MapManifest.empty(),
                 id -> id == 1988 ? pictureP : id == 1993 ? pictureQ : null, sinkA);
-        CompoundTag holderA = holderReferencing(sink, registries, 1988, 1993);
+        CompoundTag holderA = holderReferencing(sink, 1988, 1993);
         archiveA.remap(holderA, "Items");
         writeDataFiles(dataA, sinkA, archiveA);
         archiveA.manifest().save(manifestA);
@@ -207,7 +206,7 @@ class MapArchiveTest {
         resumed.raiseCounterAbove(MapManifest.highestDataFileId(dataA));
         CollectingSink sinkB = new CollectingSink();
         MapArchive archiveB = new MapArchive(resumed, id -> id == 0 ? pictureQ : id == 1 ? pictureP : null, sinkB);
-        CompoundTag holderB = holderReferencing(sink, registries, 0, 1);
+        CompoundTag holderB = holderReferencing(sink, 0, 1);
         archiveB.remap(holderB, "Items");
         writeDataFiles(dataB, sinkB, archiveB);
         archiveB.manifest().save(manifestB);

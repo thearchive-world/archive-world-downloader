@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import net.minecraft.nbt.CompoundTag;
@@ -28,7 +29,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class MapDataWriterRoundTripTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // sets the game version NbtUtils.addCurrentDataVersion reads
+        TestRegistries.bootstrap(); // sets the game version NbtUtils.addCurrentDataVersion reads
     }
 
     @Test
@@ -51,7 +52,10 @@ class MapDataWriterRoundTripTest {
         Path file = dataDirectory.resolve("map_3.dat");
         assertTrue(Files.exists(file), "write() creates the data/ directory and the <key>.dat file");
 
-        CompoundTag envelope = NbtIo.readCompressed(file.toFile());
+        CompoundTag envelope;
+        try (InputStream in = Files.newInputStream(file)) {
+            envelope = NbtIo.readCompressed(in);
+        }
         assertTrue((envelope.contains("DataVersion") ? envelope.getInt("DataVersion") : -1) > 0,
                 "the {data, DataVersion} envelope carries the current data version");
         CompoundTag back = envelope.getCompound("data");
@@ -65,7 +69,10 @@ class MapDataWriterRoundTripTest {
 
         MapDataWriter.writeIdCounts(dataDirectory, MapDataWriter.serializeIdCounts(7));
 
-        CompoundTag envelope = NbtIo.readCompressed(dataDirectory.resolve("idcounts.dat").toFile());
+        CompoundTag envelope;
+        try (InputStream in = Files.newInputStream(dataDirectory.resolve("idcounts.dat"))) {
+            envelope = NbtIo.readCompressed(in);
+        }
         assertEquals(7, envelope.getCompound("data").contains("map") ? envelope.getCompound("data").getInt("map") : -1,
                 "data/idcounts.dat is {data:{map:7}, DataVersion}");
     }

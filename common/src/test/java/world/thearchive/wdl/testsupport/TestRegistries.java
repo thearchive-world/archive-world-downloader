@@ -4,34 +4,30 @@
 package world.thearchive.wdl.testsupport;
 
 import net.minecraft.SharedConstants;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.Bootstrap;
 
 /**
- * Headless vanilla {@link RegistryAccess} for plain JUnit tests.
+ * Headless vanilla registry bootstrap for plain JUnit tests.
  *
- * <p>There is no game running here. After the idempotent vanilla bootstrap populates the static built-in registries
- * (blocks, items, ...), {@code RegistryAccess.builtin} assembles the code-defined dynamic registries the chunk codec
- * and level.dat writer read: the dimension types (via {@code DimensionType.registerBuiltin}) and the biomes and the
- * rest of worldgen. It deliberately carries no LEVEL_STEM, mirroring a real multiplayer client, which is derived from a
- * world preset where it is needed.
+ * <p>There is no game running here. At 1.15.2 the registries the chunk codec and level.dat writer read are the static
+ * built-in {@code net.minecraft.core.Registry} tables (blocks, items, biomes), populated by the idempotent vanilla
+ * bootstrap; there is no composite {@code RegistryAccess} at this band (that is the 1.16 rework). So this only runs the
+ * bootstrap, and a test that needs a biome reads the static {@code Registry.BIOME} directly.
  *
- * <p>The result is memoized: the vanilla bootstrap is idempotent but expensive, and the frozen access is immutable, so
- * it is built once per JVM.
+ * <p>The bootstrap is idempotent but expensive, so it is run once per JVM.
  */
 public final class TestRegistries {
-    private static RegistryAccess frozen;
+    private static boolean bootstrapped;
 
     private TestRegistries() {}
 
-    /** The composite static + worldgen registry access, built once per JVM. */
-    public static synchronized RegistryAccess frozen() {
-        if (frozen != null) {
-            return frozen;
+    /** Run the vanilla bootstrap once, populating the static built-in registries the tests read. */
+    public static synchronized void bootstrap() {
+        if (bootstrapped) {
+            return;
         }
         SharedConstants.getCurrentVersion();
         Bootstrap.bootStrap();
-        frozen = RegistryAccess.builtin();
-        return frozen;
+        bootstrapped = true;
     }
 }

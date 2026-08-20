@@ -8,10 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.trading.MerchantOffer;
@@ -36,7 +34,7 @@ class EntityMergeTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static CompoundTag vehicle(UUID uuid, String... itemIds) {
@@ -77,8 +75,7 @@ class EntityMergeTest {
     }
 
     private static boolean matches(CompoundTag tag, UUID uuid) {
-        return SerializableUUID.CODEC.parse(NbtOps.INSTANCE, tag.get("UUID")).result()
-                .map(uuid::equals).orElse(false);
+        return tag.hasUUID("UUID") && uuid.equals(tag.getUUID("UUID"));
     }
 
     /**

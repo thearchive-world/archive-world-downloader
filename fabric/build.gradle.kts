@@ -19,6 +19,15 @@ loom {
     // Compile-time widening for the inbound entity tee: read access on the private, non-final
     // Connection.channel. Runtime application is declared in fabric.mod.json; both point at the same file.
     accessWidenerPath.set(file("src/main/resources/wdl.accesswidener"))
+
+    // The project's first mixin (PauseScreenMixin) needs Loom's mixin annotation processor: it emits the refmap that
+    // maps the mixin's @Shadow and @Inject targets from the Mojmap compile names to the intermediary names the
+    // shipped jar runs against. Without this block Loom does not process the mixin, no refmap ships, and the mixin
+    // fails to apply on a real client with "No refMap loaded". This is the band's only mixin.
+    mixin {
+        useLegacyMixinAp.set(true)
+        defaultRefmapName.set("wdl.refmap.json")
+    }
 }
 
 // This band's Minecraft version predates the Fabric client game test framework (fabric-client-gametest-api-v1,
@@ -94,7 +103,7 @@ spotless {
 repositories {
     maven("https://maven.parchmentmc.org")   // Loom layered Parchment mappings live here
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
-    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
+    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
 }
 
 // Parchment param-name mappings are layered only on bands that publish them; a band with no Parchment
@@ -118,10 +127,12 @@ dependencies {
     // never queried. The pinned version supplies only the stable ModMenuApi; the player's own ModMenu runs.
     modCompileOnly("maven.modrinth:modmenu:${property("modmenu_version")}")
 
-    // JourneyMap 2.0 API for the source-merged overlay binding (compat/journeymap/v2), compile-only. The -fabric
-    // flavor is intermediary-named, so Loom remaps it to the named mappings the merged binding compiles against;
-    // JourneyMap provides the API jar-in-jar at runtime, so nothing ships.
-    modCompileOnly("info.journeymap:journeymap-api-fabric:${property("journeymap_api_v2_coordinate")}")
+    // JourneyMap public API for the source-merged overlay binding (compat/journeymap), compile-only. JourneyMap
+    // ships no Fabric build at 1.15.2, so there is no runtime JourneyMap to query on Fabric and no -fabric-SNAPSHOT
+    // flavor; the plain Mojmap 1.8 API here only satisfies the merged binding's compile and stays inert on Fabric
+    // (the Fabric jar carries no journeymap entrypoint). It is a plain compileOnly, not modCompileOnly, because the
+    // loader-suffixless jar is already Mojmap-named and needs no Loom remap.
+    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
 
     // JSpecify on the gametest source set so its package-info @NullMarked resolves; compileOnly is not
     // transitive across source sets. NullAway does not run here (test-scope, disabled above), so the marking

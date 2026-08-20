@@ -19,6 +19,7 @@ import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.DeferredWorkQueue;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -49,9 +50,11 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     protected void registerKeybind(String keyId, Runnable onPress) {
         KeyMapping key = new KeyMapping(keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
                 WdlKeyBinds.CATEGORY);
-        // Below 1.19 there is no RegisterKeyMappingsEvent; keys register through ClientRegistry during client setup.
-        modEventBus.addListener(
-                (FMLClientSetupEvent event) -> event.enqueueWork(() -> ClientRegistry.registerKeyBinding(key)));
+        // Below 1.19 there is no RegisterKeyMappingsEvent; keys register through ClientRegistry during client
+        // setup. At 1.15.2 the setup event has no enqueueWork, so the main-thread registration is deferred through
+        // DeferredWorkQueue instead.
+        modEventBus.addListener((FMLClientSetupEvent event) -> DeferredWorkQueue
+                .runLater(() -> ClientRegistry.registerKeyBinding(key)));
         MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent event) -> {
             if (event.phase == TickEvent.Phase.END) {
                 while (key.consumeClick()) {
@@ -163,7 +166,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     }
 
     /**
-     * The /wdl client command is unavailable on this band's Forge jar: Forge 37 has no client-command event
+     * The /wdl client command is unavailable on this band's Forge jar: Forge 31 has no client-command event
      * (RegisterClientCommandsEvent is a 1.18.2 addition), and the server-side RegisterCommandsEvent cannot register a
      * command against a remote server. The command's actions are reached through the peek keybind and the pause-menu
      * buttons instead.

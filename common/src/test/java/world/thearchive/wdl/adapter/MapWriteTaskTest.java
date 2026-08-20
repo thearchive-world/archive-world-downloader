@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,7 +35,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class MapWriteTaskTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // sets the game version NbtUtils.addCurrentDataVersion reads
+        TestRegistries.bootstrap(); // sets the game version NbtUtils.addCurrentDataVersion reads
     }
 
     private static CaptureLossLog lossLog() {
@@ -57,7 +58,10 @@ class MapWriteTaskTest {
         LiveCaptureSession.mapWriteTask(dataDirectory, "map_7", mapData(), failures, lossLog()).run();
 
         assertEquals(0, failures.get(), "a successful write counts no failure");
-        CompoundTag envelope = NbtIo.readCompressed(dataDirectory.resolve("map_7.dat").toFile());
+        CompoundTag envelope;
+        try (InputStream in = Files.newInputStream(dataDirectory.resolve("map_7.dat"))) {
+            envelope = NbtIo.readCompressed(in);
+        }
         assertEquals("minecraft:overworld", envelope.getCompound("data").getString("dimension"),
                 "the map reached disk under its key carrying the caller's own tag");
     }

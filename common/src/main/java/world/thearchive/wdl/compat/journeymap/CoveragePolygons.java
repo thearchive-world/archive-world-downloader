@@ -1,16 +1,13 @@
 // Copyright (C) Archive World Downloader contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-package world.thearchive.wdl.compat.journeymap.v2;
+package world.thearchive.wdl.compat.journeymap;
 
 import java.util.ArrayList;
 import java.util.List;
-import journeymap.api.v2.client.model.MapPolygon;
-import journeymap.api.v2.client.model.MapPolygonWithHoles;
-import journeymap.api.v2.client.model.ShapeProperties;
+import journeymap.client.api.model.MapPolygon;
+import journeymap.client.api.model.ShapeProperties;
 import net.minecraft.core.BlockPos;
-
-import world.thearchive.wdl.compat.journeymap.CoveragePolygonTracer;
 
 /**
  * Turns chunk-space coverage rectangles into JourneyMap polygon hulls and builds the fill-only shape style for a
@@ -42,19 +39,21 @@ final class CoveragePolygons {
     }
 
     /**
-     * The merged polygon hulls covering {@code rects}, four ints per rectangle in chunk space (inclusive
-     * {@code minChunkX, minChunkZ, maxChunkX, maxChunkZ}); adjacent rectangles merge into a single hull with its
-     * enclosed gaps cut as holes. An empty input yields an empty list.
+     * One convex JourneyMap polygon per coverage rectangle, four ints per rectangle in chunk space (inclusive
+     * {@code minChunkX, minChunkZ, maxChunkX, maxChunkZ}). The rectangles are disjoint and abut, so their translucent
+     * fills tile seamlessly and the uncovered gaps stay uncovered. This band feeds JourneyMap the rectangles rather
+     * than the merged holed hulls {@link CoveragePolygonTracer} produces, because JourneyMap 5.7.0 neither subtracts a
+     * hole nor fills a concave polygon: it floods the tone over the gaps and streaks the tessellation to a corner. An
+     * empty input yields an empty list.
      */
-    static List<MapPolygonWithHoles> hulls(int[] rectangles) {
-        List<CoveragePolygonTracer.HoledRing> rings = CoveragePolygonTracer.trace(rectangles);
-        List<MapPolygonWithHoles> result = new ArrayList<>(rings.size());
-        for (CoveragePolygonTracer.HoledRing ring : rings) {
-            List<MapPolygon> holes = new ArrayList<>(ring.holes().size());
-            for (int[] hole : ring.holes()) {
-                holes.add(toPolygon(hole));
-            }
-            result.add(new MapPolygonWithHoles(toPolygon(ring.hull()), holes));
+    static List<MapPolygon> polygons(int[] rectangles) {
+        List<MapPolygon> result = new ArrayList<>(rectangles.length / 4);
+        for (int i = 0; i < rectangles.length; i += 4) {
+            int x0 = rectangles[i] << 4;
+            int z0 = rectangles[i + 1] << 4;
+            int x1 = (rectangles[i + 2] + 1) << 4;
+            int z1 = (rectangles[i + 3] + 1) << 4;
+            result.add(toPolygon(new int[] { x0, z0, x1, z0, x1, z1, x0, z1 }));
         }
         return result;
     }
@@ -64,6 +63,13 @@ final class CoveragePolygons {
         for (int i = 0; i < ring.length; i += 2) {
             points.add(new BlockPos(ring[i], OVERLAY_Y, ring[i + 1]));
         }
-        return new MapPolygon(points);
+        // The pinned JourneyMap API jar carries its MapPolygon(List) BlockPos parameter in mappings this plain
+        // compile-only pin does not bridge to this band's Mojmap, so it is built reflectively; at runtime JourneyMap
+        // is loaded in the running mappings, where the constructor resolves.
+        try {
+            return MapPolygon.class.getConstructor(List.class).newInstance(points);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("the JourneyMap MapPolygon(List) constructor is unavailable", e);
+        }
     }
 }

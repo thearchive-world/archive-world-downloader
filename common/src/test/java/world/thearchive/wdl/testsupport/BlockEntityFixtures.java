@@ -4,7 +4,6 @@
 package world.thearchive.wdl.testsupport;
 
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
@@ -77,9 +76,9 @@ public final class BlockEntityFixtures {
      * container that nobody opened also looks like.
      */
     public static CompoundTag emptyContainerHolder(int containerSize, String blockEntityId) {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         CompoundTag holder = new ContainerSinkImpl()
-                .captureItems(NonNullList.withSize(containerSize, ItemStack.EMPTY), registries);
+                .captureItems(NonNullList.withSize(containerSize, ItemStack.EMPTY));
         holder.putString("wdl_block_entity_id", blockEntityId);
         return holder;
     }

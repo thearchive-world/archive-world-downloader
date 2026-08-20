@@ -9,10 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -28,12 +27,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * resolution is not exercised headless.
  */
 class MapSinkRoundTripTest {
-    private static RegistryAccess registries;
     private final MapSink sink = new MapSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static MapItemSavedData clientMap(byte scale, boolean locked) {
@@ -41,7 +39,7 @@ class MapSinkRoundTripTest {
         // scale/dimension/locked fields set, the colors array already sized by the field initializer.
         MapItemSavedData map = new MapItemSavedData("map");
         map.scale = scale;
-        map.dimension = Level.OVERWORLD;
+        map.dimension = DimensionType.OVERWORLD;
         map.locked = locked;
         // A recognizable non-blank image, so a dropped or zeroed colors array fails the round-trip.
         map.colors[0] = (byte) 42;
@@ -51,7 +49,7 @@ class MapSinkRoundTripTest {
     }
 
     private MapItemSavedData roundTrip(MapItemSavedData map) {
-        Tag data = sink.serializeMap(map, registries);
+        Tag data = sink.serializeMap(map);
         MapItemSavedData back = new MapItemSavedData("map");
         back.load((CompoundTag) data);
         return back;
@@ -90,7 +88,7 @@ class MapSinkRoundTripTest {
         MapItemSavedData back = roundTrip(map);
 
         assertArrayEquals(map.colors, back.colors, "the image survives a dimensionless serialize");
-        assertEquals(Level.OVERWORLD, back.dimension, "the serialize stands in the overworld key");
+        assertEquals(DimensionType.OVERWORLD, back.dimension, "the serialize stands in the overworld key");
         assertNull(map.dimension, "the live client map is left with its null dimension");
     }
 }

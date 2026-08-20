@@ -15,16 +15,14 @@ import java.util.Properties;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -64,16 +62,15 @@ class ItemLocationScrubTest {
     private static final String FLOWER_POS = "FlowerPos";
     private static final String BLOCK_ENTITY_TAG = "BlockEntityTag";
 
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static GlobalPos basePos() {
-        return GlobalPos.of(Level.OVERWORLD, new BlockPos(128, 64, -512));
+        return GlobalPos.of(DimensionType.OVERWORLD, new BlockPos(128, 64, -512));
     }
 
     /**
@@ -86,8 +83,7 @@ class ItemLocationScrubTest {
         GlobalPos pos = basePos();
         CompoundTag tag = compass.getOrCreateTag();
         tag.put(LODESTONE_POS, NbtUtils.writeBlockPos(pos.pos()));
-        tag.put(LODESTONE_DIMENSION,
-                Level.RESOURCE_KEY_CODEC.encodeStart(NbtOps.INSTANCE, pos.dimension()).getOrThrow(false, s -> {}));
+        tag.putString(LODESTONE_DIMENSION, DimensionType.getName(pos.dimension()).toString());
         tag.putBoolean(LODESTONE_TRACKED, true);
         return compass;
     }
@@ -172,7 +168,7 @@ class ItemLocationScrubTest {
         for (int i = 0; i < stacks.length; i++) {
             items.set(i, stacks[i]);
         }
-        return sink.captureItems(items, registries);
+        return sink.captureItems(items);
     }
 
     private NonNullList<ItemStack> readBack(CompoundTag holder, int size) {
@@ -196,7 +192,7 @@ class ItemLocationScrubTest {
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         assertEquals(saveItemCoordinates, config.saveItemCoordinates(), "the fixture must set the opt-out it names");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -221,15 +217,15 @@ class ItemLocationScrubTest {
     }
 
     private ItemStack itemOf(CompoundTag blockEntity) {
-        return ItemStack.CODEC.parse(NbtOps.INSTANCE, blockEntity.get("item")).result().orElse(ItemStack.EMPTY);
+        return ItemStack.of(blockEntity.getCompound("item"));
     }
 
     private CompoundTag itemNbt(ItemStack stack) {
-        return (CompoundTag) ItemStack.CODEC.encodeStart(NbtOps.INSTANCE, stack).getOrThrow(false, s -> {});
+        return stack.save(new CompoundTag());
     }
 
     private ItemStack itemFrom(Tag itemNbt) {
-        return ItemStack.CODEC.parse(NbtOps.INSTANCE, itemNbt).getOrThrow(false, s -> {});
+        return ItemStack.of((CompoundTag) itemNbt);
     }
 
     private CompoundTag entity(String id) {

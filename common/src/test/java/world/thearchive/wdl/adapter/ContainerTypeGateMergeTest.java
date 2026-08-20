@@ -14,7 +14,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -34,19 +33,18 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * interaction-predicted path, reconciled upstream) overlays unconditionally.
  */
 class ContainerTypeGateMergeTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** A 27-slot {@code "Items"} holder carrying {@code stack} at {@code slot}, tagged with the recorded type. */
     private CompoundTag holder(String recordedTypeId, int slot, ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(slot, stack);
-        CompoundTag holder = sink.captureItems(items, registries);
+        CompoundTag holder = sink.captureItems(items);
         if (recordedTypeId != null) {
             holder.putString("wdl_block_entity_id", recordedTypeId);
         }

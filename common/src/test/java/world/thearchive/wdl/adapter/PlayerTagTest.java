@@ -10,18 +10,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -38,12 +32,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * NBT, so it round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
  */
 class PlayerTagTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** A player-like tag carrying the strip-able keys plus an unrelated field that must always survive. */
@@ -111,25 +104,15 @@ class PlayerTagTest {
     @Test
     void setDimensionWritesCanonicalVanillaIdForCanonicalKey() {
         CompoundTag tag = playerTag();
-        PlayerTag.setDimension(tag, Level.NETHER);
-        assertEquals("minecraft:the_nether", tag.getString("Dimension"));
-    }
-
-    @Test
-    void setDimensionWritesGivenIdVerbatim() {
-        CompoundTag tag = playerTag();
-        ResourceKey<Level> datapackDimension = ResourceKey.create(Registry.DIMENSION_REGISTRY,
-                new ResourceLocation("examplepack", "skylands"));
-        PlayerTag.setDimension(tag, datapackDimension);
-        assertEquals("examplepack:skylands", tag.getString("Dimension"),
-                "setDimension writes the id it is handed verbatim; the by-type canonicalization is VanillaDimensions");
+        PlayerTag.setDimension(tag, DimensionType.NETHER);
+        assertEquals(DimensionType.NETHER.getId(), tag.getInt("Dimension"));
     }
 
     @Test
     void dimensionOfReadsBackWhatSetDimensionWrote() {
         CompoundTag tag = playerTag();
-        PlayerTag.setDimension(tag, Level.NETHER);
-        assertEquals(Level.NETHER, PlayerTag.dimensionOf(tag));
+        PlayerTag.setDimension(tag, DimensionType.NETHER);
+        assertEquals(DimensionType.NETHER, PlayerTag.dimensionOf(tag));
     }
 
     @Test
@@ -138,9 +121,7 @@ class PlayerTagTest {
         // by accident: the overworld is what an unroutable id would collapse onto if this fell back.
         CompoundTag tag = playerTag();
         assertNull(PlayerTag.dimensionOf(tag), "a player tag with no Dimension key names no dimension");
-        ResourceKey<Level> datapackDimension = ResourceKey.create(Registry.DIMENSION_REGISTRY,
-                new ResourceLocation("examplepack", "skylands"));
-        PlayerTag.setDimension(tag, datapackDimension);
+        tag.putString("Dimension", "examplepack:skylands"); // an id outside the three a capture ever writes
         assertNull(PlayerTag.dimensionOf(tag), "nor does one naming a dimension the capture never routes to");
     }
 
@@ -149,7 +130,7 @@ class PlayerTagTest {
         CompoundTag tag = playerTag(); // EnderItems starts as the empty list saveWithoutId wrote
         NonNullList<ItemStack> ender = NonNullList.withSize(27, ItemStack.EMPTY);
         ender.set(5, new ItemStack(Items.ENDER_PEARL, 9));
-        CompoundTag holder = sink.captureItems(ender, registries); // an "Items" list in ItemStackWithSlot form
+        CompoundTag holder = sink.captureItems(ender); // an "Items" list in ItemStackWithSlot form
 
         PlayerTag.setEnderItems(tag, holder);
 
@@ -172,8 +153,8 @@ class PlayerTagTest {
 
         CompoundTag rootVehicle = tag.getCompound("RootVehicle");
         assertEquals(directVehicle,
-                SerializableUUID.CODEC.parse(NbtOps.INSTANCE, rootVehicle.get("Attach")).result().orElse(null),
-                "Attach is the direct vehicle UUID in the SerializableUUID.CODEC four-int form ServerPlayer reads");
+                rootVehicle.getUUID("Attach"),
+                "Attach is the direct vehicle UUID in the pre-1.16 AttachMost/AttachLeast form ServerPlayer reads");
         assertEquals("minecraft:chest_boat", rootVehicle.getCompound("Entity").getString("id"),
                 "the vehicle NBT nests under Entity, the shape loadAndSpawnParentVehicle spawns from");
         assertTrue(tag.contains("Air"), "the rest of the player tag is untouched");
@@ -267,8 +248,7 @@ class PlayerTagTest {
 
         assertTrue(carried, "the prior download's contents restore onto the same seated mount");
         assertEquals(2, mountItems(fresh).size(), "the empty seated capture is refilled from the prior download");
-        assertEquals(mount, SerializableUUID.CODEC.parse(NbtOps.INSTANCE,
-                fresh.getCompound("RootVehicle").getCompound("Entity").get("UUID")).result().orElse(null),
+        assertEquals(mount, fresh.getCompound("RootVehicle").getCompound("Entity").getUUID("UUID"),
                 "the fresh mount identity is untouched");
     }
 

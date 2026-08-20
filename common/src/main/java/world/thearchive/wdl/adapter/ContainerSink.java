@@ -4,7 +4,6 @@
 package world.thearchive.wdl.adapter;
 
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 
@@ -14,10 +13,10 @@ import net.minecraft.world.item.ItemStack;
  * receives only while the player has the container open (via {@code ClientboundContainerSetContentPacket}), never in
  * the chunk packet, so a captured chunk's chest is structurally present but empty until this axis fills it in.
  *
- * <p>Mirrors {@link EntitySink}'s two-step seam. The live step ({@link #captureItems(NonNullList, RegistryAccess)})
- * serializes the items the session lifted from the open menu's container slots; it is client-coupled (the items come
- * from the live menu). The pure step ({@link #merge(CompoundTag, CompoundTag)}) sets {@code "Items"} on a copy of an
- * already-captured block-entity tag and is what the headless round-trip exercises.
+ * <p>Mirrors {@link EntitySink}'s two-step seam. The live step ({@link #captureItems(NonNullList)}) serializes the
+ * items the session lifted from the open menu's container slots; it is client-coupled (the items come from the live
+ * menu). The pure step ({@link #merge(CompoundTag, CompoundTag)}) sets {@code "Items"} on a copy of an already-captured
+ * block-entity tag and is what the headless round-trip exercises.
  *
  * <p>Per-band from the start: vanilla serializes items via {@code ContainerHelper.saveAllItems}, whose signature
  * follows the entity seam (1.21.11 takes a {@code ValueOutput}, the codec layer, while the &le;1.21.8 sub-band takes
@@ -32,7 +31,7 @@ public interface ContainerSink {
      * byte + stack), exactly as a block entity would save it. Server-free: a discarding problem reporter replaces the
      * world-scoped one, mirroring {@link EntitySink}'s lift.
      */
-    CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries);
+    CompoundTag captureItems(NonNullList<ItemStack> items);
 
     /**
      * Set {@code "Items"} on a copy of {@code blockEntityTag} from {@code capturedItemsHolder}, leaving every other

@@ -25,7 +25,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  */
 class LevelDatCuratedGameRulesTest {
     private Map<String, CuratedGameRule> curated() {
-        TestRegistries.frozen(); // bootstrap the vanilla registries so a default GameRules can be built
+        TestRegistries.bootstrap(); // bootstrap the vanilla registries so a default GameRules can be built
         Map<String, CuratedGameRule> byId = new LinkedHashMap<>();
         for (CuratedGameRule rule : new LevelDataWriterImpl().curatedGameRules()) {
             byId.put(rule.id(), rule);

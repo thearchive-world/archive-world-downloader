@@ -15,9 +15,8 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -59,7 +58,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class LiveCaptureSessionMapTallyTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // vanilla statics, which a test reaching a map write needs before it runs
+        TestRegistries.bootstrap(); // vanilla statics, which a test reaching a map write needs before it runs
     }
 
     /**
@@ -77,9 +76,9 @@ class LiveCaptureSessionMapTallyTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         assertTrue(config.remapMapIds(), "the manifest write path is the remap-on arm, so the fixture needs it on");
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, Level.OVERWORLD, Level.OVERWORLD, registries,
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -99,7 +98,6 @@ class LiveCaptureSessionMapTallyTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {},
                 new SaveProgress());
     }
 

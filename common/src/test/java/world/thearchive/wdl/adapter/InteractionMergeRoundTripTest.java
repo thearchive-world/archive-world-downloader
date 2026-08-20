@@ -39,7 +39,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class InteractionMergeRoundTripTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** A block entity fed through the fidelity gate as-is, so a marker stamped afterward never trips it. */

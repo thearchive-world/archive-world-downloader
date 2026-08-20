@@ -3,14 +3,13 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
 
 import world.thearchive.wdl.adapter.PlayerSink;
 
 /**
- * 1.16.5 player sink: serializes the local player via vanilla's own {@code player.saveWithoutId} (the identical call
+ * 1.15.2 player sink: serializes the local player via vanilla's own {@code player.saveWithoutId} (the identical call
  * {@code PlayerDataStorage.save} uses), so the captured {@code "Player"} compound is byte-for-byte what a vanilla
  * {@code playerdata/<uuid>.dat} would hold.
  *
@@ -20,7 +19,7 @@ import world.thearchive.wdl.adapter.PlayerSink;
  */
 public final class PlayerSinkImpl implements PlayerSink {
     @Override
-    public CompoundTag capturePlayer(Player player, RegistryAccess registries) {
+    public CompoundTag capturePlayer(Player player) {
         // saveWithoutId writes the Entity super fields (Pos/Rotation/UUID) plus Player.addAdditionalSaveData
         // (Inventory/SelectedItemSlot/EnderItems/abilities), with no id.
         CompoundTag tag = new CompoundTag();

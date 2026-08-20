@@ -15,8 +15,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 
 import world.thearchive.wdl.core.RecoveredCoverage;
 
@@ -51,7 +50,7 @@ import world.thearchive.wdl.core.RecoveredCoverage;
  * dimensions, the same split {@link RecoveredCoverage} draws. Threading: both {@link #record} and
  * {@link #recordEntities} run only on the writer thread and own the accumulators (the per-dimension block sets and the
  * flat entity set); each publishes a fresh immutable {@link RecoveredCoverage} snapshot into the concurrent
- * {@code coverage} map as one reference put, which the main thread reads through {@link #coverage(ResourceKey)}. A
+ * {@code coverage} map as one reference put, which the main thread reads through {@link #coverage(DimensionType)}. A
  * snapshot is taken only when a scan adds something new, so a resume's many empty chunks cost no copy.
  */
 final class RecoveredScan {
@@ -62,10 +61,10 @@ final class RecoveredScan {
     private static final String CHISELED_BOOKSHELF_ID = "minecraft:chiseled_bookshelf";
     private static final int BOOKSHELF_SLOTS = 6;
 
-    private final Map<ResourceKey<Level>, LongOpenHashSet> recoveredByDimension = new HashMap<>();
-    private final Map<ResourceKey<Level>, Long2IntOpenHashMap> bookshelfSlotsByDimension = new HashMap<>();
+    private final Map<DimensionType, LongOpenHashSet> recoveredByDimension = new HashMap<>();
+    private final Map<DimensionType, Long2IntOpenHashMap> bookshelfSlotsByDimension = new HashMap<>();
     private final Set<UUID> recoveredEntities = new HashSet<>();
-    private final Map<ResourceKey<Level>, RecoveredCoverage> coverage = new ConcurrentHashMap<>();
+    private final Map<DimensionType, RecoveredCoverage> coverage = new ConcurrentHashMap<>();
 
     // The one global cross-dimension ender fact, set once at resume init on the main thread, then read by the
     // writer thread in publish and by the main thread in coverage, so it is volatile. True means a prior download
@@ -75,7 +74,7 @@ final class RecoveredScan {
     /**
      * Writer thread: collect every prior-captured container position in {@code onDiskChunkTag} for {@code dimension}.
      */
-    void record(ResourceKey<Level> dimension, CompoundTag onDiskChunkTag) {
+    void record(DimensionType dimension, CompoundTag onDiskChunkTag) {
         if (!(onDiskChunkTag.getCompound("Level").get("TileEntities") instanceof ListTag)) {
             return;
         }
@@ -109,11 +108,11 @@ final class RecoveredScan {
 
     /**
      * Writer thread: collect every prior-captured container-entity UUID in {@code onDiskChunkTag}'s
-     * {@code Level.Entities} (the 1.16.5 in-chunk entity location, sibling of the {@code Level.TileEntities} that
+     * {@code Level.Entities} (the 1.15.2 in-chunk entity location, sibling of the {@code Level.TileEntities} that
      * {@link #record} reads). Keyed by the dimension being scanned so the current dimension's snapshot is republished
      * with the new ids; the ids themselves are globally unique, so the accumulator behind them is flat.
      */
-    void recordEntities(ResourceKey<Level> dimension, CompoundTag onDiskChunkTag) {
+    void recordEntities(DimensionType dimension, CompoundTag onDiskChunkTag) {
         if (!(onDiskChunkTag.getCompound("Level").get("Entities") instanceof ListTag)) {
             return;
         }
@@ -136,7 +135,7 @@ final class RecoveredScan {
     }
 
     /** Writer thread: swap a fresh immutable snapshot for {@code dimension}, folding in the flat entity ids. */
-    private void publish(ResourceKey<Level> dimension) {
+    private void publish(DimensionType dimension) {
         LongOpenHashSet recovered = recoveredByDimension.get(dimension);
         Long2IntOpenHashMap bookshelves = bookshelfSlotsByDimension.get(dimension);
         coverage.put(dimension, new RecoveredCoverage(
@@ -178,7 +177,7 @@ final class RecoveredScan {
     }
 
     /** Main thread: the latest published prior-session coverage for {@code dimension}, empty until one is recorded. */
-    RecoveredCoverage coverage(ResourceKey<Level> dimension) {
+    RecoveredCoverage coverage(DimensionType dimension) {
         return coverage.getOrDefault(dimension,
                 enderRecovered ? RecoveredCoverage.ENDER_ONLY : RecoveredCoverage.EMPTY);
     }

@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
@@ -49,30 +48,29 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * ({@link ContainerMerge#mergePlaceCandidates}).
  */
 class InteractionStashMergeTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** An interaction capture with no-op bookshelf-slot and placed-container sinks, for the tests that ignore them. */
-    private static InteractionCapture plainCapture(ContainerSink sink, RegistryAccess registries,
+    private static InteractionCapture plainCapture(ContainerSink sink,
             boolean recaptureEnabled) {
-        return plainCapture(sink, registries, recaptureEnabled, chunk -> true);
+        return plainCapture(sink, recaptureEnabled, chunk -> true);
     }
 
-    private static InteractionCapture plainCapture(ContainerSink sink, RegistryAccess registries,
+    private static InteractionCapture plainCapture(ContainerSink sink,
             boolean recaptureEnabled, InteractionCapture.ChunkCaptureGate gate) {
-        return new InteractionCapture(sink, registries, recaptureEnabled, gate,
+        return new InteractionCapture(sink, recaptureEnabled, gate,
                 (posKey, slot, occupiedMask) -> {}, (posKey, blockTypeId) -> {}, posKey -> {});
     }
 
     private CompoundTag itemsHolder(int slot, ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(slot, stack);
-        return sink.captureItems(items, registries);
+        return sink.captureItems(items);
     }
 
     private static NonNullList<ItemStack> readItems(CompoundTag holder, int size) {
@@ -194,7 +192,7 @@ class InteractionStashMergeTest {
         BlockPos placedOnly = new BlockPos(12, 70, 20);
 
         Map<BlockPos, CompoundTag> openTimeBundle = new LinkedHashMap<>();
-        openTimeBundle.put(opened, itemsHolder(0, new ItemStack(Items.NETHERITE_INGOT))); // ground-truth, edited open
+        openTimeBundle.put(opened, itemsHolder(0, new ItemStack(Items.DIAMOND))); // ground-truth, edited open
         Map<BlockPos, CompoundTag> confirmedPlace = new LinkedHashMap<>();
         confirmedPlace.put(opened, itemsHolder(0, new ItemStack(Items.DIRT))); // stale place snapshot, must lose
         confirmedPlace.put(placedOnly, itemsHolder(0, new ItemStack(Items.GOLD_INGOT))); // place-only, must survive
@@ -211,7 +209,7 @@ class InteractionStashMergeTest {
     @Test
     void blockStateAtReadsThePlacedBlockFromTheSnapshotSection() {
         BlockPos shulkerPos = new BlockPos(5, -60, 7); // a deliberately negative-Y, non-zero-local-coordinate pos
-        ChunkSnapshotSource snapshot = SyntheticChunks.withBlockAt(registries, shulkerPos,
+        ChunkSnapshotSource snapshot = SyntheticChunks.withBlockAt(shulkerPos,
                 Blocks.SHULKER_BOX.defaultBlockState());
 
         BlockState read = InteractionCapture.blockStateAt(snapshot, shulkerPos);
@@ -223,7 +221,7 @@ class InteractionStashMergeTest {
     @Test
     void blockStateAtFailsClosedWhenNoSectionCoversTheY() {
         BlockPos shulkerPos = new BlockPos(5, -60, 7);
-        ChunkSnapshotSource snapshot = SyntheticChunks.withBlockAt(registries, shulkerPos,
+        ChunkSnapshotSource snapshot = SyntheticChunks.withBlockAt(shulkerPos,
                 Blocks.SHULKER_BOX.defaultBlockState());
 
         assertNull(InteractionCapture.blockStateAt(snapshot, new BlockPos(5, 5000, 7)),
@@ -245,7 +243,7 @@ class InteractionStashMergeTest {
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(pos, new InteractionCapture.HolderCandidate(
                         InteractionCapture.InteractionKind.SHULKER, itemsHolder(0, new ItemStack(Items.DIAMOND)))),
-                SyntheticChunks.withBlockAt(registries, pos, Blocks.SHULKER_BOX.defaultBlockState()));
+                SyntheticChunks.withBlockAt(pos, Blocks.SHULKER_BOX.defaultBlockState()));
         assertTrue(bundles.items().containsKey(pos), "a confirmed shulker routes to the Items bundle");
         assertTrue(bundles.holders().isEmpty(), "and not to the holder-merge bundle");
     }
@@ -256,7 +254,7 @@ class InteractionStashMergeTest {
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(pos, new InteractionCapture.HolderCandidate(InteractionCapture.InteractionKind.JUKEBOX,
                         InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT)))),
-                SyntheticChunks.withBlockAt(registries, pos,
+                SyntheticChunks.withBlockAt(pos,
                         Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, true)));
         assertTrue(bundles.holders().containsKey(pos), "a confirmed jukebox routes to the holder-merge bundle");
         assertTrue(bundles.items().isEmpty(), "and not to the Items bundle");
@@ -268,7 +266,7 @@ class InteractionStashMergeTest {
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(pos, new InteractionCapture.HolderCandidate(InteractionCapture.InteractionKind.BEEHIVE,
                         InteractionCapture.captureBees(BlockEntityFixtures.bees(50)))),
-                SyntheticChunks.withBlockAt(registries, pos, Blocks.BEEHIVE.defaultBlockState()));
+                SyntheticChunks.withBlockAt(pos, Blocks.BEEHIVE.defaultBlockState()));
         assertTrue(bundles.holders().containsKey(pos), "a confirmed beehive routes to the holder-merge bundle");
         assertTrue(bundles.items().isEmpty(), "and not to the Items bundle");
     }
@@ -279,7 +277,7 @@ class InteractionStashMergeTest {
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(pos, new InteractionCapture.HolderCandidate(
                         InteractionCapture.InteractionKind.SHULKER, itemsHolder(0, new ItemStack(Items.DIAMOND)))),
-                SyntheticChunks.withBlockAt(registries, pos, Blocks.STONE.defaultBlockState()));
+                SyntheticChunks.withBlockAt(pos, Blocks.STONE.defaultBlockState()));
 
         assertTrue(bundles.items().isEmpty() && bundles.holders().isEmpty(),
                 "the snapshot block does not confirm a shulker, so the candidate is dropped from every bundle");
@@ -292,7 +290,7 @@ class InteractionStashMergeTest {
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(elsewhere, new InteractionCapture.HolderCandidate(
                         InteractionCapture.InteractionKind.SHULKER, itemsHolder(0, new ItemStack(Items.DIAMOND)))),
-                SyntheticChunks.withBlockAt(registries, placed, Blocks.SHULKER_BOX.defaultBlockState()));
+                SyntheticChunks.withBlockAt(placed, Blocks.SHULKER_BOX.defaultBlockState()));
 
         assertTrue(bundles.items().isEmpty(), "no captured section covers the pos, so the gate fails closed");
     }
@@ -304,7 +302,7 @@ class InteractionStashMergeTest {
     void placedShulkerNotifiesThePlacedContainerSink() {
         long[] sinkPos = { -1L };
         String[] sinkType = { null };
-        InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> true,
+        InteractionCapture capture = new InteractionCapture(sink, true, chunk -> true,
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> {
                     sinkPos[0] = posKey;
                     sinkType[0] = blockTypeId;
@@ -329,7 +327,7 @@ class InteractionStashMergeTest {
     @Test
     void aPlacementInAnUncapturableCellDoesNotDropWhatWasCapturedThere() {
         long[] sinkPos = { -1L };
-        InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> false,
+        InteractionCapture capture = new InteractionCapture(sink, true, chunk -> false,
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> {}, posKey -> sinkPos[0] = posKey);
         BlockPos pos = new BlockPos(9, 70, 9);
 
@@ -343,7 +341,7 @@ class InteractionStashMergeTest {
     @Test
     void aPlacementInTheRecapturedCellDropsWhatWasCapturedThere() {
         long[] sinkPos = { -1L };
-        InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> true,
+        InteractionCapture capture = new InteractionCapture(sink, true, chunk -> true,
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> {}, posKey -> sinkPos[0] = posKey);
         BlockPos pos = new BlockPos(9, 70, 9);
 
@@ -356,7 +354,7 @@ class InteractionStashMergeTest {
     @Test
     void placedBeehiveDoesNotNotifyThePlacedContainerSink() {
         long[] sinkPos = { -1L };
-        InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> true,
+        InteractionCapture capture = new InteractionCapture(sink, true, chunk -> true,
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> sinkPos[0] = posKey, posKey -> {});
         BlockPos pos = new BlockPos(3, 70, 5);
         ItemStack hive = beehiveWithBees(120);
@@ -368,7 +366,7 @@ class InteractionStashMergeTest {
 
     @Test
     void jukeboxInsertRecognizesPlayableDisc() {
-        InteractionCapture capture = plainCapture(sink, registries, true);
+        InteractionCapture capture = plainCapture(sink, true);
         BlockState emptyJukebox = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
 
         boolean recorded = capture.recordJukeboxInsert(emptyJukebox, new BlockPos(0, 70, 0),
@@ -380,7 +378,7 @@ class InteractionStashMergeTest {
 
     @Test
     void jukeboxClickHoldingPlaceableBlockIsNotInsert() {
-        InteractionCapture capture = plainCapture(sink, registries, true);
+        InteractionCapture capture = plainCapture(sink, true);
         BlockState emptyJukebox = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
 
         boolean recorded = capture.recordJukeboxInsert(emptyJukebox, new BlockPos(0, 70, 0),
@@ -394,7 +392,7 @@ class InteractionStashMergeTest {
     void noInsertIsRecordedWhenRecaptureIsOff() {
         // Without re-capture the reconcile gate never sees the post-insert block-state, so any candidate would be
         // silently discarded; the recognizer must record nothing rather than stash a doomed candidate.
-        InteractionCapture capture = plainCapture(sink, registries, false);
+        InteractionCapture capture = plainCapture(sink, false);
         BlockState emptyJukebox = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
 
         boolean recorded = capture.recordJukeboxInsert(emptyJukebox, new BlockPos(0, 70, 0),
@@ -406,7 +404,7 @@ class InteractionStashMergeTest {
 
     @Test
     void emptyHiveReplacementDropsStaleBeehivePrediction() {
-        InteractionCapture capture = plainCapture(sink, registries, true);
+        InteractionCapture capture = plainCapture(sink, true);
         BlockPos pos = new BlockPos(3, 70, 5);
         ItemStack filled = beehiveWithBees(120);
 
@@ -424,7 +422,7 @@ class InteractionStashMergeTest {
 
     @Test
     void throwingRecognitionIsSwallowedFailSoft() {
-        InteractionCapture capture = plainCapture(sink, registries, true);
+        InteractionCapture capture = plainCapture(sink, true);
         // A pathological component can make the click-time codec encode throw; the recognizer must skip that one
         // capture rather than letting it escape to the loader event and crash the client mid-download.
         assertDoesNotThrow(() -> capture.recordFailSoft(new BlockPos(0, 70, 0), () -> {
@@ -434,7 +432,7 @@ class InteractionStashMergeTest {
 
     @Test
     void theResidualDrainDropsEveryPendingCandidateAndNamesWhereItStood() {
-        InteractionCapture capture = plainCapture(sink, registries, true);
+        InteractionCapture capture = plainCapture(sink, true);
         BlockPos pos = new BlockPos(0, 70, 0);
         capture.recordJukeboxInsert(Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false),
                 pos, new ItemStack(Items.MUSIC_DISC_CAT));
@@ -453,7 +451,7 @@ class InteractionStashMergeTest {
     // there can only end in a silent drop, with the outline already told the content is downloaded.
     @Test
     void aJukeboxInsertInAnUncapturableChunkIsNotStashed() {
-        InteractionCapture capture = plainCapture(sink, registries, true, chunk -> false);
+        InteractionCapture capture = plainCapture(sink, true, chunk -> false);
 
         boolean recorded = capture.recordJukeboxInsert(
                 Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false),
@@ -466,7 +464,7 @@ class InteractionStashMergeTest {
     @Test
     void aPlacedShulkerInAnUncapturableChunkIsNeitherStashedNorMarked() {
         long[] sinkPos = { -1L };
-        InteractionCapture capture = new InteractionCapture(sink, registries, true, chunk -> false,
+        InteractionCapture capture = new InteractionCapture(sink, true, chunk -> false,
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> sinkPos[0] = posKey, posKey -> {});
         BlockPos pos = new BlockPos(4, 70, 8);
         ItemStack shulker = shulkerHolding(new ItemStack(Items.DIAMOND));
@@ -482,7 +480,7 @@ class InteractionStashMergeTest {
         // The supersede is not a capture: leaving a stale prediction at a cell a new block now occupies is how
         // one block's contents get written onto another, which is worse than capturing nothing.
         boolean[] capturable = { true };
-        InteractionCapture capture = plainCapture(sink, registries, true, chunk -> capturable[0]);
+        InteractionCapture capture = plainCapture(sink, true, chunk -> capturable[0]);
         BlockPos pos = new BlockPos(4, 70, 8);
         ItemStack shulker = shulkerHolding(new ItemStack(Items.DIAMOND));
         capture.recordPlaceAt(pos, shulker);

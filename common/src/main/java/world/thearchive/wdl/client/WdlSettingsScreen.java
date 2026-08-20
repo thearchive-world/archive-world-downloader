@@ -5,7 +5,6 @@ package world.thearchive.wdl.client;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import com.mojang.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,10 +25,7 @@ import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextColor;
-import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import org.jspecify.annotations.Nullable;
 
@@ -117,7 +113,7 @@ public final class WdlSettingsScreen extends Screen {
                 this.height - FOOTER_HEIGHT, ROW_HEIGHT);
         populate(settingsList);
         this.list = settingsList;
-        addWidget(settingsList);
+        this.children.add(settingsList);
 
         buildTabStrip();
         buildFooter();
@@ -133,7 +129,8 @@ public final class WdlSettingsScreen extends Screen {
             // the last tab absorbs the division remainder so the strip's right edge meets the control edge
             int thisTabWidth = i == count - 1 ? column.right() - tabX : tabWidth;
             Component title = new TranslatableComponent(SettingsLayout.tabLabelKey(SettingsLayout.TABS.get(i).id()));
-            Button tab = new Button(tabX, TAB_TOP, thisTabWidth, TAB_HEIGHT, title, button -> selectTab(index));
+            Button tab = new Button(tabX, TAB_TOP, thisTabWidth, TAB_HEIGHT, title.getString(),
+                    button -> selectTab(index));
             tab.active = i != this.activeTab; // the active tab reads as pressed by being inert
             addButton(tab);
         }
@@ -186,25 +183,19 @@ public final class WdlSettingsScreen extends Screen {
         int doneX = column.left();
         int defaultsX = doneX + buttonWidth + GAP;
         int discardX = defaultsX + buttonWidth + GAP;
-        addButton(new Button(doneX, footerY, buttonWidth, 20, CommonComponents.GUI_DONE,
+        addButton(new Button(doneX, footerY, buttonWidth, 20, I18n.get("gui.done"),
                 button -> onClose()));
+        // 1.15.2 Button carries no hover-tooltip parameter, so the Defaults button has no hover explanation.
         this.defaults = addButton(new Button(defaultsX, footerY, buttonWidth, 20,
-                new TranslatableComponent("wdl.settings.defaults"), button -> onDefaults(),
-                (button, poseStack, mouseX, mouseY) -> {
-                    if (this.draft.isAtDefaults()) {
-                        this.renderTooltip(poseStack,
-                                this.font.split(new TranslatableComponent("wdl.settings.defaults.tooltip"), 200),
-                                mouseX, mouseY);
-                    }
-                }));
+                I18n.get("wdl.settings.defaults"), button -> onDefaults()));
         // the last button absorbs the division remainder so the footer's right edge meets the control edge
         addButton(new Button(discardX, footerY, column.right() - discardX, 20,
-                new TranslatableComponent("wdl.settings.discard"), button -> onDiscard()));
+                I18n.get("wdl.settings.discard"), button -> onDiscard()));
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(poseStack);
+    public void render(int mouseX, int mouseY, float partialTick) {
+        this.renderBackground();
         // The Defaults button would only revert to a state the draft is already in, so it grays out (never
         // hides, keeping the footer stable and the feature discoverable) while the draft equals defaults, and
         // a tooltip on the gray state says why. Kept current with live edits by resolving before the widgets
@@ -221,13 +212,13 @@ public final class WdlSettingsScreen extends Screen {
         // overflow at the top and bottom edges (it does not scissor), so drawing it first lets that fill hide the
         // overflow while the tab strip and footer buttons paint on top of it. Drawing it after would bury both.
         if (this.list != null) {
-            this.list.render(poseStack, mouseX, mouseY, partialTick);
+            this.list.render(mouseX, mouseY, partialTick);
         }
-        super.render(poseStack, mouseX, mouseY, partialTick);
+        super.render(mouseX, mouseY, partialTick);
         // The recorded hover tooltips are drawn here, unclipped, after the list.
         for (Map.Entry<AbstractWidget, Component> tip : this.hoverTooltips) {
             if (tip.getKey().isHovered()) {
-                this.renderTooltip(poseStack, this.font.split(tip.getValue(), 200), mouseX, mouseY);
+                this.renderTooltip(this.font.split(tip.getValue().getString(), 200), mouseX, mouseY);
                 break;
             }
         }
@@ -286,7 +277,8 @@ public final class WdlSettingsScreen extends Screen {
             case BOOLEAN:
                 WdlCycleButton<Boolean> toggle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
                         ImmutableList.of(Boolean.TRUE, Boolean.FALSE), this.draft.getBoolean(key),
-                        value -> value ? CommonComponents.OPTION_ON : CommonComponents.OPTION_OFF,
+                        value -> value ? new TranslatableComponent("options.on")
+                                : new TranslatableComponent("options.off"),
                         (button, value) -> onBoolChange(key, value));
                 return new Control(toggle, () -> toggle.setValue(this.draft.getBoolean(key)));
             case INTEGER:
@@ -383,16 +375,15 @@ public final class WdlSettingsScreen extends Screen {
                 : "wdl.settings.confirm.recapture.to_nearby.message";
         minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
                 new TranslatableComponent("wdl.settings.confirm.recapture.title",
-                        new TranslatableComponent(valueLabelKey(value))
-                                .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER)))),
+                        amberComponent(new TranslatableComponent(valueLabelKey(value)))),
                 new TranslatableComponent(messageKey),
                 new TranslatableComponent("wdl.settings.confirm.recapture.confirm"),
-                CommonComponents.GUI_CANCEL));
+                new TranslatableComponent("gui.cancel")));
     }
 
     private Control textControl(String key) {
         EditBox box = new EditBox(this.font, 0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
-                new TranslatableComponent(SettingsLayout.optionLabelKey(key)));
+                I18n.get(SettingsLayout.optionLabelKey(key)));
         box.setMaxLength(32);
         box.setValue(currentText(key));
         box.setResponder(text -> this.draft.set(key, text));
@@ -441,11 +432,10 @@ public final class WdlSettingsScreen extends Screen {
         };
         minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
                 new TranslatableComponent(base + ".title",
-                        new TranslatableComponent(SettingsLayout.optionLabelKey(key))
-                                .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER)))),
+                        amberComponent(new TranslatableComponent(SettingsLayout.optionLabelKey(key)))),
                 new TranslatableComponent(SettingsLayout.confirmMessageKey(key)),
                 new TranslatableComponent(base + ".confirm"),
-                CommonComponents.GUI_CANCEL));
+                new TranslatableComponent("gui.cancel")));
     }
 
     private void onDefaults() {
@@ -457,22 +447,20 @@ public final class WdlSettingsScreen extends Screen {
             minecraft.setScreen(this);
         };
         minecraft.setScreen(new ConfirmScreen(choice,
-                new TranslatableComponent("wdl.settings.defaults.title")
-                        .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER))),
+                amberComponent(new TranslatableComponent("wdl.settings.defaults.title")),
                 new TranslatableComponent("wdl.settings.defaults.message"),
-                new TranslatableComponent("wdl.settings.defaults.confirm"),
-                CommonComponents.GUI_CANCEL));
+                I18n.get("wdl.settings.defaults.confirm"),
+                I18n.get("gui.cancel")));
     }
 
     private void onDiscard() {
         Minecraft minecraft = Minecraft.getInstance();
         BooleanConsumer choice = confirmed -> minecraft.setScreen(confirmed ? this.parent : this);
         minecraft.setScreen(new ConfirmScreen(choice,
-                new TranslatableComponent("wdl.settings.discard.title")
-                        .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER))),
+                amberComponent(new TranslatableComponent("wdl.settings.discard.title")),
                 new TranslatableComponent("wdl.settings.discard.message"),
-                new TranslatableComponent("wdl.settings.discard.confirm"),
-                CommonComponents.GUI_CANCEL));
+                I18n.get("wdl.settings.discard.confirm"),
+                I18n.get("gui.cancel")));
     }
 
     @Override
@@ -535,16 +523,15 @@ public final class WdlSettingsScreen extends Screen {
         private int contentWidth;
 
         @Override
-        public void render(PoseStack poseStack, int index, int top, int left, int width, int height, int mouseX,
+        public void render(int index, int top, int left, int width, int height, int mouseX,
                 int mouseY, boolean hovering, float partialTick) {
             this.contentX = left;
             this.contentY = top;
             this.contentWidth = width;
-            renderContent(poseStack, mouseX, mouseY, hovering, partialTick);
+            renderContent(mouseX, mouseY, hovering, partialTick);
         }
 
-        abstract void renderContent(PoseStack poseStack, int mouseX, int mouseY, boolean hovering,
-                float partialTick);
+        abstract void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick);
 
         int getContentX() {
             return contentX;
@@ -564,13 +551,12 @@ public final class WdlSettingsScreen extends Screen {
         private final Component label;
 
         HeaderRow(String labelKey) {
-            this.label = new TranslatableComponent(labelKey).withStyle(ChatFormatting.BOLD);
+            this.label = new TranslatableComponent(labelKey);
         }
 
         @Override
-        public void renderContent(PoseStack poseStack, int mouseX, int mouseY, boolean hovering,
-                float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(poseStack);
+        public void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl();
             int textY = getContentY() + (ROW_HEIGHT - font.lineHeight) / 2 + 2;
             surface.text(font, this.label, getContentX(), textY, BrandColors.opaque(BrandColors.AMBER));
         }
@@ -590,7 +576,7 @@ public final class WdlSettingsScreen extends Screen {
         ControlRow(Component label, @Nullable String masterKey) {
             this.label = label;
             this.masterKey = masterKey;
-            this.revert = new Button(0, 0, REVERT_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY, button -> {
+            this.revert = new Button(0, 0, REVERT_WIDTH, CONTROL_HEIGHT, "", button -> {
                 doRevert();
                 refresh();
             });
@@ -612,9 +598,8 @@ public final class WdlSettingsScreen extends Screen {
         }
 
         @Override
-        public void renderContent(PoseStack poseStack, int mouseX, int mouseY, boolean hovering,
-                float partialTick) {
-            RenderSurface surface = new RenderSurfaceImpl(poseStack);
+        public void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick) {
+            RenderSurface surface = new RenderSurfaceImpl();
             AbstractWidget control = control();
             boolean enabled = this.masterKey == null || draft.getBoolean(this.masterKey);
             int rowX = getContentX();
@@ -630,7 +615,7 @@ public final class WdlSettingsScreen extends Screen {
             control.active = enabled;
             control.x = controlX;
             control.y = controlY;
-            control.render(poseStack, mouseX, mouseY, partialTick);
+            control.render(mouseX, mouseY, partialTick);
 
             // Passive indicator: an amber caution mark sits just left of an off core-capture toggle, a
             // defense-in-depth reminder that the download will be missing that data beyond the confirm-at-change.
@@ -648,7 +633,7 @@ public final class WdlSettingsScreen extends Screen {
             this.revert.active = enabled && modified;
             this.revert.x = revertX;
             this.revert.y = controlY;
-            this.revert.render(poseStack, mouseX, mouseY, partialTick);
+            this.revert.render(mouseX, mouseY, partialTick);
 
             // The revert icon is a bundled sprite, not a font glyph: the revert codepoint resolves only through
             // the tiny unifont fallback, which no scale renders crisply. The button carries a blank label so
@@ -724,7 +709,7 @@ public final class WdlSettingsScreen extends Screen {
             this.rule = rule;
             this.toggle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
                     ImmutableList.of(Boolean.TRUE, Boolean.FALSE), isOn(),
-                    value -> value ? CommonComponents.OPTION_ON : CommonComponents.OPTION_OFF,
+                    value -> value ? new TranslatableComponent("options.on") : new TranslatableComponent("options.off"),
                     (button, value) -> draft.setGameRule(rule.bandId(),
                             value ? rule.enabledValue() : rule.disabledValue(), rule.curatedValue()));
         }
@@ -763,7 +748,8 @@ public final class WdlSettingsScreen extends Screen {
         final String key;
 
         RangeSlider(String key, double initialFraction) {
-            super(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, TextComponent.EMPTY, initialFraction);
+            // 1.15.2 AbstractSliderButton takes no message argument.
+            super(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, initialFraction);
             this.key = key;
         }
 
@@ -775,7 +761,7 @@ public final class WdlSettingsScreen extends Screen {
 
         @Override
         protected void updateMessage() {
-            setMessage(new TranslatableComponent(SettingsLayout.optionValueKey(this.key), currentText()));
+            setMessage(new TranslatableComponent(SettingsLayout.optionValueKey(this.key), currentText()).getString());
         }
 
         @Override
@@ -845,5 +831,11 @@ public final class WdlSettingsScreen extends Screen {
 
     private static double fraction(double value, double min, double max) {
         return max == min ? 0.0 : (value - min) / (max - min);
+    }
+
+    /** Tint {@code component} the nearest vanilla color to the brand amber (gold), mutating its style in place. */
+    private static Component amberComponent(Component component) {
+        component.getStyle().setColor(ChatFormatting.GOLD);
+        return component;
     }
 }

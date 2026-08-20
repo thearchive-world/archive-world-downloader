@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.chunk.LevelChunk;
 
@@ -13,18 +12,17 @@ import net.minecraft.world.level.chunk.LevelChunk;
  * {@code SerializableChunkData} slice, client-safe).
  *
  * <p>The split is what lets the heavy serialize run off the render thread: {@link #capture} runs on the client main
- * thread (the live read must), and {@link #encode} runs later on the save writer thread over the detached snapshot. The
- * {@code (LevelChunk, RegistryAccess)} capture shape is deliberately band-agnostic so both the 1.21.11
- * ({@code Level.palettedContainerFactory()}) and 1.21.4 ({@code RegistryAccess} + static codec) sub-bands can satisfy
- * it. The capture step is client/level-coupled (it reads the light engine); the encode step is pure and is what the
- * headless round-trip exercises.
+ * thread (the live read must), and {@link #encode} runs later on the save writer thread over the detached snapshot. At
+ * 1.15.2 the chunk biomes come from the static biome registry (pre-1.16 serialize needs no client registries), so
+ * neither step carries one. The capture step is client/level-coupled (it reads the light engine); the encode step is
+ * pure and is what the headless round-trip exercises.
  */
 public interface ChunkCodec {
     /**
      * Snapshot {@code chunk} (with its level) into an immutable {@link ChunkSnapshotSource} on the main thread,
      * detached so it may cross to the save writer thread for {@link #encode}.
      */
-    ChunkSnapshotSource capture(LevelChunk chunk, RegistryAccess registries);
+    ChunkSnapshotSource capture(LevelChunk chunk);
 
     /**
      * Encode an already-captured {@link ChunkSnapshotSource} to the vanilla region-file NBT (the tested slice). When
@@ -32,5 +30,5 @@ public interface ChunkCodec {
      * generated neighbor blends against it instead of walling; the caller decides that per the target dimension and
      * generator (see {@code VanillaDimensions.synthesizeBlending}).
      */
-    CompoundTag encode(ChunkSnapshotSource snapshot, RegistryAccess registries, boolean synthesizeBlending);
+    CompoundTag encode(ChunkSnapshotSource snapshot, boolean synthesizeBlending);
 }

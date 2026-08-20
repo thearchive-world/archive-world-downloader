@@ -4,7 +4,6 @@
 package world.thearchive.wdl.adapter;
 
 import com.google.common.collect.ImmutableSet;
-import com.mojang.datafixers.util.Pair;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.List;
 import java.util.Set;
@@ -22,7 +21,7 @@ import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.network.protocol.game.ClientboundSetCameraPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityLinkPacket;
-import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEquippedItemPacket;
 import net.minecraft.network.protocol.game.ClientboundSetPassengersPacket;
 import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -30,8 +29,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -96,7 +95,7 @@ final class EntityPacketCapture
             EntityType.BOAT,
             EntityType.HORSE, EntityType.DONKEY, EntityType.SKELETON_HORSE, EntityType.ZOMBIE_HORSE,
             EntityType.LLAMA, EntityType.TRADER_LLAMA,
-            EntityType.PIG, EntityType.STRIDER);
+            EntityType.PIG);
 
     /**
      * Diagnostic only (gated by {@code dumpReceivedFrames}, default off): the {@code (blockX blockY blockZ facing)} key
@@ -160,19 +159,19 @@ final class EntityPacketCapture
             sampler.onAnomalyPacket();
         } else if (packet instanceof ClientboundRespawnPacket) {
             ClientboundRespawnPacket respawn = (ClientboundRespawnPacket) packet;
-            enterDimension(respawn.getDimension().location().toString());
+            enterDimension(DimensionType.getName(respawn.getDimension()).toString());
             sampler.onRespawn();
         } else if (packet instanceof ClientboundLoginPacket) {
             ClientboundLoginPacket login = (ClientboundLoginPacket) packet;
-            enterDimension(login.getDimension().location().toString());
+            enterDimension(DimensionType.getName(login.getDimension()).toString());
             sampler.onRespawn();
         } else if (packet instanceof ClientboundSetCameraPacket) {
             sampler.onSetCamera();
         } else if (packet instanceof ClientboundSetEntityDataPacket) {
             ClientboundSetEntityDataPacket synced = (ClientboundSetEntityDataPacket) packet;
             onSetData(synced);
-        } else if (packet instanceof ClientboundSetEquipmentPacket) {
-            ClientboundSetEquipmentPacket equip = (ClientboundSetEquipmentPacket) packet;
+        } else if (packet instanceof ClientboundSetEquippedItemPacket) {
+            ClientboundSetEquippedItemPacket equip = (ClientboundSetEquippedItemPacket) packet;
             onSetEquipment(equip);
         } else if (packet instanceof ClientboundSetPassengersPacket) {
             ClientboundSetPassengersPacket passengers = (ClientboundSetPassengersPacket) packet;
@@ -207,7 +206,7 @@ final class EntityPacketCapture
     /** Whether this type feeds the range estimator: a decoration, or a non-excluded vanilla range-10 type. */
     static boolean qualifies(EntityType<?> type) {
         return DECORATION_TYPES.contains(type)
-                || (type.clientTrackingRange() == 10 && !RANGE_SAMPLING_EXCLUSIONS.contains(type));
+                || (type.chunkRange() == 10 && !RANGE_SAMPLING_EXCLUSIONS.contains(type));
     }
 
     /**
@@ -243,7 +242,7 @@ final class EntityPacketCapture
         if (distanceBlocks > plausibleMaxBlocks) {
             return;
         }
-        sendRange.observe(level.dimension().location().toString(), distanceBlocks);
+        sendRange.observe(DimensionType.getName(level.getDimension().getType()).toString(), distanceBlocks);
     }
 
     /**
@@ -260,7 +259,7 @@ final class EntityPacketCapture
         if (entity.isPassenger() || entity.isVehicle()) {
             return;
         }
-        Vec3 base = entity.getPacketCoordinates();
+        Vec3 base = entity.position();
         int id = entity.getId();
         sampler.registerSeed(id, base.x, base.z);
         int distanceBlocks = sampler.seedSample(id, playerX, playerZ);
@@ -277,7 +276,7 @@ final class EntityPacketCapture
             return;
         }
         int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(minecraft.options.renderDistance);
-        String dimensionId = level.dimension().location().toString();
+        String dimensionId = DimensionType.getName(level.getDimension().getType()).toString();
         int[] ids = packet.getEntityIds();
         for (int i = 0; i < ids.length; i++) {
             int distanceBlocks = sampler.removalSample(ids[i], player.getX(), player.getZ());
@@ -303,12 +302,11 @@ final class EntityPacketCapture
         }
     }
 
-    private void onSetEquipment(ClientboundSetEquipmentPacket packet) {
+    private void onSetEquipment(ClientboundSetEquippedItemPacket packet) {
         if (tracks(packet.getEntity())) {
-            for (Pair<EquipmentSlot, ItemStack> slot : packet.getSlots()) {
-                recordEquipment(packet.getEntity(), slot.getFirst().ordinal(),
-                        new EquipmentEntry(slot.getFirst(), slot.getSecond()));
-            }
+            // 1.15.2 sends one slot per packet, not the 1.16 slot/stack list.
+            EquipmentSlot slot = packet.getSlot();
+            recordEquipment(packet.getEntity(), slot.ordinal(), new EquipmentEntry(slot, packet.getItem()));
         }
     }
 

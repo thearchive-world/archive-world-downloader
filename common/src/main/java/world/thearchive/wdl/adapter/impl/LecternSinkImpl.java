@@ -3,14 +3,13 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 
 import world.thearchive.wdl.adapter.LecternSink;
 
 /**
- * 1.16.5 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.CODEC} (mirroring
+ * 1.15.2 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.save} (mirroring
  * {@code LecternBlockEntity.saveAdditional}) and merges it into a captured lectern block-entity tag.
  *
  * <p>Two steps (see {@link LecternSink}): {@link #captureBook} serializes the live open menu's slot-0 book and
@@ -19,8 +18,8 @@ import world.thearchive.wdl.adapter.LecternSink;
  */
 public final class LecternSinkImpl implements LecternSink {
     @Override
-    public CompoundTag captureBook(ItemStack book, int page, RegistryAccess registries) {
-        // Assumes a non-empty book (ItemStack.CODEC does not encode EMPTY); the caller guards that.
+    public CompoundTag captureBook(ItemStack book, int page) {
+        // Assumes a non-empty book; an empty slot 0 is dropped upstream.
         CompoundTag tag = new CompoundTag();
         tag.put("Book", book.save(new CompoundTag()));
         tag.putInt("Page", page);

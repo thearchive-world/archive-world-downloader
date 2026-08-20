@@ -29,7 +29,7 @@ class NaturalEquipmentTest {
     @BeforeAll
     static void bootstrap() {
         // Populates BuiltInRegistries so Items.* / EntityType.* resolve and ItemStack.is works headless.
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static ItemStack of(Item item) {
@@ -50,7 +50,6 @@ class NaturalEquipmentTest {
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.IRON_HELMET)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.FEET, of(Items.DIAMOND_BOOTS)));
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.TURTLE_HELMET)));
-        assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.NETHERITE_HELMET)));
     }
 
     @Test
@@ -69,22 +68,25 @@ class NaturalEquipmentTest {
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.DROWNED, EquipmentSlot.MAINHAND, of(Items.IRON_SWORD)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.WITHER_SKELETON, EquipmentSlot.MAINHAND,
                 of(Items.STONE_SWORD)));
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.MAINHAND, of(Items.GOLDEN_SWORD)));
-        assertFalse(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.MAINHAND, of(Items.IRON_SWORD)));
+        assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE_PIGMAN, EquipmentSlot.MAINHAND,
+                of(Items.GOLDEN_SWORD)));
+        assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE_PIGMAN, EquipmentSlot.MAINHAND,
+                of(Items.IRON_SWORD)));
     }
 
     @Test
     void typeSpecificArmorPools() {
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.CHEST, of(Items.GOLDEN_CHESTPLATE)));
-        assertFalse(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.CHEST, of(Items.IRON_CHESTPLATE)));
+        // A base-armor spawn wears any armor tier naturally; a no-armor spawn never does.
+        assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.CHEST, of(Items.GOLDEN_CHESTPLATE)));
         assertFalse(
                 NaturalEquipment.isNaturalFor(EntityType.DROWNED, EquipmentSlot.CHEST, of(Items.LEATHER_CHESTPLATE)));
     }
 
     @Test
     void offhandIsNeverInferred() {
-        // A piglin holds a bartering gold ingot in the offhand with no persistence (Piglin.holdInOffHand).
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.OFFHAND, of(Items.GOLD_INGOT)));
+        // The offhand is outside the inference: a mob can hold an unpersisted item there.
+        assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE_PIGMAN, EquipmentSlot.OFFHAND,
+                of(Items.GOLD_INGOT)));
         assertFalse(NaturalEquipment.PICKUP_SLOTS.contains(EquipmentSlot.OFFHAND));
     }
 

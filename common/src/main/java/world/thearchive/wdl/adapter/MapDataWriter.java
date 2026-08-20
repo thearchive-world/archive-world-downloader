@@ -5,6 +5,8 @@ package world.thearchive.wdl.adapter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import net.minecraft.SharedConstants;
@@ -50,7 +52,10 @@ final class MapDataWriter {
     public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");
         Files.createDirectories(file.getParent());
-        NbtIo.writeCompressed(envelope(dataTag), file.toFile());
+        // 1.15.2 NbtIo.writeCompressed takes an OutputStream, not a File.
+        try (OutputStream out = Files.newOutputStream(file)) {
+            NbtIo.writeCompressed(envelope(dataTag), out);
+        }
     }
 
     /**
@@ -82,7 +87,11 @@ final class MapDataWriter {
         if (!Files.exists(file)) {
             return -1;
         }
-        CompoundTag envelope = NbtIo.readCompressed(file.toFile());
+        // 1.15.2 NbtIo.readCompressed takes an InputStream, not a File.
+        CompoundTag envelope;
+        try (InputStream input = Files.newInputStream(file)) {
+            envelope = NbtIo.readCompressed(input);
+        }
         CompoundTag data = envelope.getCompound("data");
         return data.contains("map") ? data.getInt("map") : -1;
     }

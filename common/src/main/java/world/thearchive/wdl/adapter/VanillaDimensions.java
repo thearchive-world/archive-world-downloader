@@ -3,20 +3,16 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * Maps a captured dimension to the vanilla single-player dimension it is written under, keyed by its dimension TYPE
- * rather than its level key. A server with non-standard level keys (e.g. Multiverse's
- * {@code minecraft:worlds/2b2t/2b2t_1}) still uses a vanilla dimension type, so routing by type lays the save out under
- * the vanilla dimension's own folder rather than one derived from the custom level key. Below the 1.19 registry-sync
- * rework the client's dimension type arrives keyless (an inline Holder.Direct), so the nether and end are recognized by
- * the type's effects id rather than its registry key; above that band the key is available and either signal works.
+ * Maps a captured dimension to the vanilla single-player dimension it is written under. At 1.15.2 the dimension key is
+ * the {@link DimensionType} itself (the pre-1.16 model, before the level-key rework), so both the captured dimension
+ * and the routed target are {@code DimensionType}s and every dimension a capture records is one of the three static
+ * vanilla types.
  *
  * <p>The consequence for two server worlds is ACCEPTED rather than guarded, and it is stated here because this method
  * is where it comes from: worlds routing to one folder share it, so their terrain interleaves and their captured
@@ -28,52 +24,42 @@ final class VanillaDimensions {
 
     /**
      * The vanilla single-player dimension for a captured dimension {@code type}: the Nether goes to
-     * {@link Level#NETHER}, the End to {@link Level#END}, and everything else (overworld, its variants, and any
-     * unrecognized type) to {@link Level#OVERWORLD}.
-     *
-     * <p>Classified by the type's effects id, not its registry key, because below the 1.19 registry-sync rework the
-     * client receives the dimension type inline (a keyless {@code Holder.Direct} decoded through a plain ops), so
-     * {@code dimensionTypeRegistration().unwrapKey()} is empty and no registry key is available. The effects id, which
-     * the inline value still carries, is {@code the_nether} / {@code the_end} for the vanilla nether and end.
+     * {@link DimensionType#NETHER}, the End to {@link DimensionType#THE_END}, and everything else (overworld, its
+     * variants, and any unrecognized or modded type) to {@link DimensionType#OVERWORLD}.
      */
-    static ResourceKey<Level> forType(@Nullable DimensionType type) {
-        if (type == null) {
-            return Level.OVERWORLD;
+    static DimensionType forType(@Nullable DimensionType type) {
+        if (type == DimensionType.NETHER) {
+            return DimensionType.NETHER;
         }
-        if (DimensionType.NETHER_EFFECTS.equals(type.effectsLocation())) {
-            return Level.NETHER;
+        if (type == DimensionType.THE_END) {
+            return DimensionType.THE_END;
         }
-        if (DimensionType.END_EFFECTS.equals(type.effectsLocation())) {
-            return Level.END;
-        }
-        return Level.OVERWORLD;
+        return DimensionType.OVERWORLD;
     }
 
     /**
-     * The vanilla single-player dimension a canonical level id names, or null when {@code id} is not one of the three
-     * {@link #forType} can return. The read side of {@link #forType} over the only ids a capture ever records: every
-     * dimension it routes through is a {@link #forType} result, so an id outside that set names a folder no download of
-     * ours wrote and a caller reading one has no dimension to route into.
+     * The vanilla single-player dimension a canonical dimension id names, or null when {@code id} is not one of the
+     * three {@link #forType} can return. The read side of {@link #forType} over the only ids a capture ever records:
+     * every dimension it routes through is a {@link #forType} result, so an id outside that set names a folder no
+     * download of ours wrote and a caller reading one has no dimension to route into.
      */
-    static @Nullable ResourceKey<Level> forId(String id) {
-        if (Level.NETHER.location().toString().equals(id)) {
-            return Level.NETHER;
+    static @Nullable DimensionType forId(String id) {
+        if (DimensionType.getName(DimensionType.NETHER).toString().equals(id)) {
+            return DimensionType.NETHER;
         }
-        if (Level.END.location().toString().equals(id)) {
-            return Level.END;
+        if (DimensionType.getName(DimensionType.THE_END).toString().equals(id)) {
+            return DimensionType.THE_END;
         }
-        return Level.OVERWORLD.location().toString().equals(id) ? Level.OVERWORLD : null;
+        return DimensionType.getName(DimensionType.OVERWORLD).toString().equals(id) ? DimensionType.OVERWORLD : null;
     }
 
     /**
      * Whether a captured chunk in {@code targetDimension} needs synthesized old-generation blending. Only the DEFAULT
-     * noise generator blends terrain against the captured edge, and only in the overworld: blending is a
-     * {@code NoiseBasedChunkGenerator} mechanism, so FLAT (which writes fixed layers and discards the blender) and VOID
-     * (no neighbor terrain) never blend and their output is left untouched; the nether and end are never blended either
-     * (the fix is overworld-only). Keying on {@code targetDimension} (a {@link #forType} result) rather than the raw
-     * level key is what makes a Multiverse overworld under a custom key blend correctly.
+     * generator blends terrain against the captured edge, and only in the overworld, so FLAT and VOID never blend and
+     * the nether and end are never blended either. Keying on {@code targetDimension} (a {@link #forType} result) rather
+     * than the raw dimension is what makes a Multiverse overworld under a custom key blend correctly.
      */
-    static boolean shouldSynthesizeBlending(WorldType worldType, ResourceKey<Level> targetDimension) {
-        return worldType == WorldType.DEFAULT && Level.OVERWORLD.equals(targetDimension);
+    static boolean shouldSynthesizeBlending(WorldType worldType, DimensionType targetDimension) {
+        return worldType == WorldType.DEFAULT && DimensionType.OVERWORLD.equals(targetDimension);
     }
 }

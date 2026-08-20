@@ -19,7 +19,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -59,7 +59,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class LiveCaptureSessionFailSoftTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // initialize the vanilla static constants the value types touch
+        TestRegistries.bootstrap(); // initialize the vanilla static constants the value types touch
     }
 
     /**
@@ -97,7 +97,7 @@ class LiveCaptureSessionFailSoftTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), bridge,
-                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -116,7 +116,7 @@ class LiveCaptureSessionFailSoftTest {
     void failSoftPassesThroughSuccessfulAssembly(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
         CapturedPlayer captured = new CapturedPlayer(new CompoundTag(), BlockPos.ZERO, 0.0F, 0.0F,
-                Level.OVERWORLD, GameType.CREATIVE, Difficulty.NORMAL);
+                DimensionType.OVERWORLD, GameType.CREATIVE, Difficulty.NORMAL);
 
         assertSame(captured, session.failSoft("player", () -> captured), "a successful assembly passes through");
         assertEquals(0, losses(session), "and a step that worked counts no loss");
@@ -172,7 +172,6 @@ class LiveCaptureSessionFailSoftTest {
                 () -> {},
                 finalizer,
                 () -> null,
-                () -> {},
                 new SaveProgress()));
     }
 

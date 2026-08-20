@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 
@@ -17,10 +16,9 @@ import net.minecraft.world.item.ItemStack;
  * open menu.
  *
  * <p>Mirrors {@link ContainerSink}'s two-step seam, writing {@code "Book"}/{@code "Page"} instead of {@code "Items"}.
- * The live step ({@link #captureBook(ItemStack, int, RegistryAccess)}) serializes the book the session lifted from the
- * open menu; it is client-coupled. The pure step ({@link #merge(CompoundTag, CompoundTag)}) sets
- * {@code "Book"}/{@code "Page"} on a copy of an already-captured lectern block-entity tag and is what the headless
- * round-trip exercises.
+ * The live step ({@link #captureBook(ItemStack, int)}) serializes the book the session lifted from the open menu; it is
+ * client-coupled. The pure step ({@link #merge(CompoundTag, CompoundTag)}) sets {@code "Book"}/{@code "Page"} on a copy
+ * of an already-captured lectern block-entity tag and is what the headless round-trip exercises.
  *
  * <p>Per-band in full (both methods): {@code captureBook} serializes via the band's codec layer (1.21.11 takes a
  * {@code ValueOutput}/{@code TagValueOutput}, the &le;1.21.8 sub-band takes the older {@code CompoundTag} form), and
@@ -38,7 +36,7 @@ public interface LecternSink {
      * ({@code ItemStack.CODEC} does not encode {@code ItemStack.EMPTY}); the caller drops an empty slot 0 before
      * calling this.
      */
-    CompoundTag captureBook(ItemStack book, int page, RegistryAccess registries);
+    CompoundTag captureBook(ItemStack book, int page);
 
     /**
      * Set {@code "Book"} + {@code "Page"} on a copy of {@code lecternBlockEntityTag} from {@code capturedBookHolder},

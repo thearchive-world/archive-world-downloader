@@ -17,8 +17,8 @@ import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -56,11 +56,11 @@ class EntityRoundTripTest {
      */
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static IOWorker regionStorage(WorldPaths paths) {
-        return paths.openRegionStorage(Level.OVERWORLD);
+        return paths.openRegionStorage(DimensionType.OVERWORLD);
     }
 
     /** A host region chunk with an empty {@code Level} compound, the terrain an entity fold lands inside. */
@@ -99,7 +99,7 @@ class EntityRoundTripTest {
     @Test
     void entityCarriersFoldIntoRegionChunksAcrossBoundaries(@TempDir Path save) throws IOException {
         WorldPaths paths = new WorldPathsImpl(save);
-        Path regionDirectory = paths.regionDirectory(Level.OVERWORLD);
+        Path regionDirectory = paths.regionDirectory(DimensionType.OVERWORLD);
 
         // Same boundary set the chunk path covers: (0,0)+(31,31) share r.0.0; the others cross into
         // r.1.0 / r.0.1 / r.-1.-1. A distinct marker per entity proves each lands in its own chunk.

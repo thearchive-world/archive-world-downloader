@@ -13,7 +13,6 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -37,12 +36,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * {@code Level}).
  */
 class LecternStashMergeTest {
-    private static RegistryAccess registries;
     private final LecternSink sink = new LecternSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** A written book with a custom {@code title}, below 1.20.5's pre-component {@code title}/{@code pages} NBT. */
@@ -60,10 +58,10 @@ class LecternStashMergeTest {
     }
 
     private CompoundTag bookHolder(String title, int page) {
-        return sink.captureBook(writtenBook(title), page, registries);
+        return sink.captureBook(writtenBook(title), page);
     }
 
-    private static String titleAt(RegistryAccess registries, CompoundTag lecternTag) {
+    private static String titleAt(CompoundTag lecternTag) {
         ItemStack back = ItemStack.of(lecternTag.getCompound("Book"));
         assertTrue(!back.isEmpty(), "the merged lectern carries a decodable Book");
         return back.getTag().getString("title");
@@ -90,7 +88,7 @@ class LecternStashMergeTest {
 
         ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", 10);
         CompoundTag lectern = findByPos(blockEntities, 10, 70, 20);
-        assertEquals("Bound Here", titleAt(registries, lectern), "the lectern gains exactly the captured book");
+        assertEquals("Bound Here", titleAt(lectern), "the lectern gains exactly the captured book");
         assertEquals(2, (lectern.contains("Page") ? lectern.getInt("Page") : -1), "the reading page lands too");
         assertFalse(findByPos(blockEntities, 11, 70, 20).contains("Book"), "the neighbor block entity is untouched");
     }

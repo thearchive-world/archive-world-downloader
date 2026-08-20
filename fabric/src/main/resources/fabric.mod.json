@@ -16,15 +16,15 @@
   "license": "LGPL-3.0-or-later",
   "environment": "client",
   "accessWidener": "wdl.accesswidener",
+  "mixins": [
+    "wdl.mixins.json"
+  ],
   "entrypoints": {
     "client": [
       "world.thearchive.wdl.fabric.WdlFabricClient"
     ],
     "modmenu": [
       "world.thearchive.wdl.fabric.WdlFabricModMenu"
-    ],
-    "journeymap": [
-      "world.thearchive.wdl.compat.journeymap.v2.WdlJourneyMapPlugin"
     ]
   },
   "depends": {

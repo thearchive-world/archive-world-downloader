@@ -17,7 +17,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class ContainerCaptureTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     @Test

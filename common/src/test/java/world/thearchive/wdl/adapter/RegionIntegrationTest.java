@@ -22,12 +22,11 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Stream;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -51,27 +50,27 @@ class RegionIntegrationTest {
     private final LecternSink lecternSink = new LecternSinkImpl();
 
     private static IOWorker storage(WorldPaths paths, Path regionDirectory) {
-        return paths.openRegionStorage(Level.OVERWORLD);
+        return paths.openRegionStorage(DimensionType.OVERWORLD);
     }
 
     @Test
     void worldPathsPreCreatesDirectoriesAndOpensRegionStorage(@TempDir Path save) throws IOException {
         WorldPaths paths = new WorldPathsImpl(save);
 
-        Path region = paths.regionDirectory(Level.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
 
         assertTrue(Files.isDirectory(region), "region/ must be pre-created before any write");
         assertEquals(save.resolve("region"), region, "overworld region/ is at the save root");
-        try (IOWorker opened = paths.openRegionStorage(Level.OVERWORLD)) {
+        try (IOWorker opened = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             assertNotNull(opened, "the overworld region storage must open");
         }
     }
 
     @Test
     void multiChunkAndRegionBoundaryRoundTrip(@TempDir Path save) {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(Level.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
 
         // (0,0)+(31,31) share region 0,0; the others cross boundaries into r.1.0 / r.0.1 / r.-1.-1.
         List<ChunkPos> positions = ImmutableList.of(
@@ -80,7 +79,7 @@ class RegionIntegrationTest {
 
         try (IOWorker out = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
+                CompoundTag tag = codec.encode(SyntheticChunks.full(true), false);
                 tag.putInt("wdlTestId", i); // distinct marker -> proves each chunk lands at its own pos
                 out.store(positions.get(i), tag).join();
             }
@@ -110,7 +109,7 @@ class RegionIntegrationTest {
     @Test
     void oversizeChunkSpillsToExternalMccFile(@TempDir Path save) throws IOException {
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(Level.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
         ChunkPos pos = new ChunkPos(5, 5);
 
         // Incompressible payload: RegionFile zlib-compresses chunks, so all-zero bytes would shrink to
@@ -139,9 +138,9 @@ class RegionIntegrationTest {
 
     @Test
     void writeMergingReadsThePriorChunkAndReportsNewVersusRecaptured(@TempDir Path save) throws IOException {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(Level.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
         int[] mergeCalls = { 0 };
         RegionChunkWriter.ChunkReadMerge merge = (onDisk, fresh) -> {
             mergeCalls[0]++;
@@ -151,14 +150,14 @@ class RegionIntegrationTest {
         try (IOWorker out = storage(paths, region)) {
             // No prior on disk: a plain new write, the merge is never invoked.
             RegionChunkWriter.MergeWriteResult first = RegionChunkWriter.writeMerging(out, new ChunkPos(0, 0),
-                    codec.encode(SyntheticChunks.full(registries, true), registries, false), merge);
+                    codec.encode(SyntheticChunks.full(true), false), merge);
             assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_NEW, first.outcome());
             assertEquals(0, mergeCalls[0], "no prior, so nothing to merge");
             out.synchronize().join();
 
             // A prior now exists: the read finds it, the merge runs, the merge-back count is surfaced.
             RegionChunkWriter.MergeWriteResult second = RegionChunkWriter.writeMerging(out, new ChunkPos(0, 0),
-                    codec.encode(SyntheticChunks.full(registries, true), registries, false), merge);
+                    codec.encode(SyntheticChunks.full(true), false), merge);
             assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_RECAPTURED, second.outcome());
             assertEquals(1, mergeCalls[0], "the on-disk prior was read and merged");
             assertEquals(3, second.mergeBacks());
@@ -176,20 +175,20 @@ class RegionIntegrationTest {
      */
     @Test
     void aReWalkedChestKeepsWhatAnEarlierFlushWroteIntoTheRegionFile(@TempDir Path save) throws IOException {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(Level.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 
         try (IOWorker out = storage(paths, region)) {
-            ChunkSnapshotSource captured = chestSnapshot(registries, chestPos, "minecraft:diamond");
-            RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, registries, false),
+            ChunkSnapshotSource captured = chestSnapshot(chestPos, "minecraft:diamond");
+            RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, false),
                     ChunkFlushPlan.readMerge(captured, ImmutableList.of(), LongSets.EMPTY_SET));
             out.synchronize().join();
 
-            ChunkSnapshotSource reWalked = chestSnapshot(registries, chestPos);
-            RegionChunkWriter.writeMerging(out, pos, codec.encode(reWalked, registries, false),
+            ChunkSnapshotSource reWalked = chestSnapshot(chestPos);
+            RegionChunkWriter.writeMerging(out, pos, codec.encode(reWalked, false),
                     ChunkFlushPlan.readMerge(reWalked, ImmutableList.of(), LongSets.EMPTY_SET));
             out.synchronize().join();
         }
@@ -209,23 +208,23 @@ class RegionIntegrationTest {
      */
     @Test
     void aChestOpenedAndFoundEmptyIsWrittenEmptyIntoTheRegionFile(@TempDir Path save) throws IOException {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(Level.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 
         try (IOWorker out = storage(paths, region)) {
-            ChunkSnapshotSource captured = chestSnapshot(registries, chestPos, "minecraft:diamond");
-            RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, registries, false),
+            ChunkSnapshotSource captured = chestSnapshot(chestPos, "minecraft:diamond");
+            RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, false),
                     ChunkFlushPlan.readMerge(captured, ImmutableList.of(), LongSets.EMPTY_SET));
             out.synchronize().join();
 
-            ChunkSnapshotSource emptied = chestSnapshot(registries, chestPos);
+            ChunkSnapshotSource emptied = chestSnapshot(chestPos);
             Map<BlockPos, CompoundTag> containers = new LinkedHashMap<>();
             containers.put(chestPos, BlockEntityFixtures.emptyContainerHolder(27, "minecraft:chest"));
             List<BlockPos> landing = ChunkFlushPlan.landingHolderPositions(emptied, containers);
-            CompoundTag fresh = codec.encode(emptied, registries, false);
+            CompoundTag fresh = codec.encode(emptied, false);
             MergeTally folded = ChunkFlushPlan.foldChunkStashes(fresh, pos, containerSink, lecternSink, containers,
                     ImmutableMap.of(), ImmutableMap.of());
             assertEquals(1, folded.merged(), "the open-time holder landed, so the fresh side is what the open saw");
@@ -251,10 +250,10 @@ class RegionIntegrationTest {
     }
 
     /** A captured chunk snapshot whose one chest at {@code pos} holds each named item. */
-    private static ChunkSnapshotSource chestSnapshot(RegistryAccess registries, BlockPos pos,
+    private static ChunkSnapshotSource chestSnapshot(BlockPos pos,
             String... itemIds) {
         CompoundTag chest = blockEntity("minecraft:chest", pos.getX(), pos.getY(), pos.getZ());
         chest.put("Items", ItemFixtures.items(itemIds));
-        return SyntheticChunks.fullWithBlockEntities(registries, true, ImmutableList.of(chest));
+        return SyntheticChunks.fullWithBlockEntities(true, ImmutableList.of(chest));
     }
 }

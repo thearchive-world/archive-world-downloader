@@ -23,15 +23,15 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.chunk.storage.WdlRegionStorage;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -66,18 +66,19 @@ class OrphanedContainerSweepTest {
     }
 
     /**
-     * {@code IOWorker}'s constructor is protected and cross-package, so a test-local subclass is how a test reaches it.
+     * At 1.15.2 IOWorker's constructor is package-private, so the test opens a region worker through the
+     * WdlRegionStorage shim.
      */
-    private static final class TestRegionStorage extends IOWorker {
+    private static final class TestRegionStorage extends WdlRegionStorage {
         private TestRegionStorage(Path directory, boolean sync, String name) {
-            super(directory.toFile(), sync, name);
+            super(directory.toFile(), name);
         }
     }
 
     private static AsyncSaveWriter regionWriter(Path region) {
         return new AsyncSaveWriter(
                 dimension -> storage(region),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
     }
 
     /** A mutable single-entry holder map, matching what the session's per-chunk drain hands the fold. */
@@ -100,8 +101,7 @@ class OrphanedContainerSweepTest {
     }
 
     /** Read chunk {@code chunk} back from disk and decode the 27-slot container contents of the block entity there. */
-    private NonNullList<ItemStack> itemsOnDisk(Path region, ChunkPos chunk, int x, int y, int z,
-            RegistryAccess registries)
+    private NonNullList<ItemStack> itemsOnDisk(Path region, ChunkPos chunk, int x, int y, int z)
             throws IOException {
         try (IOWorker in = storage(region)) {
             CompoundTag back = Optional.ofNullable(in.load(chunk))
@@ -115,12 +115,12 @@ class OrphanedContainerSweepTest {
     }
 
     /** Flush a chunk to disk carrying the given (empty, client-form) block entities: the pre-open orphaned state. */
-    private void flushEmptyChunk(Path region, ChunkPos chunk, RegistryAccess registries,
+    private void flushEmptyChunk(Path region, ChunkPos chunk,
             List<CompoundTag> blockEntities)
             throws Exception {
         AsyncSaveWriter flush = regionWriter(region);
-        flush.submitChunk(Level.OVERWORLD, chunk,
-                () -> codec.encode(SyntheticChunks.fullWithBlockEntities(registries, true, blockEntities), registries,
+        flush.submitChunk(DimensionType.OVERWORLD, chunk,
+                () -> codec.encode(SyntheticChunks.fullWithBlockEntities(true, blockEntities),
                         false),
                 ChunkMerge::merge);
         assertFalse(flush.finish().get(30, TimeUnit.SECONDS).failed(), "the empty-container chunk flushed to disk");
@@ -128,7 +128,7 @@ class OrphanedContainerSweepTest {
 
     @Test
     void orphanedContainerContentsAreFoldedOntoTheFlushedOnDiskChest(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos chunk = new ChunkPos(0, 0);
@@ -136,8 +136,8 @@ class OrphanedContainerSweepTest {
 
         // The chunk is flushed carrying an empty chest, then leaves the keep-hot buffer: the client chunk packet
         // never carries container contents, so a not-yet-opened chest is on disk structurally present but empty.
-        flushEmptyChunk(region, chunk, registries, ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
-        assertTrue(itemsOnDisk(region, chunk, 2, 64, 2, registries).get(0).isEmpty(),
+        flushEmptyChunk(region, chunk, ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
+        assertTrue(itemsOnDisk(region, chunk, 2, 64, 2).get(0).isEmpty(),
                 "the flushed chunk's chest starts empty, before the container is opened");
 
         // The container is opened after its chunk was flushed, so the captured Items holder is orphaned; the fix
@@ -145,14 +145,14 @@ class OrphanedContainerSweepTest {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
-        holders.put(chestPos, sink.captureItems(items, registries));
+        holders.put(chestPos, sink.captureItems(items));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(Level.OVERWORLD, chunk,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, chunk, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
-        NonNullList<ItemStack> onDisk = itemsOnDisk(region, chunk, 2, 64, 2, registries);
+        NonNullList<ItemStack> onDisk = itemsOnDisk(region, chunk, 2, 64, 2);
         assertEquals(Items.DIAMOND, onDisk.get(0).getItem(), "the orphaned contents reached the on-disk chest");
         assertEquals(5, onDisk.get(0).getCount(), "with the right count");
         assertTrue(onDisk.get(1).isEmpty(), "the fold set only the captured slot, leaving the rest of the chest empty");
@@ -160,19 +160,19 @@ class OrphanedContainerSweepTest {
 
     @Test
     void orphanedLecternBookIsFoldedOntoTheFlushedOnDiskLectern(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         LecternSink sink = new LecternSinkImpl();
         ChunkPos chunk = new ChunkPos(0, 0);
         BlockPos lecternPos = new BlockPos(3, 64, 3);
 
-        flushEmptyChunk(region, chunk, registries, ImmutableList.of(blockEntity("minecraft:lectern", 3, 64, 3)));
+        flushEmptyChunk(region, chunk, ImmutableList.of(blockEntity("minecraft:lectern", 3, 64, 3)));
 
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
-        holders.put(lecternPos, sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 7, registries));
+        holders.put(lecternPos, sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 7));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(Level.OVERWORLD, chunk,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
                 onDisk -> ContainerMerge.mergeLecternChunkStash(sink, onDisk, chunk, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
@@ -192,7 +192,7 @@ class OrphanedContainerSweepTest {
         // A double chest straddling a chunk boundary keys each half by its own pos into its own chunk (the split
         // anomaly: the server sends both halves together, so one half saved and one lost is a mod-side loss). When
         // both halves' chunks are orphaned, the sweep folds each half onto its own on-disk chest.
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos rightChunk = new ChunkPos(0, 0);
@@ -200,26 +200,26 @@ class OrphanedContainerSweepTest {
         BlockPos rightHalf = new BlockPos(15, 64, 4); // last column of chunk (0,0)
         BlockPos leftHalf = new BlockPos(16, 64, 4);  // first column of chunk (1,0), the connected partner
 
-        flushEmptyChunk(region, rightChunk, registries, ImmutableList.of(blockEntity("minecraft:chest", 15, 64, 4)));
-        flushEmptyChunk(region, leftChunk, registries, ImmutableList.of(blockEntity("minecraft:chest", 16, 64, 4)));
+        flushEmptyChunk(region, rightChunk, ImmutableList.of(blockEntity("minecraft:chest", 15, 64, 4)));
+        flushEmptyChunk(region, leftChunk, ImmutableList.of(blockEntity("minecraft:chest", 16, 64, 4)));
 
         NonNullList<ItemStack> rightItems = NonNullList.withSize(27, ItemStack.EMPTY);
         rightItems.set(0, new ItemStack(Items.EMERALD, 3));
         NonNullList<ItemStack> leftItems = NonNullList.withSize(27, ItemStack.EMPTY);
         leftItems.set(0, new ItemStack(Items.GOLD_INGOT, 9));
-        Map<BlockPos, CompoundTag> rightHolder = holder(rightHalf, sink.captureItems(rightItems, registries));
-        Map<BlockPos, CompoundTag> leftHolder = holder(leftHalf, sink.captureItems(leftItems, registries));
+        Map<BlockPos, CompoundTag> rightHolder = holder(rightHalf, sink.captureItems(rightItems));
+        Map<BlockPos, CompoundTag> leftHolder = holder(leftHalf, sink.captureItems(leftItems));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(Level.OVERWORLD, rightChunk,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, rightChunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, rightChunk, rightHolder).merged());
-        sweep.submitChunkRewrite(Level.OVERWORLD, leftChunk,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, leftChunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, leftChunk, leftHolder).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
-        assertEquals(Items.EMERALD, itemsOnDisk(region, rightChunk, 15, 64, 4, registries).get(0).getItem(),
+        assertEquals(Items.EMERALD, itemsOnDisk(region, rightChunk, 15, 64, 4).get(0).getItem(),
                 "the right half's orphaned contents reached its on-disk chest");
-        assertEquals(Items.GOLD_INGOT, itemsOnDisk(region, leftChunk, 16, 64, 4, registries).get(0).getItem(),
+        assertEquals(Items.GOLD_INGOT, itemsOnDisk(region, leftChunk, 16, 64, 4).get(0).getItem(),
                 "the left half's orphaned contents reached its on-disk chest (no split loss)");
     }
 
@@ -228,15 +228,15 @@ class OrphanedContainerSweepTest {
         // The chunk-not-on-disk edge: a chunk whose original write failed or was skipped has no prior to fold
         // into. The rewrite finds nothing, logs the loss, and completes without aborting the save or writing a
         // partial chunk (in practice the writer's FIFO order guarantees an orphaned chunk was written first).
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos missing = new ChunkPos(5, 5);
         Map<BlockPos, CompoundTag> holders = holder(new BlockPos(82, 64, 82),
-                sink.captureItems(NonNullList.withSize(27, ItemStack.EMPTY), registries));
+                sink.captureItems(NonNullList.withSize(27, ItemStack.EMPTY)));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(Level.OVERWORLD, missing,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, missing,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, missing, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(),
                 "a rewrite for a chunk with no on-disk prior does not fail the save");
@@ -254,26 +254,26 @@ class OrphanedContainerSweepTest {
         // must return the earlier write from the region IOWorker's pending writes, not a synced-and-reopened file.
         // Drive that exact single-writer timing, and assert the merge is counted (the loss it fixes read zero on
         // every counter).
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos chunk = new ChunkPos(0, 0);
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
-        Map<BlockPos, CompoundTag> holders = holder(new BlockPos(2, 64, 2), sink.captureItems(items, registries));
+        Map<BlockPos, CompoundTag> holders = holder(new BlockPos(2, 64, 2), sink.captureItems(items));
 
         AsyncSaveWriter writer = regionWriter(region);
-        writer.submitChunk(Level.OVERWORLD, chunk, () -> codec.encode(
-                SyntheticChunks.fullWithBlockEntities(registries, true,
+        writer.submitChunk(DimensionType.OVERWORLD, chunk, () -> codec.encode(
+                SyntheticChunks.fullWithBlockEntities(true,
                         ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2))),
-                registries, false), ChunkMerge::merge);
-        writer.submitChunkRewrite(Level.OVERWORLD, chunk,
+                false), ChunkMerge::merge);
+        writer.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, chunk, holders).merged());
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "the single-writer write-then-rewrite completed");
         assertEquals(1, result.mergedContainers(), "the orphaned container merge is counted, not silently zero");
-        assertEquals(Items.DIAMOND, itemsOnDisk(region, chunk, 2, 64, 2, registries).get(0).getItem(),
+        assertEquals(Items.DIAMOND, itemsOnDisk(region, chunk, 2, 64, 2).get(0).getItem(),
                 "the rewrite folded onto the same-session write it read back from the writer's pending storage");
     }
 

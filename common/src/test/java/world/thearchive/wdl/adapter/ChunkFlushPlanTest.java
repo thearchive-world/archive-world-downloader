@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
@@ -43,14 +42,12 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * the version that preceded it turns one red.
  */
 class ChunkFlushPlanTest {
-    private static RegistryAccess registries;
-
     private final ContainerSink containerSink = new ContainerSinkImpl();
     private final LecternSink lecternSink = new LecternSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** Built on demand, never as a static initializer: ChunkPos static init needs the vanilla bootstrap. */
@@ -61,7 +58,7 @@ class ChunkFlushPlanTest {
     private CompoundTag itemsHolder(String itemId) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, ItemFixtures.stack(itemId));
-        return containerSink.captureItems(items, registries);
+        return containerSink.captureItems(items);
     }
 
     private static CompoundTag discHolder(String discId) {
@@ -79,7 +76,7 @@ class ChunkFlushPlanTest {
     /** A sink whose merge throws, the band-merge failure the fold has to isolate and count. */
     private static final ContainerSink THROWING_CONTAINER_SINK = new ContainerSink() {
         @Override
-        public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
+        public CompoundTag captureItems(NonNullList<ItemStack> items) {
             throw new AssertionError("the failure path never serializes items");
         }
 
@@ -91,7 +88,7 @@ class ChunkFlushPlanTest {
 
     private static final LecternSink THROWING_LECTERN_SINK = new LecternSink() {
         @Override
-        public CompoundTag captureBook(ItemStack book, int page, RegistryAccess registries) {
+        public CompoundTag captureBook(ItemStack book, int page) {
             throw new AssertionError("the failure path never serializes a book");
         }
 
@@ -198,7 +195,7 @@ class ChunkFlushPlanTest {
 
         Map<BlockPos, CompoundTag> containers = stash(new BlockPos(1, 64, 1), itemsHolder("minecraft:diamond"));
         Map<BlockPos, CompoundTag> lecterns = stash(new BlockPos(2, 64, 2),
-                lecternSink.captureBook(ItemFixtures.writtenBook(2), 1, registries));
+                lecternSink.captureBook(ItemFixtures.writtenBook(2), 1));
         Map<BlockPos, CompoundTag> holders = stash(new BlockPos(3, 64, 3), discHolder("minecraft:music_disc_cat"));
 
         MergeTally tally = ChunkFlushPlan.foldChunkStashes(chunkTag, origin(), containerSink, lecternSink,
@@ -253,7 +250,7 @@ class ChunkFlushPlanTest {
         MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, origin(), containerSink, lecternSink,
                 stash(new BlockPos(1, 64, 1), itemsHolder("minecraft:diamond")),
                 stash(new BlockPos(2, 64, 2),
-                        lecternSink.captureBook(ItemFixtures.writtenBook(2), 1, registries)));
+                        lecternSink.captureBook(ItemFixtures.writtenBook(2), 1)));
 
         assertEquals(2, tally.merged(), "both the container and the lectern rewrite land");
         assertEquals(0, tally.failed());
@@ -299,6 +296,6 @@ class ChunkFlushPlanTest {
 
     /** A snapshot whose block-entity list is {@code blockEntities}, with no block states behind them. */
     private static ChunkSnapshotSource snapshotOf(CompoundTag... blockEntities) {
-        return SyntheticChunks.fullWithBlockEntities(registries, true, ImmutableList.copyOf(blockEntities));
+        return SyntheticChunks.fullWithBlockEntities(true, ImmutableList.copyOf(blockEntities));
     }
 }

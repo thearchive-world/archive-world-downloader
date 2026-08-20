@@ -21,11 +21,10 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -67,12 +66,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class LiveCaptureSessionLossLogWiringTest {
     private static final String SESSION_LOGGER = LiveCaptureSession.class.getName();
 
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen(); // vanilla statics, which a test reaching a map write needs first
+        TestRegistries.bootstrap(); // vanilla statics, which a test reaching a map write needs first
     }
 
     /**
@@ -90,7 +88,7 @@ class LiveCaptureSessionLossLogWiringTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -110,7 +108,6 @@ class LiveCaptureSessionLossLogWiringTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {},
                 new SaveProgress());
     }
 
@@ -148,7 +145,7 @@ class LiveCaptureSessionLossLogWiringTest {
     }
 
     private CompoundTag itemTagOf(ItemStack stack) {
-        return (CompoundTag) ((ListTag) holderOf(sink, registries, stack).get("Items")).get(0);
+        return (CompoundTag) ((ListTag) holderOf(sink, stack).get("Items")).get(0);
     }
 
     @Test
@@ -185,7 +182,7 @@ class LiveCaptureSessionLossLogWiringTest {
             AsyncSaveWriter writer = session.bindWorldOpen(paths, archive,
                     LiveCaptureSessionLossLogWiringTest::mapOnlyWriter);
 
-            remapHolderItems(session, holderReferencing(sink, registries, 5), holderPosition);
+            remapHolderItems(session, holderReferencing(sink, 5), holderPosition);
             remapEntityItems(session, entityChunkDisplaying(framed, filledMap(9)), archive);
             AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -231,7 +228,7 @@ class LiveCaptureSessionLossLogWiringTest {
         AsyncSaveWriter writer = session.bindWorldOpen(paths, archive,
                 LiveCaptureSessionLossLogWiringTest::mapOnlyWriter);
 
-        remapHolderItems(session, holderReferencing(sink, registries, 5), new BlockPos(4, 64, -7));
+        remapHolderItems(session, holderReferencing(sink, 5), new BlockPos(4, 64, -7));
         remapEntityItems(session, entityChunkDisplaying(
                 UUID.fromString("6b1d5f2c-9a30-4e11-b8c7-5d0e3a71f402"), filledMap(9)), archive);
         session.streamMapData(7, mapData());

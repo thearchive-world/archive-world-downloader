@@ -6,14 +6,11 @@ package world.thearchive.wdl.adapter;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.FloatTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,8 +28,8 @@ import org.jspecify.annotations.Nullable;
  * lands with the world spawn.</li>
  * <li>{@link #setEnderItems} remaps a captured container holder's {@code "Items"} into {@code "EnderItems"}.</li>
  * <li>{@link #setRootVehicle} writes the vanilla {@code "RootVehicle"} record ({@code "Attach"} plus {@code "Entity"})
- * for a seated player's mount, the {@code store}-with-codec op ({@code SerializableUUID.CODEC}) whose int-array
- * {@code Attach} shape is band-local vanilla-verbatim, re-authored at the deep-band seam, the vanilla-verbatim-shape
+ * for a seated player's mount, the {@code "Attach"} UUID written through {@code CompoundTag.putUUID}, whose pre-1.16
+ * {@code AttachMost}/{@code AttachLeast} long-pair shape is band-local vanilla-verbatim, the vanilla-verbatim-shape
  * discipline {@link #setPosition} already carries.</li>
  * </ul>
  */
@@ -67,14 +64,14 @@ final class PlayerTag {
     }
 
     /**
-     * Write the canonical {@code "Dimension"} id. The value is whatever {@code dimension} carries, verbatim: the caller
-     * passes the by-type-canonicalized capture dimension ({@code targetDimension}), so a non-standard server level key
-     * and a datapack dimension alike already resolve to the vanilla folder the capture writes them under, and the id
-     * written is always one of the three {@link VanillaDimensions#forType} returns. Matches
-     * {@code ServerPlayer.addAdditionalSaveData}, which writes the plain id string.
+     * Write the canonical {@code "Dimension"} id. The caller passes the by-type-canonicalized capture dimension
+     * ({@code targetDimension}), so a non-standard server level key and a datapack dimension alike already resolve to
+     * one of the three {@link VanillaDimensions#forType} returns. At 1.15.2 vanilla reads this back as the integer id
+     * ({@code Entity.readAdditionalSaveData}), so it is written as the id, not the 1.16 string form: a string here is
+     * read by {@code getInt} as 0 and lands the player in the overworld.
      */
-    static void setDimension(CompoundTag raw, ResourceKey<Level> dimension) {
-        raw.putString("Dimension", dimension.location().toString());
+    static void setDimension(CompoundTag raw, DimensionType dimension) {
+        raw.putInt("Dimension", dimension.getId());
     }
 
     /**
@@ -82,8 +79,13 @@ final class PlayerTag {
      * three {@link #setDimension} can have written. The read side of {@link #setDimension}, and the only way to learn
      * which folder a prior download parked something in.
      */
-    static @Nullable ResourceKey<Level> dimensionOf(CompoundTag raw) {
-        return VanillaDimensions.forId(raw.getString("Dimension"));
+    static @Nullable DimensionType dimensionOf(CompoundTag raw) {
+        // 99 is vanilla's any-numeric tag sentinel: an absent or non-numeric tag (a 1.16 string id) names no dimension
+        // rather than getInt collapsing it to the overworld. getById returns null for an id outside the registry.
+        if (!raw.contains("Dimension", 99)) {
+            return null;
+        }
+        return DimensionType.getById(raw.getInt("Dimension"));
     }
 
     /**
@@ -118,15 +120,15 @@ final class PlayerTag {
 
     /**
      * Write the seated player's mount as vanilla's {@code "RootVehicle"} record: {@code "Attach"} is the direct
-     * vehicle's {@code UUID} (the {@code SerializableUUID.CODEC} four-int array) and {@code "Entity"} is the root
-     * vehicle serialized standalone. Mirrors {@code ServerPlayer.saveParentVehicle}, which
-     * {@code ServerPlayer.loadAndSpawnParentVehicle} reads on a vanilla open (a singleplayer saved player included) to
-     * respawn the vehicle and re-seat the player; an absent record is a clean load that leaves the player standing.
+     * vehicle's {@code UUID} (the pre-1.16 {@code AttachMost}/{@code AttachLeast} long pair {@code CompoundTag.putUUID}
+     * writes) and {@code "Entity"} is the root vehicle serialized standalone. Mirrors
+     * {@code ServerPlayer.saveParentVehicle}, which {@code ServerPlayer.loadAndSpawnParentVehicle} reads on a vanilla
+     * open (a singleplayer saved player included) to respawn the vehicle and re-seat the player; an absent record is a
+     * clean load that leaves the player standing.
      */
     static void setRootVehicle(CompoundTag raw, UUID attach, CompoundTag entityTag) {
         CompoundTag rootVehicle = new CompoundTag();
-        rootVehicle.put("Attach",
-                SerializableUUID.CODEC.encodeStart(NbtOps.INSTANCE, attach).getOrThrow(false, s -> {}));
+        rootVehicle.putUUID("Attach", attach);
         rootVehicle.put("Entity", entityTag);
         raw.put("RootVehicle", rootVehicle);
     }

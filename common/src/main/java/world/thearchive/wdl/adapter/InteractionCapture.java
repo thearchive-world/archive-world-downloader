@@ -17,16 +17,16 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.BlockPlaceContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.RecordItem;
-import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.item.UseOnContext;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BeehiveBlock;
@@ -65,7 +65,6 @@ public final class InteractionCapture {
     private static volatile @Nullable InteractionCapture active;
 
     private final ContainerSink containerSink;
-    private final RegistryAccess registries;
 
     /**
      * Whether the recognizer is live, coupled to {@code recaptureChunks}: the reconcile gate confirms a candidate only
@@ -149,11 +148,10 @@ public final class InteractionCapture {
         boolean isCapturable(ChunkPos chunk);
     }
 
-    InteractionCapture(ContainerSink containerSink, RegistryAccess registries, boolean recaptureEnabled,
+    InteractionCapture(ContainerSink containerSink, boolean recaptureEnabled,
             ChunkCaptureGate chunkCaptureGate, BookshelfSlotSink bookshelfSlotSink,
             PlacedContainerSink placedContainerSink, PlacementSink placementSink) {
         this.containerSink = containerSink;
-        this.registries = registries;
         this.recaptureEnabled = recaptureEnabled;
         this.chunkCaptureGate = chunkCaptureGate;
         this.bookshelfSlotSink = bookshelfSlotSink;
@@ -334,7 +332,7 @@ public final class InteractionCapture {
         // step earlier on the same client state. Without it every right-click holding a block item predicts a
         // placement into whatever cell the clicked face points at, including a cell already occupied by the
         // very block type the reconcile gate confirms on, which is exactly the state that makes writing wrong.
-        BlockPlaceContext context = new BlockPlaceContext(player, hand, stack, hit);
+        BlockPlaceContext context = new BlockPlaceContext(new UseOnContext(player, hand, hit));
         if (!context.canPlace()) {
             return;
         }
@@ -370,7 +368,7 @@ public final class InteractionCapture {
             if (blockEntityTag != null && blockEntityTag.contains("Items", 9)) {
                 NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
                 ContainerHelper.loadAllItems(blockEntityTag, items);
-                CompoundTag holder = containerSink.captureItems(items, registries);
+                CompoundTag holder = containerSink.captureItems(items);
                 placeStash.put(placedPos, new HolderCandidate(InteractionKind.SHULKER, holder));
                 placedContainerSink.containerCaptured(placedPos.asLong(), shulkerBlockEntityId());
             }

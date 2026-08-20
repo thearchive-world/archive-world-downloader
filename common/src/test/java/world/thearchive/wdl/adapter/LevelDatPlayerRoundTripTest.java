@@ -8,18 +8,19 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtOps;
+import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.storage.LevelStorage;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -50,20 +51,21 @@ class LevelDatPlayerRoundTripTest {
 
     private CompoundTag saveAndReadBack(Path saves, String name, @Nullable CapturedPlayer player)
             throws IOException {
-        RegistryAccess registries = TestRegistries.frozen();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
-        LevelStorageSource source = LevelStorageSource.createDefault(saves);
-        try (LevelStorageSource.LevelStorageAccess access = source.createAccess(name)) {
-            writer.save(access, built, player);
-        }
+        TestRegistries.bootstrap();
+        LevelDataWriter.LevelData built = writer.buildLevelData(WorldOutputConfig.DEFAULTS, null);
+        LevelStorage storage = new LevelStorageSource(saves, saves.resolve("backups"), DataFixers.getDataFixer())
+                .selectLevel(name, null);
+        writer.save(storage, built, player);
         Path levelDat = saves.resolve(name).resolve("level.dat");
-        return NbtIo.readCompressed(levelDat.toFile()).getCompound("Data");
+        try (InputStream in = Files.newInputStream(levelDat)) {
+            return NbtIo.readCompressed(in).getCompound("Data");
+        }
     }
 
     @Test
     void savesWithCapturedPlayerWritePlayerGameTypeSpawnAndDifficulty(@TempDir Path saves) throws IOException {
         CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(), new BlockPos(120, 72, -340), 90.0F, 12.0F,
-                Level.NETHER, GameType.CREATIVE, Difficulty.HARD);
+                DimensionType.NETHER, GameType.CREATIVE, Difficulty.HARD);
 
         CompoundTag data = saveAndReadBack(saves, "withplayer", captured);
 
@@ -82,7 +84,7 @@ class LevelDatPlayerRoundTripTest {
     @Test
     void savesWithSurvivalOptOutWriteTheCapturedMode(@TempDir Path saves) throws IOException {
         CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(), BlockPos.ZERO, 0.0F, 0.0F,
-                Level.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);
+                DimensionType.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);
 
         CompoundTag data = saveAndReadBack(saves, "survival", captured);
 
@@ -108,7 +110,7 @@ class LevelDatPlayerRoundTripTest {
         CompoundTag boatTag = EntityFixtures.entityTag("minecraft:chest_boat"); // the id loadEntityRecursive reads
         PlayerTag.setRootVehicle(playerTag, boat, boatTag);
         CapturedPlayer captured = new CapturedPlayer(playerTag, BlockPos.ZERO, 0.0F, 0.0F,
-                Level.OVERWORLD, GameType.CREATIVE, Difficulty.NORMAL);
+                DimensionType.OVERWORLD, GameType.CREATIVE, Difficulty.NORMAL);
 
         CompoundTag data = saveAndReadBack(saves, "rootvehicle", captured);
 
@@ -116,7 +118,7 @@ class LevelDatPlayerRoundTripTest {
         assertEquals("minecraft:chest_boat", rootVehicle.getCompound("Entity").getString("id"),
                 "the Entity child keeps its id, or loadEntityRecursive silently skips it (no re-seat)");
         assertEquals(boat,
-                SerializableUUID.CODEC.parse(NbtOps.INSTANCE, rootVehicle.get("Attach")).result().orElse(null),
-                "Attach round-trips through SerializableUUID.CODEC as the direct vehicle UUID the re-seat matches");
+                rootVehicle.getUUID("Attach"),
+                "Attach round-trips through CompoundTag.getUUID as the direct vehicle UUID the re-seat matches");
     }
 }

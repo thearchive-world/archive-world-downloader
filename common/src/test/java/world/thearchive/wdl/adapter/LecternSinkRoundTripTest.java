@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.customNameOf;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.namedBlockEntity;
 
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -37,12 +36,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * menu's slot 0) is not exercised headless, exactly as for containers.
  */
 class LecternSinkRoundTripTest {
-    private static RegistryAccess registries;
     private final LecternSink sink = new LecternSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** A captured client lectern BE tag carrying a real non-Book field, to assert no clobber. */
@@ -91,7 +89,7 @@ class LecternSinkRoundTripTest {
 
     @Test
     void captureBookProducesBookCompoundAndPageInt() {
-        CompoundTag holder = sink.captureBook(writtenBook(), 1, registries);
+        CompoundTag holder = sink.captureBook(writtenBook(), 1);
 
         assertInstanceOf(CompoundTag.class, holder.get("Book"),
                 "ItemStack#save serializes a stack to a compound under Book");
@@ -101,7 +99,7 @@ class LecternSinkRoundTripTest {
 
     @Test
     void writtenBookRoundTripsThroughMergeAndVanillaCodec() {
-        CompoundTag holder = sink.captureBook(writtenBook(), 1, registries);
+        CompoundTag holder = sink.captureBook(writtenBook(), 1);
         CompoundTag merged = sink.merge(lecternTag(10, 64, -7), holder);
 
         // No field clobber: id / pos / unrelated fields survive.
@@ -125,7 +123,7 @@ class LecternSinkRoundTripTest {
 
     @Test
     void writableBookRoundTripsThroughMergeAndVanillaCodec() {
-        CompoundTag holder = sink.captureBook(writableBook(), 0, registries);
+        CompoundTag holder = sink.captureBook(writableBook(), 0);
         CompoundTag merged = sink.merge(lecternTag(1, 1, 1), holder);
 
         assertEquals(0, (merged.contains("Page") ? merged.getInt("Page") : -1));
@@ -139,7 +137,7 @@ class LecternSinkRoundTripTest {
 
     @Test
     void mergeDoesNotMutateTheCapturedBlockEntityTag() {
-        CompoundTag holder = sink.captureBook(writtenBook(), 0, registries);
+        CompoundTag holder = sink.captureBook(writtenBook(), 0);
 
         CompoundTag blockEntity = lecternTag(0, 0, 0);
         sink.merge(blockEntity, holder);

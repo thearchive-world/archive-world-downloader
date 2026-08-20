@@ -26,7 +26,7 @@ class FixtureFidelityTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** The hand-built entry at the root of the recorded defect: no {@code "Slot"}, so every entry decodes to 0. */

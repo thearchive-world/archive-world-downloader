@@ -13,7 +13,6 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -32,12 +31,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * not exercised headless.
  */
 class MapIdCollectorTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     private static Set<Integer> collect(CompoundTag holder) {
@@ -48,7 +46,7 @@ class MapIdCollectorTest {
 
     @Test
     void collectsTopLevelAndNestedShulkerMapIdsSkippingNonMaps() {
-        CompoundTag holder = holderOf(sink, registries, filledMap(5), shulkerHolding(filledMap(7)),
+        CompoundTag holder = holderOf(sink, filledMap(5), shulkerHolding(filledMap(7)),
                 new ItemStack(Items.DIAMOND, 3));
 
         assertEquals(ImmutableSet.of(5, 7), collect(holder),
@@ -61,7 +59,7 @@ class MapIdCollectorTest {
         // A chest map referenced but never carried (imageless) is still collected, so idcounts floors
         // above it. Here ids 1 and 2 stand for imaged maps and 50 for the imageless chest map; the collection
         // (hence the idcounts floor = max) must include 50, not stop at the imaged max of 2.
-        Set<Integer> ids = collect(holderOf(sink, registries, filledMap(1), filledMap(2), filledMap(50)));
+        Set<Integer> ids = collect(holderOf(sink, filledMap(1), filledMap(2), filledMap(50)));
 
         assertEquals(ImmutableSet.of(1, 2, 50), ids);
         assertEquals(50, Collections.max(ids), "idcounts floors at the max referenced candidate id");
@@ -70,7 +68,7 @@ class MapIdCollectorTest {
     @Test
     void aHolderWithNoMapReferencesCollectsNothing() {
         Set<Integer> ids = collect(
-                holderOf(sink, registries, new ItemStack(Items.DIAMOND), new ItemStack(Items.STICK, 2)));
+                holderOf(sink, new ItemStack(Items.DIAMOND), new ItemStack(Items.STICK, 2)));
 
         assertTrue(ids.isEmpty(),
                 "no map id referenced, so nothing is collected and no data/ file is written (the no-op path)");

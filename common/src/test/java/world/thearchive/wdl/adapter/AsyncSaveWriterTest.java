@@ -30,16 +30,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.chunk.storage.WdlRegionStorage;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -68,9 +67,9 @@ class AsyncSaveWriterTest {
     /**
      * {@code IOWorker}'s constructor is protected and cross-package, so a test-local subclass is how a test reaches it.
      */
-    private static class TestRegionStorage extends IOWorker {
+    private static class TestRegionStorage extends WdlRegionStorage {
         private TestRegionStorage(Path directory, boolean sync, String name) {
-            super(directory.toFile(), sync, name);
+            super(directory.toFile(), name);
         }
     }
 
@@ -88,7 +87,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void drainsSubmittedChunksOnTheWriterThreadAndReportsTallies(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean finalized = new AtomicBoolean(false);
 
@@ -97,12 +96,12 @@ class AsyncSaveWriterTest {
                 () -> {},                  // preflight: the resume backup
                 (chunksFailed, entityChunksFailed) -> finalized.set(true), // the level.dat write stand-in
                 () -> null,                  // outputs: export + size
-                () -> {}, new SaveProgress());                 // the LevelStorageAccess close stand-in
+                new SaveProgress());                 // the LevelStorageAccess close stand-in
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(31, 31),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(31, 31),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "the drain succeeded");
@@ -127,7 +126,7 @@ class AsyncSaveWriterTest {
      */
     @Test
     void countsEveryChunkOfAnUnopenableDimensionAndStillFinalizes(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
         AtomicInteger finalizedEntityChunksFailed = new AtomicInteger(-1);
@@ -135,7 +134,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> {
-                    if (Level.NETHER.equals(dimension)) {
+                    if (DimensionType.NETHER.equals(dimension)) {
                         netherOpens.incrementAndGet();
                         throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
                     }
@@ -147,15 +146,14 @@ class AsyncSaveWriterTest {
                     finalizedEntityChunksFailed.set(entityChunksFailed);
                 },
                 () -> null,
-                () -> {},
                 new SaveProgress());
 
-        writer.submitChunk(Level.NETHER, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        writer.submitChunk(Level.NETHER, new ChunkPos(1, 1),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(2, 2),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.NETHER, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.NETHER, new ChunkPos(1, 1),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(2, 2),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(2, finalizedChunksFailed.get(),
@@ -187,7 +185,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> {
-                    if (Level.NETHER.equals(dimension)) {
+                    if (DimensionType.NETHER.equals(dimension)) {
                         netherOpens.incrementAndGet();
                         throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
                     }
@@ -199,12 +197,11 @@ class AsyncSaveWriterTest {
                     finalizedEntityChunksFailed.set(entityChunksFailed);
                 },
                 () -> null,
-                () -> {},
                 new SaveProgress());
 
-        writer.submitEntity(Level.NETHER, new ChunkPos(0, 0), pigChunk(new ChunkPos(0, 0)));
-        writer.submitEntity(Level.NETHER, new ChunkPos(1, 1), pigChunk(new ChunkPos(1, 1)));
-        writer.submitEntity(Level.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
+        writer.submitEntity(DimensionType.NETHER, new ChunkPos(0, 0), pigChunk(new ChunkPos(0, 0)));
+        writer.submitEntity(DimensionType.NETHER, new ChunkPos(1, 1), pigChunk(new ChunkPos(1, 1)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(2, finalizedEntityChunksFailed.get(),
@@ -236,10 +233,9 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalized.set(true),
                 () -> null,
-                () -> {},
                 new SaveProgress());
 
-        writer.submitChunkRewrite(Level.NETHER, new ChunkPos(0, 0),
+        writer.submitChunkRewrite(DimensionType.NETHER, new ChunkPos(0, 0),
                 onDisk -> {
                     throw new AssertionError("the storage never opened, so no chunk can be folded into");
                 });
@@ -254,7 +250,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void reportsTheChunkDrainPhaseToTheProgressSink(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         SaveProgress progress = new SaveProgress();
 
@@ -263,13 +259,12 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {},
                 progress);
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(31, 31),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(31, 31),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(SaveStage.WRITING_CHUNKS, progress.stage(), "the drain reports the chunks phase");
@@ -278,7 +273,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void reportsTheMapWritePhaseOverTheBatchAfterTheChunkDrain(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         SaveProgress progress = new SaveProgress();
         List<String> order = new ArrayList<>(); // appended only from the writer thread, so it needs no locking
@@ -289,12 +284,11 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> order.add("finalize"),
                 () -> null,
-                () -> {},
                 progress);
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
             order.add("chunk");
-            return codec.encode(SyntheticChunks.full(registries, true), registries, false);
+            return codec.encode(SyntheticChunks.full(true), false);
         }, ChunkMerge::merge);
         writer.submitMapBatch(ImmutableList.of(
                 () -> {
@@ -324,7 +318,6 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {},
                 progress);
 
         writer.submitMapBatch(ImmutableList.of(
@@ -342,7 +335,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void skipsTheMapPhaseWhenNothingWasBatched(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         SaveProgress progress = new SaveProgress();
 
@@ -351,11 +344,10 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {},
                 progress);
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         writer.submitMapBatch(ImmutableList.of());
         writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -364,7 +356,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void drainsChunksAndEntityFoldsTalliedApartIntoTheRegionChunk(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -372,12 +364,12 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
         // Terrain flushes first, then the entity folds into the same region/ chunk under Level.Entities.
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(2, 2),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        writer.submitEntity(Level.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(2, 2),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
@@ -393,23 +385,23 @@ class AsyncSaveWriterTest {
 
     @Test
     void routesEachDimensionToItsOwnStorage(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path overworldRegion = Files.createDirectories(save.resolve("region"));
         Path netherRegion = Files.createDirectories(save.resolve("DIM-1").resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
-                dimension -> storage(dimension == Level.NETHER ? netherRegion : overworldRegion, "chunk"),
+                dimension -> storage(dimension == DimensionType.NETHER ? netherRegion : overworldRegion, "chunk"),
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
         // The same chunk position in two dimensions: with a single storage these would collide; the writer
         // opens a storage per dimension on demand so each lands in its own folder.
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        writer.submitChunk(Level.NETHER, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.NETHER, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
@@ -426,27 +418,27 @@ class AsyncSaveWriterTest {
 
     @Test
     void offThreadChunkEncodeIsByteIdenticalToOnThreadEncode(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path overworldRegion = Files.createDirectories(save.resolve("region"));
         Path netherRegion = Files.createDirectories(save.resolve("DIM-1").resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
-                dimension -> storage(dimension == Level.NETHER ? netherRegion : overworldRegion, "chunk"),
+                dimension -> storage(dimension == DimensionType.NETHER ? netherRegion : overworldRegion, "chunk"),
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
         // The same snapshot encoded two ways through the same region pipeline: the thunk resolved on the
         // writer thread and a direct on-thread encode. The disk results must be identical.
-        ChunkSnapshotSource snapshot = SyntheticChunks.full(registries, true);
-        CompoundTag onThread = codec.encode(snapshot, registries, false);
+        ChunkSnapshotSource snapshot = SyntheticChunks.full(true);
+        CompoundTag onThread = codec.encode(snapshot, false);
         AtomicReference<Thread> encodedOn = new AtomicReference<>();
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
             encodedOn.set(Thread.currentThread());
-            return codec.encode(snapshot, registries, false);
+            return codec.encode(snapshot, false);
         }, ChunkMerge::merge);
-        writer.submitChunk(Level.NETHER, new ChunkPos(0, 0), () -> onThread, ChunkMerge::merge);
+        writer.submitChunk(DimensionType.NETHER, new ChunkPos(0, 0), () -> onThread, ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
@@ -467,7 +459,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void aThrowingEncodeThunkIsIsolatedToItsChunk(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean finalized = new AtomicBoolean(false);
 
@@ -476,11 +468,11 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalized.set(true),
                 () -> null,
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(1, 1), () -> {
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(1, 1), () -> {
             throw new RuntimeException("encode blew up for this one chunk");
         }, ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
@@ -507,7 +499,7 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aChunkWhoseStorageWriteThrowsIsCountedFailed(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -520,10 +512,10 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "one chunk's write failing must not abort the save");
@@ -555,9 +547,9 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
-        writer.submitEntity(Level.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "one entity fold's write failing must not abort the save");
@@ -569,7 +561,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void theWriterThreadFoldMergesContainerItemsIntoTheChunk(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
 
@@ -578,19 +570,19 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
         // A captured chunk carrying an empty chest block entity, plus the open-time Items holder for that chest:
         // the fold runs inside the writer-thread thunk, on the freshly encoded tag.
-        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
+        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(true,
                 ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
-        holders.put(new BlockPos(2, 64, 2), sink.captureItems(items, registries));
+        holders.put(new BlockPos(2, 64, 2), sink.captureItems(items));
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
-            CompoundTag tag = codec.encode(snapshot, registries, false);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
+            CompoundTag tag = codec.encode(snapshot, false);
             ContainerMerge.mergeChunkStash(sink, tag, new ChunkPos(0, 0), holders);
             return tag;
         }, ChunkMerge::merge);
@@ -610,7 +602,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void theWriterThreadFoldMergesLecternBookIntoTheChunk(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         LecternSink sink = new LecternSinkImpl();
 
@@ -619,15 +611,15 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
-        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
+        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(true,
                 ImmutableList.of(blockEntity("minecraft:lectern", 3, 64, 3)));
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
-        holders.put(new BlockPos(3, 64, 3), sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 4, registries));
+        holders.put(new BlockPos(3, 64, 3), sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 4));
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
-            CompoundTag tag = codec.encode(snapshot, registries, false);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
+            CompoundTag tag = codec.encode(snapshot, false);
             ContainerMerge.mergeLecternChunkStash(sink, tag, new ChunkPos(0, 0), holders);
             return tag;
         }, ChunkMerge::merge);
@@ -645,7 +637,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void preflightRunsBeforeAnyChunkReachesStorage(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicInteger order = new AtomicInteger();
         AtomicInteger preflightAt = new AtomicInteger(-1);
@@ -659,10 +651,10 @@ class AsyncSaveWriterTest {
                 () -> preflightAt.set(order.getAndIncrement()), // preflight: the resume backup
                 (chunksFailed, entityChunksFailed) -> {},                                        // finalizer: level.dat
                 () -> null,                                        // outputs: export + size
-                () -> {}, new SaveProgress());                                       // access close
+                new SaveProgress());                                       // access close
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
@@ -672,12 +664,11 @@ class AsyncSaveWriterTest {
     }
 
     @Test
-    void outputsRunAfterTheStoragesAndAccessAreClosed(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+    void theExportRunsAfterTheLevelDataFinalizer(@TempDir Path save) throws Exception {
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicInteger order = new AtomicInteger();
         AtomicInteger finalizerAt = new AtomicInteger(-1);
-        AtomicInteger accessCloseAt = new AtomicInteger(-1);
         AtomicInteger outputsAt = new AtomicInteger(-1);
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -688,21 +679,20 @@ class AsyncSaveWriterTest {
                     outputsAt.set(order.getAndIncrement());
                     return null;
                 },
-                () -> accessCloseAt.set(order.getAndIncrement()), new SaveProgress()); // access close
+                new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
-        assertTrue(finalizerAt.get() < accessCloseAt.get(), "the level.dat finalizer runs before the folder closes");
-        assertTrue(accessCloseAt.get() < outputsAt.get(),
-                "the export zip runs after the folder is fully written and closed");
+        assertTrue(finalizerAt.get() < outputsAt.get(),
+                "the export zip runs after the level.dat finalizer, once the folder is fully written and closed");
     }
 
     @Test
     void reportsTheWrittenZipFileNameFromTheOutputsStep(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -710,10 +700,10 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> "world.zip", // outputs: the export reports the zip it wrote
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
@@ -723,7 +713,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void aThrowingOutputsHookNeverFailsTheOpenableSave(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -733,10 +723,10 @@ class AsyncSaveWriterTest {
                 () -> {
                     throw new RuntimeException("disk full while writing the export zip");
                 },
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "a failed finalize-output (the zip) never fails the openable save");
@@ -746,7 +736,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void aThrowingPreflightHookNeverAbortsTheDrain(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -756,10 +746,10 @@ class AsyncSaveWriterTest {
                 },
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "a failed pre-merge backup never aborts the save");
@@ -771,7 +761,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void outputsDoNotRunWhenTheSaveFailed(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean outputsRan = new AtomicBoolean(false);
 
@@ -785,10 +775,10 @@ class AsyncSaveWriterTest {
                     outputsRan.set(true); // the export + size must NOT run on a failed save
                     return null;
                 },
-                () -> {}, new SaveProgress());
+                new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertTrue(result.failed(), "the finalizer failure aborts the save");
@@ -798,41 +788,41 @@ class AsyncSaveWriterTest {
 
     @Test
     void resumeScanReportsThePriorOnDiskChunkToTheObserver(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
 
         // Prior session: write a chunk carrying a filled chest to disk.
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
-        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
+        ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(true,
                 ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
-        holders.put(new BlockPos(2, 64, 2), sink.captureItems(items, registries));
-        first.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
-            CompoundTag tag = codec.encode(snapshot, registries, false);
+        holders.put(new BlockPos(2, 64, 2), sink.captureItems(items));
+        first.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
+            CompoundTag tag = codec.encode(snapshot, false);
             ContainerMerge.mergeChunkStash(sink, tag, new ChunkPos(0, 0), holders);
             return tag;
         }, ChunkMerge::merge);
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         // Resume: a read-only scan hands the prior on-disk chunk and its dimension to the observer, without writing.
-        AtomicReference<ResourceKey<Level>> observedDimension = new AtomicReference<>();
+        AtomicReference<DimensionType> observedDimension = new AtomicReference<>();
         AtomicReference<CompoundTag> observed = new AtomicReference<>();
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
         second.observeResumeReads((dimension, onDisk) -> {
             observedDimension.set(dimension);
             observed.set(onDisk);
         });
-        second.submitResumeScan(Level.OVERWORLD, new ChunkPos(0, 0));
+        second.submitResumeScan(DimensionType.OVERWORLD, new ChunkPos(0, 0));
         assertFalse(second.finish().get(30, TimeUnit.SECONDS).failed());
 
-        assertEquals(Level.OVERWORLD, observedDimension.get(), "the scan reported the chunk's dimension");
+        assertEquals(DimensionType.OVERWORLD, observedDimension.get(), "the scan reported the chunk's dimension");
         CompoundTag onDisk = observed.get();
         assertNotNull(onDisk, "the scan handed the prior on-disk chunk to the observer");
         CompoundTag chest = findByPosOrNull(onDisk, 2, 64, 2);
@@ -842,7 +832,7 @@ class AsyncSaveWriterTest {
 
     @Test
     void resumeEntityScanReportsThePriorOnDiskEntityChunkToTheObserver(@TempDir Path save) throws Exception {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         UUID cart = new UUID(0x1234L, 0x5678L);
         seedHostChunk(region, new ChunkPos(0, 0)); // the vehicle folds into its host chunk's Level.Entities
@@ -850,28 +840,28 @@ class AsyncSaveWriterTest {
         // Prior session: fold an entity carrying a filled chest minecart into the region/ chunk.
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
-        first.submitEntity(Level.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(cart)));
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
+        first.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(cart)));
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         // Resume: a read-only scan hands the prior on-disk region chunk and its dimension to the entity observer.
-        AtomicReference<ResourceKey<Level>> observedDimension = new AtomicReference<>();
+        AtomicReference<DimensionType> observedDimension = new AtomicReference<>();
         AtomicReference<CompoundTag> observed = new AtomicReference<>();
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
         second.observeEntityResumeReads((dimension, onDisk) -> {
             observedDimension.set(dimension);
             observed.set(onDisk);
         });
-        second.submitEntityResumeScan(Level.OVERWORLD, new ChunkPos(0, 0));
+        second.submitEntityResumeScan(DimensionType.OVERWORLD, new ChunkPos(0, 0));
         assertFalse(second.finish().get(30, TimeUnit.SECONDS).failed());
 
-        assertEquals(Level.OVERWORLD, observedDimension.get(), "the scan reported the chunk's dimension");
+        assertEquals(DimensionType.OVERWORLD, observedDimension.get(), "the scan reported the chunk's dimension");
         CompoundTag onDisk = observed.get();
         assertNotNull(onDisk, "the scan handed the prior on-disk region chunk to the observer");
         CompoundTag vehicle = onDisk.getCompound("Level").getList("Entities", 10).getCompound(0);
-        assertNotNull(vehicle.get("UUID"), "the prior container entity kept its UUID");
+        assertEquals(cart, EntityMerge.readUuid(vehicle), "the prior container entity kept its UUID");
         assertFalse(vehicle.getList("Items", 10).isEmpty(),
                 "the prior container entity carries the captured Items");
     }
@@ -889,7 +879,7 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aSecondEntityWriteToTheSameChunkReadMergesRatherThanOverwrites(@TempDir Path save) throws Exception {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         UUID openedAfterFlush = new UUID(0xA1L, 0xB2L); // flushed empty, then re-flushed with the opened contents
         UUID openedBeforeFlush = new UUID(0xC3L, 0xD4L); // flushed with contents, then re-flushed empty on a revisit
@@ -898,18 +888,18 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
 
         // The open-after-flush recovery: the vehicle first flushed empty (seen but not opened), then the return
         // approach re-accumulated it and the re-flush folded in the contents the player then opened.
-        writer.submitEntity(Level.OVERWORLD, new ChunkPos(0, 0), entityChunk(emptyVehicle(openedAfterFlush)));
-        writer.submitEntity(Level.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(openedAfterFlush)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0), entityChunk(emptyVehicle(openedAfterFlush)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(openedAfterFlush)));
 
         // The revisit clobber the recovery must not cause: the vehicle first flushed with its opened contents,
         // then a revisit re-accumulated it empty (the packet path carries no container items) and re-flushed;
         // the empty re-write must read-merge the on-disk items, not wipe them.
-        writer.submitEntity(Level.OVERWORLD, new ChunkPos(0, 1), entityChunk(filledVehicle(openedBeforeFlush)));
-        writer.submitEntity(Level.OVERWORLD, new ChunkPos(0, 1), entityChunk(emptyVehicle(openedBeforeFlush)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 1), entityChunk(filledVehicle(openedBeforeFlush)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 1), entityChunk(emptyVehicle(openedBeforeFlush)));
 
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -934,20 +924,20 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aTerrainReWriteKeepsThePriorEntityFold(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         ChunkPos pos = new ChunkPos(0, 0);
         UUID cart = new UUID(0x11L, 0x22L);
 
         try (IOWorker io = storage(region, "chunk")) {
             // Terrain flushes, then a captured chest minecart folds into the chunk's Level.Entities.
-            io.store(pos, codec.encode(SyntheticChunks.full(registries, true), registries, false)).join();
+            io.store(pos, codec.encode(SyntheticChunks.full(true), false)).join();
             RegionChunkWriter.foldEntitiesIntoRegion(io, pos, entityChunk(filledVehicle(cart)));
             assertFalse(vehicleItems(io, pos, cart).isEmpty(), "the fold placed the vehicle in Level.Entities");
 
             // A revisit re-flushes fresh terrain over the same chunk; the terrain tag carries no Entities of its own.
             RegionChunkWriter.MergeWriteResult reWrite = RegionChunkWriter.writeMerging(io, pos,
-                    codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+                    codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
             assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_RECAPTURED, reWrite.outcome(),
                     "the terrain re-write recaptured the prior chunk");
         }
@@ -960,23 +950,23 @@ class AsyncSaveWriterTest {
 
     @Test
     void aResumedChunkLandsInTheRecapturedBucketApartFromNew(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
-        first.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
+        first.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
-        second.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
-        second.submitChunk(Level.OVERWORLD, new ChunkPos(1, 1),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
+        second.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
+        second.submitChunk(DimensionType.OVERWORLD, new ChunkPos(1, 1),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = second.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
@@ -987,20 +977,20 @@ class AsyncSaveWriterTest {
 
     @Test
     void aChunkRewriteFoldsIntoThePriorOnDiskChunkAndTalliesMergedContainers(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
 
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
-        first.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
+        first.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
-        second.submitChunkRewrite(Level.OVERWORLD, new ChunkPos(0, 0), onDisk -> {
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
+        second.submitChunkRewrite(DimensionType.OVERWORLD, new ChunkPos(0, 0), onDisk -> {
             onDisk.putString("wdl_test_folded", "contents");
             return 2;
         });
@@ -1019,20 +1009,20 @@ class AsyncSaveWriterTest {
 
     @Test
     void anOffThreadTaskThrowIsSwallowedAndTheSaveCompletes(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean ran = new AtomicBoolean(false);
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
 
         writer.submit(() -> {
             ran.set(true);
             throw new IllegalStateException("an off-thread task failure the drain must absorb");
         });
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "the task throw never aborts the save");
@@ -1102,11 +1092,11 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aChunkPreservedWhenTheReadFailsIsCountedLost(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         List<BlockPos> chests = ImmutableList.of(new BlockPos(2, 64, 2));
-        ChunkSnapshotSource snapshot = chunkWithChests(registries, chests);
-        writeOpenedChests(region, registries, snapshot, chests);
+        ChunkSnapshotSource snapshot = chunkWithChests(chests);
+        writeOpenedChests(region, snapshot, chests);
 
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
         AsyncSaveWriter writer = new AsyncSaveWriter(
@@ -1114,11 +1104,10 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
-                () -> {},
                 new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(snapshot, registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(snapshot, false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(1, result.chunksFailed(), "the capture never reached the save, so it counts like a failure");
@@ -1126,7 +1115,7 @@ class AsyncSaveWriterTest {
         assertEquals(1, finalizedChunksFailed.get(),
                 "the finalize sees it too, so the completion record cannot stamp this download clean");
         try (IOWorker in = storage(region, "chunk")) {
-            assertEquals(Items.DIAMOND, firstItemOf(in, registries, new ChunkPos(0, 0), 2, 64, 2).getItem(),
+            assertEquals(Items.DIAMOND, firstItemOf(in, new ChunkPos(0, 0), 2, 64, 2).getItem(),
                     "the prior the writer refused to overwrite is still on disk");
         }
     }
@@ -1145,10 +1134,9 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
-                () -> {},
                 new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> null, ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> null, ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(0, result.chunksFailed(), "nothing was lost, so the download still reads clean");
@@ -1159,15 +1147,15 @@ class AsyncSaveWriterTest {
     /** The read-failure preserve on the entity fold, whose switch charges it to its own failed term. */
     @Test
     void anEntityChunkPreservedWhenTheReadFailsIsCountedLost(@TempDir Path save) throws Exception {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         UUID parked = new UUID(0xE1L, 0xE2L);
         seedHostChunk(region, new ChunkPos(0, 0)); // the prior vehicle folds into its host chunk
 
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
-        first.submitEntity(Level.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(parked)));
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
+        first.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(parked)));
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AtomicInteger finalizedEntityChunksFailed = new AtomicInteger(-1);
@@ -1176,9 +1164,8 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedEntityChunksFailed.set(entityChunksFailed),
                 () -> null,
-                () -> {},
                 new SaveProgress());
-        second.submitEntity(Level.OVERWORLD, new ChunkPos(0, 0), entityChunk(emptyVehicle(parked)));
+        second.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0), entityChunk(emptyVehicle(parked)));
         AsyncSaveWriter.SaveResult result = second.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(1, result.entityChunksFailed(), "the capture never reached the save, so it counts lost");
@@ -1197,13 +1184,13 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aChunkWhoseCarryForwardThrowsPartWayKeepsTheWholeOnDiskCopy(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         BlockPos carried = new BlockPos(2, 64, 2);
         BlockPos unreached = new BlockPos(3, 64, 3);
         List<BlockPos> chests = ImmutableList.of(carried, unreached);
-        ChunkSnapshotSource snapshot = chunkWithChests(registries, chests);
-        writeOpenedChests(region, registries, snapshot, chests);
+        ChunkSnapshotSource snapshot = chunkWithChests(chests);
+        writeOpenedChests(region, snapshot, chests);
 
         AtomicBoolean merged = new AtomicBoolean(false);
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
@@ -1212,11 +1199,10 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
-                () -> {},
                 new SaveProgress());
         // Reaching one chest and then throwing is the state the real merges leave, since both carry in place.
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(snapshot, registries, false),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(snapshot, false),
                 (onDisk, fresh) -> {
                     merged.set(true);
                     findByPos(fresh, carried.getX(), carried.getY(), carried.getZ()).put("Items",
@@ -1230,7 +1216,7 @@ class AsyncSaveWriterTest {
         try (IOWorker in = storage(region, "chunk")) {
             // Only the unreached chest can show this. The carried one holds the stack either way, because the
             // merge copied it into the fresh tag before throwing, so asserting on it would prove nothing.
-            assertEquals(Items.DIAMOND, firstItemOf(in, registries, new ChunkPos(0, 0), unreached.getX(),
+            assertEquals(Items.DIAMOND, firstItemOf(in, new ChunkPos(0, 0), unreached.getX(),
                     unreached.getY(), unreached.getZ()).getItem(),
                     "the chest the carry-forward never reached kept its contents, so no partial tag was written");
         }
@@ -1241,12 +1227,12 @@ class AsyncSaveWriterTest {
     }
 
     /** A chunk snapshot carrying an empty chest block entity at each of {@code chests}. */
-    private static ChunkSnapshotSource chunkWithChests(RegistryAccess registries, List<BlockPos> chests) {
+    private static ChunkSnapshotSource chunkWithChests(List<BlockPos> chests) {
         List<CompoundTag> blockEntities = new ArrayList<>();
         for (BlockPos chest : chests) {
             blockEntities.add(blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()));
         }
-        return SyntheticChunks.fullWithBlockEntities(registries, true, blockEntities);
+        return SyntheticChunks.fullWithBlockEntities(true, blockEntities);
     }
 
     /**
@@ -1254,26 +1240,26 @@ class AsyncSaveWriterTest {
      * the cases built on it rest on: the stack reached the region file, and a fresh encode of the same snapshot does
      * not carry it, so a revisit re-captures the chests empty.
      */
-    private void writeOpenedChests(Path region, RegistryAccess registries, ChunkSnapshotSource snapshot,
+    private void writeOpenedChests(Path region, ChunkSnapshotSource snapshot,
             List<BlockPos> chests) throws Exception {
         ContainerSink sink = new ContainerSinkImpl();
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
         for (BlockPos chest : chests) {
-            holders.put(chest, sink.captureItems(items, registries));
+            holders.put(chest, sink.captureItems(items));
         }
         AsyncSaveWriter writer = newWriter(region);
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
-            CompoundTag tag = codec.encode(snapshot, registries, false);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
+            CompoundTag tag = codec.encode(snapshot, false);
             ContainerMerge.mergeChunkStash(sink, tag, new ChunkPos(0, 0), holders);
             return tag;
         }, ChunkMerge::merge);
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed());
-        CompoundTag revisit = codec.encode(snapshot, registries, false);
+        CompoundTag revisit = codec.encode(snapshot, false);
         try (IOWorker in = storage(region, "chunk")) {
             for (BlockPos chest : chests) {
-                assertEquals(Items.DIAMOND, firstItemOf(in, registries, new ChunkPos(0, 0), chest.getX(),
+                assertEquals(Items.DIAMOND, firstItemOf(in, new ChunkPos(0, 0), chest.getX(),
                         chest.getY(), chest.getZ()).getItem(),
                         "the prior session's stack reached the region file at " + chest);
                 assertTrue(findByPos(revisit, chest.getX(), chest.getY(), chest.getZ())
@@ -1285,7 +1271,7 @@ class AsyncSaveWriterTest {
     }
 
     /** Slot 0 of the block entity saved at {@code x/y/z} in {@code pos}'s on-disk chunk. */
-    private static ItemStack firstItemOf(IOWorker storage, RegistryAccess registries, ChunkPos pos,
+    private static ItemStack firstItemOf(IOWorker storage, ChunkPos pos,
             int x, int y, int z) throws IOException {
         CompoundTag chunk = Optional.ofNullable(storage.load(pos)).get();
         CompoundTag blockEntity = findByPosOrNull(chunk, x, y, z);
@@ -1305,7 +1291,7 @@ class AsyncSaveWriterTest {
      */
     @Test
     void aStorageThatCannotBeFlushedIsNotCountedAndTheSaveStillFinalizes(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
 
@@ -1314,11 +1300,10 @@ class AsyncSaveWriterTest {
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
-                () -> {},
                 new SaveProgress());
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(0, finalizedChunksFailed.get(),
@@ -1343,7 +1328,7 @@ class AsyncSaveWriterTest {
         // the per-chunk merge being ignored. Production's only merge is a closure built per chunk, carrying the
         // bookshelf occupancy and the open-time positions; if it were dropped the carry-forward would silently
         // fall back to its unknown-everything behavior and no test would move.
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Path region = Files.createDirectories(save.resolve("region"));
         int[] applied = { 0 };
         RegionChunkWriter.ChunkReadMerge recording = (onDisk, fresh) -> {
@@ -1352,14 +1337,14 @@ class AsyncSaveWriterTest {
         };
 
         AsyncSaveWriter first = newWriter(region);
-        first.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), recording);
+        first.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), recording);
         first.finish().get(30, TimeUnit.SECONDS);
         assertEquals(0, applied[0], "no prior on disk, so no read-merge runs");
 
         AsyncSaveWriter second = newWriter(region);
-        second.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), recording);
+        second.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
+                () -> codec.encode(SyntheticChunks.full(true), false), recording);
         second.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(1, applied[0], "the second write reads the prior and applies the merge THIS submit supplied");
@@ -1369,6 +1354,6 @@ class AsyncSaveWriterTest {
     private AsyncSaveWriter newWriter(Path region) {
         return new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
     }
 }

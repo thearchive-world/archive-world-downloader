@@ -4,7 +4,6 @@
 package world.thearchive.wdl.adapter.impl;
 
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
@@ -12,7 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import world.thearchive.wdl.adapter.ContainerSink;
 
 /**
- * 1.16.5 container sink: serializes an open container's items via vanilla's own {@code ContainerHelper.saveAllItems}
+ * 1.15.2 container sink: serializes an open container's items via vanilla's own {@code ContainerHelper.saveAllItems}
  * and merges them into a captured block-entity tag.
  *
  * <p>Two steps (see {@link ContainerSink}): {@link #captureItems} serializes the live menu's container slots and
@@ -21,7 +20,7 @@ import world.thearchive.wdl.adapter.ContainerSink;
  */
 public final class ContainerSinkImpl implements ContainerSink {
     @Override
-    public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
+    public CompoundTag captureItems(NonNullList<ItemStack> items) {
         // saveAllItems writes the non-empty stacks under "Items", each a compound carrying its slot index.
         CompoundTag tag = new CompoundTag();
         ContainerHelper.saveAllItems(tag, items);

@@ -13,8 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.SerializableUUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.ContainerHelper;
@@ -41,7 +39,6 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * {@code activeWriter.finish()}: a throw there would leave an unopenable save plus a leaked session lock.
  */
 class EntityContainerStashMergeTest {
-    private static RegistryAccess registries;
     private final ContainerSink containerSink = new ContainerSinkImpl();
     private final EntitySink entitySink = new EntitySinkImpl();
 
@@ -52,7 +49,7 @@ class EntityContainerStashMergeTest {
     /** A band sink whose merge blows up, for the isolation cases; its capture side is never reached. */
     private static final ContainerSink THROWING_SINK = new ContainerSink() {
         @Override
-        public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
+        public CompoundTag captureItems(NonNullList<ItemStack> items) {
             throw new AssertionError("the failure path never serializes items");
         }
 
@@ -64,12 +61,11 @@ class EntityContainerStashMergeTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /**
-     * A serialized container-vehicle tag: an {@code id}, the {@code "UUID"} via {@link SerializableUUID#CODEC}, no
-     * items.
+     * A serialized container-vehicle tag: an {@code id}, the {@code "UUID"} via {@code putUUID}, no items.
      */
     private static CompoundTag entityTag(String id, UUID uuid) {
         return EntityFixtures.entity(id, uuid);
@@ -93,7 +89,7 @@ class EntityContainerStashMergeTest {
     private CompoundTag holderWith(int slot, ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(slot, stack);
-        return containerSink.captureItems(items, registries);
+        return containerSink.captureItems(items);
     }
 
     @Test

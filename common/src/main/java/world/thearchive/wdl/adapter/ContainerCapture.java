@@ -10,7 +10,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
@@ -65,15 +64,12 @@ final class ContainerCapture {
     static final int LECTERN_CONTAINER_SIZE = 1;
 
     private final VersionAdapter adapter;
-    private final RegistryAccess registries;
     private final @Nullable OpenClickTracker openClickTracker;
     private final boolean loaderObservesSpectatorBlockClick;
     private final boolean loaderObservesSpectatorEntityClick;
 
-    ContainerCapture(VersionAdapter adapter, PlatformBridge bridge, RegistryAccess registries,
-            @Nullable OpenClickTracker openClickTracker) {
+    ContainerCapture(VersionAdapter adapter, PlatformBridge bridge, @Nullable OpenClickTracker openClickTracker) {
         this.adapter = adapter;
-        this.registries = registries;
         this.openClickTracker = openClickTracker;
         this.loaderObservesSpectatorBlockClick = bridge.observesSpectatorBlockClick();
         this.loaderObservesSpectatorEntityClick = bridge.observesSpectatorEntityClick();
@@ -328,7 +324,7 @@ final class ContainerCapture {
             }
             index++;
         }
-        return adapter.containerSink().captureItems(items, registries);
+        return adapter.containerSink().captureItems(items);
     }
 
     /**
@@ -370,7 +366,7 @@ final class ContainerCapture {
         for (int i = 0; i < chest.size(); i++) {
             items.set(i, chest.get(i));
         }
-        return adapter.containerSink().captureItems(items, registries);
+        return adapter.containerSink().captureItems(items);
     }
 
     /**
@@ -400,6 +396,6 @@ final class ContainerCapture {
             }
             index++;
         }
-        return any ? adapter.containerSink().captureItems(items, registries) : null;
+        return any ? adapter.containerSink().captureItems(items) : null;
     }
 }

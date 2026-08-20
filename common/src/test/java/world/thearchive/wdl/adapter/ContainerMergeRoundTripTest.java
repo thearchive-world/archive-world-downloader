@@ -9,7 +9,6 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.customNameOf;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.namedBlockEntity;
 
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
@@ -32,12 +31,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * and entities. This test proves the serialize+merge+decode slice.
  */
 class ContainerMergeRoundTripTest {
-    private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /** A captured client chest BE tag carrying a real non-Items field, to assert no clobber. */
@@ -62,7 +60,7 @@ class ContainerMergeRoundTripTest {
         items.set(13, new ItemStack(Items.STICK, 2));
         items.set(26, new ItemStack(Items.OAK_PLANKS, 64));
 
-        CompoundTag holder = sink.captureItems(items, registries);
+        CompoundTag holder = sink.captureItems(items);
         assertTrue(holder.contains("Items"), "captureItems must build the vanilla Items holder");
 
         CompoundTag merged = sink.merge(chestTag(10, 64, -7), holder);
@@ -91,7 +89,7 @@ class ContainerMergeRoundTripTest {
     void mergeDoesNotMutateTheCapturedBlockEntityTag() {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 1));
-        CompoundTag holder = sink.captureItems(items, registries);
+        CompoundTag holder = sink.captureItems(items);
 
         CompoundTag blockEntity = chestTag(0, 0, 0);
         sink.merge(blockEntity, holder);
@@ -104,7 +102,7 @@ class ContainerMergeRoundTripTest {
     void openedButEmptyContainerMergesToNoItems() {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
 
-        CompoundTag merged = sink.merge(chestTag(1, 1, 1), sink.captureItems(items, registries));
+        CompoundTag merged = sink.merge(chestTag(1, 1, 1), sink.captureItems(items));
 
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(merged, back);

@@ -90,7 +90,7 @@ public final class FixtureFidelity {
         BlockPos pos = new BlockPos(subject.getInt("x"), subject.getInt("y"), subject.getInt("z"));
         BlockState state = representativeState(id);
 
-        BlockEntity blockEntity = BlockEntity.loadStatic(state, subject);
+        BlockEntity blockEntity = BlockEntity.loadStatic(subject);
         if (blockEntity == null) {
             throw new AssertionError("Fixture fidelity: the fixture at " + pos
                     + " does not load as a block entity: " + subject);
@@ -157,7 +157,7 @@ public final class FixtureFidelity {
         if (representativeStates != null) {
             return representativeStates;
         }
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
         Map<ResourceLocation, BlockState> states = new HashMap<>();
         for (Block block : Registry.BLOCK) {
             if (!(block instanceof EntityBlock)) {

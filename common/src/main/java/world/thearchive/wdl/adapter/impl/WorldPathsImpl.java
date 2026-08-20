@@ -3,8 +3,10 @@
 
 package world.thearchive.wdl.adapter.impl;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Constructor;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -14,9 +16,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.storage.IOWorker;
+import net.minecraft.world.level.chunk.storage.RegionFileStorage;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -24,10 +25,10 @@ import org.apache.logging.log4j.Logger;
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * 1.16.5 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
- * pre-creates {@code region/} so the region writer never sees a missing {@code externalFileDir} (vanilla
- * {@code RegionFile} throws otherwise). There is no {@code entities/} region at this band: entities live inside the
- * {@code region/} chunk under {@code Level.Entities}.
+ * 1.15.2 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
+ * pre-creates {@code region/} so the region writer never sees a missing directory (vanilla {@code RegionFile} throws
+ * otherwise). There is no {@code entities/} region at this band: entities live inside the {@code region/} chunk under
+ * {@code Level.Entities}.
  */
 public final class WorldPathsImpl implements WorldPaths {
     private static final Logger LOGGER = LogManager.getLogger(WorldPathsImpl.class);
@@ -39,13 +40,28 @@ public final class WorldPathsImpl implements WorldPaths {
     }
 
     @Override
-    public Path regionDirectory(ResourceKey<Level> dimension) {
+    public Path regionDirectory(DimensionType dimension) {
         return ensureDirectory(dimensionRoot(dimension).resolve("region"));
     }
 
     @Override
-    public IOWorker openRegionStorage(ResourceKey<Level> dimension) {
-        return new WdlRegionStorage(regionDirectory(dimension), false, "chunk");
+    public IOWorker openRegionStorage(DimensionType dimension) {
+        // The 1.15.2 IOWorker and RegionFileStorage constructors are package-private, and this shared module has no
+        // access widener or transformer (those are per-loader), so the storage is opened reflectively. A same-package
+        // shim compiles here but throws IllegalAccessError once the loader remaps the vanilla classes into a different
+        // runtime package; reflection with setAccessible is package-independent and is paid once per dimension.
+        File directory = regionDirectory(dimension).toFile();
+        try {
+            Constructor<RegionFileStorage> storageConstructor = RegionFileStorage.class
+                    .getDeclaredConstructor(File.class);
+            storageConstructor.setAccessible(true);
+            Constructor<IOWorker> workerConstructor = IOWorker.class
+                    .getDeclaredConstructor(RegionFileStorage.class, String.class);
+            workerConstructor.setAccessible(true);
+            return workerConstructor.newInstance(storageConstructor.newInstance(directory), "chunk");
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("failed to open region storage at " + directory, e);
+        }
     }
 
     @Override
@@ -118,9 +134,9 @@ public final class WorldPathsImpl implements WorldPaths {
         return slash < 0 ? relative : relative.substring(0, slash) + ':' + relative.substring(slash + 1);
     }
 
-    /** Vanilla layout: overworld at the save root, Nether=DIM-1, End=DIM1, custom={@code dimensions/<ns>/<path>}. */
-    private Path dimensionRoot(ResourceKey<Level> dimension) {
-        return DimensionType.getStorageFolder(dimension, saveRoot.toFile()).toPath();
+    /** Vanilla layout: overworld at the save root, Nether=DIM-1, End=DIM1. */
+    private Path dimensionRoot(DimensionType dimension) {
+        return dimension.getStorageFolder(saveRoot.toFile()).toPath();
     }
 
     private static Path ensureDirectory(Path directory) {
@@ -129,13 +145,6 @@ public final class WorldPathsImpl implements WorldPaths {
             return directory;
         } catch (IOException e) {
             throw new UncheckedIOException("failed to create " + directory, e);
-        }
-    }
-
-    /** IOWorker's constructor is protected, so this subclass is how the plug opens one. */
-    private static final class WdlRegionStorage extends IOWorker {
-        private WdlRegionStorage(Path directory, boolean sync, String name) {
-            super(directory.toFile(), sync, name);
         }
     }
 }

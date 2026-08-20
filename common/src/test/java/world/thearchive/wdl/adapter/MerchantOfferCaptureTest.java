@@ -10,15 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -34,11 +32,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * no live menu or {@code Level} is needed.
  */
 class MerchantOfferCaptureTest {
-    private static RegistryAccess registries;
-
     @BeforeAll
     static void bootstrapVanilla() {
-        registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     /**
@@ -48,11 +44,10 @@ class MerchantOfferCaptureTest {
      */
     private static ItemStack lodestoneCompass() {
         ItemStack compass = new ItemStack(Items.COMPASS);
-        GlobalPos pos = GlobalPos.of(Level.OVERWORLD, new BlockPos(128, 64, -512));
+        GlobalPos pos = GlobalPos.of(DimensionType.OVERWORLD, new BlockPos(128, 64, -512));
         CompoundTag tag = compass.getOrCreateTag();
         tag.put("LodestonePos", NbtUtils.writeBlockPos(pos.pos()));
-        tag.put("LodestoneDimension",
-                Level.RESOURCE_KEY_CODEC.encodeStart(NbtOps.INSTANCE, pos.dimension()).getOrThrow(false, s -> {}));
+        tag.putString("LodestoneDimension", DimensionType.getName(pos.dimension()).toString());
         tag.putBoolean("LodestoneTracked", true);
         return compass;
     }

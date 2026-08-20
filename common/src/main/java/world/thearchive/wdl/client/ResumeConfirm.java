@@ -4,15 +4,12 @@
 package world.thearchive.wdl.client;
 
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
-
-import world.thearchive.wdl.core.BrandColors;
 
 /**
  * The shared factory for a resume-confirm screen: a vanilla {@link ConfirmScreen} that warns before a resume writes
@@ -44,7 +41,8 @@ public final class ResumeConfirm {
         } else {
             message = new TranslatableComponent(keyPrefix + ".message_no_backup", amber(folderName));
         }
-        return create(keyPrefix, message, CommonComponents.GUI_PROCEED, CommonComponents.GUI_CANCEL,
+        return create(keyPrefix, message, new TranslatableComponent("gui.proceed"),
+                new TranslatableComponent("gui.cancel"),
                 onContinue, onCancel);
     }
 
@@ -62,11 +60,10 @@ public final class ResumeConfirm {
                 onNo.run();
             }
         };
-        return new ConfirmScreen(onChoice,
-                new TranslatableComponent(keyPrefix + ".title")
-                        .withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER))),
-                message,
-                yesLabel, noLabel);
+        // 1.15.2 ConfirmScreen takes the two button labels as plain strings, and Style carries only a named
+        // color, so the brand amber is drawn as the nearest vanilla color (gold).
+        return new ConfirmScreen(onChoice, amberComponent(new TranslatableComponent(keyPrefix + ".title")),
+                message, yesLabel.getString(), noLabel.getString());
     }
 
     /**
@@ -86,7 +83,8 @@ public final class ResumeConfirm {
                     amber(sourceZipName));
         }
         return create(keyPrefix, message,
-                new TranslatableComponent("wdl.screen.downloads.restore_action"), CommonComponents.GUI_CANCEL,
+                new TranslatableComponent("wdl.screen.downloads.restore_action"),
+                new TranslatableComponent("gui.cancel"),
                 onRestore, onCancel);
     }
 
@@ -106,10 +104,17 @@ public final class ResumeConfirm {
                     amber(folderName), amber(sourceZipName));
         }
         return create("wdl.screen.downloads.confirm_tainted", message,
-                CommonComponents.GUI_PROCEED, CommonComponents.GUI_CANCEL, onContinue, onCancel);
+                new TranslatableComponent("gui.proceed"), new TranslatableComponent("gui.cancel"), onContinue,
+                onCancel);
     }
 
     private static Component amber(String text) {
-        return new TextComponent(text).withStyle(style -> style.withColor(TextColor.fromRgb(BrandColors.AMBER)));
+        return amberComponent(new TextComponent(text));
+    }
+
+    /** Tint {@code component} the nearest vanilla color to the brand amber (gold), mutating its style in place. */
+    private static Component amberComponent(Component component) {
+        component.getStyle().setColor(ChatFormatting.GOLD);
+        return component;
     }
 }

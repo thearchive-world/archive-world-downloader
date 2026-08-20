@@ -83,6 +83,14 @@ class LangKeyCoverageTest {
 
     private static final Set<String> NOT_TRANSLATION_KEYS = ImmutableSet.of("wdl.properties");
 
+    // Button hover-tooltips the higher bands show but this band drops, since the 1.15.2 Button widget carries no
+    // hover-tooltip parameter (see WdlDownloadsScreen, WdlSettingsScreen and AbstractPlatformBridge). Their en_us
+    // strings stay so the catalog matches the higher bands, but no consumer reaches them on this band.
+    private static final Set<String> BAND_DROPPED_KEYS = ImmutableSet.of(
+            "wdl.pause.settings.tooltip",
+            "wdl.screen.downloads.download.tooltip",
+            "wdl.settings.defaults.tooltip");
+
     @Test
     void everyKeyTheCodeNamesIsCarriedByEnUs() {
         Map<String, String> catalog = loadCatalog();
@@ -144,6 +152,9 @@ class LangKeyCoverageTest {
         assertTrue(catalog.keySet().containsAll(EXTERNAL_CONSUMERS),
                 "EXTERNAL_CONSUMERS names a key en_us no longer carries");
         reached.addAll(EXTERNAL_CONSUMERS);
+        assertTrue(catalog.keySet().containsAll(BAND_DROPPED_KEYS),
+                "BAND_DROPPED_KEYS names a key en_us no longer carries");
+        reached.addAll(BAND_DROPPED_KEYS);
 
         Set<String> unreached = new TreeSet<>();
         for (String key : catalog.keySet()) {

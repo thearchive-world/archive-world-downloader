@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.protocol.Packet;
@@ -52,20 +51,20 @@ class EntitySinkRootVehicleTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen();
+        TestRegistries.bootstrap();
     }
 
     @Test
     void captureRootVehicleSerializesTheOnePlayerVehicleTheChunkPathDrops() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         RiddenVehicleEntity vehicle = new RiddenVehicleEntity();
         assertTrue(vehicle.isVehicle() && vehicle.hasOnePlayerPassenger(),
                 "precondition: a one-player vehicle the entities region refuses");
 
-        assertNull(sink.encodeChunk(ImmutableList.of(vehicle), new ChunkPos(0, 0), registries, false),
+        assertNull(sink.encodeChunk(ImmutableList.of(vehicle), new ChunkPos(0, 0), false),
                 "the chunk path drops it, exactly the loss the RootVehicle capture fixes");
 
-        CompoundTag tag = sink.captureRootVehicle(vehicle, registries, false);
+        CompoundTag tag = sink.captureRootVehicle(vehicle, false);
         assertNotNull(tag, "captureRootVehicle serializes it regardless, the RootVehicle way vanilla persists a mount");
         assertEquals("minecraft:pig", tag.getString("id"),
                 "the vehicle NBT carries its type id so loadAndSpawnParentVehicle can respawn it");
@@ -73,17 +72,17 @@ class EntitySinkRootVehicleTest {
 
     @Test
     void capturedContentsFoldIntoTheMountTagUnderItems() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         RiddenVehicleEntity vehicle = new RiddenVehicleEntity();
 
-        CompoundTag tag = sink.captureRootVehicle(vehicle, registries, false);
+        CompoundTag tag = sink.captureRootVehicle(vehicle, false);
         assertNotNull(tag);
         assertEquals(0, tag.getList("Items", 10).size(),
                 "the captured mount serializes no Items of its own, so the fold is required");
 
         NonNullList<ItemStack> contents = NonNullList.withSize(27, ItemStack.EMPTY);
         contents.set(3, new ItemStack(Items.DIAMOND, 9));
-        CompoundTag holder = containerSink.captureItems(contents, registries);
+        CompoundTag holder = containerSink.captureItems(contents);
 
         CompoundTag folded = containerSink.merge(tag, holder);
 
@@ -98,11 +97,11 @@ class EntitySinkRootVehicleTest {
 
     @Test
     void namedRootMountKeepsTheServerPersistenceTheClientNeverCarries() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         RiddenMountMob mount = new RiddenMountMob();
         mount.setCustomName(new TextComponent("Rocinante"));
 
-        CompoundTag tag = sink.captureRootVehicle(mount, registries, false);
+        CompoundTag tag = sink.captureRootVehicle(mount, false);
         assertNotNull(tag);
         assertTrue(tag.getBoolean("PersistenceRequired"),
                 "a name-tagged mount is persistence-required server-side, a flag the client entity arrives without, "
@@ -111,10 +110,10 @@ class EntitySinkRootVehicleTest {
 
     @Test
     void unnamedRootMountKeepsVanillaDespawnBehavior() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         RiddenMountMob mount = new RiddenMountMob();
 
-        CompoundTag tag = sink.captureRootVehicle(mount, registries, false);
+        CompoundTag tag = sink.captureRootVehicle(mount, false);
         assertNotNull(tag);
         assertFalse(tag.getBoolean("PersistenceRequired"),
                 "an un-named mount has nothing proving server persistence, so it keeps vanilla despawn behavior");
@@ -122,10 +121,10 @@ class EntitySinkRootVehicleTest {
 
     @Test
     void unnamedRootMountPersistsUnderTheForceKnob() {
-        RegistryAccess registries = TestRegistries.frozen();
+        TestRegistries.bootstrap();
         RiddenMountMob mount = new RiddenMountMob();
 
-        CompoundTag tag = sink.captureRootVehicle(mount, registries, true);
+        CompoundTag tag = sink.captureRootVehicle(mount, true);
         assertNotNull(tag);
         assertTrue(tag.getBoolean("PersistenceRequired"),
                 "with forceMobPersistence set every captured mob keeps PersistenceRequired, named or not, so the "
@@ -135,7 +134,9 @@ class EntitySinkRootVehicleTest {
     /** A headless vehicle double the entities region refuses, standing in for a boat carrying one player. */
     private static final class RiddenVehicleEntity extends Entity {
         private RiddenVehicleEntity() {
-            super(EntityType.PIG, null);
+            // Below 1.16 Entity.saveWithoutId writes this.dimension.getId(), which the constructor sets only from a
+            // non-null level, so the double is built against the HeadlessLevel rather than a null one.
+            super(EntityType.PIG, HeadlessLevel.get());
         }
 
         @Override

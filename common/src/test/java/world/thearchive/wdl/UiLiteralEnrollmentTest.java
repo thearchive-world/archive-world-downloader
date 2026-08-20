@@ -42,10 +42,11 @@ class UiLiteralEnrollmentTest {
             // the one amber-argument helper every confirm body's data insert (folder, backup or source zip
             // name, snapshot name) routes through
             "ResumeConfirm.java", 1,
-            "WdlDownloadsScreen.java", 4, // disclosure triangle, update banner label and url
-            // the chat and toast arguments core flattened to data, plus the pause-menu config button's ellipsis
-            // glyph, which lives on the shared bridge rather than duplicated on each loader
-            "AbstractPlatformBridge.java", 4,
+            // the disclosure triangle glyph and the update banner's underlined link label
+            "WdlDownloadsScreen.java", 2,
+            // the chat and toast arguments core flattened to data, plus the link-target hover text; all on the
+            // shared bridge rather than duplicated on each loader
+            "AbstractPlatformBridge.java", 3,
             // the empty no-phase HUD label placeholder, phaseLabel's NONE case
             "WdlHudOverlay.java", 1);
 

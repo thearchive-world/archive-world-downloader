@@ -4,8 +4,10 @@
 package world.thearchive.wdl;
 
 import com.google.common.collect.ImmutableList;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +32,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.server.IntegratedServer;
-import net.minecraft.world.level.storage.LevelResource;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -170,9 +171,40 @@ public final class Wdl {
     }
 
     /**
+     * Resolve the per-band {@link VersionAdapter}. ServiceLoader is the primary path, but Forge below 1.17 does not
+     * enumerate META-INF/services through the mod classloader's getResources, which is what ServiceLoader scans, so on
+     * an empty result the single provider file is read directly (getResourceAsStream reads the same jar this class
+     * loaded from) and its named adapter instantiated.
+     */
+    private static VersionAdapter resolveVersionAdapter() {
+        Iterator<VersionAdapter> discovered = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
+                .iterator();
+        if (discovered.hasNext()) {
+            return discovered.next();
+        }
+        InputStream in = Wdl.class.getClassLoader()
+                .getResourceAsStream("META-INF/services/" + VersionAdapter.class.getName());
+        if (in != null) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                    int comment = line.indexOf('#');
+                    String name = (comment >= 0 ? line.substring(0, comment) : line).trim();
+                    if (!name.isEmpty()) {
+                        return Class.forName(name, true, Wdl.class.getClassLoader())
+                                .asSubclass(VersionAdapter.class).getDeclaredConstructor().newInstance();
+                    }
+                }
+            } catch (IOException | ReflectiveOperationException e) {
+                throw new IllegalStateException("failed to load the VersionAdapter service", e);
+            }
+        }
+        throw new IllegalStateException("No VersionAdapter service is registered");
+    }
+
+    /**
      * Wire the capture controller to the loader hooks. Called once from the loader entrypoint, which supplies its own
-     * {@link PlatformBridge} (the loader is known at that point); the per-band {@link VersionAdapter} is the one
-     * service genuinely discovered at runtime, so it stays on {@link ServiceLoader}.
+     * {@link PlatformBridge} (the loader is known at that point); the per-band {@link VersionAdapter} is discovered at
+     * runtime via {@link #resolveVersionAdapter()}.
      */
     public static void initialize(PlatformBridge platformBridge) {
         // Route core's java.util.logging into latest.log first, so a fail-soft warning from config load or any
@@ -181,12 +213,7 @@ public final class Wdl {
         bridge = platformBridge;
         bobbyFilter = BobbyChunkFilter.resolve(bridge);
         outlineTracker.useBobbyFilter(bobbyFilter);
-        Iterator<VersionAdapter> adapters = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
-                .iterator();
-        if (!adapters.hasNext()) {
-            throw new IllegalStateException("No VersionAdapter service is registered");
-        }
-        adapter = adapters.next();
+        adapter = resolveVersionAdapter();
 
         LOGGER.info("loaded on Minecraft {}: adapter={}, bridge={}",
                 mcVersion(), adapter.getClass().getSimpleName(), bridge.getClass().getSimpleName());
@@ -850,7 +877,9 @@ public final class Wdl {
     /** The currently-loaded local world folder (refused as a target), or null when the world is remote. */
     static @Nullable Path loadedWorldPath(Minecraft minecraft) {
         IntegratedServer server = minecraft.getSingleplayerServer();
-        return server != null ? server.getWorldPath(LevelResource.ROOT) : null;
+        return server != null
+                ? server.getStorageSource().getBaseDir().resolve(server.getLevelIdName())
+                : null;
     }
 
     /** The in-capture screen label's fallback name: the current server's name, else a generic default. */

@@ -17,14 +17,14 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 /**
- * The 1.21.4 natural-spawn equipment table and the pure "was this equipped by a loot pickup" inference.
+ * The 1.15.2 natural-spawn equipment table and the pure "was this equipped by a loot pickup" inference.
  *
  * <p>Vanilla sets the server-only {@code PersistenceRequired} flag when a mob equips a picked-up item
  * ({@code Mob.setItemSlotAndDropWhenKilled}); the client never receives that flag. An equipped item that no natural
  * spawn of the mob's type could carry in that slot therefore proves the pickup ran, hence proves the mob was
  * persistent. The test is scoped to the mainhand and armor slots, the only slots the generic pickup path fills; the
- * offhand is excluded because a piglin holds a bartering gold ingot there without persistence. The enumeration is
- * verified against decompiled 1.21.4 and is band-specific.
+ * offhand is excluded because a mob can hold an unpersisted item there. The enumeration is verified against decompiled
+ * 1.15.2 and is band-specific.
  */
 final class NaturalEquipment {
     private NaturalEquipment() {}
@@ -95,11 +95,8 @@ final class NaturalEquipment {
             .put(EntityType.SKELETON, new Profile(ImmutableSet.of(Items.BOW), ArmorKind.BASE))
             .put(EntityType.STRAY, new Profile(ImmutableSet.of(Items.BOW), ArmorKind.BASE))
             .put(EntityType.WITHER_SKELETON, new Profile(ImmutableSet.of(Items.STONE_SWORD), ArmorKind.NONE))
-            .put(EntityType.PIGLIN,
-                    new Profile(ImmutableSet.of(Items.CROSSBOW, Items.GOLDEN_SWORD), ArmorKind.GOLDEN))
-            .put(EntityType.ZOMBIFIED_PIGLIN,
+            .put(EntityType.ZOMBIE_PIGMAN,
                     new Profile(ImmutableSet.of(Items.GOLDEN_SWORD), ArmorKind.NONE))
-            .put(EntityType.PIGLIN_BRUTE, new Profile(ImmutableSet.of(Items.GOLDEN_AXE), ArmorKind.NONE))
             .put(EntityType.PILLAGER, new Profile(ImmutableSet.of(Items.CROSSBOW), ArmorKind.NONE))
             .put(EntityType.VINDICATOR, new Profile(ImmutableSet.of(Items.IRON_AXE), ArmorKind.NONE))
             .put(EntityType.VEX, new Profile(ImmutableSet.of(Items.IRON_SWORD), ArmorKind.NONE))

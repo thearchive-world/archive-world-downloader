@@ -11,7 +11,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -64,7 +64,7 @@ class LiveCaptureSessionFinishLossLineTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // vanilla statics, which building a session needs before it runs
+        TestRegistries.bootstrap(); // vanilla statics, which building a session needs before it runs
     }
 
     /**
@@ -85,7 +85,7 @@ class LiveCaptureSessionFinishLossLineTest {
         assertFalse(config.showChatMessages(), "the chat arm reaches for a client this session does without");
         assertFalse(config.showToasts(), "the toast arm reaches for a player this session does without");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, Level.OVERWORLD, Level.OVERWORLD, TestRegistries.frozen(),
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
