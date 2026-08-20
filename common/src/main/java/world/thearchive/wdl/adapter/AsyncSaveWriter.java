@@ -17,7 +17,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -30,21 +29,21 @@ import world.thearchive.wdl.core.SaveProgress;
  * client render thread never blocks on region I/O and never runs the heavy chunk serialize either. {@link #submitChunk}
  * hands over a lazy encode-and-fold {@link Supplier} that the writer thread resolves (the deferred but deterministic
  * encode of immutable, detached inputs); {@link #submitEntity} hands over a fully-encoded, immutable
- * {@link CompoundTag}. Either way the writer thread is the sole owner of the {@link IOWorker}s, the one-writer
+ * {@link CompoundTag}. Either way the writer thread is the sole owner of the {@link WdlRegionStorage}s, the one-writer
  * invariant, and the reason only immutable or deferred-immutable work may cross the queue.
  *
- * <p>That invariant is this class's own, not one vanilla imposes: the region {@code IOWorker} is safe to call from any
- * thread, because it queues onto a concurrent queue and serializes execution by a status compare-and-set rather than by
- * caller identity. What needs the single thread is here. The per-dimension {@link Storages} are unsynchronized and open
- * lazily by get-then-put, so a second writer could open two storages over one directory. The merge, rewrite and
- * entity-fold paths are read-modify-write per {@link ChunkPos} and would lose a merge if interleaved. And the finalize
- * order is fixed.
+ * <p>At this band the store itself needs the single thread: vanilla {@code RegionFileStorage} keeps an unsynchronized
+ * region-file cache and does synchronous I/O, so it is not safe to call from more than one thread. The mod's own paths
+ * need it too. The per-dimension {@link Storages} are unsynchronized and open lazily by get-then-put, so a second
+ * writer could open two storages over one directory. The merge, rewrite and entity-fold paths are read-modify-write per
+ * {@link ChunkPos} and would lose a merge if interleaved. And the finalize order is fixed.
  *
- * <p>{@link #finish()} enqueues an end-of-stream marker; the writer drains the remaining tags, {@code synchronize()}s
- * and closes each storage, runs the {@link Finalizer} (the band's level.dat write), and completes the returned future
- * with the per-target tallies (or the error that aborted it). At 1.15.2 the vanilla {@code LevelStorage} holds no OS
- * lock to release at finish (session.lock is advisory pre-1.16), so there is nothing to close here. The future is
- * completed normally even on failure, so the caller polls it with one branch.
+ * <p>{@link #finish()} enqueues an end-of-stream marker; the writer drains the remaining tags, closes each storage
+ * (which is what flushes its region files, there being no channel force at this band), runs the {@link Finalizer} (the
+ * band's level.dat write), and completes the returned future with the per-target tallies (or the error that aborted
+ * it). At 1.14.4 the vanilla {@code LevelStorage} holds no OS lock to release at finish (session.lock is advisory
+ * pre-1.16), so there is nothing to close here. The future is completed normally even on failure, so the caller polls
+ * it with one branch.
  */
 final class AsyncSaveWriter {
     private static final Logger LOGGER = LogManager.getLogger(AsyncSaveWriter.class);
@@ -56,7 +55,7 @@ final class AsyncSaveWriter {
      */
     @FunctionalInterface
     public interface StorageOpener {
-        IOWorker open(DimensionType dimension) throws Exception;
+        WdlRegionStorage open(DimensionType dimension) throws Exception;
     }
 
     /** The best-effort pre-write step run before the drain opens any storage (the resume backup). */
@@ -495,7 +494,7 @@ final class AsyncSaveWriter {
                 if (next instanceof RewriteTask) {
                     RewriteTask rewrite = (RewriteTask) next;
                     progress.chunks(++drained, submitted);
-                    IOWorker region = regions.storageFor(rewrite.dimension());
+                    WdlRegionStorage region = regions.storageFor(rewrite.dimension());
                     // An unopenable dimension leaves no on-disk chunk to fold the orphaned contents onto, the
                     // same outcome rewriteExisting reports for a position with no prior, and neither has a
                     // tally of its own.
@@ -521,7 +520,7 @@ final class AsyncSaveWriter {
                     continue;
                 }
                 if (task.target() == Target.REGION) {
-                    IOWorker region = regions.storageFor(task.dimension());
+                    WdlRegionStorage region = regions.storageFor(task.dimension());
                     if (region == null) {
                         // The cause is per dimension and is logged there once; the loss is per chunk, because
                         // each task whose storage never opened is a chunk that did not reach disk, exactly what
@@ -554,7 +553,7 @@ final class AsyncSaveWriter {
                             break;
                     }
                 } else {
-                    IOWorker region = regions.storageFor(task.dimension());
+                    WdlRegionStorage region = regions.storageFor(task.dimension());
                     if (region == null) {
                         entityChunksFailed++; // per chunk, as above
                         continue;
@@ -583,7 +582,6 @@ final class AsyncSaveWriter {
                     }
                 }
             }
-            regions.synchronizeAll();
             finalizer.run(chunksFailed, entityChunksFailed); // level.dat, idcounts, and the completion record
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -636,12 +634,12 @@ final class AsyncSaveWriter {
         if (observer == null) {
             return;
         }
-        IOWorker storage = regions.storageFor(scan.dimension());
+        WdlRegionStorage storage = regions.storageFor(scan.dimension());
         if (storage == null) {
             return; // the dimension logged its own open failure; a scan reads nothing and loses nothing
         }
         try {
-            CompoundTag onDisk = storage.load(scan.pos());
+            CompoundTag onDisk = storage.read(scan.pos());
             if (onDisk != null) {
                 observer.accept(scan.dimension(), onDisk);
             }
@@ -695,7 +693,7 @@ final class AsyncSaveWriter {
     private static final class Storages {
         private final StorageOpener opener;
         private final String target;
-        private final Map<DimensionType, IOWorker> open = new LinkedHashMap<>();
+        private final Map<DimensionType, WdlRegionStorage> open = new LinkedHashMap<>();
         private final Set<DimensionType> loggedFailures = new HashSet<>();
 
         private Storages(StorageOpener opener, String target) {
@@ -709,8 +707,8 @@ final class AsyncSaveWriter {
          * and leave the chunks already on disk in a folder with no level.dat, which is a save the player cannot open,
          * so the caller counts the dropped task and the drain runs on to the finalize.
          */
-        private @Nullable IOWorker storageFor(DimensionType dimension) {
-            IOWorker storage = open.get(dimension);
+        private @Nullable WdlRegionStorage storageFor(DimensionType dimension) {
+            WdlRegionStorage storage = open.get(dimension);
             if (storage != null) {
                 return storage;
             }
@@ -725,26 +723,6 @@ final class AsyncSaveWriter {
             }
             open.put(dimension, storage);
             return storage;
-        }
-
-        /**
-         * Flush every open storage, logging rather than throwing a failure. Vanilla's flush is a channel force, and
-         * every chunk write was already awaited before it, so what a failure puts in doubt is whether those bytes
-         * survive a power loss, not whether the file system has them. Nothing is counted for it: the close that follows
-         * forces every region file again, so the failure this catch sees is usually resolved by the next statement, and
-         * this project's recorded posture is that region data is forced once at finalize and promises nothing against
-         * power loss. What the catch is for is the step behind it, the level.dat write, which a throw here would skip
-         * and leave a folder the player cannot open.
-         */
-        private void synchronizeAll() {
-            for (Map.Entry<DimensionType, IOWorker> entry : open.entrySet()) {
-                try {
-                    entry.getValue().synchronize().join();
-                } catch (RuntimeException e) {
-                    LOGGER.warn("cannot flush the {} storage for {}; its chunks may not survive a power loss",
-                            target, DimensionType.getName(entry.getKey()), e);
-                }
-            }
         }
 
         private void closeAll() {

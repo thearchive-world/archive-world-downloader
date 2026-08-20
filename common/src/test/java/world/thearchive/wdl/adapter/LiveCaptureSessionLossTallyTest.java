@@ -42,7 +42,6 @@ import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
@@ -192,10 +191,10 @@ class LiveCaptureSessionLossTallyTest {
 
     /** Seed a host region chunk at {@code pos} so an entity fold has terrain to land inside. */
     private static void seedHost(WorldPaths paths, ChunkPos pos) throws Exception {
-        try (IOWorker region = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+        try (WdlRegionStorage region = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             CompoundTag host = new CompoundTag();
             host.put("Level", new CompoundTag());
-            region.store(pos, host).join();
+            region.write(pos, host);
         }
     }
 
@@ -433,8 +432,8 @@ class LiveCaptureSessionLossTallyTest {
     /** The block entity of the given type in the chunk written to {@code paths}, or null when absent. */
     private static @Nullable CompoundTag blockEntityOnDisk(WorldPaths paths, ChunkPos pos, BlockPos at)
             throws Exception {
-        try (IOWorker storage = paths.openRegionStorage(DimensionType.OVERWORLD)) {
-            CompoundTag chunkTag = Optional.ofNullable(storage.load(pos))
+        try (WdlRegionStorage storage = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+            CompoundTag chunkTag = Optional.ofNullable(storage.read(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             return findByPosOrNull(chunkTag, at.getX(), at.getY(), at.getZ());
         }

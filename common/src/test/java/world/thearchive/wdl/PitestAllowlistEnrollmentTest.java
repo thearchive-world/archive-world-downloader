@@ -128,6 +128,7 @@ class PitestAllowlistEnrollmentTest {
             "world.thearchive.wdl.adapter.RenderSurface",
             "world.thearchive.wdl.adapter.RimRenderer",
             "world.thearchive.wdl.adapter.StashHolder",
+            "world.thearchive.wdl.adapter.WdlRegionStorage",
             "world.thearchive.wdl.adapter.WorldPaths");
 
     @Test

@@ -42,9 +42,9 @@ import net.minecraft.SharedConstants;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientChunkCache;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
+import net.minecraft.client.multiplayer.MultiPlayerLevel;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
@@ -143,7 +143,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
 /**
  * The live, MC-typed capture session behind the MC-free {@link CaptureController.Session} seam.
  *
- * <p>Bound to one {@link ClientLevel}. Each tick (client main thread) it snapshots each loaded chunk of that level
+ * <p>Bound to one {@link MultiPlayerLevel}. Each tick (client main thread) it snapshots each loaded chunk of that level
  * once, by walking the render-distance square around the player and reading the client chunk cache directly (no packet
  * Mixin). The codec reads the chunk's server-sent light from the client light engine, gated per chunk on the engine's
  * initial-light-applied bit, so a captured chunk skips vanilla's first-open relight; a chunk whose light has not yet
@@ -229,13 +229,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // What this download targets: a fresh folder (NEW) or an existing wdl-managed one to add to (RESUME). On a
     // RESUME that does not re-open the ender chest, its prior contents carry forward from the prior level.dat.
     private final DownloadTarget target;
-    // The ClientLevel currently being captured. Non-final: the session follows the player across a portal,
+    // The MultiPlayerLevel currently being captured. Non-final: the session follows the player across a portal,
     // rebinding to the new dimension's level, so this advances with targetDimension and allCaptured. Null on a
     // session built by the level-free constructor, so dereference it only through level(). The two bound-chunk
     // assert canaries compare it raw instead, because a throwing call inside an assert would make its own
     // evaluation depend on -ea; they are safe only because a level() call already ran earlier in the chain,
     // which for reencode means its callers, since it takes its chunk source as a parameter.
-    private @Nullable ClientLevel level;
+    private @Nullable MultiPlayerLevel level;
     // The vanilla single-player dimension this capture is laid out under, chosen by the captured
     // dimension's TYPE so non-standard server level keys (e.g. Multiverse's minecraft:worlds/2b2t/2b2t_1)
     // still write to the vanilla dimension's own folder, not one derived from the custom level key.
@@ -826,7 +826,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * edge the send-range sampler needs. It arrives as a value rather than being read here so that constructing a
      * session touches no client singleton at all.
      */
-    public LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config, ClientLevel level,
+    public LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config, MultiPlayerLevel level,
             DownloadTarget target, SavedChunkIndex overlayIndex, CoveredChunkIndex coveredIndex,
             SendRangeEstimator sendRange, boolean overlayActive, boolean cameraDetachedAtStart,
             BobbyChunkFilter bobbyFilter, Runnable saveCompletePoke) {
@@ -837,7 +837,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The construction a headless test can drive: the values the session takes from its {@link ClientLevel} arrive
+     * The construction a headless test can drive: the values the session takes from its {@link MultiPlayerLevel} arrive
      * directly, so {@code level} may be null and dereferencing it then fails loudly (see {@link #level()}).
      * Package-private because a null level is a test-only state; production always builds through the public
      * constructor, which derives the same values from the level it binds. {@code liveDimension} is the server's own key
@@ -845,7 +845,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * on a server that names its worlds itself.
      */
     LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config,
-            @Nullable ClientLevel level, DimensionType targetDimension, DimensionType liveDimension,
+            @Nullable MultiPlayerLevel level, DimensionType targetDimension, DimensionType liveDimension,
             DownloadTarget target, SavedChunkIndex overlayIndex,
             CoveredChunkIndex coveredIndex, SendRangeEstimator sendRange, boolean overlayActive,
             boolean cameraDetachedAtStart, BobbyChunkFilter bobbyFilter, Runnable saveCompletePoke) {
@@ -895,8 +895,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * the first capture dereference into a loud failure instead of letting the tick rebind the session to whatever
      * dimension the client happens to be in.
      */
-    private ClientLevel level() {
-        ClientLevel bound = this.level;
+    private MultiPlayerLevel level() {
+        MultiPlayerLevel bound = this.level;
         if (bound == null) {
             throw new IllegalStateException("a capture path ran on a session built without a level");
         }
@@ -1093,7 +1093,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     public void captureTick() {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
-        ClientLevel current = minecraft.level;
+        MultiPlayerLevel current = minecraft.level;
         if (player != null && current != null && current != level()) {
             rebindDimension(current); // follow the player across a portal; capture resumes below
         }
@@ -1116,14 +1116,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // displacement before the prime loop can seed against un-pruned far entities.
             EntityPacketCapture capture = this.packetCapture;
             if (capture != null) {
-                double dx = player.getX() - lastTickPlayerX;
-                double dz = player.getZ() - lastTickPlayerZ;
+                double dx = player.x - lastTickPlayerX;
+                double dz = player.z - lastTickPlayerZ;
                 double displacement = tickBaselineValid ? Math.sqrt(dx * dx + dz * dz) : 0.0;
                 capture.sampler().gateArmTick(displacement,
                         minecraft.getCameraEntity() != player);
             }
-            lastTickPlayerX = player.getX();
-            lastTickPlayerZ = player.getZ();
+            lastTickPlayerX = player.x;
+            lastTickPlayerZ = player.z;
             tickBaselineValid = true;
             int capChunks = Math.max(minecraft.options.renderDistance, 2);
             recordCoveredDisc(hotCenter, capChunks);
@@ -1145,7 +1145,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         if (level().getEntity(id) == null) {
                             continue;
                         }
-                        int distanceBlocks = sampler.seedSample(id, player.getX(), player.getZ());
+                        int distanceBlocks = sampler.seedSample(id, player.x, player.z);
                         if (distanceBlocks != SendRangeSampler.NO_SAMPLE && distanceBlocks <= boundBlocks) {
                             sendRange.observe(dimensionId, distanceBlocks);
                         }
@@ -1276,15 +1276,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * write through them and must reach the dimension being left. The open menu closes on a dimension change, so the
      * menu-bound stashes reset on the next tick. Capture resumes this same tick in the new dimension.
      */
-    private void rebindDimension(ClientLevel newLevel) {
+    private void rebindDimension(MultiPlayerLevel newLevel) {
         rebindDimension(VanillaDimensions.forType(newLevel.getDimension().getType()),
                 newLevel.getDimension().getType());
         this.level = newLevel;
     }
 
     /**
-     * The rebind a headless test can drive: the keys the session takes from its {@link ClientLevel} arrive directly,
-     * and the bound level stays the caller's to advance.
+     * The rebind a headless test can drive: the keys the session takes from its {@link MultiPlayerLevel} arrive
+     * directly, and the bound level stays the caller's to advance.
      */
     void rebindDimension(DimensionType newTarget, DimensionType liveDimension) {
         dimensionRebind.rebind(newTarget);
@@ -1402,11 +1402,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (!hasEncodeBudget()) {
                 break; // out of budget: the rest of the square (still uncaptured) spills to a later tick
             }
-            // Safety canary: capture only ever touches Minecraft.level (ClientLevel)
+            // Safety canary: capture only ever touches Minecraft.level (MultiPlayerLevel)
             // chunks, which are never persisted, so arming their unsaved flag cannot suppress a real singleplayer
             // save. The chunk comes from the bound level's own source, so this holds for a first capture and a
             // revisit re-buffer alike.
-            assert chunk.getLevel() == level : "capture touched a chunk outside the bound ClientLevel";
+            assert chunk.getLevel() == level : "capture touched a chunk outside the bound MultiPlayerLevel";
             // The snapshot stands alone in its own try because it is the only statement here whose failure
             // loses the chunk: past the buffer insert the terrain is already committed to flush, so a throw
             // costs this chunk's entity prime or its re-capture arm instead, which is a different loss and a
@@ -1486,7 +1486,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // hot buffer, so returning through a portal to captured terrain re-seeds; only the OFF and NEARBY
             // modes skip revisits. The prime loop can also see client-side-only entities spawned by other
             // mods, a mod-compat over-claim edge with no vanilla instance, accepted.
-            capture.primeSeed(entity, player.getX(), player.getZ(), plausibleMaxBlocks, overlayDimensionId);
+            capture.primeSeed(entity, player.x, player.z, plausibleMaxBlocks, overlayDimensionId);
             if (entity instanceof Player || capture.tracks(entity.getId())
                     || !new ChunkPos(new BlockPos(entity)).equals(pos)) {
                 continue; // players are not saved as entities; a tracked entity is the packet path's; a straddling
@@ -1724,9 +1724,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return; // unreachable given shouldRecapture above; the explicit check narrows nullness
         }
         // Safety canary: re-capture must only ever touch Minecraft.level
-        // (ClientLevel) chunks, which are never persisted, so clearing their unsaved flag cannot suppress a
+        // (MultiPlayerLevel) chunks, which are never persisted, so clearing their unsaved flag cannot suppress a
         // real singleplayer save. The chunk is fetched from the bound level's own source, so this holds.
-        assert chunk.getLevel() == level : "re-capture touched a chunk outside the bound ClientLevel";
+        assert chunk.getLevel() == level : "re-capture touched a chunk outside the bound MultiPlayerLevel";
         try {
             captured.put(pos, codec.capture(chunk));
             reencodedThisTick.add(key);
@@ -1746,9 +1746,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Detach the re-capture change tracking at session teardown: drop the dirty set so the
-     * {@link LevelChunk.UnsavedListener}s still attached to loaded {@link ClientLevel} chunks become inert (they guard
-     * on it being non-null) and stop pinning this finished session's set until those chunks unload. A later session
-     * re-installs its own listeners at its own first capture.
+     * {@link LevelChunk.UnsavedListener}s still attached to loaded {@link MultiPlayerLevel} chunks become inert (they
+     * guard on it being non-null) and stop pinning this finished session's set until those chunks unload. A later
+     * session re-installs its own listeners at its own first capture.
      */
     private void detachRecapture() {
         dirty = null;
@@ -2845,11 +2845,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 return; // ServerPlayer.saveParentVehicle's own condition
             }
             Set<UUID> excluded = new HashSet<>();
-            root.getSelfAndPassengers().forEach(entity -> {
+            if (!(root instanceof Player)) {
+                excluded.add(root.getUUID());
+            }
+            for (Entity entity : root.getIndirectPassengers()) {
                 if (!(entity instanceof Player)) {
                     excluded.add(entity.getUUID());
                 }
-            });
+            }
             CompoundTag entityTag = adapter.entitySink().captureRootVehicle(root, config.forceMobPersistence());
             if (entityTag == null) {
                 return;

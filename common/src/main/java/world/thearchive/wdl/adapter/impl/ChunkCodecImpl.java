@@ -20,7 +20,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.chunk.ChunkBiomeContainer;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -47,13 +46,12 @@ public final class ChunkCodecImpl implements ChunkCodec {
     /** Client chunks have no post-processing (a worldgen artifact). */
     private static final ShortList[] NO_POST_PROCESSING = new ShortList[0];
 
-    // A 1.15.2 world is 0..256: block sections 0..15, with a light-only pad one section below and above. A taller
+    // A 1.14.4 world is 0..256: block sections 0..15, with a light-only pad one section below and above. A taller
     // source (a 26.x server reached through a downgrade proxy) sends sections beyond that range; a section carrying
-    // block data outside 0..15 would crash vanilla's unchecked sections[index] on load, so its block data is dropped
-    // and the biome column is re-sliced to 0..256. Entities above or below are unaffected (a separate save axis).
+    // block data outside 0..15 would crash vanilla's unchecked sections[index] on load, so its block data is dropped.
+    // Entities above or below are unaffected (a separate save axis).
     private static final int MIN_BLOCK_SECTION = 0;
     private static final int MAX_BLOCK_SECTION = 15;
-    private static final int BIOME_QUART_LAYERS = 64;
 
     /**
      * Snapshot a live client chunk on the main thread (block-state section copies, per-chunk biomes, cloned heightmaps,
@@ -113,7 +111,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
             }
         }
 
-        int[] biomes = clampedBiomes(chunk);
+        int[] biomes = columnBiomes(chunk);
 
         return new CapturedChunkSnapshot(pos, minSectionY, level.getGameTime(),
                 chunk.getInhabitedTime(), chunk.getStatus(), lightCorrect,
@@ -201,23 +199,18 @@ public final class ChunkCodecImpl implements ChunkCodec {
     }
 
     /**
-     * The per-chunk biome ids for the 1.15.2 column, always the 0..256 grid a 1.15.2 save expects. A taller source's
-     * container spans a wider height, so each cell is read through the container's world-Y-aware accessor and re-sliced
-     * to the 1024-cell shape rather than writing the container's own longer array.
+     * The per-chunk biome ids for the 1.14.4 column: the flat 16x16 per-column grid a 1.14.4 save expects, one id per
+     * column indexed z*16+x, the {@code Biome[]} the client chunk holds mapped through the biome registry. Matches
+     * vanilla {@code ChunkSerializer.write}, which stores {@code Registry.BIOME.getId} of each column under the int
+     * array {@code "Biomes"} key a 1.14.4 client reads back.
      */
-    private static int[] clampedBiomes(LevelChunk chunk) {
-        Registry<Biome> biomeRegistry = Registry.BIOME;
-        ChunkBiomeContainer container = chunk.getBiomes();
-        int[] biomes = new int[16 * BIOME_QUART_LAYERS];
-        for (int quartY = 0; quartY < BIOME_QUART_LAYERS; quartY++) {
-            for (int quartZ = 0; quartZ < 4; quartZ++) {
-                for (int quartX = 0; quartX < 4; quartX++) {
-                    biomes[quartY << 4 | quartZ << 2 | quartX] = biomeRegistry
-                            .getId(container.getNoiseBiome(quartX, quartY, quartZ));
-                }
-            }
+    private static int[] columnBiomes(LevelChunk chunk) {
+        Biome[] biomes = chunk.getBiomes();
+        int[] ids = new int[biomes.length];
+        for (int i = 0; i < biomes.length; i++) {
+            ids[i] = Registry.BIOME.getId(biomes[i]);
         }
-        return biomes;
+        return ids;
     }
 
     /** A detached copy of a stored layer, or null when the engine holds none (empty layers are omitted). */

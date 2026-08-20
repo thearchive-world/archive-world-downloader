@@ -97,13 +97,14 @@ class ItemLocationScrubTest {
     }
 
     /**
-     * A beehive item carrying two flower positions the scrub must both blank: the hive's own top-level
-     * {@code BlockEntityTag.FlowerPos} (the pre-component item copies the hive's whole block-entity NBT, so it carries
-     * the hive's own flower position too, an E2a-only leak the component era does not carry), and one occupant's
-     * {@code BlockEntityTag.Bees[].EntityData.FlowerPos}.
+     * An item carrying beehive-shaped block-entity NBT with two flower positions the scrub must both blank: the hive's
+     * own top-level {@code BlockEntityTag.FlowerPos} (the pre-component item copies the hive's whole block-entity NBT,
+     * so it carries the hive's own flower position too, an E2a-only leak the component era does not carry), and one
+     * occupant's {@code BlockEntityTag.Bees[].EntityData.FlowerPos}. No vanilla beehive exists at this band, so a plain
+     * block item stands in as the foreign or modded carrier the scrub still has to reach.
      */
     private static ItemStack beehiveWithBeeFlowerPos() {
-        ItemStack hive = new ItemStack(Items.BEEHIVE);
+        ItemStack hive = new ItemStack(Items.CHEST);
         CompoundTag blockEntityTag = new CompoundTag();
         blockEntityTag.put(FLOWER_POS, NbtUtils.writeBlockPos(new BlockPos(130, 64, -510)));
         CompoundTag entityData = new CompoundTag();
@@ -367,8 +368,8 @@ class ItemLocationScrubTest {
                 bees.getCompound(0).get(ENTITY_DATA) instanceof CompoundTag
                         && ((CompoundTag) bees.getCompound(0).get(ENTITY_DATA)).contains(FLOWER_POS),
                 "the bee flower_pos is blanked");
-        assertEquals(Items.BEEHIVE, back.get(0).getItem(), "still a beehive");
-        assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-beehive item is untouched");
+        assertEquals(Items.CHEST, back.get(0).getItem(), "the carrier item is unchanged");
+        assertEquals(Items.DIAMOND, back.get(1).getItem(), "an item carrying no such NBT is untouched");
     }
 
     @Test
@@ -389,10 +390,10 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubOnAnEmptyBeehiveIsNoop() {
-        CompoundTag holder = holderOf(new ItemStack(Items.BEEHIVE));
+        CompoundTag holder = holderOf(new ItemStack(Items.CHEST));
         CompoundTag before = holder.copy();
         ItemLocationScrub.scrub(holder, "Items");
-        assertEquals(before, holder, "an empty beehive round-trips unchanged");
+        assertEquals(before, holder, "an item carrying no location NBT round-trips unchanged");
     }
 
     @Test

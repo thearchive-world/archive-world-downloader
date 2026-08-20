@@ -18,7 +18,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.Registry;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
@@ -29,7 +28,6 @@ import net.minecraft.world.item.RecordItem;
 import net.minecraft.world.item.UseOnContext;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.BeehiveBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
@@ -43,9 +41,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The MC-typed, loader-agnostic recognizer for interaction-prediction capture: content the chunk packet and an opened
- * menu never carry to the client (jukebox discs, placed shulker contents, placed beehive occupants) is predicted from
- * the local player's own right-click and reconciled against the authoritative synced block-state before it is
- * persisted, so a prediction the server never confirmed is never written.
+ * menu never carry to the client (jukebox discs, placed shulker contents) is predicted from the local player's own
+ * right-click and reconciled against the authoritative synced block-state before it is persisted, so a prediction the
+ * server never confirmed is never written.
  *
  * <p>Mirrors {@link EntityPacketCapture}: a connection-scoped {@code static volatile} publication point the per-loader
  * use-block hook resolves (the hook has no session reference), {@code null} when no download is running so the hook
@@ -55,9 +53,8 @@ import org.jspecify.annotations.Nullable;
  * {@link #blockStateAt}) and routing the confirmed holders to their merge ({@link ContainerMerge}). At most one capture
  * runs at a time, so a process singleton is correct.
  *
- * <p>One of the three writes reuses the open-time {@code "Items"} path (shulker, via {@link ContainerSink}); the other
- * two write the item's pre-component block-entity form directly ({@code ItemStack#save} under {@code "RecordItem"}, a
- * {@code ListTag} copy under {@code "Bees"}).
+ * <p>One of the two writes reuses the open-time {@code "Items"} path (shulker, via {@link ContainerSink}); the other
+ * writes the item's pre-component block-entity form directly ({@code ItemStack#save} under {@code "RecordItem"}).
  */
 public final class InteractionCapture {
     private static final Logger LOGGER = LogManager.getLogger(InteractionCapture.class);
@@ -85,7 +82,7 @@ public final class InteractionCapture {
     /** Insert-time candidates (jukebox), keyed by the looked-at block pos. Main-thread only. */
     private final Map<BlockPos, Candidate> insertStash = new LinkedHashMap<>();
 
-    /** Place-time candidates (shulker, beehive), keyed by the derived placed pos. Main-thread only. */
+    /** Place-time candidates (shulker), keyed by the derived placed pos. Main-thread only. */
     private final Map<BlockPos, Candidate> placeStash = new LinkedHashMap<>();
 
     /** Notified the instant a bookshelf book insert is recorded, so the outline marks that slot captured. */
@@ -197,14 +194,13 @@ public final class InteractionCapture {
      * The kind of a {@link HolderCandidate}, and the one descriptor per holder content type. Each constant carries the
      * reconcile predicate that confirms its content against the authoritative block-state, and whether its confirmed
      * holder folds into the open-time {@code "Items"} container bundle (a placed shulker, which opening supersedes) or
-     * the generic holder merge ({@link ContainerMerge#mergeHolderChunkStash}: a jukebox disc, beehive occupants).
-     * Adding a content type is one constant that drives the gate, {@link #route}, and the merge together, so a
-     * half-wired type cannot compile rather than silently capturing but never writing.
+     * the generic holder merge ({@link ContainerMerge#mergeHolderChunkStash}: a jukebox disc). Adding a content type is
+     * one constant that drives the gate, {@link #route}, and the merge together, so a half-wired type cannot compile
+     * rather than silently capturing but never writing.
      */
     enum InteractionKind {
         JUKEBOX(false, state -> state.getBlock() instanceof JukeboxBlock && state.getValue(JukeboxBlock.HAS_RECORD)),
-        SHULKER(true, state -> state.getBlock() instanceof ShulkerBoxBlock),
-        BEEHIVE(false, state -> state.getBlock() instanceof BeehiveBlock);
+        SHULKER(true, state -> state.getBlock() instanceof ShulkerBoxBlock);
 
         private final boolean itemsBundle;
         private final Predicate<BlockState> confirm;
@@ -229,9 +225,9 @@ public final class InteractionCapture {
     interface Candidate {}
 
     /**
-     * A jukebox disc, placed shulker, or placed beehive: one merge-ready single-key holder
-     * ({@code "RecordItem"}/{@code "Items"}/{@code "Bees"}). The gate keeps it whole only when the authoritative
-     * block-state confirms the content is present (HAS_RECORD, or the expected placed block type).
+     * A jukebox disc or placed shulker: one merge-ready single-key holder ({@code "RecordItem"}/{@code "Items"}). The
+     * gate keeps it whole only when the authoritative block-state confirms the content is present (HAS_RECORD, or the
+     * expected placed block type).
      */
     static final class HolderCandidate implements Candidate {
         private final InteractionKind kind;
@@ -254,8 +250,8 @@ public final class InteractionCapture {
     /**
      * A chunk's confirmed holders, split by merge path: {@code items} folds through the open-time container
      * {@code "Items"} merge (placed shulker) under the open-time-wins precedence; {@code holders} takes the generic
-     * field-copy merge (jukebox disc under {@code "RecordItem"}, beehive occupants under {@code "Bees"}), each holder
-     * already carrying exactly the key its block entity reads. One bundle drains per chunk.
+     * field-copy merge (jukebox disc under {@code "RecordItem"}), each holder already carrying exactly the key its
+     * block entity reads. One bundle drains per chunk.
      */
     static final class ChunkBundles {
         private final Map<BlockPos, CompoundTag> items;
@@ -372,15 +368,6 @@ public final class InteractionCapture {
                 placeStash.put(placedPos, new HolderCandidate(InteractionKind.SHULKER, holder));
                 placedContainerSink.containerCaptured(placedPos.asLong(), shulkerBlockEntityId());
             }
-        } else if (block instanceof BeehiveBlock) {
-            CompoundTag blockEntityTag = stack.getTagElement("BlockEntityTag");
-            if (blockEntityTag != null) {
-                ListTag beesList = blockEntityTag.getList("Bees", 10);
-                if (!beesList.isEmpty()) {
-                    CompoundTag holder = captureBees(beesList);
-                    placeStash.put(placedPos, new HolderCandidate(InteractionKind.BEEHIVE, holder));
-                }
-            }
         }
     }
 
@@ -479,9 +466,9 @@ public final class InteractionCapture {
      * candidates stand or fall whole.
      *
      * <p>The whole-confirm kinds gate on block type alone, since the synced block-state carries no occupant or contents
-     * dimension: a server that strips a placed container's contents, or bees that leave a hive on placement, still
-     * confirms on type and persists the predicted content. That is an accepted inherent ceiling of optimistic
-     * prediction, not a fixable case: there is no client-side signal that distinguishes it from a confirmed placement.
+     * dimension: a server that strips a placed container's contents still confirms on type and persists the predicted
+     * content. That is an accepted inherent ceiling of optimistic prediction, not a fixable case: there is no
+     * client-side signal that distinguishes it from a confirmed placement.
      */
     static Optional<CompoundTag> confirm(BlockState authoritative, Candidate candidate) {
         if (candidate instanceof HolderCandidate) {
@@ -524,13 +511,6 @@ public final class InteractionCapture {
         holder.putBoolean("IsPlaying", true);
         holder.putLong("RecordStartTick", 0L);
         holder.putLong("TickCount", 0L);
-        return holder;
-    }
-
-    /** Serialize {@code beesList} to a holder carrying {@code "Bees"} (the beehive occupants). */
-    static CompoundTag captureBees(ListTag beesList) {
-        CompoundTag holder = new CompoundTag();
-        holder.put("Bees", beesList.copy());
         return holder;
     }
 }

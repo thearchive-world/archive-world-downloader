@@ -8,19 +8,20 @@ import java.nio.file.Path;
 import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.IOWorker;
-import net.minecraft.world.level.chunk.storage.WdlRegionStorage;
+
+import world.thearchive.wdl.adapter.WdlRegionStorage;
 
 /**
- * Drives a chunk NBT tag through vanilla's real region pipeline ({@link IOWorker}, the async region-file worker below
- * 1.20.6) and back, so the codec round-trip exercises on-disk Anvil write/read rather than an in-memory shortcut.
+ * Drives a chunk NBT tag through vanilla's real region pipeline (the synchronous {@link WdlRegionStorage} over
+ * RegionFileStorage at this band) and back, so the codec round-trip exercises on-disk Anvil write/read rather than an
+ * in-memory shortcut.
  */
 public final class RegionRoundTrip {
     private RegionRoundTrip() {}
 
-    /** Open a region storage rooted at {@code directory} (caller closes it). {@code IOWorker}'s ctor is protected. */
-    public static IOWorker open(Path directory) {
-        return new TestRegionStorage(directory, false, "chunk");
+    /** Open a region storage rooted at {@code directory} (caller closes it). */
+    public static WdlRegionStorage open(Path directory) {
+        return new WdlRegionStorage(directory.toFile());
     }
 
     /**
@@ -28,23 +29,16 @@ public final class RegionRoundTrip {
      * pass then proves the bytes survived a real serialize -> disk -> deserialize.
      */
     public static CompoundTag writeThenRead(Path directory, ChunkPos pos, CompoundTag tag) {
-        try (IOWorker writer = open(directory)) {
-            writer.store(pos, tag).join();
-            writer.synchronize().join();
+        try (WdlRegionStorage writer = open(directory)) {
+            writer.write(pos, tag);
         } catch (IOException e) {
             throw new RuntimeException("failed writing region chunk " + pos, e);
         }
-        try (IOWorker reader = open(directory)) {
-            return Optional.ofNullable(reader.load(pos))
+        try (WdlRegionStorage reader = open(directory)) {
+            return Optional.ofNullable(reader.read(pos))
                     .orElseThrow(() -> new IllegalStateException("no chunk read back at " + pos));
         } catch (IOException e) {
             throw new RuntimeException("failed reading region chunk " + pos, e);
-        }
-    }
-
-    private static final class TestRegionStorage extends WdlRegionStorage {
-        private TestRegionStorage(Path directory, boolean sync, String name) {
-            super(directory.toFile(), name);
         }
     }
 }

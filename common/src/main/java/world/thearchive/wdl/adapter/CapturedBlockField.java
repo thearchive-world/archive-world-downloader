@@ -45,11 +45,11 @@ enum CapturedBlockField {
     /** A crafter's disabled input slots; vanilla writes an int array, empty when no slot is disabled. */
     DISABLED_SLOTS("disabled_slots", new IntArrayTag(new int[0])),
     /** Whether a crafter is powered; vanilla writes an int, zero when it is not. */
-    TRIGGERED("triggered", IntTag.valueOf(0)),
+    TRIGGERED("triggered", new IntTag(0)),
     /** A brewing stand's remaining brew ticks; vanilla writes a short, zero when it is not brewing. */
-    BREW_TIME("BrewTime", ShortTag.valueOf((short) 0)),
+    BREW_TIME("BrewTime", new ShortTag((short) 0)),
     /** A brewing stand's blaze-powder fuel; vanilla writes a byte, zero when it has none. */
-    FUEL("Fuel", ByteTag.valueOf((byte) 0));
+    FUEL("Fuel", new ByteTag((byte) 0));
 
     /**
      * Iterating this instead of {@code values()} keeps the per-block-entity loops from cloning the backing array on

@@ -3,7 +3,7 @@
 
 package world.thearchive.wdl.platform;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.platform.GlStateManager;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -38,7 +38,7 @@ final class WdlMultilineToast implements Toast {
     public Toast.Visibility render(ToastComponent toastComponent, long elapsed) {
         Minecraft mc = toastComponent.getMinecraft();
         mc.getTextureManager().bind(TEXTURE);
-        RenderSystem.color3f(1.0F, 1.0F, 1.0F);
+        GlStateManager.color3f(1.0F, 1.0F, 1.0F);
         // Keep the 16-pixel top and bottom caps of the frame sprite, which carry the borders, and tile a one-pixel
         // interior slice between them; at frameHeight 32 the two caps meet and reproduce the vanilla frame exactly.
         toastComponent.blit(0, 0, 0, 64, 160, 16);

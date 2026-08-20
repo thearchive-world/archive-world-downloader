@@ -59,9 +59,9 @@ public final class FixtureFidelity {
         if (blockEntity == null) {
             throw new AssertionError("Fixture fidelity: " + state.getBlock() + " hosts no block entity at " + pos);
         }
-        // 1.16.5 newBlockEntity takes no position (the 1.17 overload did), so the fresh block entity sits at the
-        // origin; set its position or save writes x/y/z of 0,0,0 instead of the requested cell.
-        blockEntity.setLevelAndPosition(null, pos);
+        // The fresh block entity carries no position, so it sits at the origin; set its position or save writes
+        // x/y/z of 0,0,0 instead of the requested cell.
+        blockEntity.setPosition(pos);
         return blockEntity;
     }
 

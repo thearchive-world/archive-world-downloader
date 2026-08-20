@@ -26,7 +26,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -206,15 +205,14 @@ class CarryForwardWiringTest {
 
     private static void writePrior(WorldPaths paths, ChunkPos pos, CompoundTag blockEntity) throws Exception {
         CompoundTag chunk = BlockEntityFixtures.chunkTagWith(blockEntity);
-        try (IOWorker storage = regionStorage(paths)) {
-            storage.store(pos, chunk).join();
-            storage.synchronize().join();
+        try (WdlRegionStorage storage = regionStorage(paths)) {
+            storage.write(pos, chunk);
         }
     }
 
     private List<String> itemsOnDisk(WorldPaths paths, ChunkPos pos) throws Exception {
-        try (IOWorker storage = regionStorage(paths)) {
-            CompoundTag chunk = Optional.ofNullable(storage.load(pos))
+        try (WdlRegionStorage storage = regionStorage(paths)) {
+            CompoundTag chunk = Optional.ofNullable(storage.read(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             CompoundTag written = findByPos(chunk, chest.getX(), chest.getY(), chest.getZ());
             List<String> ids = new ArrayList<>();
@@ -228,7 +226,7 @@ class CarryForwardWiringTest {
         }
     }
 
-    private static IOWorker regionStorage(WorldPaths paths) {
+    private static WdlRegionStorage regionStorage(WorldPaths paths) {
         return paths.openRegionStorage(DimensionType.OVERWORLD);
     }
 

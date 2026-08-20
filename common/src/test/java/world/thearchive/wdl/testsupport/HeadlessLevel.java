@@ -19,8 +19,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.LevelType;
 import net.minecraft.world.level.TickList;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.dimension.DimensionType;
@@ -94,11 +92,6 @@ public final class HeadlessLevel extends Level {
 
     @Override
     public void levelEvent(@Nullable Player player, int type, BlockPos pos, int data) {}
-
-    @Override
-    public Biome getUncachedNoiseBiome(int x, int y, int z) {
-        return Biomes.PLAINS;
-    }
 
     @Override
     public @Nullable Scoreboard getScoreboard() {

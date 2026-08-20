@@ -3,7 +3,7 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.platform.GlStateManager;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -84,10 +84,10 @@ public final class RenderSurfaceImpl implements RenderSurface {
         // pre-1.20 blit likewise takes no tint argument. The sole wdl sprite is the 10 by 10 revert icon.
         Minecraft.getInstance().getTextureManager()
                 .bind(new ResourceLocation("wdl", "textures/gui/sprites/" + sprite + ".png"));
-        RenderSystem.color4f((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
+        GlStateManager.color4f((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
                 (color & 0xFF) / 255.0F, (color >>> 24) / 255.0F);
         GuiComponent.blit(x, y, width, height, 0.0F, 0.0F, 10, 10, 10, 10);
-        RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.color4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     @Override
@@ -96,10 +96,10 @@ public final class RenderSurfaceImpl implements RenderSurface {
         // A selected list row leaves the shader color at black (the 1.15.2 AbstractSelectionList highlight sets it and
         // never resets it), and GuiComponent.blit does not set its own, so without this reset the selected row's icon
         // multiplies to black. Vanilla's own world-selection list resets to white here for the same reason.
-        RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
-        RenderSystem.enableBlend();
+        GlStateManager.color4f(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.enableBlend();
         GuiComponent.blit(x, y, 0.0F, 0.0F, size, size, size, size);
-        RenderSystem.disableBlend();
+        GlStateManager.disableBlend();
     }
 
     @Override
@@ -125,11 +125,11 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public int guiWidth() {
-        return Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        return Minecraft.getInstance().window.getGuiScaledWidth();
     }
 
     @Override
     public int guiHeight() {
-        return Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        return Minecraft.getInstance().window.getGuiScaledHeight();
     }
 }

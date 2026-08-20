@@ -96,13 +96,13 @@ final class PlayerTag {
      */
     static void setPosition(CompoundTag raw, BlockPos pos, float yaw, float pitch) {
         ListTag position = new ListTag();
-        position.add(DoubleTag.valueOf(pos.getX()));
-        position.add(DoubleTag.valueOf(pos.getY()));
-        position.add(DoubleTag.valueOf(pos.getZ()));
+        position.add(new DoubleTag(pos.getX()));
+        position.add(new DoubleTag(pos.getY()));
+        position.add(new DoubleTag(pos.getZ()));
         raw.put("Pos", position);
         ListTag rotation = new ListTag();
-        rotation.add(FloatTag.valueOf(yaw));
-        rotation.add(FloatTag.valueOf(pitch));
+        rotation.add(new FloatTag(yaw));
+        rotation.add(new FloatTag(pitch));
         raw.put("Rotation", rotation);
     }
 

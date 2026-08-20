@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.MultiPlayerLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
@@ -230,11 +230,11 @@ final class EntityPacketCapture
         }
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
-        ClientLevel level = minecraft.level;
+        MultiPlayerLevel level = minecraft.level;
         if (player == null || level == null) {
             return;
         }
-        int distanceBlocks = sampler.arrivalSample(player.getX(), player.getZ(), add.getX(), add.getZ());
+        int distanceBlocks = sampler.arrivalSample(player.x, player.z, add.getX(), add.getZ());
         if (distanceBlocks == SendRangeSampler.NO_SAMPLE) {
             return;
         }
@@ -271,7 +271,7 @@ final class EntityPacketCapture
     private void onRemove(ClientboundRemoveEntitiesPacket packet) {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
-        ClientLevel level = minecraft.level;
+        MultiPlayerLevel level = minecraft.level;
         if (player == null || level == null) {
             return;
         }
@@ -279,7 +279,7 @@ final class EntityPacketCapture
         String dimensionId = DimensionType.getName(level.getDimension().getType()).toString();
         int[] ids = packet.getEntityIds();
         for (int i = 0; i < ids.length; i++) {
-            int distanceBlocks = sampler.removalSample(ids[i], player.getX(), player.getZ());
+            int distanceBlocks = sampler.removalSample(ids[i], player.x, player.z);
             if (distanceBlocks != SendRangeSampler.NO_SAMPLE && distanceBlocks <= plausibleMaxBlocks) {
                 sendRange.observe(dimensionId, distanceBlocks);
             }
@@ -351,14 +351,17 @@ final class EntityPacketCapture
      * drain batches. A rotation-only update therefore leaves the home alone.
      */
     public void onMove(int id, short xa, short ya, short za, ClientboundMoveEntityPacket move) {
-        sampler.markMovedRelative(id, move.hasPosition() && (xa != 0 || ya != 0 || za != 0));
+        // This band has no ClientboundMoveEntityPacket.hasPosition; the Pos and PosRot subclasses carry a position.
+        boolean hasPosition = move instanceof ClientboundMoveEntityPacket.Pos
+                || move instanceof ClientboundMoveEntityPacket.PosRot;
+        sampler.markMovedRelative(id, hasPosition && (xa != 0 || ya != 0 || za != 0));
         EntityPos current = positionOf(id);
         if (current == null) {
             return;
         }
         float yRot = move.hasRotation() ? decodeAngle(move.getyRot()) : current.yRot();
         float xRot = move.hasRotation() ? decodeAngle(move.getxRot()) : current.xRot();
-        if (!move.hasPosition()) {
+        if (!hasPosition) {
             recordRotation(id, yRot, xRot);
             return;
         }

@@ -66,10 +66,10 @@ class NbtMergeTest {
         // empty one. Nothing carried means that empty list must not be written over what was there.
         CompoundTag disk = withBooks(0);
         CompoundTag fresh = new CompoundTag();
-        fresh.put("Items", StringTag.valueOf("not a list"));
+        fresh.put("Items", new StringTag("not a list"));
 
         assertFalse(NbtMerge.carryListBySlot(disk, fresh, "Items", 0));
-        assertEquals(StringTag.valueOf("not a list"), fresh.get("Items"),
+        assertEquals(new StringTag("not a list"), fresh.get("Items"),
                 "a malformed fresh value is not replaced by an empty list when nothing was carried");
     }
 }

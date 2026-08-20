@@ -19,13 +19,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
-import java.util.stream.Stream;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,16 +37,16 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * Region-pipeline integration: the real {@link IOWorker} path under {@link WorldPaths}, covering multi-chunk +
- * region-boundary placement, the &gt;1 MiB external-{@code .mcc} spill, {@code synchronize()}+{@code close()} drain,
- * reopen-and-read-back from a fresh storage, and the read-merge recapture path over an on-disk prior.
+ * Region-pipeline integration: the real {@link WdlRegionStorage} path under {@link WorldPaths}, covering multi-chunk +
+ * region-boundary placement, {@code close()} drain, reopen-and-read-back from a fresh storage, and the read-merge
+ * recapture path over an on-disk prior.
  */
 class RegionIntegrationTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
     private final ContainerSink containerSink = new ContainerSinkImpl();
     private final LecternSink lecternSink = new LecternSinkImpl();
 
-    private static IOWorker storage(WorldPaths paths, Path regionDirectory) {
+    private static WdlRegionStorage storage(WorldPaths paths, Path regionDirectory) {
         return paths.openRegionStorage(DimensionType.OVERWORLD);
     }
 
@@ -61,7 +58,7 @@ class RegionIntegrationTest {
 
         assertTrue(Files.isDirectory(region), "region/ must be pre-created before any write");
         assertEquals(save.resolve("region"), region, "overworld region/ is at the save root");
-        try (IOWorker opened = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+        try (WdlRegionStorage opened = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             assertNotNull(opened, "the overworld region storage must open");
         }
     }
@@ -77,21 +74,20 @@ class RegionIntegrationTest {
                 new ChunkPos(0, 0), new ChunkPos(31, 31), new ChunkPos(32, 0),
                 new ChunkPos(0, 32), new ChunkPos(-1, -1));
 
-        try (IOWorker out = storage(paths, region)) {
+        try (WdlRegionStorage out = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
                 CompoundTag tag = codec.encode(SyntheticChunks.full(true), false);
                 tag.putInt("wdlTestId", i); // distinct marker -> proves each chunk lands at its own pos
-                out.store(positions.get(i), tag).join();
+                out.write(positions.get(i), tag);
             }
-            out.synchronize().join();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
         // Reopen with a FRESH storage and read every chunk back at its position.
-        try (IOWorker in = storage(paths, region)) {
+        try (WdlRegionStorage in = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag back = Optional.ofNullable(in.load(positions.get(i)))
+                CompoundTag back = Optional.ofNullable(in.read(positions.get(i)))
                         .orElseThrow(() -> new AssertionError("missing chunk"));
                 assertEquals(i, (back.contains("wdlTestId") ? back.getInt("wdlTestId") : -1),
                         "wrong chunk read back at " + positions.get(i));
@@ -107,36 +103,6 @@ class RegionIntegrationTest {
     }
 
     @Test
-    void oversizeChunkSpillsToExternalMccFile(@TempDir Path save) throws IOException {
-        WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
-        ChunkPos pos = new ChunkPos(5, 5);
-
-        // Incompressible payload: RegionFile zlib-compresses chunks, so all-zero bytes would shrink to
-        // nothing and never spill. Fixed-seed random bytes stay ~2 MiB compressed -> external-file branch.
-        byte[] pad = new byte[2 * 1024 * 1024];
-        new Random(0xC0FFEEL).nextBytes(pad);
-        CompoundTag big = new CompoundTag();
-        big.putByteArray("pad", pad);
-
-        try (IOWorker out = storage(paths, region)) {
-            out.store(pos, big).join();
-            out.synchronize().join();
-        }
-
-        try (Stream<Path> files = Files.list(region)) {
-            assertTrue(
-                    files.anyMatch(path -> path.getFileName().toString().matches("c\\.-?\\d+\\.-?\\d+\\.mcc")),
-                    "a >1 MiB chunk must spill to an external c.x.z.mcc file");
-        }
-        try (IOWorker in = storage(paths, region)) {
-            CompoundTag back = Optional.ofNullable(in.load(pos))
-                    .orElseThrow(() -> new AssertionError("oversize chunk lost"));
-            assertEquals(2 * 1024 * 1024, back.getByteArray("pad").length);
-        }
-    }
-
-    @Test
     void writeMergingReadsThePriorChunkAndReportsNewVersusRecaptured(@TempDir Path save) throws IOException {
         TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
@@ -147,13 +113,12 @@ class RegionIntegrationTest {
             return 3; // a stand-in carry-forward count; ChunkMerge's own logic is tested headlessly
         };
 
-        try (IOWorker out = storage(paths, region)) {
+        try (WdlRegionStorage out = storage(paths, region)) {
             // No prior on disk: a plain new write, the merge is never invoked.
             RegionChunkWriter.MergeWriteResult first = RegionChunkWriter.writeMerging(out, new ChunkPos(0, 0),
                     codec.encode(SyntheticChunks.full(true), false), merge);
             assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_NEW, first.outcome());
             assertEquals(0, mergeCalls[0], "no prior, so nothing to merge");
-            out.synchronize().join();
 
             // A prior now exists: the read finds it, the merge runs, the merge-back count is surfaced.
             RegionChunkWriter.MergeWriteResult second = RegionChunkWriter.writeMerging(out, new ChunkPos(0, 0),
@@ -181,20 +146,18 @@ class RegionIntegrationTest {
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 
-        try (IOWorker out = storage(paths, region)) {
+        try (WdlRegionStorage out = storage(paths, region)) {
             ChunkSnapshotSource captured = chestSnapshot(chestPos, "minecraft:diamond");
             RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, false),
                     ChunkFlushPlan.readMerge(captured, ImmutableList.of(), LongSets.EMPTY_SET));
-            out.synchronize().join();
 
             ChunkSnapshotSource reWalked = chestSnapshot(chestPos);
             RegionChunkWriter.writeMerging(out, pos, codec.encode(reWalked, false),
                     ChunkFlushPlan.readMerge(reWalked, ImmutableList.of(), LongSets.EMPTY_SET));
-            out.synchronize().join();
         }
 
-        try (IOWorker in = storage(paths, region)) {
-            CompoundTag back = Optional.ofNullable(in.load(pos))
+        try (WdlRegionStorage in = storage(paths, region)) {
+            CompoundTag back = Optional.ofNullable(in.read(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             assertEquals(1, findByPos(back, 4, 64, 9).getList("Items", 10).size(),
                     "a chunk the player walked past again must not lose the chest an earlier flush archived");
@@ -214,11 +177,10 @@ class RegionIntegrationTest {
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 
-        try (IOWorker out = storage(paths, region)) {
+        try (WdlRegionStorage out = storage(paths, region)) {
             ChunkSnapshotSource captured = chestSnapshot(chestPos, "minecraft:diamond");
             RegionChunkWriter.writeMerging(out, pos, codec.encode(captured, false),
                     ChunkFlushPlan.readMerge(captured, ImmutableList.of(), LongSets.EMPTY_SET));
-            out.synchronize().join();
 
             ChunkSnapshotSource emptied = chestSnapshot(chestPos);
             Map<BlockPos, CompoundTag> containers = new LinkedHashMap<>();
@@ -230,7 +192,6 @@ class RegionIntegrationTest {
             assertEquals(1, folded.merged(), "the open-time holder landed, so the fresh side is what the open saw");
             RegionChunkWriter.MergeWriteResult written = RegionChunkWriter.writeMerging(out, pos, fresh,
                     ChunkFlushPlan.readMerge(emptied, landing, LongSets.EMPTY_SET));
-            out.synchronize().join();
 
             // Without these the case cannot tell the skip firing from the merge never running at all, which is
             // the same green either way.
@@ -239,8 +200,8 @@ class RegionIntegrationTest {
             assertEquals(0, written.mergeBacks(), "and carried nothing back into the container it captured");
         }
 
-        try (IOWorker in = storage(paths, region)) {
-            CompoundTag back = Optional.ofNullable(in.load(pos))
+        try (WdlRegionStorage in = storage(paths, region)) {
+            CompoundTag back = Optional.ofNullable(in.read(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             CompoundTag chest = findByPos(back, 4, 64, 9);
             assertTrue(chest.get("Items") instanceof ListTag && ((ListTag) chest.get("Items")).isEmpty(),

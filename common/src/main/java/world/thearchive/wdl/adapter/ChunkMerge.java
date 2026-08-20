@@ -51,7 +51,7 @@ final class ChunkMerge {
      */
     static final String CHISELED_BOOKSHELF_ID = "minecraft:chiseled_bookshelf";
 
-    private static final Tag CHISELED_BOOKSHELF_ID_TAG = StringTag.valueOf(CHISELED_BOOKSHELF_ID);
+    private static final Tag CHISELED_BOOKSHELF_ID_TAG = new StringTag(CHISELED_BOOKSHELF_ID);
 
     /** Every slot occupied, the answer used where no occupancy was recorded for a position. */
     private static final int ALL_SLOTS = -1;

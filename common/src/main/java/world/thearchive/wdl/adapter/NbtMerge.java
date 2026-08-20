@@ -142,8 +142,8 @@ final class NbtMerge {
      * Whether {@code blockEntity}'s saved {@code x/y/z} match {@code pos}, compared as {@link IntTag}s (band-stable).
      */
     static boolean isBlockEntityAt(CompoundTag blockEntity, BlockPos pos) {
-        return IntTag.valueOf(pos.getX()).equals(blockEntity.get("x"))
-                && IntTag.valueOf(pos.getY()).equals(blockEntity.get("y"))
-                && IntTag.valueOf(pos.getZ()).equals(blockEntity.get("z"));
+        return new IntTag(pos.getX()).equals(blockEntity.get("x"))
+                && new IntTag(pos.getY()).equals(blockEntity.get("y"))
+                && new IntTag(pos.getZ()).equals(blockEntity.get("z"));
     }
 }

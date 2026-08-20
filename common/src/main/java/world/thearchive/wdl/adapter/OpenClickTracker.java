@@ -97,7 +97,7 @@ public final class OpenClickTracker {
      */
     private static boolean suppressesBlockUse(Player player) {
         boolean haveSomethingInOurHands = !player.getMainHandItem().isEmpty() || !player.getOffhandItem().isEmpty();
-        return player.isSecondaryUseActive() && haveSomethingInOurHands;
+        return player.isSneaking() && haveSomethingInOurHands;
     }
 
     /**

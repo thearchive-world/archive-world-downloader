@@ -52,7 +52,7 @@ class LecternStashMergeTest {
         tag.putInt("generation", 0);
         tag.putBoolean("resolved", true);
         ListTag pages = new ListTag();
-        pages.add(StringTag.valueOf(Component.Serializer.toJson(new TextComponent("only page"))));
+        pages.add(new StringTag(Component.Serializer.toJson(new TextComponent("only page"))));
         tag.put("pages", pages);
         return book;
     }

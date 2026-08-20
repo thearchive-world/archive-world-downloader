@@ -17,7 +17,6 @@ import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -59,7 +58,7 @@ class EntityRoundTripTest {
         TestRegistries.bootstrap();
     }
 
-    private static IOWorker regionStorage(WorldPaths paths) {
+    private static WdlRegionStorage regionStorage(WorldPaths paths) {
         return paths.openRegionStorage(DimensionType.OVERWORLD);
     }
 
@@ -107,22 +106,21 @@ class EntityRoundTripTest {
                 new ChunkPos(0, 0), new ChunkPos(31, 31), new ChunkPos(32, 0),
                 new ChunkPos(0, 32), new ChunkPos(-1, -1));
 
-        try (IOWorker out = regionStorage(paths)) {
+        try (WdlRegionStorage out = regionStorage(paths)) {
             for (int i = 0; i < positions.size(); i++) {
                 ChunkPos pos = positions.get(i);
-                out.store(pos, hostChunk()).join(); // the host chunk the entities fold into
+                out.write(pos, hostChunk()); // the host chunk the entities fold into
                 CompoundTag carrier = sink.encodeChunk(ImmutableList.of(entityTag("minecraft:item", i)), pos);
                 RegionChunkWriter.MergeWriteResult folded = RegionChunkWriter.foldEntitiesIntoRegion(out, pos, carrier);
                 assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_NEW, folded.outcome(),
                         "a first fold into a host chunk with no prior entities is a new write");
             }
-            out.synchronize().join();
         }
 
         // Reopen with a FRESH storage and read every entity back from its chunk's Level.Entities.
-        try (IOWorker in = regionStorage(paths)) {
+        try (WdlRegionStorage in = regionStorage(paths)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag back = Optional.ofNullable(in.load(positions.get(i)))
+                CompoundTag back = Optional.ofNullable(in.read(positions.get(i)))
                         .orElseThrow(() -> new AssertionError("missing chunk"));
                 ListTag entities = back.getCompound("Level").getList("Entities", 10);
                 assertEquals(1, entities.size());

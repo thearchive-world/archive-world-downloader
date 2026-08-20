@@ -26,7 +26,6 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -237,9 +236,9 @@ class EntityVehicleRelocationTest {
     private static List<CompoundTag> entitiesOnDisk(WorldPaths paths, UUID uuid, ChunkPos... positions)
             throws Exception {
         List<CompoundTag> found = new ArrayList<>();
-        try (IOWorker storage = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+        try (WdlRegionStorage storage = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             for (ChunkPos pos : positions) {
-                CompoundTag chunkTag = Optional.ofNullable(storage.load(pos)).orElse(null);
+                CompoundTag chunkTag = Optional.ofNullable(storage.read(pos)).orElse(null);
                 if (chunkTag == null || !(chunkTag.getCompound("Level").get("Entities") instanceof ListTag)) {
                     continue;
                 }
@@ -282,11 +281,11 @@ class EntityVehicleRelocationTest {
 
     /** Seed a host region chunk at each position so the entity folds have terrain to land inside. */
     private static void seedHosts(WorldPaths paths, ChunkPos... positions) throws Exception {
-        try (IOWorker region = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+        try (WdlRegionStorage region = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             for (ChunkPos pos : positions) {
                 CompoundTag host = new CompoundTag();
                 host.put("Level", new CompoundTag());
-                region.store(pos, host).join();
+                region.write(pos, host);
             }
         }
     }

@@ -126,7 +126,7 @@ public final class ItemFixtures {
     public static ItemStack writtenBook(int pageCount) {
         ListTag pages = new ListTag();
         for (int page = 0; page < pageCount; page++) {
-            pages.add(StringTag.valueOf(Component.Serializer.toJson(new TextComponent("page " + page))));
+            pages.add(new StringTag(Component.Serializer.toJson(new TextComponent("page " + page))));
         }
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
         CompoundTag tag = book.getOrCreateTag();

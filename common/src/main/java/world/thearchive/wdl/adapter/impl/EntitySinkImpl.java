@@ -102,7 +102,7 @@ public final class EntitySinkImpl implements EntitySink {
     @Override
     public @Nullable CompoundTag encodeChunk(List<CompoundTag> entityTags, ChunkPos pos) {
         if (entityTags.isEmpty()) {
-            return null; // skip empty entity-chunks: capture omits them (vanilla writes IOWorker.STORE_EMPTY)
+            return null;
         }
         ListTag entities = new ListTag();
         for (CompoundTag entityTag : entityTags) {

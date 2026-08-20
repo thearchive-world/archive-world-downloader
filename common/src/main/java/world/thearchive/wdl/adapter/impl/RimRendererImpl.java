@@ -3,10 +3,7 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Vector4f;
-import net.minecraft.client.renderer.RenderType;
+import com.mojang.blaze3d.vertex.BufferBuilder;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -15,32 +12,26 @@ import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.core.RimFace;
 
 /**
- * The 1.16.5 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
- * {@link RenderType#lines()} type, camera-relative. The rectangle's two in-plane axes come from the block cell and its
- * normal axis from the model shape, lifted a small standoff along the face normal, so the rim frames a recessed model
- * (a chest) at block extent yet never z-fights a flush one. We draw the edges explicitly rather than feed a flat
- * {@code VoxelShape} to {@code renderShape}, which risks degenerate zero-length edges. This band's {@code lines()}
- * vertex format is POSITION_COLOR, with no per-vertex normal or width element, so each vertex carries position and
- * color only and the line width is the global vanilla default.
+ * The rim primitive on this pre-blaze3d band: an explicit four-edge draw of the selected face as GL lines,
+ * camera-relative. The edges are written straight to the shared line buffer the cull begins on the POSITION_COLOR
+ * format, so a vertex carries position and color only; there is no pose to transform by, because the ambient model-view
+ * already holds the camera orientation and the draw subtracts the camera position to reach that view space. The
+ * rectangle's two in-plane axes span the block cell and its normal axis planes onto the model shape, lifted a small
+ * standoff along the face normal, so the rim frames a recessed model (a chest) at block extent yet never z-fights a
+ * flush one. We draw the edges explicitly rather than feed a flat {@code VoxelShape} to a shape renderer, which risks
+ * degenerate zero-length edges. The line width is the global GL state the cull sets, not a per-vertex element.
  */
 public final class RimRendererImpl implements RimRenderer {
     // A small outward lift of the drawn face along its normal, so the rim clears the model surface it planes
     // onto and does not z-fight it. Raise it if a rim shimmers on a band.
     private static final double SURFACE_STANDOFF = 0.02;
 
-    // The transformed position, reused so the per-vertex write does not allocate on the render path: vertex(Pose, ...)
-    // news a Vector4f per call, the dominant outline allocation under a dense base, and the per-frame path must stay
-    // allocation-free. We transform into this field and write with the no-pose overload. Render thread only.
-    private final Vector4f position = new Vector4f();
-
     @Override
     public void drawRim(OutlineRenderContext context, AABB cellBox, AABB shapeBox, RimFace face, int colorArgb) {
         if (face == RimFace.NONE) {
             return;
         }
-        VertexConsumer lines = context.consumers().getBuffer(RenderType.lines());
-        PoseStack.Pose pose = context.pose().last();
-        float width = context.lineWidth();
+        BufferBuilder lines = context.lines();
         Vec3 camera = context.cameraPos();
         // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, lifted
         // outward by the standoff, so a recessed model is framed while a flush one is drawn on its own surface.
@@ -53,32 +44,32 @@ public final class RimRendererImpl implements RimRenderer {
         switch (face) {
             case TOP: {
                 float y = (float) (shapeBox.maxY + SURFACE_STANDOFF - camera.y);
-                quad(lines, pose, width, colorArgb, minX, y, minZ, maxX, y, minZ, maxX, y, maxZ, minX, y, maxZ);
+                quad(lines, colorArgb, minX, y, minZ, maxX, y, minZ, maxX, y, maxZ, minX, y, maxZ);
                 break;
             }
             case BOTTOM: {
                 float y = (float) (shapeBox.minY - SURFACE_STANDOFF - camera.y);
-                quad(lines, pose, width, colorArgb, minX, y, minZ, maxX, y, minZ, maxX, y, maxZ, minX, y, maxZ);
+                quad(lines, colorArgb, minX, y, minZ, maxX, y, minZ, maxX, y, maxZ, minX, y, maxZ);
                 break;
             }
             case NORTH: {
                 float z = (float) (shapeBox.minZ - SURFACE_STANDOFF - camera.z);
-                quad(lines, pose, width, colorArgb, minX, minY, z, maxX, minY, z, maxX, maxY, z, minX, maxY, z);
+                quad(lines, colorArgb, minX, minY, z, maxX, minY, z, maxX, maxY, z, minX, maxY, z);
                 break;
             }
             case SOUTH: {
                 float z = (float) (shapeBox.maxZ + SURFACE_STANDOFF - camera.z);
-                quad(lines, pose, width, colorArgb, minX, minY, z, maxX, minY, z, maxX, maxY, z, minX, maxY, z);
+                quad(lines, colorArgb, minX, minY, z, maxX, minY, z, maxX, maxY, z, minX, maxY, z);
                 break;
             }
             case WEST: {
                 float x = (float) (shapeBox.minX - SURFACE_STANDOFF - camera.x);
-                quad(lines, pose, width, colorArgb, x, minY, minZ, x, minY, maxZ, x, maxY, maxZ, x, maxY, minZ);
+                quad(lines, colorArgb, x, minY, minZ, x, minY, maxZ, x, maxY, maxZ, x, maxY, minZ);
                 break;
             }
             case EAST: {
                 float x = (float) (shapeBox.maxX + SURFACE_STANDOFF - camera.x);
-                quad(lines, pose, width, colorArgb, x, minY, minZ, x, minY, maxZ, x, maxY, maxZ, x, maxY, minZ);
+                quad(lines, colorArgb, x, minY, minZ, x, minY, maxZ, x, maxY, maxZ, x, maxY, minZ);
                 break;
             }
             default:
@@ -86,25 +77,21 @@ public final class RimRendererImpl implements RimRenderer {
         }
     }
 
-    private void quad(VertexConsumer lines, PoseStack.Pose pose, float width, int colorArgb, float ax, float ay,
-            float az, float bx, float by, float bz, float cx, float cy, float cz, float dx, float dy, float dz) {
-        edge(lines, pose, width, colorArgb, ax, ay, az, bx, by, bz);
-        edge(lines, pose, width, colorArgb, bx, by, bz, cx, cy, cz);
-        edge(lines, pose, width, colorArgb, cx, cy, cz, dx, dy, dz);
-        edge(lines, pose, width, colorArgb, dx, dy, dz, ax, ay, az);
+    private void quad(BufferBuilder lines, int colorArgb, float ax, float ay, float az, float bx, float by, float bz,
+            float cx, float cy, float cz, float dx, float dy, float dz) {
+        edge(lines, colorArgb, ax, ay, az, bx, by, bz);
+        edge(lines, colorArgb, bx, by, bz, cx, cy, cz);
+        edge(lines, colorArgb, cx, cy, cz, dx, dy, dz);
+        edge(lines, colorArgb, dx, dy, dz, ax, ay, az);
     }
 
-    private void edge(VertexConsumer lines, PoseStack.Pose pose, float width, int colorArgb, float x1, float y1,
-            float z1, float x2, float y2, float z2) {
-        vertex(lines, pose, width, x1, y1, z1, colorArgb);
-        vertex(lines, pose, width, x2, y2, z2, colorArgb);
+    private void edge(BufferBuilder lines, int colorArgb, float x1, float y1, float z1, float x2, float y2, float z2) {
+        vertex(lines, x1, y1, z1, colorArgb);
+        vertex(lines, x2, y2, z2, colorArgb);
     }
 
-    private void vertex(VertexConsumer lines, PoseStack.Pose pose, float width, float x, float y, float z,
-            int colorArgb) {
-        position.set(x, y, z, 1.0F);
-        position.transform(pose.pose());
-        lines.vertex(position.x(), position.y(), position.z())
+    private void vertex(BufferBuilder lines, float x, float y, float z, int colorArgb) {
+        lines.vertex(x, y, z)
                 .color((colorArgb >> 16) & 0xFF, (colorArgb >> 8) & 0xFF, colorArgb & 0xFF, (colorArgb >>> 24) & 0xFF)
                 .endVertex();
     }

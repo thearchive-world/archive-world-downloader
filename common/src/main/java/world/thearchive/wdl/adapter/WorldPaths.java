@@ -5,12 +5,11 @@ package world.thearchive.wdl.adapter;
 
 import java.nio.file.Path;
 import java.util.Map;
-import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 
 /**
  * Per-band save-layout axis: maps a dimension to its on-disk {@code region/} directory and opens the vanilla region
- * storage rooted at it. At 1.15.2 the dimension key is the {@link DimensionType} itself, and entities live inside the
+ * storage rooted at it. At 1.14.4 the dimension key is the {@link DimensionType} itself, and entities live inside the
  * {@code region/} chunk, so there is no separate {@code entities/} region to map or open (that is 1.17 and above).
  *
  * <p>The per-band implementation pre-creates the {@code region/} directory before any region write.
@@ -18,7 +17,7 @@ import net.minecraft.world.level.dimension.DimensionType;
 public interface WorldPaths {
     Path regionDirectory(DimensionType dimension);
 
-    IOWorker openRegionStorage(DimensionType dimension);
+    WdlRegionStorage openRegionStorage(DimensionType dimension);
 
     /**
      * The global {@code data/} directory (the SavedData surface: the map files and the map-id index), which lives under

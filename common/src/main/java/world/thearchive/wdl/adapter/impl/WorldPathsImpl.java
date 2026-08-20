@@ -3,10 +3,8 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Constructor;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -16,19 +14,17 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
-import net.minecraft.world.level.chunk.storage.IOWorker;
-import net.minecraft.world.level.chunk.storage.RegionFileStorage;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import world.thearchive.wdl.adapter.WdlRegionStorage;
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * 1.15.2 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
- * pre-creates {@code region/} so the region writer never sees a missing directory (vanilla {@code RegionFile} throws
- * otherwise). There is no {@code entities/} region at this band: entities live inside the {@code region/} chunk under
- * {@code Level.Entities}.
+ * 1.14.4 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
+ * pre-creates {@code region/} before the region writer opens it. There is no {@code entities/} region at this band:
+ * entities live inside the {@code region/} chunk under {@code Level.Entities}.
  */
 public final class WorldPathsImpl implements WorldPaths {
     private static final Logger LOGGER = LogManager.getLogger(WorldPathsImpl.class);
@@ -45,23 +41,8 @@ public final class WorldPathsImpl implements WorldPaths {
     }
 
     @Override
-    public IOWorker openRegionStorage(DimensionType dimension) {
-        // The 1.15.2 IOWorker and RegionFileStorage constructors are package-private, and this shared module has no
-        // access widener or transformer (those are per-loader), so the storage is opened reflectively. A same-package
-        // shim compiles here but throws IllegalAccessError once the loader remaps the vanilla classes into a different
-        // runtime package; reflection with setAccessible is package-independent and is paid once per dimension.
-        File directory = regionDirectory(dimension).toFile();
-        try {
-            Constructor<RegionFileStorage> storageConstructor = RegionFileStorage.class
-                    .getDeclaredConstructor(File.class);
-            storageConstructor.setAccessible(true);
-            Constructor<IOWorker> workerConstructor = IOWorker.class
-                    .getDeclaredConstructor(RegionFileStorage.class, String.class);
-            workerConstructor.setAccessible(true);
-            return workerConstructor.newInstance(storageConstructor.newInstance(directory), "chunk");
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("failed to open region storage at " + directory, e);
-        }
+    public WdlRegionStorage openRegionStorage(DimensionType dimension) {
+        return new WdlRegionStorage(regionDirectory(dimension).toFile());
     }
 
     @Override

@@ -3,19 +3,21 @@
 
 package world.thearchive.wdl.client;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.culling.Culler;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.phys.AABB;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
+import org.lwjgl.opengl.GL11;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.OutlineDrawSet;
@@ -37,8 +39,10 @@ import world.thearchive.wdl.core.TimingWindow;
  *
  * <p>The renderer reads no MC world state: each rim's exposed face is computed and stamped on the client tick by
  * {@link OutlineTracker}, since the neighbors it seals against change only on the tick, so the per-frame path is a pure
- * section frustum cull plus the delegated draw. Its only per-frame allocation is one section box per visible section
- * for the frustum test. Runs on the render thread, the vanilla client thread.
+ * section frustum cull plus the delegated draw. On this pre-blaze3d band the cull owns the line pass itself: it sets
+ * the GL line state, begins the shared Tesselator buffer on the POSITION_COLOR line format, lets each rim write its
+ * edges camera-relative into that buffer, then flushes and restores state in a finally so a throwing rim never leaves
+ * the buffer building or the state dirty. Runs on the render thread, the vanilla client thread.
  */
 public final class WdlOutlineRenderer {
     private static final Logger LOGGER = LogManager.getLogger(WdlOutlineRenderer.class);
@@ -63,24 +67,29 @@ public final class WdlOutlineRenderer {
             long startNanos = debugTiming ? System.nanoTime() : 0L;
             int rimsDrawn = 0;
             int sectionsVisible = 0;
-            Frustum frustum = context.frustum();
-            ObjectIterator<Long2ObjectMap.Entry<List<OutlineRim>>> entries = Long2ObjectMaps.fastIterator(sections);
-            while (entries.hasNext()) {
-                Long2ObjectMap.Entry<List<OutlineRim>> entry = entries.next();
-                // A null frustum is a band whose loader render event exposes none (26.x fabric-api): draw every
-                // section and let the GPU clip, rather than skip the off-screen build.
-                if (frustum != null && !frustum.isVisible(sectionBox(entry.getLongKey()))) {
-                    continue;
-                }
-                sectionsVisible++;
-                for (OutlineRim rim : entry.getValue()) {
-                    RimFace face = rim.face();
-                    if (face != RimFace.NONE) {
-                        rimRenderer.drawRim(context, rim.cellBox(), rim.box(), face,
-                                BrandColors.opaque(rim.hue().rgb()));
-                        rimsDrawn++;
+            Culler frustum = context.frustum();
+            setupLineState(context.lineWidth());
+            context.lines().begin(GL11.GL_LINES, DefaultVertexFormat.POSITION_COLOR);
+            try {
+                ObjectIterator<Long2ObjectMap.Entry<List<OutlineRim>>> entries = Long2ObjectMaps.fastIterator(sections);
+                while (entries.hasNext()) {
+                    Long2ObjectMap.Entry<List<OutlineRim>> entry = entries.next();
+                    if (frustum != null && !frustum.isVisible(sectionBox(entry.getLongKey()))) {
+                        continue;
+                    }
+                    sectionsVisible++;
+                    for (OutlineRim rim : entry.getValue()) {
+                        RimFace face = rim.face();
+                        if (face != RimFace.NONE) {
+                            rimRenderer.drawRim(context, rim.cellBox(), rim.box(), face,
+                                    BrandColors.opaque(rim.hue().rgb()));
+                            rimsDrawn++;
+                        }
                     }
                 }
+            } finally {
+                Tesselator.getInstance().end();
+                restoreLineState();
             }
             if (debugTiming) {
                 recordRenderTiming(System.nanoTime() - startNanos, rimsDrawn, sectionsVisible, sections.size());
@@ -95,18 +104,36 @@ public final class WdlOutlineRenderer {
     }
 
     /**
-     * Build the per-frame render context from the loader's pose, buffers, and frustum, resolving the effective rim line
-     * width from the config scale and the band's appropriate width, then cull and draw the live set. A null frustum (a
-     * band whose loader render event no longer exposes one) draws every section, the GPU clipping off-screen.
+     * Build the per-frame render context from the loader's frustum and the shared line buffer, resolving the effective
+     * rim line width from the config scale, then cull and draw the live set. A null frustum (a loader whose render
+     * event exposes none) draws every section, the GPU clipping off-screen.
      */
-    public static void render(PoseStack pose, MultiBufferSource consumers, @Nullable Frustum frustum,
-            RimRenderer rimRenderer) {
-        // getAppropriateLineWidth and per-vertex line width do not exist below 1.21.5, so the line-width scale is a
-        // no-op at this band: lines draw at the fixed GL width regardless of the shipped knob.
-        float lineWidth = (float) Wdl.config().outline().lineWidthScale();
-        OutlineRenderContext context = new OutlineRenderContext(pose, consumers, frustum,
+    public static void render(@Nullable Culler frustum, RimRenderer rimRenderer) {
+        // The vanilla block-selection line width (LevelRenderer.renderHitOutline), which the config scale multiplies
+        // per its documented contract; the legacy GL line width is settable on this pre-blaze3d band.
+        float base = Math.max(2.5F, Minecraft.getInstance().window.getWidth() / 1920.0F * 2.5F);
+        float lineWidth = (float) (Wdl.config().outline().lineWidthScale() * base);
+        OutlineRenderContext context = new OutlineRenderContext(Tesselator.getInstance().getBuilder(), frustum,
                 Minecraft.getInstance().gameRenderer.getMainCamera().getPosition(), lineWidth);
         render(context, Wdl.outlineDrawSet(), rimRenderer);
+    }
+
+    // Mirrors LevelRenderer.renderHitOutline, minus its projection-scale trick: the rim's surface standoff is the
+    // z-fight guard instead. The depth test is left on so a rim is occluded by nearer terrain.
+    private static void setupLineState(float lineWidth) {
+        GlStateManager.enableBlend();
+        GlStateManager.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA,
+                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE,
+                GlStateManager.DestFactor.ZERO);
+        GlStateManager.lineWidth(lineWidth);
+        GlStateManager.disableTexture();
+        GlStateManager.depthMask(false);
+    }
+
+    private static void restoreLineState() {
+        GlStateManager.depthMask(true);
+        GlStateManager.enableTexture();
+        GlStateManager.disableBlend();
     }
 
     /** Roll the per-frame render-thread cost into a windowed log line. */

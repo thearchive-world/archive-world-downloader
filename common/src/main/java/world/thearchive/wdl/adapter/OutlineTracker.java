@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.multiplayer.ClientChunkCache;
-import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.MultiPlayerLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
@@ -98,7 +98,7 @@ public final class OutlineTracker {
 
     private final OutlineDrawSet drawSet = new OutlineDrawSet();
     private final Long2ObjectMap<ChunkContainers> chunkCache = new Long2ObjectOpenHashMap<>();
-    private @Nullable ClientLevel lastLevel;
+    private @Nullable MultiPlayerLevel lastLevel;
     private long tickCounter;
     private final TimingWindow tickTiming = new TimingWindow(TIMING_WINDOW_TICKS);
     private boolean errorLogged;
@@ -162,7 +162,7 @@ public final class OutlineTracker {
      * drawn at all comes from {@code toggles}, which the caller has already reconciled against what the running
      * download latched, so no rim is drawn for an axis this download is not capturing.
      */
-    public void tick(ClientLevel level, Vec3 cameraPos, OutlineConfig config, CaptureToggles toggles,
+    public void tick(MultiPlayerLevel level, Vec3 cameraPos, OutlineConfig config, CaptureToggles toggles,
             CapturedContainers captured, RecoveredCoverage recovered) {
         try {
             if (!toggles.renderUnsavedOutline()) {
@@ -200,7 +200,7 @@ public final class OutlineTracker {
         }
     }
 
-    private void buildBlockContainers(ClientLevel level, Vec3 cameraPos, double clamp, OutlineConfig config,
+    private void buildBlockContainers(MultiPlayerLevel level, Vec3 cameraPos, double clamp, OutlineConfig config,
             CaptureToggles toggles, CapturedContainers captured, RecoveredCoverage recovered) {
         int chunkRadius = Mth.ceil(clamp / 16.0);
         int cameraChunkX = SectionPos.blockToSectionCoord(Mth.floor(cameraPos.x));
@@ -244,7 +244,7 @@ public final class OutlineTracker {
         }
     }
 
-    private void rescan(ClientLevel level, ClientChunkCache chunkSource, int cx, int cz, long key,
+    private void rescan(MultiPlayerLevel level, ClientChunkCache chunkSource, int cx, int cz, long key,
             OutlineConfig config, ChunkContainers entry) {
         entry.containers.clear();
         LevelChunk chunk = chunkSource.getChunk(cx, cz, ChunkStatus.FULL, false);
@@ -263,7 +263,7 @@ public final class OutlineTracker {
         }
     }
 
-    private void cacheContainer(ClientLevel level, BlockPos pos, BlockEntity blockEntity, OutlineConfig config,
+    private void cacheContainer(MultiPlayerLevel level, BlockPos pos, BlockEntity blockEntity, OutlineConfig config,
             ChunkContainers entry) {
         long[] cells;
         AABB box;
@@ -324,7 +324,7 @@ public final class OutlineTracker {
         return Registry.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString();
     }
 
-    private void emit(ClientLevel level, ChunkContainers entry, Vec3 cameraPos, double clamp, OutlineConfig config,
+    private void emit(MultiPlayerLevel level, ChunkContainers entry, Vec3 cameraPos, double clamp, OutlineConfig config,
             CaptureToggles toggles, CapturedContainers captured, RecoveredCoverage recovered) {
         for (int i = 0; i < entry.containers.size(); i++) {
             CachedContainer container = entry.containers.get(i);
@@ -351,7 +351,7 @@ public final class OutlineTracker {
         }
     }
 
-    private void enumerateEntityContainers(ClientLevel level, Vec3 cameraPos, double clamp, OutlineConfig config,
+    private void enumerateEntityContainers(MultiPlayerLevel level, Vec3 cameraPos, double clamp, OutlineConfig config,
             CapturedContainers captured, RecoveredCoverage recovered) {
         AABB clampBox = new AABB(cameraPos.x - clamp, cameraPos.y - clamp, cameraPos.z - clamp, cameraPos.x + clamp,
                 cameraPos.y + clamp, cameraPos.z + clamp);
@@ -439,7 +439,7 @@ public final class OutlineTracker {
     }
 
     /** The connected half of a double chest at {@code pos}, or {@code null} if it is single or not loaded. */
-    private static @Nullable BlockPos doubleChestPartner(ClientLevel level, BlockPos pos, BlockState state) {
+    private static @Nullable BlockPos doubleChestPartner(MultiPlayerLevel level, BlockPos pos, BlockState state) {
         if (!state.hasProperty(ChestBlock.TYPE) || state.getValue(ChestBlock.TYPE) == ChestType.SINGLE) {
             return null;
         }
@@ -448,7 +448,7 @@ public final class OutlineTracker {
     }
 
     /** The container's shape bounds in world coordinates, or its full cell when the shape is empty. */
-    private static AABB boxOf(ClientLevel level, BlockPos pos) {
+    private static AABB boxOf(MultiPlayerLevel level, BlockPos pos) {
         VoxelShape shape = level.getBlockState(pos).getShape(level, pos);
         AABB local = shape.isEmpty() ? new AABB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0) : shape.bounds();
         return local.move(pos);
@@ -459,7 +459,7 @@ public final class OutlineTracker {
      * the preference order. Computed on the tick so the render reads a stamped face rather than probing the world each
      * frame; the neighbors it seals against change only on the tick.
      */
-    private static RimFace faceOf(ClientLevel level, long[] cells) {
+    private static RimFace faceOf(MultiPlayerLevel level, long[] cells) {
         // The open-top chest is the overwhelming case, so settle it on one neighbor read; only a sealed top
         // pays for the rest of the order, which RimFace.selectExposed decides.
         if (!isSealed(level, cells, Direction.UP)) {
@@ -479,7 +479,7 @@ public final class OutlineTracker {
     // the cells is interior to the merged box, not an exterior face, and is skipped, without which a double
     // chest's two end faces always read open, since each end cell's inward neighbor is the other half. Only a
     // multi-cell box has such a neighbor, so a single container skips that test.
-    private static boolean isSealed(ClientLevel level, long[] cells, Direction direction) {
+    private static boolean isSealed(MultiPlayerLevel level, long[] cells, Direction direction) {
         for (long cell : cells) {
             int nx = BlockPos.getX(cell) + direction.getStepX();
             int ny = BlockPos.getY(cell) + direction.getStepY();

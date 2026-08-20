@@ -61,8 +61,8 @@ class LecternSinkRoundTripTest {
         tag.putInt("generation", 0);
         tag.putBoolean("resolved", true);
         ListTag pages = new ListTag();
-        pages.add(StringTag.valueOf(Component.Serializer.toJson(new TextComponent("Page one"))));
-        pages.add(StringTag.valueOf(Component.Serializer.toJson(new TextComponent("Page two"))));
+        pages.add(new StringTag(Component.Serializer.toJson(new TextComponent("Page one"))));
+        pages.add(new StringTag(Component.Serializer.toJson(new TextComponent("Page two"))));
         tag.put("pages", pages);
         return book;
     }
@@ -74,8 +74,8 @@ class LecternSinkRoundTripTest {
     private static ItemStack writableBook() {
         ItemStack book = new ItemStack(Items.WRITABLE_BOOK);
         ListTag pages = new ListTag();
-        pages.add(StringTag.valueOf("draft page one"));
-        pages.add(StringTag.valueOf("draft page two"));
+        pages.add(new StringTag("draft page one"));
+        pages.add(new StringTag("draft page two"));
         book.getOrCreateTag().put("pages", pages);
         return book;
     }

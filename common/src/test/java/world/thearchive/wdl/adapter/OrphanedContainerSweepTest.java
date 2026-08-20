@@ -29,8 +29,6 @@ import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.IOWorker;
-import net.minecraft.world.level.chunk.storage.WdlRegionStorage;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -52,27 +50,17 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * ({@link AsyncSaveWriter#submitChunkRewrite} over {@link RegionChunkWriter#rewriteExisting}), reusing the
  * {@link ContainerMerge} fold.
  *
- * <p>These headless tests drive the real writer against a real {@link IOWorker}, the seam the fix lives at: a chunk is
- * flushed to disk carrying an empty container (the flushed-empty orphaned state a backtrack-and-open lands in), then
- * the orphan rewrite folds the captured contents onto the on-disk block entity. The session wiring that identifies the
- * orphaned holders and routes them here ({@code LiveCaptureSession.flushBuffer}'s whole-buffer drain) is not exercised
- * headless, as with the rest of the MC-coupled session.
+ * <p>These headless tests drive the real writer against a real {@link WdlRegionStorage}, the seam the fix lives at: a
+ * chunk is flushed to disk carrying an empty container (the flushed-empty orphaned state a backtrack-and-open lands
+ * in), then the orphan rewrite folds the captured contents onto the on-disk block entity. The session wiring that
+ * identifies the orphaned holders and routes them here ({@code LiveCaptureSession.flushBuffer}'s whole-buffer drain) is
+ * not exercised headless, as with the rest of the MC-coupled session.
  */
 class OrphanedContainerSweepTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
 
-    private static IOWorker storage(Path region) {
-        return new TestRegionStorage(region, false, "chunk");
-    }
-
-    /**
-     * At 1.15.2 IOWorker's constructor is package-private, so the test opens a region worker through the
-     * WdlRegionStorage shim.
-     */
-    private static final class TestRegionStorage extends WdlRegionStorage {
-        private TestRegionStorage(Path directory, boolean sync, String name) {
-            super(directory.toFile(), name);
-        }
+    private static WdlRegionStorage storage(Path region) {
+        return new WdlRegionStorage(region.toFile());
     }
 
     private static AsyncSaveWriter regionWriter(Path region) {
@@ -103,8 +91,8 @@ class OrphanedContainerSweepTest {
     /** Read chunk {@code chunk} back from disk and decode the 27-slot container contents of the block entity there. */
     private NonNullList<ItemStack> itemsOnDisk(Path region, ChunkPos chunk, int x, int y, int z)
             throws IOException {
-        try (IOWorker in = storage(region)) {
-            CompoundTag back = Optional.ofNullable(in.load(chunk))
+        try (WdlRegionStorage in = storage(region)) {
+            CompoundTag back = Optional.ofNullable(in.read(chunk))
                     .orElseThrow(() -> new AssertionError("chunk missing on disk"));
             CompoundTag blockEntity = blockEntityAt(back, x, y, z);
             assertNotNull(blockEntity, "block entity present on disk at " + x + "," + y + "," + z);
@@ -176,8 +164,8 @@ class OrphanedContainerSweepTest {
                 onDisk -> ContainerMerge.mergeLecternChunkStash(sink, onDisk, chunk, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
-        try (IOWorker in = storage(region)) {
-            CompoundTag back = Optional.ofNullable(in.load(chunk))
+        try (WdlRegionStorage in = storage(region)) {
+            CompoundTag back = Optional.ofNullable(in.read(chunk))
                     .orElseThrow(() -> new AssertionError("chunk missing on disk"));
             CompoundTag lectern = blockEntityAt(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
@@ -241,8 +229,8 @@ class OrphanedContainerSweepTest {
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(),
                 "a rewrite for a chunk with no on-disk prior does not fail the save");
 
-        try (IOWorker in = storage(region)) {
-            assertTrue(!Optional.ofNullable(in.load(missing)).isPresent(),
+        try (WdlRegionStorage in = storage(region)) {
+            assertTrue(!Optional.ofNullable(in.read(missing)).isPresent(),
                     "no partial chunk is written when there is no prior");
         }
     }
@@ -250,8 +238,8 @@ class OrphanedContainerSweepTest {
     @Test
     void aSameWriterRewriteReadsItsOwnUnsyncedWriteAndCountsTheMerge(@TempDir Path save) throws Exception {
         // Production reuses one writer per session: the orphaned chunk's original submitChunk and the later
-        // submitChunkRewrite hit the same still-open storage with no synchronize between, so the rewrite's read
-        // must return the earlier write from the region IOWorker's pending writes, not a synced-and-reopened file.
+        // submitChunkRewrite hit the same still-open storage, so the rewrite's read must return the earlier write
+        // back through that same synchronous region storage, not a reopened file.
         // Drive that exact single-writer timing, and assert the merge is counted (the loss it fixes read zero on
         // every counter).
         TestRegistries.bootstrap();

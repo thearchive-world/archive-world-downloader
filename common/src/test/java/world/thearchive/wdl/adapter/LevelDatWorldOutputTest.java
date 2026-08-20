@@ -188,9 +188,9 @@ class LevelDatWorldOutputTest {
 
     @Test
     void aValidOverrideIsWritten() {
-        // doImmediateRespawn is not in the curated set; a valid override of it passes through.
-        GameRules rules = gameRules(build(with("gamerule.doImmediateRespawn", "true")));
+        // doLimitedCrafting is not in the curated set; a valid override of it passes through.
+        GameRules rules = gameRules(build(with("gamerule.doLimitedCrafting", "true")));
 
-        assertTrue(rules.getBoolean(GameRules.RULE_DO_IMMEDIATE_RESPAWN), "an arbitrary valid rule passes through");
+        assertTrue(rules.getBoolean(GameRules.RULE_LIMITED_CRAFTING), "an arbitrary valid rule passes through");
     }
 }

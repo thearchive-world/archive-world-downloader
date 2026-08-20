@@ -30,7 +30,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
-import world.thearchive.wdl.testsupport.BlockEntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
@@ -88,15 +87,6 @@ class InteractionStashMergeTest {
         return shulker;
     }
 
-    /** A placed beehive item carrying occupants in its pre-component {@code BlockEntityTag.Bees}. */
-    private static ItemStack beehiveWithBees(int... ticksInHive) {
-        ItemStack hive = new ItemStack(Items.BEEHIVE);
-        CompoundTag blockEntityTag = new CompoundTag();
-        blockEntityTag.put("Bees", BlockEntityFixtures.bees(ticksInHive));
-        hive.getOrCreateTag().put("BlockEntityTag", blockEntityTag);
-        return hive;
-    }
-
     // A placed or inserted prediction the block-state confirms survives the gate.
 
     @Test
@@ -125,17 +115,6 @@ class InteractionStashMergeTest {
         assertSame(holder, confirmed.get());
     }
 
-    @Test
-    void beehiveWithBlockPresentKeepsTheBeesHolder() {
-        CompoundTag holder = InteractionCapture.captureBees(BlockEntityFixtures.bees(120));
-        InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
-                InteractionCapture.InteractionKind.BEEHIVE, holder);
-
-        Optional<CompoundTag> confirmed = InteractionCapture.confirm(Blocks.BEEHIVE.defaultBlockState(), candidate);
-
-        assertTrue(confirmed.isPresent(), "a beehive present at the pos confirms the placement");
-        assertSame(holder, confirmed.get());
-    }
     // The headline discard: a prediction the synced block-state never confirms is dropped.
 
     @Test
@@ -160,16 +139,6 @@ class InteractionStashMergeTest {
         BlockState noRecord = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
         assertTrue(!InteractionCapture.confirm(noRecord, candidate).isPresent(),
                 "HAS_RECORD false (the disc was ejected or never accepted) discards the disc");
-    }
-
-    @Test
-    void beehiveDiscardedWhenBlockAbsent() {
-        CompoundTag holder = InteractionCapture.captureBees(BlockEntityFixtures.bees(60));
-        InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
-                InteractionCapture.InteractionKind.BEEHIVE, holder);
-
-        assertTrue(!InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isPresent(),
-                "no beehive at the pos discards the predicted occupants");
     }
 
     @Test
@@ -261,17 +230,6 @@ class InteractionStashMergeTest {
     }
 
     @Test
-    void reconcileRoutesConfirmedBeehiveToHolderBundle() {
-        BlockPos pos = new BlockPos(5, -60, 7);
-        InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
-                oneCandidate(pos, new InteractionCapture.HolderCandidate(InteractionCapture.InteractionKind.BEEHIVE,
-                        InteractionCapture.captureBees(BlockEntityFixtures.bees(50)))),
-                SyntheticChunks.withBlockAt(pos, Blocks.BEEHIVE.defaultBlockState()));
-        assertTrue(bundles.holders().containsKey(pos), "a confirmed beehive routes to the holder-merge bundle");
-        assertTrue(bundles.items().isEmpty(), "and not to the Items bundle");
-    }
-
-    @Test
     void reconcileDropsAnUnconfirmedCandidate() {
         BlockPos pos = new BlockPos(5, -60, 7);
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
@@ -352,19 +310,6 @@ class InteractionStashMergeTest {
     }
 
     @Test
-    void placedBeehiveDoesNotNotifyThePlacedContainerSink() {
-        long[] sinkPos = { -1L };
-        InteractionCapture capture = new InteractionCapture(sink, true, chunk -> true,
-                (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> sinkPos[0] = posKey, posKey -> {});
-        BlockPos pos = new BlockPos(3, 70, 5);
-        ItemStack hive = beehiveWithBees(120);
-
-        capture.recordPlaceAt(pos, hive);
-
-        assertEquals(-1L, sinkPos[0], "a placed beehive is not outlined, so it does not mark the captured-set");
-    }
-
-    @Test
     void jukeboxInsertRecognizesPlayableDisc() {
         InteractionCapture capture = plainCapture(sink, true);
         BlockState emptyJukebox = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
@@ -400,24 +345,6 @@ class InteractionStashMergeTest {
 
         assertFalse(recorded, "a disc insert is not recorded when re-capture (the gate's snapshot refresh) is off");
         assertTrue(capture.pendingCandidateChunks().isEmpty(), "no candidate is stashed when re-capture is off");
-    }
-
-    @Test
-    void emptyHiveReplacementDropsStaleBeehivePrediction() {
-        InteractionCapture capture = plainCapture(sink, true);
-        BlockPos pos = new BlockPos(3, 70, 5);
-        ItemStack filled = beehiveWithBees(120);
-
-        capture.recordPlaceAt(pos, filled);
-        assertFalse(capture.pendingCandidateChunks().isEmpty(), "the occupied beehive placement is predicted");
-
-        // The hive is broken and a fresh empty one re-placed at the same cell: an empty hive carries no occupants
-        // to overwrite the stale prediction, and the type-only gate cannot tell them apart, so the stale occupants
-        // must not survive the re-placement.
-        capture.recordPlaceAt(pos, new ItemStack(Items.BEEHIVE));
-
-        assertTrue(capture.pendingCandidateChunks().isEmpty(),
-                "re-placing an empty beehive at the same pos clears the stale prediction");
     }
 
     @Test

@@ -46,9 +46,9 @@ public final class EntityFixtures {
     public static CompoundTag entityAt(String id, UUID uuid, double x, double y, double z) {
         CompoundTag tag = entity(id, uuid);
         ListTag pos = new ListTag();
-        pos.add(DoubleTag.valueOf(x));
-        pos.add(DoubleTag.valueOf(y));
-        pos.add(DoubleTag.valueOf(z));
+        pos.add(new DoubleTag(x));
+        pos.add(new DoubleTag(y));
+        pos.add(new DoubleTag(z));
         tag.put("Pos", pos);
         return tag;
     }
@@ -57,8 +57,8 @@ public final class EntityFixtures {
     public static CompoundTag entityWithShortPos(String id, UUID uuid, double x, double y) {
         CompoundTag tag = entity(id, uuid);
         ListTag pos = new ListTag();
-        pos.add(DoubleTag.valueOf(x));
-        pos.add(DoubleTag.valueOf(y));
+        pos.add(new DoubleTag(x));
+        pos.add(new DoubleTag(y));
         tag.put("Pos", pos);
         return tag;
     }

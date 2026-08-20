@@ -153,9 +153,11 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
             }
         };
         GameRuleResolution resolution = worldOutput.resolveGameRules(curatedByBandId(), schema);
-        // 1.15.2 exposes no public per-value string setter (IntegerValue.deserialize is protected), so the effective
-        // rules are written through the vanilla offline loadFromTag, which sets only the ids present in the tag.
-        CompoundTag ruleTag = new CompoundTag();
+        // There is no public per-value string setter (IntegerValue.deserialize is protected), so effective rules go
+        // through the offline loadFromTag. At this band that resets every rule from the tag: an absent id reads back
+        // from the empty string to false or zero, so the tag is seeded from the level's current defaults before the
+        // effective values are overlaid, leaving non-curated rules at their vanilla defaults.
+        CompoundTag ruleTag = gameRules.createTag();
         for (Map.Entry<String, String> rule : resolution.effective().entrySet()) {
             if (available.containsKey(rule.getKey())) {
                 ruleTag.putString(rule.getKey(), rule.getValue());

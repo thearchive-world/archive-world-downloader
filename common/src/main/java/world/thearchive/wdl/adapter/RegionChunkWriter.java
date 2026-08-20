@@ -7,7 +7,6 @@ import java.io.IOException;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.IOWorker;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -82,7 +81,7 @@ final class RegionChunkWriter {
      * top. Without it a routine terrain re-flush of a revisited chunk, the default {@code EVERYWHERE} recapture mode,
      * would drop every entity a prior fold saved into that chunk.
      */
-    public static MergeWriteResult writeMerging(IOWorker storage, ChunkPos pos,
+    public static MergeWriteResult writeMerging(WdlRegionStorage storage, ChunkPos pos,
             @Nullable CompoundTag tag, ChunkReadMerge merge) {
         if (tag == null) {
             return new MergeWriteResult(MergeOutcome.NOTHING_TO_WRITE, 0);
@@ -90,7 +89,7 @@ final class RegionChunkWriter {
         @Nullable
         CompoundTag onDisk;
         try {
-            onDisk = storage.load(pos);
+            onDisk = storage.read(pos);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("preserving chunk {}: on-disk read failed", pos, e);
             return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
@@ -109,8 +108,8 @@ final class RegionChunkWriter {
             preserveEntities(onDisk, tag);
         }
         try {
-            storage.store(pos, tag).join();
-        } catch (RuntimeException e) {
+            storage.write(pos, tag);
+        } catch (IOException | RuntimeException e) {
             LOGGER.warn("skipping chunk {}: write failed", pos, e);
             return new MergeWriteResult(MergeOutcome.FAILED, 0);
         }
@@ -142,10 +141,10 @@ final class RegionChunkWriter {
      * on-disk prior to fold into (the contents are logged as lost rather than synthesized onto a terrainless chunk) or
      * a read, fold, or write failure isolates the chunk per the per-chunk discipline, never aborting the drain.
      */
-    public static int rewriteExisting(IOWorker storage, ChunkPos pos, ChunkRewrite rewrite) {
+    public static int rewriteExisting(WdlRegionStorage storage, ChunkPos pos, ChunkRewrite rewrite) {
         CompoundTag onDisk;
         try {
-            onDisk = storage.load(pos);
+            onDisk = storage.read(pos);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("orphaned-content merge for chunk {}: on-disk read failed; its captured contents are lost",
                     pos, e);
@@ -163,8 +162,8 @@ final class RegionChunkWriter {
             return 0;
         }
         try {
-            storage.store(pos, onDisk).join();
-        } catch (RuntimeException e) {
+            storage.write(pos, onDisk);
+        } catch (IOException | RuntimeException e) {
             LOGGER.warn("orphaned-content merge for chunk {}: write-back failed", pos, e);
             return 0;
         }
@@ -173,20 +172,20 @@ final class RegionChunkWriter {
 
     /**
      * Fold this session's captured entities into {@code pos}'s already-written {@code region/} chunk under
-     * {@code Level.Entities} (the 1.16.5 in-chunk entity location), unioning {@code freshEnvelope}'s entities into what
-     * the chunk already holds through the shared {@link EntityMerge#merge}, then writing the chunk back. The host chunk
-     * carries the terrain, so a missing host is a lost fold, never a terrainless chunk: with no on-disk prior the
+     * {@code Level.Entities} (the pre-1.17 in-chunk entity location), unioning {@code freshEnvelope}'s entities into
+     * what the chunk already holds through the shared {@link EntityMerge#merge}, then writing the chunk back. The host
+     * chunk carries the terrain, so a missing host is a lost fold, never a terrainless chunk: with no on-disk prior the
      * captured entities are {@link MergeOutcome#FAILED}, logged and counted, rather than synthesized onto a chunk with
      * no {@code Sections}. Returns {@link MergeOutcome#WRITTEN_RECAPTURED} with the union count when the host already
      * held entities and {@link MergeOutcome#WRITTEN_NEW} otherwise, so the writer's entity tally reads as it did
      * against the standalone {@code entities/} store; a read, fold, or write failure isolates the chunk per the
      * per-chunk discipline, never aborting the drain.
      */
-    public static MergeWriteResult foldEntitiesIntoRegion(IOWorker regionStorage, ChunkPos pos,
+    public static MergeWriteResult foldEntitiesIntoRegion(WdlRegionStorage regionStorage, ChunkPos pos,
             CompoundTag freshEnvelope) {
         CompoundTag onDisk;
         try {
-            onDisk = regionStorage.load(pos);
+            onDisk = regionStorage.read(pos);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("preserving chunk {}: on-disk read failed before the entity fold", pos, e);
             return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
@@ -219,8 +218,8 @@ final class RegionChunkWriter {
             level.put("Entities", freshEnvelope.get("Entities"));
         }
         try {
-            regionStorage.store(pos, onDisk).join();
-        } catch (RuntimeException e) {
+            regionStorage.write(pos, onDisk);
+        } catch (IOException | RuntimeException e) {
             LOGGER.warn("skipping chunk {}: entity write-back failed", pos, e);
             return new MergeWriteResult(MergeOutcome.FAILED, 0);
         }

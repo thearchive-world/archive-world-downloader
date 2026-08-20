@@ -79,7 +79,7 @@ final class EntityMerge {
                     // keys, would change that.
                     boolean carried = NbtMerge.carryList(diskNode, node.getValue(), "Items");
                     carried |= NbtMerge.carryCompound(diskNode, node.getValue(), "Offers", null);
-                    carried |= NbtMerge.carryValue(diskNode, node.getValue(), "Xp", IntTag.valueOf(0));
+                    carried |= NbtMerge.carryValue(diskNode, node.getValue(), "Xp", new IntTag(0));
                     if (carried) {
                         merged++;
                     }

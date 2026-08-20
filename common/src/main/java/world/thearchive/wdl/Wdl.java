@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.MultiPlayerLevel;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.server.IntegratedServer;
@@ -397,7 +397,7 @@ public final class Wdl {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        ClientLevel level = minecraft.level;
+        MultiPlayerLevel level = minecraft.level;
         if (level == null) {
             return; // no live start path reaches here without a loaded world; a silent guard before level is used
         }
@@ -766,7 +766,7 @@ public final class Wdl {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        ClientLevel level = minecraft.level;
+        MultiPlayerLevel level = minecraft.level;
         LocalPlayer player = minecraft.player;
         if (level == null || player == null) {
             outlineTracker.clear();

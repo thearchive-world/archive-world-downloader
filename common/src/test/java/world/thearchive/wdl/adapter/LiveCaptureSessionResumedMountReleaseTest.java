@@ -26,7 +26,6 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelStorage;
 import net.minecraft.world.level.storage.LevelStorageSource;
@@ -450,10 +449,10 @@ class LiveCaptureSessionResumedMountReleaseTest {
      * Seed a host region chunk at {@code pos} in {@code dimension} (the chunk a prior download had already written).
      */
     private static void seedHost(WorldPaths paths, DimensionType dimension, ChunkPos pos) throws Exception {
-        try (IOWorker region = paths.openRegionStorage(dimension)) {
+        try (WdlRegionStorage region = paths.openRegionStorage(dimension)) {
             CompoundTag host = new CompoundTag();
             host.put("Level", new CompoundTag());
-            region.store(pos, host).join();
+            region.write(pos, host);
         }
     }
 
@@ -463,8 +462,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
      */
     private static @Nullable CompoundTag entityChunk(WorldPaths paths, DimensionType dimension, ChunkPos pos)
             throws Exception {
-        try (IOWorker storage = paths.openRegionStorage(dimension)) {
-            Optional<CompoundTag> read = Optional.ofNullable(storage.load(pos));
+        try (WdlRegionStorage storage = paths.openRegionStorage(dimension)) {
+            Optional<CompoundTag> read = Optional.ofNullable(storage.read(pos));
             return read.orElse(null);
         }
     }

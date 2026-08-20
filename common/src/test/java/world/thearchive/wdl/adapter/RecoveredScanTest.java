@@ -242,8 +242,10 @@ class RecoveredScanTest {
         return blockEntity;
     }
 
+    // No vanilla beehive exists at this band, but RecoveredScan still reads the field-based "Bees" occupant list
+    // (CapturedBlockField.BEES) for foreign or modded block entities, so a fieldless bell stands in as the carrier.
     private static CompoundTag emptyBeehive(int x, int y, int z) {
-        return blockEntity("minecraft:beehive", x, y, z);
+        return blockEntity("minecraft:bell", x, y, z);
     }
 
     private static CompoundTag chunkWith(CompoundTag... blockEntities) {

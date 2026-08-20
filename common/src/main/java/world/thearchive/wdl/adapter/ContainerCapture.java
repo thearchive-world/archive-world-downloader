@@ -6,7 +6,7 @@ package world.thearchive.wdl.adapter;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.MultiPlayerLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
@@ -206,7 +206,7 @@ final class ContainerCapture {
     }
 
     /** Whether the open target is a block whose block entity is an ender chest (the ender discriminator). */
-    boolean isEnderChestAt(ClientLevel level, @Nullable BlockPos target) {
+    boolean isEnderChestAt(MultiPlayerLevel level, @Nullable BlockPos target) {
         return target != null && level.getBlockEntity(target) instanceof EnderChestBlockEntity;
     }
 
@@ -218,13 +218,13 @@ final class ContainerCapture {
      * it) so that a 27-slot menu falls through to the single-block container bind instead. The helper checks the menu
      * type itself, so the dispatch needs no second {@code instanceof}.
      */
-    boolean isDoubleChestOpen(ClientLevel level, AbstractContainerMenu menu, @Nullable BlockPos target) {
+    boolean isDoubleChestOpen(MultiPlayerLevel level, AbstractContainerMenu menu, @Nullable BlockPos target) {
         return menu instanceof ChestMenu && ((ChestMenu) menu).getRowCount() == 6
                 && isDoubleChestHalfAt(level, target);
     }
 
     /** Whether the open target is a block that is one half of a double chest (the double discriminator). */
-    private boolean isDoubleChestHalfAt(ClientLevel level, @Nullable BlockPos target) {
+    private boolean isDoubleChestHalfAt(MultiPlayerLevel level, @Nullable BlockPos target) {
         if (target == null) {
             return false;
         }

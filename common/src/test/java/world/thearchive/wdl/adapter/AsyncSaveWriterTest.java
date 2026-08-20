@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,8 +35,6 @@ import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.IOWorker;
-import net.minecraft.world.level.chunk.storage.WdlRegionStorage;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,24 +49,22 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The off-main-thread save writer drained against a real {@link IOWorker}: chunk encode-and-fold thunks submitted from
- * the (test) main thread are resolved on the writer's own thread, the finalizer (the level.dat stand-in) runs there
- * too, and the completion future reports the per-target tallies. This is the headless half of the no-render-freeze
- * contract; the live freeze itself is not exercised headless.
+ * The off-main-thread save writer drained against a real {@link WdlRegionStorage}: chunk encode-and-fold thunks
+ * submitted from the (test) main thread are resolved on the writer's own thread, the finalizer (the level.dat stand-in)
+ * runs there too, and the completion future reports the per-target tallies. This is the headless half of the
+ * no-render-freeze contract; the live freeze itself is not exercised headless.
  */
 class AsyncSaveWriterTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
 
-    private static IOWorker storage(Path directory, String type) {
+    private static WdlRegionStorage storage(Path directory, String type) {
         return new TestRegionStorage(directory, false, type);
     }
 
-    /**
-     * {@code IOWorker}'s constructor is protected and cross-package, so a test-local subclass is how a test reaches it.
-     */
+    /** The fault-injection base for the write and read failure tests below; a plain region store otherwise. */
     private static class TestRegionStorage extends WdlRegionStorage {
         private TestRegionStorage(Path directory, boolean sync, String name) {
-            super(directory.toFile(), name);
+            super(directory.toFile());
         }
     }
 
@@ -80,8 +75,8 @@ class AsyncSaveWriterTest {
     private static void seedHostChunk(Path region, ChunkPos pos) throws IOException {
         CompoundTag host = new CompoundTag();
         host.put("Level", new CompoundTag());
-        try (IOWorker in = storage(region, "chunk")) {
-            in.store(pos, host).join();
+        try (WdlRegionStorage in = storage(region, "chunk")) {
+            in.write(pos, host);
         }
     }
 
@@ -110,9 +105,9 @@ class AsyncSaveWriterTest {
         assertEquals(0, result.entityChunksWritten());
         assertTrue(finalized.get(), "the finalizer (level.dat) ran on the writer thread after the drain");
 
-        try (IOWorker in = storage(region, "chunk")) {
-            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(), "submitted chunk reached disk");
-            assertTrue(Optional.ofNullable(in.load(new ChunkPos(31, 31))).isPresent(), "submitted chunk reached disk");
+        try (WdlRegionStorage in = storage(region, "chunk")) {
+            assertTrue(Optional.ofNullable(in.read(new ChunkPos(0, 0))).isPresent(), "submitted chunk reached disk");
+            assertTrue(Optional.ofNullable(in.read(new ChunkPos(31, 31))).isPresent(), "submitted chunk reached disk");
         }
     }
 
@@ -166,8 +161,8 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.chunksWritten(), "and the dimension that did open still wrote its own chunk");
         assertEquals(2, netherOpens.get(),
                 "the open is retried per chunk rather than written off, since the failure can be of the moment");
-        try (IOWorker in = storage(region, "chunk")) {
-            assertTrue(Optional.ofNullable(in.load(new ChunkPos(2, 2))).isPresent(),
+        try (WdlRegionStorage in = storage(region, "chunk")) {
+            assertTrue(Optional.ofNullable(in.read(new ChunkPos(2, 2))).isPresent(),
                     "the openable dimension's chunk reached disk past the failure");
         }
     }
@@ -376,8 +371,8 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.chunksWritten(), "the terrain chunk went to region/");
         assertEquals(1, result.entityChunksWritten(), "the entity folded into its region/ chunk, tallied apart");
 
-        try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag chunk = Optional.ofNullable(in.load(new ChunkPos(2, 2))).get();
+        try (WdlRegionStorage in = storage(region, "chunk")) {
+            CompoundTag chunk = Optional.ofNullable(in.read(new ChunkPos(2, 2))).get();
             assertFalse(chunk.getCompound("Level").getList("Entities", 10).isEmpty(),
                     "the entity landed inside the region/ chunk's Level.Entities");
         }
@@ -406,12 +401,12 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         assertEquals(2, result.chunksWritten(), "both dimensions' same-position chunks were written");
-        try (IOWorker in = storage(overworldRegion, "chunk")) {
-            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(),
+        try (WdlRegionStorage in = storage(overworldRegion, "chunk")) {
+            assertTrue(Optional.ofNullable(in.read(new ChunkPos(0, 0))).isPresent(),
                     "the overworld chunk reached region/");
         }
-        try (IOWorker in = storage(netherRegion, "chunk")) {
-            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(),
+        try (WdlRegionStorage in = storage(netherRegion, "chunk")) {
+            assertTrue(Optional.ofNullable(in.read(new ChunkPos(0, 0))).isPresent(),
                     "the nether chunk reached DIM-1/region/");
         }
     }
@@ -447,11 +442,11 @@ class AsyncSaveWriterTest {
                 "the chunk encode must be deferred to the writer thread, not run at submit on the caller's");
         CompoundTag offThreadOnDisk;
         CompoundTag onThreadOnDisk;
-        try (IOWorker in = storage(overworldRegion, "chunk")) {
-            offThreadOnDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
+        try (WdlRegionStorage in = storage(overworldRegion, "chunk")) {
+            offThreadOnDisk = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
         }
-        try (IOWorker in = storage(netherRegion, "chunk")) {
-            onThreadOnDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
+        try (WdlRegionStorage in = storage(netherRegion, "chunk")) {
+            onThreadOnDisk = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
         }
         assertEquals(onThreadOnDisk, offThreadOnDisk,
                 "the writer-thread encode is byte-identical to the main-thread encode");
@@ -484,9 +479,9 @@ class AsyncSaveWriterTest {
                 "a soft chunk loss with no hard error is a partial finish; the aggregate must not read it as clean");
         assertTrue(finalized.get(), "finish() still completed past the isolated failure");
 
-        try (IOWorker in = storage(region, "chunk")) {
-            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(), "the good chunk landed");
-            assertFalse(Optional.ofNullable(in.load(new ChunkPos(1, 1))).isPresent(),
+        try (WdlRegionStorage in = storage(region, "chunk")) {
+            assertTrue(Optional.ofNullable(in.read(new ChunkPos(0, 0))).isPresent(), "the good chunk landed");
+            assertFalse(Optional.ofNullable(in.read(new ChunkPos(1, 1))).isPresent(),
                     "the throwing chunk wrote nothing");
         }
     }
@@ -505,7 +500,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> new TestRegionStorage(region, false, "chunk") {
                     @Override
-                    public CompletableFuture<Void> store(ChunkPos pos, CompoundTag tag) {
+                    public void write(ChunkPos pos, CompoundTag tag) {
                         throw new IllegalStateException("the region store rejected the write");
                     }
                 },
@@ -540,7 +535,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> new TestRegionStorage(region, false, "chunk") {
                     @Override
-                    public CompletableFuture<Void> store(ChunkPos pos, CompoundTag tag) {
+                    public void write(ChunkPos pos, CompoundTag tag) {
                         throw new IllegalStateException("the region store rejected the write");
                     }
                 },
@@ -589,8 +584,8 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
-        try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag back = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
+        try (WdlRegionStorage in = storage(region, "chunk")) {
+            CompoundTag back = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
             CompoundTag chest = findByPosOrNull(back, 2, 64, 2);
             assertNotNull(chest, "the chest block entity is on disk");
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
@@ -626,8 +621,8 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
-        try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag back = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
+        try (WdlRegionStorage in = storage(region, "chunk")) {
+            CompoundTag back = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
             CompoundTag lectern = findByPosOrNull(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
             assertTrue(lectern.getCompound("Book").contains("id"), "the writer-thread fold merged the Book");
@@ -754,8 +749,8 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed(), "a failed pre-merge backup never aborts the save");
         assertEquals(1, result.chunksWritten(), "the drain still ran past the failed preflight");
-        try (IOWorker in = storage(region, "chunk")) {
-            assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(), "the chunk still reached disk");
+        try (WdlRegionStorage in = storage(region, "chunk")) {
+            assertTrue(Optional.ofNullable(in.read(new ChunkPos(0, 0))).isPresent(), "the chunk still reached disk");
         }
     }
 
@@ -907,7 +902,7 @@ class AsyncSaveWriterTest {
         assertEquals(4, result.entityChunksWritten(), "every entity-chunk write landed, first and re-flush alike");
         assertEquals(1, result.entitiesCarriedForward(),
                 "exactly the one prior-contents carry (the revisit clobber case) reached the tally");
-        try (IOWorker in = storage(region, "chunk")) {
+        try (WdlRegionStorage in = storage(region, "chunk")) {
             assertFalse(vehicleItems(in, new ChunkPos(0, 0), openedAfterFlush).isEmpty(),
                     "the re-flush folded the opened contents onto the on-disk vehicle (open-after-flush recovers)");
             assertFalse(vehicleItems(in, new ChunkPos(0, 1), openedBeforeFlush).isEmpty(),
@@ -929,9 +924,9 @@ class AsyncSaveWriterTest {
         ChunkPos pos = new ChunkPos(0, 0);
         UUID cart = new UUID(0x11L, 0x22L);
 
-        try (IOWorker io = storage(region, "chunk")) {
+        try (WdlRegionStorage io = storage(region, "chunk")) {
             // Terrain flushes, then a captured chest minecart folds into the chunk's Level.Entities.
-            io.store(pos, codec.encode(SyntheticChunks.full(true), false)).join();
+            io.write(pos, codec.encode(SyntheticChunks.full(true), false));
             RegionChunkWriter.foldEntitiesIntoRegion(io, pos, entityChunk(filledVehicle(cart)));
             assertFalse(vehicleItems(io, pos, cart).isEmpty(), "the fold placed the vehicle in Level.Entities");
 
@@ -942,7 +937,7 @@ class AsyncSaveWriterTest {
                     "the terrain re-write recaptured the prior chunk");
         }
 
-        try (IOWorker in = storage(region, "chunk")) {
+        try (WdlRegionStorage in = storage(region, "chunk")) {
             assertFalse(vehicleItems(in, pos, cart).isEmpty(),
                     "the terrain re-write preserved the folded vehicle in Level.Entities rather than dropping it");
         }
@@ -998,8 +993,8 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         assertEquals(2, result.mergedContainers(), "the fold count reached the merged-containers tally");
-        try (IOWorker in = storage(region, "chunk")) {
-            CompoundTag onDisk = Optional.ofNullable(in.load(new ChunkPos(0, 0))).get();
+        try (WdlRegionStorage in = storage(region, "chunk")) {
+            CompoundTag onDisk = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
             assertEquals("contents", onDisk.getString("wdl_test_folded"),
                     "the folded chunk was written back to region/");
             assertFalse(onDisk.getCompound("Level").getList("Sections", 10).isEmpty(),
@@ -1038,8 +1033,8 @@ class AsyncSaveWriterTest {
         return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid);
     }
 
-    private static ListTag vehicleItems(IOWorker storage, ChunkPos pos, UUID uuid) throws IOException {
-        CompoundTag chunk = Optional.ofNullable(storage.load(pos)).get();
+    private static ListTag vehicleItems(WdlRegionStorage storage, ChunkPos pos, UUID uuid) throws IOException {
+        CompoundTag chunk = Optional.ofNullable(storage.read(pos)).get();
         ListTag list = chunk.getCompound("Level").getList("Entities", 10);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entity = list.getCompound(i);
@@ -1051,36 +1046,24 @@ class AsyncSaveWriterTest {
     }
 
     /**
-     * A real storage of either target whose on-disk read or whose flush can be made to fail, the two disk faults the
-     * drain has to survive without taking the level.dat write down with them. Everything else is the vanilla behavior,
-     * so a chunk written through it really does reach the region file.
+     * A real storage whose on-disk read can be made to fail, the disk fault the drain has to survive without taking the
+     * level.dat write down with it. Everything else is the vanilla behavior, so a chunk written through it really does
+     * reach the region file.
      */
     private static final class FaultyStorage extends TestRegionStorage {
         private final boolean failRead;
-        private final boolean failFlush;
 
-        private FaultyStorage(Path directory, String type, boolean failRead, boolean failFlush) {
+        private FaultyStorage(Path directory, String type, boolean failRead) {
             super(directory, false, type);
             this.failRead = failRead;
-            this.failFlush = failFlush;
         }
 
         @Override
-        public CompoundTag load(ChunkPos pos) throws IOException {
+        public CompoundTag read(ChunkPos pos) throws IOException {
             if (failRead) {
                 throw new IOException("the region read failed");
             }
-            return super.load(pos);
-        }
-
-        @Override
-        public CompletableFuture<Void> synchronize() {
-            if (failFlush) {
-                CompletableFuture<Void> failed = new CompletableFuture<>();
-                failed.completeExceptionally(new IOException("the region flush failed"));
-                return failed;
-            }
-            return super.synchronize();
+            return super.read(pos);
         }
     }
 
@@ -1100,7 +1083,7 @@ class AsyncSaveWriterTest {
 
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
         AsyncSaveWriter writer = new AsyncSaveWriter(
-                dimension -> new FaultyStorage(region, "chunk", true, false),
+                dimension -> new FaultyStorage(region, "chunk", true),
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
@@ -1114,7 +1097,7 @@ class AsyncSaveWriterTest {
         assertEquals(0, result.chunksWritten(), "and it is not counted as written");
         assertEquals(1, finalizedChunksFailed.get(),
                 "the finalize sees it too, so the completion record cannot stamp this download clean");
-        try (IOWorker in = storage(region, "chunk")) {
+        try (WdlRegionStorage in = storage(region, "chunk")) {
             assertEquals(Items.DIAMOND, firstItemOf(in, new ChunkPos(0, 0), 2, 64, 2).getItem(),
                     "the prior the writer refused to overwrite is still on disk");
         }
@@ -1160,7 +1143,7 @@ class AsyncSaveWriterTest {
 
         AtomicInteger finalizedEntityChunksFailed = new AtomicInteger(-1);
         AsyncSaveWriter second = new AsyncSaveWriter(
-                dimension -> new FaultyStorage(region, "chunk", true, false),
+                dimension -> new FaultyStorage(region, "chunk", true),
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedEntityChunksFailed.set(entityChunksFailed),
                 () -> null,
@@ -1171,7 +1154,7 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.entityChunksFailed(), "the capture never reached the save, so it counts lost");
         assertEquals(0, result.entityChunksWritten(), "and it is not counted as written");
         assertEquals(1, finalizedEntityChunksFailed.get(), "the finalize sees it on its own target's term");
-        try (IOWorker in = storage(region, "chunk")) {
+        try (WdlRegionStorage in = storage(region, "chunk")) {
             assertFalse(vehicleItems(in, new ChunkPos(0, 0), parked).isEmpty(),
                     "the prior the writer refused to overwrite is still on disk");
         }
@@ -1213,7 +1196,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertTrue(merged.get(), "the arm under test is the merge arm, so the injected carry-forward must have run");
-        try (IOWorker in = storage(region, "chunk")) {
+        try (WdlRegionStorage in = storage(region, "chunk")) {
             // Only the unreached chest can show this. The carried one holds the stack either way, because the
             // merge copied it into the fresh tag before throwing, so asserting on it would prove nothing.
             assertEquals(Items.DIAMOND, firstItemOf(in, new ChunkPos(0, 0), unreached.getX(),
@@ -1257,7 +1240,7 @@ class AsyncSaveWriterTest {
         }, ChunkMerge::merge);
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed());
         CompoundTag revisit = codec.encode(snapshot, false);
-        try (IOWorker in = storage(region, "chunk")) {
+        try (WdlRegionStorage in = storage(region, "chunk")) {
             for (BlockPos chest : chests) {
                 assertEquals(Items.DIAMOND, firstItemOf(in, new ChunkPos(0, 0), chest.getX(),
                         chest.getY(), chest.getZ()).getItem(),
@@ -1271,46 +1254,14 @@ class AsyncSaveWriterTest {
     }
 
     /** Slot 0 of the block entity saved at {@code x/y/z} in {@code pos}'s on-disk chunk. */
-    private static ItemStack firstItemOf(IOWorker storage, ChunkPos pos,
+    private static ItemStack firstItemOf(WdlRegionStorage storage, ChunkPos pos,
             int x, int y, int z) throws IOException {
-        CompoundTag chunk = Optional.ofNullable(storage.load(pos)).get();
+        CompoundTag chunk = Optional.ofNullable(storage.read(pos)).get();
         CompoundTag blockEntity = findByPosOrNull(chunk, x, y, z);
         assertNotNull(blockEntity, "no block entity at " + x + "/" + y + "/" + z + " in " + pos);
         NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(blockEntity, decoded);
         return decoded.get(0);
-    }
-
-    /**
-     * The flush is the last step before the level.dat write, and vanilla's is a channel force. Letting a failure
-     * through would cost the folder its level.dat and leave a world that does not open at all, which is a far worse
-     * trade than the durability doubt a failed force leaves. Nothing is counted for it, and that is the other half of
-     * the contract: the close that follows forces every region file again, so the failure this catch sees is usually
-     * resolved a statement later, and a download whose bytes all reached the file system must not report itself partial
-     * over a promise this project does not make.
-     */
-    @Test
-    void aStorageThatCannotBeFlushedIsNotCountedAndTheSaveStillFinalizes(@TempDir Path save) throws Exception {
-        TestRegistries.bootstrap();
-        Path region = Files.createDirectories(save.resolve("region"));
-        AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
-
-        AsyncSaveWriter writer = new AsyncSaveWriter(
-                dimension -> new FaultyStorage(region, "chunk", false, true),
-                () -> {},
-                (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
-                () -> null,
-                new SaveProgress());
-
-        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
-                () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
-        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
-
-        assertEquals(0, finalizedChunksFailed.get(),
-                "the finalizer ran, so the folder has its level.dat, and it was told of no lost chunk");
-        assertFalse(result.failed(), "a flush that could not be proven is not a failed save");
-        assertEquals(1, result.chunksWritten(), "the chunk was still handed to the file system");
-        assertEquals(0, result.chunksFailed(), "so the download reports clean, since nothing missed the save");
     }
 
     /** A one-entity entity-chunk tag at {@code pos}, the smallest payload an entities write task can carry. */

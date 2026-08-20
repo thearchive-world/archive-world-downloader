@@ -7,7 +7,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.client.KeyMapping;
@@ -23,10 +22,9 @@ import world.thearchive.wdl.client.WdlKeyBinds;
 
 /**
  * Fabric client entrypoint: hands {@link Wdl#initialize} the Fabric {@link FabricPlatformBridge}, installs the
- * connection packet tee on each play connection, and registers the capture HUD overlay plus its peek keybind. The HUD
- * element draws after every vanilla element rather than anchoring to one, so it inherits no gamemode render condition
- * and stays visible in creative and spectator; the render body is shared. The tee is always installed (entity packet
- * capture is the default mechanism) and no-ops whenever no download is running.
+ * connection packet tee on each play connection, and registers the local-player interaction hooks and the HUD peek
+ * keybind. The tee is always installed (entity packet capture is the default mechanism) and no-ops whenever no download
+ * is running. The capture HUD overlay has no draw hook on this band, the same render-seam gap as the in-world outline.
  */
 public final class WdlFabricClient implements ClientModInitializer {
     @Override
@@ -53,10 +51,8 @@ public final class WdlFabricClient implements ClientModInitializer {
         KeyMapping peekKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY));
         WdlHudOverlay.bindPeekKey(peekKey);
-        // This band's Fabric API predates the layered-HUD registration (HudLayerRegistrationCallback/IdentifiedLayer,
-        // fabric-api 0.116+): HudRenderCallback fires after the whole vanilla HUD, unconditionally, so the overlay
-        // inherits no gamemode render condition and stays visible in every gamemode (see the class note).
-        HudRenderCallback.EVENT.register(WdlHudOverlay::render);
+        // fabric-rendering-v1 (HudRenderCallback) postdates this band's Fabric API, so the capture HUD overlay has no
+        // draw hook here; it does not draw on Fabric at this band, the same render-seam gap as the in-world outline.
         new FabricOutlineRegistrar().register();
     }
 }
