@@ -22,7 +22,7 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelStorage;
-import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.class_99;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -63,8 +63,8 @@ class PriorPlayerReadRoundTripTest {
         TestRegistries.bootstrap();
         LevelDataWriter.LevelData built = writer.buildLevelData(WorldOutputConfig.DEFAULTS, null);
         CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(enderItems), BlockPos.ZERO, 0.0F, 0.0F,
-                DimensionType.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);
-        LevelStorage storage = new LevelStorageSource(saves, saves.resolve("backups"), DataFixers.getDataFixer())
+                DimensionType.field_18954, GameType.SURVIVAL, Difficulty.NORMAL);
+        LevelStorage storage = (LevelStorage) new class_99(saves, saves.resolve("backups"), DataFixers.getDataFixer())
                 .selectLevel(name, null);
         writer.save(storage, built, captured);
         return saves.resolve(name).resolve("level.dat");

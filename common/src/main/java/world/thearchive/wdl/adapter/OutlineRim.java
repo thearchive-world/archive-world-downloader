@@ -43,16 +43,18 @@ public final class OutlineRim {
         if (cells.length == 0) {
             return box;
         }
-        double minX = BlockPos.getX(cells[0]);
-        double minY = BlockPos.getY(cells[0]);
-        double minZ = BlockPos.getZ(cells[0]);
+        BlockPos first = BlockPos.method_10488(cells[0]);
+        double minX = first.getX();
+        double minY = first.getY();
+        double minZ = first.getZ();
         double maxX = minX + 1.0;
         double maxY = minY + 1.0;
         double maxZ = minZ + 1.0;
         for (int i = 1; i < cells.length; i++) {
-            double x = BlockPos.getX(cells[i]);
-            double y = BlockPos.getY(cells[i]);
-            double z = BlockPos.getZ(cells[i]);
+            BlockPos cell = BlockPos.method_10488(cells[i]);
+            double x = cell.getX();
+            double y = cell.getY();
+            double z = cell.getZ();
             minX = Math.min(minX, x);
             minY = Math.min(minY, y);
             minZ = Math.min(minZ, z);

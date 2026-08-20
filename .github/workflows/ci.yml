@@ -93,6 +93,7 @@ jobs:
       # release workflow's publishMods, not these. Exclude the sources / dev jars Loom and ModDev also drop
       # into libs/ so the artifact carries only the production jar.
       - name: Upload Fabric artifact
+        if: hashFiles('fabric/build/libs/*.jar') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: archive-wdl-fabric
@@ -123,4 +124,5 @@ jobs:
           path: |
             forge/build/libs/*.jar
             !forge/build/libs/*-sources.jar
+            !forge/build/libs/*-dev.jar
           if-no-files-found: error

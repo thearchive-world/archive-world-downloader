@@ -3,7 +3,6 @@
 
 package world.thearchive.wdl.client;
 
-import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -53,17 +52,18 @@ public final class ResumeConfirm {
      */
     public static Screen create(String keyPrefix, Component message, Component yesLabel, Component noLabel,
             Runnable onYes, Runnable onNo) {
-        BooleanConsumer onChoice = confirmed -> {
+        // This band's ConfirmScreen takes its title, message, and button labels as plain strings and a trailing
+        // dialog id, and it draws the title and message in a fixed white, so the brand amber (the gold title and the
+        // gold folder and zip names in the body) survives only as the legacy section codes getColoredString emits;
+        // getString would strip them and the text would render plain white.
+        return new ConfirmScreen((confirmed, dialogId) -> {
             if (confirmed) {
                 onYes.run();
             } else {
                 onNo.run();
             }
-        };
-        // 1.15.2 ConfirmScreen takes the two button labels as plain strings, and Style carries only a named
-        // color, so the brand amber is drawn as the nearest vanilla color (gold).
-        return new ConfirmScreen(onChoice, amberComponent(new TranslatableComponent(keyPrefix + ".title")),
-                message, yesLabel.getString(), noLabel.getString());
+        }, amberComponent(new TranslatableComponent(keyPrefix + ".title")).getColoredString(),
+                message.getColoredString(), yesLabel.getString(), noLabel.getString(), 0);
     }
 
     /**

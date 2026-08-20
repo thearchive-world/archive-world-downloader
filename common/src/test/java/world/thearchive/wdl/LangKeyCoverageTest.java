@@ -83,13 +83,19 @@ class LangKeyCoverageTest {
 
     private static final Set<String> NOT_TRANSLATION_KEYS = ImmutableSet.of("wdl.properties");
 
-    // Button hover-tooltips the higher bands show but this band drops, since the 1.15.2 Button widget carries no
-    // hover-tooltip parameter (see WdlDownloadsScreen, WdlSettingsScreen and AbstractPlatformBridge). Their en_us
-    // strings stay so the catalog matches the higher bands, but no consumer reaches them on this band.
+    // Narration and title strings the higher bands set through Component parameters this band's pre-1.14 widget and
+    // screen APIs do not carry: a Button hover-tooltip (the 1.15.2 Button widget has no tooltip parameter), a Screen
+    // title (the 1.13.2 GuiScreen predates the 1.14 title Component, so super(title) is dropped), and a text field's
+    // narration message (the 1.13.2 text field widget takes no message). See WdlDownloadsScreen, WdlSettingsScreen and
+    // AbstractPlatformBridge. Their en_us strings stay so the catalog matches the higher bands, but no consumer reaches
+    // them on this band.
     private static final Set<String> BAND_DROPPED_KEYS = ImmutableSet.of(
             "wdl.pause.settings.tooltip",
             "wdl.screen.downloads.download.tooltip",
-            "wdl.settings.defaults.tooltip");
+            "wdl.screen.downloads.name",
+            "wdl.screen.downloads.title",
+            "wdl.settings.defaults.tooltip",
+            "wdl.settings.title");
 
     @Test
     void everyKeyTheCodeNamesIsCarriedByEnUs() {

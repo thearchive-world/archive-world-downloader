@@ -11,7 +11,7 @@ import net.minecraft.client.gui.components.toasts.Toast;
 import net.minecraft.client.gui.components.toasts.ToastComponent;
 
 /**
- * A toast that renders a title over several wrapped body lines. The 1.15.2 SystemToast draws its body as one line and
+ * A toast that renders a title over several wrapped body lines. This band's SystemToast draws its body as one line and
  * its ToastComponent slot is a fixed 32 pixels, so a body carrying a newline (the download-complete chunk count then
  * the save name) renders the newline as a tofu glyph and overruns the frame. This wraps the body to the frame width and
  * stitches the 160 by 32 frame sprite taller to hold the extra lines. The higher bands use SystemToast.multiline,
@@ -38,14 +38,14 @@ final class WdlMultilineToast implements Toast {
     public Toast.Visibility render(ToastComponent toastComponent, long elapsed) {
         Minecraft mc = toastComponent.getMinecraft();
         mc.getTextureManager().bind(TEXTURE);
-        GlStateManager.color3f(1.0F, 1.0F, 1.0F);
+        GlStateManager.method_9825(1.0F, 1.0F, 1.0F, 1.0F);
         // Keep the 16-pixel top and bottom caps of the frame sprite, which carry the borders, and tile a one-pixel
         // interior slice between them; at frameHeight 32 the two caps meet and reproduce the vanilla frame exactly.
-        toastComponent.blit(0, 0, 0, 64, 160, 16);
+        toastComponent.method_992(0, 0, 0, 64, 160, 16);
         for (int y = 16; y < frameHeight - 16; y++) {
-            toastComponent.blit(0, y, 0, 78, 160, 1);
+            toastComponent.method_992(0, y, 0, 78, 160, 1);
         }
-        toastComponent.blit(0, frameHeight - 16, 0, 80, 160, 16);
+        toastComponent.method_992(0, frameHeight - 16, 0, 80, 160, 16);
 
         Font font = mc.font;
         font.draw(this.title, 18.0F, 7.0F, -256);

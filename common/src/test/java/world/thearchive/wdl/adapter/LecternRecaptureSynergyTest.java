@@ -20,6 +20,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
@@ -89,6 +90,8 @@ class LecternRecaptureSynergyTest {
     }
 
     @Test
+    @Disabled("lecterns are a 1.14 block entity, absent at 1.13.2; a re-captured lectern block entity cannot be built "
+            + "here, so this synergy is a documented limit at this band")
     void reCapturingThePlacedLecternLetsTheStashMergeOntoIt() {
         // After re-capture the chunk's block entities include the placed lectern, so the merge lands.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(false,
@@ -106,6 +109,8 @@ class LecternRecaptureSynergyTest {
     }
 
     @Test
+    @Disabled("lecterns are a 1.14 block entity, absent at 1.13.2; a re-captured lectern block entity cannot be built "
+            + "here, so this synergy is a documented limit at this band")
     void repeatedRecaptureBeforeFlushMergesContentsExactlyOnce() {
         // Re-capture re-encodes the chunk many times while it is hot; each fresh tag carries the (book-less)
         // lectern block entity. The book comes from the stash and merges only at the single flush, so the

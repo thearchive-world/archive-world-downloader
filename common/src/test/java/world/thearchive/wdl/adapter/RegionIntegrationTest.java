@@ -47,18 +47,18 @@ class RegionIntegrationTest {
     private final LecternSink lecternSink = new LecternSinkImpl();
 
     private static WdlRegionStorage storage(WorldPaths paths, Path regionDirectory) {
-        return paths.openRegionStorage(DimensionType.OVERWORLD);
+        return paths.openRegionStorage(DimensionType.field_18954);
     }
 
     @Test
     void worldPathsPreCreatesDirectoriesAndOpensRegionStorage(@TempDir Path save) throws IOException {
         WorldPaths paths = new WorldPathsImpl(save);
 
-        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.field_18954);
 
         assertTrue(Files.isDirectory(region), "region/ must be pre-created before any write");
         assertEquals(save.resolve("region"), region, "overworld region/ is at the save root");
-        try (WdlRegionStorage opened = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+        try (WdlRegionStorage opened = paths.openRegionStorage(DimensionType.field_18954)) {
             assertNotNull(opened, "the overworld region storage must open");
         }
     }
@@ -67,7 +67,7 @@ class RegionIntegrationTest {
     void multiChunkAndRegionBoundaryRoundTrip(@TempDir Path save) {
         TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.field_18954);
 
         // (0,0)+(31,31) share region 0,0; the others cross boundaries into r.1.0 / r.0.1 / r.-1.-1.
         List<ChunkPos> positions = ImmutableList.of(
@@ -106,7 +106,7 @@ class RegionIntegrationTest {
     void writeMergingReadsThePriorChunkAndReportsNewVersusRecaptured(@TempDir Path save) throws IOException {
         TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.field_18954);
         int[] mergeCalls = { 0 };
         RegionChunkWriter.ChunkReadMerge merge = (onDisk, fresh) -> {
             mergeCalls[0]++;
@@ -142,7 +142,7 @@ class RegionIntegrationTest {
     void aReWalkedChestKeepsWhatAnEarlierFlushWroteIntoTheRegionFile(@TempDir Path save) throws IOException {
         TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.field_18954);
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 
@@ -173,7 +173,7 @@ class RegionIntegrationTest {
     void aChestOpenedAndFoundEmptyIsWrittenEmptyIntoTheRegionFile(@TempDir Path save) throws IOException {
         TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
+        Path region = paths.regionDirectory(DimensionType.field_18954);
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 

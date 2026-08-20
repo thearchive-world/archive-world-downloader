@@ -26,22 +26,22 @@ import net.minecraft.world.item.Items;
  * every entry collapsed onto one slot.
  */
 public final class ItemFixtures {
-    private static final ResourceLocation AIR_ID = new ResourceLocation("minecraft:air");
-
     private ItemFixtures() {}
 
     /**
      * The stack for {@code itemId}, count 1.
      *
-     * <p>An unregistered id is rejected rather than resolved. {@code Registry.ITEM} is a defaulted registry, so a typo
-     * returns air, an air stack is empty, and the vanilla writer skips empty stacks: the fixture would come back as an
-     * empty list that this gate then accepts, since an empty list is its own round trip. That is the degenerate fixture
-     * the gate exists to reject, arriving through the builder.
+     * <p>An unregistered id is rejected rather than resolved. At this band {@code Registry.ITEM} is a plain
+     * {@code MappedRegistry} with no default, so {@code get} throws {@code No default value} rather than returning air;
+     * {@code getOptional} returns null for an id the registry does not hold. A silently resolved id would build an air
+     * stack, and the vanilla writer skips empty stacks: the fixture would come back as an empty list that this gate
+     * then accepts, since an empty list is its own round trip. That is the degenerate fixture the gate exists to
+     * reject, arriving through the builder.
      */
     public static ItemStack stack(String itemId) {
         ResourceLocation id = new ResourceLocation(itemId);
-        Item item = Registry.ITEM.get(id);
-        if (item == Items.AIR && !AIR_ID.equals(id)) {
+        Item item = Registry.ITEM.getOptional(id);
+        if (item == null) {
             throw new AssertionError(
                     itemId + " is not a registered item, so this fixture would be silently empty");
         }

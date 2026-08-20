@@ -6,16 +6,15 @@ package world.thearchive.wdl.adapter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
+import net.minecraft.world.class_2610;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.horse.AbstractHorse;
-import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.core.EntityMenuCapability;
@@ -81,12 +80,12 @@ public final class OpenClickTracker {
      * {@code MenuProvider} block entity (verified across 1.21.11). A server GUI opened from a provider-less block falls
      * into the documented {@link #FRESH_WINDOW_TICKS} leak class instead of the chain.
      */
-    public static void dispatchUseBlock(Player player, Level level, BlockHitResult hit) {
+    public static void dispatchUseBlock(Player player, Level level, HitResult hit) {
         OpenClickTracker tracker = active;
         if (tracker != null && level.isClientSide() && player == Minecraft.getInstance().player
                 && !suppressesBlockUse(player)
-                && opensMenuFor(level, hit.getBlockPos(), player.isSpectator())) {
-            tracker.intent.recordBlockClick(hit.getBlockPos().asLong(), tracker.currentTick);
+                && opensMenuFor(level, hit.method_9344(), player.isSpectator())) {
+            tracker.intent.recordBlockClick(hit.method_9344().asLong(), tracker.currentTick);
         }
     }
 
@@ -117,7 +116,12 @@ public final class OpenClickTracker {
      * unattributed open consumes.
      */
     static boolean opensMenuFor(Level level, BlockPos pos, boolean spectator) {
-        if (level.getBlockState(pos).getMenuProvider(level, pos) != null) {
+        // This band has no unified MenuProvider (a 1.14 abstraction); the container block entities that open a menu
+        // are exactly the lockable-container ones (class_2610, implemented by BaseContainerBlockEntity), which is
+        // what this recognizes. A provider-less workstation menu (crafting table, enchanting table, anvil) has no
+        // block entity to test here, so it is not latched and falls into the documented FRESH_WINDOW_TICKS leak
+        // class rather than the intent chain, the accepted band ceiling on this recognizer.
+        if (level.getBlockEntity(pos) instanceof class_2610) {
             return true;
         }
         return !spectator && level.getBlockEntity(pos) instanceof EnderChestBlockEntity
@@ -130,7 +134,8 @@ public final class OpenClickTracker {
      */
     private static boolean enderChestObstructed(Level level, BlockPos pos) {
         BlockPos above = pos.above();
-        return level.getBlockState(above).isRedstoneConductor(level, above);
+        // method_16907 is the solid-cube test the vanilla EnderChestBlock use handler applies to the block above.
+        return level.getBlockState(above).method_16907();
     }
 
     /**
@@ -157,10 +162,11 @@ public final class OpenClickTracker {
                 Registry.ENTITY_TYPE.getKey(entity.getType()).getNamespace());
         boolean villager = entity instanceof Villager;
         boolean baby = villager && ((Villager) entity).isBaby();
-        boolean nitwit = villager
-                && ((Villager) entity).getVillagerData().getProfession() == VillagerProfession.NITWIT;
+        // At this band the villager profession is an int on the synced data (method_3115); nitwit is profession
+        // id 5, the same tradeless state the newer bands read off VillagerProfession.NITWIT.
+        boolean nitwit = villager && ((Villager) entity).method_3115() == 5;
         return EntityMenuCapability.isMenuIncapable(vanilla, entity instanceof AbstractMinecartContainer,
-                entity instanceof AbstractHorse, entity instanceof AbstractVillager,
+                entity instanceof AbstractHorse, entity instanceof Villager,
                 villager, baby, nitwit);
     }
 

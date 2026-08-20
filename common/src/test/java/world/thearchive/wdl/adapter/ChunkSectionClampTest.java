@@ -28,23 +28,24 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * A 26.x server reached through a downgrade proxy (ViaBackwards) sends a 1.16.5 client sections outside the 0..256
- * column. A block section outside 0..15 crashes vanilla's unchecked {@code sections[index]} on load, so the codec must
- * drop everything outside the -1..16 light column and keep block data only inside 0..15.
+ * A downgrade proxy (ViaBackwards) can hand a 1.13.2 client sections outside the 0..255 column. A block section outside
+ * 0..15 crashes vanilla's unchecked {@code sections[index]} on load, and this band has no light-pad column (light is
+ * section-resident, not engine-driven, so a null-section light-only entry is a 1.14 shape that has no home here). The
+ * codec therefore writes only the block sections inside 0..15 and drops every out-of-range or section-less entry.
  */
 class ChunkSectionClampTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
 
     @Test
-    void sectionsOutsideThe117ColumnAreDroppedSoTheSaveLoads() {
+    void sectionsOutsideTheBlockColumnAreDroppedSoTheSaveLoads() {
         TestRegistries.bootstrap();
         List<ChunkSnapshotSource.SectionData> sections = new ArrayList<>();
-        sections.add(new ChunkSnapshotSource.SectionData(-4, blockSection(-4), null, null)); // below the pad, dropped
-        sections.add(new ChunkSnapshotSource.SectionData(-1, null, null, filledLight())); // light pad, kept
+        sections.add(new ChunkSnapshotSource.SectionData(-4, blockSection(-4), null, null)); // out of range, dropped
+        sections.add(new ChunkSnapshotSource.SectionData(-1, null, null, filledLight())); // section-less pad, dropped
         sections.add(new ChunkSnapshotSource.SectionData(0, blockSection(0), null, null)); // in range, kept
         sections.add(new ChunkSnapshotSource.SectionData(15, blockSection(15), null, null)); // in range, kept
-        sections.add(new ChunkSnapshotSource.SectionData(16, null, null, filledLight())); // light pad, kept
-        sections.add(new ChunkSnapshotSource.SectionData(17, blockSection(17), null, null)); // above the pad, dropped
+        sections.add(new ChunkSnapshotSource.SectionData(16, null, null, filledLight())); // section-less pad, dropped
+        sections.add(new ChunkSnapshotSource.SectionData(17, blockSection(17), null, null)); // out of range, dropped
 
         CompoundTag level = codec.encode(new ClampSnapshot(sections), false).getCompound("Level");
 
@@ -58,14 +59,14 @@ class ChunkSectionClampTest {
                 withBlockData.add(y);
             }
         }
-        assertEquals(ImmutableSet.of(-1, 0, 15, 16), writtenY,
-                "only the -1..16 light column survives; -4 and 17 are dropped");
+        assertEquals(ImmutableSet.of(0, 15), writtenY,
+                "only the in-range block sections survive; the out-of-range and section-less light pads are dropped");
         assertEquals(ImmutableSet.of(0, 15), withBlockData, "block data is written only inside the 0..15 block range");
     }
 
     private static LevelChunkSection blockSection(int sectionY) {
-        LevelChunkSection section = new LevelChunkSection(sectionY);
-        section.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState(), false);
+        LevelChunkSection section = new LevelChunkSection(sectionY, true);
+        section.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
         return section;
     }
 
@@ -107,7 +108,7 @@ class ChunkSectionClampTest {
 
         @Override
         public ChunkStatus status() {
-            return ChunkStatus.FULL;
+            return ChunkStatus.field_18865;
         }
 
         @Override
@@ -127,7 +128,7 @@ class ChunkSectionClampTest {
 
         @Override
         public int[] biomes() {
-            return new int[1024];
+            return new int[16 * 16];
         }
     }
 }

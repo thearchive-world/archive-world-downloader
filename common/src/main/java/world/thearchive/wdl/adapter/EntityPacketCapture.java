@@ -29,7 +29,9 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
@@ -71,31 +73,19 @@ final class EntityPacketCapture
     private static volatile @Nullable EntityPacketCapture active;
 
     /**
-     * The four static decoration types the covered overlay reports on. A decoration always qualifies for range
-     * sampling, independent of the range-10 rule and the exclusion list.
+     * The three static decoration types the covered overlay reports on. A decoration always qualifies for range
+     * sampling. This band's {@code EntityType} carries no tracking range (that lives on the server tracker below 1.14,
+     * not on the type), so the range-10 co-sampling of non-decoration types the newer bands do cannot be reproduced
+     * here; the estimator anchors on decorations alone, which are the stable markers it trusts most, and the
+     * mount/display exclusion list that guarded the co-sample is dropped with it.
      */
     private static final Set<EntityType<?>> DECORATION_TYPES = ImmutableSet.of(
             EntityType.ITEM_FRAME, EntityType.PAINTING, EntityType.ARMOR_STAND);
 
-    /**
-     * Range-10 types excluded from range sampling, for two reasons. The player-mountables: a riding player raises their
-     * broadcast range to the player's own (TrackedEntity.getEffectiveRange takes the max over indirect passengers), and
-     * passenger state is not visible at AddEntity time, so a boosted sample would over-claim the range. The Display
-     * types: category-configured servers commonly track their display category farther than the decorations' categories
-     * (a plugin hologram near the player would over-claim teal until the first decoration takes over). Only range-10
-     * non-decoration types are otherwise sampled, so this lists only members whose vanilla clientTrackingRange is 10:
-     * the range-8 mounts (all minecarts, the mule) are never sampled and need no entry. Re-derive per band from
-     * PlayerRideable, ItemSteerable, Boat, AbstractHorse, canAddPassenger overrides, and the Display hierarchy, keeping
-     * only the range-10 members; a missing entry over-claims coverage, the failure the measured range exists to
-     * prevent. Interaction is range 10, non-mountable, and absent from vanilla worlds; its real-world use is plugin
-     * frameworks that teleport interaction and display pairs to follow players, the hazard profile that excluded the
-     * Displays.
-     */
-    private static final Set<EntityType<?>> RANGE_SAMPLING_EXCLUSIONS = ImmutableSet.of(
-            EntityType.BOAT,
-            EntityType.HORSE, EntityType.DONKEY, EntityType.SKELETON_HORSE, EntityType.ZOMBIE_HORSE,
-            EntityType.LLAMA, EntityType.TRADER_LLAMA,
-            EntityType.PIG);
+    // Spawn-object type ids from the vanilla client handleAddEntity switch at this band; the minecart id defers its
+    // subtype to the packet data, the item frame id is the one this class classifies directly for the frame diagnostic.
+    private static final int SPAWN_OBJECT_MINECART = 10;
+    private static final int SPAWN_OBJECT_ITEM_FRAME = 71;
 
     /**
      * Diagnostic only (gated by {@code dumpReceivedFrames}, default off): the {@code (blockX blockY blockZ facing)} key
@@ -187,14 +177,13 @@ final class EntityPacketCapture
 
     private void onAdd(ClientboundAddEntityPacket add, IntSet bundleNamedIds) {
         observeSendRange(add, bundleNamedIds);
-        if (add.getType() == EntityType.PLAYER) {
-            return; // the client builds a RemotePlayer for PLAYER, and players are not saved as entities
-        }
+        // This band's spawn is split by packet: ClientboundAddEntityPacket carries objects only (never a player),
+        // so the newer bands' PLAYER skip has nothing to fire on here.
         EntityPos pos = new EntityPos(add.getX(), add.getY(), add.getZ(),
                 decodeAngle((byte) add.getyRot()), decodeAngle((byte) add.getxRot()));
         spawn(add.getId(), add.getUUID(), chunkKey(add.getX(), add.getZ()), pos, add);
         if (dumpReceivedFrames
-                && add.getType() == EntityType.ITEM_FRAME) {
+                && add.method_7626() == SPAWN_OBJECT_ITEM_FRAME) {
             // Diagnostic key for the received-frame diff: block_pos = floor(spawn pos), Facing = the data int
             // (the frame's get3DDataValue, which is also what it saves). floor recovers the block whether the
             // packet carries the block pos or the entity pos (the offset is in [0,1)).
@@ -203,10 +192,12 @@ final class EntityPacketCapture
         }
     }
 
-    /** Whether this type feeds the range estimator: a decoration, or a non-excluded vanilla range-10 type. */
+    /**
+     * Whether this type feeds the range estimator. At this band only decorations qualify (see
+     * {@link #DECORATION_TYPES}).
+     */
     static boolean qualifies(EntityType<?> type) {
-        return DECORATION_TYPES.contains(type)
-                || (type.chunkRange() == 10 && !RANGE_SAMPLING_EXCLUSIONS.contains(type));
+        return DECORATION_TYPES.contains(type);
     }
 
     /**
@@ -219,8 +210,9 @@ final class EntityPacketCapture
      * render-distance bound caps what a stale read can commit.
      */
     private void observeSendRange(ClientboundAddEntityPacket add, IntSet bundleNamedIds) {
-        if (!qualifies(add.getType())) {
-            return; // PLAYER is range 32 and never qualifies; no belt check needed
+        EntityType<?> type = objectEntityType(add.method_7626());
+        if (type == null || !qualifies(type)) {
+            return; // only decorations qualify at this band; an unmapped object type never does
         }
         int id = add.getId();
         sampler.registerArrival(id, add.getX(), add.getZ());
@@ -259,7 +251,7 @@ final class EntityPacketCapture
         if (entity.isPassenger() || entity.isVehicle()) {
             return;
         }
-        Vec3 base = entity.position();
+        Vec3 base = new Vec3(entity.x, entity.y, entity.z);
         int id = entity.getId();
         sampler.registerSeed(id, base.x, base.z);
         int distanceBlocks = sampler.seedSample(id, playerX, playerZ);
@@ -352,8 +344,10 @@ final class EntityPacketCapture
      */
     public void onMove(int id, short xa, short ya, short za, ClientboundMoveEntityPacket move) {
         // This band has no ClientboundMoveEntityPacket.hasPosition; the Pos and PosRot subclasses carry a position.
-        boolean hasPosition = move instanceof ClientboundMoveEntityPacket.Pos
-                || move instanceof ClientboundMoveEntityPacket.PosRot;
+        // The Pos and PosRot position-bearing subclasses are intermediary-named at this band (class_2028 is Pos,
+        // class_2029 is PosRot); a plain relative move (class_2030, Rot only) carries no position.
+        boolean hasPosition = move instanceof ClientboundMoveEntityPacket.class_2028
+                || move instanceof ClientboundMoveEntityPacket.class_2029;
         sampler.markMovedRelative(id, hasPosition && (xa != 0 || ya != 0 || za != 0));
         EntityPos current = positionOf(id);
         if (current == null) {
@@ -382,5 +376,91 @@ final class EntityPacketCapture
     /** Decode a wire-byte rotation (256 units per full turn) to degrees, as vanilla unpacks it. */
     private static float decodeAngle(byte packed) {
         return packed * 360 / 256.0F;
+    }
+
+    /**
+     * The {@link EntityType} a spawn-object packet's object-type id names, or null for an id this band does not spawn
+     * as an object. Mirrors the vanilla client handleAddEntity resolution; the minecart id defers its subtype to the
+     * packet data, so a bare minecart stands in here for the decoration classification, and {@link #createSpawnObject}
+     * resolves the real subtype when it reconstructs.
+     */
+    static @Nullable EntityType<?> objectEntityType(int spawnObjectType) {
+        switch (spawnObjectType) {
+            case 1:
+                return EntityType.BOAT;
+            case 2:
+                return EntityType.ITEM;
+            case 3:
+                return EntityType.AREA_EFFECT_CLOUD;
+            case SPAWN_OBJECT_MINECART:
+                return EntityType.MINECART;
+            case 50:
+                return EntityType.TNT;
+            case 51:
+                return EntityType.END_CRYSTAL;
+            case 60:
+                return EntityType.ARROW;
+            case 61:
+                return EntityType.SNOWBALL;
+            case 62:
+                return EntityType.EGG;
+            case 63:
+                return EntityType.FIREBALL;
+            case 64:
+                return EntityType.SMALL_FIREBALL;
+            case 65:
+                return EntityType.ENDER_PEARL;
+            case 66:
+                return EntityType.WITHER_SKULL;
+            case 67:
+                return EntityType.SHULKER_BULLET;
+            case 68:
+                return EntityType.LLAMA_SPIT;
+            case 70:
+                return EntityType.FALLING_BLOCK;
+            case SPAWN_OBJECT_ITEM_FRAME:
+                return EntityType.ITEM_FRAME;
+            case 72:
+                return EntityType.EYE_OF_ENDER;
+            case 73:
+                return EntityType.POTION;
+            case 75:
+                return EntityType.EXPERIENCE_BOTTLE;
+            case 76:
+                return EntityType.FIREWORK_ROCKET;
+            case 77:
+                return EntityType.LEASH_KNOT;
+            case 78:
+                return EntityType.ARMOR_STAND;
+            case 79:
+                return EntityType.EVOKER_FANGS;
+            case 90:
+                return EntityType.FISHING_BOBBER;
+            case 91:
+                return EntityType.SPECTRAL_ARROW;
+            case 93:
+                return EntityType.DRAGON_FIREBALL;
+            case 94:
+                return EntityType.TRIDENT;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Reconstruct the object a spawn-object packet describes, the int-type-to-entity resolution the vanilla client
+     * handleAddEntity applies. The minecart subtype is resolved from the packet data through
+     * AbstractMinecart.createMinecart; every other object is created bare from its {@link EntityType}, exactly as the
+     * newer bands' unified reconstruct did, so the caller's own snap-to-position, synced-value, and equipment
+     * application fill it in. Null for an id this band does not spawn as an object, or a type with no factory.
+     */
+    static @Nullable Entity createSpawnObject(ClientboundAddEntityPacket add, Level level) {
+        int spawnObjectType = add.method_7626();
+        if (spawnObjectType == SPAWN_OBJECT_MINECART) {
+            return AbstractMinecart.createMinecart(level, add.getX(), add.getY(), add.getZ(),
+                    AbstractMinecart.Type.method_11173(add.getData()));
+        }
+        EntityType<?> type = objectEntityType(spawnObjectType);
+        return type == null ? null : type.create(level);
     }
 }

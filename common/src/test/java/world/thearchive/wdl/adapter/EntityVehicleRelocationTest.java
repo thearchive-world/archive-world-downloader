@@ -236,7 +236,7 @@ class EntityVehicleRelocationTest {
     private static List<CompoundTag> entitiesOnDisk(WorldPaths paths, UUID uuid, ChunkPos... positions)
             throws Exception {
         List<CompoundTag> found = new ArrayList<>();
-        try (WdlRegionStorage storage = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+        try (WdlRegionStorage storage = paths.openRegionStorage(DimensionType.field_18954)) {
             for (ChunkPos pos : positions) {
                 CompoundTag chunkTag = Optional.ofNullable(storage.read(pos)).orElse(null);
                 if (chunkTag == null || !(chunkTag.getCompound("Level").get("Entities") instanceof ListTag)) {
@@ -267,7 +267,7 @@ class EntityVehicleRelocationTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
+                config, null, DimensionType.field_18954, DimensionType.field_18954,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -275,13 +275,13 @@ class EntityVehicleRelocationTest {
 
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
-        Files.createDirectories(paths.regionDirectory(DimensionType.OVERWORLD));
+        Files.createDirectories(paths.regionDirectory(DimensionType.field_18954));
         return paths;
     }
 
     /** Seed a host region chunk at each position so the entity folds have terrain to land inside. */
     private static void seedHosts(WorldPaths paths, ChunkPos... positions) throws Exception {
-        try (WdlRegionStorage region = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+        try (WdlRegionStorage region = paths.openRegionStorage(DimensionType.field_18954)) {
             for (ChunkPos pos : positions) {
                 CompoundTag host = new CompoundTag();
                 host.put("Level", new CompoundTag());

@@ -107,7 +107,7 @@ class OrphanedContainerSweepTest {
             List<CompoundTag> blockEntities)
             throws Exception {
         AsyncSaveWriter flush = regionWriter(region);
-        flush.submitChunk(DimensionType.OVERWORLD, chunk,
+        flush.submitChunk(DimensionType.field_18954, chunk,
                 () -> codec.encode(SyntheticChunks.fullWithBlockEntities(true, blockEntities),
                         false),
                 ChunkMerge::merge);
@@ -136,7 +136,7 @@ class OrphanedContainerSweepTest {
         holders.put(chestPos, sink.captureItems(items));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
+        sweep.submitChunkRewrite(DimensionType.field_18954, chunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, chunk, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
@@ -154,13 +154,15 @@ class OrphanedContainerSweepTest {
         ChunkPos chunk = new ChunkPos(0, 0);
         BlockPos lecternPos = new BlockPos(3, 64, 3);
 
-        flushEmptyChunk(region, chunk, ImmutableList.of(blockEntity("minecraft:lectern", 3, 64, 3)));
+        // No vanilla lectern exists at this band, so a fieldless ender chest stands in as the carrier the orphan
+        // sweep's LecternSink book fold writes "Book"/"Page" onto; the sweep-fold wiring is what is under test.
+        flushEmptyChunk(region, chunk, ImmutableList.of(blockEntity("minecraft:ender_chest", 3, 64, 3)));
 
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
         holders.put(lecternPos, sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 7));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
+        sweep.submitChunkRewrite(DimensionType.field_18954, chunk,
                 onDisk -> ContainerMerge.mergeLecternChunkStash(sink, onDisk, chunk, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
@@ -199,9 +201,9 @@ class OrphanedContainerSweepTest {
         Map<BlockPos, CompoundTag> leftHolder = holder(leftHalf, sink.captureItems(leftItems));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(DimensionType.OVERWORLD, rightChunk,
+        sweep.submitChunkRewrite(DimensionType.field_18954, rightChunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, rightChunk, rightHolder).merged());
-        sweep.submitChunkRewrite(DimensionType.OVERWORLD, leftChunk,
+        sweep.submitChunkRewrite(DimensionType.field_18954, leftChunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, leftChunk, leftHolder).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
@@ -224,7 +226,7 @@ class OrphanedContainerSweepTest {
                 sink.captureItems(NonNullList.withSize(27, ItemStack.EMPTY)));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(DimensionType.OVERWORLD, missing,
+        sweep.submitChunkRewrite(DimensionType.field_18954, missing,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, missing, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(),
                 "a rewrite for a chunk with no on-disk prior does not fail the save");
@@ -251,11 +253,11 @@ class OrphanedContainerSweepTest {
         Map<BlockPos, CompoundTag> holders = holder(new BlockPos(2, 64, 2), sink.captureItems(items));
 
         AsyncSaveWriter writer = regionWriter(region);
-        writer.submitChunk(DimensionType.OVERWORLD, chunk, () -> codec.encode(
+        writer.submitChunk(DimensionType.field_18954, chunk, () -> codec.encode(
                 SyntheticChunks.fullWithBlockEntities(true,
                         ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2))),
                 false), ChunkMerge::merge);
-        writer.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
+        writer.submitChunkRewrite(DimensionType.field_18954, chunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, chunk, holders).merged());
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 

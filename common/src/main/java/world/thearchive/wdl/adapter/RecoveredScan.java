@@ -90,8 +90,8 @@ final class RecoveredScan {
             if (blockEntity == null || !hasCoordinates(blockEntity)) {
                 continue;
             }
-            long pos = BlockPos.asLong(blockEntity.getInt("x"), blockEntity.getInt("y"),
-                    blockEntity.getInt("z"));
+            long pos = new BlockPos(blockEntity.getInt("x"), blockEntity.getInt("y"),
+                    blockEntity.getInt("z")).asLong();
             if (CHISELED_BOOKSHELF_ID.equals(blockEntity.getString("id"))) {
                 int mask = bookshelfSavedSlotMask(blockEntity);
                 if (mask != 0 && bookshelves.put(pos, mask) != mask) {

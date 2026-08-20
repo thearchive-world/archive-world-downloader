@@ -13,6 +13,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -58,7 +59,7 @@ class ContainerMergeRoundTripTest {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
         items.set(13, new ItemStack(Items.STICK, 2));
-        items.set(26, new ItemStack(Items.OAK_PLANKS, 64));
+        items.set(26, new ItemStack(Blocks.OAK_PLANKS, 64));
 
         CompoundTag holder = sink.captureItems(items);
         assertTrue(holder.contains("Items"), "captureItems must build the vanilla Items holder");
@@ -81,7 +82,7 @@ class ContainerMergeRoundTripTest {
         assertEquals(5, back.get(0).getCount());
         assertEquals(Items.STICK, back.get(13).getItem());
         assertEquals(2, back.get(13).getCount());
-        assertEquals(Items.OAK_PLANKS, back.get(26).getItem());
+        assertEquals(Blocks.OAK_PLANKS.asItem(), back.get(26).getItem());
         assertEquals(64, back.get(26).getCount());
     }
 

@@ -36,27 +36,27 @@ class VanillaDimensionsTest {
 
     @Test
     void endTypeMapsToEnd() {
-        assertEquals(DimensionType.THE_END, VanillaDimensions.forType(DimensionType.THE_END));
+        assertEquals(DimensionType.field_18956, VanillaDimensions.forType(DimensionType.field_18956));
     }
 
     @Test
     void overworldTypeMapsToOverworld() {
-        assertEquals(DimensionType.OVERWORLD, VanillaDimensions.forType(DimensionType.OVERWORLD));
+        assertEquals(DimensionType.field_18954, VanillaDimensions.forType(DimensionType.field_18954));
     }
 
     @Test
     void unknownOrUnregisteredTypeFallsBackToOverworld() {
         // A null type (a holder that resolved to no value) opens as the overworld so the capture is still a loadable
         // vanilla single-player world.
-        assertEquals(DimensionType.OVERWORLD, VanillaDimensions.forType(null));
+        assertEquals(DimensionType.field_18954, VanillaDimensions.forType(null));
     }
 
     @Test
     void everyRoutedDimensionReadsBackFromTheIdItWrites() {
         // The round trip is what a resume depends on: the prior level.dat records the routed dimension as a
         // plain id string, and reading it back wrong sends a write into another dimension's folder.
-        for (DimensionType routed : ImmutableList.of(DimensionType.OVERWORLD, DimensionType.NETHER,
-                DimensionType.THE_END)) {
+        for (DimensionType routed : ImmutableList.of(DimensionType.field_18954, DimensionType.NETHER,
+                DimensionType.field_18956)) {
             assertEquals(routed, VanillaDimensions.forId(DimensionType.getName(routed).toString()),
                     routed + " must survive the id round trip");
         }
@@ -77,23 +77,23 @@ class VanillaDimensionsTest {
         // overworld TYPE. Routing by TYPE lands it on OVERWORLD, so the DEFAULT generator blends its edge; a gate
         // keyed on the raw level key would not match minecraft:overworld and would wall instead. The call site
         // (LiveCaptureSession) is what feeds forType's routed key, not the raw key, into this predicate.
-        DimensionType routedByType = VanillaDimensions.forType(DimensionType.OVERWORLD);
-        assertEquals(DimensionType.OVERWORLD, routedByType);
+        DimensionType routedByType = VanillaDimensions.forType(DimensionType.field_18954);
+        assertEquals(DimensionType.field_18954, routedByType);
         assertTrue(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, routedByType));
     }
 
     @Test
     void onlyTheDefaultGeneratorBlendsTheOverworld() {
-        assertTrue(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, DimensionType.OVERWORLD));
-        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.FLAT, DimensionType.OVERWORLD),
+        assertTrue(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, DimensionType.field_18954));
+        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.FLAT, DimensionType.field_18954),
                 "flat writes fixed layers and discards the blender, so its marker would be inert");
-        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.VOID, DimensionType.OVERWORLD),
+        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.VOID, DimensionType.field_18954),
                 "a void world has no terrain to blend, so its output stays byte-unchanged");
     }
 
     @Test
     void netherAndEndAreNeverBlended() {
         assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, DimensionType.NETHER));
-        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, DimensionType.THE_END));
+        assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, DimensionType.field_18956));
     }
 }

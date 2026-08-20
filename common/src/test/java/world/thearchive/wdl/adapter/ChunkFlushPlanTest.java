@@ -186,11 +186,14 @@ class ChunkFlushPlanTest {
         return tag;
     }
 
+    // No vanilla lectern exists at this band, so the lectern-stash fold is exercised against a fieldless ender chest
+    // standing in as the carrier the LecternSink book merge writes "Book"/"Page" onto; the fold wiring is what is
+    // under test, not a real lectern.
     @Test
     void foldChunkStashesMergesEveryStashOntoItsOwnBlockEntity() {
         CompoundTag chunkTag = chunkTagWith(
                 blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:lectern", 2, 64, 2),
+                blockEntity("minecraft:ender_chest", 2, 64, 2),
                 blockEntity("minecraft:jukebox", 3, 64, 3));
 
         Map<BlockPos, CompoundTag> containers = stash(new BlockPos(1, 64, 1), itemsHolder("minecraft:diamond"));
@@ -215,7 +218,7 @@ class ChunkFlushPlanTest {
     void foldChunkStashesCountsEveryThrowingBandMergeAsFailed() {
         CompoundTag chunkTag = chunkTagWith(
                 blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:lectern", 2, 64, 2),
+                blockEntity("minecraft:ender_chest", 2, 64, 2),
                 blockEntity("minecraft:jukebox", 3, 64, 3));
 
         MergeTally tally = ChunkFlushPlan.foldChunkStashes(chunkTag, origin(), THROWING_CONTAINER_SINK,
@@ -245,7 +248,7 @@ class ChunkFlushPlanTest {
     void foldResidualHoldersSumsBothMergesOntoTheOnDiskChunk() {
         CompoundTag onDisk = chunkTagWith(
                 blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:lectern", 2, 64, 2));
+                blockEntity("minecraft:ender_chest", 2, 64, 2));
 
         MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, origin(), containerSink, lecternSink,
                 stash(new BlockPos(1, 64, 1), itemsHolder("minecraft:diamond")),
@@ -262,7 +265,7 @@ class ChunkFlushPlanTest {
     void foldResidualHoldersCountsEveryThrowingBandMergeAsFailed() {
         CompoundTag onDisk = chunkTagWith(
                 blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:lectern", 2, 64, 2));
+                blockEntity("minecraft:ender_chest", 2, 64, 2));
 
         MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, origin(), THROWING_CONTAINER_SINK,
                 THROWING_LECTERN_SINK,
@@ -276,13 +279,13 @@ class ChunkFlushPlanTest {
     @Test
     void landingHolderPositionsNamesOnlyTheHoldersThatWillActuallyLand() {
         CompoundTag chest = blockEntity("minecraft:chest", 1, 64, 1);
-        CompoundTag barrel = blockEntity("minecraft:barrel", 2, 64, 2);
-        ChunkSnapshotSource snapshot = snapshotOf(chest, barrel);
+        CompoundTag shulkerBox = blockEntity("minecraft:shulker_box", 2, 64, 2);
+        ChunkSnapshotSource snapshot = snapshotOf(chest, shulkerBox);
 
         CompoundTag matching = itemsHolder("minecraft:diamond");
         matching.putString("wdl_block_entity_id", "minecraft:chest");
         CompoundTag stale = itemsHolder("minecraft:emerald");
-        stale.putString("wdl_block_entity_id", "minecraft:chest"); // the block at 2,64,2 is a barrel now
+        stale.putString("wdl_block_entity_id", "minecraft:chest"); // the block at 2,64,2 is a shulker box now
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(1, 64, 1), matching);
         holders.put(new BlockPos(2, 64, 2), stale);

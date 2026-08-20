@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Properties;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.GlobalPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -22,6 +21,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -62,15 +62,14 @@ class ItemLocationScrubTest {
     private static final String FLOWER_POS = "FlowerPos";
     private static final String BLOCK_ENTITY_TAG = "BlockEntityTag";
 
+    /** The overworld position the fixture lodestones target. */
+    private static final BlockPos LODESTONE_TARGET = new BlockPos(128, 64, -512);
+
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.bootstrap();
-    }
-
-    private static GlobalPos basePos() {
-        return GlobalPos.of(DimensionType.OVERWORLD, new BlockPos(128, 64, -512));
     }
 
     /**
@@ -80,16 +79,15 @@ class ItemLocationScrubTest {
      */
     private static ItemStack lodestoneCompass() {
         ItemStack compass = new ItemStack(Items.COMPASS);
-        GlobalPos pos = basePos();
         CompoundTag tag = compass.getOrCreateTag();
-        tag.put(LODESTONE_POS, NbtUtils.writeBlockPos(pos.pos()));
-        tag.putString(LODESTONE_DIMENSION, DimensionType.getName(pos.dimension()).toString());
+        tag.put(LODESTONE_POS, NbtUtils.writeBlockPos(LODESTONE_TARGET));
+        tag.putString(LODESTONE_DIMENSION, DimensionType.getName(DimensionType.field_18954).toString());
         tag.putBoolean(LODESTONE_TRACKED, true);
         return compass;
     }
 
     private static ItemStack shulkerHoldingLodestone() {
-        ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
+        ItemStack shulker = new ItemStack(Blocks.SHULKER_BOX);
         CompoundTag blockEntityTag = new CompoundTag();
         blockEntityTag.put("Items", ItemFixtures.items(lodestoneCompass()));
         shulker.getOrCreateTag().put(BLOCK_ENTITY_TAG, blockEntityTag);
@@ -104,7 +102,7 @@ class ItemLocationScrubTest {
      * block item stands in as the foreign or modded carrier the scrub still has to reach.
      */
     private static ItemStack beehiveWithBeeFlowerPos() {
-        ItemStack hive = new ItemStack(Items.CHEST);
+        ItemStack hive = new ItemStack(Blocks.CHEST);
         CompoundTag blockEntityTag = new CompoundTag();
         blockEntityTag.put(FLOWER_POS, NbtUtils.writeBlockPos(new BlockPos(130, 64, -510)));
         CompoundTag entityData = new CompoundTag();
@@ -193,7 +191,7 @@ class ItemLocationScrubTest {
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         assertEquals(saveItemCoordinates, config.saveItemCoordinates(), "the fixture must set the opt-out it names");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
+                config, null, DimensionType.field_18954, DimensionType.field_18954,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -211,8 +209,12 @@ class ItemLocationScrubTest {
         }
     }
 
+    /**
+     * A block entity storing one item under a foreign {@code item} key; the type-agnostic scrub must still reach it.
+     */
     private CompoundTag blockEntityWithItem(ItemStack item) {
-        CompoundTag blockEntity = BlockEntityFixtures.blockEntity("minecraft:bell", 0, 64, 0);
+        // A jukebox stands in for the higher-band single-item carriers (a decorated pot); no bell exists at this band.
+        CompoundTag blockEntity = BlockEntityFixtures.blockEntity("minecraft:jukebox", 0, 64, 0);
         blockEntity.put("item", ItemFixtures.itemTag(item));
         return blockEntity;
     }
@@ -234,7 +236,8 @@ class ItemLocationScrubTest {
     }
 
     private CompoundTag blockEntityWithItems(ItemStack... stacks) {
-        CompoundTag blockEntity = BlockEntityFixtures.blockEntity("minecraft:campfire", 0, 64, 0);
+        // A chest stands in for the higher-band Items-list carriers (a campfire); no campfire exists at this band.
+        CompoundTag blockEntity = BlockEntityFixtures.blockEntity("minecraft:chest", 0, 64, 0);
         blockEntity.put("Items", holderOf(stacks).getList("Items", 10));
         return blockEntity;
     }
@@ -314,11 +317,11 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubBlockEntityBlanksLodestoneInItemsList() {
-        CompoundTag campfire = blockEntityWithItems(lodestoneCompass(), new ItemStack(Items.DIAMOND, 3));
+        CompoundTag blockEntity = blockEntityWithItems(lodestoneCompass(), new ItemStack(Items.DIAMOND, 3));
 
-        ItemLocationScrub.scrubBlockEntity(campfire);
+        ItemLocationScrub.scrubBlockEntity(blockEntity);
 
-        NonNullList<ItemStack> back = readBack(campfire, 2);
+        NonNullList<ItemStack> back = readBack(blockEntity, 2);
         assertTrue(!targetOf(back.get(0)).isPresent(), "a lodestone in the block entity's Items list is blanked");
         assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-lodestone item is untouched");
         assertEquals(3, back.get(1).getCount());
@@ -336,7 +339,7 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubBlockEntityLeavesNonItemBlockEntityUnchanged() {
-        CompoundTag blockEntity = BlockEntityFixtures.blockEntityWithForeignKey("minecraft:bell", 1, 2, 3,
+        CompoundTag blockEntity = BlockEntityFixtures.blockEntityWithForeignKey("minecraft:sign", 1, 2, 3,
                 "wdl_test_marker", "urn");
         ListTag sherds = new ListTag();
         CompoundTag sherd = new CompoundTag();
@@ -368,13 +371,13 @@ class ItemLocationScrubTest {
                 bees.getCompound(0).get(ENTITY_DATA) instanceof CompoundTag
                         && ((CompoundTag) bees.getCompound(0).get(ENTITY_DATA)).contains(FLOWER_POS),
                 "the bee flower_pos is blanked");
-        assertEquals(Items.CHEST, back.get(0).getItem(), "the carrier item is unchanged");
+        assertEquals(Blocks.CHEST.asItem(), back.get(0).getItem(), "the carrier item is unchanged");
         assertEquals(Items.DIAMOND, back.get(1).getItem(), "an item carrying no such NBT is untouched");
     }
 
     @Test
     void scrubReachesBeeFlowerPosNestedInShulker() {
-        ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
+        ItemStack shulker = new ItemStack(Blocks.SHULKER_BOX);
         CompoundTag blockEntityTag = new CompoundTag();
         blockEntityTag.put("Items", ItemFixtures.items(beehiveWithBeeFlowerPos()));
         shulker.getOrCreateTag().put(BLOCK_ENTITY_TAG, blockEntityTag);
@@ -390,7 +393,7 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubOnAnEmptyBeehiveIsNoop() {
-        CompoundTag holder = holderOf(new ItemStack(Items.CHEST));
+        CompoundTag holder = holderOf(new ItemStack(Blocks.CHEST));
         CompoundTag before = holder.copy();
         ItemLocationScrub.scrub(holder, "Items");
         assertEquals(before, holder, "an item carrying no location NBT round-trips unchanged");

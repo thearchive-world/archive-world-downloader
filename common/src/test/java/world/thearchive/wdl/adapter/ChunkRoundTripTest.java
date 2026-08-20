@@ -27,8 +27,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for chunk capture: the mod's {@link ChunkCodec#encode(ChunkSnapshotSource, boolean)} slice,
  * written through vanilla's real region pipeline and read back, is self-consistent. Every section's block-state and
- * biome container decodes, {@code OCEAN_FLOOR} is dropped, and {@code isLightOn} tracks the captured light flag (not a
- * hardcoded {@code true}). Full game-load validity is not exercised headless.
+ * biome container decodes, {@code OCEAN_FLOOR} is written (a LIVE_WORLD heightmap at this band), and light is
+ * section-resident with no chunk-level {@code isLightOn} (a 1.14 lighting-engine field absent here). Full game-load
+ * validity is not exercised headless.
  */
 class ChunkRoundTripTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
@@ -46,25 +47,27 @@ class ChunkRoundTripTest {
         assertEquals((tag.contains("DataVersion") ? tag.getInt("DataVersion") : -1),
                 (back.contains("DataVersion") ? back.getInt("DataVersion") : -2));
 
-        // OCEAN_FLOOR (LIVE_WORLD, never sent to a client) is omitted so vanilla read() re-primes it;
-        // the three CLIENT-usage heightmaps are kept. (Re-prime itself is ServerLevel-only, not exercised
-        // headless; this asserts the omission.)
+        // At this band the Heightmap.Usage enum has no CLIENT tier, so every captured heightmap is LIVE_WORLD and
+        // the codec writes it, OCEAN_FLOOR included; vanilla class_1205 writes the same set.
         CompoundTag heightmaps = back.getCompound("Level").getCompound("Heightmaps");
-        assertFalse(heightmaps.contains("OCEAN_FLOOR"), "OCEAN_FLOOR must be dropped from the written tag");
-        assertTrue(heightmaps.contains("WORLD_SURFACE"), "client-sent heightmaps must be kept");
+        assertTrue(heightmaps.contains("OCEAN_FLOOR"), "OCEAN_FLOOR is a LIVE_WORLD heightmap here and is written");
+        assertTrue(heightmaps.contains("WORLD_SURFACE"), "the LIVE_WORLD heightmaps are written");
 
         assertSectionsDecode(back);
     }
 
     @Test
-    void isLightOnTracksCapturedLightNotHardcoded() {
+    void lightIsSectionResidentWithNoChunkLevelIsLightOn() {
         TestRegistries.bootstrap();
 
         CompoundTag lit = codec.encode(SyntheticChunks.full(true), false);
         CompoundTag dark = codec.encode(SyntheticChunks.full(false), false);
 
-        assertTrue(lit.getCompound("Level").getBoolean("isLightOn"), "lightCorrect chunk -> isLightOn=true");
-        assertFalse(dark.getCompound("Level").getBoolean("isLightOn"), "non-lightCorrect chunk -> isLightOn omitted");
+        // isLightOn is a 1.14 lighting-engine field; the 1.13.2 jar carries no such key and vanilla class_1205 never
+        // writes it. Light is section-resident at this band (each section's own BlockLight/SkyLight arrays), so the
+        // codec emits no chunk-level light flag and the captured lightCorrect state has no on-disk form either way.
+        assertFalse(lit.getCompound("Level").contains("isLightOn"), "lightCorrect chunk -> no isLightOn key");
+        assertFalse(dark.getCompound("Level").contains("isLightOn"), "non-lightCorrect chunk -> no isLightOn key");
     }
 
     @Test
@@ -75,7 +78,9 @@ class ChunkRoundTripTest {
         CompoundTag tag = codec.encode(SyntheticChunks.fullWithLight(), false);
         CompoundTag back = RegionRoundTrip.writeThenRead(directory, new ChunkPos(0, 0), tag);
 
-        assertTrue(back.getCompound("Level").getBoolean("isLightOn"), "lit snapshot -> isLightOn=true");
+        // Captured light survives on-disk as the section-resident arrays; no chunk-level isLightOn is written or read
+        // back, that flag being a 1.14 field absent at this band.
+        assertFalse(back.getCompound("Level").contains("isLightOn"), "no isLightOn key round-trips at 1.13.2");
 
         CompoundTag bottom = sectionAt(back, minSectionY);
         assertArrayEquals(SyntheticChunks.lightFill(SyntheticChunks.BLOCK_LIGHT_FILL),
@@ -83,10 +88,12 @@ class ChunkRoundTripTest {
         assertArrayEquals(SyntheticChunks.lightFill(SyntheticChunks.SKY_LIGHT_FILL),
                 bottom.getByteArray("SkyLight"), "bottom section sky light survives");
 
-        CompoundTag padding = sectionAt(back, minSectionY - 1);
-        assertArrayEquals(SyntheticChunks.lightFill(SyntheticChunks.SKY_LIGHT_FILL),
-                padding.getByteArray("SkyLight"), "below-chunk padding sky light survives");
-        assertFalse(padding.contains("BlockStates"), "padding section carries no block states");
+        // The below-chunk light pad (a null-section, sky-only entry) is a 1.14 light-engine shape; light is
+        // section-resident at this band and the codec writes only the 0..15 block column, so the pad is dropped.
+        int padY = minSectionY - 1;
+        boolean padWritten = back.getCompound("Level").getList("Sections", 10).stream().map(t -> (CompoundTag) t)
+                .anyMatch(section -> section.contains("Y") && section.getByte("Y") == padY);
+        assertFalse(padWritten, "the below-chunk light pad is dropped at this band");
 
         assertSectionsDecode(back);
     }
@@ -110,15 +117,16 @@ class ChunkRoundTripTest {
         for (Tag sectionTag : level.getList("Sections", 10)) {
             CompoundTag section = (CompoundTag) sectionTag;
             if (section.contains("BlockStates", 12)) {
-                // read() throws on malformed palette or block-state data, so reaching the next line proves decode.
-                new LevelChunkSection(section.getByte("Y")).getStates()
-                        .read(section.getList("Palette", 10), section.getLongArray("BlockStates"));
+                // The palette read throws on malformed palette or block-state data, so reaching the next line proves
+                // decode; at this band it reads straight from the section tag, the mirror of the codec's write.
+                new LevelChunkSection(section.getByte("Y"), true).getStates()
+                        .method_17103(section, "Palette", "BlockStates");
             }
         }
         int[] biomeIds = level.getIntArray("Biomes");
-        assertEquals(16 * ((SyntheticChunks.HEIGHT + 3) / 4), biomeIds.length, "biomes cover the whole column");
+        assertEquals(16 * 16, biomeIds.length, "biomes are the flat 16x16 per-column grid at this band");
         for (int id : biomeIds) {
-            assertNotNull(biomeRegistry.byId(id), "every written biome id resolves to a registered biome");
+            assertNotNull(biomeRegistry.method_7326(id), "every written biome id resolves to a registered biome");
         }
     }
 }

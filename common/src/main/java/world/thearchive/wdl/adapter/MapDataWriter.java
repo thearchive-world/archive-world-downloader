@@ -9,7 +9,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import net.minecraft.SharedConstants;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
@@ -29,6 +28,10 @@ import world.thearchive.wdl.core.AtomicFileWrite;
  */
 final class MapDataWriter {
     private static final String ID_COUNTS_KEY = "idcounts";
+
+    // The 1.13.2 world data version. Vanilla stamps this literal into every SavedData DataVersion (there is no
+    // SharedConstants version accessor at this band), and it is what a 1.13.2 client reads back.
+    private static final int DATA_VERSION = 1631;
 
     private MapDataWriter() {}
 
@@ -72,7 +75,7 @@ final class MapDataWriter {
     private static CompoundTag envelope(Tag dataTag) {
         CompoundTag envelope = new CompoundTag();
         envelope.put("data", dataTag);
-        envelope.putInt("DataVersion", SharedConstants.getCurrentVersion().getWorldVersion());
+        envelope.putInt("DataVersion", DATA_VERSION);
         return envelope;
     }
 

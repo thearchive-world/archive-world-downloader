@@ -5,6 +5,7 @@
 # Forge-on-26.2 is one edited line).
 #
 # Format: <minecraft_version> <loader>[,<loader>...]
+1.13.2   forge
 1.21.3   fabric,neoforge
 1.21.4   fabric,neoforge
 1.21.5   fabric,neoforge

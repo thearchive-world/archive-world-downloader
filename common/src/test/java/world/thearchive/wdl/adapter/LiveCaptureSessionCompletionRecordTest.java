@@ -74,7 +74,7 @@ class LiveCaptureSessionCompletionRecordTest {
         assertFalse(config.showChatMessages(), "the chat arm reaches for a client this session does without");
         assertFalse(config.showToasts(), "the toast arm reaches for a player this session does without");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
+                config, null, DimensionType.field_18954, DimensionType.field_18954,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});

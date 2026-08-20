@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -40,7 +41,7 @@ class MenuChangeTrackerTest {
     @Test
     void firstLookAlwaysFires() {
         MenuChangeTracker tracker = new MenuChangeTracker();
-        List<Slot> slots = slotsOver(new SimpleContainer(3));
+        List<Slot> slots = slotsOver(new SimpleContainer(new TextComponent(""), 3));
 
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA),
                 "the first look must stash at least once");
@@ -50,7 +51,7 @@ class MenuChangeTrackerTest {
     @Test
     void replacedStackFires() {
         MenuChangeTracker tracker = new MenuChangeTracker();
-        SimpleContainer container = new SimpleContainer(3);
+        SimpleContainer container = new SimpleContainer(new TextComponent(""), 3);
         List<Slot> slots = slotsOver(container);
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
 
@@ -63,7 +64,7 @@ class MenuChangeTrackerTest {
     @Test
     void inPlaceCountChangeFires() {
         MenuChangeTracker tracker = new MenuChangeTracker();
-        SimpleContainer container = new SimpleContainer(3);
+        SimpleContainer container = new SimpleContainer(new TextComponent(""), 3);
         ItemStack stack = new ItemStack(Items.DIAMOND, 3);
         container.setItem(0, stack);
         List<Slot> slots = slotsOver(container);
@@ -78,7 +79,7 @@ class MenuChangeTrackerTest {
     @Test
     void pageTurnFires() {
         MenuChangeTracker tracker = new MenuChangeTracker();
-        List<Slot> slots = slotsOver(new SimpleContainer(1));
+        List<Slot> slots = slotsOver(new SimpleContainer(new TextComponent(""), 1));
         assertTrue(tracker.changedSince(slots, 2, MenuChangeTracker.NO_DATA));
 
         assertTrue(tracker.changedSince(slots, 3, MenuChangeTracker.NO_DATA), "a lectern page turn is a change");
@@ -88,7 +89,7 @@ class MenuChangeTrackerTest {
     @Test
     void resetForcesTheNextStash() {
         MenuChangeTracker tracker = new MenuChangeTracker();
-        List<Slot> slots = slotsOver(new SimpleContainer(2));
+        List<Slot> slots = slotsOver(new SimpleContainer(new TextComponent(""), 2));
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
         assertFalse(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
 
@@ -101,7 +102,7 @@ class MenuChangeTrackerTest {
     @Test
     void dataOnlyChangeTriggersRestash() {
         MenuChangeTracker tracker = new MenuChangeTracker();
-        List<Slot> slots = slotsOver(new SimpleContainer(1));
+        List<Slot> slots = slotsOver(new SimpleContainer(new TextComponent(""), 1));
         assertTrue(tracker.changedSince(slots, 0, new int[] { 5, 20 }));
         assertFalse(tracker.changedSince(slots, 0, new int[] { 5, 20 }));
         assertTrue(tracker.changedSince(slots, 0, new int[] { 6, 20 }), "a data-only change re-stashes");
@@ -110,7 +111,7 @@ class MenuChangeTrackerTest {
     @Test
     void dataLengthChangeTriggersRestash() {
         MenuChangeTracker tracker = new MenuChangeTracker();
-        List<Slot> slots = slotsOver(new SimpleContainer(1));
+        List<Slot> slots = slotsOver(new SimpleContainer(new TextComponent(""), 1));
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
         assertTrue(tracker.changedSince(slots, 0, new int[] { 0 }), "a data-vector length change re-stashes");
     }
@@ -118,7 +119,7 @@ class MenuChangeTrackerTest {
     @Test
     void resetForgetsData() {
         MenuChangeTracker tracker = new MenuChangeTracker();
-        List<Slot> slots = slotsOver(new SimpleContainer(1));
+        List<Slot> slots = slotsOver(new SimpleContainer(new TextComponent(""), 1));
         assertTrue(tracker.changedSince(slots, 0, new int[] { 1 }));
         tracker.reset();
         assertTrue(tracker.changedSince(slots, 0, new int[] { 1 }), "a reset forgets the last data vector");

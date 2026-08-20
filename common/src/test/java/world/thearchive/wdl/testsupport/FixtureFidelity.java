@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.block.class_1451;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.Registry;
@@ -17,7 +18,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -54,7 +54,7 @@ public final class FixtureFidelity {
     public static BlockEntity newBlockEntity(String blockEntityId, int x, int y, int z) {
         BlockPos pos = new BlockPos(x, y, z);
         BlockState state = representativeState(blockEntityId);
-        EntityBlock block = (EntityBlock) state.getBlock();
+        class_1451 block = (class_1451) state.getBlock();
         BlockEntity blockEntity = block.newBlockEntity(null);
         if (blockEntity == null) {
             throw new AssertionError("Fixture fidelity: " + state.getBlock() + " hosts no block entity at " + pos);
@@ -159,11 +159,13 @@ public final class FixtureFidelity {
         }
         TestRegistries.bootstrap();
         Map<ResourceLocation, BlockState> states = new HashMap<>();
-        for (Block block : Registry.BLOCK) {
-            if (!(block instanceof EntityBlock)) {
+        // Registry extends a raw Iterable at this band, so the loop element is Object and needs the cast to Block.
+        for (Object registered : Registry.BLOCK) {
+            Block block = (Block) registered;
+            if (!(block instanceof class_1451)) {
                 continue;
             }
-            EntityBlock entityBlock = (EntityBlock) block;
+            class_1451 entityBlock = (class_1451) block;
             BlockState state = block.defaultBlockState();
             BlockEntity blockEntity = entityBlock.newBlockEntity(null);
             if (blockEntity == null) {

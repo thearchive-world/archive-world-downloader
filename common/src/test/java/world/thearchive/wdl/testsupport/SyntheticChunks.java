@@ -30,10 +30,17 @@ import world.thearchive.wdl.adapter.ChunkSnapshotSource;
  * {@code LevelChunk} cannot avoid, so the round-trip exercises the mod's encode slice.
  */
 public final class SyntheticChunks {
-    /** A standard 1.15.2 overworld column: 0..256, so {@code minSectionY == 0}. */
+    /** A standard 1.13.2 overworld column: 0..256, so {@code minSectionY == 0}. */
     public static final int MIN_Y = 0;
     public static final int HEIGHT = 256;
     public static final long GAME_TIME = 1234L;
+
+    /**
+     * The terminal LEVELCHUNK status a saved full chunk carries: field_18865 ("postprocessed"). A networked client
+     * chunk carries none, so the capture promotes it to this before saving; there is no Mojmap name for it at this
+     * band.
+     */
+    private static final ChunkStatus FULL = ChunkStatus.field_18865;
 
     /** A recognizable WORLD_SURFACE payload so the round-trip can assert the kept heightmap survives. */
     public static final long WORLD_SURFACE_SENTINEL = 0x0102030405060708L;
@@ -43,17 +50,19 @@ public final class SyntheticChunks {
     public static final byte SKY_LIGHT_FILL = 15;
 
     /**
-     * Packed long[] length of a 256-tall world's heightmap: 256 columns at 9 bits, 7 per long, so ceil(256/7) is 37.
+     * Packed long[] length of a 256-tall world's heightmap: 256 entries at 9 bits, tightly packed across long
+     * boundaries at roundUp(256 * 9, 64) / 64, so 36 longs at this band. The padded 7-per-long layout is a later band.
      */
-    private static final int HEIGHTMAP_LONGS = 37;
+    private static final int HEIGHTMAP_LONGS = 36;
 
     private SyntheticChunks() {}
 
     /**
      * A FULL chunk at (0,0): a single stone block in the bottom section, the rest air, PLAINS biomes. Its heightmap set
-     * deliberately includes {@code OCEAN_FLOOR} (Usage.LIVE_WORLD, never sent to a client) alongside the three
-     * CLIENT-usage maps, so the codec is proven to drop the one the client never receives. {@code lightCorrect} is
-     * caller-controlled so a test can prove {@code isLightOn} tracks the flag rather than being hardcoded.
+     * is the four LIVE_WORLD maps vanilla writes to disk at this band (WORLD_SURFACE, MOTION_BLOCKING,
+     * MOTION_BLOCKING_NO_LEAVES, OCEAN_FLOOR); this band's Usage enum has no CLIENT tier, so the codec keeps all four.
+     * {@code lightCorrect} is caller-controlled, but at this band it has no on-disk form: light is section-resident and
+     * there is no chunk-level {@code isLightOn} (a 1.14 field), so a lit and a non-lit snapshot encode alike.
      */
     public static ChunkSnapshotSource full(boolean lightCorrect) {
         return fullWithBlockEntities(lightCorrect, ImmutableList.of());
@@ -83,16 +92,16 @@ public final class SyntheticChunks {
         TestRegistries.bootstrap();
         int minSectionY = MIN_Y;
 
-        LevelChunkSection bottom = new LevelChunkSection(minSectionY);
+        LevelChunkSection bottom = new LevelChunkSection(minSectionY << 4, true);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
-        LevelChunkSection air = new LevelChunkSection(minSectionY + 1);
+        LevelChunkSection air = new LevelChunkSection((minSectionY + 1) << 4, true);
 
         List<ChunkSnapshotSource.SectionData> sections = new ArrayList<>();
         sections.add(new ChunkSnapshotSource.SectionData(minSectionY, bottom, null, null));
         sections.add(new ChunkSnapshotSource.SectionData(minSectionY + 1, air, null, null));
 
         return new Snapshot(
-                new ChunkPos(0, 0), minSectionY, GAME_TIME, 0L, ChunkStatus.FULL,
+                new ChunkPos(0, 0), minSectionY, GAME_TIME, 0L, FULL,
                 lightCorrect, standardHeightmaps(), sections, saved(blockEntities, checkShape),
                 plainsBiomes());
     }
@@ -117,11 +126,11 @@ public final class SyntheticChunks {
         return ImmutableList.copyOf(stamped);
     }
 
-    /** The standard heightmap set: OCEAN_FLOOR (must be dropped by the codec) + the three CLIENT-usage maps. */
+    /** The standard heightmap set: the four LIVE_WORLD maps vanilla writes at this band, all kept by the codec. */
     private static Map<Heightmap.Types, long[]> standardHeightmaps() {
         Map<Heightmap.Types, long[]> heightmaps = new EnumMap<>(Heightmap.Types.class);
-        heightmaps.put(Heightmap.Types.OCEAN_FLOOR, new long[HEIGHTMAP_LONGS]);                 // must be dropped
-        heightmaps.put(Heightmap.Types.WORLD_SURFACE, filled(WORLD_SURFACE_SENTINEL)); // must be kept
+        heightmaps.put(Heightmap.Types.OCEAN_FLOOR, new long[HEIGHTMAP_LONGS]);
+        heightmaps.put(Heightmap.Types.WORLD_SURFACE, filled(WORLD_SURFACE_SENTINEL)); // carries the sentinel
         heightmaps.put(Heightmap.Types.MOTION_BLOCKING, new long[HEIGHTMAP_LONGS]);
         heightmaps.put(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, new long[HEIGHTMAP_LONGS]);
         return heightmaps;
@@ -134,12 +143,12 @@ public final class SyntheticChunks {
      */
     public static ChunkSnapshotSource withBlockAt(BlockPos worldPos, BlockState state) {
         TestRegistries.bootstrap();
-        LevelChunkSection section = new LevelChunkSection(worldPos.getY() >> 4);
+        LevelChunkSection section = new LevelChunkSection((worldPos.getY() >> 4) << 4, true);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
         List<ChunkSnapshotSource.SectionData> sections = ImmutableList
                 .of(new ChunkSnapshotSource.SectionData(worldPos.getY() >> 4, section, null, null));
         return new Snapshot(
-                new ChunkPos(worldPos), MIN_Y, GAME_TIME, 0L, ChunkStatus.FULL,
+                new ChunkPos(worldPos), MIN_Y, GAME_TIME, 0L, FULL,
                 true, new EnumMap<>(Heightmap.Types.class), sections, ImmutableList.of(), plainsBiomes());
     }
 
@@ -164,29 +173,29 @@ public final class SyntheticChunks {
     private static ChunkSnapshotSource withBlockEntityAt(BlockPos worldPos,
             BlockState state, CompoundTag blockEntity, boolean checkShape) {
         TestRegistries.bootstrap();
-        LevelChunkSection section = new LevelChunkSection(worldPos.getY() >> 4);
+        LevelChunkSection section = new LevelChunkSection((worldPos.getY() >> 4) << 4, true);
         section.setBlockState(worldPos.getX() & 15, worldPos.getY() & 15, worldPos.getZ() & 15, state);
         List<ChunkSnapshotSource.SectionData> sections = ImmutableList
                 .of(new ChunkSnapshotSource.SectionData(worldPos.getY() >> 4, section, null, null));
         return new Snapshot(
-                new ChunkPos(worldPos), MIN_Y, GAME_TIME, 0L, ChunkStatus.FULL,
+                new ChunkPos(worldPos), MIN_Y, GAME_TIME, 0L, FULL,
                 true, new EnumMap<>(Heightmap.Types.class), sections, saved(ImmutableList.of(blockEntity), checkShape),
                 plainsBiomes());
     }
 
     /**
      * As {@link #full} with {@code lightCorrect=true} and captured light layers, including a below-chunk padding
-     * section (sky only, null chunk section), the shape the light engine's padded range produces. Proves the encode
-     * slice writes the vanilla {@code BlockLight}/{@code SkyLight}/{@code isLightOn} shape and that a null-section
-     * {@code SectionData} survives write and parse.
+     * section (sky only, null chunk section), the higher-band shape a light engine's padded range produces. Proves the
+     * encode slice writes the vanilla section-resident {@code BlockLight}/{@code SkyLight} shape for the in-range
+     * sections and drops the null-section pad, which has no home in this band's 0..15 block column.
      */
     public static ChunkSnapshotSource fullWithLight() {
         TestRegistries.bootstrap();
         int minSectionY = MIN_Y;
 
-        LevelChunkSection bottom = new LevelChunkSection(minSectionY);
+        LevelChunkSection bottom = new LevelChunkSection(minSectionY << 4, true);
         bottom.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
-        LevelChunkSection air = new LevelChunkSection(minSectionY + 1);
+        LevelChunkSection air = new LevelChunkSection((minSectionY + 1) << 4, true);
 
         List<ChunkSnapshotSource.SectionData> sections = new ArrayList<>();
         sections.add(new ChunkSnapshotSource.SectionData(minSectionY - 1, null, null,
@@ -196,7 +205,7 @@ public final class SyntheticChunks {
         sections.add(new ChunkSnapshotSource.SectionData(minSectionY + 1, air, null,
                 new DataLayer(lightFill(SKY_LIGHT_FILL))));
 
-        return new Snapshot(new ChunkPos(0, 0), minSectionY, GAME_TIME, 0L, ChunkStatus.FULL,
+        return new Snapshot(new ChunkPos(0, 0), minSectionY, GAME_TIME, 0L, FULL,
                 true, standardHeightmaps(), ImmutableList.copyOf(sections), ImmutableList.of(),
                 plainsBiomes());
     }
@@ -214,10 +223,10 @@ public final class SyntheticChunks {
         return data;
     }
 
-    /** PLAINS-filled per-chunk biome ids sized to the 1.15.2 column: 16 * ceilDiv(HEIGHT, 4) = 1024 for 0..256. */
+    /** PLAINS-filled per-column biome ids: the flat 16x16 grid a 1.13.2 chunk carries, 256 columns indexed z*16+x. */
     private static int[] plainsBiomes() {
         int plainsId = Registry.BIOME.getId(Biomes.PLAINS);
-        int[] biomes = new int[16 * ((HEIGHT + 3) / 4)];
+        int[] biomes = new int[16 * 16];
         Arrays.fill(biomes, plainsId);
         return biomes;
     }

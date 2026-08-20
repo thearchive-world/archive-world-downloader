@@ -35,8 +35,9 @@ class ChunkMergeTest {
         return container("minecraft:chest", x, y, z, itemIds);
     }
 
-    private static CompoundTag barrel(int x, int y, int z, String... itemIds) {
-        return container("minecraft:barrel", x, y, z, itemIds);
+    /** A second container type distinct from chest, so a same-position type change can be shown; trapped chest here. */
+    private static CompoundTag trappedChest(int x, int y, int z, String... itemIds) {
+        return container("minecraft:trapped_chest", x, y, z, itemIds);
     }
 
     private static CompoundTag container(String id, int x, int y, int z, String... itemIds) {
@@ -45,8 +46,12 @@ class ChunkMergeTest {
         return blockEntity;
     }
 
+    // No vanilla lectern exists at this band, but ChunkMerge still carries the field-based "Book"/"Page"
+    // (CapturedBlockField.BOOK) forward for foreign or modded block entities, so a fieldless ender chest stands in as
+    // the carrier. A synthetic Book is no producer's output, so a Book-bearing carrier goes through
+    // malformedChunkTagWith, not the fidelity-checked chunkTagWith.
     private static CompoundTag lectern(int x, int y, int z, boolean withBook, int page) {
-        CompoundTag blockEntity = blockEntity("minecraft:lectern", x, y, z);
+        CompoundTag blockEntity = blockEntity("minecraft:ender_chest", x, y, z);
         if (withBook) {
             blockEntity.put("Book", ItemFixtures.itemTag(ItemFixtures.writtenBook(page + 1)));
             blockEntity.putInt("Page", page);
@@ -71,9 +76,10 @@ class ChunkMergeTest {
     }
 
     // No vanilla beehive exists at this band, but ChunkMerge still carries the field-based "Bees" occupant list
-    // (CapturedBlockField.BEES) for foreign or modded block entities, so a fieldless bell stands in as the carrier.
+    // (CapturedBlockField.BEES) for foreign or modded block entities, so a fieldless ender chest stands in as the
+    // carrier.
     private static CompoundTag beehive(int x, int y, int z) {
-        return blockEntity("minecraft:bell", x, y, z);
+        return blockEntity("minecraft:ender_chest", x, y, z);
     }
 
     /**
@@ -170,7 +176,7 @@ class ChunkMergeTest {
 
     @Test
     void aLecternBookAndPageCarryForwardWhenFreshHasNone() {
-        CompoundTag onDisk = chunkTagWith(lectern(5, 64, 5, true, 7));
+        CompoundTag onDisk = BlockEntityFixtures.malformedChunkTagWith(lectern(5, 64, 5, true, 7));
         CompoundTag fresh = chunkTagWith(lectern(5, 64, 5, false, 0));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
@@ -276,19 +282,19 @@ class ChunkMergeTest {
     @Test
     void aTypeChangedContainerIsNewAndEmptyNotGhosted() {
         CompoundTag onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond", "minecraft:gold_ingot"));
-        CompoundTag fresh = chunkTagWith(barrel(10, 70, 20)); // a barrel now stands where the chest was
+        CompoundTag fresh = chunkTagWith(trappedChest(10, 70, 20)); // a trapped chest now stands where the chest was
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
-        assertEquals(0, mergeBacks, "the chest's items must not ghost into a barrel at the same position");
+        assertEquals(0, mergeBacks, "the chest's items must not ghost into a trapped chest at the same position");
         assertFalse(findByPos(fresh, 10, 70, 20).get("Items") instanceof ListTag
                 && !((ListTag) findByPos(fresh, 10, 70, 20).get("Items")).isEmpty(),
-                "the replacement barrel stays empty, not the chest's 27 slots");
+                "the replacement trapped chest stays empty, not the chest's 27 slots");
     }
 
     @Test
     void aTypeChangedLecternBookIsNotGhostedIntoTheReplacementChest() {
-        CompoundTag onDisk = chunkTagWith(lectern(5, 64, 5, true, 7));
+        CompoundTag onDisk = BlockEntityFixtures.malformedChunkTagWith(lectern(5, 64, 5, true, 7));
         CompoundTag fresh = chunkTagWith(chest(5, 64, 5)); // a chest now stands where the lectern was
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
@@ -299,10 +305,10 @@ class ChunkMergeTest {
 
     @Test
     void aRevisitReflectsPlacedBlockEntitiesAndCarriesTheSurvivingContainerForward() {
-        // A revisit re-flush drives the merge from the fresh capture: a barrel placed since the first flush is
+        // A revisit re-flush drives the merge from the fresh capture: a trapped chest placed since the first flush is
         // present (the change lands), and the chest that survived carries its earlier-saved contents forward.
         CompoundTag onDisk = chunkTagWith(chest(10, 70, 20, "minecraft:diamond"));
-        CompoundTag fresh = chunkTagWith(chest(10, 70, 20), barrel(11, 70, 20));
+        CompoundTag fresh = chunkTagWith(chest(10, 70, 20), trappedChest(11, 70, 20));
 
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
@@ -310,7 +316,7 @@ class ChunkMergeTest {
         assertEquals(1, itemCount(findByPos(fresh, 10, 70, 20)), "the chest keeps its earlier-saved diamond");
         assertFalse(findByPos(fresh, 11, 70, 20).get("Items") instanceof ListTag
                 && !((ListTag) findByPos(fresh, 11, 70, 20).get("Items")).isEmpty(),
-                "the newly placed barrel is present and empty (the revisit change is reflected)");
+                "the newly placed trapped chest is present and empty (the revisit change is reflected)");
     }
 
     @Test

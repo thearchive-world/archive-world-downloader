@@ -34,7 +34,8 @@ import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -182,7 +183,7 @@ public final class InteractionCapture {
      * count for content that never reaches disk, which tells the user the opposite of the truth. The guard is inert on
      * a loader whose hook already declines to fire for a spectator and load-bearing on one whose hook does not.
      */
-    public static void dispatchUseBlock(Player player, Level level, InteractionHand hand, BlockHitResult hit) {
+    public static void dispatchUseBlock(Player player, Level level, InteractionHand hand, HitResult hit) {
         InteractionCapture capture = active;
         if (capture != null && level.isClientSide() && player == Minecraft.getInstance().player
                 && !player.isSpectator()) {
@@ -276,8 +277,8 @@ public final class InteractionCapture {
      * place of a content-bearing block-item, snapshot the hand content to immutable NBT at once, and stash it; the
      * reconcile gate at flush decides whether it survives. Never mutates the interaction or the live stack.
      */
-    private void onUseBlock(Player player, Level level, InteractionHand hand, BlockHitResult hit) {
-        recordFailSoft(hit.getBlockPos(), () -> recognize(player, level, hand, hit));
+    private void onUseBlock(Player player, Level level, InteractionHand hand, HitResult hit) {
+        recordFailSoft(hit.method_9344(), () -> recognize(player, level, hand, hit));
     }
 
     /**
@@ -294,10 +295,10 @@ public final class InteractionCapture {
         }
     }
 
-    private void recognize(Player player, Level level, InteractionHand hand, BlockHitResult hit) {
+    private void recognize(Player player, Level level, InteractionHand hand, HitResult hit) {
         ItemStack stack = player.getItemInHand(hand);
-        // getBlockPos may return a MutableBlockPos; the stash key must be immutable, like every other stash.
-        BlockPos clicked = hit.getBlockPos().immutable();
+        // method_9344 (getBlockPos) may return a MutableBlockPos; the stash key must be immutable, like every stash.
+        BlockPos clicked = hit.method_9344().immutable();
         BlockState state = level.getBlockState(clicked);
         boolean inserted = false;
         if (state.getBlock() instanceof JukeboxBlock) {
@@ -307,7 +308,7 @@ public final class InteractionCapture {
         // places a held block against that face, so fall through to recordPlace rather than returning: vanilla's
         // useItemOn yields to item use on a non-consuming result.
         if (!inserted && recaptureEnabled) {
-            recordPlace(player, hand, hit, stack);
+            recordPlace(player, hit, stack);
         }
     }
 
@@ -320,7 +321,7 @@ public final class InteractionCapture {
         return true;
     }
 
-    private void recordPlace(Player player, InteractionHand hand, BlockHitResult hit, ItemStack stack) {
+    private void recordPlace(Player player, HitResult hit, ItemStack stack) {
         if (!(stack.getItem() instanceof BlockItem)) {
             return;
         }
@@ -328,7 +329,12 @@ public final class InteractionCapture {
         // step earlier on the same client state. Without it every right-click holding a block item predicts a
         // placement into whatever cell the clicked face points at, including a cell already occupied by the
         // very block type the reconcile gate confirms on, which is exactly the state that makes writing wrong.
-        BlockPlaceContext context = new BlockPlaceContext(new UseOnContext(player, hand, hit));
+        // This band has no unified (player, hand, hit) UseOnContext; build the positional form vanilla's own use
+        // path builds, with the fractional hit coordinates relative to the clicked block.
+        BlockPos hitPos = hit.method_9344();
+        Vec3 loc = hit.location;
+        BlockPlaceContext context = new BlockPlaceContext(new UseOnContext(player, stack, hitPos, hit.field_10268,
+                (float) (loc.x - hitPos.getX()), (float) (loc.y - hitPos.getY()), (float) (loc.z - hitPos.getZ())));
         if (!context.canPlace()) {
             return;
         }

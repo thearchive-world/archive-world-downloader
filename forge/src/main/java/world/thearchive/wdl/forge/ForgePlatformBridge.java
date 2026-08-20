@@ -5,25 +5,21 @@ package world.thearchive.wdl.forge;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.gui.screens.PauseScreen;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.class_385;
+import net.minecraft.realms.class_356;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.DeferredWorkQueue;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.loading.FMLPaths;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
@@ -51,7 +47,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
         KeyMapping key = new KeyMapping(keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
                 WdlKeyBinds.CATEGORY);
         // Below 1.19 there is no RegisterKeyMappingsEvent; keys register through ClientRegistry during client
-        // setup. At 1.15.2 the setup event has no enqueueWork, so the main-thread registration is deferred through
+        // setup. At this band the setup event has no enqueueWork, so the main-thread registration is deferred through
         // DeferredWorkQueue instead.
         modEventBus.addListener((FMLClientSetupEvent event) -> DeferredWorkQueue
                 .runLater(() -> ClientRegistry.registerKeyBinding(key)));
@@ -67,25 +63,19 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     @Override
     public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
             Runnable onPrimary, Runnable onConfig) {
-        // GuiScreenEvent.InitGuiEvent.Post fires on the game bus for every screen, and a Button is a renderable
-        // GuiEventListener, so the pause-menu buttons inject as screen listeners with no mixin.
+        // GuiScreenEvent.InitGuiEvent.Post fires on the game bus for every screen and exposes the screen's own
+        // button list, so the pause-menu row injects through addButton with no mixin. This band has no addWidget
+        // and no AbstractWidget: the buttons are the realms button base, so the list is read and added as those.
         MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Post event) -> {
-            if (!(event.getGui() instanceof PauseScreen)) {
+            if (!(event.getGui() instanceof class_385)) {
                 return;
             }
-            List<AbstractWidget> widgets = new ArrayList<>();
-            for (GuiEventListener listener : event.getGui().children()) {
-                if (listener instanceof AbstractWidget) {
-                    AbstractWidget widget = (AbstractWidget) listener;
-                    widgets.add(widget);
-                }
-            }
-            AbstractWidget anchor = lowest(widgets);
+            class_356 anchor = lowest(event.getButtonList());
             if (anchor == null) {
                 return;
             }
             buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
-                    .forEach(event::addWidget);
+                    .forEach(event::addButton);
         });
     }
 
@@ -100,17 +90,43 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public void onDisconnect(Runnable callback) {
-        MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggedOutEvent event) -> callback.run());
+        onConnectionEdge(false, callback);
     }
 
     @Override
     public void onServerJoin(Runnable callback) {
-        MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggedInEvent event) -> callback.run());
+        onConnectionEdge(true, callback);
+    }
+
+    /**
+     * Fire {@code callback} on the client-tick edge where the play connection appears (when {@code fireOnConnect}) or
+     * disappears (when not). ClientPlayerNetworkEvent, the login/logout event the higher bands listen on, does not
+     * exist at this band; {@code Minecraft.getConnection()} is null until the local player is assigned and stays
+     * non-null across a dimension change, so its null edge is the once-per-connection join and disconnect signal.
+     * Disconnect must not fire on a dimension change (it stops an in-progress download), which a world load or unload
+     * event would; the connection edge does not.
+     */
+    private void onConnectionEdge(boolean fireOnConnect, Runnable callback) {
+        boolean[] connected = {false};
+        MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent tick) -> {
+            if (tick.phase != TickEvent.Phase.END) {
+                return;
+            }
+            boolean now = Minecraft.getInstance().getConnection() != null;
+            if (now != connected[0]) {
+                connected[0] = now;
+                if (now == fireOnConnect) {
+                    callback.run();
+                }
+            }
+        });
     }
 
     @Override
     public Path configDirectory() {
-        return FMLPaths.CONFIGDIR.get();
+        // FMLPaths.CONFIGDIR lives in the fml.loading layer, which is outside the remapped Forge API compile view;
+        // at this band it resolves to the game directory's config child, so it is resolved from there directly.
+        return Minecraft.getInstance().gameDirectory.toPath().resolve("config");
     }
 
     @Override

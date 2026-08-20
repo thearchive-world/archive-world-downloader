@@ -18,6 +18,7 @@ import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
@@ -34,8 +35,16 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
  * neither a live menu nor a {@code Level} is needed. The one client-coupled step (lifting the book from the live open
  * menu's slot 0) is not exercised headless, exactly as for containers.
+ *
+ * <p>At 1.13.2 the merge cases are disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag
+ * can be built from a real producer here, and lectern-book capture is a documented limit at this band. The pure
+ * {@link LecternSink#merge} keeps coverage through the re-pointed {@code ChunkFlushPlanTest} and
+ * {@code AsyncSaveWriterTest} fold-wiring tests, which drive it against a stand-in carrier. {@code captureBook} needs
+ * only a book item, so it still runs.
  */
 class LecternSinkRoundTripTest {
+    private static final String LECTERN_ABSENT = "lecterns absent at 1.13.2 (1.14 block entity, documented limit)";
+
     private final LecternSink sink = new LecternSinkImpl();
 
     @BeforeAll
@@ -98,6 +107,7 @@ class LecternSinkRoundTripTest {
     }
 
     @Test
+    @Disabled(LECTERN_ABSENT)
     void writtenBookRoundTripsThroughMergeAndVanillaCodec() {
         CompoundTag holder = sink.captureBook(writtenBook(), 1);
         CompoundTag merged = sink.merge(lecternTag(10, 64, -7), holder);
@@ -122,6 +132,7 @@ class LecternSinkRoundTripTest {
     }
 
     @Test
+    @Disabled(LECTERN_ABSENT)
     void writableBookRoundTripsThroughMergeAndVanillaCodec() {
         CompoundTag holder = sink.captureBook(writableBook(), 0);
         CompoundTag merged = sink.merge(lecternTag(1, 1, 1), holder);
@@ -136,6 +147,7 @@ class LecternSinkRoundTripTest {
     }
 
     @Test
+    @Disabled(LECTERN_ABSENT)
     void mergeDoesNotMutateTheCapturedBlockEntityTag() {
         CompoundTag holder = sink.captureBook(writtenBook(), 0);
 

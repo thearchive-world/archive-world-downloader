@@ -25,13 +25,15 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.MultiPlayerLevel;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.realms.RealmsSharedConstants;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -154,7 +156,7 @@ public final class Wdl {
 
     /** The current MC version via its Mojmap name. */
     public static String mcVersion() {
-        return SharedConstants.getCurrentVersion().getName();
+        return RealmsSharedConstants.VERSION_STRING;
     }
 
     /**
@@ -403,7 +405,7 @@ public final class Wdl {
         }
         WdlConfig config = WdlConfig.load(configPath());
         currentConfig = config;
-        Path savesDirectory = minecraft.getLevelSource().getBaseDir();
+        Path savesDirectory = minecraft.getLevelSource().getLevelPath("");
         if (target.mode() == DownloadMode.NEW
                 && RestoreOperation.attemptReferences(savesDirectory, target.folderName())) {
             // A torn restore attempt still stages this name under the temporary root; a NEW download landing on
@@ -505,7 +507,10 @@ public final class Wdl {
         // worker and run the poke inline on the dispatching stack, rather than off the game tick where every
         // other completion lands. The dispatch-failure catch below never completes the future, so the marshal
         // never fires there; that path self-heals inline.
-        CompletionMarshal.scheduleCompletionPoke(result, Minecraft.getInstance(), Wdl::restoreTick);
+        // Minecraft is not an Executor at this band; its schedule-on-main-thread method is the executor the marshal
+        // needs, running the poke inline when already on the game thread and queuing it for the next frame otherwise.
+        CompletionMarshal.scheduleCompletionPoke(result, runnable -> Minecraft.getInstance().method_6635(runnable),
+                Wdl::restoreTick);
         try {
             worker.start();
         } catch (Throwable e) {
@@ -542,7 +547,8 @@ public final class Wdl {
             }
         }, "wdl-restore-sweep");
         worker.setDaemon(true);
-        CompletionMarshal.scheduleCompletionPoke(result, Minecraft.getInstance(), Wdl::restoreTick);
+        CompletionMarshal.scheduleCompletionPoke(result, runnable -> Minecraft.getInstance().method_6635(runnable),
+                Wdl::restoreTick);
         try {
             worker.start();
         } catch (Throwable e) {
@@ -582,7 +588,7 @@ public final class Wdl {
     /** Build the MC-free browse model and show the screen; run from the deferral on the client main thread. */
     private static void showDownloadsScreen(boolean expandExistingList) {
         Minecraft minecraft = Minecraft.getInstance();
-        Path savesDirectory = minecraft.getLevelSource().getBaseDir();
+        Path savesDirectory = minecraft.getLevelSource().getLevelPath("");
         Path loadedWorld = loadedWorldPath(minecraft);
         Supplier<List<DownloadEntry>> entries = () -> {
             try {
@@ -738,7 +744,7 @@ public final class Wdl {
 
     /** The kept-aside paths a swap failure names, shortened to saves-relative form where possible. */
     private static String describeSurvivingPaths(List<Path> survivingPaths) {
-        Path savesDirectory = Minecraft.getInstance().getLevelSource().getBaseDir();
+        Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
         return survivingPaths.stream()
                 .map(path -> {
                     try {
@@ -772,7 +778,11 @@ public final class Wdl {
             outlineTracker.clear();
             return;
         }
-        outlineTracker.tick(level, minecraft.gameRenderer.getMainCamera().getPosition(), currentConfig.outline(),
+        // This band exposes no render Camera on the tick, so the view entity's eye position stands in for the camera
+        // position; the outline uses it only as the center of its distance clamp.
+        Entity camera = minecraft.getCameraEntity();
+        Vec3 cameraPos = (camera != null ? camera : player).getEyePosition(1.0F);
+        outlineTracker.tick(level, cameraPos, currentConfig.outline(),
                 controller.aidToggles(currentConfig), controller.capturedContainers(),
                 controller.recoveredCoverage());
     }
@@ -878,7 +888,7 @@ public final class Wdl {
     static @Nullable Path loadedWorldPath(Minecraft minecraft) {
         IntegratedServer server = minecraft.getSingleplayerServer();
         return server != null
-                ? server.getStorageSource().getBaseDir().resolve(server.getLevelIdName())
+                ? server.getStorageSource().getLevelPath(server.getLevelIdName())
                 : null;
     }
 

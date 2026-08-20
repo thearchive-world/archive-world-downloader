@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.gui.class_372;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -17,8 +17,8 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.RenderSurface;
 
 /**
- * The {@link RenderSurface} plug for this branch. At 1.15.2 there is no {@code GuiGraphics} and GUI draws take no
- * {@code PoseStack}: draws go through the static {@link GuiComponent} helpers and {@link Font}, and a tooltip renders
+ * The {@link RenderSurface} plug for this branch. At this band there is no {@code GuiGraphics} and GUI draws take no
+ * {@code PoseStack}: draws go through the static {@link class_372} helpers and {@link Font}, and a tooltip renders
  * through the owning {@link Screen}, the only object that draws one at this version. A HUD draw, which never shows a
  * tooltip, uses the screen-less constructor. The font draws take a {@code String}, so a {@link Component} is flattened
  * with {@code getString}.
@@ -66,15 +66,15 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void fill(int minX, int minY, int maxX, int maxY, int color) {
-        GuiComponent.fill(minX, minY, maxX, maxY, color);
+        class_372.method_988(minX, minY, maxX, maxY, color);
     }
 
     @Override
     public void outline(int x, int y, int width, int height, int color) {
-        GuiComponent.fill(x, y, x + width, y + 1, color);
-        GuiComponent.fill(x, y + height - 1, x + width, y + height, color);
-        GuiComponent.fill(x, y + 1, x + 1, y + height - 1, color);
-        GuiComponent.fill(x + width - 1, y + 1, x + width, y + height - 1, color);
+        class_372.method_988(x, y, x + width, y + 1, color);
+        class_372.method_988(x, y + height - 1, x + width, y + height, color);
+        class_372.method_988(x, y + 1, x + 1, y + height - 1, color);
+        class_372.method_988(x + width - 1, y + 1, x + width, y + height - 1, color);
     }
 
     @Override
@@ -84,22 +84,22 @@ public final class RenderSurfaceImpl implements RenderSurface {
         // pre-1.20 blit likewise takes no tint argument. The sole wdl sprite is the 10 by 10 revert icon.
         Minecraft.getInstance().getTextureManager()
                 .bind(new ResourceLocation("wdl", "textures/gui/sprites/" + sprite + ".png"));
-        GlStateManager.color4f((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
+        GlStateManager.method_9825((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
                 (color & 0xFF) / 255.0F, (color >>> 24) / 255.0F);
-        GuiComponent.blit(x, y, width, height, 0.0F, 0.0F, 10, 10, 10, 10);
-        GlStateManager.color4f(1.0F, 1.0F, 1.0F, 1.0F);
+        class_372.method_6675(x, y, 0.0F, 0.0F, width, height, width, height, 10, 10);
+        GlStateManager.method_9825(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     @Override
     public void blitFavicon(ResourceLocation icon, int x, int y, int size) {
         Minecraft.getInstance().getTextureManager().bind(icon);
-        // A selected list row leaves the shader color at black (the 1.15.2 AbstractSelectionList highlight sets it and
-        // never resets it), and GuiComponent.blit does not set its own, so without this reset the selected row's icon
+        // A selected list row leaves the shader color at black (the AbstractSelectionList highlight sets it and
+        // never resets it), and the blit does not set its own, so without this reset the selected row's icon
         // multiplies to black. Vanilla's own world-selection list resets to white here for the same reason.
-        GlStateManager.color4f(1.0F, 1.0F, 1.0F, 1.0F);
-        GlStateManager.enableBlend();
-        GuiComponent.blit(x, y, 0.0F, 0.0F, size, size, size, size);
-        GlStateManager.disableBlend();
+        GlStateManager.method_9825(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.method_9843();
+        class_372.method_6674(x, y, 0.0F, 0.0F, size, size, size, size);
+        GlStateManager.method_9842();
     }
 
     @Override

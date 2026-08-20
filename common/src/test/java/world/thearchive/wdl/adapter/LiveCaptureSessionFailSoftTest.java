@@ -97,7 +97,7 @@ class LiveCaptureSessionFailSoftTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), bridge,
-                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
+                config, null, DimensionType.field_18954, DimensionType.field_18954,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -116,7 +116,7 @@ class LiveCaptureSessionFailSoftTest {
     void failSoftPassesThroughSuccessfulAssembly(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
         CapturedPlayer captured = new CapturedPlayer(new CompoundTag(), BlockPos.ZERO, 0.0F, 0.0F,
-                DimensionType.OVERWORLD, GameType.CREATIVE, Difficulty.NORMAL);
+                DimensionType.field_18954, GameType.CREATIVE, Difficulty.NORMAL);
 
         assertSame(captured, session.failSoft("player", () -> captured), "a successful assembly passes through");
         assertEquals(0, losses(session), "and a step that worked counts no loss");

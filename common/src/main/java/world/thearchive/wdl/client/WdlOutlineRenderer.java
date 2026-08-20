@@ -12,8 +12,9 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Culler;
-import net.minecraft.core.SectionPos;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -25,6 +26,7 @@ import world.thearchive.wdl.adapter.OutlineRenderContext;
 import world.thearchive.wdl.adapter.OutlineRim;
 import world.thearchive.wdl.adapter.OutlineTracker;
 import world.thearchive.wdl.adapter.RimRenderer;
+import world.thearchive.wdl.adapter.SectionKey;
 import world.thearchive.wdl.core.BrandColors;
 import world.thearchive.wdl.core.CaptureState;
 import world.thearchive.wdl.core.RimFace;
@@ -114,26 +116,38 @@ public final class WdlOutlineRenderer {
         float base = Math.max(2.5F, Minecraft.getInstance().window.getWidth() / 1920.0F * 2.5F);
         float lineWidth = (float) (Wdl.config().outline().lineWidthScale() * base);
         OutlineRenderContext context = new OutlineRenderContext(Tesselator.getInstance().getBuilder(), frustum,
-                Minecraft.getInstance().gameRenderer.getMainCamera().getPosition(), lineWidth);
+                cameraPos(), lineWidth);
         render(context, Wdl.outlineDrawSet(), rimRenderer);
+    }
+
+    // The world modelview this overlay draws into puts the camera entity's interpolated feet position at its
+    // origin (the eye height is folded into the view translate), the same origin vanilla's own block-outline and
+    // block-break overlays subtract, so the rim draw subtracts exactly this. There is no Camera type before 1.14.
+    private static Vec3 cameraPos() {
+        Minecraft minecraft = Minecraft.getInstance();
+        Entity camera = minecraft.getCameraEntity();
+        float partialTick = minecraft.getFrameTime();
+        return new Vec3(camera.xOld + (camera.x - camera.xOld) * partialTick,
+                camera.yOld + (camera.y - camera.yOld) * partialTick,
+                camera.zOld + (camera.z - camera.zOld) * partialTick);
     }
 
     // Mirrors LevelRenderer.renderHitOutline, minus its projection-scale trick: the rim's surface standoff is the
     // z-fight guard instead. The depth test is left on so a rim is occluded by nearer terrain.
     private static void setupLineState(float lineWidth) {
-        GlStateManager.enableBlend();
+        GlStateManager.method_9843();
         GlStateManager.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA,
                 GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE,
                 GlStateManager.DestFactor.ZERO);
-        GlStateManager.lineWidth(lineWidth);
-        GlStateManager.disableTexture();
+        GlStateManager.method_12304(lineWidth);
+        GlStateManager.method_9856();
         GlStateManager.depthMask(false);
     }
 
     private static void restoreLineState() {
         GlStateManager.depthMask(true);
-        GlStateManager.enableTexture();
-        GlStateManager.disableBlend();
+        GlStateManager.method_9855();
+        GlStateManager.method_9842();
     }
 
     /** Roll the per-frame render-thread cost into a windowed log line. */
@@ -148,9 +162,9 @@ public final class WdlOutlineRenderer {
     }
 
     private static AABB sectionBox(long sectionKey) {
-        int x = SectionPos.sectionToBlockCoord(SectionPos.x(sectionKey));
-        int y = SectionPos.sectionToBlockCoord(SectionPos.y(sectionKey));
-        int z = SectionPos.sectionToBlockCoord(SectionPos.z(sectionKey));
+        int x = SectionKey.sectionToBlockCoord(SectionKey.x(sectionKey));
+        int y = SectionKey.sectionToBlockCoord(SectionKey.y(sectionKey));
+        int z = SectionKey.sectionToBlockCoord(SectionKey.z(sectionKey));
         return new AABB(x, y, z, x + 16.0, y + 16.0, z + 16.0);
     }
 }

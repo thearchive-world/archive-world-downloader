@@ -25,8 +25,6 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -101,7 +99,7 @@ final class ContainerCapture {
         if (tracker != null) {
             OpenClickIntent.Target resolved = tracker.resolve();
             if (resolved == OpenClickIntent.Target.BLOCK) {
-                BlockPos clicked = BlockPos.of(tracker.resolvedBlockPosKey());
+                BlockPos clicked = BlockPos.method_10488(tracker.resolvedBlockPosKey());
                 LOGGER.debug("open target: clicked block {}", clicked);
                 return new OpenTarget(clicked, null, false);
             }
@@ -133,30 +131,29 @@ final class ContainerCapture {
                 return new OpenTarget(null, null, false);
             }
         }
+        // This band's HitResult is a single unified type; the BLOCK/ENTITY discriminator is the field_595 type
+        // field, the block pos is method_9344, and the entity is field_601. There is no BlockHitResult /
+        // EntityHitResult split to cast to.
         HitResult hit = minecraft.hitResult;
-        BlockHitResult blockHit = hit instanceof BlockHitResult && hit.getType() == HitResult.Type.BLOCK
-                ? (BlockHitResult) hit
-                : null;
-        EntityHitResult entityHit = hit instanceof EntityHitResult && hit.getType() == HitResult.Type.ENTITY
-                ? (EntityHitResult) hit
-                : null;
+        HitResult blockHit = hit != null && hit.field_595 == HitResult.Type.BLOCK ? hit : null;
+        HitResult entityHit = hit != null && hit.field_595 == HitResult.Type.ENTITY ? hit : null;
         // The provider read is gated on the gamemode here, not left to the rule below: Java evaluates
-        // arguments eagerly, so passing it unguarded would run a mod-overridable getMenuProvider and an
+        // arguments eagerly, so passing it unguarded would run a mod-overridable container test and an
         // on-demand getBlockEntity for every unattributed open in every gamemode, on a path with no catch
         // between it and the capture tick. The rule still decides; this only withholds an input it cannot use.
         boolean spectator = player.isSpectator();
         boolean blockOpensForSpectator = spectator && blockHit != null
-                && spectatorCouldOpen(player.level, blockHit.getBlockPos());
+                && spectatorCouldOpen(player.level, blockHit.method_9344());
         SpectatorCrosshairFallback.Axis axis = SpectatorCrosshairFallback.axisFor(spectator,
                 loaderObservesSpectatorBlockClick, loaderObservesSpectatorEntityClick, blockHit != null,
                 entityHit != null, blockOpensForSpectator);
         if (axis == SpectatorCrosshairFallback.Axis.BLOCK && blockHit != null) {
-            LOGGER.debug("open target: spectator crosshair block {}", blockHit.getBlockPos());
-            return new OpenTarget(blockHit.getBlockPos().immutable(), null, false);
+            LOGGER.debug("open target: spectator crosshair block {}", blockHit.method_9344());
+            return new OpenTarget(blockHit.method_9344().immutable(), null, false);
         }
         if (axis == SpectatorCrosshairFallback.Axis.ENTITY && entityHit != null) {
-            LOGGER.debug("open target: spectator crosshair entity {}", entityHit.getEntity());
-            return new OpenTarget(null, entityHit.getEntity(), false);
+            LOGGER.debug("open target: spectator crosshair entity {}", entityHit.field_601);
+            return new OpenTarget(null, entityHit.field_601, false);
         }
         LOGGER.info("open target: none (no fresh click or vehicle open request seeded this open)");
         return new OpenTarget(null, null, false);
@@ -219,7 +216,10 @@ final class ContainerCapture {
      * type itself, so the dispatch needs no second {@code instanceof}.
      */
     boolean isDoubleChestOpen(MultiPlayerLevel level, AbstractContainerMenu menu, @Nullable BlockPos target) {
-        return menu instanceof ChestMenu && ((ChestMenu) menu).getRowCount() == 6
+        // This band's ChestMenu has no getRowCount; a ChestMenu adds its block container slots first, so slot 0's
+        // container is the block container and its size is the six-row (54) signal getRowCount() == 6 stood for.
+        return menu instanceof ChestMenu && !menu.slots.isEmpty()
+                && menu.slots.get(0).container.getContainerSize() == 54
                 && isDoubleChestHalfAt(level, target);
     }
 

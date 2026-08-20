@@ -1,7 +1,25 @@
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import net.ltgt.gradle.errorprone.errorprone
+import org.objectweb.asm.AnnotationVisitor
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
+
+// ASM on the buildscript classpath drives the compile-side Minecraft annotation strip below
+// (stripMinecraftParameterAnnotations); pinned to the version the tools/mojmap-bridge generator uses.
+buildscript {
+    repositories { mavenCentral() }
+    dependencies { classpath("org.ow2.asm:asm:9.10.1") }
+}
 
 plugins {
-    id("net.neoforged.gradle.vanilla") version "7.1.38" // common's Minecraft toolchain, versioned inline
+    // common's Minecraft toolchain: vanilla-mode Fabric Loom + the intermediary->Mojmap bridge mapping. The
+    // version is pinned in the catalog and declared apply-false at the root, so it is applied here version-less.
+    alias(libs.plugins.loom)
     id("com.diffplug.spotless")    // applied per-subproject, not via build-logic (see below)
     id("wdl.java-conventions")
     id("wdl.nullness-conventions")
@@ -22,19 +40,41 @@ spotless {
     }
 }
 
-// --- Minecraft toolchain: NeoGradle vanilla, not ModDevGradle Vanilla mode ---
-// NeoForm has no 1.18.x release: NeoForged forked from Forge at 1.20.2, so net.neoforged:neoform starts there,
-// and ModDevGradle Vanilla mode (which resolves that coordinate) cannot target this band. NeoGradle's vanilla
-// plugin builds the same Mojmap (official) Minecraft on Gradle 9 by deriving it from mcp_config 1.18.2 instead,
-// the exact namespace common is written in, with no intermediary remap. The net.minecraft:client distribution
-// carries the shared and server-side classes the codec reads plus the bundled vanilla data pack, and an
-// implementation dependency is inherited by the test source set, so the headless JUnit suite boots the vanilla
-// registries against it with no extra wiring (the analog of MDG Vanilla mode's addModdingDependenciesTo(test)).
-// Parchment is not layered on this band's common: NeoGradle vanilla takes no Parchment coordinate here, so the
-// decompiled Minecraft carries generated parameter names, which WDL never references; fabric keeps its own
-// Loom-layered Parchment separately.
+// --- Minecraft toolchain: Fabric Loom (vanilla mode) + the composed intermediary->Mojmap bridge ---
+// This band predates the Mojmap floor NeoForm/ModDevGradle and NeoGradle vanilla can target (NeoForm has no
+// pre-1.20.2 release), so neither resolves official Mojang mappings for 1.13.2. Fabric Loom provisions the vanilla
+// jar and remaps it to Mojmap names in two hops: obf->intermediary via Legacy Fabric's published intermediary,
+// then intermediary->named via the bridge mapping the tools/mojmap-bridge included build composes (genBridge).
+// common is written in Mojmap names, so it compiles against this remapped jar with no per-name glue. Loom's test
+// source set inherits the same named jar, so the headless JUnit suite boots the vanilla registries against it.
+loom {
+    // Legacy Fabric hosts intermediary for the pre-1.14 versions the modern Fabric maven does not; %1$s is the MC version.
+    intermediaryUrl.set("https://maven.legacyfabric.net/net/legacyfabric/intermediary/%1\$s/intermediary-%1\$s-v2.jar")
+}
+
+// Forge-only band: common is built standalone for its gates and tests alone; it ships no Fabric jar, since the
+// shippable artifact is the forge island's modJar (reobfuscated Mojmap -> SRG by the separate forge/ build, which
+// compiles common's source directly). Fabric Loom is applied here only to provision the Mojmap Minecraft classpath,
+// so its auto-registered Fabric-mod remap tasks have no consumer on this band, and remapJar's Mojmap -> intermediary
+// direction cannot even run: tiny-remapper hits unfixable conflicts in the Legacy Fabric 1.13.2 intermediary (over
+// Minecraft's own members, never WDL code), so leaving it wired into build would fail assemble for an artifact
+// nobody uses. Disable both so the root build runs the gates and tests without them.
+tasks.matching { it.name == "remapJar" || it.name == "remapSourcesJar" }.configureEach {
+    enabled = false
+}
+
 dependencies {
-    implementation("net.minecraft:client:${property("minecraft_version")}")
+    minecraft("com.mojang:minecraft:${property("minecraft_version")}")
+    // The bridge jar is produced by the included build's genBridge. builtBy declares that producer edge, but it is
+    // NOT sufficient on its own: Loom resolves mappings(files(...)) during provisioning inside afterEvaluate, at
+    // CONFIGURATION time, whereas a builtBy producer only runs in the execution phase, which never precedes a
+    // config-time read. So the canonical build must run genBridge as a PREREQUISITE invocation
+    // (cd tools/mojmap-bridge && ./gradlew genBridge) BEFORE this root build configures; the jar must already
+    // exist on disk here. The builtBy stays to express the dependency for incremental rebuilds once it exists.
+    mappings(
+        files(rootProject.file("tools/mojmap-bridge/build/bridge/intermediary-mojmap.jar"))
+            .builtBy(gradle.includedBuild("mojmap-bridge").task(":genBridge"))
+    )
 }
 
 // --- PITest mutation testing: on-demand fidelity-gap discovery (./gradlew :common:pitest) ---
@@ -107,6 +147,7 @@ pitest {
         "world.thearchive.wdl.adapter.PlayerProgressSerializer",
         "world.thearchive.wdl.adapter.PlayerTag",
         "world.thearchive.wdl.adapter.RecoveredScan",
+        "world.thearchive.wdl.adapter.SectionKey",
         "world.thearchive.wdl.adapter.VanillaDimensions",
         "world.thearchive.wdl.adapter.impl.NaturalEquipment",
     ))
@@ -358,6 +399,8 @@ tasks.named("check") {
 repositories {
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
     maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
+    // Legacy Fabric intermediary (obf->intermediary) for this pre-1.14 band; the modern Fabric maven has none.
+    maven("https://maven.legacyfabric.net/")
 }
 
 dependencies {
@@ -365,4 +408,119 @@ dependencies {
     // The binding compiles against the journeymap.client.api 1.8 surface, its own API types rather than Minecraft
     // signatures; the -SNAPSHOT suffix is appended here.
     compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
+}
+
+// --- Compile-side Minecraft annotation strip + classpath interposition ---
+// The Mojmap-remapped 1.13.2 jar carries Minecraft's own malformed empty RuntimeVisibleParameterAnnotations
+// attributes: they are present on Minecraft's classes in the vanilla obf jar and are merely preserved by the
+// remap. JDK 8's javac rejects them ("bad class file"), which would sink the clean subset before it reaches a
+// single seam. Because the attributes sit on Minecraft's own classes, which never ship in the mod jar (Forge
+// supplies Minecraft at runtime), removing them is a compile-side fix with no ship consequence. An ASM pass drops
+// every parameter annotation from the provisioned jar, and the stripped jar is interposed onto the compile
+// classpaths in place of Loom's own minecraft entry, so the same stripped jar feeds compileJava and
+// compileTestJava. The runtime classpath keeps Loom's entry: the malformed attribute poisons javac only, and the
+// JVM ignores unread annotation attributes, so the registry-boot tests still run against the provisioned jar.
+abstract class StripParameterAnnotations : DefaultTask() {
+    @get:InputFiles
+    abstract val inputJars: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun strip() {
+        val outDir = outputDir.get().asFile
+        outDir.mkdirs()
+        outDir.listFiles()?.forEach { it.delete() }
+        for (jar in inputJars.files) {
+            val target = outDir.resolve(jar.nameWithoutExtension + "-stripped.jar")
+            ZipInputStream(jar.inputStream().buffered()).use { zin ->
+                ZipOutputStream(target.outputStream().buffered()).use { zout ->
+                    var entry = zin.nextEntry
+                    while (entry != null) {
+                        val bytes = zin.readBytes()
+                        val transformed = if (entry.name.endsWith(".class")) stripClass(bytes) else bytes
+                        zout.putNextEntry(ZipEntry(entry.name))
+                        zout.write(transformed)
+                        zout.closeEntry()
+                        entry = zin.nextEntry
+                    }
+                }
+            }
+            logger.lifecycle("stripped parameter annotations from ${jar.name} -> ${target.name}")
+        }
+    }
+
+    private fun stripClass(bytes: ByteArray): ByteArray {
+        val reader = ClassReader(bytes)
+        val writer = ClassWriter(0)
+        reader.accept(object : ClassVisitor(Opcodes.ASM9, writer) {
+            override fun visitMethod(
+                access: Int,
+                name: String?,
+                descriptor: String?,
+                signature: String?,
+                exceptions: Array<out String>?,
+            ): MethodVisitor? {
+                val delegate = super.visitMethod(access, name, descriptor, signature, exceptions) ?: return null
+                return object : MethodVisitor(Opcodes.ASM9, delegate) {
+                    // Drop the count and every parameter annotation so no (malformed) RuntimeVisible /
+                    // RuntimeInvisibleParameterAnnotations attribute is written back for this method.
+                    override fun visitAnnotableParameterCount(parameterCount: Int, visible: Boolean) {}
+
+                    override fun visitParameterAnnotation(parameter: Int, descriptor: String?, visible: Boolean): AnnotationVisitor? = null
+                }
+            }
+        }, 0)
+        return writer.toByteArray()
+    }
+}
+
+// Only Minecraft's own remapped jar carries the malformed attributes; Loom names it minecraft-*, distinct from
+// every library on the classpath, so a name filter isolates it. The stripped jar carries the strip task as its
+// producer, and each compile classpath drops the original minecraft entry and adds the stripped one in its place.
+val strippedMinecraftDir = layout.buildDirectory.dir("stripped-minecraft").get().asFile
+
+val stripMinecraftParameterAnnotations = tasks.register<StripParameterAnnotations>("stripMinecraftParameterAnnotations") {
+    inputJars.from(sourceSets["main"].compileClasspath.filter { it.name.startsWith("minecraft-") })
+    outputDir.set(strippedMinecraftDir)
+}
+
+val strippedMinecraft = fileTree(strippedMinecraftDir) { include("**/*.jar") }.builtBy(stripMinecraftParameterAnnotations)
+
+tasks.named<JavaCompile>("compileJava") {
+    classpath = sourceSets["main"].compileClasspath.filter { !it.name.startsWith("minecraft-") } + strippedMinecraft
+}
+tasks.named<JavaCompile>("compileTestJava") {
+    classpath = sourceSets["test"].compileClasspath.filter { !it.name.startsWith("minecraft-") } + strippedMinecraft
+}
+
+// --- Publish the island classpath: the exact compile classpath the separate Forge build consumes ---
+// The hand-rolled Forge island (forge/, its own Gradle 8 wrapper) has no Loom to resolve Minecraft and its
+// transitive libraries (com.mojang datafixers/brigadier/authlib, gson, netty, guava, fastutil, jopt, log4j). It
+// reads this file, one absolute path per line: the main compile classpath with Loom's raw minecraft-* jar swapped
+// for the stripped one (the same interposition compileJava does above), so the island compiles the source-merged
+// common against exactly the classpath Loom resolved here. Like genBridge, this runs as a PREREQUISITE root
+// invocation (./gradlew :common:writeIslandClasspath) before the island build configures and reads the file.
+abstract class WriteIslandClasspath : DefaultTask() {
+    @get:InputFiles
+    abstract val libraries: ConfigurableFileCollection
+
+    @get:InputFiles
+    abstract val stripped: ConfigurableFileCollection
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun write() {
+        val entries = (libraries.files + stripped.files).map { it.absolutePath }
+        outputFile.get().asFile.writeText(entries.joinToString("\n"))
+    }
+}
+
+tasks.register<WriteIslandClasspath>("writeIslandClasspath") {
+    libraries.from(sourceSets["main"].compileClasspath.filter { !it.name.startsWith("minecraft-") })
+    stripped.from(strippedMinecraft) // the built stripped jar; carries the strip task as its producer
+    outputFile.set(layout.buildDirectory.file("island-classpath.txt"))
 }

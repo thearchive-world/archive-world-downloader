@@ -13,8 +13,6 @@ import com.google.common.collect.ImmutableList;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -137,11 +135,6 @@ class EntitySinkRootVehicleTest {
             // Below 1.16 Entity.saveWithoutId writes this.dimension.getId(), which the constructor sets only from a
             // non-null level, so the double is built against the HeadlessLevel rather than a null one.
             super(EntityType.PIG, HeadlessLevel.get());
-        }
-
-        @Override
-        public Packet<?> getAddEntityPacket() {
-            return new ClientboundAddEntityPacket(this);
         }
 
         // 1.16.5 has no Entity.shouldBeSaved; a one-player vehicle is refused by the isVehicle and

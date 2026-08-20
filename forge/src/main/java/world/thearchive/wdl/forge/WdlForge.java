@@ -5,10 +5,11 @@ package world.thearchive.wdl.forge;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -18,6 +19,7 @@ import net.minecraftforge.fml.ExtensionPoint;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.lwjgl.glfw.GLFW;
@@ -44,35 +46,49 @@ public final class WdlForge {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         Wdl.initialize(new ForgePlatformBridge(modEventBus));
         MountMenuReader.install(new ForgeMountMenuReader());
-        // At 1.15.2 the config-screen factory is an ExtensionPoint carrying a BiFunction, not the
+        // At this band the config-screen factory is an ExtensionPoint carrying a BiFunction, not the
         // ConfigGuiHandler.ConfigGuiFactory wrapper the 1.17-and-above bands register.
         ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.CONFIGGUIFACTORY,
                 () -> (minecraft, modListScreen) -> Wdl.createSettingsScreen(modListScreen));
-        MinecraftForge.EVENT_BUS.addListener(
-                (ClientPlayerNetworkEvent.LoggedInEvent event) -> ForgeConnectionTee.install(event.getNetworkManager()));
+        // ClientPlayerNetworkEvent does not exist at this band, so the tee installs on the first client tick that
+        // sees a play connection: Minecraft.getConnection() is null until the local player is assigned (the login
+        // moment) and stays non-null across a dimension change, so the connection-appears edge is the once-per-
+        // connection install point. installInto no-ops if the pipeline is not a play pipeline or the tee is present.
+        boolean[] teeConnected = {false};
+        MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent tick) -> {
+            if (tick.phase != TickEvent.Phase.END) {
+                return;
+            }
+            ClientPacketListener listener = Minecraft.getInstance().getConnection();
+            boolean nowConnected = listener != null;
+            if (nowConnected && !teeConnected[0]) {
+                ForgeConnectionTee.install(listener.getConnection());
+            }
+            teeConnected[0] = nowConnected;
+        });
         MinecraftForge.EVENT_BUS.addListener((PlayerInteractEvent.RightClickBlock event) -> {
-            // At 1.15.2 RightClickBlock carries no hit vector; getHitVec is a 1.16 addition. The consumers read
+            // At this band RightClickBlock carries no hit vector; getHitVec is a 1.16 addition. The consumers read
             // only the clicked block position, so the hit is rebuilt from the event's position and face, with the
             // block center standing in for the precise location the event does not provide.
             BlockPos clicked = event.getPos();
-            BlockHitResult hit = new BlockHitResult(
+            HitResult hit = new HitResult(
                     new Vec3(clicked.getX() + 0.5, clicked.getY() + 0.5, clicked.getZ() + 0.5),
-                    event.getFace(), clicked, false);
-            InteractionCapture.dispatchUseBlock(event.getPlayer(), event.getWorld(), event.getHand(), hit);
-            OpenClickTracker.dispatchUseBlock(event.getPlayer(), event.getWorld(), hit);
+                    event.getFace(), clicked);
+            InteractionCapture.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), event.getHand(), hit);
+            OpenClickTracker.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), hit);
         });
         MinecraftForge.EVENT_BUS.addListener((PlayerInteractEvent.EntityInteract event) -> OpenClickTracker
-                .dispatchUseEntity(event.getPlayer(), event.getWorld(), event.getTarget()));
+                .dispatchUseEntity(event.getEntityPlayer(), event.getWorld(), event.getTarget()));
 
         KeyMapping peekKey = new KeyMapping(
                 "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY);
         // Below 1.19 there is no RegisterKeyMappingsEvent; keys register through ClientRegistry during client
-        // setup. At 1.15.2 the setup event has no enqueueWork, so the main-thread registration is deferred through
+        // setup. At this band the setup event has no enqueueWork, so the main-thread registration is deferred through
         // DeferredWorkQueue instead.
         modEventBus.addListener((FMLClientSetupEvent event) -> DeferredWorkQueue
                 .runLater(() -> ClientRegistry.registerKeyBinding(peekKey)));
         WdlHudOverlay.bindPeekKey(peekKey);
-        // At 1.15.2 there is no OverlayRegistry (a 1.17 addition) or RegisterGuiOverlaysEvent (1.19); the HUD host
+        // At this band there is no OverlayRegistry (a 1.17 addition) or RegisterGuiOverlaysEvent (1.19); the HUD host
         // is RenderGameOverlayEvent on the game bus. Post with ElementType.ALL fires once after the whole vanilla
         // HUD, so the overlay draws above every element in every gamemode; it self-gates F1 and blocking screens.
         MinecraftForge.EVENT_BUS.addListener((RenderGameOverlayEvent.Post event) -> {

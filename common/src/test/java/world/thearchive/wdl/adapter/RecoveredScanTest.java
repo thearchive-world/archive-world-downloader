@@ -39,69 +39,70 @@ class RecoveredScanTest {
 
     @Test
     void startsEmpty() {
-        assertSame(RecoveredCoverage.EMPTY, new RecoveredScan().coverage(DimensionType.OVERWORLD));
+        assertSame(RecoveredCoverage.EMPTY, new RecoveredScan().coverage(DimensionType.field_18954));
     }
 
     @Test
     void collectsPriorCapturedPositionsAndExcludesEmptyOnes() {
         RecoveredScan scan = new RecoveredScan();
-        scan.record(DimensionType.OVERWORLD, chunkWith(
+        // lecternWithBook is a synthetic-field carrier (see its own doc), so this chunk is built unchecked.
+        scan.record(DimensionType.field_18954, BlockEntityFixtures.malformedChunkTagWith(
                 filledChest(10, 70, 20),
                 emptyChest(11, 70, 20),
                 lecternWithBook(12, 70, 20)));
 
-        RecoveredCoverage coverage = scan.coverage(DimensionType.OVERWORLD);
-        assertTrue(coverage.contains(BlockPos.asLong(10, 70, 20)), "a prior-captured chest is coverage");
-        assertTrue(coverage.contains(BlockPos.asLong(12, 70, 20)), "a prior-captured lectern is coverage");
-        assertFalse(coverage.contains(BlockPos.asLong(11, 70, 20)), "an empty re-walked chest is not coverage");
+        RecoveredCoverage coverage = scan.coverage(DimensionType.field_18954);
+        assertTrue(coverage.contains(new BlockPos(10, 70, 20).asLong()), "a prior-captured chest is coverage");
+        assertTrue(coverage.contains(new BlockPos(12, 70, 20).asLong()), "a prior-captured lectern is coverage");
+        assertFalse(coverage.contains(new BlockPos(11, 70, 20).asLong()), "an empty re-walked chest is not coverage");
     }
 
     @Test
     void collectsPriorCapturedJukeboxAndBeehivePositions() {
         RecoveredScan scan = new RecoveredScan();
         // beehiveWithBees is not a real producer's shape (see its own doc), so this chunk is built unchecked.
-        scan.record(DimensionType.OVERWORLD, BlockEntityFixtures.malformedChunkTagWith(
+        scan.record(DimensionType.field_18954, BlockEntityFixtures.malformedChunkTagWith(
                 jukeboxWithDisc(20, 70, 20),
                 beehiveWithBees(21, 70, 20),
                 emptyJukebox(22, 70, 20),
                 emptyBeehive(23, 70, 20)));
 
-        RecoveredCoverage coverage = scan.coverage(DimensionType.OVERWORLD);
-        assertTrue(coverage.contains(BlockPos.asLong(20, 70, 20)), "a prior-captured jukebox disc is coverage");
-        assertTrue(coverage.contains(BlockPos.asLong(21, 70, 20)), "prior-captured beehive bees are coverage");
-        assertFalse(coverage.contains(BlockPos.asLong(22, 70, 20)), "an empty re-walked jukebox is not coverage");
-        assertFalse(coverage.contains(BlockPos.asLong(23, 70, 20)), "an empty re-walked beehive is not coverage");
+        RecoveredCoverage coverage = scan.coverage(DimensionType.field_18954);
+        assertTrue(coverage.contains(new BlockPos(20, 70, 20).asLong()), "a prior-captured jukebox disc is coverage");
+        assertTrue(coverage.contains(new BlockPos(21, 70, 20).asLong()), "prior-captured beehive bees are coverage");
+        assertFalse(coverage.contains(new BlockPos(22, 70, 20).asLong()), "an empty re-walked jukebox is not coverage");
+        assertFalse(coverage.contains(new BlockPos(23, 70, 20).asLong()), "an empty re-walked beehive is not coverage");
     }
 
     @Test
     void accumulatesAcrossChunks() {
         RecoveredScan scan = new RecoveredScan();
-        scan.record(DimensionType.OVERWORLD, chunkWith(filledChest(10, 70, 20)));
-        scan.record(DimensionType.OVERWORLD, chunkWith(filledChest(99, 64, -40)));
+        scan.record(DimensionType.field_18954, chunkWith(filledChest(10, 70, 20)));
+        scan.record(DimensionType.field_18954, chunkWith(filledChest(99, 64, -40)));
 
-        RecoveredCoverage coverage = scan.coverage(DimensionType.OVERWORLD);
-        assertTrue(coverage.contains(BlockPos.asLong(10, 70, 20)), "the first chunk's coverage persists");
-        assertTrue(coverage.contains(BlockPos.asLong(99, 64, -40)), "the second chunk's coverage is added");
+        RecoveredCoverage coverage = scan.coverage(DimensionType.field_18954);
+        assertTrue(coverage.contains(new BlockPos(10, 70, 20).asLong()), "the first chunk's coverage persists");
+        assertTrue(coverage.contains(new BlockPos(99, 64, -40).asLong()), "the second chunk's coverage is added");
     }
 
     @Test
     void coverageIsScopedPerDimension() {
         RecoveredScan scan = new RecoveredScan();
-        scan.record(DimensionType.OVERWORLD, chunkWith(filledChest(10, 70, 20)));
+        scan.record(DimensionType.field_18954, chunkWith(filledChest(10, 70, 20)));
 
-        assertTrue(scan.coverage(DimensionType.OVERWORLD).contains(BlockPos.asLong(10, 70, 20)),
+        assertTrue(scan.coverage(DimensionType.field_18954).contains(new BlockPos(10, 70, 20).asLong()),
                 "the overworld position is overworld coverage");
-        assertFalse(scan.coverage(DimensionType.NETHER).contains(BlockPos.asLong(10, 70, 20)),
+        assertFalse(scan.coverage(DimensionType.NETHER).contains(new BlockPos(10, 70, 20).asLong()),
                 "the same coordinate in the nether is not coverage");
     }
 
     @Test
     void aChunkWithNoCoverageDoesNotRepublish() {
         RecoveredScan scan = new RecoveredScan();
-        scan.record(DimensionType.OVERWORLD, chunkWith(filledChest(10, 70, 20)));
-        RecoveredCoverage afterFirst = scan.coverage(DimensionType.OVERWORLD);
-        scan.record(DimensionType.OVERWORLD, chunkWith(emptyChest(11, 70, 20)));
-        assertSame(afterFirst, scan.coverage(DimensionType.OVERWORLD),
+        scan.record(DimensionType.field_18954, chunkWith(filledChest(10, 70, 20)));
+        RecoveredCoverage afterFirst = scan.coverage(DimensionType.field_18954);
+        scan.record(DimensionType.field_18954, chunkWith(emptyChest(11, 70, 20)));
+        assertSame(afterFirst, scan.coverage(DimensionType.field_18954),
                 "no new coverage means the same published snapshot");
     }
 
@@ -110,14 +111,14 @@ class RecoveredScanTest {
         RecoveredScan scan = new RecoveredScan();
         CompoundTag chest = filledChest(14, 64, 14);
         chest.remove("x");
-        scan.record(DimensionType.OVERWORLD, BlockEntityFixtures.malformedChunkTagWith(chest));
-        assertSame(RecoveredCoverage.EMPTY, scan.coverage(DimensionType.OVERWORLD),
+        scan.record(DimensionType.field_18954, BlockEntityFixtures.malformedChunkTagWith(chest));
+        assertSame(RecoveredCoverage.EMPTY, scan.coverage(DimensionType.field_18954),
                 "a block entity without int coordinates cannot be keyed and is dropped");
     }
 
     @Test
     void enderRecoveredIsFalseUntilMarked() {
-        assertFalse(new RecoveredScan().coverage(DimensionType.OVERWORLD).enderRecovered(),
+        assertFalse(new RecoveredScan().coverage(DimensionType.field_18954).enderRecovered(),
                 "an unmarked scan reports no restored ender inventory");
     }
 
@@ -133,19 +134,19 @@ class RecoveredScanTest {
     void markEnderRecoveredIsFoldedIntoPublishedSnapshot() {
         RecoveredScan scan = new RecoveredScan();
         scan.markEnderRecovered();
-        scan.record(DimensionType.OVERWORLD, chunkWith(filledChest(10, 70, 20)));
+        scan.record(DimensionType.field_18954, chunkWith(filledChest(10, 70, 20)));
 
-        RecoveredCoverage coverage = scan.coverage(DimensionType.OVERWORLD);
-        assertTrue(coverage.contains(BlockPos.asLong(10, 70, 20)), "the per-position coverage still publishes");
+        RecoveredCoverage coverage = scan.coverage(DimensionType.field_18954);
+        assertTrue(coverage.contains(new BlockPos(10, 70, 20).asLong()), "the per-position coverage still publishes");
         assertTrue(coverage.enderRecovered(), "the global ender fact rides on the published snapshot too");
     }
 
     @Test
     void collectsPriorCapturedEntityUuidsAndExcludesEmptyOnes() {
         RecoveredScan scan = new RecoveredScan();
-        scan.recordEntities(DimensionType.OVERWORLD, entityChunkWith(filledVehicle(CART_A), emptyVehicle(CART_B)));
+        scan.recordEntities(DimensionType.field_18954, entityChunkWith(filledVehicle(CART_A), emptyVehicle(CART_B)));
 
-        RecoveredCoverage coverage = scan.coverage(DimensionType.OVERWORLD);
+        RecoveredCoverage coverage = scan.coverage(DimensionType.field_18954);
         assertTrue(coverage.containsEntity(CART_A), "a prior-captured container entity is coverage");
         assertFalse(coverage.containsEntity(CART_B), "an empty re-walked container entity is not coverage");
     }
@@ -155,31 +156,32 @@ class RecoveredScanTest {
         // A chested mule pushed into a minecart saves nested under the minecart's Passengers, so the resume
         // outline must mark it recovered from the nested node or it re-outlines and re-captures it empty.
         RecoveredScan scan = new RecoveredScan();
-        scan.recordEntities(DimensionType.OVERWORLD,
+        scan.recordEntities(DimensionType.field_18954,
                 entityChunkWith(EntityFixtures.entityCarrying(emptyVehicle(CART_A), filledVehicle(CART_B))));
 
-        assertTrue(scan.coverage(DimensionType.OVERWORLD).containsEntity(CART_B),
+        assertTrue(scan.coverage(DimensionType.field_18954).containsEntity(CART_B),
                 "the filled mule nested under the minecart is recovered coverage");
     }
 
     @Test
     void entityCoverageCoexistsWithBlockCoverageInOneSnapshot() {
         RecoveredScan scan = new RecoveredScan();
-        scan.record(DimensionType.OVERWORLD, chunkWith(filledChest(10, 70, 20)));
-        scan.recordEntities(DimensionType.OVERWORLD, entityChunkWith(filledVehicle(CART_A)));
+        scan.record(DimensionType.field_18954, chunkWith(filledChest(10, 70, 20)));
+        scan.recordEntities(DimensionType.field_18954, entityChunkWith(filledVehicle(CART_A)));
 
-        RecoveredCoverage coverage = scan.coverage(DimensionType.OVERWORLD);
-        assertTrue(coverage.contains(BlockPos.asLong(10, 70, 20)), "the block coverage survives the entity publish");
+        RecoveredCoverage coverage = scan.coverage(DimensionType.field_18954);
+        assertTrue(coverage.contains(new BlockPos(10, 70, 20).asLong()),
+                "the block coverage survives the entity publish");
         assertTrue(coverage.containsEntity(CART_A), "the entity coverage is folded into the same snapshot");
     }
 
     @Test
     void anEntityChunkWithNoCapturedContainerDoesNotRepublish() {
         RecoveredScan scan = new RecoveredScan();
-        scan.record(DimensionType.OVERWORLD, chunkWith(filledChest(10, 70, 20)));
-        RecoveredCoverage afterBlock = scan.coverage(DimensionType.OVERWORLD);
-        scan.recordEntities(DimensionType.OVERWORLD, entityChunkWith(emptyVehicle(CART_B)));
-        assertSame(afterBlock, scan.coverage(DimensionType.OVERWORLD),
+        scan.record(DimensionType.field_18954, chunkWith(filledChest(10, 70, 20)));
+        RecoveredCoverage afterBlock = scan.coverage(DimensionType.field_18954);
+        scan.recordEntities(DimensionType.field_18954, entityChunkWith(emptyVehicle(CART_B)));
+        assertSame(afterBlock, scan.coverage(DimensionType.field_18954),
                 "no new entity coverage means the same published snapshot");
     }
 
@@ -208,8 +210,11 @@ class RecoveredScanTest {
         return blockEntity("minecraft:chest", x, y, z);
     }
 
+    // No vanilla lectern exists at this band, but RecoveredScan still reads the field-based "Book" (CapturedBlockField
+    // .BOOK) for foreign or modded block entities, so a fieldless ender chest stands in as the carrier. A synthetic
+    // Book is no producer's output, so a chunk built from this must go through malformedChunkTagWith.
     private static CompoundTag lecternWithBook(int x, int y, int z) {
-        CompoundTag blockEntity = blockEntity("minecraft:lectern", x, y, z);
+        CompoundTag blockEntity = blockEntity("minecraft:ender_chest", x, y, z);
         blockEntity.put("Book", ItemFixtures.itemTag(ItemFixtures.writtenBook(1)));
         blockEntity.putInt("Page", 0);
         return blockEntity;
@@ -243,9 +248,10 @@ class RecoveredScanTest {
     }
 
     // No vanilla beehive exists at this band, but RecoveredScan still reads the field-based "Bees" occupant list
-    // (CapturedBlockField.BEES) for foreign or modded block entities, so a fieldless bell stands in as the carrier.
+    // (CapturedBlockField.BEES) for foreign or modded block entities, so a fieldless ender chest stands in as the
+    // carrier.
     private static CompoundTag emptyBeehive(int x, int y, int z) {
-        return blockEntity("minecraft:bell", x, y, z);
+        return blockEntity("minecraft:ender_chest", x, y, z);
     }
 
     private static CompoundTag chunkWith(CompoundTag... blockEntities) {

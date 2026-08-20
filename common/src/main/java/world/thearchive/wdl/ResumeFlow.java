@@ -72,7 +72,7 @@ final class ResumeFlow {
             return;
         }
         if (start.classification() == TargetClassification.RESUME_EXISTING) {
-            Path savesDirectory = Minecraft.getInstance().getLevelSource().getBaseDir();
+            Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
             DownloadTarget target = TargetResolver.resolveResume(start.target().folderName(), savesDirectory)
                     .withOrigin(start.target().origin());
             if (!DownloadFolders.isWdlManaged(savesDirectory.resolve(target.folderName()))) {
@@ -108,7 +108,7 @@ final class ResumeFlow {
         if (start.classification() == TargetClassification.RESUME_EXISTING) {
             // The managed gate ahead of the already-a-download reply: pointing the player at
             // /wdl resume for a folder that is not a wdl download would send them into a dead end.
-            Path savesDirectory = Minecraft.getInstance().getLevelSource().getBaseDir();
+            Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
             if (!DownloadFolders.isWdlManaged(savesDirectory.resolve(start.target().folderName()))) {
                 bridge.sendChat(ChatCopy.refuseOccupant(start.target().folderName(), true));
             } else {
@@ -135,7 +135,7 @@ final class ResumeFlow {
             bridge.sendChat(ChatCopy.joinMultiplayer());
             return;
         }
-        Path savesDirectory = Minecraft.getInstance().getLevelSource().getBaseDir();
+        Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
         DownloadTarget target = DownloadFolders.resolveManagedResume(name, savesDirectory);
         if (target == null) {
             bridge.sendChat(ChatCopy.noSuchDownload(name));
@@ -165,7 +165,7 @@ final class ResumeFlow {
             return null;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        Path savesDirectory = minecraft.getLevelSource().getBaseDir();
+        Path savesDirectory = minecraft.getLevelSource().getLevelPath("");
         DownloadTarget target = TargetResolver.resolveNew(name, LocalDate.now(),
                 configSupplier.get().appendDateSuffix())
                 .withOrigin(deliberate ? DownloadTarget.Origin.FLOW_DELIBERATE : DownloadTarget.Origin.FLOW_AUTO);
@@ -206,7 +206,7 @@ final class ResumeFlow {
      */
     private void confirmThenResume(DownloadTarget target, String folderName) {
         WdlConfig config = configSupplier.get();
-        Path savesDirectory = Minecraft.getInstance().getLevelSource().getBaseDir();
+        Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
         Path saveFolder = savesDirectory.resolve(folderName);
         SinglePlayerTaint.TaintState taint = SinglePlayerTaint.classify(saveFolder);
         SinglePlayerTaint.Decision decision = SinglePlayerTaint.decide(taint, config.blockTaintedResume());
@@ -286,7 +286,7 @@ final class ResumeFlow {
             Minecraft minecraft = Minecraft.getInstance();
             minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
                     folderName,
-                    FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getBaseDir(), folderName),
+                    FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getLevelPath(""), folderName),
                     backupHere,
                     () -> {
                         minecraft.setScreen(null);
@@ -314,7 +314,7 @@ final class ResumeFlow {
             Minecraft minecraft = Minecraft.getInstance();
             minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
                     folderName,
-                    FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getBaseDir(), folderName),
+                    FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getLevelPath(""), folderName),
                     config.zipOnResume(),
                     () -> {
                         startDownload.accept(target);

@@ -7,6 +7,7 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
@@ -32,7 +33,7 @@ public final class MapHolderFixtures {
      * component).
      */
     public static ItemStack shulkerHolding(ItemStack... contents) {
-        ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
+        ItemStack shulker = new ItemStack(Blocks.SHULKER_BOX);
         CompoundTag blockEntityTag = new CompoundTag();
         blockEntityTag.put("Items", ItemFixtures.items(contents));
         shulker.getOrCreateTag().put("BlockEntityTag", blockEntityTag);

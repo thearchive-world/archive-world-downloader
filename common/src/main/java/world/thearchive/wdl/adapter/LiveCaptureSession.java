@@ -38,9 +38,10 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import net.minecraft.SharedConstants;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.MerchantScreen;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
@@ -49,7 +50,6 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
-import net.minecraft.core.SectionPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
@@ -58,24 +58,19 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
+import net.minecraft.village.class_1145;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
-import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.BrewingStandMenu;
 import net.minecraft.world.inventory.ChestMenu;
-import net.minecraft.world.inventory.LecternMenu;
 import net.minecraft.world.inventory.MerchantMenu;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.MapItem;
-import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.ChestBlock;
@@ -83,7 +78,6 @@ import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
-import net.minecraft.world.level.block.entity.LecternBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.chunk.ChunkStatus;
@@ -551,7 +545,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** The UUID of the container vehicle the live menu is bound to, set once at bind time; read by the stash. */
     private @Nullable UUID boundEntityUuid;
-    private boolean boundMerchantIsVillager; // a villager gets Xp, a wandering trader does not
 
     /**
      * The seated player's mount, captured at finish before the entity drain and attached to the saved player tag as
@@ -1010,7 +1003,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * claiming the new one is downloaded.
      */
     private void onBlockPlacedAt(long posKey) {
-        BlockPos pos = BlockPos.of(posKey);
+        BlockPos pos = BlockPos.method_10488(posKey);
         containerStash.remove(pos);
         lecternStash.remove(pos);
         unmarkCaptured(posKey);
@@ -1342,8 +1335,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * "server never sent it" skip.
      */
     private @Nullable LevelChunk liveChunkAt(ClientChunkCache chunkSource, ChunkPos pos) {
-        LevelChunk chunk = chunkSource.getChunk(pos.x, pos.z, ChunkStatus.FULL, false);
-        return (chunk == null || bobbyFilter.isBobbyChunk(chunk)) ? null : chunk;
+        // This band's client chunk source has no status-taking getChunk; method_17044(x, z, load, createEmpty)
+        // returns the live full chunk or null (createEmpty false), which is what ChunkStatus.FULL + no-create meant.
+        LevelChunk chunk = chunkSource.method_17044(pos.x, pos.z, true, false);
+        if (chunk == null || bobbyFilter.isBobbyChunk(chunk)) {
+            return null;
+        }
+        // A client-networked chunk carries no status at this band (the constructor and the packet load never set
+        // one, so getStatus returns EMPTY, a PROTOCHUNK type), and the codec serializes whatever getStatus returns.
+        // Promote it to the terminal LEVELCHUNK status (field_18865, "postprocessed") so the saved chunk's Status
+        // string loads as a full chunk without the mod rather than regenerating. Inert on the client, which never
+        // reads chunk status for rendering.
+        chunk.setStatus(ChunkStatus.field_18865);
+        return chunk;
     }
 
     private void captureLoadedChunks(Minecraft minecraft, LocalPlayer player, ChunkPos anchor) {
@@ -1481,7 +1485,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // result is narrowed to the chunk's own column below, and vanilla keys a saved entity by that column alone.
         AABB bounds = new AABB(pos.getMinBlockX(), -2048, pos.getMinBlockZ(),
                 pos.getMaxBlockX() + 1, 2048, pos.getMaxBlockZ() + 1);
-        for (Entity entity : level().getEntitiesOfClass(Entity.class, bounds)) {
+        // This band has no two-argument getEntitiesOfClass; the three-argument form takes a predicate, and an
+        // all-pass predicate reproduces the every-entity-in-bounds seed the prime loop wants.
+        for (Entity entity : level().getEntitiesOfClass(Entity.class, bounds, candidate -> true)) {
             // Under the default recapture config (EVERYWHERE) a revisited chunk re-primes once it leaves the
             // hot buffer, so returning through a portal to captured terrain re-seeds; only the OFF and NEARBY
             // modes skip revisits. The prime loop can also see client-side-only entities spawned by other
@@ -1540,7 +1546,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     /** The client entity with this uuid, or null when none is loaded. The client has no by-uuid index at this band. */
     private @Nullable Entity entityByUuid(UUID uuid) {
-        for (Entity entity : level().entitiesForRendering()) {
+        for (Entity entity : level().field_4541) {
             if (entity.getUUID().equals(uuid)) {
                 return entity;
             }
@@ -1635,7 +1641,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void pollDirtyChunks(ClientChunkCache chunkSource, LongOpenHashSet dirtySet) {
         for (ChunkPos pos : captured.keySet()) {
             LevelChunk chunk = liveChunkAt(chunkSource, pos);
-            if (chunk != null && chunk.isUnsaved()) {
+            // This band's LevelChunk exposes no isUnsaved reader; method_3893(false) is the should-save query, which
+            // for a client chunk (no last-save entity timer) reduces to the unsaved flag isUnsaved returned.
+            if (chunk != null && chunk.method_3893(false)) {
                 dirtySet.add(pos.toLong());
             }
         }
@@ -1873,9 +1881,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // non-player slots) ridden alongside a hopper minecart (size 5) would otherwise be claimed by the
             // vehicle branch and mis-merge the chest into the minecart. Only a mount menu names a chested
             // animal (no vehicle opens one), so peeling it off first cannot starve a vehicle capture.
-            if (menu instanceof LecternMenu) {
-                bindOpenedLectern(menu, player, block);
-            } else if (menu instanceof MerchantMenu) {
+            // The lectern (LecternMenu / LecternBlockEntity) is a 1.14 addition absent at this band, so its bind arm
+            // is dropped; a book-in-lectern cannot exist here to lose.
+            if (menu instanceof MerchantMenu) {
                 // Villager-exclusive, so this early arm steals no non-merchant open; placed above the
                 // menu-type-blind vehicle arm so a villager opened while riding a chest vehicle is not pre-empted.
                 if (config.captureEntities()) {
@@ -1910,22 +1918,22 @@ public final class LiveCaptureSession implements CaptureController.Session {
         association.boundPos().ifPresent(posKey -> {
             if (association.boundKind() == ContainerAssociation.BindKind.MERCHANT
                     && menu instanceof MerchantMenu) {
-                MerchantMenu merchant = (MerchantMenu) menu;
-                // The offers and trade experience are disjoint from the three trade slots the change gate keys on,
-                // so re-stash every tick on its own path: a switch case behind the gate would drop a mid-open
-                // offers change and lose a whole villager whose offers packet lands a tick after the open.
-                stashMerchantOffers(merchant);
+                // The offers are disjoint from the three trade slots the change gate keys on, so re-stash every tick
+                // on its own path: a switch case behind the gate would drop a mid-open offers change and lose a whole
+                // villager whose offers packet lands a tick after the open.
+                stashMerchantOffers();
                 return;
             }
-            int page = menu instanceof LecternMenu ? ((LecternMenu) menu).getPage() : 0;
-            int[] data = menuDataVector(menu);
+            // The lectern page (a LecternMenu concept) does not exist at this band, so the page dimension of the
+            // change key is always the fixed 0.
+            int page = 0;
+            // No menu's ContainerData is readable at this band (the brewing stand's brew time and fuel have no
+            // public accessor), so the change gate keys on the slots alone.
+            int[] data = MenuChangeTracker.NO_DATA;
             if (!stashChangeTracker.changedSince(menu.slots, page, data)) {
                 return; // unchanged since the last stash: last-seen-wins needs no re-serialize this tick
             }
             switch (association.boundKind()) {
-                case LECTERN:
-                    stashLecternBook((LecternMenu) menu, posKey);
-                    break;
                 case ENDER:
                     stashEnderItems(menu, player);
                     break;
@@ -1971,40 +1979,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
         OptionalLong bound = association.open(atBlock, posKey, menuSlotCount, blockContainerSize);
         if (bound.isPresent()) {
             reportCounts.addContainer("b:" + bound.getAsLong());
-            LOGGER.debug("bound open container to {}", BlockPos.of(bound.getAsLong()));
+            LOGGER.debug("bound open container to {}", BlockPos.method_10488(bound.getAsLong()));
         } else if (target != null) {
             // Only a real block hit that the size guard rejected is signal (the mis-bind it avoided); a
             // null target is a menu with nothing to bind (targetless GUI, superseded click) and is already
             // explained by resolveOpenTarget's own logging, so it stays silent here.
             LOGGER.info("dropped open container at {}: menuSlots={}, blockContainerSize={}, chunkLoaded={}",
                     target, menuSlotCount, blockContainerSize,
-                    level().hasChunk(SectionPos.blockToSectionCoord(target.getX()),
-                            SectionPos.blockToSectionCoord(target.getZ())));
-        }
-    }
-
-    /**
-     * Translate the lectern-open target into primitives for {@link ContainerAssociation#openLectern}. A
-     * {@code LecternMenu} is a fixed 1-slot lectern-specific menu, so the bind is confident when the open target is a
-     * lectern block and the menu carries the lectern's one book slot. The book reaches the client only through this
-     * menu, never the chunk packet.
-     */
-    private void bindOpenedLectern(AbstractContainerMenu menu, LocalPlayer player, @Nullable BlockPos target) {
-        boolean atBlock = false;
-        long posKey = 0L;
-        boolean blockIsLectern = false;
-        int menuSlotCount = 0;
-        if (target != null) {
-            atBlock = true;
-            posKey = target.asLong();
-            blockIsLectern = level().getBlockEntity(target) instanceof LecternBlockEntity;
-            menuSlotCount = ContainerCapture.countBlockSlots(menu, player);
-        }
-        OptionalLong bound = association.openLectern(atBlock, posKey, blockIsLectern, menuSlotCount,
-                ContainerCapture.LECTERN_CONTAINER_SIZE);
-        if (bound.isPresent()) {
-            reportCounts.addContainer("l:" + bound.getAsLong());
-            LOGGER.debug("bound open lectern to {}", BlockPos.of(bound.getAsLong()));
+                    level().hasChunk(target.getX() >> 4, target.getZ() >> 4));
         }
     }
 
@@ -2035,7 +2017,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // One shared inventory per session: a single fixed id rides the Set dedup, so re-opening the ender
             // chest never bumps the count past one.
             reportCounts.addContainer("e:");
-            LOGGER.debug("bound open ender chest to {}", BlockPos.of(bound.getAsLong()));
+            LOGGER.debug("bound open ender chest to {}", BlockPos.method_10488(bound.getAsLong()));
         }
     }
 
@@ -2079,7 +2061,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (association.openDoubleChest(atBlock, atRightHalf, targetPosKey, partnerPosKey,
                 menuSlotCount, combinedContainerSize)) {
             reportCounts.addContainer("d:" + targetPosKey); // a double chest is one container in the count
-            LOGGER.debug("bound double chest at {} + {}", BlockPos.of(targetPosKey), BlockPos.of(partnerPosKey));
+            LOGGER.debug("bound double chest at {} + {}", BlockPos.method_10488(targetPosKey),
+                    BlockPos.method_10488(partnerPosKey));
         }
     }
 
@@ -2147,11 +2130,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * {@link #stashMerchantOffers}, not here, since the offers can land a tick after the open.
      */
     private void bindOpenedMerchant(@Nullable Entity target) {
-        if (association.openMerchant(target instanceof AbstractVillager, true)
-                && target instanceof AbstractVillager) {
-            AbstractVillager villager = (AbstractVillager) target;
+        // This band has no AbstractVillager (a 1.14 superclass added with the wandering trader); the villager is the
+        // only merchant entity, so Villager is the whole merchant test.
+        if (association.openMerchant(target instanceof Villager, true)
+                && target instanceof Villager) {
+            Villager villager = (Villager) target;
             boundEntityUuid = villager.getUUID();
-            boundMerchantIsVillager = villager instanceof Villager;
             LOGGER.debug("bound open merchant to {}", villager.getUUID());
         }
     }
@@ -2186,27 +2170,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void stashContainerItems(AbstractContainerMenu menu, LocalPlayer player, long posKey) {
         CompoundTag holder = containerCapture.captureBlockSlots(menu, player);
         if (holder != null) {
-            if (menu instanceof BrewingStandMenu) {
-                BrewingStandMenu brewingStand = (BrewingStandMenu) menu;
-                // Items capture stays generic; only the rider is menu-typed, and the write itself
-                // is the pure tested helper.
-                ContainerCapture.putBrewingState(holder, brewingStand.getBrewingTicks(),
-                        brewingStand.getFuel());
-            }
-            stashBlockHolder(containerStash, BlockPos.of(posKey), holder);
+            // The brewing stand's brew-time and fuel are menu-only ContainerData held in private fields with no
+            // public reader at this band (getBrewingTicks / getFuel are later accessors), so they are not captured
+            // here; the potions, ingredient, and fuel item are captured as ordinary Items, and the timer resumes on
+            // load. Losing the in-progress timer is the accepted band limit.
+            stashBlockHolder(containerStash, BlockPos.method_10488(posKey), holder);
         }
-    }
-
-    /**
-     * The menu-only ContainerData values the change gate tracks beside the slots: the brewing stand's brew time plus
-     * fuel. Every other menu tracks no data; the state-less constant keeps the per-tick call allocation-free for them.
-     */
-    private static int[] menuDataVector(AbstractContainerMenu menu) {
-        if (menu instanceof BrewingStandMenu) {
-            BrewingStandMenu brewingStand = (BrewingStandMenu) menu;
-            return new int[] { brewingStand.getBrewingTicks(), brewingStand.getFuel() };
-        }
-        return MenuChangeTracker.NO_DATA;
     }
 
     /**
@@ -2227,10 +2196,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         CompoundTag firstHolder = containerCapture.captureHalfSlots(menu, player, 0, half);
         CompoundTag secondHolder = containerCapture.captureHalfSlots(menu, player, half, 2 * half);
         if (firstHolder != null) {
-            stashBlockHolder(containerStash, BlockPos.of(first.getAsLong()), firstHolder);
+            stashBlockHolder(containerStash, BlockPos.method_10488(first.getAsLong()), firstHolder);
         }
         if (secondHolder != null) {
-            stashBlockHolder(containerStash, BlockPos.of(second.getAsLong()), secondHolder);
+            stashBlockHolder(containerStash, BlockPos.method_10488(second.getAsLong()), secondHolder);
         }
     }
 
@@ -2291,18 +2260,25 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * is open, so it is skipped, logged once, and remembered so it is not retried. The captured-set add clears the
      * outline rim and runs only on a successful encode, so a failed encode is never falsely reported as captured.
      */
-    private void stashMerchantOffers(MerchantMenu merchant) {
+    private void stashMerchantOffers() {
         UUID uuid = boundEntityUuid;
         if (uuid == null || merchantEncodeFailed.contains(uuid)) {
             return; // no uuid, or this villager already threw once: do not retry every tick
         }
-        MerchantOffers offers = merchant.getOffers();
-        if (offers.isEmpty()) {
-            return; // never overwrite a captured non-empty set with an empty tick
+        // The open trade menu's offers live on the client-side merchant the MerchantScreen holds, not on the
+        // MerchantMenu (whose merchant field is not public at this band), so read them off the screen. The trade
+        // experience the newer bands also serialize is a 1.14 addition, omitted here (see MerchantOfferCapture).
+        Screen screen = Minecraft.getInstance().screen;
+        if (!(screen instanceof MerchantScreen)) {
+            return;
+        }
+        class_1145 offers = ((MerchantScreen) screen).method_1160().method_3545(Minecraft.getInstance().player);
+        if (offers == null || offers.isEmpty()) {
+            return; // offers not synced yet, or empty: never overwrite a captured non-empty set with an empty tick
         }
         CompoundTag holder;
         try {
-            holder = MerchantOfferCapture.serialize(offers, merchant.getTraderXp(), boundMerchantIsVillager);
+            holder = MerchantOfferCapture.serialize(offers);
         } catch (RuntimeException e) {
             merchantEncodeFailed.add(uuid);
             LOGGER.warn("skipping villager {} trades: offers encode failed", uuid, e);
@@ -2311,25 +2287,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         merchantStash.put(uuid, holder);
         capturedEntityIds.add(uuid); // clears the outline rim, only on a successful encode
         reportCounts.addContainer("m:" + uuid); // count at real capture, not at bind
-    }
-
-    /**
-     * Lift the bound lectern's slot-0 book and reading page from the open menu and stash them keyed by block pos,
-     * overwriting any earlier capture for the same open menu (last-seen-wins, so a page turn re-stashes the live page).
-     * An empty slot 0 removes any stash entry (mirrors {@code saveAdditional}'s {@code !isEmpty()} guard, and is the
-     * take-the-book resurrection guard): client-coupled, so the empty-drop branch is not exercised headless (as with
-     * {@code stashContainerItems}).
-     */
-    private void stashLecternBook(LecternMenu menu, long posKey) {
-        ItemStack book = menu.getBook();
-        BlockPos pos = BlockPos.of(posKey);
-        if (book.isEmpty()) {
-            lecternStash.remove(pos);
-            capturedBlockKeys.remove(posKey);
-            return;
-        }
-        CompoundTag holder = adapter.lecternSink().captureBook(book, menu.getPage());
-        stashBlockHolder(lecternStash, pos, holder);
     }
 
     /**
@@ -2356,7 +2313,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     @Override
     public void finish() {
-        completeThroughWriter(Minecraft.getInstance(), this::finishCapture);
+        // Minecraft is not an Executor at this band; method_6635 (its schedule-on-main-thread) is the executor the
+        // completion poke needs.
+        completeThroughWriter(runnable -> Minecraft.getInstance().method_6635(runnable), this::finishCapture);
     }
 
     /**
@@ -3055,11 +3014,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return new CapturedProgress(player.getUUID(), advancements, stats);
     }
 
-    /** The data version, read band-stably via the same vanilla stamp {@link MapDataWriter} uses. */
+    /** The data version, the band-stable stamp the region chunks also carry. */
     private static int currentDataVersion() {
-        CompoundTag probe = new CompoundTag();
-        probe.putInt("DataVersion", SharedConstants.getCurrentVersion().getWorldVersion());
-        return probe.getInt("DataVersion");
+        // This band's SharedConstants exposes no version object (getCurrentVersion is a later addition), so the value
+        // is the 1.13.2 world data version constant, the same one the chunk codec stamps on every region chunk.
+        return 1631;
     }
 
     /**
@@ -3313,7 +3272,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * (every {@link MapArchive#archiveIdFor} call is), where the mutable {@code MapItemSavedData} may be read.
      */
     private @Nullable Tag resolveMapImage(int sessionId) {
-        MapItemSavedData saved = level().getMapData(MapItem.makeKey(sessionId));
+        // This band's Level.getMapData is the get-player-by-name method; MapItem.method_16115 is the by-key map-data
+        // load the map item itself uses.
+        MapItemSavedData saved = MapItem.method_16115(level(), "map_" + sessionId);
         if (saved == null) {
             return null; // colors never received (imageless): skipped, never fabricated
         }
@@ -3448,11 +3409,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // for its type on a loss whose cause is the message itself.
             mapsFailed.incrementAndGet();
             LOGGER.info("map data {} had no writer to stream to; it is missing from the save",
-                    MapItem.makeKey(archiveId));
+                    ("map_" + archiveId));
             return;
         }
         Path dataDirectory = paths.dataDirectory();
-        String key = MapItem.makeKey(archiveId);
+        String key = ("map_" + archiveId);
         if (finishBatchClosed) {
             // Unreachable today: every remap site precedes the handover, and the inbound hooks are detached
             // before it. Counted and logged so a future late remap site becomes visible instead of losing a map
@@ -3577,7 +3538,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // Path containment: assert the resolved level root stays under the saves base before selectLevel, which
             // creates the folder plus its advisory session.lock, so the check must run first or an escape touches
             // disk. toRealPath canonicalizes the base so a symlinked saves directory cannot defeat the lexical check.
-            Path savesBase = source.getBaseDir().toRealPath();
+            // This band's LevelStorageSource has no getBaseDir; the saves base is the game directory's saves folder,
+            // the same root it constructs the level source over.
+            Path savesBase = minecraft.gameDirectory.toPath().resolve("saves").toRealPath();
             Path resolved = savesBase.resolve(saveName).normalize();
             // A download folder is a single component directly under saves; requiring the parent to be exactly
             // the saves base rejects both a parent-escape and any multi-component name (whose first segment could
@@ -3586,7 +3549,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (!resolved.startsWith(savesBase) || !savesBase.equals(resolved.getParent())) {
                 throw new IOException("the download folder escapes the saves directory: " + saveName);
             }
-            storage = source.selectLevel(saveName, null);
+            // This band's selectLevel returns the class_101 save-handler interface; the concrete handler is a
+            // LevelStorage (it implements class_101), which is what the level-data writer and getFolder need.
+            storage = (LevelStorage) source.selectLevel(saveName, null);
         } catch (IOException | RuntimeException e) {
             startError = e;
             return null;
@@ -4431,8 +4396,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private @Nullable Entity reconstructPacketEntity(
             PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> frame) {
-        EntityType<?> type = frame.spawn().getType();
-        Entity entity = type.create(level());
+        // This band's ClientboundAddEntityPacket carries an object-type id, not an EntityType; resolve the object the
+        // vanilla client handleAddEntity switch would build (see EntityPacketCapture.createSpawnObject).
+        Entity entity = EntityPacketCapture.createSpawnObject(frame.spawn(), level());
         if (entity == null) {
             return null;
         }
@@ -4577,7 +4543,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (partial) {
                 bridge.sendChat(ChatCopy.downloadIncomplete(failed));
             }
-            Path saveFolder = Minecraft.getInstance().getLevelSource().getBaseDir().resolve(saveName)
+            Path saveFolder = Minecraft.getInstance().gameDirectory.toPath().resolve("saves").resolve(saveName)
                     .toAbsolutePath();
             bridge.sendChat(ChatCopy.savedTo(saveName, saveFolder.toString()));
         }

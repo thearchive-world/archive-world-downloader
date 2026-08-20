@@ -14,6 +14,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +42,8 @@ class NaturalEquipmentTest {
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.MAINHAND, of(Items.IRON_SWORD)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.MAINHAND, of(Items.IRON_SHOVEL)));
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.MAINHAND, of(Items.DIAMOND_SWORD)));
-        assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.MAINHAND, of(Items.GRASS_BLOCK)));
+        assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.MAINHAND,
+                of(Blocks.GRASS_BLOCK.asItem())));
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.MAINHAND, of(Items.WOODEN_SWORD)));
     }
 
@@ -54,10 +56,14 @@ class NaturalEquipmentTest {
 
     @Test
     void naturalHeadItemsAreCarvedOutGlobally() {
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.CARVED_PUMPKIN)));
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.SKELETON, EquipmentSlot.HEAD, of(Items.JACK_O_LANTERN)));
-        // Raid/patrol captain ominous banner; Paper strips the pattern to a bare white banner, match the item.
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.PILLAGER, EquipmentSlot.HEAD, of(Items.WHITE_BANNER)));
+        assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD,
+                of(Blocks.CARVED_PUMPKIN.asItem())));
+        assertTrue(NaturalEquipment.isNaturalFor(EntityType.SKELETON, EquipmentSlot.HEAD,
+                of(Blocks.JACK_O_LANTERN.asItem())));
+        // The white-banner head carve-out, exercised on a geared no-armor illager so the carve-out itself decides it
+        // rather than an armor pool. Its raid/patrol captain ominous banner is a 1.14 feature the carve-out
+        // anticipates.
+        assertTrue(NaturalEquipment.isNaturalFor(EntityType.VINDICATOR, EquipmentSlot.HEAD, of(Items.WHITE_BANNER)));
     }
 
     @Test

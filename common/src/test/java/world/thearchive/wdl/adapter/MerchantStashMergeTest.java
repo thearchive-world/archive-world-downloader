@@ -13,10 +13,10 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.village.class_1144;
+import net.minecraft.village.class_1145;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.trading.MerchantOffer;
-import net.minecraft.world.item.trading.MerchantOffers;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -55,12 +55,12 @@ class MerchantStashMergeTest {
         return EntityFixtures.entityChunkTagWith(entities);
     }
 
-    /** The Recipes offers holder vanilla's own {@code MerchantOffers.createTag} writes, one offer selling the item. */
+    /** The Recipes offers holder vanilla's own trade-list NBT write produces, one offer selling the item. */
     private static CompoundTag offersWith(String sellId) {
-        // Below 1.20.5 there is no ItemCost; a merchant offer's buy cost is a plain ItemStack.
-        MerchantOffers offers = new MerchantOffers();
-        offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), ItemFixtures.stack(sellId), 1, 0, 0.0f));
-        return offers.createTag();
+        // This band's merchant offer takes a plain buy/sell ItemStack pair, no trade experience or price multiplier.
+        class_1145 offers = new class_1145();
+        offers.add(new class_1144(new ItemStack(Items.EMERALD, 1), ItemFixtures.stack(sellId)));
+        return offers.method_3557();
     }
 
     private static CompoundTag merchantHolder(CompoundTag offers, @Nullable Integer xp) {

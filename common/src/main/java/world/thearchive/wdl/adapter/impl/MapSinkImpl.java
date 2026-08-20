@@ -30,7 +30,7 @@ public final class MapSinkImpl implements MapSink {
         // client with a null dimension, which save dereferences (this.dimension.getId()). Stand in the overworld
         // type for the serialize so the image still writes, then restore so the live client map is left as received,
         // the way the session leaves its locked flag alone.
-        saved.dimension = DimensionType.OVERWORLD;
+        saved.dimension = DimensionType.field_18954;
         try {
             return saved.save(new CompoundTag());
         } finally {

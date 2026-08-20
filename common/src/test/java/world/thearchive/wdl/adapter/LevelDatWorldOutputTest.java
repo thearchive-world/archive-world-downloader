@@ -103,20 +103,20 @@ class LevelDatWorldOutputTest {
     void defaultsWriteTheCuratedSafeGameRules() {
         GameRules rules = gameRules(build(WorldOutputConfig.DEFAULTS));
 
-        assertFalse(rules.getBoolean(GameRules.RULE_DOMOBSPAWNING), "no mob spawning");
-        assertTrue(rules.getBoolean(GameRules.RULE_KEEPINVENTORY), "keep inventory");
-        assertFalse(rules.getBoolean(GameRules.RULE_MOBGRIEFING), "no mob griefing");
-        assertFalse(rules.getBoolean(GameRules.RULE_DAYLIGHT), "day frozen");
-        assertFalse(rules.getBoolean(GameRules.RULE_WEATHER_CYCLE), "weather frozen");
+        assertFalse(rules.method_4671("doMobSpawning"), "no mob spawning");
+        assertTrue(rules.method_4671("keepInventory"), "keep inventory");
+        assertFalse(rules.method_4671("mobGriefing"), "no mob griefing");
+        assertFalse(rules.method_4671("doDaylightCycle"), "day frozen");
+        assertFalse(rules.method_4671("doWeatherCycle"), "weather frozen");
     }
 
     @Test
     void gameRuleMasterOffLeavesVanillaDefaults() {
         GameRules rules = gameRules(build(with("overrideGamerules", "false")));
 
-        assertTrue(rules.getBoolean(GameRules.RULE_DOMOBSPAWNING),
+        assertTrue(rules.method_4671("doMobSpawning"),
                 "master off: the vanilla default (mobs spawn) stands");
-        assertFalse(rules.getBoolean(GameRules.RULE_KEEPINVENTORY),
+        assertFalse(rules.method_4671("keepInventory"),
                 "master off: keep-inventory stays at its vanilla default");
     }
 
@@ -173,7 +173,7 @@ class LevelDatWorldOutputTest {
         LevelDataWriter.LevelData built = build(with("gamerule.keepInventory", "banana"));
 
         assertTrue(built.gameRules().droppedInvalidValues().contains("keepInventory"), "the typo is surfaced");
-        assertTrue(gameRules(built).getBoolean(GameRules.RULE_KEEPINVENTORY),
+        assertTrue(gameRules(built).method_4671("keepInventory"),
                 "the curated value stands; the typo is not written");
     }
 
@@ -183,7 +183,7 @@ class LevelDatWorldOutputTest {
         LevelDataWriter.LevelData built = build(with("gamerule.spawn_mobs", "true"));
 
         assertTrue(built.gameRules().unknownIds().contains("spawn_mobs"), "the cross-band loss is surfaced");
-        assertFalse(gameRules(built).getBoolean(GameRules.RULE_DOMOBSPAWNING), "the curated safe set still applies");
+        assertFalse(gameRules(built).method_4671("doMobSpawning"), "the curated safe set still applies");
     }
 
     @Test
@@ -191,6 +191,6 @@ class LevelDatWorldOutputTest {
         // doLimitedCrafting is not in the curated set; a valid override of it passes through.
         GameRules rules = gameRules(build(with("gamerule.doLimitedCrafting", "true")));
 
-        assertTrue(rules.getBoolean(GameRules.RULE_LIMITED_CRAFTING), "an arbitrary valid rule passes through");
+        assertTrue(rules.method_4671("doLimitedCrafting"), "an arbitrary valid rule passes through");
     }
 }

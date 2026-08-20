@@ -63,7 +63,7 @@ class MapArchiveTest {
     }
 
     private static CompoundTag picture(int colorFill) {
-        return mapData(colorFill, 0, DimensionType.OVERWORLD, true);
+        return mapData(colorFill, 0, DimensionType.field_18954, true);
     }
 
     private static Set<Integer> collect(CompoundTag holder) {
@@ -105,15 +105,15 @@ class MapArchiveTest {
 
     @Test
     void hashIgnoresLockedAndCentersButTracksColorsScaleDimension() {
-        String base = MapArchive.hashOf(mapData(7, 1, DimensionType.OVERWORLD, true));
-        assertEquals(base, MapArchive.hashOf(mapData(7, 1, DimensionType.OVERWORLD, false)),
+        String base = MapArchive.hashOf(mapData(7, 1, DimensionType.field_18954, true));
+        assertEquals(base, MapArchive.hashOf(mapData(7, 1, DimensionType.field_18954, false)),
                 "a lock-state flip resolves to the same id");
-        CompoundTag recentered = mapData(7, 1, DimensionType.OVERWORLD, true);
+        CompoundTag recentered = mapData(7, 1, DimensionType.field_18954, true);
         recentered.putInt("xCenter", 512);
         recentered.putInt("zCenter", -512);
         assertEquals(base, MapArchive.hashOf(recentered), "a recentered map resolves to the same id");
-        assertNotEquals(base, MapArchive.hashOf(mapData(8, 1, DimensionType.OVERWORLD, true)), "colors matter");
-        assertNotEquals(base, MapArchive.hashOf(mapData(7, 2, DimensionType.OVERWORLD, true)), "scale matters");
+        assertNotEquals(base, MapArchive.hashOf(mapData(8, 1, DimensionType.field_18954, true)), "colors matter");
+        assertNotEquals(base, MapArchive.hashOf(mapData(7, 2, DimensionType.field_18954, true)), "scale matters");
         assertNotEquals(base, MapArchive.hashOf(mapData(7, 1, DimensionType.NETHER, true)), "dimension matters");
     }
 

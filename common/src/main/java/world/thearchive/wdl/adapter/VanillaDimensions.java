@@ -31,10 +31,10 @@ final class VanillaDimensions {
         if (type == DimensionType.NETHER) {
             return DimensionType.NETHER;
         }
-        if (type == DimensionType.THE_END) {
-            return DimensionType.THE_END;
+        if (type == DimensionType.field_18956) {
+            return DimensionType.field_18956;
         }
-        return DimensionType.OVERWORLD;
+        return DimensionType.field_18954;
     }
 
     /**
@@ -47,10 +47,11 @@ final class VanillaDimensions {
         if (DimensionType.getName(DimensionType.NETHER).toString().equals(id)) {
             return DimensionType.NETHER;
         }
-        if (DimensionType.getName(DimensionType.THE_END).toString().equals(id)) {
-            return DimensionType.THE_END;
+        if (DimensionType.getName(DimensionType.field_18956).toString().equals(id)) {
+            return DimensionType.field_18956;
         }
-        return DimensionType.getName(DimensionType.OVERWORLD).toString().equals(id) ? DimensionType.OVERWORLD : null;
+        return DimensionType.getName(DimensionType.field_18954).toString().equals(id) ? DimensionType.field_18954
+                : null;
     }
 
     /**
@@ -60,6 +61,6 @@ final class VanillaDimensions {
      * than the raw dimension is what makes a Multiverse overworld under a custom key blend correctly.
      */
     static boolean shouldSynthesizeBlending(WorldType worldType, DimensionType targetDimension) {
-        return worldType == WorldType.DEFAULT && DimensionType.OVERWORLD.equals(targetDimension);
+        return worldType == WorldType.DEFAULT && DimensionType.field_18954.equals(targetDimension);
     }
 }

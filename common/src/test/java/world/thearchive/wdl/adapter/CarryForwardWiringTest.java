@@ -23,7 +23,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.dimension.DimensionType;
@@ -156,7 +155,7 @@ class CarryForwardWiringTest {
         field.setAccessible(true);
         InteractionCapture capture = (InteractionCapture) field.get(session);
         assertNotNull(capture, "the fixture must publish a recognizer, or the placement reaches nothing");
-        capture.recordPlaceAt(pos, new ItemStack(Items.CHEST));
+        capture.recordPlaceAt(pos, new ItemStack(Blocks.CHEST));
     }
 
     /** The open-time lectern capture at {@code pos}, which a placement in that cell must also drop. */
@@ -227,7 +226,7 @@ class CarryForwardWiringTest {
     }
 
     private static WdlRegionStorage regionStorage(WorldPaths paths) {
-        return paths.openRegionStorage(DimensionType.OVERWORLD);
+        return paths.openRegionStorage(DimensionType.field_18954);
     }
 
     private static LiveCaptureSession session(Path configDirectory) {
@@ -235,7 +234,7 @@ class CarryForwardWiringTest {
         properties.setProperty("captureEntities", "false");
         WdlConfig config = WdlConfig.parse(properties);
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
+                config, null, DimensionType.field_18954, DimensionType.field_18954,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -243,7 +242,7 @@ class CarryForwardWiringTest {
 
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
-        Files.createDirectories(paths.regionDirectory(DimensionType.OVERWORLD));
+        Files.createDirectories(paths.regionDirectory(DimensionType.field_18954));
         return paths;
     }
 

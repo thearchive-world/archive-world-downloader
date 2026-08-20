@@ -20,8 +20,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -32,6 +30,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.realms.class_356;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -211,8 +210,8 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             mc.getToasts().addToast(new SystemToast(id, new TranslatableComponent(toast.titleKey()), body));
             return;
         }
-        // A job-done body can carry a newline (the chunk count then the save name), which the 1.15.2 SystemToast draws
-        // as one overrunning line; a multiline toast wraps it and stitches its own frame instead.
+        // A job-done body can carry a newline (the chunk count then the save name), which this band's SystemToast
+        // draws as one overrunning line; a multiline toast wraps it and stitches its own frame instead.
         int bodyRgb = toast.bodyColor().isPresent() ? 0xFF000000 | toast.bodyColor().getAsInt() : -1;
         mc.getToasts().addToast(new WdlMultilineToast(mc.font,
                 new TranslatableComponent(toast.titleKey()).getString(), body.getString(), bodyRgb));
@@ -224,7 +223,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
      * loader-agnostic. Returns none in the user's own local world, leaving the anchor unshifted so the vanilla menu
      * keeps its own spacing.
      */
-    protected List<AbstractWidget> buildPauseMenuRow(AbstractWidget anchor,
+    protected List<class_356> buildPauseMenuRow(class_356 anchor,
             Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled, Runnable onPrimary,
             Runnable onConfig) {
         // A local world refuses every action this row leads to, and the /wdl commands and downloads keybind
@@ -233,23 +232,32 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (!isRemoteWorld()) {
             return ImmutableList.of();
         }
-        int x = anchor.x;
-        int y = anchor.y;
+        int x = anchor.field_1051;
+        int y = anchor.field_1052;
         int width = anchor.getWidth();
-        anchor.y = y + 24; // shift the bottom button (Disconnect) down to open a row above it
-        Button primary = new Button(x, y, width - 24, 20, I18n.get(primaryLabelKey.get()),
-                button -> onPrimary.run());
-        primary.active = primaryEnabled.getAsBoolean();
-        // 1.15.2 Button carries no hover-tooltip parameter, so the settings button has no hover label.
-        Button config = new Button(x + width - 20, y, 20, 20, "...", button -> onConfig.run());
+        anchor.field_1052 = y + 24; // shift the bottom button (Disconnect) down to open a row above it
+        class_356 primary = new class_356(0, x, y, width - 24, 20, I18n.get(primaryLabelKey.get())) {
+            @Override
+            public void method_18374(double mouseX, double mouseY) {
+                onPrimary.run();
+            }
+        };
+        primary.field_1055 = primaryEnabled.getAsBoolean();
+        // This band's button carries no hover-tooltip parameter, so the settings button has no hover label.
+        class_356 config = new class_356(0, x + width - 20, y, 20, 20, "...") {
+            @Override
+            public void method_18374(double mouseX, double mouseY) {
+                onConfig.run();
+            }
+        };
         return ImmutableList.of(primary, config);
     }
 
     /** The lowest existing pause-menu button (Disconnect), the anchor to insert the wdl row above. */
-    protected static @Nullable AbstractWidget lowest(List<AbstractWidget> widgets) {
-        AbstractWidget lowest = null;
-        for (AbstractWidget widget : widgets) {
-            if (lowest == null || widget.y > lowest.y) {
+    protected static @Nullable class_356 lowest(List<class_356> widgets) {
+        class_356 lowest = null;
+        for (class_356 widget : widgets) {
+            if (lowest == null || widget.field_1052 > lowest.field_1052) {
                 lowest = widget;
             }
         }
@@ -264,7 +272,9 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
 
     /** Suggest the wdl-managed download names for {@code /wdl resume} tab-completion. */
     private static CompletableFuture<Suggestions> suggestDownloads(SuggestionsBuilder builder) {
-        Path savesDirectory = Minecraft.getInstance().getLevelSource().getBaseDir();
+        // 1.13.2 LevelStorageSource exposes no saves-root accessor (getBaseDir is a later addition), and the saves
+        // folder is the game directory's own saves child at this band, so it is resolved from there.
+        Path savesDirectory = Minecraft.getInstance().gameDirectory.toPath().resolve("saves");
         try {
             return SharedSuggestionProvider.suggest(DownloadFolders.listManaged(savesDirectory), builder);
         } catch (IOException exception) {

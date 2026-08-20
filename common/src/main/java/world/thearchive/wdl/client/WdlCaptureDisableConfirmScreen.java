@@ -18,8 +18,11 @@ final class WdlCaptureDisableConfirmScreen extends ConfirmScreen {
 
     WdlCaptureDisableConfirmScreen(BooleanConsumer callback, Component title, Component message,
             Component disableButton, Component keepButton) {
-        // 1.15.2 ConfirmScreen takes the two button labels as plain strings.
-        super(callback, title, message, disableButton.getString(), keepButton.getString());
+        // This band's ConfirmScreen takes a two-argument confirm callback and plain-string title, message, and
+        // button labels, plus a trailing dialog id; it draws the title in a fixed white, so the amber option name in
+        // the title rides the legacy section codes getColoredString emits (getString would strip them).
+        super((confirmed, dialogId) -> callback.accept(confirmed), title.getColoredString(), message.getString(),
+                disableButton.getString(), keepButton.getString(), 0);
     }
 
     @Override

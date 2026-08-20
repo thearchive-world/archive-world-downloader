@@ -179,7 +179,7 @@ final class ChunkMerge {
         if (x == null || y == null || z == null) {
             return OptionalLong.empty();
         }
-        return OptionalLong.of(BlockPos.asLong(x.getAsInt(), y.getAsInt(), z.getAsInt()));
+        return OptionalLong.of(new BlockPos(x.getAsInt(), y.getAsInt(), z.getAsInt()).asLong());
     }
 
     /** The occupancy mask recorded for {@code pos}, or every slot when none was recorded. */

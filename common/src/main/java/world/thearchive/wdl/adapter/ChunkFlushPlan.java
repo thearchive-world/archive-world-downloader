@@ -61,7 +61,7 @@ final class ChunkFlushPlan {
     static LongSet replacedIn(ChunkPos pos, LongSet replacedBlockKeys) {
         LongOpenHashSet inChunk = new LongOpenHashSet();
         for (long posKey : replacedBlockKeys) {
-            if (new ChunkPos(BlockPos.of(posKey)).equals(pos)) {
+            if (new ChunkPos(BlockPos.method_10488(posKey)).equals(pos)) {
                 inChunk.add(posKey);
             }
         }

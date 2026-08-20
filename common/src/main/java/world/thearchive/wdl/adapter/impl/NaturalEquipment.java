@@ -15,6 +15,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
 
 /**
  * The 1.15.2 natural-spawn equipment table and the pure "was this equipped by a loot pickup" inference.
@@ -65,7 +66,7 @@ final class NaturalEquipment {
      * invisible-ambiguous case.
      */
     private static final Set<Item> NATURAL_HEAD_EXTRAS = ImmutableSet.of(
-            Items.CARVED_PUMPKIN, Items.JACK_O_LANTERN, Items.WHITE_BANNER);
+            Blocks.CARVED_PUMPKIN.asItem(), Blocks.JACK_O_LANTERN.asItem(), Items.WHITE_BANNER);
 
     private static final Map<EquipmentSlot, Set<Item>> BASE_ARMOR = ImmutableMap.of(
             EquipmentSlot.HEAD, ImmutableSet.of(Items.LEATHER_HELMET, Items.GOLDEN_HELMET,
@@ -97,7 +98,6 @@ final class NaturalEquipment {
             .put(EntityType.WITHER_SKELETON, new Profile(ImmutableSet.of(Items.STONE_SWORD), ArmorKind.NONE))
             .put(EntityType.ZOMBIE_PIGMAN,
                     new Profile(ImmutableSet.of(Items.GOLDEN_SWORD), ArmorKind.NONE))
-            .put(EntityType.PILLAGER, new Profile(ImmutableSet.of(Items.CROSSBOW), ArmorKind.NONE))
             .put(EntityType.VINDICATOR, new Profile(ImmutableSet.of(Items.IRON_AXE), ArmorKind.NONE))
             .put(EntityType.VEX, new Profile(ImmutableSet.of(Items.IRON_SWORD), ArmorKind.NONE))
             .build();

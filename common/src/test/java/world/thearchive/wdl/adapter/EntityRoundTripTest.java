@@ -59,7 +59,7 @@ class EntityRoundTripTest {
     }
 
     private static WdlRegionStorage regionStorage(WorldPaths paths) {
-        return paths.openRegionStorage(DimensionType.OVERWORLD);
+        return paths.openRegionStorage(DimensionType.field_18954);
     }
 
     /** A host region chunk with an empty {@code Level} compound, the terrain an entity fold lands inside. */
@@ -98,7 +98,7 @@ class EntityRoundTripTest {
     @Test
     void entityCarriersFoldIntoRegionChunksAcrossBoundaries(@TempDir Path save) throws IOException {
         WorldPaths paths = new WorldPathsImpl(save);
-        Path regionDirectory = paths.regionDirectory(DimensionType.OVERWORLD);
+        Path regionDirectory = paths.regionDirectory(DimensionType.field_18954);
 
         // Same boundary set the chunk path covers: (0,0)+(31,31) share r.0.0; the others cross into
         // r.1.0 / r.0.1 / r.-1.-1. A distinct marker per entity proves each lands in its own chunk.

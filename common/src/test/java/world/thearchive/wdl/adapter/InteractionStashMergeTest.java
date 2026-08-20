@@ -80,7 +80,7 @@ class InteractionStashMergeTest {
 
     /** A placed shulker box item holding {@code contents} in its pre-component {@code BlockEntityTag.Items}. */
     private static ItemStack shulkerHolding(ItemStack... contents) {
-        ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
+        ItemStack shulker = new ItemStack(Blocks.SHULKER_BOX);
         CompoundTag blockEntityTag = new CompoundTag();
         blockEntityTag.put("Items", ItemFixtures.items(contents));
         shulker.getOrCreateTag().put("BlockEntityTag", blockEntityTag);
@@ -163,7 +163,7 @@ class InteractionStashMergeTest {
         Map<BlockPos, CompoundTag> openTimeBundle = new LinkedHashMap<>();
         openTimeBundle.put(opened, itemsHolder(0, new ItemStack(Items.DIAMOND))); // ground-truth, edited open
         Map<BlockPos, CompoundTag> confirmedPlace = new LinkedHashMap<>();
-        confirmedPlace.put(opened, itemsHolder(0, new ItemStack(Items.DIRT))); // stale place snapshot, must lose
+        confirmedPlace.put(opened, itemsHolder(0, new ItemStack(Blocks.DIRT))); // stale place snapshot, must lose
         confirmedPlace.put(placedOnly, itemsHolder(0, new ItemStack(Items.GOLD_INGOT))); // place-only, must survive
 
         Map<BlockPos, CompoundTag> surviving = ContainerMerge.mergePlaceCandidates(openTimeBundle, confirmedPlace);
@@ -289,7 +289,7 @@ class InteractionStashMergeTest {
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> {}, posKey -> sinkPos[0] = posKey);
         BlockPos pos = new BlockPos(9, 70, 9);
 
-        capture.recordPlaceAt(pos, new ItemStack(Items.CHEST));
+        capture.recordPlaceAt(pos, new ItemStack(Blocks.CHEST));
 
         assertEquals(-1L, sinkPos[0],
                 "the chunk is written and frozen, so the block on disk still predates this placement");
@@ -303,7 +303,7 @@ class InteractionStashMergeTest {
                 (posKey, slot, occupied) -> {}, (posKey, blockTypeId) -> {}, posKey -> sinkPos[0] = posKey);
         BlockPos pos = new BlockPos(9, 70, 9);
 
-        capture.recordPlaceAt(pos, new ItemStack(Items.CHEST));
+        capture.recordPlaceAt(pos, new ItemStack(Blocks.CHEST));
 
         assertEquals(pos.asLong(), sinkPos[0],
                 "the chunk re-captures with the new block, so the old block's capture is stale there");
@@ -327,7 +327,7 @@ class InteractionStashMergeTest {
         BlockState emptyJukebox = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
 
         boolean recorded = capture.recordJukeboxInsert(emptyJukebox, new BlockPos(0, 70, 0),
-                new ItemStack(Items.SHULKER_BOX));
+                new ItemStack(Blocks.SHULKER_BOX));
 
         assertFalse(recorded, "a shulker clicked on a jukebox face is a placement, not a disc insert");
         assertTrue(capture.pendingCandidateChunks().isEmpty(), "no phantom jukebox candidate is stashed");
@@ -414,7 +414,7 @@ class InteractionStashMergeTest {
         assertFalse(capture.pendingCandidateChunks().isEmpty(), "the first placement is predicted");
 
         capturable[0] = false;
-        capture.recordPlaceAt(pos, new ItemStack(Items.STONE));
+        capture.recordPlaceAt(pos, new ItemStack(Blocks.STONE));
 
         assertTrue(capture.pendingCandidateChunks().isEmpty(),
                 "the stale shulker prediction is dropped even though the new placement is not captured");

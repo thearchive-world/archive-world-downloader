@@ -17,6 +17,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.level.storage.LevelStorage;
 import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.class_99;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -74,7 +75,7 @@ class LevelDatRoundTripTest {
 
         // Drive the REAL production save (LevelStorage.saveLevelData) rather than a hand-rolled NbtIo write, so the
         // headless suite guards the band-specific save call inside LevelDataWriter.save().
-        LevelStorage storage = storageSource(saves).selectLevel("wdltest", null);
+        LevelStorage storage = (LevelStorage) storageSource(saves).selectLevel("wdltest", null);
         writer.save(storage, built, null);
 
         Path levelDat = saves.resolve("wdltest").resolve("level.dat");
@@ -89,7 +90,7 @@ class LevelDatRoundTripTest {
     @Test
     void levelDatCarriesTheGivenWorldName(@TempDir Path saves) throws IOException {
         TestRegistries.bootstrap();
-        LevelStorage storage = storageSource(saves).selectLevel("named", null);
+        LevelStorage storage = (LevelStorage) storageSource(saves).selectLevel("named", null);
         writer.save(storage, writer.buildLevelData(WorldOutputConfig.DEFAULTS, "My Base"), null);
         assertEquals("My Base", levelName(saves.resolve("named")), "the typed name is written as LevelName");
     }
@@ -97,14 +98,14 @@ class LevelDatRoundTripTest {
     @Test
     void levelDatDefaultsTheWorldNameWhenAbsent(@TempDir Path saves) throws IOException {
         TestRegistries.bootstrap();
-        LevelStorage storage = storageSource(saves).selectLevel("unnamed", null);
+        LevelStorage storage = (LevelStorage) storageSource(saves).selectLevel("unnamed", null);
         writer.save(storage, writer.buildLevelData(WorldOutputConfig.DEFAULTS, null), null);
         assertEquals("Archive World Downloader", levelName(saves.resolve("unnamed")),
                 "a null name falls back to the writer default");
     }
 
     private static LevelStorageSource storageSource(Path saves) {
-        return new LevelStorageSource(saves, saves.resolve("backups"), DataFixers.getDataFixer());
+        return new class_99(saves, saves.resolve("backups"), DataFixers.getDataFixer());
     }
 
     private static String levelName(Path worldFolder) throws IOException {

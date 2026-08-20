@@ -21,7 +21,7 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelStorage;
-import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.class_99;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,7 +53,7 @@ class LevelDatPlayerRoundTripTest {
             throws IOException {
         TestRegistries.bootstrap();
         LevelDataWriter.LevelData built = writer.buildLevelData(WorldOutputConfig.DEFAULTS, null);
-        LevelStorage storage = new LevelStorageSource(saves, saves.resolve("backups"), DataFixers.getDataFixer())
+        LevelStorage storage = (LevelStorage) new class_99(saves, saves.resolve("backups"), DataFixers.getDataFixer())
                 .selectLevel(name, null);
         writer.save(storage, built, player);
         Path levelDat = saves.resolve(name).resolve("level.dat");
@@ -84,7 +84,7 @@ class LevelDatPlayerRoundTripTest {
     @Test
     void savesWithSurvivalOptOutWriteTheCapturedMode(@TempDir Path saves) throws IOException {
         CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(), BlockPos.ZERO, 0.0F, 0.0F,
-                DimensionType.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);
+                DimensionType.field_18954, GameType.SURVIVAL, Difficulty.NORMAL);
 
         CompoundTag data = saveAndReadBack(saves, "survival", captured);
 
@@ -110,7 +110,7 @@ class LevelDatPlayerRoundTripTest {
         CompoundTag boatTag = EntityFixtures.entityTag("minecraft:chest_boat"); // the id loadEntityRecursive reads
         PlayerTag.setRootVehicle(playerTag, boat, boatTag);
         CapturedPlayer captured = new CapturedPlayer(playerTag, BlockPos.ZERO, 0.0F, 0.0F,
-                DimensionType.OVERWORLD, GameType.CREATIVE, Difficulty.NORMAL);
+                DimensionType.field_18954, GameType.CREATIVE, Difficulty.NORMAL);
 
         CompoundTag data = saveAndReadBack(saves, "rootvehicle", captured);
 

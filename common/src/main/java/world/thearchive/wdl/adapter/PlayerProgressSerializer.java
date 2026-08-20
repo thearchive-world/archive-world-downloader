@@ -7,6 +7,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 import java.util.Map;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.Registry;
@@ -23,7 +24,7 @@ import org.jspecify.annotations.Nullable;
  */
 final class PlayerProgressSerializer {
     private static final Gson gson = new GsonBuilder()
-            .registerTypeAdapter(AdvancementProgress.class, new AdvancementProgress.Serializer())
+            .registerTypeAdapter(AdvancementProgress.class, new AdvancementProgress.class_3335())
             .create();
 
     private PlayerProgressSerializer() {}
@@ -45,8 +46,9 @@ final class PlayerProgressSerializer {
     static byte @Nullable [] statsJson(StatsCounter counter, int dataVersion) {
         JsonObject stats = new JsonObject();
         boolean any = false;
-        for (StatType<?> type : Registry.STAT_TYPE) {
-            any |= collectStatType(type, counter, stats);
+        Iterator<StatType<?>> types = Registry.STAT_TYPE.iterator();
+        while (types.hasNext()) {
+            any |= collectStatType(types.next(), counter, stats);
         }
         if (!any) {
             return null;
@@ -63,7 +65,9 @@ final class PlayerProgressSerializer {
         String typeId = Registry.STAT_TYPE.getKey(type).toString();
         Registry<T> registry = type.getRegistry();
         boolean any = false;
-        for (T value : registry) {
+        Iterator<T> values = registry.iterator();
+        while (values.hasNext()) {
+            T value = values.next();
             // getValue(type, value) is contains()-guarded, so it never force-creates a Stat in the shared
             // StatType map (which a concurrent stats-reply decode on the network thread also mutates).
             int count = counter.getValue(type, value);
