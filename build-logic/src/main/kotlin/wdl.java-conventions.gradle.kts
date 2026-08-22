@@ -38,13 +38,20 @@ checkstyle {
 // Checkstyle 10.x requires Java 11+ to run, which the deep Java-8 bands cannot host on their own toolchain.
 // Checkstyle analyzes source text, so its runner JVM is independent of the Java-8 language level the sources
 // compile at; point the Checkstyle tasks at a modern launcher there while the compile stays on the band toolchain.
+// PITest 1.22.1 is Java-11 bytecode for the same reason: it analyzes and forks against compiled class files,
+// not the language level, so it can run against Java-8-compiled sources from a newer launcher. The pitest task
+// is selected by name off JavaExec (its actual supertype), not by the PitestTask type, since the pitest plugin
+// is applied after this convention plugin and is never on build-logic's classpath.
 if (providers.gradleProperty("java_version").get().toInt() < 11) {
-    val checkstyleLauncher = javaToolchains.launcherFor {
+    val modernLauncher = javaToolchains.launcherFor {
         languageVersion = JavaLanguageVersion.of(17)
         vendor = JvmVendorSpec.ADOPTIUM
     }
     tasks.withType<Checkstyle>().configureEach {
-        javaLauncher = checkstyleLauncher
+        javaLauncher = modernLauncher
+    }
+    tasks.withType<JavaExec>().matching { it.name == "pitest" }.configureEach {
+        javaLauncher = modernLauncher
     }
 }
 
