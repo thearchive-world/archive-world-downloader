@@ -643,19 +643,19 @@ class WdlConfigTest {
     }
 
     @Test
-    void advancementsDefaultOnStatisticsOff() {
+    void advancementsAndStatisticsDefaultOn() {
         assertTrue(WdlConfig.DEFAULTS.captureAdvancements(), "captureAdvancements defaults on");
-        assertFalse(WdlConfig.DEFAULTS.captureStatistics(), "captureStatistics defaults off on this band");
+        assertTrue(WdlConfig.DEFAULTS.captureStatistics(), "captureStatistics defaults on");
     }
 
     @Test
     void parsesTheTwoNewToggles() {
         Properties properties = new Properties();
         properties.setProperty("captureAdvancements", "false");
-        properties.setProperty("captureStatistics", "true");
+        properties.setProperty("captureStatistics", "false");
         WdlConfig config = WdlConfig.parse(properties);
         assertEquals(false, config.captureAdvancements());
-        assertEquals(true, config.captureStatistics());
+        assertEquals(false, config.captureStatistics());
     }
 
     @Test
