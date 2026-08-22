@@ -7,12 +7,18 @@ import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.MultiPlayerLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundAddExperienceOrbPacket;
+import net.minecraft.network.protocol.game.ClientboundAddMobPacket;
+import net.minecraft.network.protocol.game.ClientboundAddPaintingPacket;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
@@ -29,7 +35,12 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.entity.decoration.LeashFenceKnotEntity;
+import net.minecraft.world.entity.decoration.Painting;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
@@ -39,10 +50,15 @@ import world.thearchive.wdl.core.SendRangeSampler;
 
 /**
  * The production specialization of {@link EntityPacketAccumulator}, binding the MC packet types and mapping each
- * inbound entity packet to the generic state the main thread reconstructs from: {@code AddEntity} as the spawn payload,
- * {@code SynchedEntityData.DataValue} as the synced-value payload, and the equipment slot/stack pair as the equipment
- * payload. The reconstruct applies each post-spawn packet the way the client handlers do, so this only has to decode
- * each packet to the same state the client would hold.
+ * inbound entity packet to the generic state the main thread reconstructs from. This band splits a non-player spawn
+ * across several packets ({@code AddEntity} for objects and living display entities, {@code AddMob} for living
+ * entities, {@code AddPainting}, and {@code AddExperienceOrb}), so the spawn payload is the erased {@code Packet} and
+ * {@link #createSpawnEntity} dispatches on the concrete type at reconstruct; the newer bands fold every one of these
+ * into {@code AddEntity} at 1.19 and 1.21.5. The lightning bolt ({@code AddGlobalEntity}) is deliberately left unread:
+ * its entity type is not serializable, so the unified bands never save it either, and reading it would only add sink
+ * refusals. {@code SynchedEntityData.DataValue} is the synced-value payload and the equipment slot/stack pair the
+ * equipment payload. This band has no {@code Entity.recreateFromPacket} (added at 1.17), so the reconstruct builds each
+ * hanging entity through its positioned constructor rather than letting the packet fill the facing.
  *
  * <p>Every accessor used here is public MC API, so this compiles in {@code common} against the un-widened vanilla jar.
  * The one exception is {@code ClientboundMoveEntityPacket}'s entity id, which is {@code protected}; the per-loader tee,
@@ -67,7 +83,7 @@ import world.thearchive.wdl.core.SendRangeSampler;
  */
 final class EntityPacketCapture
         extends
-        EntityPacketAccumulator<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> {
+        EntityPacketAccumulator<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry> {
     private static volatile @Nullable EntityPacketCapture active;
 
     /**
@@ -152,6 +168,15 @@ final class EntityPacketCapture
         if (packet instanceof ClientboundAddEntityPacket) {
             ClientboundAddEntityPacket add = (ClientboundAddEntityPacket) packet;
             onAdd(add, bundleNamedIds);
+        } else if (packet instanceof ClientboundAddMobPacket) {
+            ClientboundAddMobPacket mob = (ClientboundAddMobPacket) packet;
+            onAddMob(mob);
+        } else if (packet instanceof ClientboundAddPaintingPacket) {
+            ClientboundAddPaintingPacket painting = (ClientboundAddPaintingPacket) packet;
+            onAddPainting(painting);
+        } else if (packet instanceof ClientboundAddExperienceOrbPacket) {
+            ClientboundAddExperienceOrbPacket orb = (ClientboundAddExperienceOrbPacket) packet;
+            onAddExperienceOrb(orb);
         } else if (packet instanceof ClientboundRemoveEntitiesPacket) {
             ClientboundRemoveEntitiesPacket remove = (ClientboundRemoveEntitiesPacket) packet;
             onRemove(remove);
@@ -201,6 +226,47 @@ final class EntityPacketCapture
             receivedFrames.add(Mth.floor(add.getX()) + " " + Mth.floor(add.getY()) + " " + Mth.floor(add.getZ())
                     + " " + add.getData());
         }
+    }
+
+    /**
+     * Ingest a living-entity spawn ({@code AddMob}, this band's separate mob spawn, folded into {@code AddEntity} at
+     * 1.19). The spawn carries the synched data inline, so those values are seeded here the way handleAddMob applies
+     * them at spawn; later {@code SetEntityData} packets merge over them.
+     */
+    private void onAddMob(ClientboundAddMobPacket mob) {
+        EntityPos pos = new EntityPos(mob.getX(), mob.getY(), mob.getZ(),
+                decodeAngle(mob.getyRot()), decodeAngle(mob.getxRot()));
+        spawn(mob.getId(), mob.getUUID(), chunkKey(mob.getX(), mob.getZ()), pos, mob);
+        List<SynchedEntityData.DataItem<?>> items = mob.getUnpackedData();
+        if (items != null) {
+            for (SynchedEntityData.DataItem<?> value : items) {
+                recordData(mob.getId(), value.getAccessor().getId(), value);
+            }
+        }
+    }
+
+    /**
+     * Ingest a painting spawn ({@code AddPainting}, separate until 1.19). A painting is a hanging entity fixed by its
+     * block pos and facing, so the accumulated position is that block, which the reconstruct rebuilds it on.
+     */
+    private void onAddPainting(ClientboundAddPaintingPacket painting) {
+        BlockPos block = painting.getPos();
+        EntityPos pos = new EntityPos(block.getX(), block.getY(), block.getZ(), 0.0F, 0.0F);
+        spawn(painting.getId(), painting.getUUID(), chunkKey(block.getX(), block.getZ()), pos, painting);
+    }
+
+    /**
+     * Ingest an experience-orb spawn ({@code AddExperienceOrb}, separate until 1.21.5). The packet carries no UUID, so
+     * a synthetic id-derived one stands in as the accumulator's identity key; orbs are transient and merge.
+     */
+    private void onAddExperienceOrb(ClientboundAddExperienceOrbPacket orb) {
+        EntityPos pos = new EntityPos(orb.getX(), orb.getY(), orb.getZ(), 0.0F, 0.0F);
+        spawn(orb.getId(), syntheticUuid(orb.getId()), chunkKey(orb.getX(), orb.getZ()), pos, orb);
+    }
+
+    /** A stable id-derived UUID for a spawn packet that carries none (the experience orb). */
+    private static UUID syntheticUuid(int id) {
+        return new UUID(0L, id & 0xFFFFFFFFL);
     }
 
     /** Whether this type feeds the range estimator: a decoration, or a non-excluded vanilla range-10 type. */
@@ -382,5 +448,41 @@ final class EntityPacketCapture
     /** Decode a wire-byte rotation (256 units per full turn) to degrees, as vanilla unpacks it. */
     private static float decodeAngle(byte packed) {
         return packed * 360 / 256.0F;
+    }
+
+    /**
+     * Reconstruct the entity a spawn packet describes, dispatching on the concrete spawn packet the way the vanilla
+     * client's per-packet handlers do: an object or living display from its {@link EntityType}, a mob from its type id,
+     * a painting from its own constructor, an experience orb from its value. The item frame and leash knot are hanging
+     * entities built through their positioned constructors, which set the block pos and facing their save reads; a bare
+     * {@code EntityType.create} would leave those null and this band has no {@code Entity.recreateFromPacket} to fill
+     * them, so {@code Entity.save} would throw. Null for a packet this does not spawn from, or a type with no factory.
+     * The caller applies the identity, position, synced values, and equipment.
+     */
+    static @Nullable Entity createSpawnEntity(Packet<?> spawn, Level level) {
+        if (spawn instanceof ClientboundAddEntityPacket) {
+            ClientboundAddEntityPacket add = (ClientboundAddEntityPacket) spawn;
+            EntityType<?> type = add.getType();
+            if (type == EntityType.ITEM_FRAME) {
+                return new ItemFrame(level, new BlockPos(add.getX(), add.getY(), add.getZ()),
+                        Direction.from3DDataValue(add.getData()));
+            }
+            if (type == EntityType.LEASH_KNOT) {
+                return new LeashFenceKnotEntity(level, new BlockPos(add.getX(), add.getY(), add.getZ()));
+            }
+            return type.create(level);
+        }
+        if (spawn instanceof ClientboundAddMobPacket) {
+            return EntityType.create(((ClientboundAddMobPacket) spawn).getType(), level);
+        }
+        if (spawn instanceof ClientboundAddPaintingPacket) {
+            ClientboundAddPaintingPacket painting = (ClientboundAddPaintingPacket) spawn;
+            return new Painting(level, painting.getPos(), painting.getDirection(), painting.getMotive());
+        }
+        if (spawn instanceof ClientboundAddExperienceOrbPacket) {
+            ClientboundAddExperienceOrbPacket orb = (ClientboundAddExperienceOrbPacket) spawn;
+            return new ExperienceOrb(level, orb.getX(), orb.getY(), orb.getZ(), orb.getValue());
+        }
+        return null;
     }
 }
