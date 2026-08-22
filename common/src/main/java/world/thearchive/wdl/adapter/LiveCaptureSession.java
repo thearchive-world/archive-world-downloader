@@ -54,7 +54,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
@@ -4314,10 +4314,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * inside the vehicle).
      */
     private void promoteChunk(ChunkPos pos,
-            List<PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry>> held) {
+            List<PacketEntity<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry>> held) {
         List<Promoted> built = new ArrayList<>();
         Map<Integer, Entity> byId = new HashMap<>();
-        for (PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> frame : held) {
+        for (PacketEntity<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry> frame : held) {
             if (excludedRootVehicleUuids.contains(frame.uuid())) {
                 continue; // captured into the player's RootVehicle; not also a standalone entity (same-UUID clash)
             }
@@ -4367,16 +4367,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** A drained entity paired with the entity reconstructed from it, for the in-batch relationship wiring. */
     private static final class Promoted {
-        private final PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> frame;
+        private final PacketEntity<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry> frame;
         private final Entity entity;
 
-        Promoted(PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> frame,
+        Promoted(PacketEntity<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry> frame,
                 Entity entity) {
             this.frame = frame;
             this.entity = entity;
         }
 
-        PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> frame() {
+        PacketEntity<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry> frame() {
             return frame;
         }
 
@@ -4386,26 +4386,26 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Rebuild a live entity from its accumulated packet state, the way the client does on {@code AddEntity} then the
-     * post-spawn packets: create the typed entity against the live level, apply the spawn packet (the spawn position,
-     * rotation, and the data int such as a hanging facing), snap it to its last known position (the accumulated
-     * move/teleport/position-sync, so a mob saves where it ended), assign the merged synced values, and set the merged
-     * equipment per slot. Passengers and the leash are wired by {@link #promoteChunk} once the sibling entities exist.
-     * The result is a fresh, never-removed entity {@link EntitySink} saves like any other. Returns null if the type
-     * cannot create.
+     * Rebuild a live entity from its accumulated packet state, the way the client does on each spawn packet then the
+     * post-spawn packets: create the typed entity against the live level (an object, mob, painting, or experience orb,
+     * each built as its client handler builds it, so a hanging entity gets its block pos and facing here), snap it to
+     * its last known position (the accumulated move/teleport/position-sync, so a mob saves where it ended), assign the
+     * merged synced values, and set the merged equipment per slot. Passengers and the leash are wired by
+     * {@link #promoteChunk} once the sibling entities exist. The result is a fresh, never-removed entity
+     * {@link EntitySink} saves like any other. Returns null if the type cannot create.
      */
     private @Nullable Entity reconstructPacketEntity(
-            PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> frame) {
-        // This band's ClientboundAddEntityPacket carries an object-type id, not an EntityType; resolve the object the
-        // vanilla client handleAddEntity switch would build (see EntityPacketCapture.createSpawnObject).
-        Entity entity = EntityPacketCapture.createSpawnObject(frame.spawn(), level());
+            PacketEntity<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry> frame) {
+        // This band splits a non-player spawn across several packets; createSpawnEntity dispatches on the concrete one
+        // the way the vanilla client handlers do (see EntityPacketCapture).
+        Entity entity = EntityPacketCapture.createSpawnEntity(frame.spawn(), level());
         if (entity == null) {
             return null;
         }
-        // 1.16.5 has no Entity.recreateFromPacket; set the id and uuid from the spawn packet directly (the moveTo
+        // This band has no Entity.recreateFromPacket; set the id and uuid from the accumulated identity (the moveTo
         // below sets position and rotation), which is the identity the reconstructed entity is saved under.
-        entity.setId(frame.spawn().getId());
-        entity.setUUID(frame.spawn().getUUID());
+        entity.setId(frame.id());
+        entity.setUUID(frame.uuid());
         EntityPos pos = frame.pos();
         entity.moveTo(pos.x(), pos.y(), pos.z(), pos.yRot(), pos.xRot());
         List<SynchedEntityData.DataItem<?>> synced = frame.synced();
