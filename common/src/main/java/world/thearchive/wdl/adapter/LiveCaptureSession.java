@@ -52,14 +52,13 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
@@ -4315,10 +4314,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * inside the vehicle).
      */
     private void promoteChunk(ChunkPos pos,
-            List<PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry>> held) {
+            List<PacketEntity<Packet<?>, SynchedEntityData.DataValue<?>, EquipmentEntry>> held) {
         List<Promoted> built = new ArrayList<>();
         Map<Integer, Entity> byId = new HashMap<>();
-        for (PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> frame : held) {
+        for (PacketEntity<Packet<?>, SynchedEntityData.DataValue<?>, EquipmentEntry> frame : held) {
             if (excludedRootVehicleUuids.contains(frame.uuid())) {
                 continue; // captured into the player's RootVehicle; not also a standalone entity (same-UUID clash)
             }
@@ -4367,26 +4366,26 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** A drained entity paired with the entity reconstructed from it, for the in-batch relationship wiring. */
     private record Promoted(
-            PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> frame,
+            PacketEntity<Packet<?>, SynchedEntityData.DataValue<?>, EquipmentEntry> frame,
             Entity entity) {}
 
     /**
-     * Rebuild a live entity from its accumulated packet state, the way the client does on {@code AddEntity} then the
-     * post-spawn packets: create the typed entity against the live level, apply the spawn packet (the spawn position,
-     * rotation, and the data int such as a hanging facing), snap it to its last known position (the accumulated
-     * move/teleport/position-sync, so a mob saves where it ended), assign the merged synced values, and set the merged
-     * equipment per slot. Passengers and the leash are wired by {@link #promoteChunk} once the sibling entities exist.
-     * The result is a fresh, never-removed entity {@link EntitySink} saves like any other. Returns null if the type
-     * cannot create.
+     * Rebuild a live entity from its accumulated packet state, the way the client does on the spawn packet then the
+     * post-spawn packets: delegate to {@link EntityPacketCapture#createSpawnEntity} (the AddEntity spawn rebuilt via
+     * {@code recreateFromPacket}, the experience orb constructed directly), then stamp the accumulated id and uuid,
+     * snap it to its last known position (the accumulated move/teleport/position-sync, so a mob saves where it ended),
+     * assign the merged synced values, and set the merged equipment per slot. Passengers and the leash are wired by
+     * {@link #promoteChunk} once the sibling entities exist. The result is a fresh, never-removed entity
+     * {@link EntitySink} saves like any other. Returns null if the type cannot create.
      */
     private @Nullable Entity reconstructPacketEntity(
-            PacketEntity<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> frame) {
-        EntityType<?> type = frame.spawn().getType();
-        Entity entity = type.create(level());
+            PacketEntity<Packet<?>, SynchedEntityData.DataValue<?>, EquipmentEntry> frame) {
+        Entity entity = EntityPacketCapture.createSpawnEntity(frame.spawn(), level());
         if (entity == null) {
             return null;
         }
-        entity.recreateFromPacket(frame.spawn());
+        entity.setId(frame.id());
+        entity.setUUID(frame.uuid());
         EntityPos pos = frame.pos();
         entity.moveTo(pos.x(), pos.y(), pos.z(), pos.yRot(), pos.xRot());
         List<SynchedEntityData.DataValue<?>> synced = frame.synced();
