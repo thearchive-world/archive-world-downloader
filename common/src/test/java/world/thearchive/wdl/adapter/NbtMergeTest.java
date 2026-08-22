@@ -61,6 +61,18 @@ class NbtMergeTest {
     }
 
     @Test
+    void aCarryWritesTheKeyWhenTheFreshTagHasNoList() {
+        // The other half of the write side: the fresh tag has no list to add into, so the union builds one and the
+        // write back is the only thing that puts it on the tag. Without it the carried books are assembled and
+        // dropped, and the carry still reports true.
+        CompoundTag disk = withBooks(0, 2);
+        CompoundTag fresh = new CompoundTag();
+
+        assertTrue(NbtMerge.carryListBySlot(disk, fresh, "Items", ALL_SLOTS));
+        assertEquals(2, fresh.getList("Items", 10).size(), "both disk slots reach the fresh tag");
+    }
+
+    @Test
     void aFreshValueOfTheWrongTypeIsLeftAloneWhenNothingCarries() {
         // The fresh side is read through an instanceof guard, so a value that is not a list falls back to an
         // empty one. Nothing carried means that empty list must not be written over what was there.

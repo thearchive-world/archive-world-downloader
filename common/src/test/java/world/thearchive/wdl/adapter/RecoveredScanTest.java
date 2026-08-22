@@ -3,14 +3,18 @@
 
 package world.thearchive.wdl.adapter;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
+import static world.thearchive.wdl.testsupport.BlockEntityFixtures.unhostedBlockEntity;
 
+import java.util.Arrays;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -107,6 +111,55 @@ class RecoveredScanTest {
     }
 
     @Test
+    void collectsBookshelfSavedSlotMaskAndKeepsItOutOfTheBooleanSet() {
+        RecoveredScan scan = new RecoveredScan();
+        scan.record(DimensionType.field_18954, bookshelfChunk(bookshelf(30, 64, 30, 0, 2)));
+
+        RecoveredCoverage coverage = scan.coverage(DimensionType.field_18954);
+        assertEquals(0b101, coverage.bookshelfSavedSlots(new BlockPos(30, 64, 30).asLong()),
+                "the saved bookshelf slots are a per-slot mask");
+        assertFalse(coverage.contains(new BlockPos(30, 64, 30).asLong()),
+                "a bookshelf never enters the boolean recovered set");
+    }
+
+    @Test
+    void routesChestAndBookshelfIntoSeparateChannels() {
+        RecoveredScan scan = new RecoveredScan();
+        scan.record(DimensionType.field_18954,
+                bookshelfChunk(filledChest(10, 70, 20), bookshelf(11, 70, 20, 1)));
+
+        RecoveredCoverage coverage = scan.coverage(DimensionType.field_18954);
+        assertTrue(coverage.contains(new BlockPos(10, 70, 20).asLong()), "the chest is boolean coverage");
+        assertEquals(0, coverage.bookshelfSavedSlots(new BlockPos(10, 70, 20).asLong()),
+                "the chest has no bookshelf mask");
+        assertEquals(0b10, coverage.bookshelfSavedSlots(new BlockPos(11, 70, 20).asLong()),
+                "the bookshelf has its mask");
+        assertFalse(coverage.contains(new BlockPos(11, 70, 20).asLong()), "the bookshelf is not boolean coverage");
+    }
+
+    @Test
+    void emptyBookshelfIsNotCoverage() {
+        RecoveredScan scan = new RecoveredScan();
+        scan.record(DimensionType.field_18954, bookshelfChunk(bookshelf(12, 64, 12)));
+        assertSame(RecoveredCoverage.EMPTY, scan.coverage(DimensionType.field_18954),
+                "an empty re-walked bookshelf records no coverage");
+    }
+
+    @Test
+    void dropsAnItemsEntryWithNoSlotOrAnOutOfRangeSlot() {
+        RecoveredScan scan = new RecoveredScan();
+        CompoundTag bookshelf = bookshelf(13, 64, 13);
+        ListTag items = new ListTag();
+        items.add(ItemFixtures.malformedEntryWithoutSlot("minecraft:written_book"));
+        items.add(ItemFixtures.entryAtSlot(6, "minecraft:written_book")); // the first out-of-range slot
+        items.add(ItemFixtures.entryAtSlot(7, "minecraft:written_book"));
+        bookshelf.put("Items", items);
+        scan.record(DimensionType.field_18954, bookshelfChunk(bookshelf));
+        assertSame(RecoveredCoverage.EMPTY, scan.coverage(DimensionType.field_18954),
+                "a missing Slot must not phantom-mark slot 0 and an out-of-range Slot is dropped");
+    }
+
+    @Test
     void dropsBlockEntitiesWithoutIntCoordinates() {
         RecoveredScan scan = new RecoveredScan();
         CompoundTag chest = filledChest(14, 64, 14);
@@ -114,6 +167,19 @@ class RecoveredScanTest {
         scan.record(DimensionType.field_18954, BlockEntityFixtures.malformedChunkTagWith(chest));
         assertSame(RecoveredCoverage.EMPTY, scan.coverage(DimensionType.field_18954),
                 "a block entity without int coordinates cannot be keyed and is dropped");
+    }
+
+    @Test
+    void aBookshelfMaskGrowsThenRepublishesOnlyWhenItChanges() {
+        RecoveredScan scan = new RecoveredScan();
+        scan.record(DimensionType.field_18954, bookshelfChunk(bookshelf(40, 64, 40, 0)));
+        RecoveredCoverage afterFirst = scan.coverage(DimensionType.field_18954);
+        assertEquals(0b1, afterFirst.bookshelfSavedSlots(new BlockPos(40, 64, 40).asLong()),
+                "the first mask is published");
+
+        scan.record(DimensionType.field_18954, bookshelfChunk(bookshelf(40, 64, 40, 0)));
+        assertSame(afterFirst, scan.coverage(DimensionType.field_18954),
+                "re-recording the same mask does not republish");
     }
 
     @Test
@@ -198,6 +264,22 @@ class RecoveredScanTest {
         CompoundTag chunk = new CompoundTag();
         chunk.put("Level", EntityFixtures.entityChunkTagWith(entities));
         return chunk;
+    }
+
+    /**
+     * A chiseled bookshelf's saved tag. No block on this band hosts the type, so it has no producer to take a shape
+     * from; the per-slot mask under test is band-agnostic tag code that a save written on a later band reaches.
+     */
+    private static CompoundTag bookshelf(int x, int y, int z, int... slots) {
+        CompoundTag blockEntity = unhostedBlockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, x, y, z);
+        String[] books = new String[slots.length];
+        Arrays.fill(books, "minecraft:written_book");
+        blockEntity.put("Items", ItemFixtures.itemsAtSlots(slots, books));
+        return blockEntity;
+    }
+
+    private static CompoundTag bookshelfChunk(CompoundTag... blockEntities) {
+        return BlockEntityFixtures.malformedChunkTagWith(blockEntities);
     }
 
     private static CompoundTag filledChest(int x, int y, int z) {

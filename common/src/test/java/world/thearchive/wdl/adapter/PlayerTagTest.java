@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -123,6 +124,26 @@ class PlayerTagTest {
         assertNull(PlayerTag.dimensionOf(tag), "a player tag with no Dimension key names no dimension");
         tag.putString("Dimension", "examplepack:skylands"); // an id outside the three a capture ever writes
         assertNull(PlayerTag.dimensionOf(tag), "nor does one naming a dimension the capture never routes to");
+    }
+
+    @Test
+    void setPositionWritesTheCaptureAnchorInTheShapesVanillaReadsBack() {
+        // Vanilla reads Pos as three doubles and Rotation as two floats in yaw-then-pitch order, and a list of any
+        // other shape or order loads silently as the origin, so the saved player would land somewhere the capture
+        // never anchored with no error anywhere.
+        CompoundTag tag = playerTag();
+
+        PlayerTag.setPosition(tag, new BlockPos(12, 70, -34), 90.0f, -15.0f);
+
+        ListTag pos = tag.getList("Pos", 6);
+        assertEquals(3, pos.size(), "the anchor is written as three doubles");
+        assertEquals(12.0, pos.getDouble(0));
+        assertEquals(70.0, pos.getDouble(1));
+        assertEquals(-34.0, pos.getDouble(2));
+        ListTag rotation = tag.getList("Rotation", 5);
+        assertEquals(2, rotation.size(), "the rotation is written as two floats");
+        assertEquals(90.0f, rotation.getFloat(0), "yaw first");
+        assertEquals(-15.0f, rotation.getFloat(1), "then pitch");
     }
 
     @Test
