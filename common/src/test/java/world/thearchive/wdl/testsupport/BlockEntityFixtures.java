@@ -55,6 +55,22 @@ public final class BlockEntityFixtures {
     }
 
     /**
+     * A block entity of a type no block on this band hosts. {@link #blockEntity} cannot build one: it resolves the type
+     * to a representative block state to take the producer's shape from, and a type this band does not register has
+     * none. Only for such a type, and only where what is under test is band-agnostic tag code a save written on a band
+     * that does have the block reaches; a registered type belongs on {@link #blockEntity}, where the shape is checked,
+     * and a tag from here reaches a chunk through {@link #malformedChunkTagWith}.
+     */
+    public static CompoundTag unhostedBlockEntity(String id, int x, int y, int z) {
+        CompoundTag tag = new CompoundTag();
+        tag.putString("id", id);
+        tag.putInt("x", x);
+        tag.putInt("y", y);
+        tag.putInt("z", z);
+        return tag;
+    }
+
+    /**
      * A block entity carrying a key no vanilla writer emits, for the one property that needs exactly that: the chunk
      * codec must pass a block entity's NBT through opaquely, since the tags it re-encodes come from the client and may
      * have been written by a foreign or modded server. A probe vanilla itself round-trips cannot prove that, because a
