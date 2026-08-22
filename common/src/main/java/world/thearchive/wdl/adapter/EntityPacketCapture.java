@@ -8,12 +8,17 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundAddExperienceOrbPacket;
+import net.minecraft.network.protocol.game.ClientboundAddMobPacket;
+import net.minecraft.network.protocol.game.ClientboundAddPaintingPacket;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
@@ -30,8 +35,11 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.decoration.Painting;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -40,10 +48,13 @@ import world.thearchive.wdl.core.SendRangeSampler;
 
 /**
  * The production specialization of {@link EntityPacketAccumulator}, binding the MC packet types and mapping each
- * inbound entity packet to the generic state the main thread reconstructs from: {@code AddEntity} as the spawn payload,
+ * inbound entity packet to the generic state the main thread reconstructs from: the spawn packet as the spawn payload,
  * {@code SynchedEntityData.DataValue} as the synced-value payload, and the equipment slot/stack pair as the equipment
- * payload. The reconstruct applies each post-spawn packet the way the client handlers do, so this only has to decode
- * each packet to the same state the client would hold.
+ * payload. On this band the spawn payload arrives split across four packets, {@code AddEntity}, {@code AddMob},
+ * {@code AddPainting}, and {@code AddExperienceOrb}; only {@code AddEntity} is rebuilt through
+ * {@code recreateFromPacket}, so the mob, painting, and orb are constructed directly by type and placed from the
+ * accumulated position. The reconstruct applies each post-spawn packet the way the client handlers do, so this only has
+ * to decode each packet to the same state the client would hold.
  *
  * <p>Every accessor used here is public MC API, so this compiles in {@code common} against the un-widened vanilla jar.
  * The one exception is {@code ClientboundMoveEntityPacket}'s entity id, which is {@code protected}; the per-loader tee,
@@ -68,7 +79,7 @@ import world.thearchive.wdl.core.SendRangeSampler;
  */
 final class EntityPacketCapture
         extends
-        EntityPacketAccumulator<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> {
+        EntityPacketAccumulator<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry> {
     private static volatile @Nullable EntityPacketCapture active;
 
     /**
@@ -152,6 +163,12 @@ final class EntityPacketCapture
     public void accept(Packet<?> packet, IntSet bundleNamedIds) {
         if (packet instanceof ClientboundAddEntityPacket add) {
             onAdd(add, bundleNamedIds);
+        } else if (packet instanceof ClientboundAddMobPacket mob) {
+            onAddMob(mob);
+        } else if (packet instanceof ClientboundAddPaintingPacket painting) {
+            onAddPainting(painting);
+        } else if (packet instanceof ClientboundAddExperienceOrbPacket orb) {
+            onAddExperienceOrb(orb);
         } else if (packet instanceof ClientboundRemoveEntitiesPacket remove) {
             onRemove(remove);
         } else if (packet instanceof ClientboundPlayerPositionPacket) {
@@ -258,6 +275,52 @@ final class EntityPacketCapture
         if (distanceBlocks != SendRangeSampler.NO_SAMPLE && distanceBlocks <= plausibleMaxBlocks) {
             sendRange.observe(dimensionId, distanceBlocks);
         }
+    }
+
+    private void onAddMob(ClientboundAddMobPacket mob) {
+        EntityPos pos = new EntityPos(mob.getX(), mob.getY(), mob.getZ(),
+                decodeAngle(mob.getyRot()), decodeAngle(mob.getxRot()));
+        spawn(mob.getId(), mob.getUUID(), chunkKey(mob.getX(), mob.getZ()), pos, mob);
+    }
+
+    private void onAddPainting(ClientboundAddPaintingPacket painting) {
+        BlockPos block = painting.getPos();
+        EntityPos pos = new EntityPos(block.getX(), block.getY(), block.getZ(), 0.0F, 0.0F);
+        spawn(painting.getId(), painting.getUUID(), chunkKey(block.getX(), block.getZ()), pos, painting);
+    }
+
+    private void onAddExperienceOrb(ClientboundAddExperienceOrbPacket orb) {
+        EntityPos pos = new EntityPos(orb.getX(), orb.getY(), orb.getZ(), 0.0F, 0.0F);
+        spawn(orb.getId(), syntheticUuid(orb.getId()), chunkKey(orb.getX(), orb.getZ()), pos, orb);
+    }
+
+    /** No UUID rides the experience-orb spawn packet; the low bits of the entity id stand in for one. */
+    private static UUID syntheticUuid(int id) {
+        return new UUID(0L, id & 0xFFFFFFFFL);
+    }
+
+    /**
+     * Recreate the typed entity a drained spawn packet names, the way the matching client handler does; null if the
+     * type cannot create.
+     */
+    static @Nullable Entity createSpawnEntity(Packet<?> spawn, Level level) {
+        if (spawn instanceof ClientboundAddEntityPacket add) {
+            Entity entity = add.getType().create(level);
+            if (entity != null) {
+                entity.recreateFromPacket(add);
+            }
+            return entity;
+        }
+        if (spawn instanceof ClientboundAddMobPacket mob) {
+            return EntityType.create(mob.getType(), level);
+        }
+        if (spawn instanceof ClientboundAddPaintingPacket painting) {
+            return new Painting(level, painting.getPos(), painting.getDirection(), painting.getMotive());
+        }
+        if (spawn instanceof ClientboundAddExperienceOrbPacket orb) {
+            return new ExperienceOrb(level, orb.getX(), orb.getY(), orb.getZ(), orb.getValue());
+        }
+        return null;
     }
 
     private void onRemove(ClientboundRemoveEntitiesPacket packet) {
