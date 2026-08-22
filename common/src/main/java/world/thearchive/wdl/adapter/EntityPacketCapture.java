@@ -7,12 +7,14 @@ import com.mojang.datafixers.util.Pair;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundAddExperienceOrbPacket;
 import net.minecraft.network.protocol.game.ClientboundEntityPositionSyncPacket;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
@@ -28,11 +30,14 @@ import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -41,10 +46,11 @@ import world.thearchive.wdl.core.SendRangeSampler;
 
 /**
  * The production specialization of {@link EntityPacketAccumulator}, binding the MC packet types and mapping each
- * inbound entity packet to the generic state the main thread reconstructs from: {@code AddEntity} as the spawn payload,
- * {@code SynchedEntityData.DataValue} as the synced-value payload, and the equipment slot/stack pair as the equipment
- * payload. The reconstruct applies each post-spawn packet the way the client handlers do, so this only has to decode
- * each packet to the same state the client would hold.
+ * inbound entity packet to the generic state the main thread reconstructs from: {@code AddEntity} or, on this band, the
+ * still-separate {@code AddExperienceOrb} as the spawn payload (the orb folds into {@code AddEntity} starting at
+ * 1.21.5), {@code SynchedEntityData.DataValue} as the synced-value payload, and the equipment slot/stack pair as the
+ * equipment payload. The reconstruct applies each post-spawn packet the way the client handlers do, so this only has to
+ * decode each packet to the same state the client would hold.
  *
  * <p>Every accessor used here is public MC API, so this compiles in {@code common} against the un-widened vanilla jar.
  * The one exception is {@code ClientboundMoveEntityPacket}'s entity id, which is {@code protected}; the per-loader tee,
@@ -69,7 +75,7 @@ import world.thearchive.wdl.core.SendRangeSampler;
  */
 final class EntityPacketCapture
         extends
-        EntityPacketAccumulator<ClientboundAddEntityPacket, SynchedEntityData.DataValue<?>, EquipmentEntry> {
+        EntityPacketAccumulator<Packet<?>, SynchedEntityData.DataValue<?>, EquipmentEntry> {
     private static volatile @Nullable EntityPacketCapture active;
 
     /**
@@ -161,6 +167,8 @@ final class EntityPacketCapture
     public void accept(Packet<?> packet, IntSet bundleNamedIds) {
         if (packet instanceof ClientboundAddEntityPacket add) {
             onAdd(add, bundleNamedIds);
+        } else if (packet instanceof ClientboundAddExperienceOrbPacket orb) {
+            onAddExperienceOrb(orb);
         } else if (packet instanceof ClientboundRemoveEntitiesPacket remove) {
             onRemove(remove);
         } else if (packet instanceof ClientboundPlayerPositionPacket) {
@@ -203,6 +211,35 @@ final class EntityPacketCapture
             receivedFrames.add(Mth.floor(add.getX()) + " " + Mth.floor(add.getY()) + " " + Mth.floor(add.getZ())
                     + " " + add.getData());
         }
+    }
+
+    private void onAddExperienceOrb(ClientboundAddExperienceOrbPacket orb) {
+        EntityPos pos = new EntityPos(orb.getX(), orb.getY(), orb.getZ(), 0.0F, 0.0F);
+        spawn(orb.getId(), syntheticUuid(orb.getId()), chunkKey(orb.getX(), orb.getZ()), pos, orb);
+    }
+
+    /** No UUID rides the experience-orb spawn packet; the low bits of the entity id stand in for one. */
+    private static UUID syntheticUuid(int id) {
+        return new UUID(0L, id & 0xFFFFFFFFL);
+    }
+
+    /**
+     * Recreate the typed entity a drained spawn packet names, the way the matching client handler does: the AddEntity
+     * spawn is rebuilt through {@link Entity#recreateFromPacket}, the experience orb constructed directly. Null if the
+     * type cannot create or the packet is not a spawn this reconstructs.
+     */
+    static @Nullable Entity createSpawnEntity(Packet<?> spawn, Level level) {
+        if (spawn instanceof ClientboundAddEntityPacket add) {
+            Entity entity = add.getType().create(level, EntitySpawnReason.LOAD);
+            if (entity != null) {
+                entity.recreateFromPacket(add);
+            }
+            return entity;
+        }
+        if (spawn instanceof ClientboundAddExperienceOrbPacket orb) {
+            return new ExperienceOrb(level, orb.getX(), orb.getY(), orb.getZ(), orb.getValue());
+        }
+        return null;
     }
 
     /** Whether this type feeds the range estimator: a decoration, or a non-excluded vanilla range-10 type. */
