@@ -813,6 +813,45 @@ class LiveCaptureSessionLossTallyTest {
     }
 
     /**
+     * The reconstruct's own per-entity isolation, the sibling of the single-entity encode's. A chunk has already left
+     * the accumulator when it is reconstructed, so a reconstruct that threw and escaped the loop would take every
+     * sibling in that drained chunk down with it and skip the pass's later chunks; each must instead be skipped and
+     * counted on its own. Three entities across two captured chunks, all of whose reconstructs throw out of level(): a
+     * catch hoisted out of the per-entity loop would destroy the siblings behind the first thrower, and a throw that
+     * escaped the pass would never reach the later chunk, so neither could report three.
+     */
+    @Test
+    void anEntityWhoseReconstructThrowsIsSkippedPerEntityRatherThanAbortingTheDrainedChunk(@TempDir Path temporary)
+            throws Exception {
+        LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
+        EntityPacketCapture capture = installPacketCapture(session);
+        ChunkPos laterChunk = new ChunkPos(1, 0);
+        UUID laterEntity = UUID.fromString("7a3e1c92-4f88-4d21-8b0a-6c5e9f2d1a34");
+        captureTerrain(session, chunk);
+        captureTerrain(session, laterChunk);
+        spawn(capture, 1, VEHICLE, chunk);
+        spawn(capture, 2, FRAME, chunk); // a sibling in the same drained chunk as the entity above
+        spawn(capture, 3, laterEntity, laterChunk); // a later chunk in the same pass
+        assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
+
+        // The finish pass this drives wraps its drain in a pass-level catch, so model it: the loss must be observable
+        // as the count below, not an escaped throw that fails the test as an error.
+        try {
+            session.promotePacketEntities(LiveCaptureSession.PromotePass.FINISH, 0, 0, 0);
+        } catch (RuntimeException escaped) {
+            // pre-fix, the first entity's reconstruct throw escapes here, taking its drained siblings with it
+        }
+        session.reportEntityReconciliation();
+
+        assertEquals(3, losses(session, "createDrops"),
+                "each entity whose reconstruct threw is skipped and counted on its own, so one bad entity takes "
+                        + "neither its drained-chunk siblings nor the pass's later chunks down with it");
+        assertEquals(3, losses(session, "structuralEntitiesLost"),
+                "and they are structural, the arm of the reconciliation the partial verdict reads");
+        assertTrue(session.isPartialSave(0, 0), "so the finish is partial rather than reporting the save clean");
+    }
+
+    /**
      * The finish re-offer's own per-entity catch, which covers the hops around the encode that the encode's own
      * isolation never sees. A throw in any of them destroys the refused mount the re-offer exists to recover, so it has
      * to reach the same structural count the encode's throw does. Two entities, so a catch hoisted out of the
