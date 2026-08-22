@@ -65,12 +65,11 @@ tasks.matching { it.name == "remapJar" || it.name == "remapSourcesJar" }.configu
 
 dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
-    // The bridge jar is produced by the included build's genBridge. builtBy declares that producer edge, but it is
-    // NOT sufficient on its own: Loom resolves mappings(files(...)) during provisioning inside afterEvaluate, at
+    // The bridge jar is produced by the included build's genBridge. builtBy declares that producer edge, but it
+    // cannot order it: Loom resolves mappings(files(...)) during provisioning inside afterEvaluate, at
     // CONFIGURATION time, whereas a builtBy producer only runs in the execution phase, which never precedes a
-    // config-time read. So the canonical build must run genBridge as a PREREQUISITE invocation
-    // (cd tools/mojmap-bridge && ./gradlew genBridge) BEFORE this root build configures; the jar must already
-    // exist on disk here. The builtBy stays to express the dependency for incremental rebuilds once it exists.
+    // config-time read. settings.gradle.kts therefore runs genBridge during settings evaluation, which is what
+    // actually puts the jar on disk before this line; the builtBy stays as the declared producer relationship.
     mappings(
         files(rootProject.file("tools/mojmap-bridge/build/bridge/intermediary-mojmap.jar"))
             .builtBy(gradle.includedBuild("mojmap-bridge").task(":genBridge"))
