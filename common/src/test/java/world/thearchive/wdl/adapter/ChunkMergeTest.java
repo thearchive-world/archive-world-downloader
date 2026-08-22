@@ -9,10 +9,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.chunkTagWith;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
+import static world.thearchive.wdl.testsupport.BlockEntityFixtures.unhostedBlockEntity;
 
 import com.google.common.collect.ImmutableList;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -350,6 +356,46 @@ class ChunkMergeTest {
         assertEquals(0, ChunkMerge.merge(onDisk, fresh));
     }
 
+    /**
+     * A chiseled bookshelf's saved tag. No block on this band hosts the type, so it has no producer to take a shape
+     * from; the per-slot union under test is band-agnostic tag code that a save written on a later band reaches.
+     */
+    private static CompoundTag bookshelf(int x, int y, int z, int... slots) {
+        CompoundTag blockEntity = unhostedBlockEntity(ChunkMerge.CHISELED_BOOKSHELF_ID, x, y, z);
+        String[] books = new String[slots.length];
+        Arrays.fill(books, "minecraft:written_book");
+        blockEntity.put("Items", ItemFixtures.itemsAtSlots(slots, books));
+        return blockEntity;
+    }
+
+    private static CompoundTag bookshelfChunk(CompoundTag... blockEntities) {
+        return BlockEntityFixtures.malformedChunkTagWith(blockEntities);
+    }
+
+    /**
+     * The slots an Items list names, in list order and WITH duplicates. A set would hide the one corruption this axis
+     * can produce: two entries for one slot, where vanilla's load does a last-write-wins set and the stale entry
+     * therefore beats the fresher one.
+     */
+    private static List<Integer> slotsOf(CompoundTag blockEntity) {
+        List<Integer> slots = new ArrayList<>();
+        if (blockEntity.get("Items") instanceof ListTag) {
+            ListTag items = (ListTag) blockEntity.get("Items");
+            for (int i = 0; i < items.size(); i++) {
+                CompoundTag entry = (CompoundTag) items.get(i);
+                slots.add((int) (entry.contains("Slot") ? entry.getByte("Slot") : (byte) -1));
+            }
+        }
+        return slots;
+    }
+
+    /** The same slots sorted, for the cases whose subject is membership rather than order. */
+    private static List<Integer> sortedSlotsOf(CompoundTag blockEntity) {
+        List<Integer> slots = new ArrayList<>(slotsOf(blockEntity));
+        Collections.sort(slots);
+        return slots;
+    }
+
     private static CompoundTag brewingStand(int x, int y, int z, short brewTime, byte fuel) {
         CompoundTag blockEntity = blockEntity("minecraft:brewing_stand", x, y, z);
         blockEntity.putShort("BrewTime", brewTime);
@@ -360,6 +406,79 @@ class ChunkMergeTest {
     /** A brewing stand as the client re-captures one it never opened: the keys present, at their defaults. */
     private static CompoundTag freshBrewingStand(int x, int y, int z) {
         return brewingStand(x, y, z, (short) 0, (byte) 0);
+    }
+
+    @Test
+    void aBookshelfInsertUnionsWithTheBooksAlreadyOnDisk() {
+        // The bookshelf's capture unit is one slot, so the fresh side names only the book inserted since the last
+        // flush. Replacing wholesale would delete the books an earlier flush of this same download already saved.
+        CompoundTag onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
+        CompoundTag fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
+
+        int mergeBacks = ChunkMerge.merge(onDisk, fresh);
+
+        assertEquals(1, mergeBacks, "the shelf carried forward");
+        assertEquals(ImmutableList.of(0, 1, 2, 3), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
+                "the three books already on disk survive beside the fourth");
+    }
+
+    @Test
+    void aBookshelfSlotCapturedTwiceKeepsTheFresherBook() {
+        CompoundTag onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1));
+        CompoundTag freshShelf = bookshelf(4, 64, 9);
+        freshShelf.put("Items", ItemFixtures.itemsAtSlots(new int[] { 1 }, "minecraft:enchanted_book"));
+        CompoundTag fresh = bookshelfChunk(freshShelf);
+
+        int mergeBacks = ChunkMerge.merge(onDisk, fresh);
+
+        assertEquals(1, mergeBacks, "slot 0 carried forward");
+        assertEquals(ImmutableList.of(0, 1), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
+                "both slots present, and exactly once each: a duplicated slot would let the stale disk book "
+                        + "overwrite the fresher one, since vanilla's load is a last-write-wins set");
+        ListTag merged = (ListTag) findByPos(fresh, 4, 64, 9).get("Items");
+        assertTrue(
+                merged.stream().map(tag -> (CompoundTag) tag)
+                        .anyMatch(entry -> (entry.contains("Slot") ? entry.getByte("Slot") : (byte) -1) == 1
+                                && "minecraft:enchanted_book".equals(entry.getString("id"))),
+                "the slot captured this session keeps the fresher book");
+    }
+
+    @Test
+    void anEmptyFreshBookshelfStillCarriesTheWholeDiskList() {
+        CompoundTag onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
+        CompoundTag fresh = bookshelfChunk(bookshelf(4, 64, 9)); // re-walked, no insert this pass
+
+        assertEquals(1, ChunkMerge.merge(onDisk, fresh));
+        assertEquals(ImmutableList.of(0, 1, 2), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
+                "a plain re-walk loses nothing");
+    }
+
+    @Test
+    void anOnDiskBookshelfHoldingNoBooksCarriesNothingAndCountsNothing() {
+        // The union's own empty case. A shelf whose prior visit saved no book has nothing to contribute, so the
+        // carry must report that it carried nothing: counting it would tell the caller a block entity was
+        // recovered when the fresh insert is all there is.
+        CompoundTag onDisk = bookshelfChunk(bookshelf(4, 64, 9));
+        CompoundTag fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
+
+        assertEquals(0, ChunkMerge.merge(onDisk, fresh), "an empty on-disk shelf carries nothing");
+        assertEquals(Collections.singletonList(3), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
+                "and the fresh insert stands alone");
+    }
+
+    @Test
+    void aBookshelfOpenedThisWriteStillUnionsTheBooksAlreadyOnDisk() {
+        // A bookshelf reaches the same position set as an opened chest, since a confirmed insert routes to the
+        // container bundle the set is built from. Its fresh list is the one slot the player clicked, not the whole
+        // shelf, so treating the position as ground truth for every slot would drop every earlier-saved book.
+        CompoundTag onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
+        CompoundTag fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
+        LongSet opened = ChunkMerge.capturedPositions(ImmutableList.of(new BlockPos(4, 64, 9)));
+
+        assertEquals(1, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), opened, LongSets.EMPTY_SET),
+                "the shelf carries forward even though this write captured a slot of it");
+        assertEquals(ImmutableList.of(0, 1, 2, 3), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
+                "the three books an earlier flush saved survive beside the fourth");
     }
 
     @Test
@@ -448,6 +567,47 @@ class ChunkMergeTest {
                 "a mid-brew stand does not restart");
         assertEquals((byte) 12, (merged.contains("Fuel") ? merged.getByte("Fuel") : (byte) -1),
                 "and keeps its blaze powder");
+    }
+
+    @Test
+    void aBookTakenOutBetweenVisitsIsNotWrittenBackIntoAnEmptySlot() {
+        // Carrying a slot the saved block-state denies puts an item in the archive that the loaded world shows
+        // nowhere, cannot be taken out by hand, and destroys without a drop on the next insert there.
+        CompoundTag onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
+        CompoundTag fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
+        Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
+        occupancy.put(new BlockPos(4, 64, 9).asLong(), 0b1110); // slot 0 emptied since; 1, 2 and 3 occupied
+
+        int mergeBacks = ChunkMerge.merge(onDisk, fresh, occupancy, LongSets.EMPTY_SET, LongSets.EMPTY_SET);
+
+        assertEquals(1, mergeBacks, "the shelf still carries the slots that are still occupied");
+        assertEquals(ImmutableList.of(1, 2, 3), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
+                "slot 0 is dropped because the block-state says it is empty");
+    }
+
+    @Test
+    void aBookshelfWithNoRecordedOccupancyKeepsEveryOnDiskSlot() {
+        // The over-capture direction when the occupancy is unknown, which is what the no-argument merge means.
+        CompoundTag onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
+        CompoundTag fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
+
+        assertEquals(1,
+                ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), LongSets.EMPTY_SET, LongSets.EMPTY_SET));
+        assertEquals(ImmutableList.of(0, 1, 2, 3), sortedSlotsOf(findByPos(fresh, 4, 64, 9)));
+    }
+
+    @Test
+    void aBookshelfNotNamedByTheOccupancyMapKeepsEveryOnDiskSlot() {
+        // The unknown-occupancy fallback has to survive a map that names OTHER positions, which is the shape
+        // production builds: one entry per bookshelf in the chunk, nothing for a shelf whose state was unreadable.
+        CompoundTag onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
+        CompoundTag fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
+        Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
+        occupancy.put(new BlockPos(11, 70, 2).asLong(), 0b1); // some other shelf entirely
+
+        assertEquals(1, ChunkMerge.merge(onDisk, fresh, occupancy, LongSets.EMPTY_SET, LongSets.EMPTY_SET));
+        assertEquals(ImmutableList.of(0, 1, 2, 3), sortedSlotsOf(findByPos(fresh, 4, 64, 9)),
+                "an unrecorded position falls back to keeping every slot, not to keeping none");
     }
 
     @Test
