@@ -507,7 +507,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** Reconstructed entities saved nested in a vehicle (not a written root), for the finish reconciliation. */
     private int nestedPassengers;
 
-    /** Reconstructed entities dropped because the typed entity could not be created. */
+    /** Reconstructed entities dropped because the typed entity could not be created or its reconstruct threw. */
     private int createDrops;
 
     /** Reconstructed entities the sink refused: one of vanilla's own non-saves, so reported and not a loss. */
@@ -4321,7 +4321,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (excludedRootVehicleUuids.contains(frame.uuid())) {
                 continue; // captured into the player's RootVehicle; not also a standalone entity (same-UUID clash)
             }
-            Entity entity = reconstructPacketEntity(frame);
+            Entity entity;
+            try {
+                entity = reconstructPacketEntity(frame);
+            } catch (RuntimeException e) {
+                // The chunk is already drained from the accumulator, so a throw escaping this loop would lose every
+                // sibling with it and skip the pass's remaining chunks.
+                createDrops++;
+                LOGGER.warn("skipping entity {}: reconstruct failed", frame.uuid(), e);
+                continue;
+            }
             if (entity != null) {
                 built.add(new Promoted(frame, entity));
                 byId.put(frame.id(), entity);
