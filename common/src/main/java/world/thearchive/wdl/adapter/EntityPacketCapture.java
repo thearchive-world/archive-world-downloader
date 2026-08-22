@@ -8,12 +8,17 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundAddExperienceOrbPacket;
+import net.minecraft.network.protocol.game.ClientboundAddMobPacket;
+import net.minecraft.network.protocol.game.ClientboundAddPaintingPacket;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
@@ -30,8 +35,11 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.decoration.Painting;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -40,7 +48,8 @@ import world.thearchive.wdl.core.SendRangeSampler;
 
 /**
  * The production specialization of {@link EntityPacketAccumulator}, binding the MC packet types and mapping each
- * inbound entity packet to the generic state the main thread reconstructs from: {@code AddEntity} as the spawn payload,
+ * inbound entity packet to the generic state the main thread reconstructs from: one of the four spawn packets
+ * ({@code AddEntity}, {@code AddMob}, {@code AddPainting}, {@code AddExperienceOrb}) as the spawn payload,
  * {@code SynchedEntityData.DataValue} as the synced-value payload, and the equipment slot/stack pair as the equipment
  * payload. The reconstruct applies each post-spawn packet the way the client handlers do, so this only has to decode
  * each packet to the same state the client would hold.
@@ -68,7 +77,7 @@ import world.thearchive.wdl.core.SendRangeSampler;
  */
 final class EntityPacketCapture
         extends
-        EntityPacketAccumulator<ClientboundAddEntityPacket, SynchedEntityData.DataItem<?>, EquipmentEntry> {
+        EntityPacketAccumulator<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry> {
     private static volatile @Nullable EntityPacketCapture active;
 
     /**
@@ -152,6 +161,12 @@ final class EntityPacketCapture
     public void accept(Packet<?> packet, IntSet bundleNamedIds) {
         if (packet instanceof ClientboundAddEntityPacket add) {
             onAdd(add, bundleNamedIds);
+        } else if (packet instanceof ClientboundAddMobPacket mob) {
+            onAddMob(mob);
+        } else if (packet instanceof ClientboundAddPaintingPacket painting) {
+            onAddPainting(painting);
+        } else if (packet instanceof ClientboundAddExperienceOrbPacket orb) {
+            onAddExperienceOrb(orb);
         } else if (packet instanceof ClientboundRemoveEntitiesPacket remove) {
             onRemove(remove);
         } else if (packet instanceof ClientboundPlayerPositionPacket) {
@@ -193,6 +208,54 @@ final class EntityPacketCapture
             receivedFrames.add(Mth.floor(add.getX()) + " " + Mth.floor(add.getY()) + " " + Mth.floor(add.getZ())
                     + " " + add.getData());
         }
+    }
+
+    private void onAddMob(ClientboundAddMobPacket mob) {
+        EntityPos pos = new EntityPos(mob.getX(), mob.getY(), mob.getZ(),
+                decodeAngle(mob.getyRot()), decodeAngle(mob.getxRot()));
+        spawn(mob.getId(), mob.getUUID(), chunkKey(mob.getX(), mob.getZ()), pos, mob);
+    }
+
+    private void onAddPainting(ClientboundAddPaintingPacket painting) {
+        BlockPos block = painting.getPos();
+        EntityPos pos = new EntityPos(block.getX(), block.getY(), block.getZ(), 0.0F, 0.0F);
+        spawn(painting.getId(), painting.getUUID(), chunkKey(block.getX(), block.getZ()), pos, painting);
+    }
+
+    private void onAddExperienceOrb(ClientboundAddExperienceOrbPacket orb) {
+        EntityPos pos = new EntityPos(orb.getX(), orb.getY(), orb.getZ(), 0.0F, 0.0F);
+        spawn(orb.getId(), syntheticUuid(orb.getId()), chunkKey(orb.getX(), orb.getZ()), pos, orb);
+    }
+
+    /** {@code ClientboundAddExperienceOrbPacket} carries no UUID; the accumulator keys every spawn by one. */
+    private static UUID syntheticUuid(int id) {
+        return new UUID(0L, id & 0xFFFFFFFFL);
+    }
+
+    /**
+     * Rebuild the entity a split spawn packet announces, the way the client's own handler does: {@code AddEntity} is
+     * the only one {@link Entity#recreateFromPacket} applies to, so it alone is created then handed to that method;
+     * mob, painting, and experience orb are constructed directly by type from the packet's own fields, the same shape
+     * their client handlers use. Returns null if the type cannot create.
+     */
+    static @Nullable Entity createSpawnEntity(Packet<?> spawn, Level level) {
+        if (spawn instanceof ClientboundAddEntityPacket add) {
+            Entity entity = add.getType().create(level);
+            if (entity != null) {
+                entity.recreateFromPacket(add);
+            }
+            return entity;
+        }
+        if (spawn instanceof ClientboundAddMobPacket mob) {
+            return EntityType.create(mob.getType(), level);
+        }
+        if (spawn instanceof ClientboundAddPaintingPacket painting) {
+            return new Painting(level, painting.getPos(), painting.getDirection(), painting.getMotive());
+        }
+        if (spawn instanceof ClientboundAddExperienceOrbPacket orb) {
+            return new ExperienceOrb(level, orb.getX(), orb.getY(), orb.getZ(), orb.getValue());
+        }
+        return null;
     }
 
     /** Whether this type feeds the range estimator: a decoration, or a non-excluded vanilla range-10 type. */
