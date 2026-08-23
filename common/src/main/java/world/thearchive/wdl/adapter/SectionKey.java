@@ -34,7 +34,8 @@ public final class SectionKey {
 
     /** The section x coordinate packed into {@code key}. */
     public static int x(long key) {
-        return (int) (key << 64 - X_SHIFT - 22 >> 64 - 22);
+        // x occupies the top bits, so the arithmetic shift already sign-extends it; y and z need their left shift.
+        return (int) (key >> X_SHIFT);
     }
 
     /** The section y coordinate packed into {@code key}. */
