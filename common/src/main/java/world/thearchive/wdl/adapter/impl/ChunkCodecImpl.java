@@ -62,6 +62,10 @@ public final class ChunkCodecImpl implements ChunkCodec {
      * <p>Light is read off each non-empty section's own layers, the way vanilla's save reads them: the block layer is
      * always present, and the sky layer only in a dimension that has sky light. A copy is taken so nothing live crosses
      * to the writer thread.
+     *
+     * <p>Below 1.15 a block entity's items serialize through vanilla {@code ItemStack.save}, which puts the live
+     * stack's own {@code tag} compound into its output, so each block-entity tag is detached before the snapshot
+     * carries it: the snapshot is encoded on the writer thread, and the client keeps nothing it could reach.
      */
     @Override
     public ChunkSnapshotSource capture(LevelChunk chunk) {
@@ -93,7 +97,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
         for (BlockPos blockEntityPos : chunk.getBlockEntitiesPos()) {
             CompoundTag tag = blockEntityNbtForSaving(chunk, blockEntityPos);
             if (tag != null) {
-                blockEntities.add(tag);
+                blockEntities.add(tag.copy());
             }
         }
 

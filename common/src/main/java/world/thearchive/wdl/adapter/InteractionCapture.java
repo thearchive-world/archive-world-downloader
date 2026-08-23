@@ -510,10 +510,13 @@ public final class InteractionCapture {
      * state a fresh insert leaves ({@code "IsPlaying"} true, {@code "RecordStartTick"} and {@code "TickCount"} zero).
      * Vanilla loadAdditional restores that state, so the saved jukebox plays and emits the note particles; the disc
      * sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
+     *
+     * <p>Below 1.15 vanilla {@code ItemStack.save} puts the live stack's own {@code tag} compound into its output, so
+     * the returned holder is detached before it is handed on and the caller owns it.
      */
     static CompoundTag captureRecordItem(ItemStack disc) {
         CompoundTag holder = new CompoundTag();
-        holder.put("RecordItem", disc.save(new CompoundTag()));
+        holder.put("RecordItem", disc.save(new CompoundTag()).copy());
         holder.putBoolean("IsPlaying", true);
         holder.putLong("RecordStartTick", 0L);
         holder.putLong("TickCount", 0L);

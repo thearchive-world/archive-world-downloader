@@ -128,6 +128,36 @@ class MerchantOfferCaptureTest {
     }
 
     @Test
+    void remappingTheCapturedOffersLeavesTheLiveSellStackAlone() {
+        ItemStack live = filledMap(7);
+        CompoundTag holder = holderSelling(live);
+        MapArchive archive = new MapArchive(MapManifest.empty(), sessionId -> null, (archiveId, dataTag) -> {});
+
+        MerchantOfferCapture.scrubAndRemapOffers(holder, false, archive);
+
+        assertNotEquals(7, sellItemTag(holder).getInt("map"), "the captured holder carries the archive id");
+        assertEquals(7, live.getOrCreateTag().getInt("map"),
+                "the live offer keeps the server's map id, so the trade still sells the map it advertises");
+    }
+
+    @Test
+    void reStashingTheSameLiveOffersResolvesToOneArchiveId() {
+        // The offers are re-stashed every tick the trade screen is open, each tick building a fresh holder.
+        ItemStack live = filledMap(7);
+        MapArchive archive = new MapArchive(MapManifest.empty(), sessionId -> null, (archiveId, dataTag) -> {});
+
+        CompoundTag first = holderSelling(live);
+        MerchantOfferCapture.scrubAndRemapOffers(first, false, archive);
+        // Read before the second pass: a holder that still aliases the live stack would report the later id here.
+        int firstId = sellItemTag(first).getInt("map");
+        CompoundTag second = holderSelling(live);
+        MerchantOfferCapture.scrubAndRemapOffers(second, false, archive);
+
+        assertEquals(firstId, sellItemTag(second).getInt("map"),
+                "a holder re-stashed on a later tick resolves to the same archive id rather than a fresh one");
+    }
+
+    @Test
     void scrubIgnoresHolderWithNoOffers() {
         CompoundTag holder = new CompoundTag();
 
