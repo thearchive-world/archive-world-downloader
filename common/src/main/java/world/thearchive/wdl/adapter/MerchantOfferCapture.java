@@ -32,10 +32,15 @@ final class MerchantOfferCapture {
     /**
      * Serialize {@code offers} to the {@code "Offers"} holder, adding {@code "Xp"} only when {@code isVillager}. The
      * pre-component NBT write does not reject an offer on this band, so it does not throw (see the class note).
+     *
+     * <p>Below 1.15 vanilla {@code ItemStack.save} puts each offer item's live {@code tag} compound into its output, so
+     * the offers are detached before they are handed on. Without that, the drain-time scrub and map-id remap write into
+     * the merchant's own stacks, and a re-stash on the next tick resolves the rewritten id as a fresh one, burning an
+     * archive id per tick and saving a trade that points at an unimaged map.
      */
     static CompoundTag serialize(MerchantOffers offers, int xp, boolean isVillager) {
         CompoundTag holder = new CompoundTag();
-        Tag offersTag = offers.createTag();
+        Tag offersTag = offers.createTag().copy();
         holder.put("Offers", offersTag);
         if (isVillager) {
             holder.putInt("Xp", xp);

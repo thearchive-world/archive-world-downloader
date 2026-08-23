@@ -18,12 +18,17 @@ import world.thearchive.wdl.adapter.PlayerSink;
  * level.dat apply) carries the headless guard.
  */
 public final class PlayerSinkImpl implements PlayerSink {
+    /**
+     * Below 1.15 vanilla {@code ItemStack.save} puts the live stack's own {@code tag} compound into its output, so the
+     * returned tag is detached before it is handed on: the caller owns it, and the client keeps nothing the map-id
+     * remap, the coordinate scrub or the save writer could reach.
+     */
     @Override
     public CompoundTag capturePlayer(Player player) {
         // saveWithoutId writes the Entity super fields (Pos/Rotation/UUID) plus Player.addAdditionalSaveData
         // (Inventory/SelectedItemSlot/EnderItems/abilities), with no id.
         CompoundTag tag = new CompoundTag();
         player.saveWithoutId(tag);
-        return tag;
+        return tag.copy();
     }
 }

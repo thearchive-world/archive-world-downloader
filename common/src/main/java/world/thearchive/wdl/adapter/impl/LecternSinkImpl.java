@@ -17,13 +17,18 @@ import world.thearchive.wdl.adapter.LecternSink;
  * the headless round-trip guards it).
  */
 public final class LecternSinkImpl implements LecternSink {
+    /**
+     * Below 1.15 vanilla {@code ItemStack.save} puts the live stack's own {@code tag} compound into its output, so the
+     * returned tag is detached before it is handed on: the caller owns it, and the client keeps nothing the map-id
+     * remap, the coordinate scrub or the save writer could reach.
+     */
     @Override
     public CompoundTag captureBook(ItemStack book, int page) {
         // Assumes a non-empty book; an empty slot 0 is dropped upstream.
         CompoundTag tag = new CompoundTag();
         tag.put("Book", book.save(new CompoundTag()));
         tag.putInt("Page", page);
-        return tag;
+        return tag.copy();
     }
 
     @Override

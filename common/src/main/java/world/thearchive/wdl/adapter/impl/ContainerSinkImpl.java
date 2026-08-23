@@ -19,12 +19,17 @@ import world.thearchive.wdl.adapter.ContainerSink;
  * round-trip guards it).
  */
 public final class ContainerSinkImpl implements ContainerSink {
+    /**
+     * Below 1.15 vanilla {@code ItemStack.save} puts the live stack's own {@code tag} compound into its output, so the
+     * returned tag is detached before it is handed on: the caller owns it, and the client keeps nothing the map-id
+     * remap, the coordinate scrub or the save writer could reach.
+     */
     @Override
     public CompoundTag captureItems(NonNullList<ItemStack> items) {
         // saveAllItems writes the non-empty stacks under "Items", each a compound carrying its slot index.
         CompoundTag tag = new CompoundTag();
         ContainerHelper.saveAllItems(tag, items);
-        return tag;
+        return tag.copy();
     }
 
     @Override

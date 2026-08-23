@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static world.thearchive.wdl.testsupport.MapHolderFixtures.filledMap;
+import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderOf;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderReferencing;
 
 import com.google.common.collect.ImmutableSet;
@@ -21,6 +23,7 @@ import java.util.Set;
 import net.minecraft.nbt.ByteArrayTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -179,6 +182,23 @@ class MapArchiveTest {
         archive.remap(holder, "Items");
 
         assertEquals(ImmutableSet.of(archive.archiveIdFor(1988), archive.archiveIdFor(1993)), collect(holder));
+    }
+
+    @Test
+    void remappingTheCapturedHolderLeavesTheLiveStackAlone() {
+        CollectingSink stream = new CollectingSink();
+        MapArchive archive = new MapArchive(MapManifest.empty(), id -> picture(1), stream);
+        // Below 1.15 vanilla ItemStack.save shares the live stack's tag compound instead of copying it, so a
+        // capture that does not detach hands the remap the player's own held item.
+        ItemStack live = filledMap(1988);
+        CompoundTag holder = holderOf(sink, live);
+
+        archive.remap(holder, "Items");
+
+        assertEquals(ImmutableSet.of(archive.archiveIdFor(1988)), collect(holder),
+                "the captured holder carries the archive id");
+        assertEquals(1988, live.getOrCreateTag().getInt("map"),
+                "the live stack keeps the server's map id, so a held map still renders");
     }
 
     @Test

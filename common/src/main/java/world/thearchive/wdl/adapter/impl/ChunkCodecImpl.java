@@ -64,6 +64,10 @@ public final class ChunkCodecImpl implements ChunkCodec {
      * and vanilla relights that chunk on load. Pending light work is drained first, effectively once per tick (later
      * calls find none): a block edit updates the section palette immediately while its relight waits for the render
      * pass, so an undrained read could freeze pre-edit light under {@code isLightOn=true}.
+     *
+     * <p>Below 1.15 a block entity's items serialize through vanilla {@code ItemStack.save}, which puts the live
+     * stack's own {@code tag} compound into its output, so each block-entity tag is detached before the snapshot
+     * carries it: the snapshot is encoded on the writer thread, and the client keeps nothing it could reach.
      */
     @Override
     public ChunkSnapshotSource capture(LevelChunk chunk) {
@@ -107,7 +111,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
         for (BlockPos blockEntityPos : chunk.getBlockEntitiesPos()) {
             CompoundTag tag = chunk.getBlockEntityNbtForSaving(blockEntityPos);
             if (tag != null) {
-                blockEntities.add(tag);
+                blockEntities.add(tag.copy());
             }
         }
 

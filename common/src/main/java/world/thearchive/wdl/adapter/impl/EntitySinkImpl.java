@@ -32,6 +32,11 @@ public final class EntitySinkImpl implements EntitySink {
                 && (!entity.isVehicle() || !entity.hasOnePlayerPassenger());
     }
 
+    /**
+     * Below 1.15 vanilla {@code ItemStack.save} puts the live stack's own {@code tag} compound into its output, so each
+     * entity tag is detached before it is handed on: the caller owns it, and the client keeps nothing the map-id remap,
+     * the coordinate scrub or the save writer could reach.
+     */
     @Override
     public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, boolean forceMobPersistence) {
         // Lift of EntityStorage.storeEntities' write branch, server-free: entity.save writes the entity NBT
@@ -45,12 +50,17 @@ public final class EntitySinkImpl implements EntitySink {
             CompoundTag entityTag = new CompoundTag();
             if (entity.save(entityTag)) {
                 applyMobPersistence(entityTag, entity, forceMobPersistence);
-                entityTags.add(entityTag);
+                entityTags.add(entityTag.copy());
             }
         }
         return encodeChunk(entityTags, pos);
     }
 
+    /**
+     * Below 1.15 vanilla {@code ItemStack.save} puts the live stack's own {@code tag} compound into its output, so each
+     * entity tag is detached before it is handed on: the caller owns it, and the client keeps nothing the map-id remap,
+     * the coordinate scrub or the save writer could reach.
+     */
     @Override
     public @Nullable CompoundTag captureRootVehicle(Entity vehicle, boolean forceMobPersistence) {
         // Vanilla saveParentVehicle serializes the root vehicle via root.save, id-bearing and passenger-recursing,
@@ -63,7 +73,7 @@ public final class EntitySinkImpl implements EntitySink {
             return null;
         }
         applyMobPersistence(tag, vehicle, forceMobPersistence);
-        return tag;
+        return tag.copy();
     }
 
     /**
