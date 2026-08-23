@@ -65,14 +65,11 @@ tasks.matching { it.name == "remapJar" || it.name == "remapSourcesJar" }.configu
 
 dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
-    // The bridge jar is produced by the included build's genBridge. builtBy declares that producer edge, but it
-    // cannot order it: Loom resolves mappings(files(...)) during provisioning inside afterEvaluate, at
-    // CONFIGURATION time, whereas a builtBy producer only runs in the execution phase, which never precedes a
-    // config-time read. settings.gradle.kts therefore runs genBridge during settings evaluation, which is what
-    // actually puts the jar on disk before this line; the builtBy stays as the declared producer relationship.
+    // Loom resolves mappings(files(...)) at CONFIGURATION time, before any task can run, so no task edge in
+    // this build can produce the jar in time. settings.gradle.kts runs genBridge during settings evaluation
+    // instead, which is what actually puts the jar on disk before this line.
     mappings(
         files(rootProject.file("tools/mojmap-bridge/build/bridge/intermediary-mojmap.jar"))
-            .builtBy(gradle.includedBuild("mojmap-bridge").task(":genBridge"))
     )
 }
 
