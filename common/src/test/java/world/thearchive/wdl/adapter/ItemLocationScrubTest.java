@@ -153,6 +153,12 @@ class ItemLocationScrubTest {
         return tag == null ? Optional.empty() : Optional.ofNullable(tag.get(LODESTONE_POS));
     }
 
+    /** The lodestone target's dimension, the second half of the coordinate the scrub removes with the position. */
+    private static Optional<Tag> targetDimensionOf(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        return tag == null ? Optional.empty() : Optional.ofNullable(tag.get(LODESTONE_DIMENSION));
+    }
+
     /** The hive item's {@code BlockEntityTag.Bees} list, or an empty list when the item carries none. */
     private static ListTag beesOf(ItemStack stack) {
         CompoundTag tag = stack.getTag();
@@ -259,12 +265,16 @@ class ItemLocationScrubTest {
     @Test
     void scrubBlanksTheLodestoneTargetButKeepsTheCompass() {
         CompoundTag holder = holderOf(lodestoneCompass(), new ItemStack(Items.DIAMOND, 3));
-        assertTrue(targetOf(readBack(holder, 2).get(0)).isPresent(), "precondition: the fixture compass has a target");
+        ItemStack before = readBack(holder, 2).get(0);
+        assertTrue(targetOf(before).isPresent(), "precondition: the fixture compass has a target");
+        assertTrue(targetDimensionOf(before).isPresent(), "precondition: the fixture compass names the target's world");
 
         ItemLocationScrub.scrub(holder, "Items");
 
         NonNullList<ItemStack> back = readBack(holder, 2);
         assertTrue(targetOf(back.get(0)).isEmpty(), "the lodestone target is blanked");
+        assertTrue(targetDimensionOf(back.get(0)).isEmpty(),
+                "the target's dimension goes with the position, so no half-target names the base's world");
         assertNotNull(lodestoneTrackerOf(back.get(0)),
                 "the lodestone_tracker component is kept: the compass stays a valid compass pointing nowhere");
         assertEquals(Items.COMPASS, back.get(0).getItem(), "still a compass");
