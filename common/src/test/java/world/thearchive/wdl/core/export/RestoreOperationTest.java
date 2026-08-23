@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -409,17 +410,31 @@ class RestoreOperationTest {
         Path aside = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-1")
                 .resolve("aside").resolve("World");
         FileChannel[] holder = new FileChannel[1];
+        Throwable[] setUpFailure = new Throwable[1];
         RestoreOperation operation = opWithMoveHook("World", betweenMoves(() -> {
-            Files.createDirectories(saves.resolve("World"));
-            Path lock = Files.write(aside.resolve("session.lock"), new byte[] { 0x2A });
-            holder[0] = FileChannel.open(lock, StandardOpenOption.WRITE);
-            holder[0].lock();
+            try {
+                Files.createDirectories(saves.resolve("World"));
+                Path lock = Files.write(aside.resolve("session.lock"), new byte[] { 0x2A });
+                holder[0] = FileChannel.open(lock, StandardOpenOption.WRITE);
+                holder[0].lock();
+            } catch (IOException | RuntimeException | Error e) {
+                setUpFailure[0] = e;
+                throw e;
+            }
         }));
         RestoreOperation.Result result;
         try {
             result = operation.run();
         } finally {
-            holder[0].close();
+            if (holder[0] != null) {
+                holder[0].close();
+            }
+        }
+        // run() swallows whatever a hook throws, so a lock this hook failed to take leaves the aside
+        // genuinely unlocked and the disposition then correctly relocates it. Report that cause instead of
+        // the outcome it produces, which reads as a disposition bug that is not there.
+        if (setUpFailure[0] != null) {
+            fail("the hook never took the aside session lock", setUpFailure[0]);
         }
         // Never a relocation under a live session: the disposition defers and the notice names the aside.
         assertEquals(RestoreOperation.Outcome.SWAP_FAILED, result.outcome());
