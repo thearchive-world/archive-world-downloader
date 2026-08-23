@@ -23,9 +23,10 @@ public final class MapSinkImpl implements MapSink {
     @Override
     public Tag serializeMap(MapItemSavedData saved, RegistryAccess registries) {
         // save writes the inner map "data" compound the band-agnostic MapDataWriter then wraps as
-        // {data, DataVersion} and gzips.
+        // {data, DataVersion} and gzips. It puts the live colors array into that compound rather than a copy of
+        // it, and vanilla's map packet handler keeps writing received pixels into that same array.
         if (saved.dimension != null) {
-            return saved.save(new CompoundTag());
+            return saved.save(new CompoundTag()).copy();
         }
         // A version-bridging proxy (ViaVersion/ViaBackwards fronting a newer server) can relay a filled map to the
         // client with a null dimension, which save dereferences (this.dimension.location()). Stand in the overworld
@@ -33,7 +34,7 @@ public final class MapSinkImpl implements MapSink {
         // the way the session leaves its locked flag alone.
         saved.dimension = Level.OVERWORLD;
         try {
-            return saved.save(new CompoundTag());
+            return saved.save(new CompoundTag()).copy();
         } finally {
             saved.dimension = null;
         }

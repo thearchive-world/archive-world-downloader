@@ -93,4 +93,28 @@ class MapSinkRoundTripTest {
         assertEquals(Level.OVERWORLD, back.dimension, "the serialize stands in the overworld key");
         assertNull(map.dimension, "the live client map is left with its null dimension");
     }
+
+    @Test
+    void theSerializedTagDoesNotAliasTheLiveColors() {
+        MapItemSavedData map = clientMap((byte) 0, false);
+
+        CompoundTag data = (CompoundTag) sink.serializeMap(map, registries);
+        data.getByteArray("colors")[0] = (byte) 7;
+
+        assertEquals((byte) 42, map.colors[0],
+                "the live client map keeps its image when the tag handed to the writer thread is written to");
+    }
+
+    @Test
+    void theDimensionlessSerializeDoesNotAliasTheLiveColorsEither() {
+        // The null-dimension stand-in is a second serialize return, which a fixture carrying a dimension never reaches.
+        MapItemSavedData map = clientMap((byte) 0, false);
+        map.dimension = null;
+
+        CompoundTag data = (CompoundTag) sink.serializeMap(map, registries);
+        data.getByteArray("colors")[0] = (byte) 7;
+
+        assertEquals((byte) 42, map.colors[0],
+                "the proxy-relayed map keeps its image when the tag handed to the writer thread is written to");
+    }
 }
