@@ -24,7 +24,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * Pins the natural-spawn equipment table: an item outside a type's pool in a pickup-fillable slot is a proven loot
  * pickup (persistence restored), an item inside the pool is ambiguous (left alone), the offhand is never inferred, and
- * unknown types are never inferred. Verified against decompiled 1.21.11.
+ * unknown types are never inferred. Unlike every other band, the table under test is not verified against decompiled
+ * source: Mojang published no mappings for 1.13.2.
  */
 class NaturalEquipmentTest {
     @BeforeAll
