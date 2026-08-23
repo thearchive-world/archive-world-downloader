@@ -66,11 +66,11 @@ final class EntityContainerMerge {
         }
         int merged = 0;
         int failed = 0;
-        for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag)) {
+        for (Tag element : entities) {
+            if (!(element instanceof CompoundTag)) {
                 continue;
             }
-            CompoundTag entityTag = (CompoundTag) entities.get(i);
+            CompoundTag entityTag = (CompoundTag) element;
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 UUID uuid = node.getKey();
                 CompoundTag holder = stash.containsKey(uuid) ? null : folded.get(uuid);
@@ -109,11 +109,11 @@ final class EntityContainerMerge {
         }
         int merged = 0;
         int failed = 0;
-        for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag)) {
+        for (Tag element : entities) {
+            if (!(element instanceof CompoundTag)) {
                 continue;
             }
-            CompoundTag entityTag = (CompoundTag) entities.get(i);
+            CompoundTag entityTag = (CompoundTag) element;
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 CompoundTag holder = stash.remove(node.getKey());
                 if (holder == null) {
@@ -152,11 +152,11 @@ final class EntityContainerMerge {
             return new MergeTally(0, 0);
         }
         int merged = 0;
-        for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag)) {
+        for (Tag element : entities) {
+            if (!(element instanceof CompoundTag)) {
                 continue;
             }
-            CompoundTag entityTag = (CompoundTag) entities.get(i);
+            CompoundTag entityTag = (CompoundTag) element;
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 CompoundTag holder = stash.remove(node.getKey());
                 if (holder == null) {
@@ -185,11 +185,11 @@ final class EntityContainerMerge {
             return new MergeTally(0, 0);
         }
         int merged = 0;
-        for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag)) {
+        for (Tag element : entities) {
+            if (!(element instanceof CompoundTag)) {
                 continue;
             }
-            CompoundTag entityTag = (CompoundTag) entities.get(i);
+            CompoundTag entityTag = (CompoundTag) element;
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 UUID uuid = node.getKey();
                 CompoundTag holder = stash.containsKey(uuid) ? null : folded.get(uuid);

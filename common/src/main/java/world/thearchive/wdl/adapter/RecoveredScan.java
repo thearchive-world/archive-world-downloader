@@ -15,6 +15,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.dimension.DimensionType;
 
 import world.thearchive.wdl.core.RecoveredCoverage;
@@ -83,10 +84,8 @@ final class RecoveredScan {
         Long2IntOpenHashMap bookshelves = bookshelfSlotsByDimension.computeIfAbsent(dimension,
                 key -> new Long2IntOpenHashMap());
         boolean grew = false;
-        for (int i = 0; i < blockEntities.size(); i++) {
-            CompoundTag blockEntity = blockEntities.get(i) instanceof CompoundTag
-                    ? (CompoundTag) blockEntities.get(i)
-                    : null;
+        for (Tag element : blockEntities) {
+            CompoundTag blockEntity = element instanceof CompoundTag ? (CompoundTag) element : null;
             if (blockEntity == null || !hasCoordinates(blockEntity)) {
                 continue;
             }
@@ -118,11 +117,11 @@ final class RecoveredScan {
         }
         ListTag entities = (ListTag) onDiskChunkTag.getCompound("Level").get("Entities");
         boolean grew = false;
-        for (int i = 0; i < entities.size(); i++) {
-            if (!(entities.get(i) instanceof CompoundTag)) {
+        for (Tag element : entities) {
+            if (!(element instanceof CompoundTag)) {
                 continue;
             }
-            CompoundTag entity = (CompoundTag) entities.get(i);
+            CompoundTag entity = (CompoundTag) element;
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entity).entrySet()) {
                 if (EntityMerge.hasCapturedContent(node.getValue())) {
                     grew |= recoveredEntities.add(node.getKey());
@@ -152,9 +151,9 @@ final class RecoveredScan {
         }
         ListTag items = (ListTag) blockEntity.get("Items");
         int mask = 0;
-        for (int i = 0; i < items.size(); i++) {
-            if (items.get(i) instanceof CompoundTag) {
-                CompoundTag entry = (CompoundTag) items.get(i);
+        for (Tag element : items) {
+            if (element instanceof CompoundTag) {
+                CompoundTag entry = (CompoundTag) element;
                 // 0xFF default, not 0: a malformed entry with no Slot must drop on the range check below, not
                 // phantom-mark slot 0. The range check also blocks a corrupt out-of-range Slot from 1 << 31.
                 int slot = (entry.contains("Slot") ? entry.getByte("Slot") : (byte) 0xFF) & 0xFF;

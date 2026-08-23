@@ -106,9 +106,9 @@ final class ItemLocationScrub {
         }
         if (entity.get(PASSENGERS) instanceof ListTag) {
             ListTag passengers = (ListTag) entity.get(PASSENGERS);
-            for (int i = 0; i < passengers.size(); i++) {
-                if (passengers.get(i) instanceof CompoundTag) {
-                    CompoundTag passenger = (CompoundTag) passengers.get(i);
+            for (Tag element : passengers) {
+                if (element instanceof CompoundTag) {
+                    CompoundTag passenger = (CompoundTag) element;
                     scrubEntity(passenger);
                 }
             }
@@ -133,8 +133,8 @@ final class ItemLocationScrub {
             blockEntityTag.remove(FLOWER_POS);
             if (blockEntityTag.get(BEES) instanceof ListTag) {
                 ListTag bees = (ListTag) blockEntityTag.get(BEES);
-                for (int i = 0; i < bees.size(); i++) {
-                    CompoundTag occupant = bees.get(i) instanceof CompoundTag ? (CompoundTag) bees.get(i) : null;
+                for (Tag element : bees) {
+                    CompoundTag occupant = element instanceof CompoundTag ? (CompoundTag) element : null;
                     if (occupant != null && occupant.get(ENTITY_DATA) instanceof CompoundTag) {
                         CompoundTag entityData = (CompoundTag) occupant.get(ENTITY_DATA);
                         entityData.remove(FLOWER_POS);

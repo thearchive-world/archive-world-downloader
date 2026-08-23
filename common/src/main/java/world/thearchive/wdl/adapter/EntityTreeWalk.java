@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 
 /**
  * The walk over a serialized entity and its {@code "Passengers"} subtree, the tag-side analogue of
@@ -42,9 +43,9 @@ final class EntityTreeWalk {
         }
         if (node.get("Passengers") instanceof ListTag) {
             ListTag passengers = (ListTag) node.get("Passengers");
-            for (int i = 0; i < passengers.size(); i++) {
-                if (passengers.get(i) instanceof CompoundTag) {
-                    CompoundTag passenger = (CompoundTag) passengers.get(i);
+            for (Tag element : passengers) {
+                if (element instanceof CompoundTag) {
+                    CompoundTag passenger = (CompoundTag) element;
                     index(passenger, nodes);
                 }
             }

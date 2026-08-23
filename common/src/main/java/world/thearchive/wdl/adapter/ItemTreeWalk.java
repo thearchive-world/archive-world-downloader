@@ -6,6 +6,7 @@ package world.thearchive.wdl.adapter;
 import java.util.function.Consumer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 
 /**
  * The 1.20.4 walk over a serialized item tree: apply a leaf action to each item's {@code tag} compound, then recurse
@@ -25,9 +26,9 @@ final class ItemTreeWalk {
      * without a leading {@code "Slot"}); a non-compound element is skipped.
      */
     static void walkList(ListTag items, Consumer<CompoundTag> onLeaf) {
-        for (int i = 0; i < items.size(); i++) {
-            if (items.get(i) instanceof CompoundTag) {
-                CompoundTag item = (CompoundTag) items.get(i);
+        for (Tag element : items) {
+            if (element instanceof CompoundTag) {
+                CompoundTag item = (CompoundTag) element;
                 walkItem(item, onLeaf);
             }
         }

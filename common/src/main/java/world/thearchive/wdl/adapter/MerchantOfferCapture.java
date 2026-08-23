@@ -5,6 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.village.class_1145;
 import org.jspecify.annotations.Nullable;
 
@@ -51,8 +52,8 @@ final class MerchantOfferCapture {
         if (offers == null || recipes == null) {
             return;
         }
-        for (int i = 0; i < recipes.size(); i++) {
-            CompoundTag recipe = recipes.get(i) instanceof CompoundTag ? (CompoundTag) recipes.get(i) : null;
+        for (Tag element : recipes) {
+            CompoundTag recipe = element instanceof CompoundTag ? (CompoundTag) element : null;
             CompoundTag sell = recipe != null && recipe.get("sell") instanceof CompoundTag
                     ? (CompoundTag) recipe.get("sell")
                     : null;

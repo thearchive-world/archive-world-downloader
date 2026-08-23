@@ -356,11 +356,15 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 
 # 1.20.4 CompoundTag.get returns a non-null Tag, so a carry-forward reads it with a null check rather than a
 # redundant instanceof-Tag pattern.
+# 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks here iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk recurses into a shulker's nested items via
 # tag.BlockEntityTag.Items and a bundle's via tag.Items, rather than the minecraft:container/minecraft:bundle_contents
 # components.
+# 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks here iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/ItemTreeWalk.java
 
 # Below 1.20.5 a filled map's id is the raw int tag."map", not a minecraft:map_id component, so the remap reads
@@ -380,12 +384,16 @@ common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
 # MerchantOffers.createTag (a lenient NBT write that never rejects an offer) rather than encoding through
 # RegistryOps; the per-villager isolation of a rejecting serialize is inert on this band but kept because the
 # caller is band-stable.
+# 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks here iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 
 # Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the
 # raw LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position (carried
 # by a pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and
 # tag.BlockEntityTag.FlowerPos, both scrubbed here.
+# 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks here iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
@@ -587,6 +595,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
 # the four-int UUID codec that became UUIDUtil.CODEC at 1.19. Below 1.17 (era E3) the merge folds into the in-chunk
 # Level.Entities rather than a separate entities/ region (its {Entities:[...]} envelope in/out is band-agnostic, so
 # only the Javadoc naming the target diverges; the merge logic is unchanged and is reused by foldEntitiesIntoRegion).
+# 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks here iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
 
 # XaeroPlus publishes no 1.18.x build for either loader, so the coverage overlay's XaeroPlus binding is dropped as a
@@ -661,11 +671,15 @@ common/src/test/java/world/thearchive/wdl/WorldgenWarmupTest.java
 
 # Below 1.18 a chunk's block entities are nested under Level.TileEntities, not the flat root block_entities added at
 # 1.18, so the carry-forward read navigates the Level compound first.
+# 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks here iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkMerge.java
 
 # Below 1.18 the recovered-container scan reads block entities from Level.TileEntities, not the flat root block_entities.
 # Below 1.17 (era E3) the recovered-entity scan (recordEntities) likewise reads the in-chunk Level.Entities, the sibling
 # of that Level.TileEntities, rather than a separate entities/ region chunk's top-level Entities.
+# 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks here iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/RecoveredScan.java
 
 # com.mojang.logging.LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is
@@ -737,3 +751,11 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkSectionClampTest.java
 # Below 1.18 a chunk's block entities nest under Level.TileEntities, not the flat root block_entities added at 1.18,
 # so the in-session stash merge locates a block entity by x/y/z through the Level compound.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+
+# 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks here iterate the list instead of indexing it.
+common/src/main/java/world/thearchive/wdl/adapter/EntityTreeWalk.java
+
+# 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks here iterate the list instead of indexing it.
+common/src/main/java/world/thearchive/wdl/adapter/NbtMerge.java

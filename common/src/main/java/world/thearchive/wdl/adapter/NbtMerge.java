@@ -54,18 +54,18 @@ final class NbtMerge {
         }
         ListTag freshList = fresh.get(key) instanceof ListTag ? (ListTag) fresh.get(key) : new ListTag();
         Set<Integer> slots = new HashSet<>();
-        for (int i = 0; i < freshList.size(); i++) {
-            if (freshList.get(i) instanceof CompoundTag) {
-                CompoundTag entry = (CompoundTag) freshList.get(i);
+        for (Tag element : freshList) {
+            if (element instanceof CompoundTag) {
+                CompoundTag entry = (CompoundTag) element;
                 slots.add(slotOf(entry));
             }
         }
         boolean carried = false;
-        for (int i = 0; i < diskList.size(); i++) {
-            if (!(diskList.get(i) instanceof CompoundTag)) {
+        for (Tag element : diskList) {
+            if (!(element instanceof CompoundTag)) {
                 continue;
             }
-            CompoundTag entry = (CompoundTag) diskList.get(i);
+            CompoundTag entry = (CompoundTag) element;
             int slot = slotOf(entry);
             // The authoritative block-state says whether a slot still holds anything. Carrying an entry for a
             // slot that now reads empty would put an item into the save that its own saved block-state denies:

@@ -11,6 +11,7 @@ import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -54,19 +55,19 @@ final class EntityMerge {
         ListTag freshEntities = (ListTag) fresh.get("Entities");
         ListTag diskEntities = (ListTag) onDisk.get("Entities");
         Map<UUID, CompoundTag> diskNodes = new LinkedHashMap<>();
-        for (int i = 0; i < diskEntities.size(); i++) {
-            if (diskEntities.get(i) instanceof CompoundTag) {
-                CompoundTag diskEntity = (CompoundTag) diskEntities.get(i);
+        for (Tag element : diskEntities) {
+            if (element instanceof CompoundTag) {
+                CompoundTag diskEntity = (CompoundTag) element;
                 diskNodes.putAll(EntityTreeWalk.byUuid(diskEntity));
             }
         }
         Set<UUID> freshUuids = new HashSet<>();
         int merged = 0;
-        for (int i = 0; i < freshEntities.size(); i++) {
-            if (!(freshEntities.get(i) instanceof CompoundTag)) {
+        for (Tag element : freshEntities) {
+            if (!(element instanceof CompoundTag)) {
                 continue;
             }
-            CompoundTag freshEntity = (CompoundTag) freshEntities.get(i);
+            CompoundTag freshEntity = (CompoundTag) element;
             for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(freshEntity).entrySet()) {
                 freshUuids.add(node.getKey());
                 CompoundTag diskNode = diskNodes.get(node.getKey());
@@ -92,11 +93,11 @@ final class EntityMerge {
         // unconditionally rather than dropped: the contract is over-capture over under-capture, and dropping it
         // would silently lose existing world data. A keyed one is carried only when the fresh set lacks it, matched
         // against the whole fresh tree so an entity that moved into or out of a vehicle is deduped, not duplicated.
-        for (int i = 0; i < diskEntities.size(); i++) {
-            if (!(diskEntities.get(i) instanceof CompoundTag)) {
+        for (Tag element : diskEntities) {
+            if (!(element instanceof CompoundTag)) {
                 continue;
             }
-            CompoundTag diskEntity = (CompoundTag) diskEntities.get(i);
+            CompoundTag diskEntity = (CompoundTag) element;
             UUID uuid = readUuid(diskEntity);
             if (uuid == null || !freshUuids.contains(uuid)) {
                 freshEntities.add(diskEntity.copy());
