@@ -35,7 +35,7 @@ final class NaturalEquipment {
 
     /** Which armor family a type may naturally wear. */
     private enum ArmorKind {
-        BASE, GOLDEN, NONE
+        BASE, NONE
     }
 
     private static final class Profile {
@@ -77,12 +77,6 @@ final class NaturalEquipment {
             EquipmentSlot.FEET, ImmutableSet.of(Items.LEATHER_BOOTS, Items.GOLDEN_BOOTS,
                     Items.CHAINMAIL_BOOTS, Items.IRON_BOOTS, Items.DIAMOND_BOOTS));
 
-    private static final Map<EquipmentSlot, Set<Item>> GOLDEN_ARMOR = ImmutableMap.of(
-            EquipmentSlot.HEAD, ImmutableSet.of(Items.GOLDEN_HELMET),
-            EquipmentSlot.CHEST, ImmutableSet.of(Items.GOLDEN_CHESTPLATE),
-            EquipmentSlot.LEGS, ImmutableSet.of(Items.GOLDEN_LEGGINGS),
-            EquipmentSlot.FEET, ImmutableSet.of(Items.GOLDEN_BOOTS));
-
     private static final Map<EntityType<?>, Profile> PROFILES = ImmutableMap.<EntityType<?>, Profile>builder()
             .put(EntityType.ZOMBIE,
                     new Profile(ImmutableSet.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE))
@@ -123,8 +117,6 @@ final class NaturalEquipment {
         switch (profile.armor()) {
             case BASE:
                 return BASE_ARMOR.getOrDefault(slot, ImmutableSet.of()).contains(item.getItem());
-            case GOLDEN:
-                return GOLDEN_ARMOR.getOrDefault(slot, ImmutableSet.of()).contains(item.getItem());
             case NONE:
                 return false;
             default:
