@@ -79,9 +79,9 @@ repositories {
 }
 
 // The Minecraft toolchain the root's Fabric Loom resolved: the Mojmap-remapped 1.13.2 jar (parameter-annotation
-// stripped) plus every transitive library, one absolute path per line. It is produced by the PREREQUISITE
-// invocation ./gradlew :common:writeIslandClasspath in the root build, which must run before this island
-// configures (like the genBridge prerequisite the root's own Loom provision needs).
+// stripped) plus every transitive library, one absolute path per line. common's assemble depends on
+// writeIslandClasspath, so a plain `./gradlew build` at the root produces this before this island ever
+// configures; run ./gradlew :common:writeIslandClasspath by hand if only the island is being built.
 val islandClasspathFile = rootDir.resolve("../common/build/island-classpath.txt")
 require(islandClasspathFile.exists()) {
     "island classpath not found at $islandClasspathFile; run ':common:writeIslandClasspath' in the root build first"

@@ -496,8 +496,9 @@ tasks.named<JavaCompile>("compileTestJava") {
 // transitive libraries (com.mojang datafixers/brigadier/authlib, gson, netty, guava, fastutil, jopt, log4j). It
 // reads this file, one absolute path per line: the main compile classpath with Loom's raw minecraft-* jar swapped
 // for the stripped one (the same interposition compileJava does above), so the island compiles the source-merged
-// common against exactly the classpath Loom resolved here. Like genBridge, this runs as a PREREQUISITE root
-// invocation (./gradlew :common:writeIslandClasspath) before the island build configures and reads the file.
+// common against exactly the classpath Loom resolved here. Unlike genBridge, the island reads this file from a
+// later, separate Gradle invocation rather than during the root's own configuration, so hanging it on assemble
+// (below) is enough; no settings-time prerequisite is needed.
 abstract class WriteIslandClasspath : DefaultTask() {
     @get:InputFiles
     abstract val libraries: ConfigurableFileCollection
@@ -515,8 +516,14 @@ abstract class WriteIslandClasspath : DefaultTask() {
     }
 }
 
-tasks.register<WriteIslandClasspath>("writeIslandClasspath") {
+val writeIslandClasspath = tasks.register<WriteIslandClasspath>("writeIslandClasspath") {
     libraries.from(sourceSets["main"].compileClasspath.filter { !it.name.startsWith("minecraft-") })
     stripped.from(strippedMinecraft) // the built stripped jar; carries the strip task as its producer
     outputFile.set(layout.buildDirectory.file("island-classpath.txt"))
+}
+
+// The island build reads island-classpath.txt from a separate, later invocation, so it only needs a producer
+// edge somewhere in the root build's own lifecycle; assemble is what `./gradlew build` at the root runs.
+tasks.named("assemble") {
+    dependsOn(writeIslandClasspath)
 }
