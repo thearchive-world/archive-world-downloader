@@ -69,6 +69,10 @@ class NaturalEquipmentTest {
                 of(Items.STONE_SWORD)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.MAINHAND, of(Items.GOLDEN_SWORD)));
         assertFalse(NaturalEquipment.isNaturalFor(EntityType.PIGLIN, EquipmentSlot.MAINHAND, of(Items.IRON_SWORD)));
+        assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIFIED_PIGLIN, EquipmentSlot.MAINHAND,
+                of(Items.WARPED_FUNGUS_ON_A_STICK)));
+        assertFalse(NaturalEquipment.isNaturalFor(EntityType.ZOMBIFIED_PIGLIN, EquipmentSlot.MAINHAND,
+                of(Items.IRON_SWORD)));
     }
 
     @Test

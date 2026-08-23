@@ -80,7 +80,7 @@ final class NaturalEquipment {
             Map.entry(EntityType.PIGLIN,
                     new Profile(Set.of(Items.CROSSBOW, Items.GOLDEN_SWORD), ArmorKind.GOLDEN)),
             Map.entry(EntityType.ZOMBIFIED_PIGLIN,
-                    new Profile(Set.of(Items.GOLDEN_SWORD), ArmorKind.NONE)),
+                    new Profile(Set.of(Items.GOLDEN_SWORD, Items.WARPED_FUNGUS_ON_A_STICK), ArmorKind.NONE)),
             Map.entry(EntityType.PIGLIN_BRUTE, new Profile(Set.of(Items.GOLDEN_AXE), ArmorKind.NONE)),
             Map.entry(EntityType.PILLAGER, new Profile(Set.of(Items.CROSSBOW), ArmorKind.NONE)),
             Map.entry(EntityType.VINDICATOR, new Profile(Set.of(Items.IRON_AXE), ArmorKind.NONE)),
