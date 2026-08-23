@@ -98,7 +98,7 @@ final class NaturalEquipment {
             .put(EntityType.PIGLIN,
                     new Profile(ImmutableSet.of(Items.CROSSBOW, Items.GOLDEN_SWORD), ArmorKind.GOLDEN))
             .put(EntityType.ZOMBIFIED_PIGLIN,
-                    new Profile(ImmutableSet.of(Items.GOLDEN_SWORD), ArmorKind.NONE))
+                    new Profile(ImmutableSet.of(Items.GOLDEN_SWORD, Items.WARPED_FUNGUS_ON_A_STICK), ArmorKind.NONE))
             .put(EntityType.PIGLIN_BRUTE, new Profile(ImmutableSet.of(Items.GOLDEN_AXE), ArmorKind.NONE))
             .put(EntityType.PILLAGER, new Profile(ImmutableSet.of(Items.CROSSBOW), ArmorKind.NONE))
             .put(EntityType.VINDICATOR, new Profile(ImmutableSet.of(Items.IRON_AXE), ArmorKind.NONE))
