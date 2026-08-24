@@ -78,20 +78,48 @@ jobs:
         with:
           cache-disabled: true
 
-      - name: Build, then rebuild clean, and byte-diff the two production jars
+      - name: Build, then rebuild clean, and byte-diff the production jars
         run: |
           set -euo pipefail
-          # Resolve the two authoritative jar paths deterministically: capture via command substitution, so
-          # set -e catches a gradle failure (a process-substitution < <(...) would swallow its exit code);
-          # filter to jar paths under build/libs (tolerating any stray -q line); and sort, so parallel
-          # execution (org.gradle.parallel=true races the two subprojects' stdout) can't reorder the list and
-          # false-fail the diff on byte-identical jars.
+          # Loader-aware jar resolution. The root build's production jars come from the loader subprojects the
+          # band includes: a fabric+neoforge band includes :fabric and :neoforge, a forge-only deep band includes
+          # neither (its Forge jar is a separate hand-rolled plain-java island under forge/, no ForgeGradle and no
+          # Loom, which resolves the three real Forge-classpath libraries its glue transitively reaches at compile
+          # time: eventbus and forgespi from the Forge maven, maven-artifact from Maven Central, the real API view
+          # that replaced the deleted compile-only stubs). Read the loader set from settings.gradle.kts's
+          # include(...) statements -- matching the quoted project name on an include line, so a comment naming a
+          # loader cannot false-positive -- and never assert a :<loader>:printProductionJar for a project this
+          # band does not include.
+          LOADER_TASKS=()
+          for loader in fabric neoforge; do
+            if grep -E '^[[:space:]]*include\(' settings.gradle.kts | grep -q "\"${loader}\""; then
+              LOADER_TASKS+=(":${loader}:printProductionJar")
+            fi
+          done
+          if [ "${#LOADER_TASKS[@]}" -eq 0 ]; then
+            # The shippable Forge jar is the forge/ island's modJar (a separate hand-rolled plain-java build). Its
+            # modJar is authored for byte-stability (a reproducible file order plus stripped timestamps), but this
+            # workflow does not yet re-diff it across two builds, and the island's checkShipJar gate is a class-file
+            # health check, not a byte-identity guard.
+            # TODO: when the forge/ island build is wired into a warmed-GRADLE_USER_HOME CI path (as the root job
+            # above has), add a real two-build byte-diff of forge/'s modJar here; the modJar is already
+            # order-normalized and timestamp-stripped, so only the CI wiring is missing.
+            echo "no loader subprojects on this band (settings.gradle.kts includes no :fabric/:neoforge); the"
+            echo "shippable Forge jar is the forge/ island's modJar, produced by that separate build. No root"
+            echo "production jar to byte-diff here; see the TODO above for the island modJar byte-diff."
+            exit 0
+          fi
+          # Resolve the authoritative jar paths deterministically: capture via command substitution, so set -e
+          # catches a gradle failure (a process-substitution < <(...) would swallow its exit code); filter to jar
+          # paths under build/libs (tolerating any stray -q line); and sort, so parallel execution
+          # (org.gradle.parallel=true races the subprojects' stdout) can't reorder the list and false-fail the
+          # diff on byte-identical jars.
           hash_jars() {
             local out
-            out="$(./gradlew -q :fabric:printProductionJar :neoforge:printProductionJar)"
+            out="$(./gradlew -q "${LOADER_TASKS[@]}")"
             mapfile -t JARS < <(printf '%s\n' "$out" | grep -E '/build/libs/.*\.jar$' | sort)
-            if [ "${#JARS[@]}" -ne 2 ]; then
-              echo "::error::expected exactly 2 production jars, got ${#JARS[@]}"; printf '%s\n' "$out"; exit 1
+            if [ "${#JARS[@]}" -ne "${#LOADER_TASKS[@]}" ]; then
+              echo "::error::expected ${#LOADER_TASKS[@]} production jars, got ${#JARS[@]}"; printf '%s\n' "$out"; exit 1
             fi
             for j in "${JARS[@]}"; do
               [ -s "$j" ] || { echo "::error::production jar missing or empty: $j"; exit 1; }
