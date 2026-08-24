@@ -22,7 +22,8 @@ public final class MapSinkImpl implements MapSink {
     @Override
     public Tag serializeMap(MapItemSavedData saved, RegistryAccess registries) {
         // save writes the inner map "data" compound the band-agnostic MapDataWriter then wraps as
-        // {data, DataVersion} and gzips.
-        return saved.save(new CompoundTag(), registries);
+        // {data, DataVersion} and gzips. It puts the live colors array into that compound rather than a copy of
+        // it, and vanilla's map packet handler keeps writing received pixels into that same array.
+        return saved.save(new CompoundTag(), registries).copy();
     }
 }
