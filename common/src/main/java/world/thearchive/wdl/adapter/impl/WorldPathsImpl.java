@@ -22,7 +22,7 @@ import world.thearchive.wdl.adapter.WdlRegionStorage;
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * 1.14.4 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
+ * 1.13.2 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
  * pre-creates {@code region/} before the region writer opens it. There is no {@code entities/} region at this band:
  * entities live inside the {@code region/} chunk under {@code Level.Entities}.
  */

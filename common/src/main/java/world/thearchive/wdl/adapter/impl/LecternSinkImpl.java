@@ -9,7 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import world.thearchive.wdl.adapter.LecternSink;
 
 /**
- * 1.15.2 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.save} (mirroring
+ * 1.13.2 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.save} (mirroring
  * {@code LecternBlockEntity.saveAdditional}) and merges it into a captured lectern block-entity tag.
  *
  * <p>Two steps (see {@link LecternSink}): {@link #captureBook} serializes the live open menu's slot-0 book and
