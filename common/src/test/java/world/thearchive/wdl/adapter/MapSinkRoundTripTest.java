@@ -75,4 +75,15 @@ class MapSinkRoundTripTest {
         assertEquals((byte) 42, back.colors[0],
                 "locked() arraycopied the image, so the later source mutation does not leak into the snapshot");
     }
+
+    @Test
+    void theSerializedTagDoesNotAliasTheLiveColors() {
+        MapItemSavedData map = clientMap((byte) 0, false);
+
+        CompoundTag data = (CompoundTag) sink.serializeMap(map, registries);
+        data.getByteArray("colors")[0] = (byte) 7;
+
+        assertEquals((byte) 42, map.colors[0],
+                "the live client map keeps its image when the tag handed to the writer thread is written to");
+    }
 }
