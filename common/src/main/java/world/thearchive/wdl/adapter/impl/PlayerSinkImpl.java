@@ -9,7 +9,7 @@ import net.minecraft.world.entity.player.Player;
 import world.thearchive.wdl.adapter.PlayerSink;
 
 /**
- * 1.15.2 player sink: serializes the local player via vanilla's own {@code player.saveWithoutId} (the identical call
+ * 1.14.4 player sink: serializes the local player via vanilla's own {@code player.saveWithoutId} (the identical call
  * {@code PlayerDataStorage.save} uses), so the captured {@code "Player"} compound is byte-for-byte what a vanilla
  * {@code playerdata/<uuid>.dat} would hold.
  *

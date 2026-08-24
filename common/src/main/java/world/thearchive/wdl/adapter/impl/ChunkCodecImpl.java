@@ -33,7 +33,7 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.15.2 chunk codec: replicates the minimal client-safe slice of vanilla
+ * 1.14.4 chunk codec: replicates the minimal client-safe slice of vanilla
  * {@code ChunkSerializer.write(ServerLevel, ChunkAccess)} to NBT. Below the 1.21.2 cut the chunk write is a static
  * method that reads from a {@code ServerLevel} a multiplayer client never has, so {@link #encode} rebuilds the tag
  * field by field from the captured snapshot rather than calling vanilla.
