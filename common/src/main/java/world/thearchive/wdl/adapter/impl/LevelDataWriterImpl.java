@@ -63,7 +63,7 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.21.11 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
+ * 1.21.8 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
  * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
  * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
  * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
