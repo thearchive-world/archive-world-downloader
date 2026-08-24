@@ -13,7 +13,7 @@ import net.minecraft.world.level.storage.TagValueOutput;
 import world.thearchive.wdl.adapter.ContainerSink;
 
 /**
- * 1.21.11 container sink: serializes an open container's items via vanilla's own {@code ContainerHelper.saveAllItems}
+ * 1.21.10 container sink: serializes an open container's items via vanilla's own {@code ContainerHelper.saveAllItems}
  * (the codec/{@code ValueOutput} layer) and merges them into a captured block-entity tag.
  *
  * <p>Two steps (see {@link ContainerSink}): {@link #captureItems} serializes the live menu's container slots and

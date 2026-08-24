@@ -34,7 +34,7 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.21.11 chunk codec: replicates the minimal client-safe slice of vanilla
+ * 1.21.10 chunk codec: replicates the minimal client-safe slice of vanilla
  * {@code SerializableChunkData.copyOf(ServerLevel, ChunkAccess)} to {@code write()}.
  *
  * <p>Two steps (see {@link ChunkCodec}): {@link #capture(LevelChunk, RegistryAccess)} captures a live client chunk into
