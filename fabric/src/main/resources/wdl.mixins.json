@@ -3,6 +3,7 @@
   "package": "world.thearchive.wdl.fabric.mixin",
   "compatibilityLevel": "JAVA_8",
   "client": [
+    "MinecraftDisconnectMixin",
     "PauseScreenMixin",
     "ScreenAccessor"
   ],

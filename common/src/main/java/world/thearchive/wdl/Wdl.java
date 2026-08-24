@@ -269,6 +269,15 @@ public final class Wdl {
         }
     }
 
+    /**
+     * Stop and save a running download when the client tears down a world, for a disconnect that no loader hook
+     * delivers. A no-op unless a capture is recording, so a path that also fires the loader disconnect hook stops the
+     * download only once.
+     */
+    public static void onClientDisconnect() {
+        controller.onDisconnect();
+    }
+
     /** Keybind handler (client main thread): start a download, or stop and save the running one. */
     private static void onToggle() {
         CaptureState state = controller.state();
