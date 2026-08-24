@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.EntitySink;
 
 /**
- * 1.21.11 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
+ * 26.2 entity sink: a client-safe lift of {@code EntityStorage.storeEntities}'s write branch.
  *
  * <p>Three members (see {@link EntitySink}): {@link #encodeChunk(List, ChunkPos, RegistryAccess, boolean)} serializes
  * the live client entities, {@link #encodeChunk(List, ChunkPos)} builds the entities-region envelope from
