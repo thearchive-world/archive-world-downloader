@@ -11,7 +11,7 @@ import net.minecraft.world.level.storage.TagValueOutput;
 import world.thearchive.wdl.adapter.LecternSink;
 
 /**
- * 1.21.11 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.CODEC} on the
+ * 26.1.2 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.CODEC} on the
  * codec/{@code ValueOutput} layer (mirroring {@code LecternBlockEntity.saveAdditional}) and merges it into a captured
  * lectern block-entity tag.
  *

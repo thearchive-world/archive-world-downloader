@@ -11,7 +11,7 @@ import net.minecraft.world.level.storage.TagValueOutput;
 import world.thearchive.wdl.adapter.PlayerSink;
 
 /**
- * 1.21.11 player sink: serializes the local player via vanilla's own {@code player.saveWithoutId} on the
+ * 26.1.2 player sink: serializes the local player via vanilla's own {@code player.saveWithoutId} on the
  * codec/{@code ValueOutput} layer (the identical call {@code PlayerDataStorage.save} uses), so the captured
  * {@code "Player"} compound is byte-for-byte what a vanilla {@code playerdata/<uuid>.dat} would hold.
  *
