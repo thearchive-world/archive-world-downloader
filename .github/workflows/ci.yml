@@ -1,9 +1,10 @@
 name: CI
 
 # Build every era-band branch + PR, on the JDK that branch's gradle.properties names. ./gradlew build
-# continuously guards the source-merge gate (:fabric:build -> remap common to intermediary) plus the core
-# invariants (:common:check -> checkCoreImports, checkPlugBand, checkCoreJava8, checkJavaVersion) and the
-# headless unit suite (:common:test).
+# continuously guards the core invariants (:common:check -> checkCoreImports, checkPlugBand, checkJavaVersion)
+# and the headless unit suite (:common:test); on this Forge-only, Java-8-toolchain, Unimined band there is no
+# fabric or neoforge module (so no source-merge remap-to-intermediary gate) and checkCoreJava8 does not run
+# (moot once java_version is already 8).
 on:
   push:
     branches:
@@ -45,9 +46,9 @@ defaults:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # The gate is a few minutes warm, but the first run on a fresh branch pays a cold Loom + ModDev setup
-    # (download + remap Minecraft). Budget generously; the cap only exists to kill a hung run rather than
-    # letting it ride to the 6h default.
+    # The gate is a few minutes warm, but the first run on a fresh branch pays a cold Unimined FG3 provision
+    # (download the classic-MCP Minecraft jar and, for the Forge island, the Forge loader/universal jar).
+    # Budget generously; the cap only exists to kill a hung run rather than letting it ride to the 6h default.
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -58,18 +59,39 @@ jobs:
           persist-credentials: false
 
       - name: Resolve the build JDK
-        # setup-java cannot read a .properties file, so this branch's own coordinate is lifted here.
+        # setup-java cannot read a .properties file, so this branch's own coordinate is lifted here. The major
+        # (the same digit-prefix checkJavaVersion compares java_version against) also names the
+        # JAVA_HOME_<major>_X64 variable setup-java exports for that install, which the fromEnv bridge below
+        # points Gradle's toolchain auto-detection at.
         id: jdk
         run: |
           version="$(sed -n 's/^java_build_version=//p' gradle.properties | tail -n1 | tr -d '[:space:]')"
           [ -n "$version" ] || { echo "no java_build_version=<jdk> line in gradle.properties" >&2; exit 1; }
+          major="${version%%[!0-9]*}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Gradle auto-detects an installation named by JAVA_HOME itself, plus whatever
+          # org.gradle.java.installations.fromEnv names (a locally installed JDK a developer reaches through
+          # SDKMAN or a package manager is picked up the same way, with no fromEnv needed) -- but nothing scans
+          # the GitHub Actions tool-cache paths setup-java installs into on its own, and auto-download stays off
+          # per gradle.properties, so without this bridge there is nothing else to fall back to. GRADLE_OPTS
+          # applies to every gradlew invocation in the job, so this covers both the root build below and the
+          # Forge island's separate wrapper in one place.
+          echo "GRADLE_OPTS=-Dorg.gradle.java.installations.fromEnv=JAVA_HOME_${major}_X64" >> "$GITHUB_ENV"
 
-      - name: Set up the build JDK (Temurin)
+      - name: Set up the build JDKs (Temurin)
+        # Two installs, not one: Unimined's FG3 provision (both :common's and the Forge island's) is proven only
+        # with the Gradle daemon on JDK 21, but this band's own toolchain target (java_version, checked against
+        # java_build_version by checkJavaVersion below) is 8. Listing the build JDK first and 21 last makes 21
+        # the default JAVA_HOME/PATH (setup-java hands the default to the last entry in a multi-version list),
+        # so the daemon launches on it; the build JDK is reached only through its own JAVA_HOME_<major>_X64
+        # variable and the fromEnv bridge above, a real toolchain resolution rather than a same-JVM --release
+        # target.
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
         with:
           distribution: temurin
-          java-version: ${{ steps.jdk.outputs.version }}
+          java-version: |
+            ${{ steps.jdk.outputs.version }}
+            21
 
       - name: Set up Gradle
         # basic is the MIT caching provider. The v6 default routes caching through the proprietary
@@ -79,14 +101,61 @@ jobs:
           cache-provider: basic
 
       - name: Build (source-merge gate) + core invariant + headless suite
+        # A failure before any compileJava task starts (Unimined's FG3 provision, resolved during
+        # configuration) reads as a cache or network problem worth one retry against a clean cache below. A
+        # failure once compileJava is running is a real code-level failure -- today, the known seam-red compile
+        # pending the seam port that re-vocabularizes common's net.minecraft-facing files to MCP names (see the bootSmoke comment
+        # in common/build.gradle.kts) -- that wiping the cache cannot fix, so that outcome is reported as-is
+        # here rather than silently doubling every CI run's time retrying a failure the retry cannot resolve.
+        id: build
+        run: |
+          set +e
+          ./gradlew build --stacktrace 2>&1 | tee /tmp/build.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" != "0" ] && ! grep -q '^> Task .*compileJava' /tmp/build.log; then
+            echo "retry=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          exit "$status"
+
+      # Scoped to the unimined subdirectories only, not the whole .gradle tree, so Gradle's own module/build
+      # cache and configuration-cache state survive the wipe. :common's provision lands at the repo root's
+      # .gradle/unimined (the overall build's root, not the common/ subproject dir); common/.gradle/unimined is
+      # empty in practice but wiped too for symmetry with the per-project layout.
+      - name: Wipe the FG3 provision cache after a failed provision
+        if: steps.build.outputs.retry == 'true'
+        run: rm -rf .gradle/unimined common/.gradle/unimined forge/.gradle/unimined
+
+      - name: Retry the build after the cache wipe
+        if: steps.build.outputs.retry == 'true'
         run: ./gradlew build --stacktrace
 
-      # The non-Fabric jar on the deep bands is a separate ForgeGradle-6 Gradle-8 island (forge/) with its own
-      # wrapper, which the root build above does not reach. Build it only on bands that carry one. It runs on the
-      # setup-java JDK (Java 17), where ForgeGradle 6 is supported; the root build's daemon runs on a detected
-      # Java 21 for Loom.
+      # The non-Fabric jar on the deep bands is a separate Gradle-8 island (forge/) with its own wrapper, which
+      # the root build above does not reach. Build it only on bands that carry one. Below the Mojmap floor this
+      # island provisions Forge itself through Unimined's FG3 (see forge/build.gradle.kts), the same
+      # daemon-on-21/toolchain-on-8 split as the root build above, bridged by the same GRADLE_OPTS; its own
+      # compileJava folds in common's source and is intentionally seam-red for the same reason until the seam port lands.
       - name: Build the Forge island (deep bands only)
         if: hashFiles('forge/gradlew') != ''
+        id: forge-build
+        run: |
+          set +e
+          (cd forge && ./gradlew build --stacktrace) 2>&1 | tee /tmp/forge-build.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" != "0" ] && ! grep -q '^> Task .*compileJava' /tmp/forge-build.log; then
+            echo "retry=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          exit "$status"
+
+      - name: Wipe the Forge island's FG3 provision cache after a failed provision
+        if: hashFiles('forge/gradlew') != '' && steps.forge-build.outputs.retry == 'true'
+        run: rm -rf forge/.gradle/unimined
+
+      - name: Retry the Forge island build after the cache wipe
+        if: hashFiles('forge/gradlew') != '' && steps.forge-build.outputs.retry == 'true'
         run: cd forge && ./gradlew build --stacktrace
 
       # Convenience: grab the built jars off a green run without a local build. The real distribution is the

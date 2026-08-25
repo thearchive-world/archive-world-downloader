@@ -548,12 +548,13 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 # the map keys).
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
-# The Forge island's manifest carries loaderVersion [25,) and pins minecraft versionRange [1.13.2] at this band
-# (Forge 1.13.2-25.0.223, the 25.x line for 1.13.2). The forge/ tree diverges per band across its shim, platform
-# bridge, connection tee and mount reader; the access transformer is re-pinned for this band to the classic SRG
+# Forge did not introduce the TOML-based mods.toml manifest until the 25.x line at 1.13.2; below that floor
+# the loader still scans the legacy JSON mcmod.info this band ships instead (see forge/build.gradle.kts's
+# processResources token expansion). The forge/ tree diverges per band across its shim, platform bridge,
+# connection tee and mount reader; the access transformer is re-pinned for this band to the classic SRG
 # field_NNNNN_ member scheme (the 1.17-and-above bands use TSRGv2 f_NNNNN_) with the xa/ya/za move-delta widenings.
 # forge/build.gradle.kts is excluded from the diff as a *.gradle.kts.
-forge/src/main/resources/META-INF/mods.toml
+forge/src/main/resources/mcmod.info
 
 # The Forge connection tee names two members the Forge access transformer widens (net.minecraft.network.Connection
 # channel and the ClientboundMoveEntityPacket entity id, both non-public with no getter at this band) and narrows the
@@ -569,11 +570,13 @@ forge/src/main/java/world/thearchive/wdl/forge/ForgeMountMenuReader.java
 # accepts only 4 at this band, treating 3 and below as too old and 5 and above as too new).
 forge/src/main/resources/pack.mcmeta
 
-# The reobf pass/negative fixtures: a band-local build-support source set that compiles a small Mojmap-named
-# fixture, kept separate from the real merged-main reobf path. checkReobfNegative reobfuscates and scans this
-# fixture to prove checkReobf fires on a known-dirty input; reobfJar itself reobfuscates the real merged-main
-# island output (Mojmap -> 1.13.2 SRG). New at this band; no higher band carries a hand-rolled Forge reobf
-# island, so nothing to diff against on dev.
+# The reobf pass/negative fixtures: a band-local build-support source set that compiles a small MCP-named
+# fixture, kept separate from the real merged-main reobf path. Below the Mojmap floor there is no hand-rolled
+# Mojmap -> SRG remap to validate: Unimined's native reobf (defaultRemapJar) reobfuscates the shipped jar
+# MCP -> searge directly, so checkShipJar and checkReobfNegative instead scan this fixture's own class output
+# to prove that native pass and the searge-literal scan around it both fire correctly (checkShipJar stands in
+# for the real ship jar until the seam port re-vocabularizes common and lets modJar build). New at this
+# band; no higher band carries a hand-rolled Forge reobf island, so nothing to diff against on dev.
 forge/src/reobftest/**
 
 # Below the 1.19 registry split the code-defined registries are static fields on Registry (Registry.ENTITY_TYPE),
