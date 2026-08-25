@@ -3,27 +3,15 @@
 
 package world.thearchive.wdl.reobftest;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-
-// Compile-only reobf fixture. It references surviving Mojmap Minecraft members that each carry a
-// mojmap to srg entry (CompoundTag.putInt/getInt/putString/getString, BlockPos.below/above), so
-// reobfJar rewrites every Minecraft reference to its 1.13.2 searge id and checkReobf sees only valid
-// SRG names. The class's own world.thearchive.wdl name is absent from the mapping, so tiny-remapper
-// leaves it untouched, which is the reobf contract the island's shipped output relies on.
+// Positive reobf fixture. Under Unimined a wrong compiled Minecraft reference cannot compile (the classic
+// checkReobf reference scan is largely redundant here), so the residual mis-bind surface is a reflective,
+// SRG-shaped string literal, the kind a runtime binder feeding Class.getDeclaredField/getDeclaredMethod uses
+// to reach a Forge-obfuscated member by name. This literal names net/minecraft/entity/Entity's "world" field
+// (MCP name) under its real 1.12.2 searge id; checkShipJar resolves it against the pinned mcp_config
+// joined.tsrg oracle, where it must succeed.
 public final class ReobfFixture {
 
     private ReobfFixture() {}
 
-    public static CompoundTag encode(BlockPos pos) {
-        CompoundTag tag = new CompoundTag();
-        BlockPos anchor = pos.below().above();
-        tag.putInt("marker", anchor == pos ? 1 : 0);
-        tag.putString("id", "wdl");
-        return tag;
-    }
-
-    public static int decode(CompoundTag tag) {
-        return tag.getInt("marker") + tag.getString("id").length();
-    }
+    public static final String WORLD_FIELD_SEARGE_ID = "field_70170_p";
 }

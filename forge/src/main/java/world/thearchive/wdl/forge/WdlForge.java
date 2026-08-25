@@ -3,26 +3,17 @@
 
 package world.thearchive.wdl.forge;
 
-import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.network.NetHandlerPlayClient;
+import net.minecraft.client.settings.KeyBinding;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.DeferredWorkQueue;
-import net.minecraftforge.fml.ExtensionPoint;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.input.Keyboard;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.InteractionCapture;
@@ -32,70 +23,84 @@ import world.thearchive.wdl.client.WdlHudOverlay;
 import world.thearchive.wdl.client.WdlKeyBinds;
 
 /**
- * Forge client entrypoint, the analog of {@code WdlFabricClient} and the NeoForge {@code WdlNeoForge}. Unlike
- * NeoForge, Forge's {@code @Mod} constructor takes no arguments, so the mod event bus is fetched from
- * {@link FMLJavaModLoadingContext} rather than injected; the keybind registers on that bus through
- * {@link FMLClientSetupEvent}, while the connection tee, interaction observers, HUD overlay and outline draw
- * listen on {@link MinecraftForge#EVENT_BUS}. Forge's {@code IEventBus} has no {@code addListener(Class, Consumer)}
- * overload, so each listener is a typed lambda whose parameter names the event. Client-only is declared in
- * mods.toml's {@code side = "CLIENT"} entries.
+ * Forge client entrypoint, the analog of {@code WdlFabricClient} and the NeoForge {@code WdlNeoForge}. This band
+ * predates ModLauncher: there is one event bus, not a mod bus split from a game bus, so every listener below
+ * registers on {@link MinecraftForge#EVENT_BUS} via {@code @SubscribeEvent} rather than a lambda (there is no
+ * functional {@code addListener} overload here), and the mod is instantiated by a bare no-arg constructor FML
+ * discovers from the {@link Mod} annotation, not handed a mod-bus reference. {@code useMetadata = true} reads
+ * the display metadata, name/version-fallback/description/url/authorList/logoFile, from {@code mcmod.info}.
+ * {@code FMLModContainer.bindMetadata} reads {@code acceptedMinecraftVersions} from the annotation descriptor
+ * unconditionally (mcmod.info carries no such field in this FML release, so a JSON key there is silently
+ * dropped), and reads {@code dependencies} from the annotation too unless mcmod.info opts a mod into
+ * {@code useDependencyInformation}, which this one does not; both stay on the annotation rather than
+ * mcmod.info. Client-only is declared by this jar shipping no dedicated-server entrypoint; a client-only mod
+ * needs no {@code side} attribute at this band.
+ *
+ * <p>The pause-menu config-GUI hook ({@code IModGuiFactory} plus the {@code @Mod(guiFactory = ...)} attribute,
+ * this band's replacement for the {@code ExtensionPoint}/{@code ConfigGuiHandler} mechanisms newer bands use) is
+ * not wired here: {@link Wdl#createSettingsScreen} returns a {@code Screen} of a namespace this band's client does
+ * not carry, so the factory has nothing valid to construct until that seam is ported.
  */
-@Mod("wdl")
+@Mod(
+        modid = "wdl",
+        useMetadata = true,
+        dependencies = "required-after:forge@[14.23.5.2768,);",
+        acceptedMinecraftVersions = "[1.12.2]")
 public final class WdlForge {
-    public WdlForge() {
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
-        Wdl.initialize(new ForgePlatformBridge(modEventBus));
-        MountMenuReader.install(new ForgeMountMenuReader());
-        // At this band the config-screen factory is an ExtensionPoint carrying a BiFunction, not the
-        // ConfigGuiHandler.ConfigGuiFactory wrapper the 1.17-and-above bands register.
-        ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.CONFIGGUIFACTORY,
-                () -> (minecraft, modListScreen) -> Wdl.createSettingsScreen(modListScreen));
-        // ClientPlayerNetworkEvent does not exist at this band, so the tee installs on the first client tick that
-        // sees a play connection: Minecraft.getConnection() is null until the local player is assigned (the login
-        // moment) and stays non-null across a dimension change, so the connection-appears edge is the once-per-
-        // connection install point. installInto no-ops if the pipeline is not a play pipeline or the tee is present.
-        boolean[] teeConnected = {false};
-        MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent tick) -> {
-            if (tick.phase != TickEvent.Phase.END) {
-                return;
-            }
-            ClientPacketListener listener = Minecraft.getInstance().getConnection();
-            boolean nowConnected = listener != null;
-            if (nowConnected && !teeConnected[0]) {
-                ForgeConnectionTee.install(listener.getConnection());
-            }
-            teeConnected[0] = nowConnected;
-        });
-        MinecraftForge.EVENT_BUS.addListener((PlayerInteractEvent.RightClickBlock event) -> {
-            // At this band RightClickBlock carries no hit vector; getHitVec is a 1.16 addition. The consumers read
-            // only the clicked block position, so the hit is rebuilt from the event's position and face, with the
-            // block center standing in for the precise location the event does not provide.
-            BlockPos clicked = event.getPos();
-            HitResult hit = new HitResult(
-                    new Vec3(clicked.getX() + 0.5, clicked.getY() + 0.5, clicked.getZ() + 0.5),
-                    event.getFace(), clicked);
-            InteractionCapture.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), event.getHand(), hit);
-            OpenClickTracker.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), hit);
-        });
-        MinecraftForge.EVENT_BUS.addListener((PlayerInteractEvent.EntityInteract event) -> OpenClickTracker
-                .dispatchUseEntity(event.getEntityPlayer(), event.getWorld(), event.getTarget()));
+    private boolean teeConnected;
 
-        KeyMapping peekKey = new KeyMapping(
-                "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY);
-        // Below 1.19 there is no RegisterKeyMappingsEvent; keys register through ClientRegistry during client
-        // setup. At this band the setup event has no enqueueWork, so the main-thread registration is deferred through
-        // DeferredWorkQueue instead.
-        modEventBus.addListener((FMLClientSetupEvent event) -> DeferredWorkQueue
-                .runLater(() -> ClientRegistry.registerKeyBinding(peekKey)));
+    public WdlForge() {
+        MinecraftForge.EVENT_BUS.register(this);
+        Wdl.initialize(new ForgePlatformBridge());
+        MountMenuReader.install(new ForgeMountMenuReader());
+
+        KeyBinding peekKey = new KeyBinding("key.wdl.peek_hud", Keyboard.KEY_LMENU, WdlKeyBinds.CATEGORY);
+        ClientRegistry.registerKeyBinding(peekKey);
         WdlHudOverlay.bindPeekKey(peekKey);
-        // At this band there is no OverlayRegistry (a 1.17 addition) or RegisterGuiOverlaysEvent (1.19); the HUD host
-        // is RenderGameOverlayEvent on the game bus. Post with ElementType.ALL fires once after the whole vanilla
-        // HUD, so the overlay draws above every element in every gamemode; it self-gates F1 and blocking screens.
-        MinecraftForge.EVENT_BUS.addListener((RenderGameOverlayEvent.Post event) -> {
-            if (event.getType() == RenderGameOverlayEvent.ElementType.ALL) {
-                WdlHudOverlay.render(event.getPartialTicks());
-            }
-        });
+
         new ForgeOutlineRegistrar().register();
+    }
+
+    /**
+     * Installs the connection tee on the client-tick edge where the play connection appears, the once-per-
+     * connection join signal at this band (there is no login/logout event to hook instead): {@code
+     * Minecraft.getMinecraft().getConnection()} is null until the local player is assigned and stays non-null
+     * across a dimension change. {@code ForgeConnectionTee.install} still takes the shared adapter's not-yet-ported
+     * {@code Connection}
+     * parameter type, so this call site stays red pending that port; the tick-edge detection itself is
+     * this band's own, already-correct FML mechanics.
+     */
+    @SubscribeEvent
+    public void onClientTick(TickEvent.ClientTickEvent tick) {
+        if (tick.phase != TickEvent.Phase.END) {
+            return;
+        }
+        NetHandlerPlayClient listener = Minecraft.getMinecraft().getConnection();
+        boolean nowConnected = listener != null;
+        if (nowConnected && !teeConnected) {
+            ForgeConnectionTee.install(listener.getNetworkManager());
+        }
+        teeConnected = nowConnected;
+    }
+
+    @SubscribeEvent
+    public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        InteractionCapture.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), event.getHand(),
+                event.getHitVec());
+        OpenClickTracker.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), event.getHitVec());
+    }
+
+    @SubscribeEvent
+    public void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
+        OpenClickTracker.dispatchUseEntity(event.getEntityPlayer(), event.getWorld(), event.getTarget());
+    }
+
+    // Post with ElementType.ALL fires once after the whole vanilla HUD, so the overlay draws above every element
+    // in every gamemode; it self-gates F1 and blocking screens.
+    @SubscribeEvent
+    public void onRenderGameOverlay(RenderGameOverlayEvent.Post event) {
+        if (event.getType() == RenderGameOverlayEvent.ElementType.ALL) {
+            WdlHudOverlay.render(event.getPartialTicks());
+        }
     }
 }
