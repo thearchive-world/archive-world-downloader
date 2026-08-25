@@ -1,25 +1,10 @@
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 import net.ltgt.gradle.errorprone.errorprone
-import org.objectweb.asm.AnnotationVisitor
-import org.objectweb.asm.ClassReader
-import org.objectweb.asm.ClassVisitor
-import org.objectweb.asm.ClassWriter
-import org.objectweb.asm.MethodVisitor
-import org.objectweb.asm.Opcodes
-
-// ASM on the buildscript classpath drives the compile-side Minecraft annotation strip below
-// (stripMinecraftParameterAnnotations); pinned to the version the tools/mojmap-bridge generator uses.
-buildscript {
-    repositories { mavenCentral() }
-    dependencies { classpath("org.ow2.asm:asm:9.10.1") }
-}
 
 plugins {
-    // common's Minecraft toolchain: vanilla-mode Fabric Loom + the intermediary->Mojmap bridge mapping. The
-    // version is pinned in the catalog and declared apply-false at the root, so it is applied here version-less.
-    alias(libs.plugins.loom)
+    // common's Minecraft toolchain: loader-less Unimined against classic MCP mappings (see below). Versioned
+    // inline, not catalog-pinned: common is the only consumer, and the forge/ island (a separate Gradle build)
+    // pins its own copy independently.
+    id("xyz.wagyourtail.unimined") version "1.4.1"
     id("com.diffplug.spotless")    // applied per-subproject, not via build-logic (see below)
     id("wdl.java-conventions")
     id("wdl.nullness-conventions")
@@ -40,37 +25,64 @@ spotless {
     }
 }
 
-// --- Minecraft toolchain: Fabric Loom (vanilla mode) + the composed intermediary->Mojmap bridge ---
-// This band predates the Mojmap floor NeoForm/ModDevGradle and NeoGradle vanilla can target (NeoForm has no
-// pre-1.20.2 release), so neither resolves official Mojang mappings for 1.13.2. Fabric Loom provisions the vanilla
-// jar and remaps it to Mojmap names in two hops: obf->intermediary via Legacy Fabric's published intermediary,
-// then intermediary->named via the bridge mapping the tools/mojmap-bridge included build composes (genBridge).
-// common is written in Mojmap names, so it compiles against this remapped jar with no per-name glue. Loom's test
-// source set inherits the same named jar, so the headless JUnit suite boots the vanilla registries against it.
-loom {
-    // Legacy Fabric hosts intermediary for the pre-1.14 versions the modern Fabric maven does not; %1$s is the MC version.
-    intermediaryUrl.set("https://maven.legacyfabric.net/net/legacyfabric/intermediary/%1\$s/intermediary-%1\$s-v2.jar")
+// --- Minecraft toolchain: loader-less Unimined against classic MCP mappings ---
+// This band predates the Mojmap floor NeoForm/ModDevGradle and NeoGradle vanilla can target, and unlike the
+// 1.13.2 parent it also predates Mojang's own official mappings (Mojang has published none before 1.14.4), so
+// even a hand-composed bridge has nothing to bridge to. The toolchain reaches for the classic pre-Mojmap
+// standard instead: searge (obf->SRG) composed with the MCP project's community names on top.
+// Unimined resolves both natively from a single provisioned jar, with no Fabric/Legacy-Fabric intermediary hop
+// and no hand-rolled bridge build. common is written in MCP names, so it compiles against Unimined's provisioned
+// jar with no per-name glue; Unimined's test source set inherits the same jar, so the headless JUnit suite boots
+// the vanilla registries against it.
+val minecraftVersion = providers.gradleProperty("minecraft_version").get()
+val mcpMappingsChannel = providers.gradleProperty("mcp_mappings_channel").get()
+val mcpMappingsVersion = providers.gradleProperty("mcp_mappings_version").get()
+
+// useGlobalCache=false keeps every provisioned artifact under this project's own build directory rather than a
+// shared user-home cache, matching genBridge's old per-project provisioning and keeping a stale cache from one
+// band from ever leaking into another's compile classpath.
+unimined.useGlobalCache = false
+unimined.minecraft {
+    version = minecraftVersion
+    mappings {
+        searge()
+        mcp(mcpMappingsChannel, mcpMappingsVersion)
+    }
+    // Forge-only band: common is built standalone for its gates and tests alone; it ships no jar of its own,
+    // since the shippable artifact is the forge island's jar (the separate forge/ build, which compiles
+    // common's source directly and reobfuscates natively through its own Unimined provision). common keeps
+    // Unimined's MCP (dev) names, so there is nothing here for Unimined to remap.
+    defaultRemapJar = false
 }
 
-// Forge-only band: common is built standalone for its gates and tests alone; it ships no Fabric jar, since the
-// shippable artifact is the forge island's modJar (reobfuscated Mojmap -> SRG by the separate forge/ build, which
-// compiles common's source directly). Fabric Loom is applied here only to provision the Mojmap Minecraft classpath,
-// so its auto-registered Fabric-mod remap tasks have no consumer on this band, and remapJar's Mojmap -> intermediary
-// direction cannot even run: tiny-remapper hits unfixable conflicts in the Legacy Fabric 1.13.2 intermediary (over
-// Minecraft's own members, never WDL code), so leaving it wired into build would fail assemble for an artifact
-// nobody uses. Disable both so the root build runs the gates and tests without them.
-tasks.matching { it.name == "remapJar" || it.name == "remapSourcesJar" }.configureEach {
-    enabled = false
-}
+// --- bootsmoke: isolated boot-proof source set (./gradlew :common:bootSmoke) ---
+// Proves the Unimined provision above actually runs under the Java 8 target. It cannot live in main (seam-red
+// on the 75 net.minecraft-facing files, so compileJava is intentionally red and main's output does not exist)
+// or in test (76 of its files import Mojmap types the MCP jar does not carry, so compileTestJava cannot run
+// until the seam port). This source set reads main's COMPILE classpath for the Minecraft jar and libraries, never
+// main's output, mirroring the forge island's reobftest isolation: nothing on main/test depends on bootsmoke,
+// and bootsmoke depends on nothing of theirs.
+val bootsmoke = sourceSets.create("bootsmoke")
+val libsCatalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 dependencies {
-    minecraft("com.mojang:minecraft:${property("minecraft_version")}")
-    // Loom resolves mappings(files(...)) at CONFIGURATION time, before any task can run, so no task edge in
-    // this build can produce the jar in time. settings.gradle.kts runs genBridge during settings evaluation
-    // instead, which is what actually puts the jar on disk before this line.
-    mappings(
-        files(rootProject.file("tools/mojmap-bridge/build/bridge/intermediary-mojmap.jar"))
-    )
+    "bootsmokeImplementation"(files(sourceSets.main.get().compileClasspath))
+    "bootsmokeImplementation"(platform(libsCatalog.findLibrary("junit-bom").get()))
+    "bootsmokeImplementation"("org.junit.jupiter:junit-jupiter")
+    "bootsmokeCompileOnly"(libsCatalog.findLibrary("jspecify").get())
+    "bootsmokeRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.register<Test>("bootSmoke") {
+    group = "verification"
+    description = "Boots the vanilla registries against the Unimined-provisioned MCP jar under the Java 8 target"
+    testClassesDirs = bootsmoke.output.classesDirs
+    classpath = bootsmoke.runtimeClasspath
+    // package-info.class carries @NullMarked, whose own @Target lists the Java 9 ElementType.MODULE. Gradle's
+    // JUnit Platform discovery scans every class file in testClassesDirs, including package-info, and a real
+    // Java 8 runtime throws (not just warns, unlike javac under --release 8) reflecting on that annotation's
+    // meta-annotation before JUnit's own class predicate gets to skip it as a non-test class.
+    exclude("**/package-info.class")
 }
 
 // --- PITest mutation testing: on-demand fidelity-gap discovery (./gradlew :common:pitest) ---
@@ -87,7 +99,7 @@ dependencies {
 // build when a new core/adapter class is neither enrolled here nor explicitly acknowledged-excluded.
 //
 // The minion JVMs inherit sourceSets.test.runtimeClasspath (net.minecraft + the bundled vanilla data pack
-// from the net.minecraft:client implementation above), so registry-booting tests run in the minion exactly as under :test.
+// from Unimined's provisioned Minecraft jar), so registry-booting tests run in the minion exactly as under :test.
 // CI-gated by .github/workflows/mutation-testing.yml on dev and version-branch pushes; a new survivor is
 // triaged (killed, suppressed, or rewritten away) rather than absorbed by lowering the floor.
 pitest {
@@ -397,6 +409,10 @@ repositories {
     maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
     // Legacy Fabric intermediary (obf->intermediary) for this pre-1.14 band; the modern Fabric maven has none.
     maven("https://maven.legacyfabric.net/")
+    // Unimined's own published artifacts, plus the classic searge/MCP mapping files it resolves against.
+    maven("https://maven.wagyourtail.xyz/releases")
+    maven("https://repo.spongepowered.org/maven")
+    mavenCentral()
 }
 
 dependencies {
@@ -404,126 +420,4 @@ dependencies {
     // The binding compiles against the journeymap.client.api 1.8 surface, its own API types rather than Minecraft
     // signatures; the -SNAPSHOT suffix is appended here.
     compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
-}
-
-// --- Compile-side Minecraft annotation strip + classpath interposition ---
-// The Mojmap-remapped 1.13.2 jar carries Minecraft's own malformed empty RuntimeVisibleParameterAnnotations
-// attributes: they are present on Minecraft's classes in the vanilla obf jar and are merely preserved by the
-// remap. JDK 8's javac rejects them ("bad class file"), which would sink the clean subset before it reaches a
-// single seam. Because the attributes sit on Minecraft's own classes, which never ship in the mod jar (Forge
-// supplies Minecraft at runtime), removing them is a compile-side fix with no ship consequence. An ASM pass drops
-// every parameter annotation from the provisioned jar, and the stripped jar is interposed onto the compile
-// classpaths in place of Loom's own minecraft entry, so the same stripped jar feeds compileJava and
-// compileTestJava. The runtime classpath keeps Loom's entry: the malformed attribute poisons javac only, and the
-// JVM ignores unread annotation attributes, so the registry-boot tests still run against the provisioned jar.
-abstract class StripParameterAnnotations : DefaultTask() {
-    @get:InputFiles
-    abstract val inputJars: ConfigurableFileCollection
-
-    @get:OutputDirectory
-    abstract val outputDir: DirectoryProperty
-
-    @TaskAction
-    fun strip() {
-        val outDir = outputDir.get().asFile
-        outDir.mkdirs()
-        outDir.listFiles()?.forEach { it.delete() }
-        for (jar in inputJars.files) {
-            val target = outDir.resolve(jar.nameWithoutExtension + "-stripped.jar")
-            ZipInputStream(jar.inputStream().buffered()).use { zin ->
-                ZipOutputStream(target.outputStream().buffered()).use { zout ->
-                    var entry = zin.nextEntry
-                    while (entry != null) {
-                        val bytes = zin.readBytes()
-                        val transformed = if (entry.name.endsWith(".class")) stripClass(bytes) else bytes
-                        zout.putNextEntry(ZipEntry(entry.name))
-                        zout.write(transformed)
-                        zout.closeEntry()
-                        entry = zin.nextEntry
-                    }
-                }
-            }
-            logger.lifecycle("stripped parameter annotations from ${jar.name} -> ${target.name}")
-        }
-    }
-
-    private fun stripClass(bytes: ByteArray): ByteArray {
-        val reader = ClassReader(bytes)
-        val writer = ClassWriter(0)
-        reader.accept(object : ClassVisitor(Opcodes.ASM9, writer) {
-            override fun visitMethod(
-                access: Int,
-                name: String?,
-                descriptor: String?,
-                signature: String?,
-                exceptions: Array<out String>?,
-            ): MethodVisitor? {
-                val delegate = super.visitMethod(access, name, descriptor, signature, exceptions) ?: return null
-                return object : MethodVisitor(Opcodes.ASM9, delegate) {
-                    // Drop the count and every parameter annotation so no (malformed) RuntimeVisible /
-                    // RuntimeInvisibleParameterAnnotations attribute is written back for this method.
-                    override fun visitAnnotableParameterCount(parameterCount: Int, visible: Boolean) {}
-
-                    override fun visitParameterAnnotation(parameter: Int, descriptor: String?, visible: Boolean): AnnotationVisitor? = null
-                }
-            }
-        }, 0)
-        return writer.toByteArray()
-    }
-}
-
-// Only Minecraft's own remapped jar carries the malformed attributes; Loom names it minecraft-*, distinct from
-// every library on the classpath, so a name filter isolates it. The stripped jar carries the strip task as its
-// producer, and each compile classpath drops the original minecraft entry and adds the stripped one in its place.
-val strippedMinecraftDir = layout.buildDirectory.dir("stripped-minecraft").get().asFile
-
-val stripMinecraftParameterAnnotations = tasks.register<StripParameterAnnotations>("stripMinecraftParameterAnnotations") {
-    inputJars.from(sourceSets["main"].compileClasspath.filter { it.name.startsWith("minecraft-") })
-    outputDir.set(strippedMinecraftDir)
-}
-
-val strippedMinecraft = fileTree(strippedMinecraftDir) { include("**/*.jar") }.builtBy(stripMinecraftParameterAnnotations)
-
-tasks.named<JavaCompile>("compileJava") {
-    classpath = sourceSets["main"].compileClasspath.filter { !it.name.startsWith("minecraft-") } + strippedMinecraft
-}
-tasks.named<JavaCompile>("compileTestJava") {
-    classpath = sourceSets["test"].compileClasspath.filter { !it.name.startsWith("minecraft-") } + strippedMinecraft
-}
-
-// --- Publish the island classpath: the exact compile classpath the separate Forge build consumes ---
-// The hand-rolled Forge island (forge/, its own Gradle 8 wrapper) has no Loom to resolve Minecraft and its
-// transitive libraries (com.mojang datafixers/brigadier/authlib, gson, netty, guava, fastutil, jopt, log4j). It
-// reads this file, one absolute path per line: the main compile classpath with Loom's raw minecraft-* jar swapped
-// for the stripped one (the same interposition compileJava does above), so the island compiles the source-merged
-// common against exactly the classpath Loom resolved here. Unlike genBridge, the island reads this file from a
-// later, separate Gradle invocation rather than during the root's own configuration, so hanging it on assemble
-// (below) is enough; no settings-time prerequisite is needed.
-abstract class WriteIslandClasspath : DefaultTask() {
-    @get:InputFiles
-    abstract val libraries: ConfigurableFileCollection
-
-    @get:InputFiles
-    abstract val stripped: ConfigurableFileCollection
-
-    @get:OutputFile
-    abstract val outputFile: RegularFileProperty
-
-    @TaskAction
-    fun write() {
-        val entries = (libraries.files + stripped.files).map { it.absolutePath }
-        outputFile.get().asFile.writeText(entries.joinToString("\n"))
-    }
-}
-
-val writeIslandClasspath = tasks.register<WriteIslandClasspath>("writeIslandClasspath") {
-    libraries.from(sourceSets["main"].compileClasspath.filter { !it.name.startsWith("minecraft-") })
-    stripped.from(strippedMinecraft) // the built stripped jar; carries the strip task as its producer
-    outputFile.set(layout.buildDirectory.file("island-classpath.txt"))
-}
-
-// The island build reads island-classpath.txt from a separate, later invocation, so it only needs a producer
-// edge somewhere in the root build's own lifecycle; assemble is what `./gradlew build` at the root runs.
-tasks.named("assemble") {
-    dependsOn(writeIslandClasspath)
 }
