@@ -9,15 +9,11 @@
 # (gradle/gradle#15383).
 
 [versions]
-loom = "1.17.19"
-moddev = "2.0.143"
 spotless = "8.9.0"
 errorprone-plugin = "5.1.0"
 mod-publish-plugin = "2.2.0"
 
 [plugins]
-loom = { id = "fabric-loom", version.ref = "loom" }
-moddev = { id = "net.neoforged.moddev", version.ref = "moddev" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 # One catalog-pinned version shared by both loader subprojects' publishMods configuration (applied per
 # loader, declared apply-false at the root). Drives the release upload to Modrinth + GitHub.
