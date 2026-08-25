@@ -17,6 +17,9 @@ buildscript {
 
 plugins {
     java
+    // Release publishing. Pinned as a literal because the island is a separate build with no access to the root
+    // version catalog; keep in sync with gradle/libs.versions.toml's mod-publish-plugin.
+    id("me.modmuss50.mod-publish-plugin") version "2.2.0"
 }
 
 apply(plugin = "net.minecraftforge.gradle")
@@ -102,4 +105,40 @@ tasks.named<ProcessResources>("processResources") {
     inputs.properties(tokens)
     filesMatching("META-INF/mods.toml") { expand(tokens) }
     filesMatching("wdl-publishing.properties") { expand(tokens) }
+}
+
+// Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge
+// jar to CurseForge and Modrinth per this band's MC version, mirroring the fabric/neoforge loader subprojects.
+// Coordinates come from band() (the island reads the root gradle.properties), not providers.gradleProperty,
+// because forge/gradle.properties carries none. There is no github block: the release workflow funnels every
+// band's jars into one shared GitHub release with gh. Nothing publishes on an ordinary build.
+publishMods {
+    // Resolve the shipped jar by path: every island build system (Loom remapJar, ForgeGradle reobfJar, plain
+    // java jar) emits build/libs/archive-wdl-forge-<version>.jar, and the release job builds the island before
+    // invoking publishMods, so one path form works on every band without a build-system-specific task handle.
+    file.set(layout.buildDirectory.file("libs/${band("mod_archives_base")}-forge-${project.version}.jar"))
+    changelog.set(providers.environmentVariable("CHANGELOG").orElse(""))
+    type.set(STABLE)
+    version.set(project.version.toString())
+    displayName.set("${project.version} (Forge)")
+    modLoaders.add("forge")
+    dryRun.set(
+        providers.environmentVariable("PUBLISH_DRY_RUN").map { it.toBooleanStrict() }.orElse(false),
+    )
+
+    modrinth {
+        projectId.set(band("modrinth_id"))
+        accessToken.set(providers.environmentVariable("MODRINTH_TOKEN"))
+        minecraftVersions.add(band("minecraft_version"))
+        // Java mod: no hard runtime dependency to declare (JourneyMap is an optional jar-in-jar).
+    }
+
+    curseforge {
+        projectId.set(band("curseforge_id"))
+        accessToken.set(providers.environmentVariable("CURSEFORGE_TOKEN"))
+        minecraftVersions.add(band("minecraft_version"))
+        // Client-only mod: CurseForge requires at least one declared environment.
+        client.set(true)
+        server.set(false)
+    }
 }
