@@ -84,7 +84,13 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          BUILT=$(./gradlew -q :fabric:printVersion | sed -n 's/^PROJECT_VERSION=//p')
+          if grep -E '^[[:space:]]*include\(' settings.gradle.kts | grep -q '"fabric"'; then
+            BUILT=$(./gradlew -q :fabric:printVersion | sed -n 's/^PROJECT_VERSION=//p')
+          else
+            # Forge-only band: no :fabric project. The built version is mod_version+minecraft_version, the same
+            # build-metadata string the forge island names its jar from.
+            BUILT="$(sed -n 's/^mod_version=//p' gradle.properties | tr -d '[:space:]')+$(sed -n 's/^minecraft_version=//p' gradle.properties | tr -d '[:space:]')"
+          fi
           echo "pushed tag: ${REF_NAME}"
           echo "built version: ${BUILT}"
           if [ "${REF_NAME}" != "${BUILT}" ]; then
@@ -95,23 +101,50 @@ jobs:
       - name: Build
         run: ./gradlew build --stacktrace
 
+      # The forge/ island is a separate Gradle build the root build above does not reach. Build it only on the
+      # bands that carry one, so its jar exists for the resolve / publish / upload steps below (mirrors ci.yml).
+      - name: Build the Forge island (deep bands only)
+        if: hashFiles('forge/gradlew') != ''
+        run: cd forge && ./gradlew build --stacktrace
+
       - name: Resolve authoritative production-jar paths
         id: jars
         run: |
           set -euo pipefail
-          # Command substitution (not < <(...)) so set -e catches a gradle failure; filter to build/libs
-          # jar paths (tolerating stray -q lines); sort for a stable order under parallel execution.
-          out="$(./gradlew -q :fabric:printProductionJar :neoforge:printProductionJar)"
-          mapfile -t JARS < <(printf '%s\n' "$out" | grep -E '/build/libs/.*\.jar$' | sort)
-          if [ "${#JARS[@]}" -ne 2 ]; then
-            echo "::error::expected exactly 2 production jars, got ${#JARS[@]}"; printf '%s\n' "$out"; exit 1
+          # Resolve every production jar this band ships. Root loaders come from settings.gradle.kts's include(...)
+          # (fabric and/or neoforge); the forge/ island (deep bands) is a separate build, so its jar is taken by
+          # glob from forge/build/libs, the same non-sources/non-dev selection ci.yml uploads. Command
+          # substitution (not < <(...)) so set -e catches a gradle failure; sorted for a stable, comma-joinable
+          # order across parallel stdout.
+          JARS=()
+          LOADER_TASKS=()
+          for loader in fabric neoforge; do
+            if grep -E '^[[:space:]]*include\(' settings.gradle.kts | grep -q "\"${loader}\""; then
+              LOADER_TASKS+=(":${loader}:printProductionJar")
+            fi
+          done
+          if [ "${#LOADER_TASKS[@]}" -gt 0 ]; then
+            out="$(./gradlew -q "${LOADER_TASKS[@]}")"
+            mapfile -t root_jars < <(printf '%s\n' "$out" | grep -E '/build/libs/.*\.jar$')
+            JARS+=("${root_jars[@]}")
+          fi
+          if [ -f forge/gradlew ]; then
+            for j in forge/build/libs/*.jar; do
+              case "$j" in *-sources.jar | *-dev.jar) continue ;; esac
+              [ -e "$j" ] && JARS+=("$j")
+            done
+          fi
+          mapfile -t JARS < <(printf '%s\n' "${JARS[@]}" | sort)
+          if [ "${#JARS[@]}" -eq 0 ]; then
+            echo "::error::no production jars found (loaders: ${LOADER_TASKS[*]:-none}, forge island: $([ -f forge/gradlew ] && echo yes || echo no))"; exit 1
           fi
           for j in "${JARS[@]}"; do
             [ -s "$j" ] || { echo "::error::production jar missing or empty: $j"; exit 1; }
           done
-          # Comma-delimited single line (actions/attest subject-path accepts commas), printf-joined so IFS
-          # is never left changed. Sorted order puts fabric before neoforge.
-          printf 'paths=%s,%s\n' "${JARS[0]}" "${JARS[1]}" >> "$GITHUB_OUTPUT"
+          # Comma-delimited single line (actions/attest subject-path accepts commas), joined without leaving IFS
+          # changed. The set is band-dependent: fabric+neoforge on modern bands, fabric+forge (or forge only) deep.
+          paths="$(IFS=,; printf '%s' "${JARS[*]}")"
+          printf 'paths=%s\n' "$paths" >> "$GITHUB_OUTPUT"
 
       # The reproducibility record is a per-band asset file, not an edit to the shared release body, so the
       # concurrent per-band runs never race on a read-modify-write of the notes.
@@ -122,22 +155,29 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          JDK="$(./gradlew -q :fabric:printCompileJavaVersion | grep -E '\(Java [0-9]+\)$' | tail -n1)"
+          if grep -E '^[[:space:]]*include\(' settings.gradle.kts | grep -q '"fabric"'; then
+            JDK="$(./gradlew -q :fabric:printCompileJavaVersion | grep -E '\(Java [0-9]+\)$' | tail -n1)"
+          else
+            # Forge-only band: no :fabric project. The island compiles to java_version, so name that JDK directly.
+            JDK="(Java $(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]'))"
+          fi
           JDK_MAJOR="$(printf '%s' "$JDK" | sed -n 's/.*(Java \([0-9]\+\)).*/\1/p')"
           EXPECT="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
           if [ "$JDK_MAJOR" != "$EXPECT" ]; then
             echo "::error::compile toolchain Java $JDK_MAJOR != java_version $EXPECT"; exit 1
           fi
-          IFS=',' read -r FAB NEO <<< "$PATHS"
-          FAB_SHA="$(sha256sum "$FAB" | awk '{print $1}')"
-          NEO_SHA="$(sha256sum "$NEO" | awk '{print $1}')"
+          # One SHA-256 line per jar this band ships (band-dependent set from the resolve step above), so the
+          # forge jar carries a published, verifiable hash exactly like fabric/neoforge. The compile-toolchain
+          # JDK is a per-band build fact (the island compiles to the same java_version), so one line covers all.
+          IFS=',' read -ra JARS <<< "$PATHS"
           RECORD="reproducibility-${VERSION}.txt"
           {
             echo "### Reproducibility record: ${VERSION}"
             echo "- Build JDK (compile toolchain): ${JDK}"
             echo "- Reference OS: ${{ runner.os }} (${{ runner.arch }}), GitHub-hosted ubuntu-latest"
-            echo "- $(basename "$FAB") SHA-256: ${FAB_SHA}"
-            echo "- $(basename "$NEO") SHA-256: ${NEO_SHA}"
+            for j in "${JARS[@]}"; do
+              echo "- $(basename "$j") SHA-256: $(sha256sum "$j" | awk '{print $1}')"
+            done
           } > "$RECORD"
           echo "file=${RECORD}" >> "$GITHUB_OUTPUT"
 
@@ -153,6 +193,10 @@ jobs:
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          # Dry-run is opt-in via a repository variable. Unset resolves to 'false' (a real publish, unchanged
+          # from before); a fork or the CI test repo sets PUBLISH_DRY_RUN=true to validate the platform
+          # coordinates without uploading. Both the root loaders and the forge island read it from the env.
+          PUBLISH_DRY_RUN: ${{ vars.PUBLISH_DRY_RUN || 'false' }}
           VERSION: ${{ github.ref_name }}
           RECORD: ${{ steps.repro.outputs.file }}
         run: |
@@ -164,7 +208,13 @@ jobs:
           fi
           CHANGELOG="$(printf '%s\n\n%s\n' "$NOTES" "$(cat "$RECORD")")"
           export CHANGELOG
-          ./gradlew publishMods
+          # Root loaders (fabric and/or neoforge) publish from the root build; skip it on a forge-only band,
+          # whose root includes no loader subproject and so has no publishMods task. The forge/ island is a
+          # separate build with its own publishMods config and publishes on its own. Both honor PUBLISH_DRY_RUN.
+          if grep -E '^[[:space:]]*include\(' settings.gradle.kts | grep -qE '"fabric"|"neoforge"'; then
+            ./gradlew publishMods
+          fi
+          if [ -f forge/gradlew ]; then ( cd forge && ./gradlew publishMods ); fi
 
       # Append this band's jars and record to the shared draft release that release-open created for this
       # version. Release assets are independent of the tagged commit, so one release carries jars from many
@@ -183,5 +233,5 @@ jobs:
           if ! gh release view "$CORE" >/dev/null 2>&1; then
             echo "::error::draft release '$CORE' does not exist; run the Release open workflow for $CORE before pushing band tags"; exit 1
           fi
-          IFS=',' read -r FAB NEO <<< "$PATHS"
-          gh release upload "$CORE" "$FAB" "$NEO" "$RECORD" --clobber
+          IFS=',' read -ra JARS <<< "$PATHS"
+          gh release upload "$CORE" "${JARS[@]}" "$RECORD" --clobber
