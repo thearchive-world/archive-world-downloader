@@ -4,98 +4,95 @@
 package world.thearchive.wdl.adapter;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.CompressedStreamTools;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
 
 import world.thearchive.wdl.core.AtomicFileWrite;
 
 /**
- * Writes the band-agnostic map {@code data/} save surface: wraps a per-band serialized inner {@code "data"} tag (from
- * {@link MapSink#serializeMap}, or the {@code idcounts} tag below) as {@code {data, DataVersion}} via vanilla
- * {@code NbtUtils.addCurrentDataVersion} and gzips it to {@code data/<key>.dat}, the identical envelope vanilla's
- * {@code DimensionDataStorage} writes, both band-stable across the 1.21.5 codec cut. The {@code data/} surface's
- * sibling of {@link RegionChunkWriter}: only the inner {@code data} tag is per-band, this wrapper is not.
+ * Writes the classic-MCP map {@code data/} save surface. A {@code data/map_<id>.dat} file wraps a per-band serialized
+ * inner {@code "data"} tag (from {@link MapSink#serializeMap}) as {@code {data}} and gzips it, the envelope vanilla's
+ * {@code MapStorage} writes for a map file; below 1.13 that envelope carries no {@code DataVersion}.
  *
- * <p>The {@code idcounts} inner tag ({@code {map: maxId}}) is band-agnostic too: the 1.21.4 {@code MapIndex} is a
- * structurally different class with no settable {@code "map"}, but the on-disk {@code {map: int}} shape is identical on
- * both bands (fixture-confirmed), so it is hand-built here rather than routed through a per-band sink.
+ * <p>The {@code data/idcounts.dat} file is the map allocator's high-water, and at this band it is a different on-disk
+ * shape than the map file: a root {@code {map: short}} written UNCOMPRESSED, with no {@code data} wrapper and no
+ * {@code DataVersion}, the exact bytes vanilla's {@code MapStorage.getUniqueDataId}/{@code loadIdCounts} write and
+ * read. The write ({@link #writeIdCounts}), the read ({@link #readIdCounts}) and the serialize
+ * ({@link #serializeIdCounts}) are branched together: a write-only branch would leave {@code readIdCounts} expecting
+ * the parent band's gzip {@code {data:{map:int}}} envelope, throwing on the 1.12.2 file, restarting the id floor and
+ * overwriting archived map data.
  */
 final class MapDataWriter {
     private static final String ID_COUNTS_KEY = "idcounts";
-
-    // The 1.13.2 world data version. Vanilla stamps this literal into every SavedData DataVersion (there is no
-    // SharedConstants version accessor at this band), and it is what a 1.13.2 client reads back.
-    private static final int DATA_VERSION = 1631;
+    private static final String MAP_KEY = "map";
 
     private MapDataWriter() {}
 
     /**
-     * The band-agnostic {@code idcounts} inner {@code "data"} tag: {@code {map: maxId}}. Written so the reopened
-     * world's map allocator ({@code getNextMapId} = {@code ++lastMapId}, reading this {@code "map"}) issues the next id
-     * above every captured id, imaged or not, so no reopened-world craft is ever aliased to a captured map.
+     * The idcounts root tag {@code {map: maxId}}, with {@code map} a short (the map's ItemStack-metadata type). Written
+     * so the reopened world's allocator ({@code getUniqueDataId}, reading this {@code "map"}) issues the next id above
+     * every captured id, imaged or not, so no reopened-world craft is ever aliased to a captured map.
      */
-    public static CompoundTag serializeIdCounts(int maxId) {
-        CompoundTag idCounts = new CompoundTag();
-        idCounts.putInt("map", maxId);
+    public static NBTTagCompound serializeIdCounts(int maxId) {
+        NBTTagCompound idCounts = new NBTTagCompound();
+        idCounts.setShort(MAP_KEY, (short) maxId);
         return idCounts;
     }
 
     /**
-     * Wrap {@code dataTag} as {@code {data, DataVersion}} and gzip it to {@code dataDirectory/<key>.dat}, creating the
-     * target's parent first since {@code NbtIo.writeCompressed} opens the file without making parents. The key can name
-     * a subfolder (the 26.x {@code maps/<id>} form), so the parent is the file's own directory, not {@code
-     * dataDirectory}. The same envelope vanilla's {@code DimensionDataStorage} writes for every SavedData.
+     * Wrap {@code dataTag} as {@code {data}} and gzip it to {@code dataDirectory/<key>.dat}, creating the target's
+     * parent first since {@code CompressedStreamTools.writeCompressed} opens the file without making parents. The key
+     * can name a subfolder, so the parent is the file's own directory. The same envelope vanilla's {@code MapStorage}
+     * writes for a map file, minus the {@code DataVersion} that does not exist below 1.13.
      */
-    public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
+    public static void write(Path dataDirectory, String key, NBTBase dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");
         Files.createDirectories(file.getParent());
-        // 1.15.2 NbtIo.writeCompressed takes an OutputStream, not a File.
+        NBTTagCompound envelope = new NBTTagCompound();
+        envelope.setTag("data", dataTag);
         try (OutputStream out = Files.newOutputStream(file)) {
-            NbtIo.writeCompressed(envelope(dataTag), out);
+            CompressedStreamTools.writeCompressed(envelope, out);
         }
     }
 
     /**
-     * Write {@code dataTag} to {@code dataDirectory/idcounts.dat} through {@link AtomicFileWrite} rather than
-     * {@link #write}: losing this file restarts the reopened world's map allocator at id 0, which overwrites archived
-     * map data, and {@code NbtIo.writeCompressed} truncates its destination at open.
+     * Write the idcounts root tag to {@code dataDirectory/idcounts.dat} through {@link AtomicFileWrite}, UNCOMPRESSED
+     * via the classic MCP {@code CompressedStreamTools.write} (the uncompressed form; {@code writeCompressed} is the
+     * gzip one). Losing this file restarts the reopened world's allocator at id 0, which overwrites archived map data,
+     * so it is staged whole and atomically moved rather than truncating the destination at open.
      */
-    public static void writeIdCounts(Path dataDirectory, Tag dataTag) throws IOException {
+    public static void writeIdCounts(Path dataDirectory, NBTBase dataTag) throws IOException {
         ByteArrayOutputStream staged = new ByteArrayOutputStream();
-        NbtIo.writeCompressed(envelope(dataTag), staged);
+        DataOutputStream out = new DataOutputStream(staged);
+        CompressedStreamTools.write((NBTTagCompound) dataTag, out);
+        out.flush();
         AtomicFileWrite.write(dataDirectory.resolve(ID_COUNTS_KEY + ".dat"), staged.toByteArray());
-    }
-
-    private static CompoundTag envelope(Tag dataTag) {
-        CompoundTag envelope = new CompoundTag();
-        envelope.put("data", dataTag);
-        envelope.putInt("DataVersion", DATA_VERSION);
-        return envelope;
     }
 
     /**
      * The {@code map} high-water recorded in an existing {@code data/idcounts.dat}, or -1 when there is none. Off-mode
      * has no manifest to persist the id floor across a resume, so it reconstructs the floor from this file (the only
      * durable record of an imageless id that sits above the highest imaged {@code map_<n>.dat}). Reads the same
-     * {@code {data:{map:int}}} envelope {@link #serializeIdCounts} writes, band-stable across bands.
+     * UNCOMPRESSED root {@code {map: short}} {@link #writeIdCounts} writes, branched in lockstep with the write so the
+     * resume read never faults on the 1.12.2 file.
      */
     public static int readIdCounts(Path dataDirectory) throws IOException {
         Path file = dataDirectory.resolve(ID_COUNTS_KEY + ".dat");
         if (!Files.exists(file)) {
             return -1;
         }
-        // 1.15.2 NbtIo.readCompressed takes an InputStream, not a File.
-        CompoundTag envelope;
+        NBTTagCompound root;
         try (InputStream input = Files.newInputStream(file)) {
-            envelope = NbtIo.readCompressed(input);
+            root = CompressedStreamTools.read(new DataInputStream(input));
         }
-        CompoundTag data = envelope.getCompound("data");
-        return data.contains("map") ? data.getInt("map") : -1;
+        return root.hasKey(MAP_KEY) ? root.getShort(MAP_KEY) : -1;
     }
 }

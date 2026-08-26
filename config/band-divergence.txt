@@ -384,15 +384,35 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
 # components.
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList/NBTBase, getTag rather than get; NBTTagList is
+# iterable), and the filled-map id moved from the inner tag."map" to the item-level Damage short, so the walk gains an
+# item-compound view (forEachItem) alongside the tag view (walkList/walkItem the coordinate scrub keeps): a filled map
+# carries no tag at all, so the tag view would never reach it.
 common/src/main/java/world/thearchive/wdl/adapter/ItemTreeWalk.java
 
 # Below 1.20.5 a filled map's id is the raw int tag."map", not a minecraft:map_id component, so the remap reads
 # and writes that key directly rather than through MapId.CODEC.
+# Below 1.13 the NBT API is classic MCP, and a filled map's id is not on the inner tag at all: it is the item-level
+# Damage short (the map's ItemStack metadata) behind the id == "minecraft:filled_map" identity gate. Damage is the
+# universal item field every ItemStack writes, so the rewrite gates on the item id before touching Damage, over the
+# ItemTreeWalk item-compound view rather than the tag view.
 common/src/main/java/world/thearchive/wdl/adapter/MapIdRemap.java
 
 # Below 1.20.5 a filled map's id is the raw int tag."map", not a minecraft:map_id component, so the collector
 # reads that key directly rather than through MapId.CODEC.
+# Below 1.13 the NBT API is classic MCP, and a filled map's id is the item-level Damage short (the map's ItemStack
+# metadata) behind the id == "minecraft:filled_map" identity gate, not the inner tag."map": Damage is the universal
+# item field, so the collector gates on the item id before reading Damage, over the ItemTreeWalk item-compound view.
 common/src/main/java/world/thearchive/wdl/adapter/MapIdCollector.java
+
+# Below 1.13 there is no Mojang mapping, so the on-sight map archive names classic MCP NBTTagCompound/NBTBase rather
+# than CompoundTag/Tag, and the content hash reads the map dimension via getInteger (vanilla MapData.writeToNBT stores
+# it as an int); the remap-table logic and the manifest are unchanged.
+common/src/main/java/world/thearchive/wdl/adapter/MapArchive.java
+
+# Below 1.13 there is no Mojang mapping, so this map-serialize SPI names classic MCP MapData/NBTBase rather than
+# MapItemSavedData/Tag; the serialize is vanilla MapData.writeToNBT.
+common/src/main/java/world/thearchive/wdl/adapter/MapSink.java
 
 # Below 1.20.5 there is no BundleContents component; a bundle mutates its stack's tag."Items" list in place, so
 # the change signal snapshots a value copy of that tag rather than reference-comparing the (immutable,
@@ -528,6 +548,11 @@ common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so the compressed write takes a File
 # (NbtIo.writeCompressed(CompoundTag, File)) and the read a File with no accounter; the OutputStream write
 # overload the id-counts staging uses is unchanged.
+# Below 1.13 the NBT round trip is classic MCP CompressedStreamTools (writeCompressed/readCompressed for the gzip map
+# file, write/read for the uncompressed idcounts) rather than NbtIo, the map file's {data} envelope carries no
+# DataVersion (there is none pre-1.13), and idcounts.dat is a different shape than the map file: a root {map: short}
+# written UNCOMPRESSED with no data wrapper, the exact bytes vanilla's MapStorage getUniqueDataId/loadIdCounts write
+# and read, branched across write, read and serialize together so the resume read never faults on the 1.12.2 file.
 common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
 
 # Below 1.20.3 NbtIo.readCompressed takes an InputStream with no NbtAccounter argument.
@@ -551,7 +576,19 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.ja
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this round trip reads and writes through the File
 # forms.
+# Below 1.13 the round trip is classic MCP CompressedStreamTools, the map file's envelope carries no DataVersion, and
+# the idcounts assertions are the uncompressed root {map: short} the branched writeIdCounts/readIdCounts round-trip.
 common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.java
+
+# New at this band: the idcounts byte-check gate. Below 1.13 data/idcounts.dat is the classic MCP root {map: short}
+# written UNCOMPRESSED via CompressedStreamTools, with no data wrapper and no DataVersion, so this gate asserts that
+# raw shape against a regression to the parent band's gzip {data:{map:int}, DataVersion} envelope.
+common/src/test/java/world/thearchive/wdl/adapter/MapIdCountsShapeTest.java
+
+# New at this band: the container-map loss gate. Below 1.13 a filled map's id is the item-level Damage short behind the
+# id == "minecraft:filled_map" gate, so this test drives hand-built classic-MCP item NBT to prove the chest- and
+# shulker-nested maps collect and remap while a damaged non-map item's universal Damage field is left untouched.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerMapCollectionTest.java
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java

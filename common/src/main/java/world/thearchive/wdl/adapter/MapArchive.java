@@ -6,8 +6,8 @@ package world.thearchive.wdl.adapter;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.core.MapHash;
@@ -26,15 +26,16 @@ import world.thearchive.wdl.core.MapManifest;
  * to the content-dedup archive id, so a carried map always renders. The remap rewrite is single-pass: each captured
  * holder is a fresh serialized copy and is remapped exactly once, at the point it is consumed.
  *
- * <p>The three hashed fields are read off the serialized inner {@code "data"} tag with the plain NBT getters; at 1.15.2
- * the dimension is an int id, hashed by its string form. {@code locked} and the centers are excluded from the hash.
+ * <p>The three hashed fields are read off the serialized inner {@code "data"} tag with the plain NBT getters; at this
+ * band the dimension is an int id, hashed by its string form. {@code locked} and the centers are excluded from the
+ * hash.
  */
 final class MapArchive {
     /** Resolves a session-local map id to its serialized inner data tag, or null if the colors were not received. */
     @FunctionalInterface
     public interface ImageResolver {
         @Nullable
-        Tag resolve(int sessionId);
+        NBTBase resolve(int sessionId);
     }
 
     /**
@@ -44,7 +45,7 @@ final class MapArchive {
      */
     @FunctionalInterface
     public interface MapDataSink {
-        void accept(int archiveId, Tag dataTag);
+        void accept(int archiveId, NBTBase dataTag);
     }
 
     private final MapManifest manifest;
@@ -87,7 +88,7 @@ final class MapArchive {
         if (cached != null && imagedIds.contains(cached.intValue())) {
             return cached; // already imaged: sticky and idempotent
         }
-        Tag dataTag = resolver.resolve(sessionId);
+        NBTBase dataTag = resolver.resolve(sessionId);
         if (dataTag != null) {
             int archiveId = manifest.lookupOrInsert(hashOf(dataTag));
             if (imagedIds.add(archiveId)) {
@@ -112,7 +113,7 @@ final class MapArchive {
     private int identityIdFor(int sessionId) {
         identityHighWater = Math.max(identityHighWater, sessionId);
         if (!imagedIds.contains(sessionId)) {
-            Tag dataTag = resolver.resolve(sessionId);
+            NBTBase dataTag = resolver.resolve(sessionId);
             if (dataTag != null) {
                 imagedIds.add(sessionId); // imaged sightings only: a null resolve must stay upgradeable
                 dataSink.accept(sessionId, dataTag);
@@ -126,7 +127,7 @@ final class MapArchive {
      * shulkers and bundles, and stream each first-imaged map's data on the way (the on-sight stream). Single-pass: call
      * exactly once per captured holder.
      */
-    public void remap(CompoundTag holder, String listKey) {
+    public void remap(NBTTagCompound holder, String listKey) {
         MapIdRemap.remapFromItemList(holder, listKey, this::archiveIdFor);
     }
 
@@ -134,7 +135,7 @@ final class MapArchive {
      * Remap (and on-sight stream) the maps referenced by a single entity-borne item (an item frame's or a dropped item
      * entity's {@code "Item"}). Single-pass: call exactly once per captured entity item.
      */
-    public void remapItem(CompoundTag item) {
+    public void remapItem(NBTTagCompound item) {
         MapIdRemap.remapItem(item, this::archiveIdFor);
     }
 
@@ -143,22 +144,22 @@ final class MapArchive {
      * next id above every captured id, or null when no id was referenced or seeded this session. The
      * {@code map_<id>.dat} files themselves stream through the sink at first image.
      */
-    public @Nullable Tag idCountsTag() {
+    public @Nullable NBTBase idCountsTag() {
         int highWater = remap ? manifest.highestAssignedId() : identityHighWater;
         return highWater >= 0 ? MapDataWriter.serializeIdCounts(highWater) : null;
     }
 
     /**
      * The content hash of a serialized inner map data tag: SHA-256 over the colors, scale and dimension; {@code locked}
-     * and the centers are excluded. At 1.15.2 the map data stores its dimension as an int id, so it is hashed by its
+     * and the centers are excluded. At this band the map data stores its dimension as an int id, so it is hashed by its
      * string form.
      */
-    static String hashOf(Tag dataTag) {
-        if (!(dataTag instanceof CompoundTag)) {
+    static String hashOf(NBTBase dataTag) {
+        if (!(dataTag instanceof NBTTagCompound)) {
             return MapHash.of(new byte[0], 0, "");
         }
-        CompoundTag data = (CompoundTag) dataTag;
+        NBTTagCompound data = (NBTTagCompound) dataTag;
         return MapHash.of(data.getByteArray("colors"), data.getByte("scale"),
-                String.valueOf(data.getInt("dimension")));
+                String.valueOf(data.getInteger("dimension")));
     }
 }
