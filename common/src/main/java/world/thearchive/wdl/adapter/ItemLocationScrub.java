@@ -3,9 +3,9 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 
 /**
  * Reusable privacy scrub for item-borne location data: blanks the lodestone-compass target and the flower position
@@ -23,10 +23,10 @@ import net.minecraft.nbt.Tag;
  * band-stable {@code get}/{@code instanceof}/{@code remove} NBT ops, so this band re-authors the pre-component key
  * paths while the walk and merge discipline are shared.
  *
- * <p>Reaches items three ways: an item-list holder via {@link #scrub(CompoundTag, String)} (the inventory, the ender
- * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)} (a decorated pot, a
- * shelf), and a serialized entity via {@link #scrubEntity(CompoundTag)} (an item frame, an item display, mob equipment,
- * an allay, a dropped item, and their passengers).
+ * <p>Reaches items three ways: an item-list holder via {@link #scrub(NBTTagCompound, String)} (the inventory, the ender
+ * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(NBTTagCompound)} (a decorated
+ * pot, a shelf), and a serialized entity via {@link #scrubEntity(NBTTagCompound)} (an item frame, an item display, mob
+ * equipment, an allay, a dropped item, and their passengers).
  *
  * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive flower
  * positions only. Opaque server NBT whose coordinate leak is speculative is left alone, since blanking a whole unknown
@@ -49,9 +49,9 @@ final class ItemLocationScrub {
      * item-NBT compound, with or without a leading {@code "Slot"}), recursing into nested containers and bundles. A
      * missing or non-list {@code listKey} is a no-op. The holder is mutated in place.
      */
-    public static void scrub(CompoundTag holder, String listKey) {
-        if (holder.get(listKey) instanceof ListTag) {
-            ListTag list = (ListTag) holder.get(listKey);
+    public static void scrub(NBTTagCompound holder, String listKey) {
+        if (holder.getTag(listKey) instanceof NBTTagList) {
+            NBTTagList list = (NBTTagList) holder.getTag(listKey);
             ItemTreeWalk.walkList(list, ItemLocationScrub::scrubItemTag);
         }
     }
@@ -63,14 +63,14 @@ final class ItemLocationScrub {
      * {@code tag}, so non-item children (the block entity's own coordinates, its type id) are a no-op. Works for every
      * block-entity type without a per-type key list.
      */
-    public static void scrubBlockEntity(CompoundTag blockEntity) {
-        for (String key : blockEntity.getAllKeys()) {
-            Tag value = blockEntity.get(key);
-            if (value instanceof ListTag) {
-                ListTag list = (ListTag) value;
+    public static void scrubBlockEntity(NBTTagCompound blockEntity) {
+        for (String key : blockEntity.getKeySet()) {
+            NBTBase value = blockEntity.getTag(key);
+            if (value instanceof NBTTagList) {
+                NBTTagList list = (NBTTagList) value;
                 ItemTreeWalk.walkList(list, ItemLocationScrub::scrubItemTag);
-            } else if (value instanceof CompoundTag) {
-                CompoundTag compound = (CompoundTag) value;
+            } else if (value instanceof NBTTagCompound) {
+                NBTTagCompound compound = (NBTTagCompound) value;
                 ItemTreeWalk.walkItem(compound, ItemLocationScrub::scrubItemTag);
             }
         }
@@ -84,31 +84,31 @@ final class ItemLocationScrub {
      * of slot to item, so each value is walked; {@code Passengers} is a list of nested entities, so each is recursed.
      * Works only on already-serialized entity NBT.
      */
-    public static void scrubEntity(CompoundTag entity) {
-        for (String key : entity.getAllKeys()) {
-            Tag value = entity.get(key);
-            if (value instanceof ListTag) {
-                ListTag list = (ListTag) value;
+    public static void scrubEntity(NBTTagCompound entity) {
+        for (String key : entity.getKeySet()) {
+            NBTBase value = entity.getTag(key);
+            if (value instanceof NBTTagList) {
+                NBTTagList list = (NBTTagList) value;
                 ItemTreeWalk.walkList(list, ItemLocationScrub::scrubItemTag);
-            } else if (value instanceof CompoundTag) {
-                CompoundTag compound = (CompoundTag) value;
+            } else if (value instanceof NBTTagCompound) {
+                NBTTagCompound compound = (NBTTagCompound) value;
                 ItemTreeWalk.walkItem(compound, ItemLocationScrub::scrubItemTag);
             }
         }
-        if (entity.get(EQUIPMENT) instanceof CompoundTag) {
-            CompoundTag equipment = (CompoundTag) entity.get(EQUIPMENT);
-            for (String slot : equipment.getAllKeys()) {
-                if (equipment.get(slot) instanceof CompoundTag) {
-                    CompoundTag item = (CompoundTag) equipment.get(slot);
+        if (entity.getTag(EQUIPMENT) instanceof NBTTagCompound) {
+            NBTTagCompound equipment = (NBTTagCompound) entity.getTag(EQUIPMENT);
+            for (String slot : equipment.getKeySet()) {
+                if (equipment.getTag(slot) instanceof NBTTagCompound) {
+                    NBTTagCompound item = (NBTTagCompound) equipment.getTag(slot);
                     ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
                 }
             }
         }
-        if (entity.get(PASSENGERS) instanceof ListTag) {
-            ListTag passengers = (ListTag) entity.get(PASSENGERS);
-            for (Tag element : passengers) {
-                if (element instanceof CompoundTag) {
-                    CompoundTag passenger = (CompoundTag) element;
+        if (entity.getTag(PASSENGERS) instanceof NBTTagList) {
+            NBTTagList passengers = (NBTTagList) entity.getTag(PASSENGERS);
+            for (NBTBase element : passengers) {
+                if (element instanceof NBTTagCompound) {
+                    NBTTagCompound passenger = (NBTTagCompound) element;
                     scrubEntity(passenger);
                 }
             }
@@ -120,24 +120,24 @@ final class ItemLocationScrub {
      * nested containers and bundles. The single-item entry, for an offer's {@code sell} item, which sits under no list
      * holder.
      */
-    public static void scrubItem(CompoundTag item) {
+    public static void scrubItem(NBTTagCompound item) {
         ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
     }
 
     /** Blank the lodestone target and the beehive flower positions on an item's {@code tag}. */
-    private static void scrubItemTag(CompoundTag tag) {
-        tag.remove(LODESTONE_POS);
-        tag.remove(LODESTONE_DIMENSION);
-        if (tag.get(BLOCK_ENTITY_TAG) instanceof CompoundTag) {
-            CompoundTag blockEntityTag = (CompoundTag) tag.get(BLOCK_ENTITY_TAG);
-            blockEntityTag.remove(FLOWER_POS);
-            if (blockEntityTag.get(BEES) instanceof ListTag) {
-                ListTag bees = (ListTag) blockEntityTag.get(BEES);
-                for (Tag element : bees) {
-                    CompoundTag occupant = element instanceof CompoundTag ? (CompoundTag) element : null;
-                    if (occupant != null && occupant.get(ENTITY_DATA) instanceof CompoundTag) {
-                        CompoundTag entityData = (CompoundTag) occupant.get(ENTITY_DATA);
-                        entityData.remove(FLOWER_POS);
+    private static void scrubItemTag(NBTTagCompound tag) {
+        tag.removeTag(LODESTONE_POS);
+        tag.removeTag(LODESTONE_DIMENSION);
+        if (tag.getTag(BLOCK_ENTITY_TAG) instanceof NBTTagCompound) {
+            NBTTagCompound blockEntityTag = (NBTTagCompound) tag.getTag(BLOCK_ENTITY_TAG);
+            blockEntityTag.removeTag(FLOWER_POS);
+            if (blockEntityTag.getTag(BEES) instanceof NBTTagList) {
+                NBTTagList bees = (NBTTagList) blockEntityTag.getTag(BEES);
+                for (NBTBase element : bees) {
+                    NBTTagCompound occupant = element instanceof NBTTagCompound ? (NBTTagCompound) element : null;
+                    if (occupant != null && occupant.getTag(ENTITY_DATA) instanceof NBTTagCompound) {
+                        NBTTagCompound entityData = (NBTTagCompound) occupant.getTag(ENTITY_DATA);
+                        entityData.removeTag(FLOWER_POS);
                     }
                 }
             }

@@ -5,8 +5,8 @@ package world.thearchive.wdl.adapter;
 
 import java.util.Arrays;
 import java.util.List;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -41,7 +41,7 @@ final class MenuChangeTracker {
             return true;
         }
         for (int i = 0; i < stacks.length; i++) {
-            ItemStack current = slots.get(i).getItem();
+            ItemStack current = slots.get(i).getStack();
             if (current != stacks[i] || current.getCount() != counts[i]) {
                 snapshot(slots, page, data);
                 return true;
@@ -68,7 +68,7 @@ final class MenuChangeTracker {
             lastCounts = counts;
         }
         for (int i = 0; i < stacks.length; i++) {
-            ItemStack current = slots.get(i).getItem();
+            ItemStack current = slots.get(i).getStack();
             stacks[i] = current;
             counts[i] = current.getCount();
         }

@@ -3,11 +3,15 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 
 /**
- * Per-band lectern-book-capture axis: serialize a book placed on a lectern (with the reading page) into the vanilla
+ * Documented limit: the lectern is a 1.14 block, absent at this band and at the 1.13.2 parent alike, so this axis never
+ * captures a real lectern. The seam stays wired as a compiling no-op so the shared capture path does not fork on the
+ * band, the way other later-than-band features stay as unused-but-compiling plugs.
+ *
+ * <p>Per-band lectern-book-capture axis: serialize a book placed on a lectern (with the reading page) into the vanilla
  * lectern block-entity {@code "Book"}/{@code "Page"} NBT and merge it into a captured lectern block-entity tag. A
  * lectern's book never reaches the client's persisted {@code LecternBlockEntity} ({@code LecternBlockEntity} overrides
  * neither {@code getUpdatePacket} nor {@code getUpdateTag}, so the chunk packet carries no book and there is no
@@ -36,12 +40,12 @@ public interface LecternSink {
      * ({@code ItemStack.CODEC} does not encode {@code ItemStack.EMPTY}); the caller drops an empty slot 0 before
      * calling this.
      */
-    CompoundTag captureBook(ItemStack book, int page);
+    NBTTagCompound captureBook(ItemStack book, int page);
 
     /**
      * Set {@code "Book"} + {@code "Page"} on a copy of {@code lecternBlockEntityTag} from {@code capturedBookHolder},
      * leaving every other field intact (id, x/y/z, ...): the captured chunk's lectern gains its real book with no
      * clobber. The input tag is not mutated.
      */
-    CompoundTag merge(CompoundTag lecternBlockEntityTag, CompoundTag capturedBookHolder);
+    NBTTagCompound merge(NBTTagCompound lecternBlockEntityTag, NBTTagCompound capturedBookHolder);
 }

@@ -7,11 +7,11 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -44,8 +44,8 @@ final class ContainerMerge {
      * merged onto a captured block entity; an entry with no matching captured block entity is still drained but not
      * counted (its items are lost, the acceptable revisit edge: a container only opened after its chunk was flushed).
      */
-    static MergeTally mergeChunkStash(ContainerSink sink, CompoundTag chunkTag, ChunkPos pos,
-            Map<BlockPos, CompoundTag> stash) {
+    static MergeTally mergeChunkStash(ContainerSink sink, NBTTagCompound chunkTag, ChunkPos pos,
+            Map<BlockPos, NBTTagCompound> stash) {
         return mergeStashWith(
                 (blockEntityTag, holder) -> mergeStateKeys(sink.merge(blockEntityTag, holder), holder),
                 chunkTag, pos, stash);
@@ -58,14 +58,14 @@ final class ContainerMerge {
      * re-write. Still a whitelist, and still fails closed, so an internal holder key ({@code wdl_block_entity_id}) can
      * never leak to disk.
      */
-    private static CompoundTag mergeStateKeys(CompoundTag merged, CompoundTag holder) {
+    private static NBTTagCompound mergeStateKeys(NBTTagCompound merged, NBTTagCompound holder) {
         for (CapturedBlockField field : CapturedBlockField.fields()) {
             if (!field.openTimeState()) {
                 continue;
             }
-            Tag value = holder.get(field.key());
+            NBTBase value = holder.getTag(field.key());
             if (value != null) {
-                merged.put(field.key(), value);
+                merged.setTag(field.key(), value);
             }
         }
         return merged;
@@ -77,8 +77,8 @@ final class ContainerMerge {
      * entity. Same {@code x/y/z} locator, per-entry isolation, and drain semantics; a lectern BE and any container BE
      * are distinct entities, so the two merges never interfere.
      */
-    static MergeTally mergeLecternChunkStash(LecternSink sink, CompoundTag chunkTag, ChunkPos pos,
-            Map<BlockPos, CompoundTag> stash) {
+    static MergeTally mergeLecternChunkStash(LecternSink sink, NBTTagCompound chunkTag, ChunkPos pos,
+            Map<BlockPos, NBTTagCompound> stash) {
         return mergeStashWith(sink::merge, chunkTag, pos, stash);
     }
 
@@ -88,7 +88,8 @@ final class ContainerMerge {
      * Band-stable: a plain copy of the keys the holder already carries with no per-band sink, since each was encoded
      * with the public codec. One method serves every single-key content type.
      */
-    static MergeTally mergeHolderChunkStash(CompoundTag chunkTag, ChunkPos pos, Map<BlockPos, CompoundTag> stash) {
+    static MergeTally mergeHolderChunkStash(NBTTagCompound chunkTag, ChunkPos pos,
+            Map<BlockPos, NBTTagCompound> stash) {
         return mergeStashWith(ContainerMerge::mergeHolderFields, chunkTag, pos, stash);
     }
 
@@ -100,10 +101,10 @@ final class ContainerMerge {
      * {@code "Items"} merge. Membership is tested against the already-drained bundle, since the shared container stash
      * is emptied into it before this runs.
      */
-    static Map<BlockPos, CompoundTag> mergePlaceCandidates(Map<BlockPos, CompoundTag> openTimeBundle,
-            Map<BlockPos, CompoundTag> confirmedPlace) {
-        Map<BlockPos, CompoundTag> surviving = new LinkedHashMap<>();
-        for (Map.Entry<BlockPos, CompoundTag> entry : confirmedPlace.entrySet()) {
+    static Map<BlockPos, NBTTagCompound> mergePlaceCandidates(Map<BlockPos, NBTTagCompound> openTimeBundle,
+            Map<BlockPos, NBTTagCompound> confirmedPlace) {
+        Map<BlockPos, NBTTagCompound> surviving = new LinkedHashMap<>();
+        for (Map.Entry<BlockPos, NBTTagCompound> entry : confirmedPlace.entrySet()) {
             if (!openTimeBundle.containsKey(entry.getKey())) {
                 surviving.put(entry.getKey(), entry.getValue());
             }
@@ -113,16 +114,16 @@ final class ContainerMerge {
 
     /**
      * Copy every key {@code holder} carries onto a copy of {@code blockEntityTag}, leaving its other fields intact (the
-     * {@link ContainerSink#merge} no-clobber discipline). Uses only the band-stable {@code get}/{@code put}/
+     * {@link ContainerSink#merge} no-clobber discipline). Uses only the band-stable {@code getTag}/{@code setTag}/
      * {@code copy} NBT ops, so the interaction holder writes need no per-band sink. An empty holder leaves the block
      * entity unchanged (fail-soft).
      */
-    private static CompoundTag mergeHolderFields(CompoundTag blockEntityTag, CompoundTag holder) {
-        CompoundTag merged = blockEntityTag.copy();
-        for (String key : holder.getAllKeys()) {
-            Tag value = holder.get(key);
+    private static NBTTagCompound mergeHolderFields(NBTTagCompound blockEntityTag, NBTTagCompound holder) {
+        NBTTagCompound merged = blockEntityTag.copy();
+        for (String key : holder.getKeySet()) {
+            NBTBase value = holder.getTag(key);
             if (value != null) {
-                merged.put(key, value);
+                merged.setTag(key, value);
             }
         }
         return merged;
@@ -133,13 +134,13 @@ final class ContainerMerge {
      * {@code merge} to the matching captured block entity. Independent of <em>what</em> the merge writes
      * ({@code "Items"} vs {@code "Book"}/{@code "Page"}), so both axes share the verified loop.
      */
-    private static MergeTally mergeStashWith(BiFunction<CompoundTag, CompoundTag, CompoundTag> merge,
-            CompoundTag chunkTag, ChunkPos pos, Map<BlockPos, CompoundTag> stash) {
+    private static MergeTally mergeStashWith(BiFunction<NBTTagCompound, NBTTagCompound, NBTTagCompound> merge,
+            NBTTagCompound chunkTag, ChunkPos pos, Map<BlockPos, NBTTagCompound> stash) {
         int merged = 0;
         int failed = 0;
-        Iterator<Map.Entry<BlockPos, CompoundTag>> entries = stash.entrySet().iterator();
+        Iterator<Map.Entry<BlockPos, NBTTagCompound>> entries = stash.entrySet().iterator();
         while (entries.hasNext()) {
-            Map.Entry<BlockPos, CompoundTag> entry = entries.next();
+            Map.Entry<BlockPos, NBTTagCompound> entry = entries.next();
             if (!new ChunkPos(entry.getKey()).equals(pos)) {
                 continue; // a block entity in some other chunk; leave it for that chunk's flush
             }
@@ -156,19 +157,18 @@ final class ContainerMerge {
         return new MergeTally(merged, failed);
     }
 
-    private static boolean mergeOne(BiFunction<CompoundTag, CompoundTag, CompoundTag> merge,
-            CompoundTag chunkTag, BlockPos pos, CompoundTag holder) {
-        // Use only NBT ops stable across the pre-1.18 chunk format (get(String)/get(int)/instanceof/set plus
-        // an IntTag value compare). The getXxxOr accessors are 1.21.10+ only; the ListTag/CompoundTag/IntTag
-        // basics are older still. This band reads the pre-1.18 Level.TileEntities chunk layout (see the class
-        // Javadoc), where higher bands read the flattened root block_entities.
-        if (!(chunkTag.getCompound("Level").get("TileEntities") instanceof ListTag)) {
+    private static boolean mergeOne(BiFunction<NBTTagCompound, NBTTagCompound, NBTTagCompound> merge,
+            NBTTagCompound chunkTag, BlockPos pos, NBTTagCompound holder) {
+        // Use only classic MCP NBT ops (getTag(String)/get(int)/instanceof/set plus an NBTTagInt value compare).
+        // This band reads the pre-1.18 Level.TileEntities chunk layout (see the class Javadoc), where higher bands
+        // read the flattened root block_entities.
+        if (!(chunkTag.getCompoundTag("Level").getTag("TileEntities") instanceof NBTTagList)) {
             return false; // no block entities captured for this chunk
         }
-        ListTag blockEntities = (ListTag) chunkTag.getCompound("Level").get("TileEntities");
-        for (int i = 0; i < blockEntities.size(); i++) {
-            CompoundTag blockEntityTag = blockEntities.get(i) instanceof CompoundTag
-                    ? (CompoundTag) blockEntities.get(i)
+        NBTTagList blockEntities = (NBTTagList) chunkTag.getCompoundTag("Level").getTag("TileEntities");
+        for (int i = 0; i < blockEntities.tagCount(); i++) {
+            NBTTagCompound blockEntityTag = blockEntities.get(i) instanceof NBTTagCompound
+                    ? (NBTTagCompound) blockEntities.get(i)
                     : null;
             if (blockEntityTag != null && NbtMerge.isBlockEntityAt(blockEntityTag, pos)) {
                 if (!recordedTypeMatches(holder, blockEntityTag)) {
@@ -185,13 +185,13 @@ final class ContainerMerge {
      * Whether {@code holder}'s recorded block-entity type ({@code wdl_block_entity_id}, stamped at open) matches
      * {@code blockEntityTag}'s saved {@code "id"} (Gate 1). A holder carrying no {@code wdl_block_entity_id} makes no
      * type claim and always matches: that is the interaction-predicted path, already reconciled against the captured
-     * snapshot upstream. The registry-key strings compare like for like ({@code "id"} is written with
-     * {@code BLOCK_ENTITY_TYPE.byNameCodec()}, the same key a live {@code getType()} records), so a mismatch means the
-     * position was replaced by a different block entity after capture and the stale items must not be written. Shared
-     * with {@link LiveCaptureSession}'s merge tally so the count cannot drift from the merge.
+     * snapshot upstream. The registry-key strings compare like for like ({@code "id"} is the block entity's own
+     * registry name string, the same key a live block entity records), so a mismatch means the position was replaced by
+     * a different block entity after capture and the stale items must not be written. Shared with
+     * {@link LiveCaptureSession}'s merge tally so the count cannot drift from the merge.
      */
-    static boolean recordedTypeMatches(CompoundTag holder, CompoundTag blockEntityTag) {
-        Tag recorded = holder.get("wdl_block_entity_id");
-        return recorded == null || recorded.equals(blockEntityTag.get("id"));
+    static boolean recordedTypeMatches(NBTTagCompound holder, NBTTagCompound blockEntityTag) {
+        NBTBase recorded = holder.getTag("wdl_block_entity_id");
+        return recorded == null || recorded.equals(blockEntityTag.getTag("id"));
     }
 }

@@ -3,9 +3,9 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.NonNullList;
 
 /**
  * Per-band container-capture axis: serialize an open container's items into the vanilla block-entity {@code "Items"}
@@ -15,8 +15,8 @@ import net.minecraft.world.item.ItemStack;
  *
  * <p>Mirrors {@link EntitySink}'s two-step seam. The live step ({@link #captureItems(NonNullList)}) serializes the
  * items the session lifted from the open menu's container slots; it is client-coupled (the items come from the live
- * menu). The pure step ({@link #merge(CompoundTag, CompoundTag)}) sets {@code "Items"} on a copy of an already-captured
- * block-entity tag and is what the headless round-trip exercises.
+ * menu). The pure step ({@link #merge(NBTTagCompound, NBTTagCompound)}) sets {@code "Items"} on a copy of an
+ * already-captured block-entity tag and is what the headless round-trip exercises.
  *
  * <p>Per-band from the start: vanilla serializes items via {@code ContainerHelper.saveAllItems}, whose signature
  * follows the entity seam (1.21.11 takes a {@code ValueOutput}, the codec layer, while the &le;1.21.8 sub-band takes
@@ -27,16 +27,16 @@ import net.minecraft.world.item.ItemStack;
 public interface ContainerSink {
     /**
      * Serialize {@code items} (a container-sized list with each captured stack at its container-slot index, empty slots
-     * are {@code ItemStack.EMPTY}) into a holder {@link CompoundTag} carrying the vanilla {@code "Items"} list (slot
+     * are {@code ItemStack.EMPTY}) into a holder {@link NBTTagCompound} carrying the vanilla {@code "Items"} list (slot
      * byte + stack), exactly as a block entity would save it. Server-free: a discarding problem reporter replaces the
      * world-scoped one, mirroring {@link EntitySink}'s lift.
      */
-    CompoundTag captureItems(NonNullList<ItemStack> items);
+    NBTTagCompound captureItems(NonNullList<ItemStack> items);
 
     /**
      * Set {@code "Items"} on a copy of {@code blockEntityTag} from {@code capturedItemsHolder}, leaving every other
      * field intact (id, x/y/z, CustomName, ...): the captured chunk's block entity gains its real contents with no
      * clobber. The input tag is not mutated.
      */
-    CompoundTag merge(CompoundTag blockEntityTag, CompoundTag capturedItemsHolder);
+    NBTTagCompound merge(NBTTagCompound blockEntityTag, NBTTagCompound capturedItemsHolder);
 }

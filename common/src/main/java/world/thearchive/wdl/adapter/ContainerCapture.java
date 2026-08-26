@@ -5,27 +5,26 @@ package world.thearchive.wdl.adapter;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.block.BlockChest;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.MultiPlayerLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.Container;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
-import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ChestMenu;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.ChestType;
-import net.minecraft.world.phys.HitResult;
+import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.item.EntityMinecartContainer;
+import net.minecraft.entity.passive.AbstractChestHorse;
+import net.minecraft.inventory.Container;
+import net.minecraft.inventory.ContainerChest;
+import net.minecraft.inventory.IInventory;
+import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.tileentity.TileEntityChest;
+import net.minecraft.tileentity.TileEntityEnderChest;
+import net.minecraft.util.NonNullList;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.world.World;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -50,15 +49,11 @@ final class ContainerCapture {
     private static final Logger LOGGER = LogManager.getLogger(ContainerCapture.class);
 
     // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the
-    // body-armor on every band. Vanilla names the same 2 in AbstractMountInventoryMenu.SLOT_INVENTORY_START
-    // and, on 1.21.4, HorseInventoryMenu.SLOT_HORSE_INVENTORY_START; the first is an instance field and the
-    // second a static one, so those are name references to the invariant rather than a constant to import.
+    // body-armor. Vanilla names the same 2 as the mount inventory start index.
     private static final int SLOT_INVENTORY_START = 2;
 
-    // A lectern block entity keeps its book access private and hands it only to the menu it builds, so the
-    // lectern's own container size cannot be read off the live block the way every other block target's can.
-    // This is the size LecternMenu itself checks its container against on construction, which the vanilla
-    // lectern is the only producer of.
+    // A lectern block entity does not exist at this band (lecterns are a 1.14 block), so the lectern capture path is
+    // inert here; the constant is kept for the shared, band-stable bind wiring the deep-band guard-out leaves in place.
     static final int LECTERN_CONTAINER_SIZE = 1;
 
     private final VersionAdapter adapter;
@@ -83,23 +78,18 @@ final class ContainerCapture {
      *
      * <p>A spectator keeps the crosshair, and it is LOAD-BEARING there, not a vestige of the pre-click behavior: a
      * loader use hook that declines to fire for a spectator leaves the click unobserved, so every container a spectator
-     * opens on that axis would bind nothing without this. Vanilla is not the obstacle (a spectator's use packet still
-     * goes out, built and sent by {@code startPrediction} after {@code MultiPlayerGameMode.performUseItemOn} has
-     * already returned {@code CONSUME}, and the server opens the menu for any clicked block carrying a
-     * {@code MenuProvider}); the loader hook is, so do not delete this branch on the reasoning that the click chain
-     * already covers the gamemode. The open-time drift the clicked target removes elsewhere is accepted here, because
-     * the alternative on a blind axis is capturing nothing at all. {@code WdlSpectatorContainerCaptureTest} in the
-     * Fabric gametest tier is the standing proof: it goes red the moment the block leg is removed.
+     * opens on that axis would bind nothing without this. The open-time drift the clicked target removes elsewhere is
+     * accepted here, because the alternative on a blind axis is capturing nothing at all.
      *
      * <p>Which leg may run, and when, is {@link SpectatorCrosshairFallback}, decided MC-free so both loader
      * configurations are pinned headlessly; this extracts the live booleans it reads.
      */
-    OpenTarget resolveOpenTarget(Minecraft minecraft, LocalPlayer player) {
+    OpenTarget resolveOpenTarget(Minecraft minecraft, EntityPlayerSP player) {
         OpenClickTracker tracker = this.openClickTracker;
         if (tracker != null) {
             OpenClickIntent.Target resolved = tracker.resolve();
             if (resolved == OpenClickIntent.Target.BLOCK) {
-                BlockPos clicked = BlockPos.method_10488(tracker.resolvedBlockPosKey());
+                BlockPos clicked = BlockPos.fromLong(tracker.resolvedBlockPosKey());
                 LOGGER.debug("open target: clicked block {}", clicked);
                 return new OpenTarget(clicked, null, false);
             }
@@ -109,19 +99,17 @@ final class ContainerCapture {
             }
             if (resolved == OpenClickIntent.Target.VEHICLE) {
                 // An open-inventory request the client sent while riding a container vehicle: the open is that
-                // vehicle's own menu as far as the latch can tell, so the target stays empty and the vehicle
-                // intent it carries is what the
-                // ridden-vehicle bind claims it on. The crosshair is deliberately not consulted: whatever it
-                // rests on did not cause this open.
-                Entity vehicle = player.getVehicle();
-                if (vehicle != null && vehicle.getId() == tracker.resolvedVehicleId()) {
+                // vehicle's own menu as far as the latch can tell, so the target stays empty and the vehicle intent
+                // it carries is what the ridden-vehicle bind claims it on. The crosshair is deliberately not
+                // consulted: whatever it rests on did not cause this open.
+                Entity vehicle = player.getRidingEntity();
+                if (vehicle != null && vehicle.getEntityId() == tracker.resolvedVehicleId()) {
                     LOGGER.debug("open target: ridden vehicle (open-inventory request)");
                     return new OpenTarget(null, null, true);
                 }
-                // The player has changed or left the vehicle since the request went out, so this menu is not
-                // the one that request asked for. Binding it would write one vehicle's contents onto another,
-                // which no slot-count guard separates: two container vehicles of the same size are identical
-                // to it. Drop instead.
+                // The player has changed or left the vehicle since the request went out, so this menu is not the one
+                // that request asked for. Binding it would write one vehicle's contents onto another, which no
+                // slot-count guard separates: two container vehicles of the same size are identical to it. Drop.
                 LOGGER.info("open target: none (the vehicle the open-inventory request named is no longer ridden)");
                 return new OpenTarget(null, null, false);
             }
@@ -131,29 +119,28 @@ final class ContainerCapture {
                 return new OpenTarget(null, null, false);
             }
         }
-        // This band's HitResult is a single unified type; the BLOCK/ENTITY discriminator is the field_595 type
-        // field, the block pos is method_9344, and the entity is field_601. There is no BlockHitResult /
-        // EntityHitResult split to cast to.
-        HitResult hit = minecraft.hitResult;
-        HitResult blockHit = hit != null && hit.field_595 == HitResult.Type.BLOCK ? hit : null;
-        HitResult entityHit = hit != null && hit.field_595 == HitResult.Type.ENTITY ? hit : null;
-        // The provider read is gated on the gamemode here, not left to the rule below: Java evaluates
-        // arguments eagerly, so passing it unguarded would run a mod-overridable container test and an
-        // on-demand getBlockEntity for every unattributed open in every gamemode, on a path with no catch
-        // between it and the capture tick. The rule still decides; this only withholds an input it cannot use.
+        // This band's RayTraceResult is a single unified type; the BLOCK/ENTITY discriminator is the typeOfHit field,
+        // the block pos is getBlockPos, and the entity is entityHit. There is no BlockHitResult / EntityHitResult
+        // split to cast to.
+        RayTraceResult hit = minecraft.objectMouseOver;
+        RayTraceResult blockHit = hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK ? hit : null;
+        RayTraceResult entityHit = hit != null && hit.typeOfHit == RayTraceResult.Type.ENTITY ? hit : null;
+        // The provider read is gated on the gamemode here, not left to the rule below: Java evaluates arguments
+        // eagerly, so passing it unguarded would run an on-demand getTileEntity for every unattributed open in every
+        // gamemode. The rule still decides; this only withholds an input it cannot use.
         boolean spectator = player.isSpectator();
         boolean blockOpensForSpectator = spectator && blockHit != null
-                && spectatorCouldOpen(player.level, blockHit.method_9344());
+                && spectatorCouldOpen(player.world, blockHit.getBlockPos());
         SpectatorCrosshairFallback.Axis axis = SpectatorCrosshairFallback.axisFor(spectator,
                 loaderObservesSpectatorBlockClick, loaderObservesSpectatorEntityClick, blockHit != null,
                 entityHit != null, blockOpensForSpectator);
         if (axis == SpectatorCrosshairFallback.Axis.BLOCK && blockHit != null) {
-            LOGGER.debug("open target: spectator crosshair block {}", blockHit.method_9344());
-            return new OpenTarget(blockHit.method_9344().immutable(), null, false);
+            LOGGER.debug("open target: spectator crosshair block {}", blockHit.getBlockPos());
+            return new OpenTarget(blockHit.getBlockPos().toImmutable(), null, false);
         }
         if (axis == SpectatorCrosshairFallback.Axis.ENTITY && entityHit != null) {
-            LOGGER.debug("open target: spectator crosshair entity {}", entityHit.field_601);
-            return new OpenTarget(null, entityHit.field_601, false);
+            LOGGER.debug("open target: spectator crosshair entity {}", entityHit.entityHit);
+            return new OpenTarget(null, entityHit.entityHit, false);
         }
         LOGGER.info("open target: none (no fresh click or vehicle open request seeded this open)");
         return new OpenTarget(null, null, false);
@@ -165,7 +152,7 @@ final class ContainerCapture {
      * seed a latch nor be read off the crosshair, and two copies of that rule would drift. See
      * {@link OpenClickTracker#opensMenuFor} for why the spectator answer is narrower.
      */
-    private static boolean spectatorCouldOpen(Level level, BlockPos pos) {
+    private static boolean spectatorCouldOpen(World level, BlockPos pos) {
         return OpenClickTracker.opensMenuFor(level, pos, true);
     }
 
@@ -203,48 +190,63 @@ final class ContainerCapture {
     }
 
     /** Whether the open target is a block whose block entity is an ender chest (the ender discriminator). */
-    boolean isEnderChestAt(MultiPlayerLevel level, @Nullable BlockPos target) {
-        return target != null && level.getBlockEntity(target) instanceof EnderChestBlockEntity;
+    boolean isEnderChestAt(WorldClient level, @Nullable BlockPos target) {
+        return target != null && level.getTileEntity(target) instanceof TileEntityEnderChest;
     }
 
     /**
-     * Whether this is a genuine double-chest open: a six-row (54-slot) {@link ChestMenu} opened over an open target
-     * that is one half of a double chest. The double discriminator. The six-row gate is the cheap "this is a 54 open"
-     * signal; it also rejects any sub-54 {@code ChestMenu} seen while the client still renders a double half during a
-     * transient block-state / menu-open sync race (which the sum guard would otherwise claim then drop, silently losing
-     * it) so that a 27-slot menu falls through to the single-block container bind instead. The helper checks the menu
-     * type itself, so the dispatch needs no second {@code instanceof}.
+     * Whether this is a genuine double-chest open: a six-row (54-slot) {@link ContainerChest} opened over an open
+     * target that is one half of a double chest. The double discriminator. The six-row gate is the cheap "this is a 54
+     * open" signal; it also rejects any sub-54 {@code ContainerChest} seen while the client still renders a double half
+     * during a transient block-state / menu-open sync race so that a 27-slot menu falls through to the single-block
+     * container bind instead.
      */
-    boolean isDoubleChestOpen(MultiPlayerLevel level, AbstractContainerMenu menu, @Nullable BlockPos target) {
-        // This band's ChestMenu has no getRowCount; a ChestMenu adds its block container slots first, so slot 0's
-        // container is the block container and its size is the six-row (54) signal getRowCount() == 6 stood for.
-        return menu instanceof ChestMenu && !menu.slots.isEmpty()
-                && menu.slots.get(0).container.getContainerSize() == 54
+    boolean isDoubleChestOpen(WorldClient level, Container menu, @Nullable BlockPos target) {
+        // A ContainerChest adds its block container slots first, so slot 0's inventory is the block container and its
+        // size is the six-row (54) signal.
+        return menu instanceof ContainerChest && !menu.inventorySlots.isEmpty()
+                && menu.inventorySlots.get(0).inventory.getSizeInventory() == 54
                 && isDoubleChestHalfAt(level, target);
     }
 
     /** Whether the open target is a block that is one half of a double chest (the double discriminator). */
-    private boolean isDoubleChestHalfAt(MultiPlayerLevel level, @Nullable BlockPos target) {
-        if (target == null) {
-            return false;
+    private boolean isDoubleChestHalfAt(WorldClient level, @Nullable BlockPos target) {
+        return target != null && doubleChestPartner(level, target) != null;
+    }
+
+    /**
+     * The matching adjacent chest that forms a double chest with the one at {@code pos}, or null when {@code pos} is
+     * not a chest or has no matching neighbor. There is no {@code ChestType} left/right block-state property before
+     * 1.13, so a double chest is recognized by the pre-Flattening neighbor probe: both halves are plain
+     * {@link TileEntityChest}s, so the four horizontal neighbors are probed in the order {@code +Z, -Z, +X, -X} and the
+     * first one that is a chest of the same kind (normal vs trapped, {@code getChestType}) is the partner, exactly as
+     * vanilla pairs a large chest. A chest never pairs with a chest of the other kind.
+     */
+    @Nullable
+    static BlockPos doubleChestPartner(World level, BlockPos pos) {
+        TileEntity te = level.getTileEntity(pos);
+        if (!(te instanceof TileEntityChest)) {
+            return null;
         }
-        BlockState state = level.getBlockState(target);
-        return level.getBlockEntity(target) instanceof ChestBlockEntity
-                && state.hasProperty(ChestBlock.TYPE) && state.getValue(ChestBlock.TYPE) != ChestType.SINGLE;
+        BlockChest.Type kind = ((TileEntityChest) te).getChestType();
+        BlockPos[] neighbors = { pos.south(), pos.north(), pos.east(), pos.west() };
+        for (BlockPos neighbor : neighbors) {
+            TileEntity neighborTe = level.getTileEntity(neighbor);
+            if (neighborTe instanceof TileEntityChest && ((TileEntityChest) neighborTe).getChestType() == kind) {
+                return neighbor;
+            }
+        }
+        return null;
     }
 
     /**
      * Whether the container-vehicle axis claims this open: either the open target is a container vehicle (right-click a
-     * chest minecart, or sneak-right-click a chest boat while aiming at it) or the open carries a vehicle intent and
-     * the player rides one. The riding case is the press-E open flow: a chest boat opens its menu through
-     * {@code player.getVehicle()} (it is a {@code HasCustomInventoryScreen}, so the inventory key opens it server-side)
-     * and fires no use event, so the clicked target alone misses the way most players open a chest boat; observing the
-     * outgoing request records that flow as its intent. The precedence itself is
+     * chest minecart) or the open carries a vehicle intent and the player rides one. The precedence itself is
      * {@link ContainerAssociation#shouldClaimVehicleOpen}, decided MC-free; this extracts the live booleans.
      */
-    boolean shouldClaimVehicleOpen(LocalPlayer player, @Nullable Entity target, boolean vehicleIntentOpen) {
-        return ContainerAssociation.shouldClaimVehicleOpen(target instanceof AbstractMinecartContainer,
-                player.getVehicle() instanceof AbstractMinecartContainer, vehicleIntentOpen);
+    boolean shouldClaimVehicleOpen(EntityPlayerSP player, @Nullable Entity target, boolean vehicleIntentOpen) {
+        return ContainerAssociation.shouldClaimVehicleOpen(target instanceof EntityMinecartContainer,
+                player.getRidingEntity() instanceof EntityMinecartContainer, vehicleIntentOpen);
     }
 
     /**
@@ -256,20 +258,20 @@ final class ContainerCapture {
      * vehicle branch.
      */
     @Nullable
-    AbstractChestedHorse chestedAnimal(AbstractContainerMenu menu) {
-        return MountMenuReader.mountOf(menu) instanceof AbstractChestedHorse
-                ? (AbstractChestedHorse) MountMenuReader.mountOf(menu)
+    AbstractChestHorse chestedAnimal(Container menu) {
+        return MountMenuReader.mountOf(menu) instanceof AbstractChestHorse
+                ? (AbstractChestHorse) MountMenuReader.mountOf(menu)
                 : null;
     }
 
     /**
-     * Count the menu's non-player slots: the block container's slots (the client backs them with a SimpleContainer).
+     * Count the menu's non-player slots: the block container's slots.
      */
-    static int countBlockSlots(AbstractContainerMenu menu, LocalPlayer player) {
-        Container playerInventory = player.inventory;
+    static int countBlockSlots(Container menu, EntityPlayerSP player) {
+        IInventory playerInventory = player.inventory;
         int count = 0;
-        for (Slot slot : menu.slots) {
-            if (slot.container != playerInventory) {
+        for (Slot slot : menu.inventorySlots) {
+            if (slot.inventory != playerInventory) {
                 count++;
             }
         }
@@ -281,11 +283,11 @@ final class ContainerCapture {
      * (the saddle and body slots lead and are skipped by the index floor; the player inventory is skipped by container
      * identity). Equals the animal's own chest size, the mis-bind guard.
      */
-    static int countChestSlots(AbstractContainerMenu menu, LocalPlayer player) {
-        Container playerInventory = player.inventory;
+    static int countChestSlots(Container menu, EntityPlayerSP player) {
+        IInventory playerInventory = player.inventory;
         int count = 0;
-        for (int i = SLOT_INVENTORY_START; i < menu.slots.size(); i++) {
-            if (menu.slots.get(i).container != playerInventory) {
+        for (int i = SLOT_INVENTORY_START; i < menu.inventorySlots.size(); i++) {
+            if (menu.inventorySlots.get(i).inventory != playerInventory) {
                 count++;
             }
         }
@@ -298,29 +300,29 @@ final class ContainerCapture {
      * container and ender-chest stashes (both lift the same synthetic client slots).
      */
     @Nullable
-    CompoundTag captureBlockSlots(AbstractContainerMenu menu, LocalPlayer player) {
-        Container playerInventory = player.inventory;
-        Container blockContainer = null;
-        for (Slot slot : menu.slots) {
-            if (slot.container != playerInventory) {
-                blockContainer = slot.container;
+    NBTTagCompound captureBlockSlots(Container menu, EntityPlayerSP player) {
+        IInventory playerInventory = player.inventory;
+        IInventory blockContainer = null;
+        for (Slot slot : menu.inventorySlots) {
+            if (slot.inventory != playerInventory) {
+                blockContainer = slot.inventory;
                 break;
             }
         }
         if (blockContainer == null) {
             return null; // bound but no block slots this tick; nothing to capture
         }
-        int size = blockContainer.getContainerSize();
+        int size = blockContainer.getSizeInventory();
         NonNullList<ItemStack> items = NonNullList.withSize(size, ItemStack.EMPTY);
-        // 1.16.5 Slot has no getContainerSlot accessor, so the container index is the menu order of the
-        // non-player slots: a client block container adds its slots consecutively in container-index order.
+        // 1.12.2 Slot has no container-slot accessor, so the container index is the menu order of the non-player
+        // slots: a client block container adds its slots consecutively in container-index order.
         int index = 0;
-        for (Slot slot : menu.slots) {
-            if (slot.container == playerInventory) {
+        for (Slot slot : menu.inventorySlots) {
+            if (slot.inventory == playerInventory) {
                 continue;
             }
             if (index < size) {
-                items.set(index, slot.getItem());
+                items.set(index, slot.getStack());
             }
             index++;
         }
@@ -332,31 +334,28 @@ final class ContainerCapture {
      * (BrewTime short, Fuel byte), so the merged block entity loads unchanged. Pure so the key/type contract is
      * testable headless; the caller reads the live menu's two data values.
      */
-    static void putBrewingState(CompoundTag holder, int brewingTicks, int fuel) {
-        holder.putShort("BrewTime", (short) brewingTicks);
-        holder.putByte("Fuel", (byte) fuel);
+    static void putBrewingState(NBTTagCompound holder, int brewingTicks, int fuel) {
+        holder.setShort("BrewTime", (short) brewingTicks);
+        holder.setByte("Fuel", (byte) fuel);
     }
 
     /**
      * Serialize only the chest slots of an open chested-animal menu (the non-player slots from
      * {@link #SLOT_INVENTORY_START}) into an {@code "Items"} holder via the per-band {@link ContainerSink}, or
      * {@code null} when the menu exposes no chest slots this tick (a chestless animal). Distinct from
-     * {@link #captureBlockSlots}: the chest is numbered 0-based in MENU ORDER, not by {@code Slot.getContainerSlot()},
-     * which is what makes the lift band-agnostic. Kept separate on purpose.
+     * {@link #captureBlockSlots}: the chest is numbered 0-based in MENU ORDER, which is what makes the lift
+     * band-agnostic. Kept separate on purpose.
      */
     @Nullable
-    CompoundTag captureChestSlots(AbstractContainerMenu menu, LocalPlayer player) {
-        Container playerInventory = player.inventory;
+    NBTTagCompound captureChestSlots(Container menu, EntityPlayerSP player) {
+        IInventory playerInventory = player.inventory;
         List<ItemStack> chest = new ArrayList<>();
-        for (int i = SLOT_INVENTORY_START; i < menu.slots.size(); i++) {
-            Slot slot = menu.slots.get(i);
-            if (slot.container != playerInventory) {
-                // The 0-based menu-order index here, not getContainerSlot(), is the chest-relative Items slot:
-                // getContainerSlot() is 0-based on 1.21.11 but 1-based on 1.21.4 (the saddle is container index
-                // 0 there), so the menu-order count is what absorbs the per-band saddle offset and keeps the
-                // chest from shifting by one on 1.21.4. Do not reindex by getContainerSlot() or fold this into
-                // captureBlockSlots.
-                chest.add(slot.getItem());
+        for (int i = SLOT_INVENTORY_START; i < menu.inventorySlots.size(); i++) {
+            Slot slot = menu.inventorySlots.get(i);
+            if (slot.inventory != playerInventory) {
+                // The 0-based menu-order index here is the chest-relative Items slot; it absorbs the leading
+                // saddle/body slots and keeps the chest from shifting. Do not fold this into captureBlockSlots.
+                chest.add(slot.getStack());
             }
         }
         if (chest.isEmpty()) {
@@ -370,28 +369,28 @@ final class ContainerCapture {
     }
 
     /**
-     * Serialize the menu's non-player slots whose container index is in {@code [lo, hi)} into a 0-based {@code "Items"}
-     * holder (re-based to {@code index - lo}) via the per-band {@link ContainerSink}, or {@code null} when that range
-     * is empty this tick. The client's double-chest menu is one {@code SimpleContainer(54)} with contiguous container
-     * indices 0..53, so {@code [0, 27)} is the RIGHT chest and {@code [27, 54)} the LEFT (the {@code CompoundContainer}
-     * (RIGHT, LEFT) order). Kept separate from {@link #captureChestSlots} on purpose (see the slot-index note below).
+     * Serialize the menu's non-player slots whose container index is in {@code [low, high)} into a 0-based
+     * {@code "Items"} holder (re-based to {@code index - low}) via the per-band {@link ContainerSink}, or {@code null}
+     * when that range is empty this tick. The client's double-chest menu is one {@code InventoryLargeChest(54)} with
+     * contiguous container indices 0..53, so {@code [0, 27)} is the lower-coordinate chest (slots 0-26) and
+     * {@code [27, 54)} the higher-coordinate one, matching vanilla's own large-chest slot order. Kept separate from
+     * {@link #captureChestSlots} on purpose.
      */
     @Nullable
-    CompoundTag captureHalfSlots(AbstractContainerMenu menu, LocalPlayer player, int low, int high) {
-        Container playerInventory = player.inventory;
+    NBTTagCompound captureHalfSlots(Container menu, EntityPlayerSP player, int low, int high) {
+        IInventory playerInventory = player.inventory;
         NonNullList<ItemStack> items = NonNullList.withSize(high - low, ItemStack.EMPTY);
         boolean any = false;
-        // 1.16.5 Slot has no getContainerSlot accessor, so the container index is the menu order of the
-        // non-player slots. The client double-chest menu is one SimpleContainer(54) with contiguous indices
-        // 0..53, so menu order equals the container index; do not unify this lift with captureChestSlots, whose
-        // menu-order numbering serves the same chest-relative role.
+        // 1.12.2 Slot has no container-slot accessor, so the container index is the menu order of the non-player
+        // slots. The client double-chest menu is one InventoryLargeChest(54) with contiguous indices 0..53, so menu
+        // order equals the container index.
         int index = 0;
-        for (Slot slot : menu.slots) {
-            if (slot.container == playerInventory) {
+        for (Slot slot : menu.inventorySlots) {
+            if (slot.inventory == playerInventory) {
                 continue;
             }
             if (index >= low && index < high) {
-                items.set(index - low, slot.getItem());
+                items.set(index - low, slot.getStack());
                 any = true;
             }
             index++;

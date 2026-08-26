@@ -3,17 +3,17 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.village.class_1145;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.village.MerchantRecipeList;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Serializes a merchant's open-menu trades to the on-disk holder, and sanitizes each offer's sell item. A pure
  * transform over already-client-held data: the client receives the offers over the menu channel and exposes them as a
- * {@code class_1145} (the trade list), and this drives its own {@code method_3557} NBT write directly, so the tag it
- * writes is the one vanilla's own {@code "Offers"} write produces and the archive loads without the mod.
+ * {@link MerchantRecipeList} (the trade list), and this drives its own {@code getRecipiesAsTags} NBT write directly, so
+ * the tag it writes is the one vanilla's own {@code "Offers"} write produces and the archive loads without the mod.
  *
  * <p>{@link #serialize} builds the {@code {Offers:{Recipes:[...]}}} holder from the trade list's own NBT write. The
  * {@code "Xp"} trade-experience tag a newer band writes is omitted here: trade experience is a 1.14 addition absent at
@@ -38,9 +38,9 @@ final class MerchantOfferCapture {
      * the merchant's own stacks, and a re-stash on the next tick resolves the rewritten id as a fresh one, burning an
      * archive id per tick and saving a trade that points at an unimaged map.
      */
-    static CompoundTag serialize(class_1145 offers) {
-        CompoundTag holder = new CompoundTag();
-        holder.put("Offers", offers.method_3557().copy());
+    static NBTTagCompound serialize(MerchantRecipeList offers) {
+        NBTTagCompound holder = new NBTTagCompound();
+        holder.setTag("Offers", offers.getRecipiesAsTags().copy());
         return holder;
     }
 
@@ -49,18 +49,20 @@ final class MerchantOfferCapture {
      * remap (when {@code archive} is non-null), in place. A holder with no {@code "Offers"}/{@code "Recipes"}, or a
      * recipe with no {@code "sell"}, is skipped. Drain-time work: call once per holder before it merges.
      */
-    static void scrubAndRemapOffers(CompoundTag holder, boolean scrubCoordinates, @Nullable MapArchive archive) {
-        CompoundTag offers = holder.get("Offers") instanceof CompoundTag ? (CompoundTag) holder.get("Offers") : null;
-        ListTag recipes = offers != null && offers.get("Recipes") instanceof ListTag
-                ? (ListTag) offers.get("Recipes")
+    static void scrubAndRemapOffers(NBTTagCompound holder, boolean scrubCoordinates, @Nullable MapArchive archive) {
+        NBTTagCompound offers = holder.getTag("Offers") instanceof NBTTagCompound
+                ? (NBTTagCompound) holder.getTag("Offers")
+                : null;
+        NBTTagList recipes = offers != null && offers.getTag("Recipes") instanceof NBTTagList
+                ? (NBTTagList) offers.getTag("Recipes")
                 : null;
         if (offers == null || recipes == null) {
             return;
         }
-        for (Tag element : recipes) {
-            CompoundTag recipe = element instanceof CompoundTag ? (CompoundTag) element : null;
-            CompoundTag sell = recipe != null && recipe.get("sell") instanceof CompoundTag
-                    ? (CompoundTag) recipe.get("sell")
+        for (NBTBase element : recipes) {
+            NBTTagCompound recipe = element instanceof NBTTagCompound ? (NBTTagCompound) element : null;
+            NBTTagCompound sell = recipe != null && recipe.getTag("sell") instanceof NBTTagCompound
+                    ? (NBTTagCompound) recipe.getTag("sell")
                     : null;
             if (recipe == null || sell == null) {
                 continue;

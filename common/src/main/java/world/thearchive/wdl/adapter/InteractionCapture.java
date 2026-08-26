@@ -13,29 +13,27 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockJukebox;
+import net.minecraft.block.BlockShulkerBox;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
-import net.minecraft.core.Registry;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.BlockPlaceContext;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.RecordItem;
-import net.minecraft.world.item.UseOnContext;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.JukeboxBlock;
-import net.minecraft.world.level.block.ShulkerBoxBlock;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.inventory.ItemStackHelper;
+import net.minecraft.item.ItemBlock;
+import net.minecraft.item.ItemRecord;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.tileentity.TileEntityShulkerBox;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.EnumHand;
+import net.minecraft.util.NonNullList;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.world.World;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -55,7 +53,7 @@ import org.jspecify.annotations.Nullable;
  * runs at a time, so a process singleton is correct.
  *
  * <p>One of the two writes reuses the open-time {@code "Items"} path (shulker, via {@link ContainerSink}); the other
- * writes the item's pre-component block-entity form directly ({@code ItemStack#save} under {@code "RecordItem"}).
+ * writes the item's pre-component block-entity form directly ({@code ItemStack.writeToNBT} under {@code "RecordItem"}).
  */
 public final class InteractionCapture {
     private static final Logger LOGGER = LogManager.getLogger(InteractionCapture.class);
@@ -183,9 +181,9 @@ public final class InteractionCapture {
      * count for content that never reaches disk, which tells the user the opposite of the truth. The guard is inert on
      * a loader whose hook already declines to fire for a spectator and load-bearing on one whose hook does not.
      */
-    public static void dispatchUseBlock(Player player, Level level, InteractionHand hand, HitResult hit) {
+    public static void dispatchUseBlock(EntityPlayer player, World level, EnumHand hand, RayTraceResult hit) {
         InteractionCapture capture = active;
-        if (capture != null && level.isClientSide() && player == Minecraft.getInstance().player
+        if (capture != null && level.isRemote && player == Minecraft.getMinecraft().player
                 && !player.isSpectator()) {
             capture.onUseBlock(player, level, hand, hit);
         }
@@ -200,13 +198,13 @@ public final class InteractionCapture {
      * rather than silently capturing but never writing.
      */
     enum InteractionKind {
-        JUKEBOX(false, state -> state.getBlock() instanceof JukeboxBlock && state.getValue(JukeboxBlock.HAS_RECORD)),
-        SHULKER(true, state -> state.getBlock() instanceof ShulkerBoxBlock);
+        JUKEBOX(false, state -> state.getBlock() instanceof BlockJukebox && state.getValue(BlockJukebox.HAS_RECORD)),
+        SHULKER(true, state -> state.getBlock() instanceof BlockShulkerBox);
 
         private final boolean itemsBundle;
-        private final Predicate<BlockState> confirm;
+        private final Predicate<IBlockState> confirm;
 
-        InteractionKind(boolean itemsBundle, Predicate<BlockState> confirm) {
+        InteractionKind(boolean itemsBundle, Predicate<IBlockState> confirm) {
             this.itemsBundle = itemsBundle;
             this.confirm = confirm;
         }
@@ -217,7 +215,7 @@ public final class InteractionCapture {
         }
 
         /** Whether the authoritative synced {@code state} confirms this kind's predicted content is present. */
-        boolean confirms(BlockState state) {
+        boolean confirms(IBlockState state) {
             return confirm.test(state);
         }
     }
@@ -232,9 +230,9 @@ public final class InteractionCapture {
      */
     static final class HolderCandidate implements Candidate {
         private final InteractionKind kind;
-        private final CompoundTag holder;
+        private final NBTTagCompound holder;
 
-        HolderCandidate(InteractionKind kind, CompoundTag holder) {
+        HolderCandidate(InteractionKind kind, NBTTagCompound holder) {
             this.kind = kind;
             this.holder = holder;
         }
@@ -243,7 +241,7 @@ public final class InteractionCapture {
             return kind;
         }
 
-        CompoundTag holder() {
+        NBTTagCompound holder() {
             return holder;
         }
     }
@@ -255,19 +253,19 @@ public final class InteractionCapture {
      * block entity reads. One bundle drains per chunk.
      */
     static final class ChunkBundles {
-        private final Map<BlockPos, CompoundTag> items;
-        private final Map<BlockPos, CompoundTag> holders;
+        private final Map<BlockPos, NBTTagCompound> items;
+        private final Map<BlockPos, NBTTagCompound> holders;
 
-        ChunkBundles(Map<BlockPos, CompoundTag> items, Map<BlockPos, CompoundTag> holders) {
+        ChunkBundles(Map<BlockPos, NBTTagCompound> items, Map<BlockPos, NBTTagCompound> holders) {
             this.items = items;
             this.holders = holders;
         }
 
-        Map<BlockPos, CompoundTag> items() {
+        Map<BlockPos, NBTTagCompound> items() {
             return items;
         }
 
-        Map<BlockPos, CompoundTag> holders() {
+        Map<BlockPos, NBTTagCompound> holders() {
             return holders;
         }
     }
@@ -277,15 +275,14 @@ public final class InteractionCapture {
      * place of a content-bearing block-item, snapshot the hand content to immutable NBT at once, and stash it; the
      * reconcile gate at flush decides whether it survives. Never mutates the interaction or the live stack.
      */
-    private void onUseBlock(Player player, Level level, InteractionHand hand, HitResult hit) {
-        recordFailSoft(hit.method_9344(), () -> recognize(player, level, hand, hit));
+    private void onUseBlock(EntityPlayer player, World level, EnumHand hand, RayTraceResult hit) {
+        recordFailSoft(hit.getBlockPos(), () -> recognize(player, level, hand, hit));
     }
 
     /**
-     * Run {@code recognition} with per-click failure isolation, mirroring the writer-side merge: the click-time codec
-     * encode can throw on a pathological component whose network form diverges from its persistent form, so isolate it
-     * here rather than letting it escape to the loader event and crash the client mid-download. Skips that one capture
-     * and logs.
+     * Run {@code recognition} with per-click failure isolation, mirroring the writer-side merge: the click-time encode
+     * can throw on a pathological item whose network form diverges from its persistent form, so isolate it here rather
+     * than letting it escape to the loader event and crash the client mid-download. Skips that one capture and logs.
      */
     void recordFailSoft(BlockPos pos, Runnable recognition) {
         try {
@@ -295,25 +292,25 @@ public final class InteractionCapture {
         }
     }
 
-    private void recognize(Player player, Level level, InteractionHand hand, HitResult hit) {
-        ItemStack stack = player.getItemInHand(hand);
-        // method_9344 (getBlockPos) may return a MutableBlockPos; the stash key must be immutable, like every stash.
-        BlockPos clicked = hit.method_9344().immutable();
-        BlockState state = level.getBlockState(clicked);
+    private void recognize(EntityPlayer player, World level, EnumHand hand, RayTraceResult hit) {
+        ItemStack stack = player.getHeldItem(hand);
+        // getBlockPos may return a MutableBlockPos; the stash key must be immutable, like every stash.
+        BlockPos clicked = hit.getBlockPos().toImmutable();
+        IBlockState state = level.getBlockState(clicked);
         boolean inserted = false;
-        if (state.getBlock() instanceof JukeboxBlock) {
+        if (state.getBlock() instanceof BlockJukebox) {
             inserted = recordJukeboxInsert(state, clicked, stack);
         }
         // A right-click on a jukebox that the block did not consume as an insert (a non-disc, an occupied slot) still
-        // places a held block against that face, so fall through to recordPlace rather than returning: vanilla's
-        // useItemOn yields to item use on a non-consuming result.
+        // places a held block against that face, so fall through to recordPlace rather than returning: vanilla's use
+        // path yields to item use on a non-consuming result.
         if (!inserted && recaptureEnabled) {
             recordPlace(player, hit, stack);
         }
     }
 
-    boolean recordJukeboxInsert(BlockState state, BlockPos pos, ItemStack stack) {
-        if (state.getValue(JukeboxBlock.HAS_RECORD) || !(stack.getItem() instanceof RecordItem)
+    boolean recordJukeboxInsert(IBlockState state, BlockPos pos, ItemStack stack) {
+        if (state.getValue(BlockJukebox.HAS_RECORD) || !(stack.getItem() instanceof ItemRecord)
                 || !isCapturable(pos)) {
             return false; // an occupied jukebox ejects; only a playable disc inserts, and only where it can confirm
         }
@@ -321,27 +318,28 @@ public final class InteractionCapture {
         return true;
     }
 
-    private void recordPlace(Player player, HitResult hit, ItemStack stack) {
-        if (!(stack.getItem() instanceof BlockItem)) {
+    private void recordPlace(EntityPlayer player, RayTraceResult hit, ItemStack stack) {
+        if (!(stack.getItem() instanceof ItemBlock)) {
             return;
         }
-        // The same context vanilla's own BlockItem.place builds and asks first, so this is that question one
-        // step earlier on the same client state. Without it every right-click holding a block item predicts a
-        // placement into whatever cell the clicked face points at, including a cell already occupied by the
-        // very block type the reconcile gate confirms on, which is exactly the state that makes writing wrong.
-        // This band has no unified (player, hand, hit) UseOnContext; build the positional form vanilla's own use
-        // path builds, with the fractional hit coordinates relative to the clicked block.
-        BlockPos hitPos = hit.method_9344();
-        Vec3 loc = hit.location;
-        BlockPlaceContext context = new BlockPlaceContext(new UseOnContext(player, stack, hitPos, hit.field_10268,
-                (float) (loc.x - hitPos.getX()), (float) (loc.y - hitPos.getY()), (float) (loc.z - hitPos.getZ())));
-        if (!context.canPlace()) {
+        // The same question vanilla's own ItemBlock.onItemUse asks before it places, one step earlier on the same
+        // client state. This band has no unified (player, hand, hit) UseOnContext / BlockPlaceContext; reproduce its
+        // positional math directly. The placement lands on the clicked cell when the clicked block is replaceable
+        // (grass, water), else the cell against the clicked face; the place is allowed only where the player may edit
+        // it and World.mayPlace accepts the block, exactly vanilla's own gate (the player is the mayPlace placer, so
+        // it is excluded from the placement collision check just as vanilla's ItemBlock.onItemUse does).
+        World level = player.world;
+        Block placeBlock = Block.getBlockFromItem(stack.getItem());
+        BlockPos clicked = hit.getBlockPos();
+        EnumFacing facing = hit.sideHit;
+        IBlockState clickedState = level.getBlockState(clicked);
+        BlockPos placedPos = clickedState.getBlock().isReplaceable(level, clicked) ? clicked : clicked.offset(facing);
+        if (stack.isEmpty() || !player.canPlayerEdit(placedPos, facing, stack)
+                || !level.mayPlace(placeBlock, placedPos, false, facing, player)) {
             return;
         }
-        // The cell the placement lands in: relative to the clicked face normally, but the clicked cell when the
-        // target is replaceable (grass, water), which the naive relative(face) gets wrong. getClickedPos may
-        // return a MutableBlockPos; the stash key must be immutable, like every other stash.
-        recordPlaceAt(context.getClickedPos().immutable(), stack);
+        // The stash key must be immutable, like every other stash.
+        recordPlaceAt(placedPos.toImmutable(), stack);
     }
 
     void recordPlaceAt(BlockPos placedPos, ItemStack stack) {
@@ -361,25 +359,25 @@ public final class InteractionCapture {
             // gate needs a post-interaction snapshot this chunk will never produce.
             return;
         }
-        placementSink.blockPlacedAt(placedPos.asLong());
-        Block block = Block.byItem(stack.getItem());
+        placementSink.blockPlacedAt(placedPos.toLong());
+        Block block = Block.getBlockFromItem(stack.getItem());
         // Keyed by the (block-entity-NBT key, block) pairing: key presence alone does not imply this block saves
         // under the mapped key, and an unrecognized pairing has no general block-to-key mapping, so it drops.
-        if (block instanceof ShulkerBoxBlock) {
-            CompoundTag blockEntityTag = stack.getTagElement("BlockEntityTag");
-            if (blockEntityTag != null && blockEntityTag.contains("Items", 9)) {
+        if (block instanceof BlockShulkerBox) {
+            NBTTagCompound blockEntityTag = stack.getSubCompound("BlockEntityTag");
+            if (blockEntityTag != null && blockEntityTag.hasKey("Items", 9)) {
                 NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-                ContainerHelper.loadAllItems(blockEntityTag, items);
-                CompoundTag holder = containerSink.captureItems(items);
+                ItemStackHelper.loadAllItems(blockEntityTag, items);
+                NBTTagCompound holder = containerSink.captureItems(items);
                 placeStash.put(placedPos, new HolderCandidate(InteractionKind.SHULKER, holder));
-                placedContainerSink.containerCaptured(placedPos.asLong(), shulkerBlockEntityId());
+                placedContainerSink.containerCaptured(placedPos.toLong(), shulkerBlockEntityId());
             }
         }
     }
 
-    @SuppressWarnings("NullAway") // getKey is non-null for a registered vanilla block-entity type
+    @SuppressWarnings("NullAway") // getKey is non-null for the registered vanilla shulker box block entity
     private static String shulkerBlockEntityId() {
-        return Registry.BLOCK_ENTITY_TYPE.getKey(BlockEntityType.SHULKER_BOX).toString();
+        return TileEntity.getKey(TileEntityShulkerBox.class).toString();
     }
 
     /** The chunks holding a pending candidate, so the session can re-encode the loaded ones before the gate. */
@@ -444,7 +442,7 @@ public final class InteractionCapture {
     static ChunkBundles reconcile(Map<BlockPos, Candidate> candidates, ChunkSnapshotSource snapshot) {
         ChunkBundles bundles = new ChunkBundles(new LinkedHashMap<>(), new LinkedHashMap<>());
         for (Map.Entry<BlockPos, Candidate> entry : candidates.entrySet()) {
-            BlockState state = blockStateAt(snapshot, entry.getKey());
+            IBlockState state = blockStateAt(snapshot, entry.getKey());
             if (state == null) {
                 continue;
             }
@@ -454,7 +452,7 @@ public final class InteractionCapture {
         return bundles;
     }
 
-    private static void route(BlockPos pos, Candidate candidate, CompoundTag holder, ChunkBundles bundles) {
+    private static void route(BlockPos pos, Candidate candidate, NBTTagCompound holder, ChunkBundles bundles) {
         // The descriptor decides the merge path, so a new content type adds an InteractionKind constant, never a
         // case here: a holder kind not bound to the "Items" bundle takes the generic field-copy merge, while a
         // shulker confirms to an open-time "Items" holder.
@@ -476,7 +474,7 @@ public final class InteractionCapture {
      * content. That is an accepted inherent ceiling of optimistic prediction, not a fixable case: there is no
      * client-side signal that distinguishes it from a confirmed placement.
      */
-    static Optional<CompoundTag> confirm(BlockState authoritative, Candidate candidate) {
+    static Optional<NBTTagCompound> confirm(IBlockState authoritative, Candidate candidate) {
         if (candidate instanceof HolderCandidate) {
             HolderCandidate held = (HolderCandidate) candidate;
             return held.kind().confirms(authoritative) ? Optional.of(held.holder()) : Optional.empty();
@@ -491,15 +489,15 @@ public final class InteractionCapture {
      * covers the pos's Y, so the gate fails closed (drops the candidate) rather than reading a default state; a real
      * interaction's pos never lands out of range.
      */
-    static @Nullable BlockState blockStateAt(ChunkSnapshotSource snapshot, BlockPos pos) {
+    static @Nullable IBlockState blockStateAt(ChunkSnapshotSource snapshot, BlockPos pos) {
         int sectionY = pos.getY() >> 4;
         for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
             if (section.y() == sectionY) {
-                LevelChunkSection chunkSection = section.chunkSection();
+                ExtendedBlockStorage chunkSection = section.chunkSection();
                 if (chunkSection == null) {
                     return null;
                 }
-                return chunkSection.getBlockState(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15);
+                return chunkSection.get(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15);
             }
         }
         return null;
@@ -508,18 +506,18 @@ public final class InteractionCapture {
     /**
      * Serialize {@code disc} to a holder carrying the jukebox disc ({@code "RecordItem"}) plus the just-started playing
      * state a fresh insert leaves ({@code "IsPlaying"} true, {@code "RecordStartTick"} and {@code "TickCount"} zero).
-     * Vanilla loadAdditional restores that state, so the saved jukebox plays and emits the note particles; the disc
-     * sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
+     * Vanilla restores that state, so the saved jukebox plays and emits the note particles; the disc sound itself
+     * cannot resume on load (an MC limitation, it fires only on the insert event).
      *
-     * <p>Below 1.15 vanilla {@code ItemStack.save} puts the live stack's own {@code tag} compound into its output, so
-     * the returned holder is detached before it is handed on and the caller owns it.
+     * <p>Below 1.15 vanilla {@code ItemStack.writeToNBT} puts the live stack's own {@code tag} compound into its
+     * output, so the returned holder is detached before it is handed on and the caller owns it.
      */
-    static CompoundTag captureRecordItem(ItemStack disc) {
-        CompoundTag holder = new CompoundTag();
-        holder.put("RecordItem", disc.save(new CompoundTag()).copy());
-        holder.putBoolean("IsPlaying", true);
-        holder.putLong("RecordStartTick", 0L);
-        holder.putLong("TickCount", 0L);
+    static NBTTagCompound captureRecordItem(ItemStack disc) {
+        NBTTagCompound holder = new NBTTagCompound();
+        holder.setTag("RecordItem", disc.writeToNBT(new NBTTagCompound()).copy());
+        holder.setBoolean("IsPlaying", true);
+        holder.setLong("RecordStartTick", 0L);
+        holder.setLong("TickCount", 0L);
         return holder;
     }
 }

@@ -6,9 +6,9 @@ package world.thearchive.wdl.adapter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 
 /**
  * The walk over a serialized entity and its {@code "Passengers"} subtree, the tag-side analogue of
@@ -30,22 +30,22 @@ final class EntityTreeWalk {
      * values are the node compounds inside {@code entity}, so writing to one writes into the tree. A node whose UUID
      * does not decode is left out of the index, and its own passengers are still indexed.
      */
-    static Map<UUID, CompoundTag> byUuid(CompoundTag entity) {
-        Map<UUID, CompoundTag> nodes = new LinkedHashMap<>();
+    static Map<UUID, NBTTagCompound> byUuid(NBTTagCompound entity) {
+        Map<UUID, NBTTagCompound> nodes = new LinkedHashMap<>();
         index(entity, nodes);
         return nodes;
     }
 
-    private static void index(CompoundTag node, Map<UUID, CompoundTag> nodes) {
+    private static void index(NBTTagCompound node, Map<UUID, NBTTagCompound> nodes) {
         UUID uuid = EntityMerge.readUuid(node);
         if (uuid != null) {
             nodes.put(uuid, node);
         }
-        if (node.get("Passengers") instanceof ListTag) {
-            ListTag passengers = (ListTag) node.get("Passengers");
-            for (Tag element : passengers) {
-                if (element instanceof CompoundTag) {
-                    CompoundTag passenger = (CompoundTag) element;
+        if (node.getTag("Passengers") instanceof NBTTagList) {
+            NBTTagList passengers = (NBTTagList) node.getTag("Passengers");
+            for (NBTBase element : passengers) {
+                if (element instanceof NBTTagCompound) {
+                    NBTTagCompound passenger = (NBTTagCompound) element;
                     index(passenger, nodes);
                 }
             }

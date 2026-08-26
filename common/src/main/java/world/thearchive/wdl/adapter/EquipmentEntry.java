@@ -3,8 +3,8 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
 
 /**
  * One equipment slot and the stack in it: the equipment payload {@link EntityPacketCapture} holds (merged so the latest
@@ -12,15 +12,15 @@ import net.minecraft.world.item.ItemStack;
  * {@code Pair} so the accumulator's bound type stays short and the slot travels with its stack.
  */
 final class EquipmentEntry {
-    private final EquipmentSlot slot;
+    private final EntityEquipmentSlot slot;
     private final ItemStack stack;
 
-    EquipmentEntry(EquipmentSlot slot, ItemStack stack) {
+    EquipmentEntry(EntityEquipmentSlot slot, ItemStack stack) {
         this.slot = slot;
         this.stack = stack;
     }
 
-    EquipmentSlot slot() {
+    EntityEquipmentSlot slot() {
         return slot;
     }
 

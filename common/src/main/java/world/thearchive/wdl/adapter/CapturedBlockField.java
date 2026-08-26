@@ -5,12 +5,12 @@ package world.thearchive.wdl.adapter;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
-import net.minecraft.nbt.ByteTag;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntArrayTag;
-import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.ShortTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagByte;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagInt;
+import net.minecraft.nbt.NBTTagIntArray;
+import net.minecraft.nbt.NBTTagShort;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -43,13 +43,13 @@ enum CapturedBlockField {
     /** A beehive's occupants, written by the interaction holder merge. */
     BEES("Bees", null, Shape.LIST),
     /** A crafter's disabled input slots; vanilla writes an int array, empty when no slot is disabled. */
-    DISABLED_SLOTS("disabled_slots", new IntArrayTag(new int[0])),
+    DISABLED_SLOTS("disabled_slots", new NBTTagIntArray(new int[0])),
     /** Whether a crafter is powered; vanilla writes an int, zero when it is not. */
-    TRIGGERED("triggered", new IntTag(0)),
+    TRIGGERED("triggered", new NBTTagInt(0)),
     /** A brewing stand's remaining brew ticks; vanilla writes a short, zero when it is not brewing. */
-    BREW_TIME("BrewTime", new ShortTag((short) 0)),
+    BREW_TIME("BrewTime", new NBTTagShort((short) 0)),
     /** A brewing stand's blaze-powder fuel; vanilla writes a byte, zero when it has none. */
-    FUEL("Fuel", new ByteTag((byte) 0));
+    FUEL("Fuel", new NBTTagByte((byte) 0));
 
     /**
      * Iterating this instead of {@code values()} keeps the per-block-entity loops from cloning the backing array on
@@ -74,7 +74,7 @@ enum CapturedBlockField {
     private final String key;
     private final @Nullable String sidecarKey;
     private final Shape shape;
-    private final @Nullable Tag clientDefault;
+    private final @Nullable NBTBase clientDefault;
 
     CapturedBlockField(String key, @Nullable String sidecarKey, Shape shape) {
         this.key = key;
@@ -83,7 +83,7 @@ enum CapturedBlockField {
         this.clientDefault = null;
     }
 
-    CapturedBlockField(String key, Tag clientDefault) {
+    CapturedBlockField(String key, NBTBase clientDefault) {
         this.key = key;
         this.sidecarKey = null;
         this.shape = Shape.VALUE;
@@ -124,12 +124,12 @@ enum CapturedBlockField {
      * Whether {@code blockEntity} holds captured content in this field: a non-empty list, or a present compound. Always
      * false for open-time state, which accompanies content but is not content itself.
      */
-    boolean holdsContent(CompoundTag blockEntity) {
+    boolean holdsContent(NBTTagCompound blockEntity) {
         switch (shape) {
             case LIST:
                 return NbtMerge.isNonEmptyList(blockEntity, key);
             case COMPOUND:
-                return blockEntity.get(key) instanceof CompoundTag;
+                return blockEntity.getTag(key) instanceof NBTTagCompound;
             case VALUE:
                 return false;
             default:
@@ -143,7 +143,7 @@ enum CapturedBlockField {
      * capture unit is a single slot rather than the whole container, where the fresh list is a fragment and the
      * all-or-nothing rule would drop every slot the fragment does not name.
      */
-    boolean carry(CompoundTag disk, CompoundTag fresh, boolean itemsBySlot, int occupiedSlots) {
+    boolean carry(NBTTagCompound disk, NBTTagCompound fresh, boolean itemsBySlot, int occupiedSlots) {
         if (this == ITEMS && itemsBySlot) {
             return NbtMerge.carryListBySlot(disk, fresh, key, occupiedSlots);
         }

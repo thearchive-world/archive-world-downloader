@@ -40,12 +40,19 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 # and a placed beehive's occupants are its BlockEntityTag.Bees list rather than DataComponents.BEES. This band's
 # java_version is 16, where sealed interfaces are only a preview feature, so the Candidate type is a plain interface
 # and confirm() is an if/instanceof chain rather than a pattern-matching switch.
+# Below 1.13 there is no unified UseOnContext/BlockPlaceContext: the placement gate reproduces vanilla
+# ItemBlock.onItemUse positional math directly (the clicked cell when the clicked block is replaceable, else the
+# offset cell, gated by EntityPlayer.canPlayerEdit and World.mayPlace), and there is no BlockEntityType registry,
+# so the placed shulker's block-entity id is TileEntity.getKey(TileEntityShulkerBox.class). The NBT and item/block
+# API is classic MCP (getSubCompound, ItemStack.writeToNBT, Block.getBlockFromItem, ExtendedBlockStorage.get).
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
 # Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
 # ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying. Below 1.20.5 the
 # beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so this field
 # carries that key rather than bees.
+# Below 1.13 the NBT API is classic MCP, so the client-default tags are NBTTagInt/NBTTagShort/NBTTagByte/
+# NBTTagIntArray and the field-presence check reads getTag(key) instanceof NBTTagCompound.
 common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 
 # Below 1.21.2 the entity position wire differs: the absolute-only ClientboundTeleportEntityPacket replaces the
@@ -54,6 +61,13 @@ common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 # update VecDeltaCodec has no getBase accessor, so the packet-visible base position is read via decode(0, 0, 0).
 # Below 1.20.2 the respawn and login packets carry no CommonPlayerSpawnInfo, so the entered dimension is read
 # directly through ClientboundRespawnPacket.getDimension and the ClientboundLoginPacket dimension record accessor.
+# Below 1.13 there is no EntityType: the spawn is split across SPacketSpawnObject/SPacketSpawnMob/
+# SPacketSpawnPainting/SPacketSpawnExperienceOrb, discrimination runs on the spawn-object type id and EntityList,
+# and reconstruction goes through EntityList.createEntityByID/createEntityByIDFromName (the item frame, leash knot
+# and minecart through their positioned constructors) rather than EntityType.create. The mob-spawn synched data
+# arrives inline (SPacketSpawnMob.getDataManagerEntries), the dimension marker reads the classic DimensionType by
+# id, the lightning bolt SPacketSpawnGlobalEntity is present but deliberately unread, and the NBT/packet API is
+# classic MCP (EntityDataManager.DataEntry, MathHelper, Vec3d).
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 
 # The Java 8 floor has no records, so this MC-free packet-position carrier, accepted as a record on the higher bands
@@ -75,6 +89,13 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # id would otherwise misplace the export zip). Below 1.20.2 ClientPacketListener has no serverBrand, so the
 # report environment reads the server brand through LocalPlayer.getServerBrand(). Below 1.20 Entity.level is a
 # public field rather than the level() accessor, so the camera-anchor level guard reads camera.level directly.
+# Below 1.13 there is no EntityType or unified Registry: a captured block entity's type id is
+# TileEntity.getKey(be.getClass()); the client chunk is fetched through ChunkProviderClient.getLoadedChunk with no
+# ChunkStatus promotion (a classic client chunk is always full); the double chest is recognized by the
+# pre-Flattening neighbor probe (no ChestType property) with the lower-coordinate half taking slots 0-26; the
+# villager trades are read off GuiMerchant.getMerchant().getRecipes as a MerchantRecipeList; the by-key map data
+# loads through World.getMapStorage; and the NBT/dimension/save-format API is classic MCP (NBTTagCompound,
+# DimensionType.getName, AnvilSaveConverter/ISaveFormat).
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
@@ -354,6 +375,8 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 # redundant instanceof-Tag pattern.
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
+# Below 1.13 the NBT API is classic MCP, and the captured-entity UUID is the pre-1.16 UUIDMost/UUIDLeast long pair
+# rather than a four-int array.
 common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk recurses into a shulker's nested items via
@@ -374,6 +397,7 @@ common/src/main/java/world/thearchive/wdl/adapter/MapIdCollector.java
 # Below 1.20.5 there is no BundleContents component; a bundle mutates its stack's tag."Items" list in place, so
 # the change signal snapshots a value copy of that tag rather than reference-comparing the (immutable,
 # always-swapped) component.
+# Below 1.13 the slot stack is read through the classic Slot.getStack and ItemStack is net.minecraft.item.
 common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
 
 # Below 1.20.5 MerchantOffers has no CODEC, so the offers holder is written via the vanilla
@@ -382,6 +406,9 @@ common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
 # caller is band-stable.
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
+# Below 1.13 the trade list is the classic net.minecraft.village.MerchantRecipeList whose getRecipiesAsTags writes
+# the {Recipes:[...]} compound, and the NBT API is classic MCP; the villager save carries no trade-experience Xp
+# (a 1.14 addition).
 common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 
 # Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the
@@ -390,6 +417,8 @@ common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 # tag.BlockEntityTag.FlowerPos, both scrubbed here.
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList/NBTBase, getTag/getKeySet/removeTag rather than
+# get/getAllKeys/remove).
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
@@ -490,6 +519,10 @@ neoforge/src/test/java/world/thearchive/wdl/neoforge/NeoForgeServiceResolutionTe
 # so this band drops the crafter open-bind leg, the crafter stash and the crafter menu-only ContainerData; the
 # core CrafterSlots and ContainerAssociation.openCrafter stay as unused-but-compiling code. Below 1.20 Entity.level
 # is a public field rather than the level() accessor, so the spectator-reach guard reads player.level directly.
+# Below 1.13 there is no ChestType left/right property: a double chest is recognized by the neighbor probe over
+# identical TileEntityChest kinds (doubleChestPartner). The open menu is the classic Container/ContainerChest over
+# IInventory-backed slots (menu.inventorySlots, slot.inventory, getSizeInventory, Slot.getStack), and the
+# RayTraceResult and item/block API are classic MCP.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so the compressed write takes a File
@@ -498,6 +531,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
 
 # Below 1.20.3 NbtIo.readCompressed takes an InputStream with no NbtAccounter argument.
+# Below 1.13 the compressed NBT round trip is classic MCP CompressedStreamTools.writeCompressed/readCompressed
+# rather than NbtIo.
 common/src/main/java/world/thearchive/wdl/adapter/StashHolder.java
 
 # Below 1.20.3 MutableComponent has no withColor(int) convenience, so a template color is applied through
@@ -569,6 +604,10 @@ forge/src/reobftest/**
 # Below the 1.19 registry split the code-defined registries are static fields on Registry (Registry.ENTITY_TYPE),
 # not the net.minecraft.core.registries.BuiltInRegistries added at 1.19.3, so this open-click type check resolves the
 # entity id through Registry.ENTITY_TYPE.
+# Below 1.13 there is no EntityType or unified Registry: the entity's vanilla-ness is read from its classic
+# EntityList registry name, the villager profession is the classic int getProfession, the lockable-container
+# recognizer is ILootContainer, and the ender-chest obstruction is the classic doesSideBlockChestOpening test; the
+# world/hit/BlockPos API is classic MCP.
 common/src/main/java/world/thearchive/wdl/adapter/OpenClickTracker.java
 
 # Below the 1.19 registry-sync rework the client receives the dimension type inline (a keyless Holder.Direct), so
@@ -589,6 +628,9 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
 # only the Javadoc naming the target diverges; the merge logic is unchanged and is reused by foldEntitiesIntoRegion).
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList/NBTBase, getTag/setTag/appendTag), the
+# captured-entity UUID is the pre-1.16 UUIDMost/UUIDLeast long pair read through hasUniqueId/getUniqueId, and the
+# Xp default carry is a NBTTagInt.
 common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
 
 # XaeroPlus publishes no 1.18.x build for either loader, so the coverage overlay's XaeroPlus binding is dropped as a
@@ -795,14 +837,22 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkSectionClampTest.java
 
 # Below 1.18 a chunk's block entities nest under Level.TileEntities, not the flat root block_entities added at 1.18,
 # so the in-session stash merge locates a block entity by x/y/z through the Level compound.
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList/NBTBase, getTag/setTag/getCompoundTag/tagCount
+# rather than get/put), and the block-entity type gate compares the classic registry-name id string a live
+# TileEntity records.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
 
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList/NBTBase, getTag rather than get); NBTTagList is
+# iterable, so the passenger walk iterates it.
 common/src/main/java/world/thearchive/wdl/adapter/EntityTreeWalk.java
 
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList/NBTBase/NBTPrimitive, getTag/setTag/appendTag/
+# tagCount rather than get/put/add), BlockPos is net.minecraft.util.math, and a slot index is read via
+# NBTPrimitive.getByte.
 common/src/main/java/world/thearchive/wdl/adapter/NbtMerge.java
 
 # Below 1.13 Minecraft ships no Mojang mapping, so this interface names classic MCP NBTTagCompound/Chunk rather than
@@ -819,3 +869,24 @@ common/src/main/java/world/thearchive/wdl/adapter/SectionKey.java
 # net.minecraft.world.chunk.storage.RegionFile and reads/writes through getChunkDataInputStream/
 # getChunkDataOutputStream and CompressedStreamTools, the pre-NbtIo name.
 common/src/main/java/world/thearchive/wdl/adapter/WdlRegionStorage.java
+
+# Below 1.13 there is no Mojang mapping, so this container-capture seam names classic MCP NBTTagCompound/ItemStack and
+# NonNullList (net.minecraft.util) rather than CompoundTag/ItemStack and NonNullList (net.minecraft.core); the on-disk
+# Items shape underneath is unchanged.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerSink.java
+
+# Below 1.13 there is no Mojang mapping, so this entity-capture seam names classic MCP Entity/NBTTagCompound and ChunkPos
+# (net.minecraft.util.math) rather than the Mojmap Entity/CompoundTag/ChunkPos; the entities carrier shape is unchanged.
+common/src/main/java/world/thearchive/wdl/adapter/EntitySink.java
+
+# Below 1.13 there is no Mojang mapping, so this per-tick entity buffer names classic MCP NBTTagCompound and ChunkPos
+# (net.minecraft.util.math) rather than CompoundTag/ChunkPos.
+common/src/main/java/world/thearchive/wdl/adapter/EntityBuffer.java
+
+# Below 1.13 there is no Mojang mapping, so this equipment payload names classic MCP EntityEquipmentSlot
+# (net.minecraft.inventory) and ItemStack (net.minecraft.item) rather than EquipmentSlot/ItemStack.
+common/src/main/java/world/thearchive/wdl/adapter/EquipmentEntry.java
+
+# Below 1.13 there is no Mojang mapping, so this seam names classic MCP NBTTagCompound/ItemStack; the lectern is a 1.14
+# block absent at this band, so the axis is a compiling no-op behind the band-stable SPI (a documented limit).
+common/src/main/java/world/thearchive/wdl/adapter/LecternSink.java

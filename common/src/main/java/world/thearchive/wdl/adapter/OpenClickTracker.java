@@ -4,17 +4,19 @@
 package world.thearchive.wdl.adapter;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
-import net.minecraft.world.class_2610;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.animal.horse.AbstractHorse;
-import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
-import net.minecraft.world.phys.HitResult;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityList;
+import net.minecraft.entity.item.EntityMinecartContainer;
+import net.minecraft.entity.passive.AbstractHorse;
+import net.minecraft.entity.passive.EntityVillager;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.tileentity.TileEntityEnderChest;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.world.ILockableContainer;
+import net.minecraft.world.World;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.core.EntityMenuCapability;
@@ -80,12 +82,12 @@ public final class OpenClickTracker {
      * {@code MenuProvider} block entity (verified across 1.21.11). A server GUI opened from a provider-less block falls
      * into the documented {@link #FRESH_WINDOW_TICKS} leak class instead of the chain.
      */
-    public static void dispatchUseBlock(Player player, Level level, HitResult hit) {
+    public static void dispatchUseBlock(EntityPlayer player, World level, RayTraceResult hit) {
         OpenClickTracker tracker = active;
-        if (tracker != null && level.isClientSide() && player == Minecraft.getInstance().player
+        if (tracker != null && level.isRemote && player == Minecraft.getMinecraft().player
                 && !suppressesBlockUse(player)
-                && opensMenuFor(level, hit.method_9344(), player.isSpectator())) {
-            tracker.intent.recordBlockClick(hit.method_9344().asLong(), tracker.currentTick);
+                && opensMenuFor(level, hit.getBlockPos(), player.isSpectator())) {
+            tracker.intent.recordBlockClick(hit.getBlockPos().toLong(), tracker.currentTick);
         }
     }
 
@@ -94,8 +96,9 @@ public final class OpenClickTracker {
      * can open. Identical predicate on both sides (MultiPlayerGameMode / ServerPlayerGameMode), so a click in this
      * state owes no open and must not be latched.
      */
-    private static boolean suppressesBlockUse(Player player) {
-        boolean haveSomethingInOurHands = !player.getMainHandItem().isEmpty() || !player.getOffhandItem().isEmpty();
+    private static boolean suppressesBlockUse(EntityPlayer player) {
+        boolean haveSomethingInOurHands = !player.getHeldItemMainhand().isEmpty()
+                || !player.getHeldItemOffhand().isEmpty();
         return player.isSneaking() && haveSomethingInOurHands;
     }
 
@@ -115,16 +118,18 @@ public final class OpenClickTracker {
      * direction to the ender chest's. A block latched without ever receiving its open leaves an intent the next
      * unattributed open consumes.
      */
-    static boolean opensMenuFor(Level level, BlockPos pos, boolean spectator) {
+    static boolean opensMenuFor(World level, BlockPos pos, boolean spectator) {
         // This band has no unified MenuProvider (a 1.14 abstraction); the container block entities that open a menu
-        // are exactly the lockable-container ones (class_2610, implemented by BaseContainerBlockEntity), which is
-        // what this recognizes. A provider-less workstation menu (crafting table, enchanting table, anvil) has no
-        // block entity to test here, so it is not latched and falls into the documented FRESH_WINDOW_TICKS leak
-        // class rather than the intent chain, the accepted band ceiling on this recognizer.
-        if (level.getBlockEntity(pos) instanceof class_2610) {
+        // are exactly the lockable-container ones (ILockableContainer, implemented by TileEntityLockable), which is
+        // what this recognizes. That covers both the loot containers (chest, hopper, dispenser, dropper, shulker,
+        // through TileEntityLockableLoot) and the non-loot menu containers (furnace, brewing stand, beacon), where
+        // the narrower ILootContainer would have missed the latter and dropped their contents. A provider-less
+        // workstation menu (crafting table, enchanting table, anvil) has no block entity to test here, so it is not
+        // latched and falls into the documented FRESH_WINDOW_TICKS leak class rather than the intent chain.
+        if (level.getTileEntity(pos) instanceof ILockableContainer) {
             return true;
         }
-        return !spectator && level.getBlockEntity(pos) instanceof EnderChestBlockEntity
+        return !spectator && level.getTileEntity(pos) instanceof TileEntityEnderChest
                 && !enderChestObstructed(level, pos);
     }
 
@@ -132,10 +137,11 @@ public final class OpenClickTracker {
      * Whether an ender chest at {@code pos} is covered by a redstone conductor, vanilla's own gate: its use handler
      * returns before opening anything in that case, so the click owes no open at all.
      */
-    private static boolean enderChestObstructed(Level level, BlockPos pos) {
-        BlockPos above = pos.above();
-        // method_16907 is the solid-cube test the vanilla EnderChestBlock use handler applies to the block above.
-        return level.getBlockState(above).method_16907();
+    private static boolean enderChestObstructed(World level, BlockPos pos) {
+        BlockPos above = pos.up();
+        // doesSideBlockChestOpening is the obstruction test the vanilla BlockEnderChest use handler applies to the
+        // block above (its downward face), returning before opening anything when it blocks.
+        return level.getBlockState(above).doesSideBlockChestOpening(level, above, EnumFacing.DOWN);
     }
 
     /**
@@ -143,12 +149,12 @@ public final class OpenClickTracker {
      * clicked entity is latched; {@link #anyEntityMayOpenMenu} is the eligibility declaration that says so, and its
      * contract states why no narrower one is admissible.
      */
-    public static void dispatchUseEntity(Player player, Level level, Entity entity) {
+    public static void dispatchUseEntity(EntityPlayer player, World level, Entity entity) {
         OpenClickTracker tracker = active;
-        if (tracker != null && level.isClientSide() && player == Minecraft.getInstance().player
+        if (tracker != null && level.isRemote && player == Minecraft.getMinecraft().player
                 && anyEntityMayOpenMenu(entity)) {
             tracker.clickedEntity = entity;
-            tracker.intent.recordEntityClick(entity.getId(), tracker.currentTick, menuIncapable(entity));
+            tracker.intent.recordEntityClick(entity.getEntityId(), tracker.currentTick, menuIncapable(entity));
         }
     }
 
@@ -158,15 +164,17 @@ public final class OpenClickTracker {
      * villager states robust to profession-sync staleness; NONE is deliberately excluded.
      */
     private static boolean menuIncapable(Entity entity) {
-        boolean vanilla = "minecraft".equals(
-                Registry.ENTITY_TYPE.getKey(entity.getType()).getNamespace());
-        boolean villager = entity instanceof Villager;
-        boolean baby = villager && ((Villager) entity).isBaby();
-        // At this band the villager profession is an int on the synced data (method_3115); nitwit is profession
-        // id 5, the same tradeless state the newer bands read off VillagerProfession.NITWIT.
-        boolean nitwit = villager && ((Villager) entity).method_3115() == 5;
-        return EntityMenuCapability.isMenuIncapable(vanilla, entity instanceof AbstractMinecartContainer,
-                entity instanceof AbstractHorse, entity instanceof Villager,
+        // There is no EntityType registry before 1.13, so the entity's vanilla-ness is read from its classic
+        // EntityList registry name; a null key (a player, lightning, an unregistered entity) is not vanilla.
+        ResourceLocation key = EntityList.getKey(entity);
+        boolean vanilla = key != null && "minecraft".equals(key.getNamespace());
+        boolean villager = entity instanceof EntityVillager;
+        boolean baby = villager && ((EntityVillager) entity).isChild();
+        // At this band the villager profession is an int (getProfession); nitwit is profession id 5, the same
+        // tradeless state the newer bands read off VillagerProfession.NITWIT.
+        boolean nitwit = villager && ((EntityVillager) entity).getProfession() == 5;
+        return EntityMenuCapability.isMenuIncapable(vanilla, entity instanceof EntityMinecartContainer,
+                entity instanceof AbstractHorse, entity instanceof EntityVillager,
                 villager, baby, nitwit);
     }
 
@@ -211,8 +219,8 @@ public final class OpenClickTracker {
             return;
         }
         openInventoryRequested = false;
-        if (vehicle instanceof AbstractMinecartContainer) {
-            intent.recordVehicleOpenIntent(vehicle.getId(), currentTick);
+        if (vehicle instanceof EntityMinecartContainer) {
+            intent.recordVehicleOpenIntent(vehicle.getEntityId(), currentTick);
         }
     }
 
@@ -226,7 +234,7 @@ public final class OpenClickTracker {
     void dismissClickOnMountedVehicle(@Nullable Entity vehicle) {
         Entity clicked = this.clickedEntity;
         if (vehicle != null && clicked == vehicle) {
-            intent.dismissEntityClick(clicked.getId());
+            intent.dismissEntityClick(clicked.getEntityId());
         }
     }
 

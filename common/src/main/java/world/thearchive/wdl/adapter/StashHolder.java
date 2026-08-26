@@ -6,8 +6,8 @@ package world.thearchive.wdl.adapter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.CompressedStreamTools;
+import net.minecraft.nbt.NBTTagCompound;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -18,15 +18,15 @@ import org.jspecify.annotations.Nullable;
  * collapses with it. Main-thread only, like the stashes themselves.
  */
 final class StashHolder {
-    private @Nullable CompoundTag tag;
+    private @Nullable NBTTagCompound tag;
     private byte @Nullable [] packed;
     private boolean packFailed;
 
-    private StashHolder(CompoundTag tag) {
+    private StashHolder(NBTTagCompound tag) {
         this.tag = tag;
     }
 
-    static StashHolder of(CompoundTag tag) {
+    static StashHolder of(NBTTagCompound tag) {
         return new StashHolder(tag);
     }
 
@@ -45,13 +45,13 @@ final class StashHolder {
      * the same bytes.
      */
     void compact() throws IOException {
-        CompoundTag live = tag;
+        NBTTagCompound live = tag;
         if (live == null) {
             return;
         }
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try {
-            NbtIo.writeCompressed(live, bytes);
+            CompressedStreamTools.writeCompressed(live, bytes);
         } catch (IOException e) {
             packFailed = true;
             throw e;
@@ -61,8 +61,8 @@ final class StashHolder {
     }
 
     /** The holder tag: the live tree as-is, or the packed bytes decoded (the holder stays packed). */
-    CompoundTag unpack() throws IOException {
-        CompoundTag live = tag;
+    NBTTagCompound unpack() throws IOException {
+        NBTTagCompound live = tag;
         if (live != null) {
             return live;
         }
@@ -70,6 +70,6 @@ final class StashHolder {
         if (bytes == null) {
             throw new IOException("stash holder holds neither a tag nor packed bytes");
         }
-        return NbtIo.readCompressed(new ByteArrayInputStream(bytes));
+        return CompressedStreamTools.readCompressed(new ByteArrayInputStream(bytes));
     }
 }

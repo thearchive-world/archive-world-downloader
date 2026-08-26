@@ -5,12 +5,12 @@ package world.thearchive.wdl.adapter;
 
 import java.util.HashSet;
 import java.util.Set;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NumericTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTPrimitive;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagInt;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.math.BlockPos;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -23,17 +23,17 @@ final class NbtMerge {
     private NbtMerge() {}
 
     /** Whether {@code tag}'s value at {@code key} is a non-empty list. */
-    static boolean isNonEmptyList(CompoundTag tag, String key) {
-        return tag.get(key) instanceof ListTag && !((ListTag) tag.get(key)).isEmpty();
+    static boolean isNonEmptyList(NBTTagCompound tag, String key) {
+        return tag.getTag(key) instanceof NBTTagList && !((NBTTagList) tag.getTag(key)).isEmpty();
     }
 
     /** Copy {@code key}'s list from {@code disk} when {@code fresh}'s is absent or empty; true if a copy happened. */
-    static boolean carryList(CompoundTag disk, CompoundTag fresh, String key) {
-        ListTag diskList = disk.get(key) instanceof ListTag ? (ListTag) disk.get(key) : null;
+    static boolean carryList(NBTTagCompound disk, NBTTagCompound fresh, String key) {
+        NBTTagList diskList = disk.getTag(key) instanceof NBTTagList ? (NBTTagList) disk.getTag(key) : null;
         if (isNonEmptyList(fresh, key) || diskList == null || diskList.isEmpty()) {
             return false;
         }
-        fresh.put(key, diskList.copy());
+        fresh.setTag(key, diskList.copy());
         return true;
     }
 
@@ -47,25 +47,26 @@ final class NbtMerge {
      * <p>Not the rule for a container captured from an opened menu, whose fresh list is the whole container and
      * therefore ground truth: a union there would resurrect items the player watched leave.
      */
-    static boolean carryListBySlot(CompoundTag disk, CompoundTag fresh, String key, int occupiedSlots) {
-        ListTag diskList = disk.get(key) instanceof ListTag ? (ListTag) disk.get(key) : null;
+    static boolean carryListBySlot(NBTTagCompound disk, NBTTagCompound fresh, String key, int occupiedSlots) {
+        NBTTagList diskList = disk.getTag(key) instanceof NBTTagList ? (NBTTagList) disk.getTag(key) : null;
         if (diskList == null || diskList.isEmpty()) {
             return false;
         }
-        ListTag freshList = fresh.get(key) instanceof ListTag ? (ListTag) fresh.get(key) : new ListTag();
+        NBTTagList freshList = fresh.getTag(key) instanceof NBTTagList ? (NBTTagList) fresh.getTag(key)
+                : new NBTTagList();
         Set<Integer> slots = new HashSet<>();
-        for (Tag element : freshList) {
-            if (element instanceof CompoundTag) {
-                CompoundTag entry = (CompoundTag) element;
+        for (NBTBase element : freshList) {
+            if (element instanceof NBTTagCompound) {
+                NBTTagCompound entry = (NBTTagCompound) element;
                 slots.add(slotOf(entry));
             }
         }
         boolean carried = false;
-        for (Tag element : diskList) {
-            if (!(element instanceof CompoundTag)) {
+        for (NBTBase element : diskList) {
+            if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
-            CompoundTag entry = (CompoundTag) element;
+            NBTTagCompound entry = (NBTTagCompound) element;
             int slot = slotOf(entry);
             // The authoritative block-state says whether a slot still holds anything. Carrying an entry for a
             // slot that now reads empty would put an item into the save that its own saved block-state denies:
@@ -74,11 +75,11 @@ final class NbtMerge {
             if ((occupiedSlots & (1 << slot)) == 0 || !slots.add(slot)) {
                 continue;
             }
-            freshList.add(entry.copy());
+            freshList.appendTag(entry.copy());
             carried = true;
         }
         if (carried) {
-            fresh.put(key, freshList);
+            fresh.setTag(key, freshList);
         }
         return carried;
     }
@@ -88,8 +89,9 @@ final class NbtMerge {
      * absent key is slot 0, which is what the codec's default decodes it as, and a slot written as any numeric tag must
      * not read as a distinct slot from the same number written as a byte.
      */
-    private static int slotOf(CompoundTag entry) {
-        return entry.get("Slot") instanceof NumericTag ? ((NumericTag) entry.get("Slot")).getAsByte() & 0xFF : 0;
+    private static int slotOf(NBTTagCompound entry) {
+        return entry.getTag("Slot") instanceof NBTPrimitive ? ((NBTPrimitive) entry.getTag("Slot")).getByte() & 0xFF
+                : 0;
     }
 
     /**
@@ -97,16 +99,17 @@ final class NbtMerge {
      * compound at {@code key}; true if a copy happened. The compound sibling of {@link #carryList}: a lectern's
      * {@code "Book"}/{@code "Page"} and a jukebox's {@code "RecordItem"}/{@code "ticks_since_song_started"} share it.
      */
-    static boolean carryCompound(CompoundTag disk, CompoundTag fresh, String key, @Nullable String sidecarKey) {
-        CompoundTag diskCompound = disk.get(key) instanceof CompoundTag ? (CompoundTag) disk.get(key) : null;
-        if (fresh.get(key) instanceof CompoundTag || diskCompound == null) {
+    static boolean carryCompound(NBTTagCompound disk, NBTTagCompound fresh, String key, @Nullable String sidecarKey) {
+        NBTTagCompound diskCompound = disk.getTag(key) instanceof NBTTagCompound ? (NBTTagCompound) disk.getTag(key)
+                : null;
+        if (fresh.getTag(key) instanceof NBTTagCompound || diskCompound == null) {
             return false;
         }
-        fresh.put(key, diskCompound.copy());
+        fresh.setTag(key, diskCompound.copy());
         if (sidecarKey != null) {
-            Tag sidecar = disk.get(sidecarKey);
+            NBTBase sidecar = disk.getTag(sidecarKey);
             if (sidecar != null) {
-                fresh.put(sidecarKey, sidecar.copy());
+                fresh.setTag(sidecarKey, sidecar.copy());
             }
         }
         return true;
@@ -125,25 +128,26 @@ final class NbtMerge {
      * the two are indistinguishable here. That is the over-capture direction: the archive keeps the older captured
      * state rather than dropping the state entirely.
      */
-    static boolean carryValue(CompoundTag disk, CompoundTag fresh, String key, @Nullable Tag clientDefault) {
-        Tag value = disk.get(key);
+    static boolean carryValue(NBTTagCompound disk, NBTTagCompound fresh, String key, @Nullable NBTBase clientDefault) {
+        NBTBase value = disk.getTag(key);
         if (value == null || value.equals(clientDefault)) {
             return false; // nothing worth carrying; the disk side is itself at the default
         }
-        Tag current = fresh.get(key);
+        NBTBase current = fresh.getTag(key);
         if (current != null && !current.equals(clientDefault)) {
             return false; // the fresh side carries a real capture of its own
         }
-        fresh.put(key, value.copy());
+        fresh.setTag(key, value.copy());
         return true;
     }
 
     /**
-     * Whether {@code blockEntity}'s saved {@code x/y/z} match {@code pos}, compared as {@link IntTag}s (band-stable).
+     * Whether {@code blockEntity}'s saved {@code x/y/z} match {@code pos}, compared as {@link NBTTagInt}s
+     * (band-stable).
      */
-    static boolean isBlockEntityAt(CompoundTag blockEntity, BlockPos pos) {
-        return new IntTag(pos.getX()).equals(blockEntity.get("x"))
-                && new IntTag(pos.getY()).equals(blockEntity.get("y"))
-                && new IntTag(pos.getZ()).equals(blockEntity.get("z"));
+    static boolean isBlockEntityAt(NBTTagCompound blockEntity, BlockPos pos) {
+        return new NBTTagInt(pos.getX()).equals(blockEntity.getTag("x"))
+                && new NBTTagInt(pos.getY()).equals(blockEntity.getTag("y"))
+                && new NBTTagInt(pos.getZ()).equals(blockEntity.getTag("z"));
     }
 }

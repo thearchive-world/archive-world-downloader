@@ -9,31 +9,36 @@ import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.entity.EntityList;
+import net.minecraft.entity.EntityLiving;
+import net.minecraft.init.Blocks;
+import net.minecraft.init.Items;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 
 /**
- * The 1.13.2 natural-spawn equipment table, derived from the 1.14.4 table this band was forked from and reduced to the
- * entity types 1.13.2 registers, and the pure "was this equipped by a loot pickup" inference.
+ * The 1.12.2 natural-spawn equipment table, derived from the 1.13.2 table this band was forked from and reduced to the
+ * entity types 1.12.2 registers (the drowned, its trident, and the 1.14 raid ominous banner are dropped), and the pure
+ * "was this equipped by a loot pickup" inference.
+ *
+ * <p>There is no {@code EntityType} type-object before 1.13, so a mob is discriminated by its classic
+ * {@code EntityList} registry name ({@link EntityList#getKey(net.minecraft.entity.Entity)}) rather than
+ * {@code mob.getType()}; the profile table is keyed by that {@link ResourceLocation}.
  *
  * <p>Vanilla sets the server-only {@code PersistenceRequired} flag when a mob equips a picked-up item
- * ({@code Mob.setItemSlotAndDropWhenKilled}); the client never receives that flag. An equipped item that no natural
- * spawn of the mob's type could carry in that slot therefore proves the pickup ran, hence proves the mob was
- * persistent. The test is scoped to the mainhand and armor slots, the only slots the generic pickup path fills; the
- * offhand is excluded because a mob can hold an unpersisted item there. Unlike every other band, the enumeration is not
- * verified against decompiled source: Mojang published no mappings for 1.13.2.
+ * ({@code EntityLiving.setItemStackToSlot} plus the drop-chance flag); the client never receives that flag. An equipped
+ * item that no natural spawn of the mob's type could carry in that slot therefore proves the pickup ran, hence proves
+ * the mob was persistent. The test is scoped to the mainhand and armor slots, the only slots the generic pickup path
+ * fills; the offhand is excluded because a mob can hold an unpersisted item there.
  */
 final class NaturalEquipment {
     private NaturalEquipment() {}
 
     /** The slots the generic pickup path equips (and thus can set persistence for); the offhand is excluded. */
-    static final List<EquipmentSlot> PICKUP_SLOTS = ImmutableList.of(
-            EquipmentSlot.MAINHAND, EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET);
+    static final List<EntityEquipmentSlot> PICKUP_SLOTS = ImmutableList.of(EntityEquipmentSlot.MAINHAND,
+            EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET);
 
     /** Which armor family a type may naturally wear. */
     private enum ArmorKind {
@@ -59,60 +64,57 @@ final class NaturalEquipment {
     }
 
     /**
-     * Non-armor head items a spawn may legitimately wear: the Halloween pumpkins (zombie/skeleton) and the raid or
-     * patrol captain ominous banner. The ominous banner is a plain {@link Items#WHITE_BANNER} carrying a pattern
-     * component, and a component-sanitizing server strips that pattern to the bare item, so the match is on the item
-     * type. Exempting these for every type stays free of false positives: no despawn-capable mob acquires them in the
-     * head slot through a persistence-setting pickup, and a mob that did pick up a pumpkin is the accepted
-     * invisible-ambiguous case.
+     * Non-armor head items a spawn may legitimately wear: the Halloween pumpkins (zombie/skeleton). Exempting these for
+     * every type stays free of false positives: no despawn-capable mob acquires them in the head slot through a
+     * persistence-setting pickup, and a mob that did pick up a pumpkin is the accepted invisible-ambiguous case.
      */
     private static final Set<Item> NATURAL_HEAD_EXTRAS = ImmutableSet.of(
-            Blocks.CARVED_PUMPKIN.asItem(), Blocks.JACK_O_LANTERN.asItem(), Items.WHITE_BANNER);
+            Item.getItemFromBlock(Blocks.PUMPKIN), Item.getItemFromBlock(Blocks.LIT_PUMPKIN));
 
-    private static final Map<EquipmentSlot, Set<Item>> BASE_ARMOR = ImmutableMap.of(
-            EquipmentSlot.HEAD, ImmutableSet.of(Items.LEATHER_HELMET, Items.GOLDEN_HELMET,
+    private static final Map<EntityEquipmentSlot, Set<Item>> BASE_ARMOR = ImmutableMap.of(
+            EntityEquipmentSlot.HEAD, ImmutableSet.<Item>of(Items.LEATHER_HELMET, Items.GOLDEN_HELMET,
                     Items.CHAINMAIL_HELMET, Items.IRON_HELMET, Items.DIAMOND_HELMET),
-            EquipmentSlot.CHEST, ImmutableSet.of(Items.LEATHER_CHESTPLATE, Items.GOLDEN_CHESTPLATE,
+            EntityEquipmentSlot.CHEST, ImmutableSet.<Item>of(Items.LEATHER_CHESTPLATE, Items.GOLDEN_CHESTPLATE,
                     Items.CHAINMAIL_CHESTPLATE, Items.IRON_CHESTPLATE, Items.DIAMOND_CHESTPLATE),
-            EquipmentSlot.LEGS, ImmutableSet.of(Items.LEATHER_LEGGINGS, Items.GOLDEN_LEGGINGS,
+            EntityEquipmentSlot.LEGS, ImmutableSet.<Item>of(Items.LEATHER_LEGGINGS, Items.GOLDEN_LEGGINGS,
                     Items.CHAINMAIL_LEGGINGS, Items.IRON_LEGGINGS, Items.DIAMOND_LEGGINGS),
-            EquipmentSlot.FEET, ImmutableSet.of(Items.LEATHER_BOOTS, Items.GOLDEN_BOOTS,
+            EntityEquipmentSlot.FEET, ImmutableSet.<Item>of(Items.LEATHER_BOOTS, Items.GOLDEN_BOOTS,
                     Items.CHAINMAIL_BOOTS, Items.IRON_BOOTS, Items.DIAMOND_BOOTS));
 
-    private static final Map<EntityType<?>, Profile> PROFILES = ImmutableMap.<EntityType<?>, Profile>builder()
-            .put(EntityType.ZOMBIE,
+    private static final Map<ResourceLocation, Profile> PROFILES = ImmutableMap.<ResourceLocation, Profile>builder()
+            .put(new ResourceLocation("zombie"),
                     new Profile(ImmutableSet.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE))
-            .put(EntityType.HUSK,
+            .put(new ResourceLocation("husk"),
                     new Profile(ImmutableSet.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE))
-            .put(EntityType.ZOMBIE_VILLAGER,
+            .put(new ResourceLocation("zombie_villager"),
                     new Profile(ImmutableSet.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE))
-            .put(EntityType.DROWNED,
-                    new Profile(ImmutableSet.of(Items.TRIDENT, Items.FISHING_ROD), ArmorKind.NONE))
-            .put(EntityType.SKELETON, new Profile(ImmutableSet.of(Items.BOW), ArmorKind.BASE))
-            .put(EntityType.STRAY, new Profile(ImmutableSet.of(Items.BOW), ArmorKind.BASE))
-            .put(EntityType.WITHER_SKELETON, new Profile(ImmutableSet.of(Items.STONE_SWORD), ArmorKind.NONE))
-            .put(EntityType.ZOMBIE_PIGMAN,
+            .put(new ResourceLocation("skeleton"), new Profile(ImmutableSet.of(Items.BOW), ArmorKind.BASE))
+            .put(new ResourceLocation("stray"), new Profile(ImmutableSet.of(Items.BOW), ArmorKind.BASE))
+            .put(new ResourceLocation("wither_skeleton"),
+                    new Profile(ImmutableSet.of(Items.STONE_SWORD), ArmorKind.NONE))
+            .put(new ResourceLocation("zombie_pigman"),
                     new Profile(ImmutableSet.of(Items.GOLDEN_SWORD), ArmorKind.NONE))
-            .put(EntityType.VINDICATOR, new Profile(ImmutableSet.of(Items.IRON_AXE), ArmorKind.NONE))
-            .put(EntityType.VEX, new Profile(ImmutableSet.of(Items.IRON_SWORD), ArmorKind.NONE))
+            .put(new ResourceLocation("vindication_illager"),
+                    new Profile(ImmutableSet.of(Items.IRON_AXE), ArmorKind.NONE))
+            .put(new ResourceLocation("vex"), new Profile(ImmutableSet.of(Items.IRON_SWORD), ArmorKind.NONE))
             .build();
 
-    static boolean isGearedType(EntityType<?> type) {
+    static boolean isGearedType(ResourceLocation type) {
         return PROFILES.containsKey(type);
     }
 
-    static boolean isNaturalFor(EntityType<?> type, EquipmentSlot slot, ItemStack item) {
+    static boolean isNaturalFor(ResourceLocation type, EntityEquipmentSlot slot, ItemStack item) {
         Profile profile = PROFILES.get(type);
         if (profile == null) {
             return true; // an unknown type is never inferred against
         }
-        if (slot == EquipmentSlot.OFFHAND) {
+        if (slot == EntityEquipmentSlot.OFFHAND) {
             return true; // the offhand is outside the inference: a bartering gold ingot sits there unpersisted
         }
-        if (slot == EquipmentSlot.MAINHAND) {
+        if (slot == EntityEquipmentSlot.MAINHAND) {
             return profile.mainhand().contains(item.getItem());
         }
-        if (slot == EquipmentSlot.HEAD && NATURAL_HEAD_EXTRAS.contains(item.getItem())) {
+        if (slot == EntityEquipmentSlot.HEAD && NATURAL_HEAD_EXTRAS.contains(item.getItem())) {
             return true;
         }
         switch (profile.armor()) {
@@ -125,13 +127,13 @@ final class NaturalEquipment {
         }
     }
 
-    static boolean wasLootEquipped(Mob mob) {
-        EntityType<?> type = mob.getType();
-        if (!isGearedType(type)) {
+    static boolean wasLootEquipped(EntityLiving mob) {
+        ResourceLocation type = EntityList.getKey(mob);
+        if (type == null || !isGearedType(type)) {
             return false;
         }
-        for (EquipmentSlot slot : PICKUP_SLOTS) {
-            ItemStack item = mob.getItemBySlot(slot);
+        for (EntityEquipmentSlot slot : PICKUP_SLOTS) {
+            ItemStack item = mob.getItemStackFromSlot(slot);
             if (!item.isEmpty() && !isNaturalFor(type, slot, item)) {
                 return true;
             }

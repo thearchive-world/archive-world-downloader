@@ -4,9 +4,9 @@
 package world.thearchive.wdl.adapter;
 
 import java.util.List;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.entity.Entity;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.ChunkPos;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -38,7 +38,7 @@ public interface EntitySink {
      * named or not.
      */
     @Nullable
-    CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, boolean forceMobPersistence);
+    NBTTagCompound encodeChunk(List<Entity> entities, ChunkPos pos, boolean forceMobPersistence);
 
     /**
      * Build the {@code {Entities, Position, DataVersion}} entities-region envelope from already-serialized entity tags
@@ -47,7 +47,7 @@ public interface EntitySink {
      * list (skip the chunk).
      */
     @Nullable
-    CompoundTag encodeChunk(List<CompoundTag> entityTags, ChunkPos pos);
+    NBTTagCompound encodeChunk(List<NBTTagCompound> entityTags, ChunkPos pos);
 
     /**
      * Serialize a seated player's root vehicle to its standalone NBT for the player tag's {@code "RootVehicle"} record,
@@ -66,5 +66,5 @@ public interface EntitySink {
      * isolate. Client main thread only (it reads a live entity); never from a background/overlay read path.
      */
     @Nullable
-    CompoundTag captureRootVehicle(Entity vehicle, boolean forceMobPersistence);
+    NBTTagCompound captureRootVehicle(Entity vehicle, boolean forceMobPersistence);
 }

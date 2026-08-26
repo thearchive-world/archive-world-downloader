@@ -8,10 +8,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagInt;
+import net.minecraft.nbt.NBTTagList;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -33,7 +33,7 @@ import org.jspecify.annotations.Nullable;
  * entity that has since despawned.</li>
  * </ul>
  *
- * <p>Pure {@code CompoundTag} in/out, operating on a {@code {Entities:[...]}} envelope regardless of where the chunk
+ * <p>Pure {@code NBTTagCompound} in/out, operating on a {@code {Entities:[...]}} envelope regardless of where the chunk
  * stores it (the {@code region/} {@code Level.Entities} at this band, a separate {@code entities/} region above it).
  * The UUID-keyed sibling of {@link ChunkMerge}. The 1.21.4-only saddle ({@code "SaddleItem"}, an inventory slot below
  * the 1.21.5 equipment-slot cut) is an additional content carry-forward key the 1.21.4 port adds here; on this band the
@@ -48,29 +48,29 @@ final class EntityMerge {
      * carry-forward (a content carry or a union add). A chunk with no {@code "Entities"} list on either side is a
      * no-op.
      */
-    static int merge(CompoundTag onDisk, CompoundTag fresh) {
-        if (!(fresh.get("Entities") instanceof ListTag) || !(onDisk.get("Entities") instanceof ListTag)) {
+    static int merge(NBTTagCompound onDisk, NBTTagCompound fresh) {
+        if (!(fresh.getTag("Entities") instanceof NBTTagList) || !(onDisk.getTag("Entities") instanceof NBTTagList)) {
             return 0;
         }
-        ListTag freshEntities = (ListTag) fresh.get("Entities");
-        ListTag diskEntities = (ListTag) onDisk.get("Entities");
-        Map<UUID, CompoundTag> diskNodes = new LinkedHashMap<>();
-        for (Tag element : diskEntities) {
-            if (element instanceof CompoundTag) {
-                CompoundTag diskEntity = (CompoundTag) element;
+        NBTTagList freshEntities = (NBTTagList) fresh.getTag("Entities");
+        NBTTagList diskEntities = (NBTTagList) onDisk.getTag("Entities");
+        Map<UUID, NBTTagCompound> diskNodes = new LinkedHashMap<>();
+        for (NBTBase element : diskEntities) {
+            if (element instanceof NBTTagCompound) {
+                NBTTagCompound diskEntity = (NBTTagCompound) element;
                 diskNodes.putAll(EntityTreeWalk.byUuid(diskEntity));
             }
         }
         Set<UUID> freshUuids = new HashSet<>();
         int merged = 0;
-        for (Tag element : freshEntities) {
-            if (!(element instanceof CompoundTag)) {
+        for (NBTBase element : freshEntities) {
+            if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
-            CompoundTag freshEntity = (CompoundTag) element;
-            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(freshEntity).entrySet()) {
+            NBTTagCompound freshEntity = (NBTTagCompound) element;
+            for (Map.Entry<UUID, NBTTagCompound> node : EntityTreeWalk.byUuid(freshEntity).entrySet()) {
                 freshUuids.add(node.getKey());
-                CompoundTag diskNode = diskNodes.get(node.getKey());
+                NBTTagCompound diskNode = diskNodes.get(node.getKey());
                 if (diskNode != null) {
                     // The Offers and Xp carries run for every node but are inert for non-villagers under client
                     // capture: only AbstractVillager writes Offers, and only server-side, so a client-reconstructed
@@ -80,7 +80,7 @@ final class EntityMerge {
                     // keys, would change that.
                     boolean carried = NbtMerge.carryList(diskNode, node.getValue(), "Items");
                     carried |= NbtMerge.carryCompound(diskNode, node.getValue(), "Offers", null);
-                    carried |= NbtMerge.carryValue(diskNode, node.getValue(), "Xp", new IntTag(0));
+                    carried |= NbtMerge.carryValue(diskNode, node.getValue(), "Xp", new NBTTagInt(0));
                     if (carried) {
                         merged++;
                     }
@@ -93,14 +93,14 @@ final class EntityMerge {
         // unconditionally rather than dropped: the contract is over-capture over under-capture, and dropping it
         // would silently lose existing world data. A keyed one is carried only when the fresh set lacks it, matched
         // against the whole fresh tree so an entity that moved into or out of a vehicle is deduped, not duplicated.
-        for (Tag element : diskEntities) {
-            if (!(element instanceof CompoundTag)) {
+        for (NBTBase element : diskEntities) {
+            if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
-            CompoundTag diskEntity = (CompoundTag) element;
+            NBTTagCompound diskEntity = (NBTTagCompound) element;
             UUID uuid = readUuid(diskEntity);
             if (uuid == null || !freshUuids.contains(uuid)) {
-                freshEntities.add(diskEntity.copy());
+                freshEntities.appendTag(diskEntity.copy());
                 merged++;
             }
         }
@@ -114,20 +114,20 @@ final class EntityMerge {
      * UUID-keyed sibling of {@link ChunkMerge#hasCapturedContent}. A future band's added content key (the pre-1.21.5
      * saddle slot) extends this and the carry-forward together.
      */
-    static boolean hasCapturedContent(CompoundTag entity) {
+    static boolean hasCapturedContent(NBTTagCompound entity) {
         return NbtMerge.isNonEmptyList(entity, "Items") || hasCapturedOffers(entity);
     }
 
-    private static boolean hasCapturedOffers(CompoundTag entity) {
-        return entity.get("Offers") instanceof CompoundTag
-                && NbtMerge.isNonEmptyList((CompoundTag) entity.get("Offers"), "Recipes");
+    private static boolean hasCapturedOffers(NBTTagCompound entity) {
+        return entity.getTag("Offers") instanceof NBTTagCompound
+                && NbtMerge.isNonEmptyList((NBTTagCompound) entity.getTag("Offers"), "Recipes");
     }
 
     /**
      * Decode an entity tag's {@code "UUID"} (the pre-1.16 {@code UUIDMost}/{@code UUIDLeast} long pair), or null when
      * absent.
      */
-    static @Nullable UUID readUuid(CompoundTag entityTag) {
-        return entityTag.hasUUID("UUID") ? entityTag.getUUID("UUID") : null;
+    static @Nullable UUID readUuid(NBTTagCompound entityTag) {
+        return entityTag.hasUniqueId("UUID") ? entityTag.getUniqueId("UUID") : null;
     }
 }

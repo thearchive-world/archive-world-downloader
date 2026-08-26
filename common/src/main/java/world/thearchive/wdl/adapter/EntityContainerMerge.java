@@ -5,9 +5,9 @@ package world.thearchive.wdl.adapter;
 
 import java.util.Map;
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -26,8 +26,8 @@ import org.apache.logging.log4j.Logger;
  * per-entry failure isolation, so unlike the item fold they cannot throw and always report zero failed.
  *
  * <p>Portable across the entities-region format: the {@code "Entities"} list, the recursive {@code "Passengers"} list
- * and a per-entity {@code "UUID"} 4-int array ({@code UUIDUtil.CODEC}) are vanilla-stable post-1.16, so only the
- * per-band {@code "Items"} serialization (behind {@link ContainerSink#merge}) differs. The matched node's
+ * and a per-entity {@code "UUID"} long pair ({@code UUIDMost}/{@code UUIDLeast}) are vanilla-stable pre-1.16, so only
+ * the per-band {@code "Items"} serialization (behind {@link ContainerSink#merge}) differs. The matched node's
  * {@code "Items"} is set in place inside the captured chunk tag, so the merged contents are written by the regular
  * entity write that follows.
  */
@@ -56,24 +56,24 @@ final class EntityContainerMerge {
      * and folding the stale one first would only double-count a failure. Failures are tallied, not thrown, on the same
      * per-entity isolation as the first fold.
      */
-    static MergeTally refoldFlushedContainers(ContainerSink sink, CompoundTag entitiesChunkTag,
-            Map<UUID, CompoundTag> folded, Map<UUID, CompoundTag> stash) {
-        ListTag entities = entitiesChunkTag.get("Entities") instanceof ListTag
-                ? (ListTag) entitiesChunkTag.get("Entities")
+    static MergeTally refoldFlushedContainers(ContainerSink sink, NBTTagCompound entitiesChunkTag,
+            Map<UUID, NBTTagCompound> folded, Map<UUID, NBTTagCompound> stash) {
+        NBTTagList entities = entitiesChunkTag.getTag("Entities") instanceof NBTTagList
+                ? (NBTTagList) entitiesChunkTag.getTag("Entities")
                 : null;
         if (folded.isEmpty() || entities == null) {
             return new MergeTally(0, 0);
         }
         int merged = 0;
         int failed = 0;
-        for (Tag element : entities) {
-            if (!(element instanceof CompoundTag)) {
+        for (NBTBase element : entities) {
+            if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
-            CompoundTag entityTag = (CompoundTag) element;
-            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
+            NBTTagCompound entityTag = (NBTTagCompound) element;
+            for (Map.Entry<UUID, NBTTagCompound> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 UUID uuid = node.getKey();
-                CompoundTag holder = stash.containsKey(uuid) ? null : folded.get(uuid);
+                NBTTagCompound holder = stash.containsKey(uuid) ? null : folded.get(uuid);
                 if (holder == null) {
                     continue; // no earlier fold to repeat, or a reopened menu whose own fold runs next and wins
                 }
@@ -99,23 +99,23 @@ final class EntityContainerMerge {
      * for another chunk; whatever remains after all chunks is the accepted revisit edge (an entity that unloaded,
      * despawned, or whose terrain was not captured). Returns how many nodes actually gained their captured items.
      */
-    static MergeTally mergeEntityStash(ContainerSink sink, CompoundTag entitiesChunkTag,
-            Map<UUID, CompoundTag> stash) {
-        ListTag entities = entitiesChunkTag.get("Entities") instanceof ListTag
-                ? (ListTag) entitiesChunkTag.get("Entities")
+    static MergeTally mergeEntityStash(ContainerSink sink, NBTTagCompound entitiesChunkTag,
+            Map<UUID, NBTTagCompound> stash) {
+        NBTTagList entities = entitiesChunkTag.getTag("Entities") instanceof NBTTagList
+                ? (NBTTagList) entitiesChunkTag.getTag("Entities")
                 : null;
         if (stash.isEmpty() || entities == null) {
             return new MergeTally(0, 0);
         }
         int merged = 0;
         int failed = 0;
-        for (Tag element : entities) {
-            if (!(element instanceof CompoundTag)) {
+        for (NBTBase element : entities) {
+            if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
-            CompoundTag entityTag = (CompoundTag) element;
-            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
-                CompoundTag holder = stash.remove(node.getKey());
+            NBTTagCompound entityTag = (NBTTagCompound) element;
+            for (Map.Entry<UUID, NBTTagCompound> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
+                NBTTagCompound holder = stash.remove(node.getKey());
                 if (holder == null) {
                     continue;
                 }
@@ -131,8 +131,8 @@ final class EntityContainerMerge {
         return new MergeTally(merged, failed);
     }
 
-    private static void foldItems(ContainerSink sink, CompoundTag entityTag, CompoundTag holder) {
-        entityTag.put("Items", sink.merge(entityTag, holder).getList("Items", 10));
+    private static void foldItems(ContainerSink sink, NBTTagCompound entityTag, NBTTagCompound holder) {
+        entityTag.setTag("Items", sink.merge(entityTag, holder).getTagList("Items", 10));
     }
 
     /**
@@ -144,21 +144,21 @@ final class EntityContainerMerge {
      * offers were serialized when the tick stashed them and scrubbed once at flush, so by here nothing can throw and a
      * malformed holder merely skips a key. Returns how many nodes gained their trades.
      */
-    static MergeTally mergeMerchantStash(CompoundTag entitiesChunkTag, Map<UUID, CompoundTag> stash) {
-        ListTag entities = entitiesChunkTag.get("Entities") instanceof ListTag
-                ? (ListTag) entitiesChunkTag.get("Entities")
+    static MergeTally mergeMerchantStash(NBTTagCompound entitiesChunkTag, Map<UUID, NBTTagCompound> stash) {
+        NBTTagList entities = entitiesChunkTag.getTag("Entities") instanceof NBTTagList
+                ? (NBTTagList) entitiesChunkTag.getTag("Entities")
                 : null;
         if (stash.isEmpty() || entities == null) {
             return new MergeTally(0, 0);
         }
         int merged = 0;
-        for (Tag element : entities) {
-            if (!(element instanceof CompoundTag)) {
+        for (NBTBase element : entities) {
+            if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
-            CompoundTag entityTag = (CompoundTag) element;
-            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
-                CompoundTag holder = stash.remove(node.getKey());
+            NBTTagCompound entityTag = (NBTTagCompound) element;
+            for (Map.Entry<UUID, NBTTagCompound> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
+                NBTTagCompound holder = stash.remove(node.getKey());
                 if (holder == null) {
                     continue;
                 }
@@ -176,23 +176,23 @@ final class EntityContainerMerge {
      * to each copy. A node whose menu was reopened is skipped, since {@link #mergeMerchantStash} is about to fold its
      * fresher capture. Like the merge above it cannot fail and reports zero failed.
      */
-    static MergeTally refoldFlushedMerchants(CompoundTag entitiesChunkTag, Map<UUID, CompoundTag> folded,
-            Map<UUID, CompoundTag> stash) {
-        ListTag entities = entitiesChunkTag.get("Entities") instanceof ListTag
-                ? (ListTag) entitiesChunkTag.get("Entities")
+    static MergeTally refoldFlushedMerchants(NBTTagCompound entitiesChunkTag, Map<UUID, NBTTagCompound> folded,
+            Map<UUID, NBTTagCompound> stash) {
+        NBTTagList entities = entitiesChunkTag.getTag("Entities") instanceof NBTTagList
+                ? (NBTTagList) entitiesChunkTag.getTag("Entities")
                 : null;
         if (folded.isEmpty() || entities == null) {
             return new MergeTally(0, 0);
         }
         int merged = 0;
-        for (Tag element : entities) {
-            if (!(element instanceof CompoundTag)) {
+        for (NBTBase element : entities) {
+            if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
-            CompoundTag entityTag = (CompoundTag) element;
-            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
+            NBTTagCompound entityTag = (NBTTagCompound) element;
+            for (Map.Entry<UUID, NBTTagCompound> node : EntityTreeWalk.byUuid(entityTag).entrySet()) {
                 UUID uuid = node.getKey();
-                CompoundTag holder = stash.containsKey(uuid) ? null : folded.get(uuid);
+                NBTTagCompound holder = stash.containsKey(uuid) ? null : folded.get(uuid);
                 if (holder == null) {
                     continue; // no earlier fold to repeat, or a reopened menu whose own fold runs next and wins
                 }
@@ -207,14 +207,14 @@ final class EntityContainerMerge {
      * Copy the holder's {@code "Offers"} onto the node, and its {@code "Xp"} when present (a wandering trader has
      * none).
      */
-    private static void foldOffers(CompoundTag entityTag, CompoundTag holder) {
-        if (holder.get("Offers") instanceof CompoundTag) {
-            CompoundTag offers = (CompoundTag) holder.get("Offers");
-            entityTag.put("Offers", offers.copy());
+    private static void foldOffers(NBTTagCompound entityTag, NBTTagCompound holder) {
+        if (holder.getTag("Offers") instanceof NBTTagCompound) {
+            NBTTagCompound offers = (NBTTagCompound) holder.getTag("Offers");
+            entityTag.setTag("Offers", offers.copy());
         }
-        Tag experience = holder.get("Xp");
+        NBTBase experience = holder.getTag("Xp");
         if (experience != null) {
-            entityTag.put("Xp", experience.copy());
+            entityTag.setTag("Xp", experience.copy());
         }
     }
 }

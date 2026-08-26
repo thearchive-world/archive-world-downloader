@@ -11,8 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.ChunkPos;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -28,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Holds already-serialized entity tags (the snapshot-on-main discipline: each entity is encoded on the main thread
  * when seen, and only finished tags are later handed across the writer queue). MC-typed only in
- * {@code ChunkPos}/{@code CompoundTag}; the accumulation and dedup are plain map operations.
+ * {@code ChunkPos}/{@code NBTTagCompound}; the accumulation and dedup are plain map operations.
  */
 final class EntityBuffer {
     private final Map<UUID, ChunkPos> chunkByUuid = new HashMap<>();
@@ -39,13 +39,13 @@ final class EntityBuffer {
      * entity in no bucket is never written and never counted as a drop, so it would leave a silently short save that
      * reports itself clean.
      */
-    private final Map<ChunkPos, Map<UUID, CompoundTag>> byChunk = new LinkedHashMap<>();
+    private final Map<ChunkPos, Map<UUID, NBTTagCompound>> byChunk = new LinkedHashMap<>();
 
     /**
      * Accumulate (or re-home) an entity's encoded tag, keyed by UUID. The latest chunk wins: if the entity was buffered
      * in another chunk, that copy is implicitly dropped (this entry replaces it), the write-time dedup.
      */
-    void accumulate(UUID uuid, ChunkPos pos, CompoundTag tag) {
+    void accumulate(UUID uuid, ChunkPos pos, NBTTagCompound tag) {
         ChunkPos prior = chunkByUuid.put(uuid, pos);
         if (prior != null && !prior.equals(pos)) {
             byChunk.computeIfPresent(prior, (chunk, vacated) -> {
@@ -63,8 +63,8 @@ final class EntityBuffer {
     }
 
     /** Drain and return the encoded tags for the entities in {@code pos}'s chunk, removing them from the buffer. */
-    List<CompoundTag> drainChunk(ChunkPos pos) {
-        Map<UUID, CompoundTag> bucket = byChunk.remove(pos);
+    List<NBTTagCompound> drainChunk(ChunkPos pos) {
+        Map<UUID, NBTTagCompound> bucket = byChunk.remove(pos);
         if (bucket == null) {
             return new ArrayList<>();
         }
