@@ -3,9 +3,9 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.Vec3d;
 
 import world.thearchive.wdl.adapter.OutlineRenderContext;
 import world.thearchive.wdl.adapter.RimRenderer;
@@ -27,12 +27,13 @@ public final class RimRendererImpl implements RimRenderer {
     private static final double SURFACE_STANDOFF = 0.02;
 
     @Override
-    public void drawRim(OutlineRenderContext context, AABB cellBox, AABB shapeBox, RimFace face, int colorArgb) {
+    public void drawRim(OutlineRenderContext context, AxisAlignedBB cellBox, AxisAlignedBB shapeBox, RimFace face,
+            int colorArgb) {
         if (face == RimFace.NONE) {
             return;
         }
         BufferBuilder lines = context.lines();
-        Vec3 camera = context.cameraPos();
+        Vec3d camera = context.cameraPos();
         // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, lifted
         // outward by the standoff, so a recessed model is framed while a flush one is drawn on its own surface.
         float minX = (float) (cellBox.minX - camera.x);
@@ -91,7 +92,7 @@ public final class RimRendererImpl implements RimRenderer {
     }
 
     private void vertex(BufferBuilder lines, float x, float y, float z, int colorArgb) {
-        lines.vertex(x, y, z)
+        lines.pos(x, y, z)
                 .color((colorArgb >> 16) & 0xFF, (colorArgb >> 8) & 0xFF, colorArgb & 0xFF, (colorArgb >>> 24) & 0xFF)
                 .endVertex();
     }

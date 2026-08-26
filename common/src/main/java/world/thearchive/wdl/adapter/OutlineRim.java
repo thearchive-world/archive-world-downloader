@@ -3,8 +3,8 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.BlockPos;
 
 import world.thearchive.wdl.core.MarkerHue;
 import world.thearchive.wdl.core.RimFace;
@@ -24,11 +24,11 @@ import world.thearchive.wdl.core.RimFace;
 public final class OutlineRim {
     private MarkerHue hue;
     private RimFace face = RimFace.NONE;
-    private final AABB box;
-    private final AABB cellBox;
+    private final AxisAlignedBB box;
+    private final AxisAlignedBB cellBox;
     private final long[] cells;
 
-    OutlineRim(MarkerHue hue, AABB box, long[] cells) {
+    OutlineRim(MarkerHue hue, AxisAlignedBB box, long[] cells) {
         this.hue = hue;
         this.box = box;
         this.cellBox = cellBoxOf(box, cells);
@@ -39,11 +39,11 @@ public final class OutlineRim {
      * The block-cell box: the union of unit cubes over the rim's cells (one cell, or two for a double chest), or the
      * passed box itself when there are no cells (an entity rim, whose cell box is its bounding box).
      */
-    private static AABB cellBoxOf(AABB box, long[] cells) {
+    private static AxisAlignedBB cellBoxOf(AxisAlignedBB box, long[] cells) {
         if (cells.length == 0) {
             return box;
         }
-        BlockPos first = BlockPos.method_10488(cells[0]);
+        BlockPos first = BlockPos.fromLong(cells[0]);
         double minX = first.getX();
         double minY = first.getY();
         double minZ = first.getZ();
@@ -51,7 +51,7 @@ public final class OutlineRim {
         double maxY = minY + 1.0;
         double maxZ = minZ + 1.0;
         for (int i = 1; i < cells.length; i++) {
-            BlockPos cell = BlockPos.method_10488(cells[i]);
+            BlockPos cell = BlockPos.fromLong(cells[i]);
             double x = cell.getX();
             double y = cell.getY();
             double z = cell.getZ();
@@ -62,7 +62,7 @@ public final class OutlineRim {
             maxY = Math.max(maxY, y + 1.0);
             maxZ = Math.max(maxZ, z + 1.0);
         }
-        return new AABB(minX, minY, minZ, maxX, maxY, maxZ);
+        return new AxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
     /** Restamp the hue from this tick's classification (a cached rim is reused across ticks). */
@@ -84,12 +84,12 @@ public final class OutlineRim {
         return face;
     }
 
-    public AABB box() {
+    public AxisAlignedBB box() {
         return box;
     }
 
     /** The block-cell box the rim's in-plane rectangle spans (full cell extent), as computed at cache time. */
-    public AABB cellBox() {
+    public AxisAlignedBB cellBox() {
         return cellBox;
     }
 

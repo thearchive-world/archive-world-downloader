@@ -4,13 +4,13 @@
 package world.thearchive.wdl.client;
 
 import java.util.OptionalLong;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
-import net.minecraft.util.Mth;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -113,20 +113,20 @@ public final class WdlHudOverlay {
     }
 
     // The peek key, registered per loader and bound here, plus the toggle-mode latch the overlay flips per press.
-    private static @Nullable KeyMapping peekKey;
+    private static @Nullable KeyBinding peekKey;
     private static boolean peekToggled;
 
     private WdlHudOverlay() {}
 
     /** Bind the per-loader peek keybind so the overlay can reveal the detailed layout on hold or toggle. */
-    public static void bindPeekKey(KeyMapping key) {
+    public static void bindPeekKey(KeyBinding key) {
         peekKey = key;
     }
 
     /** Draw one frame; called per render from each loader's registered HUD element/layer. */
     public static void render(float partialTick) {
         try {
-            Minecraft minecraft = Minecraft.getInstance();
+            Minecraft minecraft = Minecraft.getMinecraft();
             HudConfig config = Wdl.config().hud();
             updatePeekToggle(config);
             if (!config.showHud() || isHidden(minecraft)) {
@@ -137,7 +137,7 @@ public final class WdlHudOverlay {
                 return; // idle, or past the done linger: the overlay draws nothing
             }
             boolean detailed = config.detailed() || isPeeking(config);
-            draw(new RenderSurfaceImpl(), minecraft.font, config, frame, detailed);
+            draw(new RenderSurfaceImpl(), minecraft.fontRenderer, config, frame, detailed);
         } catch (RuntimeException e) {
             // A per-frame draw must never crash the HUD pass or spam the log; surface the first failure only.
             if (!errorLogged) {
@@ -150,7 +150,7 @@ public final class WdlHudOverlay {
     private static boolean isHidden(Minecraft minecraft) {
         PlatformBridge platform = Wdl.platformBridge();
         return minecraft.player == null
-                || minecraft.level == null
+                || minecraft.world == null
                 || platform.isBlockingScreenOpen()
                 || platform.isHudHidden();
     }
@@ -181,16 +181,16 @@ public final class WdlHudOverlay {
             return null;
         }
         float alpha = sinceDone <= lingerMillis ? 1.0f : 1.0f - (sinceDone - lingerMillis) / (float) FADE_TAIL_MILLIS;
-        return new Frame(Phase.DONE, counts, elapsed, SaveStage.NONE, 0.0f, Mth.clamp(alpha, 0.0f, 1.0f));
+        return new Frame(Phase.DONE, counts, elapsed, SaveStage.NONE, 0.0f, MathHelper.clamp(alpha, 0.0f, 1.0f));
     }
 
     private static void updatePeekToggle(HudConfig config) {
-        KeyMapping key = peekKey;
+        KeyBinding key = peekKey;
         if (key == null) {
             return;
         }
         if (config.peekMode() == HudPeekMode.TOGGLE) {
-            while (key.consumeClick()) {
+            while (key.isPressed()) {
                 peekToggled = !peekToggled;
             }
         } else {
@@ -199,28 +199,29 @@ public final class WdlHudOverlay {
     }
 
     private static boolean isPeeking(HudConfig config) {
-        KeyMapping key = peekKey;
+        KeyBinding key = peekKey;
         if (key == null) {
             return false;
         }
-        return config.peekMode() == HudPeekMode.HOLD ? key.isDown() : peekToggled;
+        return config.peekMode() == HudPeekMode.HOLD ? key.isKeyDown() : peekToggled;
     }
 
-    private static void draw(RenderSurface surface, Font font, HudConfig config, Frame frame, boolean detailed) {
+    private static void draw(RenderSurface surface, FontRenderer font, HudConfig config, Frame frame,
+            boolean detailed) {
         int boxWidth = detailed ? DETAILED_WIDTH : COMPACT_WIDTH;
         int boxHeight = 2 * PADDING + contentHeight(frame.phase(), detailed);
 
         int screenWidth = surface.guiWidth();
         int screenHeight = surface.guiHeight();
-        int boxX = Mth.clamp(anchorX(config.anchor(), screenWidth, boxWidth) + config.offsetX(),
+        int boxX = MathHelper.clamp(anchorX(config.anchor(), screenWidth, boxWidth) + config.offsetX(),
                 0, Math.max(0, screenWidth - boxWidth));
-        int boxY = Mth.clamp(anchorY(config.anchor(), screenHeight, boxHeight) + config.offsetY(),
+        int boxY = MathHelper.clamp(anchorY(config.anchor(), screenHeight, boxHeight) + config.offsetY(),
                 0, Math.max(0, screenHeight - boxHeight));
 
         float alpha = frame.alpha();
         boolean shadow = !config.background();
         if (config.background()) {
-            int panelAlpha = Mth.clamp(Math.round(config.panelOpacity() / 100.0f * 255.0f * alpha), 0, 255);
+            int panelAlpha = MathHelper.clamp(Math.round(config.panelOpacity() / 100.0f * 255.0f * alpha), 0, 255);
             surface.fill(boxX, boxY, boxX + boxWidth, boxY + boxHeight,
                     (panelAlpha << 24) | (BrandColors.PANEL & 0xFFFFFF));
         }
@@ -246,25 +247,25 @@ public final class WdlHudOverlay {
         return LINE_HEIGHT;
     }
 
-    private static void drawCompact(RenderSurface surface, Font font, Frame frame,
+    private static void drawCompact(RenderSurface surface, FontRenderer font, Frame frame,
             int contentX, int contentY, int contentWidth, float alpha, boolean shadow) {
         String glyph = glyph(frame.phase());
         int textColor = withAlpha(BrandColors.IVORY, alpha);
         surface.text(font, glyph, contentX, contentY, withAlpha(glyphColor(frame.phase()), alpha), shadow);
 
-        int afterGlyph = contentX + font.width(glyph) + GLYPH_GAP;
+        int afterGlyph = contentX + font.getStringWidth(glyph) + GLYPH_GAP;
         String timer = CaptureStatus.elapsed(frame.elapsedMillis());
         surface.text(font, timer, afterGlyph, contentY, textColor, shadow);
 
         // Anchor the chunk label at a fixed x so a growing count extends to its right rather than shoving the
         // word left; right-aligning the whole label-and-count phrase would drift the word as digits are added.
         // Clamp the anchor past the timer so an over-wide localized label sits behind it rather than overlapping.
-        String label = new TranslatableComponent("wdl.hud.label.chunks").getString();
+        String label = new TextComponentTranslation("wdl.hud.label.chunks").getUnformattedText();
         String count = CaptureStatus.compactCount(frame.counts().chunks());
         int rightEdge = contentX + contentWidth;
-        int labelAdvance = font.width(label + " ");
-        int afterTimer = afterGlyph + font.width(timer) + GLYPH_GAP;
-        int labelX = Math.max(afterTimer, rightEdge - labelAdvance - font.width(COMPACT_COUNT_TEMPLATE));
+        int labelAdvance = font.getStringWidth(label + " ");
+        int afterTimer = afterGlyph + font.getStringWidth(timer) + GLYPH_GAP;
+        int labelX = Math.max(afterTimer, rightEdge - labelAdvance - font.getStringWidth(COMPACT_COUNT_TEMPLATE));
         surface.text(font, label, labelX, contentY, textColor, shadow);
         int countX = labelX + labelAdvance;
         String shownCount = ClientText.ellipsize(font, count, Math.max(0, rightEdge - countX));
@@ -280,21 +281,22 @@ public final class WdlHudOverlay {
      * The compact finalization bar: a full-width track filled to the fraction, with the phase label drawn over the left
      * and the percent over the right. The over-bar text is always shadowed for contrast.
      */
-    private static void drawLabeledBar(RenderSurface surface, Font font, int x, int y, int width,
+    private static void drawLabeledBar(RenderSurface surface, FontRenderer font, int x, int y, int width,
             SaveStage stage, float fraction, float alpha) {
         fillBar(surface, x, y, width, SAVING_BAR_HEIGHT, fraction, alpha);
         int textColor = withAlpha(BrandColors.IVORY, alpha);
-        int textY = y + (SAVING_BAR_HEIGHT - font.lineHeight) / 2 + 1;
+        int textY = y + (SAVING_BAR_HEIGHT - font.FONT_HEIGHT) / 2 + 1;
         surface.text(font, phaseLabel(stage), x + 2, textY, textColor, true);
-        int percent = Math.round(Mth.clamp(fraction, 0.0f, 1.0f) * 100.0f);
-        Component percentText = new TranslatableComponent("wdl.hud.percent", percent);
-        surface.text(font, percentText, x + width - font.width(percentText.getString()) - 1, textY, textColor, true);
+        int percent = Math.round(MathHelper.clamp(fraction, 0.0f, 1.0f) * 100.0f);
+        ITextComponent percentText = new TextComponentTranslation("wdl.hud.percent", percent);
+        surface.text(font, percentText, x + width - font.getStringWidth(percentText.getUnformattedText()) - 1, textY,
+                textColor, true);
     }
 
-    private static void drawDetailed(RenderSurface surface, Font font, Frame frame,
+    private static void drawDetailed(RenderSurface surface, FontRenderer font, Frame frame,
             int contentX, int contentY, int contentWidth, float alpha, boolean shadow) {
         String glyph = glyph(frame.phase());
-        int glyphAdvance = font.width(glyph) + GLYPH_GAP;
+        int glyphAdvance = font.getStringWidth(glyph) + GLYPH_GAP;
         CaptureCounts counts = frame.counts();
         int rowX = contentX + glyphAdvance;
         int rowWidth = contentWidth - glyphAdvance;
@@ -316,41 +318,41 @@ public final class WdlHudOverlay {
 
         if (frame.phase() == Phase.SAVING) {
             rowY += LINE_HEIGHT;
-            int percent = Math.round(Mth.clamp(frame.progress(), 0.0f, 1.0f) * 100.0f);
-            surface.text(font, new TranslatableComponent("wdl.hud.label.stage"), rowX, rowY, textColor, shadow);
-            Component stageValue = new TranslatableComponent("wdl.hud.stage_percent", phaseLabel(frame.stage()),
+            int percent = Math.round(MathHelper.clamp(frame.progress(), 0.0f, 1.0f) * 100.0f);
+            surface.text(font, new TextComponentTranslation("wdl.hud.label.stage"), rowX, rowY, textColor, shadow);
+            ITextComponent stageValue = new TextComponentTranslation("wdl.hud.stage_percent", phaseLabel(frame.stage()),
                     percent);
-            surface.text(font, stageValue, rowX + rowWidth - font.width(stageValue.getString()), rowY,
+            surface.text(font, stageValue, rowX + rowWidth - font.getStringWidth(stageValue.getUnformattedText()), rowY,
                     withAlpha(BrandColors.SAVING_GRAY, alpha), shadow);
             fillBar(surface, rowX, rowY + LINE_HEIGHT - 1, rowWidth, BAR_HEIGHT, frame.progress(), alpha);
         }
     }
 
-    private static void drawRow(RenderSurface surface, Font font, String labelKey, String value, int x, int y,
+    private static void drawRow(RenderSurface surface, FontRenderer font, String labelKey, String value, int x, int y,
             int width, int color, boolean shadow) {
-        surface.text(font, new TranslatableComponent(labelKey), x, y, color, shadow);
-        surface.text(font, value, x + width - font.width(value), y, color, shadow);
+        surface.text(font, new TextComponentTranslation(labelKey), x, y, color, shadow);
+        surface.text(font, value, x + width - font.getStringWidth(value), y, color, shadow);
     }
 
     private static void fillBar(RenderSurface surface, int x, int y, int width, int height, float fraction,
             float alpha) {
         surface.fill(x, y, x + width, y + height, withAlpha(lighten(BrandColors.PANEL, TRACK_LIGHTEN), alpha));
-        int filled = Math.round(width * Mth.clamp(fraction, 0.0f, 1.0f));
+        int filled = Math.round(width * MathHelper.clamp(fraction, 0.0f, 1.0f));
         if (filled > 0) {
             surface.fill(x, y, x + filled, y + height, withAlpha(BrandColors.AMBER, alpha));
         }
     }
 
-    private static Component phaseLabel(SaveStage stage) {
+    private static ITextComponent phaseLabel(SaveStage stage) {
         switch (stage) {
             case WRITING_CHUNKS:
-                return new TranslatableComponent("wdl.hud.phase.chunks");
+                return new TextComponentTranslation("wdl.hud.phase.chunks");
             case WRITING_MAPS:
-                return new TranslatableComponent("wdl.hud.phase.maps");
+                return new TextComponentTranslation("wdl.hud.phase.maps");
             case COMPRESSING:
-                return new TranslatableComponent("wdl.hud.phase.compressing");
+                return new TextComponentTranslation("wdl.hud.phase.compressing");
             case NONE:
-                return new TextComponent("");
+                return new TextComponentString("");
             default:
                 throw new IncompatibleClassChangeError();
         }
@@ -419,7 +421,7 @@ public final class WdlHudOverlay {
     }
 
     private static int withAlpha(int rgb, float alpha) {
-        int alphaByte = Mth.clamp(Math.round(alpha * 255.0f), 0, 255);
+        int alphaByte = MathHelper.clamp(Math.round(alpha * 255.0f), 0, 255);
         return (alphaByte << 24) | (rgb & 0xFFFFFF);
     }
 
@@ -431,6 +433,6 @@ public final class WdlHudOverlay {
     }
 
     private static int lightenChannel(int channel, float amount) {
-        return Mth.clamp(Math.round(channel + (255 - channel) * amount), 0, 255);
+        return MathHelper.clamp(Math.round(channel + (255 - channel) * amount), 0, 255);
     }
 }

@@ -3,9 +3,9 @@
 
 package world.thearchive.wdl.adapter;
 
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import net.minecraft.client.renderer.culling.Culler;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.client.renderer.culling.ICamera;
+import net.minecraft.util.math.Vec3d;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -24,11 +24,11 @@ import org.jspecify.annotations.Nullable;
  */
 public final class OutlineRenderContext {
     private final BufferBuilder lines;
-    private final @Nullable Culler frustum;
-    private final Vec3 cameraPos;
+    private final @Nullable ICamera frustum;
+    private final Vec3d cameraPos;
     private final float lineWidth;
 
-    public OutlineRenderContext(BufferBuilder lines, @Nullable Culler frustum, Vec3 cameraPos, float lineWidth) {
+    public OutlineRenderContext(BufferBuilder lines, @Nullable ICamera frustum, Vec3d cameraPos, float lineWidth) {
         this.lines = lines;
         this.frustum = frustum;
         this.cameraPos = cameraPos;
@@ -39,11 +39,11 @@ public final class OutlineRenderContext {
         return lines;
     }
 
-    public @Nullable Culler frustum() {
+    public @Nullable ICamera frustum() {
         return frustum;
     }
 
-    public Vec3 cameraPos() {
+    public Vec3d cameraPos() {
         return cameraPos;
     }
 

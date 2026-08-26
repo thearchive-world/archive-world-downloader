@@ -10,28 +10,23 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import net.minecraft.client.multiplayer.ClientChunkCache;
-import net.minecraft.client.multiplayer.MultiPlayerLevel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Registry;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
-import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.ChestType;
-import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.client.multiplayer.ChunkProviderClient;
+import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.item.EntityMinecartContainer;
+import net.minecraft.entity.passive.AbstractChestHorse;
+import net.minecraft.entity.passive.EntityVillager;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.tileentity.TileEntityChest;
+import net.minecraft.tileentity.TileEntityEnderChest;
+import net.minecraft.tileentity.TileEntityLockable;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.chunk.Chunk;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -92,7 +87,7 @@ public final class OutlineTracker {
 
     private final OutlineDrawSet drawSet = new OutlineDrawSet();
     private final Long2ObjectMap<ChunkContainers> chunkCache = new Long2ObjectOpenHashMap<>();
-    private @Nullable MultiPlayerLevel lastLevel;
+    private @Nullable WorldClient lastLevel;
     private long tickCounter;
     private final TimingWindow tickTiming = new TimingWindow(TIMING_WINDOW_TICKS);
     private boolean errorLogged;
@@ -156,7 +151,7 @@ public final class OutlineTracker {
      * drawn at all comes from {@code toggles}, which the caller has already reconciled against what the running
      * download latched, so no rim is drawn for an axis this download is not capturing.
      */
-    public void tick(MultiPlayerLevel level, Vec3 cameraPos, OutlineConfig config, CaptureToggles toggles,
+    public void tick(WorldClient level, Vec3d cameraPos, OutlineConfig config, CaptureToggles toggles,
             CapturedContainers captured, RecoveredCoverage recovered) {
         try {
             if (!toggles.renderUnsavedOutline()) {
@@ -194,12 +189,12 @@ public final class OutlineTracker {
         }
     }
 
-    private void buildBlockContainers(MultiPlayerLevel level, Vec3 cameraPos, double clamp, OutlineConfig config,
+    private void buildBlockContainers(WorldClient level, Vec3d cameraPos, double clamp, OutlineConfig config,
             CaptureToggles toggles, CapturedContainers captured, RecoveredCoverage recovered) {
-        int chunkRadius = Mth.ceil(clamp / 16.0);
-        int cameraChunkX = Mth.floor(cameraPos.x) >> 4;
-        int cameraChunkZ = Mth.floor(cameraPos.z) >> 4;
-        ClientChunkCache chunkSource = level.getChunkSource();
+        int chunkRadius = MathHelper.ceil(clamp / 16.0);
+        int cameraChunkX = MathHelper.floor(cameraPos.x) >> 4;
+        int cameraChunkZ = MathHelper.floor(cameraPos.z) >> 4;
+        ChunkProviderClient chunkSource = level.getChunkProvider();
         int rescans = 0;
         for (int cx = cameraChunkX - chunkRadius; cx <= cameraChunkX + chunkRadius; cx++) {
             for (int cz = cameraChunkZ - chunkRadius; cz <= cameraChunkZ + chunkRadius; cz++) {
@@ -238,12 +233,12 @@ public final class OutlineTracker {
         }
     }
 
-    private void rescan(MultiPlayerLevel level, ClientChunkCache chunkSource, int cx, int cz, long key,
+    private void rescan(WorldClient level, ChunkProviderClient chunkSource, int cx, int cz, long key,
             OutlineConfig config, ChunkContainers entry) {
         entry.containers.clear();
-        // This band's client chunk source has no status-taking getChunk; method_17044(x, z, load, createEmpty)
-        // returns the live full chunk or null (createEmpty false), which is what ChunkStatus.FULL + no-create meant.
-        LevelChunk chunk = chunkSource.method_17044(cx, cz, true, false);
+        // This band's client chunk source has no status-taking getChunk; getLoadedChunk(x, z)
+        // returns the live full chunk or null, which is what ChunkStatus.FULL with no-create meant.
+        Chunk chunk = chunkSource.getLoadedChunk(cx, cz);
         if (chunk == null) {
             entry.nextRescanTick = tickCounter + 1L; // not loaded yet; retry next tick so its containers appear
             return;
@@ -254,15 +249,15 @@ public final class OutlineTracker {
             return;
         }
         entry.nextRescanTick = tickCounter + RESCAN_PERIOD_TICKS + Math.floorMod(key, RESCAN_PERIOD_TICKS);
-        for (Map.Entry<BlockPos, BlockEntity> blockEntity : chunk.getBlockEntities().entrySet()) {
+        for (Map.Entry<BlockPos, TileEntity> blockEntity : chunk.getTileEntityMap().entrySet()) {
             cacheContainer(level, blockEntity.getKey(), blockEntity.getValue(), config, entry);
         }
     }
 
-    private void cacheContainer(MultiPlayerLevel level, BlockPos pos, BlockEntity blockEntity, OutlineConfig config,
+    private void cacheContainer(WorldClient level, BlockPos pos, TileEntity blockEntity, OutlineConfig config,
             ChunkContainers entry) {
         long[] cells;
-        AABB box;
+        AxisAlignedBB box;
         boolean ender = false;
         // Invariant, kept in sync by hand: every type outlined here (and in isContainerEntity and
         // isTradeableMerchant) must have an enabled capture path, or its rim is a to-do the player can never
@@ -271,29 +266,30 @@ public final class OutlineTracker {
         // recorded in InteractionCapture. The invariant is one-way; a capturable type need not be outlined.
         // Two deliberate asymmetries: an ender chest reaches the save through the player tag rather than this
         // position, so its rim is suppressed in emit on the toggle that write is gated on; a jukebox is captured on
-        // interaction but deliberately not outlined (not a BaseContainerBlockEntity, it falls through to the else
+        // interaction but deliberately not outlined (not a TileEntityLockable, it falls through to the else
         // return below).
-        if (blockEntity instanceof ChestBlockEntity) {
-            BlockState state = level.getBlockState(pos);
-            BlockPos partner = doubleChestPartner(level, pos, state);
+        if (blockEntity instanceof TileEntityChest) {
+            // The double-chest partner is the capture side's inventory pairing (ContainerCapture.doubleChestPartner),
+            // so the coverage outline reflects exactly what an open would capture, not vanilla's render-shape pairing.
+            BlockPos partner = ContainerCapture.doubleChestPartner(level, pos);
             if (partner != null) {
-                if (pos.asLong() > partner.asLong()) {
+                if (pos.toLong() > partner.toLong()) {
                     return; // the lower-keyed half caches the merged rim, so the double chest is one entry
                 }
-                cells = new long[] { pos.asLong(), partner.asLong() };
-                box = boxOf(level, pos).minmax(boxOf(level, partner));
+                cells = new long[] { pos.toLong(), partner.toLong() };
+                box = boxOf(level, pos).union(boxOf(level, partner));
             } else {
-                cells = new long[] { pos.asLong() };
+                cells = new long[] { pos.toLong() };
                 box = boxOf(level, pos);
             }
-        } else if (blockEntity instanceof EnderChestBlockEntity) {
-            cells = new long[] { pos.asLong() };
+        } else if (blockEntity instanceof TileEntityEnderChest) {
+            cells = new long[] { pos.toLong() };
             box = boxOf(level, pos);
             ender = true;
             // The lectern (LecternBlock / LecternBlockEntity) is a 1.14 addition and cannot exist at this band, so
             // its outline branch is dropped; there is nothing to lose here.
-        } else if (blockEntity instanceof BaseContainerBlockEntity) {
-            cells = new long[] { pos.asLong() };
+        } else if (blockEntity instanceof TileEntityLockable) {
+            cells = new long[] { pos.toLong() };
             box = boxOf(level, pos);
         } else {
             return; // not a container whose contents arrive only on open
@@ -307,15 +303,15 @@ public final class OutlineTracker {
                 (box.minZ + box.maxZ) * 0.5));
     }
 
-    // The block-entity registry id string, the key the chunk tag writes as "id" (via byNameCodec) and the same
-    // one the recorded capture type holds. Kept as a String, never the band-renamed id type (ResourceLocation
-    // vs Identifier), so this shared file stays band-portable.
+    // The block-entity registry id string, the key the chunk tag writes as "id" and the same one the recorded
+    // capture type holds. Kept as a String, never the band-renamed id type (ResourceLocation vs Identifier), so
+    // this shared file stays band-portable.
     @SuppressWarnings("NullAway") // getKey is non-null for a live block entity's registered type
-    private static String blockEntityTypeId(BlockEntity blockEntity) {
-        return Registry.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()).toString();
+    private static String blockEntityTypeId(TileEntity blockEntity) {
+        return TileEntity.getKey(blockEntity.getClass()).toString();
     }
 
-    private void emit(MultiPlayerLevel level, ChunkContainers entry, Vec3 cameraPos, double clamp, OutlineConfig config,
+    private void emit(WorldClient level, ChunkContainers entry, Vec3d cameraPos, double clamp, OutlineConfig config,
             CaptureToggles toggles, CapturedContainers captured, RecoveredCoverage recovered) {
         for (int i = 0; i < entry.containers.size(); i++) {
             CachedContainer container = entry.containers.get(i);
@@ -342,26 +338,27 @@ public final class OutlineTracker {
         }
     }
 
-    private void enumerateEntityContainers(MultiPlayerLevel level, Vec3 cameraPos, double clamp, OutlineConfig config,
+    private void enumerateEntityContainers(WorldClient level, Vec3d cameraPos, double clamp, OutlineConfig config,
             CapturedContainers captured, RecoveredCoverage recovered) {
-        AABB clampBox = new AABB(cameraPos.x - clamp, cameraPos.y - clamp, cameraPos.z - clamp, cameraPos.x + clamp,
+        AxisAlignedBB clampBox = new AxisAlignedBB(cameraPos.x - clamp, cameraPos.y - clamp, cameraPos.z - clamp,
+                cameraPos.x + clamp,
                 cameraPos.y + clamp, cameraPos.z + clamp);
-        for (Entity entity : level.getEntitiesOfClass(Entity.class, clampBox,
+        for (Entity entity : level.getEntitiesWithinAABB(Entity.class, clampBox,
                 candidate -> isContainerEntity(candidate) || isTradeableMerchant(candidate))) {
             if (entity.isInvisible()) {
                 continue; // an invisible mob's body does not render, so its rim would reveal it: a fairness leak
             }
-            Vec3 center = new Vec3(entity.x, entity.y, entity.z);
+            Vec3d center = new Vec3d(entity.posX, entity.posY, entity.posZ);
             if (!OutlineClamp.isWithin(cameraPos.x, cameraPos.y, cameraPos.z, center.x, center.y, center.z, clamp)) {
                 continue;
             }
-            OutlineClass classification = OutlineClassifier.classify(NO_CELLS, null, entity.getUUID(), false,
+            OutlineClass classification = OutlineClassifier.classify(NO_CELLS, null, entity.getUniqueID(), false,
                     captured, recovered);
             if (classification == OutlineClass.CAPTURED) {
                 continue;
             }
-            long sectionKey = SectionKey.asLong(Mth.floor(center.x) >> 4, Mth.floor(center.y) >> 4,
-                    Mth.floor(center.z) >> 4);
+            long sectionKey = SectionKey.asLong(MathHelper.floor(center.x) >> 4, MathHelper.floor(center.y) >> 4,
+                    MathHelper.floor(center.z) >> 4);
             OutlineRim rim = new OutlineRim(OutlineClassifier.hueFor(classification, config), rimBox(entity),
                     NO_CELLS);
             rim.face(RimFace.TOP); // a vehicle in the open has no block neighbors to seal, so it rims its box top
@@ -373,12 +370,12 @@ public final class OutlineTracker {
      * The rim box for a container entity: a chested animal's box drops to its chest and a tradeable villager's below
      * its head, so a trading-hall roof or a trapdoor at head height does not hide the rim; a vehicle keeps its own box.
      */
-    private static AABB rimBox(Entity entity) {
-        AABB box = entity.getBoundingBox();
-        if (entity instanceof AbstractChestedHorse) {
+    private static AxisAlignedBB rimBox(Entity entity) {
+        AxisAlignedBB box = entity.getEntityBoundingBox();
+        if (entity instanceof AbstractChestHorse) {
             return chestedRimBox(box);
         }
-        if (entity instanceof Villager) {
+        if (entity instanceof EntityVillager) {
             return merchantRimBox(box);
         }
         return box;
@@ -387,7 +384,7 @@ public final class OutlineTracker {
     /**
      * {@code box} with its top capped to the chest height (see {@link #CHESTED_RIM_HEIGHT_FRACTION}), footprint kept.
      */
-    static AABB chestedRimBox(AABB box) {
+    static AxisAlignedBB chestedRimBox(AxisAlignedBB box) {
         return cappedRimBox(box, CHESTED_RIM_HEIGHT_FRACTION);
     }
 
@@ -395,20 +392,20 @@ public final class OutlineTracker {
      * {@code box} with its top dropped below the villager's head (see {@link #MERCHANT_RIM_HEIGHT_FRACTION}), footprint
      * kept, so a trading-hall roof or a trapdoor at head height does not hide the rim.
      */
-    static AABB merchantRimBox(AABB box) {
+    static AxisAlignedBB merchantRimBox(AxisAlignedBB box) {
         return cappedRimBox(box, MERCHANT_RIM_HEIGHT_FRACTION);
     }
 
-    private static AABB cappedRimBox(AABB box, double heightFraction) {
+    private static AxisAlignedBB cappedRimBox(AxisAlignedBB box, double heightFraction) {
         double top = box.minY + (box.maxY - box.minY) * heightFraction;
-        return new AABB(box.minX, box.minY, box.minZ, box.maxX, top, box.maxZ);
+        return new AxisAlignedBB(box.minX, box.minY, box.minZ, box.maxX, top, box.maxZ);
     }
 
     /** Whether {@code entity} is a container vehicle or a chested animal (the open-time entity-container set). */
     private static boolean isContainerEntity(Entity entity) {
         // Below 1.21 getInventoryColumns is nonzero without a chest, so it cannot substitute for hasChest.
-        return entity instanceof AbstractMinecartContainer
-                || (entity instanceof AbstractChestedHorse && ((AbstractChestedHorse) entity).hasChest());
+        return entity instanceof EntityMinecartContainer
+                || (entity instanceof AbstractChestHorse && ((AbstractChestHorse) entity).hasChest());
     }
 
     /**
@@ -418,28 +415,18 @@ public final class OutlineTracker {
      * is not a case here; villagers are the only merchants.
      */
     private static boolean isTradeableMerchant(Entity entity) {
-        if (entity instanceof Villager && !((Villager) entity).isBaby()) {
-            // Profession is an int on the synced data (method_3115) at this band; every profession trades except
+        if (entity instanceof EntityVillager && !((EntityVillager) entity).isChild()) {
+            // Profession is an int on the synced data (getProfession) at this band; every profession trades except
             // nitwit (id 5), and there is no unemployed state below 1.14.
-            return ((Villager) entity).method_3115() != 5;
+            return ((EntityVillager) entity).getProfession() != 5;
         }
         return false;
     }
 
-    /** The connected half of a double chest at {@code pos}, or {@code null} if it is single or not loaded. */
-    private static @Nullable BlockPos doubleChestPartner(MultiPlayerLevel level, BlockPos pos, BlockState state) {
-        if (!state.hasProperty(ChestBlock.TYPE) || state.getValue(ChestBlock.TYPE) == ChestType.SINGLE) {
-            return null;
-        }
-        BlockPos partner = pos.relative(ChestBlock.getConnectedDirection(state));
-        return level.getBlockEntity(partner) instanceof ChestBlockEntity ? partner : null;
-    }
-
-    /** The container's shape bounds in world coordinates, or its full cell when the shape is empty. */
-    private static AABB boxOf(MultiPlayerLevel level, BlockPos pos) {
-        VoxelShape shape = level.getBlockState(pos).getShape(level, pos);
-        AABB local = shape.isEmpty() ? new AABB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0) : shape.bounds();
-        return local.move(pos);
+    private static AxisAlignedBB boxOf(WorldClient level, BlockPos pos) {
+        // Below the Flattening a block state has no VoxelShape; its collision bounding box stands in for the
+        // outline shape, block-local, and is offset to world coordinates.
+        return level.getBlockState(pos).getBoundingBox(level, pos).offset(pos);
     }
 
     /**
@@ -447,18 +434,18 @@ public final class OutlineTracker {
      * the preference order. Computed on the tick so the render reads a stamped face rather than probing the world each
      * frame; the neighbors it seals against change only on the tick.
      */
-    private static RimFace faceOf(MultiPlayerLevel level, long[] cells) {
+    private static RimFace faceOf(WorldClient level, long[] cells) {
         // The open-top chest is the overwhelming case, so settle it on one neighbor read; only a sealed top
         // pays for the rest of the order, which RimFace.selectExposed decides.
-        if (!isSealed(level, cells, Direction.UP)) {
+        if (!isSealed(level, cells, EnumFacing.UP)) {
             return RimFace.TOP;
         }
         return RimFace.selectExposed(true,
-                isSealed(level, cells, Direction.DOWN),
-                isSealed(level, cells, Direction.NORTH),
-                isSealed(level, cells, Direction.SOUTH),
-                isSealed(level, cells, Direction.WEST),
-                isSealed(level, cells, Direction.EAST));
+                isSealed(level, cells, EnumFacing.DOWN),
+                isSealed(level, cells, EnumFacing.NORTH),
+                isSealed(level, cells, EnumFacing.SOUTH),
+                isSealed(level, cells, EnumFacing.WEST),
+                isSealed(level, cells, EnumFacing.EAST));
     }
 
     // A merged-box face is exposed when any cell is open in that direction, so a double chest with one half
@@ -467,20 +454,20 @@ public final class OutlineTracker {
     // the cells is interior to the merged box, not an exterior face, and is skipped, without which a double
     // chest's two end faces always read open, since each end cell's inward neighbor is the other half. Only a
     // multi-cell box has such a neighbor, so a single container skips that test.
-    private static boolean isSealed(MultiPlayerLevel level, long[] cells, Direction direction) {
+    private static boolean isSealed(WorldClient level, long[] cells, EnumFacing direction) {
         for (long cell : cells) {
             // This band has no static BlockPos long helpers (getX(long)/asLong(int,int,int)); unpack the cell key
-            // through method_10488 and repack the neighbor through a BlockPos. method_16907 is the solid-cube test
+            // through fromLong and repack the neighbor through a BlockPos. isFullBlock is the solid-cube test
             // standing in for isCollisionShapeFullBlock, which is a cosmetic rim-face seal, not saved data.
-            BlockPos cellPos = BlockPos.method_10488(cell);
-            int nx = cellPos.getX() + direction.getStepX();
-            int ny = cellPos.getY() + direction.getStepY();
-            int nz = cellPos.getZ() + direction.getStepZ();
-            if (cells.length > 1 && containsCell(cells, new BlockPos(nx, ny, nz).asLong())) {
+            BlockPos cellPos = BlockPos.fromLong(cell);
+            int nx = cellPos.getX() + direction.getXOffset();
+            int ny = cellPos.getY() + direction.getYOffset();
+            int nz = cellPos.getZ() + direction.getZOffset();
+            if (cells.length > 1 && containsCell(cells, new BlockPos(nx, ny, nz).toLong())) {
                 continue;
             }
-            neighbor.set(nx, ny, nz);
-            if (!level.getBlockState(neighbor).method_16907()) {
+            neighbor.setPos(nx, ny, nz);
+            if (!level.getBlockState(neighbor).isFullBlock()) {
                 return false;
             }
         }

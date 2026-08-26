@@ -15,7 +15,7 @@ import journeymap.client.api.event.ClientEvent;
 import journeymap.client.api.model.MapPolygon;
 import journeymap.client.api.model.ShapeProperties;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.DimensionType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -143,8 +143,8 @@ public final class JourneyMapOverlayDriver {
     private void onClientTick() {
         try {
             clientTicks++;
-            Minecraft mc = Minecraft.getInstance();
-            if (mc == null || mc.level == null) {
+            Minecraft mc = Minecraft.getMinecraft();
+            if (mc == null || mc.world == null) {
                 return;
             }
             IClientAPI localApi = api;
@@ -162,7 +162,7 @@ public final class JourneyMapOverlayDriver {
             // Read the generation strictly before the facade snapshots, so a change landing after this read is
             // seen by a later tick at a higher generation rather than silently folded into this build.
             long generation = Wdl.overlayGeneration();
-            DimensionType dimension = mc.level.getDimension().getType();
+            DimensionType dimension = mc.world.provider.getDimensionType();
             if (generation == lastGeneration && dimension.equals(lastDimension)) {
                 return;
             }
@@ -257,7 +257,7 @@ public final class JourneyMapOverlayDriver {
     }
 
     private void dispatch(long generation, DimensionType dimension) {
-        String dimensionId = DimensionType.getName(dimension).toString();
+        String dimensionId = dimension.getName();
         // Snapshot saved strictly before covered: the facade mirrors the covered read onto the saved set until
         // the send range is calibrated, and this order is what lets that mirror yield an empty suspect set rather
         // than a persistent cold-start suspect ring.

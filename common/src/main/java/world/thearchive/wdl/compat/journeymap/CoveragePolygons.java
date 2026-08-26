@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import journeymap.client.api.model.MapPolygon;
 import journeymap.client.api.model.ShapeProperties;
-import net.minecraft.core.BlockPos;
+import net.minecraft.util.math.BlockPos;
 
 /**
  * Turns chunk-space coverage rectangles into JourneyMap polygon hulls and builds the fill-only shape style for a

@@ -177,6 +177,8 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 
 # Below the 1.21 update the HUD render callback carries a float partial-tick rather than a DeltaTracker, so the
 # shared overlay's render entry point takes a float on this band.
+# Below 1.13 there is no Mojang mapping, so the overlay names the classic client types: FontRenderer, KeyBinding,
+# Minecraft.getMinecraft/world/fontRenderer, and ITextComponent.getUnformattedText for the flattened strings.
 common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
 
 # Below 1.17 there is no CycleButton widget (it arrived at 1.17 with the narration API), so this band-local cycle
@@ -187,6 +189,8 @@ common/src/main/java/world/thearchive/wdl/client/WdlCycleButton.java
 # Below 1.20 there is no FaviconTexture (added by the 1.20 GUI overhaul), so the client draw seam's blitFavicon names
 # the world icon's registered ResourceLocation instead of the 1.20+ FaviconTexture handle it cannot reference on this
 # band. The draw surface itself (GuiGraphics, likewise 1.20+) is reimplemented in the plug, which the diff excludes.
+# Below 1.13 there is no Mojang mapping, so the interface names the classic band-stable types FontRenderer and
+# ITextComponent rather than Font and Component.
 common/src/main/java/world/thearchive/wdl/adapter/RenderSurface.java
 
 # Below the 1.21 update Util.OS has no openPath(Path), so the open-folder affordances call openFile(File). And at
@@ -354,6 +358,14 @@ common/src/test/java/world/thearchive/wdl/adapter/RegionIntegrationTest.java
 common/src/test/java/world/thearchive/wdl/testsupport/RegionRoundTrip.java
 
 # Below 1.20.5 ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update.
+# Below 1.13 there is no Mojang mapping, and two absent types are reimplemented here: a block state has no
+# VoxelShape (its collision AxisAlignedBB, offset to world, stands in for the outline shape), and there is no
+# unified Registry (the block-entity id is TileEntity.getKey(getClass())). A chest carries no left/right pair
+# property either, so the double-chest partner is the capture side's inventory pairing,
+# ContainerCapture.doubleChestPartner (a getChestType equality test in the recon section 6 probe order), so the
+# outline reflects exactly what an open would capture rather than vanilla's render-shape pairing. The client level
+# is WorldClient with a ChunkProviderClient (getLoadedChunk), the container base is TileEntityLockable, and the
+# seal test is IBlockState.isFullBlock.
 common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
 
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
@@ -592,6 +604,9 @@ common/src/main/java/world/thearchive/wdl/adapter/StashHolder.java
 
 # Below 1.20.3 MutableComponent has no withColor(int) convenience, so a template color is applied through
 # withStyle(style -> style.withColor(rgb)).
+# Below 1.13 there is no Screen or ConfirmScreen, so the resume confirms are the classic GuiYesNo built with
+# plain-string title, message, and labels through ITextComponent.getFormattedText/getUnformattedText, and the amber
+# styling rides the legacy section codes getFormattedText emits.
 common/src/main/java/world/thearchive/wdl/client/ResumeConfirm.java
 
 # Below 1.20.3 there is no Crafter menu or block entity, so the crafter capture tests are dropped.
@@ -806,6 +821,10 @@ common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressWriter.java
 
 # LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is acquired through
 # log4j2 LogManager directly.
+# Below 1.13 the line pass uses the classic fixed-function render forms: the shared Tessellator/BufferBuilder
+# (net.minecraft.client.renderer) begun on DefaultVertexFormats.POSITION_COLOR, GlStateManager color/blend/line-width
+# and texture state, an ICamera frustum, and the camera-entity interpolation read from the classic
+# lastTickPos/pos fields with getRenderViewEntity/getRenderPartialTicks.
 common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
 
 # LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is acquired through
@@ -965,3 +984,31 @@ common/src/main/java/world/thearchive/wdl/adapter/EquipmentEntry.java
 # Below 1.13 there is no Mojang mapping, so this seam names classic MCP NBTTagCompound/ItemStack; the lectern is a 1.14
 # block absent at this band, so the axis is a compiling no-op behind the band-stable SPI (a documented limit).
 common/src/main/java/world/thearchive/wdl/adapter/LecternSink.java
+
+# Below 1.13 there is no Mojang mapping, so the injected rim-primitive interface names the classic box type
+# AxisAlignedBB rather than AABB.
+common/src/main/java/world/thearchive/wdl/adapter/RimRenderer.java
+
+# Below 1.13 there is no Mojang mapping, so this per-frame context names the classic render types: the shared line
+# buffer is BufferBuilder (net.minecraft.client.renderer), the frustum is ICamera rather than a Culler, and the
+# camera position is a Vec3d.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineRenderContext.java
+
+# Below 1.13 there is no Mojang mapping, so this rim holder names the classic box type AxisAlignedBB and unpacks a
+# cell key through BlockPos.fromLong rather than the 1.13+ static long helper.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineRim.java
+
+# Below 1.13 there is no Mojang mapping, so the shared text helper measures against the classic FontRenderer
+# (getStringWidth) rather than Font.width.
+common/src/main/java/world/thearchive/wdl/client/ClientText.java
+
+# Below 1.13 there is no Screen or ConfirmScreen, so this delayed confirm extends the classic GuiYesNo (the
+# six-argument constructor with a GuiYesNoCallback confirmClicked(boolean, int) and setButtonDelay), applies its
+# amber title through ITextComponent.getFormattedText, and takes a java.util.function.Consumer<Boolean> callback
+# since the fastutil BooleanConsumer is absent from the 1.12.2 fastutil subset.
+common/src/main/java/world/thearchive/wdl/client/WdlCaptureDisableConfirmScreen.java
+
+# Below 1.13 there is no Mojang mapping, so this multi-line toast implements the classic IToast SPI (draw(GuiToast,
+# long) returning IToast.Visibility) rather than Toast/ToastComponent, stitches the frame with
+# Gui.drawTexturedModalRect, and draws its text through FontRenderer.
+common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
