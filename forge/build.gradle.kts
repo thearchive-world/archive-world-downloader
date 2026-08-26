@@ -33,7 +33,7 @@ plugins {
     java
     id("xyz.wagyourtail.unimined") version "1.4.1"
     // Release publishing. Pinned as a literal because the island is a separate build with no access to the root
-    // version catalog; keep in sync with gradle/libs.versions.toml's mod-publish-plugin.
+    // version catalog.
     id("me.modmuss50.mod-publish-plugin") version "2.2.0"
 }
 
@@ -151,7 +151,7 @@ sourceSets {
 dependencies {
     // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
     // shim are null-marked. NullAway itself does not run on this island (it is a build-logic pass that runs on
-    // the root, at 8.14.5, over common + fabric); here the annotations only need to resolve so the marked
+    // the root, at 8.14.5, over common); here the annotations only need to resolve so the marked
     // source compiles.
     compileOnly("org.jspecify:jspecify:1.0.0")
 
@@ -161,7 +161,7 @@ dependencies {
     compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
 }
 
-// Source-merge :common the way wdl.common-merge does for loader subprojects on other bands, but by direct path
+// Source-merge :common the way a loader subproject does on the higher bands, but by direct path
 // since the island is a separate build with no access to :common's consumable configurations: fold common's
 // main source into this compile and its resources into the jar. Scoped to compileJava only (never
 // configureEach), so the isolated reobftest compile never picks up common's source too.
@@ -179,7 +179,7 @@ tasks.named<ProcessResources>("processResources") {
         exclude("**/.gitkeep")
     }
     // Keep mcmod.info's and wdl-publishing.properties' templated fields in sync with the band coordinates,
-    // matching the fabric/neoforge processResources. The Forge floor (forge_version_min) is a deliberate value
+    // matching the higher bands' loader processResources. The Forge floor (forge_version_min) is a deliberate value
     // distinct from the build coordinate forge_version.
     val tokens = mapOf(
         "version" to version.toString(),
@@ -524,7 +524,7 @@ tasks.named("check") {
 }
 
 // Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge
-// jar to CurseForge and Modrinth per this band's MC version, mirroring the fabric/neoforge loader subprojects.
+// jar to CurseForge and Modrinth per this band's MC version, mirroring the higher bands' loader subprojects.
 // Coordinates come from band() (the island reads the root gradle.properties), not providers.gradleProperty,
 // because forge/gradle.properties carries none. There is no github block: the release workflow funnels every
 // band's jars into one shared GitHub release with gh. Nothing publishes on an ordinary build.

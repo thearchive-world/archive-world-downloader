@@ -22,23 +22,6 @@
 # the deeper bands thread through is all post-1.19), and no kept test binds data-driven tags.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
-# ClientCommandManager) is Fabric-API-coupled and moves across bands.
-fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
-
-# Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
-fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
-
-# The villager-trade capture gametest carries the deep-band client forms: villager types are the flat npc package,
-# EntityType is not yet EntityTypes, Minecraft.setScreen is not relocated into Minecraft.gui, the crosshair pick is
-# GameRenderer.pick rather than LocalPlayer.raycastHitResult, an entity is resolved by UUID over entitiesForRendering
-# rather than Level.getEntity(UUID), and the pre-1.21.5 CompoundTag/ListTag accessors (getCompound/getInt/getList)
-# replace the Optional-returning family.
-fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
-# The shared capture driver reads the camera through GameRenderer.getMainCamera().getPosition(), the pre-26.2,
-# pre-1.21.11 forms.
-fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
-
 # Below the 1.21.2 chunk-serialization cut vanilla has no SerializableChunkData.SectionData record, so this
 # chunk-snapshot seam defines its own band-stable SectionData carrier for the static-write codec. Below 1.20.5
 # ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update.
@@ -524,15 +507,6 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
-
-# The ModMenu API for this band (the 8.x line for 1.20.2) ships no update-checker API (UpdateChecker/UpdateInfo/
-# UpdateChannel arrived in a later ModMenu), so this entrypoint implements only the config-screen factory and does
-# not override getUpdateChecker.
-fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
-
-# The ModMenu API for this band ships no update-checker API, so the ModMenu update-badge feeder does not exist on
-# this band (deleted, not merely divergent); the launch update check still runs, only its ModMenu badge is gone.
-fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
 # Below 1.20.2 there is no AdvancementHolder/AdvancementNode split (the advancement datapack rewrite is 1.20.2),
 # so the harvesting ClientAdvancements.Listener works in Advancement and reads the id via Advancement.getId().

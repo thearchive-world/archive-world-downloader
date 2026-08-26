@@ -40,8 +40,8 @@ if (errorProneUsable) {
     // contend with them), then NullAway is re-enabled at ERROR. AnnotatedPackages marks our own code as
     // the checked, @NullMarked surface; everything outside it (MC, the JDK) stays unannotated and
     // is assumed non-null, so NullAway enforces our internal consistency without modeling MC.
-    // In the loader subprojects this compile also re-checks :common's source merged in by
-    // wdl.common-merge; AnnotatedPackages keeps the verdict identical to :common's own run.
+    // Where a loader subproject source-merges :common, this compile also re-checks that merged-in
+    // source; AnnotatedPackages keeps the verdict identical to :common's own run.
     tasks.named<JavaCompile>("compileJava") {
         options.errorprone {
             disableAllChecks.set(true)

@@ -215,24 +215,6 @@ pitest {
     threads.set(providers.gradleProperty("pitestThreads").map { it.toInt() }.orElse(4))
 }
 
-// --- Expose common's main source + resources for source-merge into loader subprojects ---
-// MultiLoader-Template "commonJava"/"commonResources" pattern:
-// the loader (e.g. :fabric) consumes these and compiles common's SOURCE directly into its jar,
-// so common's classes are remapped by Loom alongside the loader's own classes. The consumer side
-// lives in the wdl.common-merge convention plugin.
-val commonJava = configurations.create("commonJava") {
-    isCanBeConsumed = true
-    isCanBeResolved = false
-}
-val commonResources = configurations.create("commonResources") {
-    isCanBeConsumed = true
-    isCanBeResolved = false
-}
-artifacts {
-    add("commonJava", file("src/main/java"))
-    add("commonResources", file("src/main/resources"))
-}
-
 // --- core invariant: world.thearchive.wdl.core.** imports only from the allowlisted prefixes ---
 // Keeps cross-branch cherry-picks of core viable as era-bands accrue. A fail-closed ALLOWLIST like the
 // pitest scope above, not a net.minecraft denylist: an MC-bundled library (com.mojang, gson, netty, joml,

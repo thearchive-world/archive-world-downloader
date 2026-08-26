@@ -11,13 +11,9 @@
 [versions]
 spotless = "8.9.0"
 errorprone-plugin = "5.1.0"
-mod-publish-plugin = "2.2.0"
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
-# One catalog-pinned version shared by both loader subprojects' publishMods configuration (applied per
-# loader, declared apply-false at the root). Drives the release upload to Modrinth + GitHub.
-mod-publish-plugin = { id = "me.modmuss50.mod-publish-plugin", version.ref = "mod-publish-plugin" }
 
 [libraries]
 # The Error Prone plugin is applied by wdl.nullness-conventions, so build-logic depends on its
