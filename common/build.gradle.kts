@@ -80,6 +80,13 @@ dependencies {
     "bootsmokeImplementation"("org.junit.jupiter:junit-jupiter")
     "bootsmokeCompileOnly"(libsCatalog.findLibrary("jspecify").get())
     "bootsmokeRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+
+    // Gradle's own test source set has the identical gap bootsmoke works around above: Unimined wires its
+    // provisioned Minecraft/Forge jar (plus every library it pulls in) onto main's own classpath only, never
+    // test's, so compileTestJava and the runtime test classpath alike see none of it until this line. Sharing
+    // main's already-resolved compile classpath, the same technique bootsmoke uses, needs no second Unimined
+    // provision and stays byte-identical to the one jar main itself compiles against.
+    testImplementation(files(sourceSets.main.get().compileClasspath))
 }
 
 tasks.register<Test>("bootSmoke") {
@@ -238,6 +245,12 @@ tasks.test {
     inputs.file(rootProject.layout.projectDirectory.file(".github/ISSUE_TEMPLATE/5-translation.yml"))
         .withPropertyName("translationForm")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // Every package under src/test (including the com.moulberry.flashback / de.johni0702.minecraft.bobby test
+    // doubles) carries a package-info.class with @NullMarked, whose own @Target lists the Java 9
+    // ElementType.MODULE. See bootSmoke's identical exclude above for why a Java 8 test runtime throws (not
+    // just warns) reflecting on that annotation before JUnit's class predicate gets to skip it as a non-test
+    // class. The main test task needs the same exclude for the same reason.
+    exclude("**/package-info.class")
 }
 
 val checkCoreImports = tasks.register("checkCoreImports") {
