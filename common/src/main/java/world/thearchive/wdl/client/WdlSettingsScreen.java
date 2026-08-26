@@ -5,8 +5,7 @@ package world.thearchive.wdl.client;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import com.mojang.blaze3d.platform.GlStateManager;
-import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,18 +14,20 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.class_4122;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.class_1802;
-import net.minecraft.client.gui.screens.ConfirmScreen;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.resources.language.I18n;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TranslatableComponent;
-import net.minecraft.realms.class_356;
-import net.minecraft.util.Mth;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiListExtended;
+import net.minecraft.client.gui.GuiPageButtonList;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.gui.GuiYesNo;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.resources.I18n;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentTranslation;
+import net.minecraft.util.text.TextFormatting;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.RenderSurface;
@@ -53,7 +54,7 @@ import world.thearchive.wdl.core.WorldType;
  * commit, Discard abandons behind a confirm, and disabling a core capture toggle confirms at the change. The rows,
  * their order, and the gamerule group come from {@link SettingsLayout}.
  */
-public final class WdlSettingsScreen extends Screen {
+public final class WdlSettingsScreen extends GuiScreen {
     private static final int TAB_TOP = 6;
     private static final int TAB_HEIGHT = 20;
     private static final int ROW_BAND_MAX = 345;
@@ -69,20 +70,20 @@ public final class WdlSettingsScreen extends Screen {
     private static final int REVERT_ICON_WIDTH = 10;
     private static final int REVERT_ICON_HEIGHT = 10;
 
-    private final @Nullable Screen parent;
+    private final @Nullable GuiScreen parent;
     private final SettingsDraft draft;
     private final Consumer<WdlConfig> onSave;
     private final Map<String, CuratedGameRule> curatedById;
     private final Predicate<String> modLoaded;
 
     private int activeTab;
-    private @Nullable class_356 defaults;
+    private @Nullable GuiButton defaults;
     private @Nullable SettingsList list;
     // Below 1.19.3 there is no per-widget Tooltip, and a control's tooltip inside the scrolling list clips to the
     // list scissor, so hovered tooltips are recorded here and drawn screen-side after the list in render.
-    private final List<Map.Entry<class_4122, Component>> hoverTooltips = new ArrayList<>();
+    private final List<Map.Entry<Gui, ITextComponent>> hoverTooltips = new ArrayList<>();
 
-    public WdlSettingsScreen(@Nullable Screen parent, WdlConfig live, Consumer<WdlConfig> onSave,
+    public WdlSettingsScreen(@Nullable GuiScreen parent, WdlConfig live, Consumer<WdlConfig> onSave,
             List<CuratedGameRule> curatedGameRules, Predicate<String> modLoaded) {
         this.parent = parent;
         this.draft = SettingsDraft.of(live);
@@ -100,22 +101,89 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     private void rebuildWidgets() {
-        this.field_1232.clear();
-        this.field_20307.clear();
-        init();
+        this.buttonList.clear();
+        initGui();
     }
 
     @Override
-    protected void init() {
+    public void initGui() {
         this.hoverTooltips.clear();
-        SettingsList settingsList = new SettingsList(Minecraft.getInstance(), this.field_1230, this.field_1231,
-                LIST_TOP, this.field_1231 - FOOTER_HEIGHT, ROW_HEIGHT);
+        SettingsList settingsList = new SettingsList(this.mc, this.width, this.height,
+                LIST_TOP, this.height - FOOTER_HEIGHT, ROW_HEIGHT);
         populate(settingsList);
         this.list = settingsList;
-        this.field_20307.add(settingsList);
-
         buildTabStrip();
         buildFooter();
+    }
+
+    @Override
+    protected void actionPerformed(GuiButton button) {
+        if (button instanceof ActionButton) {
+            ((ActionButton) button).press();
+        }
+    }
+
+    @Override
+    protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        super.mouseClicked(mouseX, mouseY, mouseButton);
+        if (this.list != null) {
+            // Drop focus first so a click re-focuses only the seed field it lands on, matching the higher bands
+            // where the list owns focus; the field's own mouseClicked below re-takes it when the click hits it.
+            this.list.clearFieldFocus();
+            this.list.mouseClicked(mouseX, mouseY, mouseButton);
+        }
+    }
+
+    @Override
+    protected void mouseReleased(int mouseX, int mouseY, int state) {
+        super.mouseReleased(mouseX, mouseY, state);
+        if (this.list != null) {
+            this.list.mouseReleased(mouseX, mouseY, state);
+        }
+    }
+
+    @Override
+    public void handleMouseInput() throws IOException {
+        super.handleMouseInput();
+        if (this.list != null) {
+            this.list.handleMouseInput();
+        }
+    }
+
+    @Override
+    protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (keyCode == 1) { // Esc commits the draft, matching the Done button, rather than discarding
+            closeAndSave();
+            return;
+        }
+        if (this.list != null && this.list.forwardKeyToFocused(typedChar, keyCode)) {
+            return;
+        }
+        super.keyTyped(typedChar, keyCode);
+    }
+
+    @Override
+    public void updateScreen() {
+        if (this.list != null) {
+            this.list.tickControls();
+        }
+    }
+
+    /**
+     * A button that runs an action on press, since the pre-1.13 GuiButton has no onPress; dispatched by
+     * actionPerformed.
+     */
+    private final class ActionButton extends GuiButton {
+        private final Runnable onPress;
+
+        ActionButton(int x, int y, int width, int height, String label, Runnable onPress) {
+            super(0, x, y, width, height, label);
+            this.onPress = onPress;
+        }
+
+        void press() {
+            this.onPress.run();
+        }
     }
 
     private void buildTabStrip() {
@@ -127,21 +195,18 @@ public final class WdlSettingsScreen extends Screen {
             int tabX = column.left() + i * tabWidth;
             // the last tab absorbs the division remainder so the strip's right edge meets the control edge
             int thisTabWidth = i == count - 1 ? column.right() - tabX : tabWidth;
-            Component title = new TranslatableComponent(SettingsLayout.tabLabelKey(SettingsLayout.TABS.get(i).id()));
-            class_356 tab = new class_356(0, tabX, TAB_TOP, thisTabWidth, TAB_HEIGHT, title.getString()) {
-                @Override
-                public void method_18374(double mouseX, double mouseY) {
-                    selectTab(index);
-                }
-            };
-            tab.field_1055 = i != this.activeTab; // the active tab reads as pressed by being inert
-            method_13411(tab);
+            ITextComponent title = new TextComponentTranslation(
+                    SettingsLayout.tabLabelKey(SettingsLayout.TABS.get(i).id()));
+            ActionButton tab = new ActionButton(tabX, TAB_TOP, thisTabWidth, TAB_HEIGHT, title.getUnformattedText(),
+                    () -> selectTab(index));
+            tab.enabled = i != this.activeTab; // the active tab reads as pressed by being inert
+            addButton(tab);
         }
     }
 
     /** The option content band width, the single source the tab strip, footer, and list rows all size to. */
     private int contentBandWidth() {
-        return Math.min(this.field_1230 - 20, ROW_BAND_MAX);
+        return Math.min(this.width - 20, ROW_BAND_MAX);
     }
 
     /**
@@ -151,7 +216,7 @@ public final class WdlSettingsScreen extends Screen {
      */
     private ColumnBounds optionColumn() {
         int band = contentBandWidth();
-        int left = this.field_1230 / 2 - band / 2 + 2;
+        int left = this.width / 2 - band / 2 + 2;
         int right = left + (band - 4) - REVERT_WIDTH - GAP;
         return new ColumnBounds(left, right);
     }
@@ -182,108 +247,95 @@ public final class WdlSettingsScreen extends Screen {
     private void buildFooter() {
         ColumnBounds column = optionColumn();
         int buttonWidth = (column.width() - 2 * GAP) / 3;
-        int footerY = this.field_1231 - 26;
+        int footerY = this.height - 26;
         int doneX = column.left();
         int defaultsX = doneX + buttonWidth + GAP;
         int discardX = defaultsX + buttonWidth + GAP;
-        method_13411(new class_356(0, doneX, footerY, buttonWidth, 20, I18n.get("gui.done")) {
-            @Override
-            public void method_18374(double mouseX, double mouseY) {
-                method_18608();
-            }
-        });
+        addButton(new ActionButton(doneX, footerY, buttonWidth, 20, I18n.format("gui.done"), this::closeAndSave));
         // This band's button carries no hover-tooltip parameter, so the Defaults button has no hover explanation.
-        this.defaults = method_13411(new class_356(0, defaultsX, footerY, buttonWidth, 20,
-                I18n.get("wdl.settings.defaults")) {
-            @Override
-            public void method_18374(double mouseX, double mouseY) {
-                onDefaults();
-            }
-        });
+        this.defaults = addButton(new ActionButton(defaultsX, footerY, buttonWidth, 20,
+                I18n.format("wdl.settings.defaults"), this::onDefaults));
         // the last button absorbs the division remainder so the footer's right edge meets the control edge
-        method_13411(new class_356(0, discardX, footerY, column.right() - discardX, 20,
-                I18n.get("wdl.settings.discard")) {
-            @Override
-            public void method_18374(double mouseX, double mouseY) {
-                onDiscard();
-            }
-        });
+        addButton(new ActionButton(discardX, footerY, column.right() - discardX, 20,
+                I18n.format("wdl.settings.discard"), this::onDiscard));
     }
 
     @Override
-    public void render(int mouseX, int mouseY, float partialTick) {
-        this.method_1043();
+    public void drawScreen(int mouseX, int mouseY, float partialTick) {
+        this.drawDefaultBackground();
         // The Defaults button would only revert to a state the draft is already in, so it grays out (never
         // hides, keeping the footer stable and the feature discoverable) while the draft equals defaults, and
         // a tooltip on the gray state says why. Kept current with live edits by resolving before the widgets
         // draw; the equality check gates the write so the tooltip is rebuilt only when the state flips.
         if (this.defaults != null) {
             boolean atDefaults = this.draft.isAtDefaults();
-            if (this.defaults.field_1055 == atDefaults) {
-                this.defaults.field_1055 = !atDefaults;
+            if (this.defaults.enabled == atDefaults) {
+                this.defaults.enabled = !atDefaults;
             }
         }
-        // Below the 1.19.4 GUI additions Screen.render paints only its buttons, so the list added as a widget is
+        // Below the 1.19.4 GUI additions GuiScreen.render paints only its buttons, so the list added as a widget is
         // drawn by hand. It draws before the buttons here, not after as the renderable order on the higher bands:
         // below 1.20.2 this list fills tiled dirt above and below itself, which is what hides its unclipped row
         // overflow at the top and bottom edges (it does not scissor), so drawing it first lets that fill hide the
         // overflow while the tab strip and footer buttons paint on top of it. Drawing it after would bury both.
         if (this.list != null) {
-            this.list.method_1053(mouseX, mouseY, partialTick);
+            this.list.drawScreen(mouseX, mouseY, partialTick);
         }
-        super.render(mouseX, mouseY, partialTick);
+        super.drawScreen(mouseX, mouseY, partialTick);
         // The recorded hover tooltips are drawn here, unclipped, after the list.
-        for (Map.Entry<class_4122, Component> tip : this.hoverTooltips) {
+        for (Map.Entry<Gui, ITextComponent> tip : this.hoverTooltips) {
             if (isControlHovered(tip.getKey(), mouseX, mouseY)) {
-                this.renderTooltip(this.field_1234.split(tip.getValue().getString(), 200), mouseX, mouseY);
+                this.drawHoveringText(
+                        this.fontRenderer.listFormattedStringToWidth(tip.getValue().getUnformattedText(), 200),
+                        mouseX, mouseY);
                 break;
             }
         }
     }
 
-    // This band's EditBox and Button share no widget base, so a row's control is held as the common event-listener
-    // type and driven through these: the button exposes position, width, render, and hover directly, while the
-    // EditBox carries its own coordinate fields, a final width, an editable flag, and no hover state, so its hover is
-    // tested against the fixed control box.
-    private static void setControlActive(class_4122 control, boolean active) {
-        if (control instanceof class_356) {
-            ((class_356) control).field_1055 = active;
+    // Below 1.13 GuiButton and GuiTextField share only the Gui base, so a row's control is held as Gui and narrowed
+    // at each site through these: a button exposes position, width, render, and hover directly, while a GuiTextField
+    // carries its own coordinate fields and a fixed width and has no hover state, so its hover is tested against the
+    // control box.
+    private static void setControlActive(Gui control, boolean active) {
+        if (control instanceof GuiButton) {
+            ((GuiButton) control).enabled = active;
         } else {
-            ((EditBox) control).setEditable(active);
+            ((GuiTextField) control).setEnabled(active);
         }
     }
 
-    private static void setControlPosition(class_4122 control, int x, int y) {
-        if (control instanceof class_356) {
-            class_356 button = (class_356) control;
-            button.field_1051 = x;
-            button.field_1052 = y;
+    private static void setControlPosition(Gui control, int x, int y) {
+        if (control instanceof GuiButton) {
+            GuiButton button = (GuiButton) control;
+            button.x = x;
+            button.y = y;
         } else {
-            EditBox box = (EditBox) control;
-            box.field_1117 = x;
-            box.field_1118 = y;
+            GuiTextField box = (GuiTextField) control;
+            box.x = x;
+            box.y = y;
         }
     }
 
-    private static int controlWidth(class_4122 control) {
-        return control instanceof class_356 ? ((class_356) control).getWidth() : CONTROL_WIDTH;
+    private static int controlWidth(Gui control) {
+        return control instanceof GuiButton ? ((GuiButton) control).getButtonWidth() : CONTROL_WIDTH;
     }
 
-    private static void renderControl(class_4122 control, int mouseX, int mouseY, float partialTick) {
-        if (control instanceof class_356) {
-            ((class_356) control).renderButton(mouseX, mouseY, partialTick);
+    private static void renderControl(Gui control, int mouseX, int mouseY, float partialTick) {
+        if (control instanceof GuiButton) {
+            ((GuiButton) control).drawButton(Minecraft.getMinecraft(), mouseX, mouseY, partialTick);
         } else {
-            ((EditBox) control).renderButton(mouseX, mouseY, partialTick);
+            ((GuiTextField) control).drawTextBox();
         }
     }
 
-    private static boolean isControlHovered(class_4122 control, int mouseX, int mouseY) {
-        if (control instanceof class_356) {
-            return ((class_356) control).method_4229();
+    private static boolean isControlHovered(Gui control, int mouseX, int mouseY) {
+        if (control instanceof GuiButton) {
+            return ((GuiButton) control).isMouseOver();
         }
-        EditBox box = (EditBox) control;
-        return mouseX >= box.field_1117 && mouseX < box.field_1117 + CONTROL_WIDTH
-                && mouseY >= box.field_1118 && mouseY < box.field_1118 + CONTROL_HEIGHT;
+        GuiTextField box = (GuiTextField) control;
+        return mouseX >= box.x && mouseX < box.x + CONTROL_WIDTH
+                && mouseY >= box.y && mouseY < box.y + CONTROL_HEIGHT;
     }
 
     private void selectTab(int index) {
@@ -339,8 +391,8 @@ public final class WdlSettingsScreen extends Screen {
             case BOOLEAN:
                 WdlCycleButton<Boolean> toggle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
                         ImmutableList.of(Boolean.TRUE, Boolean.FALSE), this.draft.getBoolean(key),
-                        value -> value ? new TranslatableComponent("options.on")
-                                : new TranslatableComponent("options.off"),
+                        value -> value ? new TextComponentTranslation("options.on")
+                                : new TextComponentTranslation("options.off"),
                         (button, value) -> onBoolChange(key, value));
                 return new Control(toggle, () -> toggle.setValue(this.draft.getBoolean(key)));
             case INTEGER:
@@ -395,7 +447,7 @@ public final class WdlSettingsScreen extends Screen {
 
     private <E extends Enum<E>> Control cycleControl(String key, Class<E> type, List<E> values, E initial) {
         WdlCycleButton<E> cycle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, values, initial,
-                value -> new TranslatableComponent(valueLabelKey(value)),
+                value -> new TextComponentTranslation(valueLabelKey(value)),
                 (button, value) -> this.draft.set(key, value.name()));
         return new Control(cycle, () -> cycle.setValue(this.draft.getEnum(key, type)));
     }
@@ -403,7 +455,7 @@ public final class WdlSettingsScreen extends Screen {
     private Control recaptureControl(String key) {
         WdlCycleButton<RecaptureMode> cycle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
                 ImmutableList.copyOf(RecaptureMode.values()), this.draft.getEnum(key, RecaptureMode.class),
-                value -> new TranslatableComponent(valueLabelKey(value)),
+                value -> new TextComponentTranslation(valueLabelKey(value)),
                 (button, value) -> onRecaptureChange(key, value));
         return new Control(cycle, () -> cycle.setValue(this.draft.getEnum(key, RecaptureMode.class)));
     }
@@ -423,32 +475,43 @@ public final class WdlSettingsScreen extends Screen {
      * to this screen re-reads the mode from the draft so a cancel visibly snaps it back.
      */
     private void showReduceRecaptureConfirm(String key, RecaptureMode value) {
-        Minecraft minecraft = Minecraft.getInstance();
-        BooleanConsumer choice = confirmed -> {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        Consumer<Boolean> choice = confirmed -> {
             if (confirmed) {
                 this.draft.set(key, value.name());
             }
-            minecraft.setScreen(this);
+            minecraft.displayGuiScreen(this);
         };
         // The lost capability differs by target: switching to OFF freezes every area after its first capture,
         // while switching to NEARBY only drops the revisit overwrite (the area around you stays current).
         String messageKey = value == RecaptureMode.OFF
                 ? "wdl.settings.confirm.recapture.to_off.message"
                 : "wdl.settings.confirm.recapture.to_nearby.message";
-        minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
-                new TranslatableComponent("wdl.settings.confirm.recapture.title",
-                        amberComponent(new TranslatableComponent(valueLabelKey(value)))),
-                new TranslatableComponent(messageKey),
-                new TranslatableComponent("wdl.settings.confirm.recapture.confirm"),
-                new TranslatableComponent("gui.cancel")));
+        minecraft.displayGuiScreen(new WdlCaptureDisableConfirmScreen(choice,
+                new TextComponentTranslation("wdl.settings.confirm.recapture.title",
+                        amberComponent(new TextComponentTranslation(valueLabelKey(value)))),
+                new TextComponentTranslation(messageKey),
+                new TextComponentTranslation("wdl.settings.confirm.recapture.confirm"),
+                new TextComponentTranslation("gui.cancel")));
     }
 
     private Control textControl(String key) {
-        EditBox box = new EditBox(0, this.field_1234, 0, 0, CONTROL_WIDTH, CONTROL_HEIGHT);
-        box.setMaxLength(32);
-        box.setValue(currentText(key));
-        box.method_18387((editId, text) -> this.draft.set(key, text));
-        return new Control(box, () -> box.setValue(currentText(key)));
+        GuiTextField box = new GuiTextField(0, this.fontRenderer, 0, 0, CONTROL_WIDTH, CONTROL_HEIGHT);
+        box.setMaxStringLength(32);
+        box.setText(currentText(key));
+        box.setGuiResponder(new GuiPageButtonList.GuiResponder() {
+            @Override
+            public void setEntryValue(int id, boolean value) {}
+
+            @Override
+            public void setEntryValue(int id, float value) {}
+
+            @Override
+            public void setEntryValue(int id, String value) {
+                draft.set(key, value);
+            }
+        });
+        return new Control(box, () -> box.setText(currentText(key)));
     }
 
     private String currentText(String key) {
@@ -461,10 +524,10 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     /** Attach the option's help tooltip to its control, only when the language file carries the key (helpKey). */
-    private void applyTooltip(class_4122 widget, String key) {
+    private void applyTooltip(Gui widget, String key) {
         String tooltipKey = SettingsLayout.optionTooltipKey(key);
-        if (I18n.exists(tooltipKey)) {
-            this.hoverTooltips.add(Maps.immutableEntry(widget, new TranslatableComponent(tooltipKey)));
+        if (I18n.hasKey(tooltipKey)) {
+            this.hoverTooltips.add(Maps.immutableEntry(widget, new TextComponentTranslation(tooltipKey)));
         }
     }
 
@@ -484,65 +547,65 @@ public final class WdlSettingsScreen extends Screen {
      */
     private void showDisableConfirm(String key) {
         String base = "wdl.settings.confirm.capture"; // only the boolean capture toggles route here
-        Minecraft minecraft = Minecraft.getInstance();
-        BooleanConsumer choice = confirmed -> {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        Consumer<Boolean> choice = confirmed -> {
             if (confirmed) {
                 this.draft.set(key, "false");
             }
-            minecraft.setScreen(this);
+            minecraft.displayGuiScreen(this);
         };
-        minecraft.setScreen(new WdlCaptureDisableConfirmScreen(choice,
-                new TranslatableComponent(base + ".title",
-                        amberComponent(new TranslatableComponent(SettingsLayout.optionLabelKey(key)))),
-                new TranslatableComponent(SettingsLayout.confirmMessageKey(key)),
-                new TranslatableComponent(base + ".confirm"),
-                new TranslatableComponent("gui.cancel")));
+        minecraft.displayGuiScreen(new WdlCaptureDisableConfirmScreen(choice,
+                new TextComponentTranslation(base + ".title",
+                        amberComponent(new TextComponentTranslation(SettingsLayout.optionLabelKey(key)))),
+                new TextComponentTranslation(SettingsLayout.confirmMessageKey(key)),
+                new TextComponentTranslation(base + ".confirm"),
+                new TextComponentTranslation("gui.cancel")));
     }
 
     private void onDefaults() {
-        Minecraft minecraft = Minecraft.getInstance();
-        minecraft.setScreen(new ConfirmScreen((confirmed, dialogId) -> {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        minecraft.displayGuiScreen(new GuiYesNo((confirmed, dialogId) -> {
             if (confirmed) {
                 this.draft.revertAllToDefaults();
             }
-            minecraft.setScreen(this);
-        }, amberComponent(new TranslatableComponent("wdl.settings.defaults.title")).getColoredString(),
-                new TranslatableComponent("wdl.settings.defaults.message").getString(),
-                I18n.get("wdl.settings.defaults.confirm"),
-                I18n.get("gui.cancel"), 0));
+            minecraft.displayGuiScreen(this);
+        }, amberComponent(new TextComponentTranslation("wdl.settings.defaults.title")).getFormattedText(),
+                new TextComponentTranslation("wdl.settings.defaults.message").getUnformattedText(),
+                I18n.format("wdl.settings.defaults.confirm"),
+                I18n.format("gui.cancel"), 0));
     }
 
     private void onDiscard() {
-        Minecraft minecraft = Minecraft.getInstance();
-        minecraft.setScreen(new ConfirmScreen((confirmed, dialogId) -> minecraft.setScreen(confirmed ? this.parent
-                : this),
-                amberComponent(new TranslatableComponent("wdl.settings.discard.title")).getColoredString(),
-                new TranslatableComponent("wdl.settings.discard.message").getString(),
-                I18n.get("wdl.settings.discard.confirm"),
-                I18n.get("gui.cancel"), 0));
+        Minecraft minecraft = Minecraft.getMinecraft();
+        minecraft.displayGuiScreen(new GuiYesNo(
+                (confirmed, dialogId) -> minecraft.displayGuiScreen(confirmed ? this.parent
+                        : this),
+                amberComponent(new TextComponentTranslation("wdl.settings.discard.title")).getFormattedText(),
+                new TextComponentTranslation("wdl.settings.discard.message").getUnformattedText(),
+                I18n.format("wdl.settings.discard.confirm"),
+                I18n.format("gui.cancel"), 0));
     }
 
-    @Override
-    public void method_18608() {
+    private void closeAndSave() {
         // Only write when something actually changed: a transient read failure at open seeds the draft from
         // DEFAULTS, so an unconditional close-write would overwrite an intact on-disk config with defaults, and
         // even a clean open+close would needlessly re-canonicalize the file.
         if (this.draft.isDirty()) {
             this.onSave.accept(this.draft.toConfig());
         }
-        Minecraft.getInstance().setScreen(this.parent);
+        this.mc.displayGuiScreen(this.parent);
     }
 
     private static final class Control {
-        private final class_4122 widget;
+        private final Gui widget;
         private final Runnable refresh;
 
-        Control(class_4122 widget, Runnable refresh) {
+        Control(Gui widget, Runnable refresh) {
             this.widget = widget;
             this.refresh = refresh;
         }
 
-        class_4122 widget() {
+        Gui widget() {
             return widget;
         }
 
@@ -552,43 +615,95 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     /** The scrollable list of rows for the active tab; rebuilt whole on a tab switch or resize. */
-    private final class SettingsList extends class_1802<SettingsEntry> {
+    private final class SettingsList extends GuiListExtended {
+        private final List<SettingsEntry> entries = new ArrayList<>();
+
         SettingsList(Minecraft minecraft, int width, int height, int top, int bottom, int itemHeight) {
             super(minecraft, width, height, top, bottom, itemHeight);
         }
 
         void add(SettingsEntry entry) {
-            method_18398(entry);
+            this.entries.add(entry);
         }
 
         @Override
-        public int method_6706() {
+        protected int getSize() {
+            return this.entries.size();
+        }
+
+        @Override
+        public GuiListExtended.IGuiListEntry getListEntry(int index) {
+            return this.entries.get(index);
+        }
+
+        @Override
+        public int getListWidth() {
             return contentBandWidth();
         }
 
         @Override
-        protected int method_1069() {
+        protected int getScrollBarX() {
             // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row, so with this
             // screen's wider row it lands inside each row and cuts through the controls; later bands derive it
             // from the row right edge, which this follows.
-            return this.field_7734 + this.field_7733 / 2 + method_6706() / 2 + 10;
+            return this.left + this.width / 2 + getListWidth() / 2 + 10;
+        }
+
+        boolean forwardKeyToFocused(char typedChar, int keyCode) {
+            boolean handled = false;
+            for (SettingsEntry entry : this.entries) {
+                handled |= entry.keyTyped(typedChar, keyCode);
+            }
+            return handled;
+        }
+
+        void tickControls() {
+            for (SettingsEntry entry : this.entries) {
+                entry.updateCursor();
+            }
+        }
+
+        void clearFieldFocus() {
+            for (SettingsEntry entry : this.entries) {
+                entry.clearFocus();
+            }
         }
     }
 
     /** A list row: a section header, an option, or a game rule. */
-    private abstract class SettingsEntry extends class_1802.class_1803<SettingsEntry> {
+    private abstract class SettingsEntry implements GuiListExtended.IGuiListEntry {
         private int contentX;
         private int contentY;
         private int contentWidth;
 
         @Override
-        public void method_6700(int rowWidth, int rowHeight, int mouseX, int mouseY, boolean hovering,
-                float partialTick) {
-            this.contentX = method_18404();
-            this.contentY = method_18403();
-            this.contentWidth = rowWidth;
-            renderContent(mouseX, mouseY, hovering, partialTick);
+        public void drawEntry(int slotIndex, int x, int y, int listWidth, int slotHeight, int mouseX, int mouseY,
+                boolean isSelected, float partialTicks) {
+            this.contentX = x;
+            this.contentY = y;
+            this.contentWidth = listWidth;
+            renderContent(mouseX, mouseY, isSelected, partialTicks);
         }
+
+        @Override
+        public void updatePosition(int slotIndex, int x, int y, float partialTicks) {}
+
+        @Override
+        public boolean mousePressed(int slotIndex, int mouseX, int mouseY, int mouseEvent, int relativeX,
+                int relativeY) {
+            return false;
+        }
+
+        @Override
+        public void mouseReleased(int slotIndex, int x, int y, int mouseEvent, int relativeX, int relativeY) {}
+
+        boolean keyTyped(char typedChar, int keyCode) {
+            return false;
+        }
+
+        void updateCursor() {}
+
+        void clearFocus() {}
 
         abstract void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick);
 
@@ -607,41 +722,35 @@ public final class WdlSettingsScreen extends Screen {
 
     /** A non-interactive section caption drawn in the brand accent. */
     private final class HeaderRow extends SettingsEntry {
-        private final Component label;
+        private final ITextComponent label;
 
         HeaderRow(String labelKey) {
-            this.label = new TranslatableComponent(labelKey);
+            this.label = new TextComponentTranslation(labelKey);
         }
 
         @Override
         public void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl();
-            int textY = getContentY() + (ROW_HEIGHT - field_1234.lineHeight) / 2 + 2;
-            surface.text(field_1234, this.label, getContentX(), textY, BrandColors.opaque(BrandColors.AMBER));
+            int textY = getContentY() + (ROW_HEIGHT - fontRenderer.FONT_HEIGHT) / 2 + 2;
+            surface.text(fontRenderer, this.label, getContentX(), textY, BrandColors.opaque(BrandColors.AMBER));
         }
     }
 
     /** A row with a label, one editing control, and a revert affordance, master-gated when applicable. */
     private abstract class ControlRow extends SettingsEntry {
-        private final Component label;
-        private final class_356 revert;
+        private final ITextComponent label;
+        private final GuiButton revert;
         private final @Nullable String masterKey;
 
-        ControlRow(Component label, @Nullable String masterKey) {
+        ControlRow(ITextComponent label, @Nullable String masterKey) {
             this.label = label;
             this.masterKey = masterKey;
-            this.revert = new class_356(0, 0, 0, REVERT_WIDTH, CONTROL_HEIGHT, "") {
-                @Override
-                public void method_18374(double mouseX, double mouseY) {
-                    doRevert();
-                    refresh();
-                }
-            };
+            this.revert = new GuiButton(0, 0, 0, REVERT_WIDTH, CONTROL_HEIGHT, "");
             WdlSettingsScreen.this.hoverTooltips.add(
-                    Maps.immutableEntry(this.revert, new TranslatableComponent("wdl.settings.defaults")));
+                    Maps.immutableEntry(this.revert, new TextComponentTranslation("wdl.settings.defaults")));
         }
 
-        abstract class_4122 control();
+        abstract Gui control();
 
         abstract boolean isModified();
 
@@ -657,7 +766,7 @@ public final class WdlSettingsScreen extends Screen {
         @Override
         public void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl();
-            class_4122 control = control();
+            Gui control = control();
             boolean enabled = this.masterKey == null || draft.getBoolean(this.masterKey);
             int rowX = getContentX();
             int rowTop = getContentY();
@@ -665,8 +774,8 @@ public final class WdlSettingsScreen extends Screen {
             int revertX = rowX + getContentWidth() - REVERT_WIDTH;
             int controlX = revertX - GAP - controlWidth(control);
 
-            int textY = rowTop + (ROW_HEIGHT - field_1234.lineHeight) / 2;
-            surface.text(field_1234, this.label, rowX, textY, BrandColors.opaque(enabled ? BrandColors.IVORY
+            int textY = rowTop + (ROW_HEIGHT - fontRenderer.FONT_HEIGHT) / 2;
+            surface.text(fontRenderer, this.label, rowX, textY, BrandColors.opaque(enabled ? BrandColors.IVORY
                     : BrandColors.GRAY));
 
             setControlActive(control, enabled);
@@ -676,20 +785,20 @@ public final class WdlSettingsScreen extends Screen {
             // Passive indicator: an amber caution mark sits just left of an off core-capture toggle, a
             // defense-in-depth reminder that the download will be missing that data beyond the confirm-at-change.
             if (showsCaptureWarning()) {
-                int glyphY = controlY + (CONTROL_HEIGHT - field_1234.lineHeight) / 2;
-                surface.text(field_1234, CAPTURE_WARNING_GLYPH,
-                        controlX - GAP - field_1234.width(CAPTURE_WARNING_GLYPH), glyphY,
+                int glyphY = controlY + (CONTROL_HEIGHT - fontRenderer.FONT_HEIGHT) / 2;
+                surface.text(fontRenderer, CAPTURE_WARNING_GLYPH,
+                        controlX - GAP - fontRenderer.getStringWidth(CAPTURE_WARNING_GLYPH), glyphY,
                         BrandColors.opaque(BrandColors.AMBER));
             }
 
             // The revert affordance is shown only when the row differs from its default, hidden otherwise
             // (not grayed). The control slot above stays reserved either way, so nothing reflows as it appears.
             boolean modified = isModified();
-            this.revert.field_1056 = modified;
-            this.revert.field_1055 = enabled && modified;
-            this.revert.field_1051 = revertX;
-            this.revert.field_1052 = controlY;
-            this.revert.renderButton(mouseX, mouseY, partialTick);
+            this.revert.visible = modified;
+            this.revert.enabled = enabled && modified;
+            this.revert.x = revertX;
+            this.revert.y = controlY;
+            this.revert.drawButton(Minecraft.getMinecraft(), mouseX, mouseY, partialTick);
 
             // The revert icon is a bundled sprite, not a font glyph: the revert codepoint resolves only through
             // the tiny unifont fallback, which no scale renders crisply. The button carries a blank label so
@@ -710,46 +819,72 @@ public final class WdlSettingsScreen extends Screen {
         }
 
         // The list routes a row click, drag, and key to the entry, not to its inner widgets, so the row forwards
-        // each to its control (the slider needs the click and release; the seed field needs the keys) and its
-        // revert button.
+        // each to its control (a cycle button advances, a slider grabs, a seed field focuses and takes keys) and
+        // to its revert button.
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            return control().mouseClicked(mouseX, mouseY, button) || this.revert.mouseClicked(mouseX, mouseY, button);
+        public boolean mousePressed(int slotIndex, int mouseX, int mouseY, int mouseEvent, int relativeX,
+                int relativeY) {
+            Gui control = control();
+            boolean controlHit = control instanceof GuiButton
+                    ? ((GuiButton) control).mousePressed(Minecraft.getMinecraft(), mouseX, mouseY)
+                    : ((GuiTextField) control).mouseClicked(mouseX, mouseY, mouseEvent);
+            if (controlHit) {
+                return true;
+            }
+            if (this.revert.enabled && this.revert.mousePressed(Minecraft.getMinecraft(), mouseX, mouseY)) {
+                doRevert();
+                refresh();
+                return true;
+            }
+            return false;
         }
 
         @Override
-        public boolean mouseReleased(double mouseX, double mouseY, int button) {
-            boolean handledControl = control().mouseReleased(mouseX, mouseY, button);
-            boolean handledRevert = this.revert.mouseReleased(mouseX, mouseY, button);
-            return handledControl || handledRevert;
+        public void mouseReleased(int slotIndex, int x, int y, int mouseEvent, int relativeX, int relativeY) {
+            Gui control = control();
+            if (control instanceof GuiButton) {
+                ((GuiButton) control).mouseReleased(x, y);
+            }
         }
 
         @Override
-        public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-            return control().keyPressed(keyCode, scanCode, modifiers);
+        boolean keyTyped(char typedChar, int keyCode) {
+            Gui control = control();
+            return control instanceof GuiTextField && ((GuiTextField) control).textboxKeyTyped(typedChar, keyCode);
         }
 
         @Override
-        public boolean charTyped(char codePoint, int modifiers) {
-            return control().charTyped(codePoint, modifiers);
+        void updateCursor() {
+            Gui control = control();
+            if (control instanceof GuiTextField) {
+                ((GuiTextField) control).updateCursorCounter();
+            }
+        }
+
+        @Override
+        void clearFocus() {
+            Gui control = control();
+            if (control instanceof GuiTextField) {
+                ((GuiTextField) control).setFocused(false);
+            }
         }
     }
 
     /** A descriptor-backed option row: reverts to the descriptor default. */
     private final class OptionRow extends ControlRow {
         private final String key;
-        private final class_4122 control;
+        private final Gui control;
         private final Runnable refresher;
 
-        OptionRow(String key, class_4122 control, Runnable refresher, @Nullable String masterKey) {
-            super(new TranslatableComponent(SettingsLayout.optionLabelKey(key)), masterKey);
+        OptionRow(String key, Gui control, Runnable refresher, @Nullable String masterKey) {
+            super(new TextComponentTranslation(SettingsLayout.optionLabelKey(key)), masterKey);
             this.key = key;
             this.control = control;
             this.refresher = refresher;
         }
 
         @Override
-        class_4122 control() {
+        Gui control() {
             return this.control;
         }
 
@@ -781,17 +916,18 @@ public final class WdlSettingsScreen extends Screen {
         private final WdlCycleButton<Boolean> toggle;
 
         GameRuleRow(CuratedGameRule rule) {
-            super(new TranslatableComponent(SettingsLayout.gameRuleLabelKey(rule.id())), "overrideGamerules");
+            super(new TextComponentTranslation(SettingsLayout.gameRuleLabelKey(rule.id())), "overrideGamerules");
             this.rule = rule;
             this.toggle = new WdlCycleButton<>(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
                     ImmutableList.of(Boolean.TRUE, Boolean.FALSE), isOn(),
-                    value -> value ? new TranslatableComponent("options.on") : new TranslatableComponent("options.off"),
+                    value -> value ? new TextComponentTranslation("options.on")
+                            : new TextComponentTranslation("options.off"),
                     (button, value) -> draft.setGameRule(rule.bandId(),
                             value ? rule.enabledValue() : rule.disabledValue(), rule.curatedValue()));
         }
 
         @Override
-        class_4122 control() {
+        Gui control() {
             return this.toggle;
         }
 
@@ -822,7 +958,7 @@ public final class WdlSettingsScreen extends Screen {
      * background pass, and a subclass supplies only the value quantization and formatting (int versus tenth-quantized
      * float).
      */
-    private abstract class RangeSlider extends class_356 {
+    private abstract class RangeSlider extends GuiButton {
         final String key;
         protected double value;
         private boolean sliding;
@@ -840,8 +976,8 @@ public final class WdlSettingsScreen extends Screen {
         abstract double draftFraction();
 
         protected void updateMessage() {
-            this.field_1053 = new TranslatableComponent(SettingsLayout.optionValueKey(this.key), currentText())
-                    .getString();
+            this.displayString = new TextComponentTranslation(SettingsLayout.optionValueKey(this.key), currentText())
+                    .getUnformattedText();
         }
 
         protected void applyValue() {
@@ -853,38 +989,43 @@ public final class WdlSettingsScreen extends Screen {
             updateMessage();
         }
 
-        // The flat button face stands in for the slider groove (method_892 returning 0 selects the base texture
-        // row), and the handle is drawn over it here, matching vanilla's own slider.
+        // The flat button face stands in for the slider groove (getHoverState returning 0 selects the base texture
+        // row), and the handle is drawn over it in mouseDragged, which drawButton calls each frame between the face
+        // and the label, matching where vanilla's own slider draws its handle.
         @Override
-        protected int method_892(boolean hovered) {
+        protected int getHoverState(boolean mouseOver) {
             return 0;
         }
 
         @Override
-        protected void renderBg(Minecraft minecraft, int mouseX, int mouseY) {
+        protected void mouseDragged(Minecraft minecraft, int mouseX, int mouseY) {
             if (this.sliding) {
                 setValueFromMouse(mouseX);
             }
-            minecraft.getTextureManager().bind(field_6282);
-            GlStateManager.method_9825(1.0F, 1.0F, 1.0F, 1.0F);
-            int handleX = this.field_1051 + (int) (this.value * (this.field_1049 - 8));
-            this.method_992(handleX, this.field_1052, 0, 66, 4, 20);
-            this.method_992(handleX + 4, this.field_1052, 196, 66, 4, 20);
+            minecraft.getTextureManager().bindTexture(BUTTON_TEXTURES);
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            int handleX = this.x + (int) (this.value * (this.width - 8));
+            this.drawTexturedModalRect(handleX, this.y, 0, 66, 4, 20);
+            this.drawTexturedModalRect(handleX + 4, this.y, 196, 66, 4, 20);
         }
 
         @Override
-        public void method_18374(double mouseX, double mouseY) {
+        public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+            if (!super.mousePressed(minecraft, mouseX, mouseY)) {
+                return false;
+            }
             setValueFromMouse(mouseX);
             this.sliding = true;
+            return true;
         }
 
         @Override
-        public void method_18376(double mouseX, double mouseY) {
+        public void mouseReleased(int mouseX, int mouseY) {
             this.sliding = false;
         }
 
         private void setValueFromMouse(double mouseX) {
-            this.value = Mth.clamp((mouseX - (this.field_1051 + 4)) / (this.field_1049 - 8), 0.0, 1.0);
+            this.value = MathHelper.clamp((mouseX - (this.x + 4)) / (this.width - 8), 0.0, 1.0);
             updateMessage();
             applyValue();
         }
@@ -949,8 +1090,8 @@ public final class WdlSettingsScreen extends Screen {
     }
 
     /** Tint {@code component} the nearest vanilla color to the brand amber (gold), mutating its style in place. */
-    private static Component amberComponent(Component component) {
-        component.getStyle().setColor(ChatFormatting.GOLD);
+    private static ITextComponent amberComponent(ITextComponent component) {
+        component.getStyle().setColor(TextFormatting.GOLD);
         return component;
     }
 }

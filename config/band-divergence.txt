@@ -184,6 +184,8 @@ common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
 # Below 1.17 there is no CycleButton widget (it arrived at 1.17 with the narration API), so this band-local cycle
 # button reproduces the value-cycling toggle the higher bands get from vanilla's CycleButton, without the 1.17
 # narration API this band lacks. New at this band.
+# Below 1.13 the button base is the pre-onPress GuiButton, so a hit advances the value in an overridden
+# mousePressed rather than through an onPress callback.
 common/src/main/java/world/thearchive/wdl/client/WdlCycleButton.java
 
 # Below 1.20 there is no FaviconTexture (added by the 1.20 GUI overhaul), so the client draw seam's blitFavicon names
@@ -211,6 +213,13 @@ common/src/main/java/world/thearchive/wdl/adapter/RenderSurface.java
 # per-entry updateNarration hook, so the download row narrates through the list's setSelected override calling
 # NarratorChatListener.INSTANCE.sayNow, the way vanilla WorldSelectionList narrates its rows; the shared lang key
 # wdl.screen.downloads.narration stays live and identical across all bands.
+# Below 1.13 the whole screen is reimplemented on the pre-GuiScreen event model, which has no Screen.children,
+# onPress, or AbstractSelectionList: it extends GuiScreen, so its buttons are GuiButton subclasses dispatched
+# through actionPerformed (custom-drawn widgets ride a WidgetButton base), the name field is a hand-managed
+# GuiTextField driven from keyTyped and updateScreen, and the download list is a GuiListExtended with raw
+# slotIndex IGuiListEntry rows. The world icon is decoded through ImageIO into the BufferedImage DynamicTexture
+# takes (no NativeImage), Rect2i becomes a local int-rect holder, folder and browser opens go through
+# java.awt.Desktop (no Util.getPlatform), and the narration call is NarratorChatListener.INSTANCE.say.
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 
 # The same getScrollbarPosition divergence reaches the settings list: this band's fixed width/2 + 124 assumes the
@@ -222,6 +231,11 @@ common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 # unclipped row overflow at the top and bottom edges (the list does not scissor at this band), so the settings
 # screen paints the list before its own tab strip and footer buttons rather than after as on the higher bands: the
 # fill hides the row overflow while the buttons draw on top of it.
+# Below 1.13 the screen is reimplemented on the pre-GuiScreen event model: it extends GuiScreen, its tabs and
+# footer are GuiButton actions dispatched through actionPerformed, the row controls (cycle button, slider, seed
+# field) share only the Gui base and are narrowed at each site, the slider rides the GuiButton
+# mouseDragged/getHoverState idiom rather than a renderBg hook, and the list is a GuiListExtended with raw
+# slotIndex IGuiListEntry rows, keys forwarded from keyTyped to the focused GuiTextField.
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the HUD-layer id is built with the
