@@ -206,6 +206,14 @@ val reobfFixtureJar = tasks.register<Jar>("reobfFixtureJar") {
     from(sourceSets["reobftest"].output)
 }
 
+// Unimined's remapJar otherwise defaults to the same archiveBaseName/version as modJar below (no classifier),
+// which collides with modJar's own ship-name output path: modJar's from(zipTree(remapJar.archiveFile)) would
+// then open its own output file for writing before reading it back, truncating the very jar it is trying to
+// read. Classifying remapJar's output "searge" gives modJar a distinct file to read from.
+tasks.named<Jar>("remapJar") {
+    archiveClassifier.set("searge")
+}
+
 // --- Ship jar (modJar) + the checkShipJar class-file health gate ---
 // The shipped Forge jar must be the reobf'd, searge-named artifact. Unimined's defaultRemapJar produces that jar
 // natively (the "remapJar" task; the plain `jar` task stays the MCP-named dev jar), so modJar wraps it under the
