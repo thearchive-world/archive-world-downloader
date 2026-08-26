@@ -3,8 +3,8 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.entity.Entity;
+import net.minecraft.inventory.Container;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -17,8 +17,8 @@ import org.jspecify.annotations.Nullable;
  * <p>Mirrors {@link ConnectionTee}: the MC-typed accessor is declared abstract here, in common, which is compiled
  * without either loader's widening, and each per-loader plug ships the concrete read. Published statically because the
  * bind that consumes it holds no loader reference, and installed once from the loader entry point, before any capture
- * can run. The parameter is the plain {@link AbstractContainerMenu} rather than the mount menu type, so each plug names
- * the menu class its own band ships.
+ * can run. The parameter is the plain {@link Container} rather than the mount menu type, so each plug names the menu
+ * class its own band ships.
  */
 public abstract class MountMenuReader {
     // An install this read cannot see costs every chested-animal capture, silently and with no log line.
@@ -40,11 +40,11 @@ public abstract class MountMenuReader {
      * the uninstalled state as a real hazard rather than a safe no-op if anything ever makes a block target and a
      * click-less mount open coexist.
      */
-    static @Nullable Entity mountOf(AbstractContainerMenu menu) {
+    static @Nullable Entity mountOf(Container menu) {
         MountMenuReader reader = installed;
         return reader != null ? reader.mount(menu) : null;
     }
 
     /** The menu's mount; the per-loader plug widens or transforms the non-public field. */
-    protected abstract @Nullable Entity mount(AbstractContainerMenu menu);
+    protected abstract @Nullable Entity mount(Container menu);
 }

@@ -340,7 +340,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
     private static void openFolder(File folder) {
         try {
             Desktop.getDesktop().open(folder);
-        } catch (IOException | RuntimeException | UnsupportedOperationException e) {
+        } catch (IOException | RuntimeException e) {
             LOGGER.warn("could not open the folder {}", folder, e);
         }
     }
@@ -903,9 +903,9 @@ public final class WdlDownloadsScreen extends GuiScreen {
         @Override
         void draw(int mouseX, int mouseY, float partialTick) {
             RenderSurface surface = new RenderSurfaceImpl();
-            surface.fill(this.x, this.y, this.x + getWidth(),
+            surface.fill(this.x, this.y, this.x + getButtonWidth(),
                     this.y + this.height, BANNER_FILL_ARGB);
-            surface.outline(this.x, this.y, getWidth(), this.height, BANNER_OUTLINE_ARGB);
+            surface.outline(this.x, this.y, getButtonWidth(), this.height, BANNER_OUTLINE_ARGB);
             int textY = this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2;
             surface.text(fontRenderer, WARNING_GLYPH, this.x + BANNER_GAP, textY, BANNER_GLYPH_ARGB);
             surface.text(fontRenderer, this.prose, this.x + BANNER_GAP + fontRenderer.getStringWidth(WARNING_GLYPH),

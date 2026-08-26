@@ -10,10 +10,10 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
-import net.minecraft.network.Connection;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
-import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.Packet;
+import net.minecraft.network.play.client.CPacketEntityAction;
+import net.minecraft.network.play.server.SPacketEntity;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -68,23 +68,23 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
     }
 
     /** The connection's Netty channel; the per-loader plug widens or transforms the non-public field. */
-    protected abstract Channel channel(Connection connection);
+    protected abstract Channel channel(NetworkManager connection);
 
     /** A relative-move packet's entity id; the per-loader plug widens or transforms the non-public field. */
-    protected abstract int entityId(ClientboundMoveEntityPacket move);
+    protected abstract int entityId(SPacketEntity move);
 
     /** A relative-move packet's short position deltas; the per-loader plug widens the non-public fields. */
-    protected abstract short moveDeltaX(ClientboundMoveEntityPacket move);
+    protected abstract short moveDeltaX(SPacketEntity move);
 
-    protected abstract short moveDeltaY(ClientboundMoveEntityPacket move);
+    protected abstract short moveDeltaY(SPacketEntity move);
 
-    protected abstract short moveDeltaZ(ClientboundMoveEntityPacket move);
+    protected abstract short moveDeltaZ(SPacketEntity move);
 
     /**
      * Insert this tee into {@code connection}'s pipeline before {@code "packet_handler"}, once. Fail-soft: any pipeline
      * surprise is logged, never thrown, so it never disrupts the connection.
      */
-    protected final void installInto(Connection connection) {
+    protected final void installInto(NetworkManager connection) {
         try {
             ChannelPipeline pipeline = channel(connection).pipeline();
             if (pipeline.get("packet_handler") == null || pipeline.get(NAME) != null) {
@@ -124,9 +124,9 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
      */
     @Override
     public void write(ChannelHandlerContext context, Object message, ChannelPromise promise) throws Exception {
-        if (message instanceof ServerboundPlayerCommandPacket
-                && ((ServerboundPlayerCommandPacket) message)
-                        .getAction() == ServerboundPlayerCommandPacket.Action.OPEN_INVENTORY) {
+        if (message instanceof CPacketEntityAction
+                && ((CPacketEntityAction) message)
+                        .getAction() == CPacketEntityAction.Action.OPEN_INVENTORY) {
             OpenClickTracker.signalOpenInventoryRequest();
         }
         super.write(context, message, promise); // always forward, unchanged: the tee never consumes
@@ -140,8 +140,8 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
     }
 
     private void routeOne(Packet<?> packet, EntityPacketCapture capture, IntSet bundleNamedIds) {
-        if (packet instanceof ClientboundMoveEntityPacket) {
-            ClientboundMoveEntityPacket move = (ClientboundMoveEntityPacket) packet;
+        if (packet instanceof SPacketEntity) {
+            SPacketEntity move = (SPacketEntity) packet;
             // A relative move's entity id has no public getter, so the capture cannot read it; pass the loader's
             // widened or transformed field. Every other entity packet exposes its id publicly.
             capture.onMove(entityId(move), moveDeltaX(move), moveDeltaY(move), moveDeltaZ(move), move);

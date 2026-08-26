@@ -104,6 +104,14 @@ common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
 # SystemToast has no custom-id class, so the two toast streams reuse two distinct vanilla SystemToastIds enum
 # categories, and MutableComponent has no withColor(int), so toast text colors go through withStyle.
+# Below 1.13 there is no Mojang mapping and no Brigadier, so the whole bridge re-vocabularizes to classic MCP and
+# leaves the cherry-pick line: the /wdl command is a net.minecraft.command.CommandBase (execute and
+# getTabCompletions over an ICommandSender) the loader registers through Forge's ClientCommandHandler rather than
+# a LiteralArgumentBuilder tree; the pause-menu row is GuiButton subclasses dispatched through the loader's
+# action-performed hook rather than an onPress callback; the chat and toast text is classic ITextComponent built
+# from TextComponentString/TextComponentTranslation with Style.setColor(TextFormatting); the toast host is
+# Minecraft.getToastGui with the two streams reusing SystemToast.Type categories; and the nearest-named-color
+# quantizer recomputes each color's RGB from its color index, since TextFormatting exposes no RGB accessor.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
 # The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
@@ -381,6 +389,10 @@ common/src/test/java/world/thearchive/wdl/testsupport/RegionRoundTrip.java
 # is WorldClient with a ChunkProviderClient (getLoadedChunk), the container base is TileEntityLockable, and the
 # seal test is IBlockState.isFullBlock.
 common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
+
+# The fastutil Minecraft bundles at this band has no static Long2ObjectMaps.fastIterator, so the draw-set walks its
+# sections through long2ObjectEntrySet().iterator() instead.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineDrawSet.java
 
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
 # Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList, getTag/removeTag/setTag rather than
@@ -664,7 +676,14 @@ common/src/main/java/world/thearchive/wdl/adapter/AdvancementSnapshot.java
 # Below 1.20.2 there is no configuration phase, so the connection tee does not observe
 # ClientboundStartConfigurationPacket; the backend-transfer stop machinery (signalTransfer / consumeTransferSignal)
 # stays for the controller wiring but is never raised on this band.
+# Below 1.13 the packet types are classic MCP: the connection is NetworkManager, the relative-move packet is
+# SPacketEntity (its int move-deltas read through the public getX/getY/getZ), and the ridden-vehicle open request
+# is CPacketEntityAction.
 common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
+
+# Below 1.13 there is no Mojang mapping, so the shared mount-menu read names the classic MCP net.minecraft.entity.Entity
+# and net.minecraft.inventory.Container rather than the Mojmap world.entity.Entity and world.inventory.AbstractContainerMenu.
+common/src/main/java/world/thearchive/wdl/adapter/MountMenuReader.java
 
 # Below 1.20.2 there is no AdvancementRequirements, so the fixture drives the two-argument
 # AdvancementProgress.update(Map<String, Criterion>, String[][]) with a no-argument Criterion (update reads only
@@ -740,7 +759,17 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
 # XaeroPlus publishes no 1.18.x build for either loader, so the coverage overlay's XaeroPlus binding is dropped as a
 # disclosed limit on this band: Wdl.initialize no longer constructs the XaeroPlus integration, and the compat/xaeroplus
 # package is deleted. The JourneyMap overlay covers the same role where its API resolves.
+# Below 1.13 there is no Mojang mapping, so the client entry point names the classic MCP Minecraft API:
+# Minecraft.getMinecraft, the world/currentScreen/gameSettings/player fields, getIntegratedServer/getRenderViewEntity/
+# getCurrentServerData, addScheduledTask for the restore-completion marshal, displayGuiScreen for the screen opens,
+# ServerData.serverName for the source name, and the saves directory resolved as the game directory's saves child (the
+# save format exposes no saves-root accessor), with the loaded-world path taken as the integrated server's folder under it.
 common/src/main/java/world/thearchive/wdl/Wdl.java
+
+# Below 1.13 there is no Mojang mapping, so the resume/confirm flow names the classic MCP Minecraft API:
+# Minecraft.getMinecraft, displayGuiScreen for the confirm screens, and the saves directory resolved as the game
+# directory's saves child (the save format exposes no saves-root accessor).
+common/src/main/java/world/thearchive/wdl/ResumeFlow.java
 
 # Deleted on this band with the rest of the XaeroPlus binding (XaeroPlus ships no 1.18.x build for either loader): the
 # plugin binding that reads the coverage index into XaeroPlus.

@@ -4,7 +4,6 @@
 package world.thearchive.wdl.adapter;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.ArrayList;
@@ -27,7 +26,7 @@ public final class OutlineDrawSet {
      * of lag rather than letting it accumulate empty buckets along the camera's path.
      */
     void clear() {
-        ObjectIterator<Long2ObjectMap.Entry<List<OutlineRim>>> entries = Long2ObjectMaps.fastIterator(sections);
+        ObjectIterator<Long2ObjectMap.Entry<List<OutlineRim>>> entries = sections.long2ObjectEntrySet().iterator();
         while (entries.hasNext()) {
             List<OutlineRim> rims = entries.next().getValue();
             if (rims.isEmpty()) {

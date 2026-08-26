@@ -4,7 +4,6 @@
 package world.thearchive.wdl.adapter;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.ArrayList;
@@ -225,7 +224,7 @@ public final class OutlineTracker {
 
     /** Drop cache entries the camera no longer covers (not visited this tick), bounding the cache to the clamp. */
     private void evictUntouched() {
-        ObjectIterator<Long2ObjectMap.Entry<ChunkContainers>> entries = Long2ObjectMaps.fastIterator(chunkCache);
+        ObjectIterator<Long2ObjectMap.Entry<ChunkContainers>> entries = chunkCache.long2ObjectEntrySet().iterator();
         while (entries.hasNext()) {
             if (entries.next().getValue().lastTouchedTick != tickCounter) {
                 entries.remove();

@@ -72,7 +72,7 @@ final class ResumeFlow {
             return;
         }
         if (start.classification() == TargetClassification.RESUME_EXISTING) {
-            Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
+            Path savesDirectory = Minecraft.getMinecraft().gameDir.toPath().resolve("saves");
             DownloadTarget target = TargetResolver.resolveResume(start.target().folderName(), savesDirectory)
                     .withOrigin(start.target().origin());
             if (!DownloadFolders.isWdlManaged(savesDirectory.resolve(target.folderName()))) {
@@ -108,7 +108,7 @@ final class ResumeFlow {
         if (start.classification() == TargetClassification.RESUME_EXISTING) {
             // The managed gate ahead of the already-a-download reply: pointing the player at
             // /wdl resume for a folder that is not a wdl download would send them into a dead end.
-            Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
+            Path savesDirectory = Minecraft.getMinecraft().gameDir.toPath().resolve("saves");
             if (!DownloadFolders.isWdlManaged(savesDirectory.resolve(start.target().folderName()))) {
                 bridge.sendChat(ChatCopy.refuseOccupant(start.target().folderName(), true));
             } else {
@@ -135,14 +135,14 @@ final class ResumeFlow {
             bridge.sendChat(ChatCopy.joinMultiplayer());
             return;
         }
-        Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
+        Path savesDirectory = Minecraft.getMinecraft().gameDir.toPath().resolve("saves");
         DownloadTarget target = DownloadFolders.resolveManagedResume(name, savesDirectory);
         if (target == null) {
             bridge.sendChat(ChatCopy.noSuchDownload(name));
             return;
         }
         if (TargetResolver.classifyTarget(target.folderName(), savesDirectory,
-                Wdl.loadedWorldPath(Minecraft.getInstance())) == TargetClassification.REFUSE_LOADED) {
+                Wdl.loadedWorldPath(Minecraft.getMinecraft())) == TargetClassification.REFUSE_LOADED) {
             bridge.sendChat(ChatCopy.refuseLoaded());
             return;
         }
@@ -164,8 +164,8 @@ final class ResumeFlow {
             bridge.sendChat(ChatCopy.joinMultiplayer());
             return null;
         }
-        Minecraft minecraft = Minecraft.getInstance();
-        Path savesDirectory = minecraft.getLevelSource().getLevelPath("");
+        Minecraft minecraft = Minecraft.getMinecraft();
+        Path savesDirectory = minecraft.gameDir.toPath().resolve("saves");
         DownloadTarget target = TargetResolver.resolveNew(name, LocalDate.now(),
                 configSupplier.get().appendDateSuffix())
                 .withOrigin(deliberate ? DownloadTarget.Origin.FLOW_DELIBERATE : DownloadTarget.Origin.FLOW_AUTO);
@@ -206,7 +206,7 @@ final class ResumeFlow {
      */
     private void confirmThenResume(DownloadTarget target, String folderName) {
         WdlConfig config = configSupplier.get();
-        Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
+        Path savesDirectory = Minecraft.getMinecraft().gameDir.toPath().resolve("saves");
         Path saveFolder = savesDirectory.resolve(folderName);
         SinglePlayerTaint.TaintState taint = SinglePlayerTaint.classify(saveFolder);
         SinglePlayerTaint.Decision decision = SinglePlayerTaint.decide(taint, config.blockTaintedResume());
@@ -216,17 +216,17 @@ final class ResumeFlow {
                 if (source.isPresent()) {
                     RestoreSource pinned = source.get();
                     deferScreen.accept(() -> {
-                        Minecraft minecraft = Minecraft.getInstance();
-                        minecraft.setScreen(ResumeConfirm.createRestore(
+                        Minecraft minecraft = Minecraft.getMinecraft();
+                        minecraft.displayGuiScreen(ResumeConfirm.createRestore(
                                 "wdl.screen.downloads.confirm_restore_blocked",
                                 folderName, sourceZipName(pinned),
                                 RestoreOperation.nextSnapshotName(savesDirectory, folderName), config.zipOnResume(),
                                 () -> {
-                                    minecraft.setScreen(null);
+                                    minecraft.displayGuiScreen(null);
                                     Wdl.launchRestore(savesDirectory, folderName, pinned);
                                 },
                                 () -> {
-                                    minecraft.setScreen(null);
+                                    minecraft.displayGuiScreen(null);
                                     bridge.sendChat(ChatCopy.resumeCancelled());
                                 }));
                     });
@@ -242,17 +242,17 @@ final class ResumeFlow {
                     ? RestoreSource.find(savesDirectory, folderName)
                     : Optional.empty();
             deferScreen.accept(() -> {
-                Minecraft minecraft = Minecraft.getInstance();
+                Minecraft minecraft = Minecraft.getMinecraft();
                 boolean backupHere = config.zipOnResume() && !mismatch;
                 Runnable onContinue = () -> gateMapIdMismatch(folderName, mismatch, config.zipOnResume(), () -> {
                     startDownload.accept(target);
-                    Minecraft.getInstance().setScreen(null);
+                    Minecraft.getMinecraft().displayGuiScreen(null);
                 });
                 Runnable onCancel = () -> {
-                    minecraft.setScreen(null);
+                    minecraft.displayGuiScreen(null);
                     bridge.sendChat(ChatCopy.resumeCancelled());
                 };
-                minecraft.setScreen(source.isPresent()
+                minecraft.displayGuiScreen(source.isPresent()
                         ? ResumeConfirm.createTaintedRestorable(folderName, sourceZipName(source.get()),
                                 FinalizeOutputs.nextBackupName(savesDirectory, folderName), backupHere,
                                 onContinue, onCancel)
@@ -283,17 +283,17 @@ final class ResumeFlow {
             return;
         }
         deferScreen.accept(() -> {
-            Minecraft minecraft = Minecraft.getInstance();
-            minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
+            Minecraft minecraft = Minecraft.getMinecraft();
+            minecraft.displayGuiScreen(ResumeConfirm.create("wdl.screen.downloads.confirm_map_id_mismatch",
                     folderName,
-                    FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getLevelPath(""), folderName),
+                    FinalizeOutputs.nextBackupName(minecraft.gameDir.toPath().resolve("saves"), folderName),
                     backupHere,
                     () -> {
-                        minecraft.setScreen(null);
+                        minecraft.displayGuiScreen(null);
                         proceed.run();
                     },
                     () -> {
-                        minecraft.setScreen(null);
+                        minecraft.displayGuiScreen(null);
                         bridge.sendChat(ChatCopy.resumeCancelled());
                     }));
         });
@@ -311,17 +311,17 @@ final class ResumeFlow {
             return;
         }
         deferScreen.accept(() -> {
-            Minecraft minecraft = Minecraft.getInstance();
-            minecraft.setScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
+            Minecraft minecraft = Minecraft.getMinecraft();
+            minecraft.displayGuiScreen(ResumeConfirm.create("wdl.screen.downloads.merge",
                     folderName,
-                    FinalizeOutputs.nextBackupName(minecraft.getLevelSource().getLevelPath(""), folderName),
+                    FinalizeOutputs.nextBackupName(minecraft.gameDir.toPath().resolve("saves"), folderName),
                     config.zipOnResume(),
                     () -> {
                         startDownload.accept(target);
-                        minecraft.setScreen(null);
+                        minecraft.displayGuiScreen(null);
                     },
                     () -> {
-                        minecraft.setScreen(null);
+                        minecraft.displayGuiScreen(null);
                         bridge.sendChat(ChatCopy.resumeCancelled());
                     }));
         });

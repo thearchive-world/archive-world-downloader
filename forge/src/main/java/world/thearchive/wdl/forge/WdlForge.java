@@ -6,6 +6,7 @@ package world.thearchive.wdl.forge;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.util.math.RayTraceResult;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -36,10 +37,11 @@ import world.thearchive.wdl.client.WdlKeyBinds;
  * mcmod.info. Client-only is declared by this jar shipping no dedicated-server entrypoint; a client-only mod
  * needs no {@code side} attribute at this band.
  *
- * <p>The pause-menu config-GUI hook ({@code IModGuiFactory} plus the {@code @Mod(guiFactory = ...)} attribute,
- * this band's replacement for the {@code ExtensionPoint}/{@code ConfigGuiHandler} mechanisms newer bands use) is
- * not wired here: {@link Wdl#createSettingsScreen} returns a {@code Screen} of a namespace this band's client does
- * not carry, so the factory has nothing valid to construct until that seam is ported.
+ * <p>The mods-list config-GUI hook ({@code IModGuiFactory} plus the {@code @Mod(guiFactory = ...)} attribute,
+ * this band's form of the {@code ExtensionPoint}/{@code ConfigGuiHandler} mechanisms newer bands use) is left
+ * unwired: the in-mod settings screen {@link Wdl#createSettingsScreen} builds is already reached through the
+ * pause-menu settings button and {@code /wdl config}, so the mods-list entry point is a redundant second path this
+ * band does without.
  */
 @Mod(
         modid = "wdl",
@@ -62,13 +64,11 @@ public final class WdlForge {
     }
 
     /**
-     * Installs the connection tee on the client-tick edge where the play connection appears, the once-per-
-     * connection join signal at this band (there is no login/logout event to hook instead): {@code
-     * Minecraft.getMinecraft().getConnection()} is null until the local player is assigned and stays non-null
-     * across a dimension change. {@code ForgeConnectionTee.install} still takes the shared adapter's not-yet-ported
-     * {@code Connection}
-     * parameter type, so this call site stays red pending that port; the tick-edge detection itself is
-     * this band's own, already-correct FML mechanics.
+     * Installs the connection tee on the client-tick edge where the play connection appears, the once-per-connection
+     * join signal this band detects off {@code Minecraft.getMinecraft().getConnection()}, which is null until the
+     * local player is assigned and stays non-null across a dimension change. The tick-edge detection is this band's
+     * own FML mechanics; the legacy-FML ClientConnectedToServerEvent could hook it instead, but the tick edge keeps
+     * the install path uniform with the shared connect/disconnect wiring.
      */
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent tick) {
@@ -85,9 +85,12 @@ public final class WdlForge {
 
     @SubscribeEvent
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        InteractionCapture.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), event.getHand(),
-                event.getHitVec());
-        OpenClickTracker.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), event.getHitVec());
+        // The shared interaction hooks take the block-hit as a RayTraceResult (the higher bands pass a
+        // BlockHitResult); this band's event exposes the hit as its position, face, and hit vector, so the result
+        // is rebuilt here from those.
+        RayTraceResult hit = new RayTraceResult(event.getHitVec(), event.getFace(), event.getPos());
+        InteractionCapture.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), event.getHand(), hit);
+        OpenClickTracker.dispatchUseBlock(event.getEntityPlayer(), event.getWorld(), hit);
     }
 
     @SubscribeEvent

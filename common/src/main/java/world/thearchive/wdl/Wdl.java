@@ -26,14 +26,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.multiplayer.MultiPlayerLevel;
+import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.multiplayer.ServerData;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.entity.Entity;
 import net.minecraft.realms.RealmsSharedConstants;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.server.integrated.IntegratedServer;
+import net.minecraft.util.math.Vec3d;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -398,14 +398,14 @@ public final class Wdl {
             sendRefusal(target.origin(), ToastCopy.joinMultiplayer(), ChatCopy.joinMultiplayer());
             return;
         }
-        Minecraft minecraft = Minecraft.getInstance();
-        MultiPlayerLevel level = minecraft.level;
+        Minecraft minecraft = Minecraft.getMinecraft();
+        WorldClient level = minecraft.world;
         if (level == null) {
             return; // no live start path reaches here without a loaded world; a silent guard before level is used
         }
         WdlConfig config = WdlConfig.load(configPath());
         currentConfig = config;
-        Path savesDirectory = minecraft.getLevelSource().getLevelPath("");
+        Path savesDirectory = minecraft.gameDir.toPath().resolve("saves");
         if (target.mode() == DownloadMode.NEW
                 && RestoreOperation.attemptReferences(savesDirectory, target.folderName())) {
             // A torn restore attempt still stages this name under the temporary root; a NEW download landing on
@@ -445,7 +445,7 @@ public final class Wdl {
         controller.start(() -> new LiveCaptureSession(adapter, bridge, config, level, target,
                 controller.savedChunks(), controller.coveredChunks(), controller.sendRange(),
                 bridge.isModLoaded("xaeroplus") || bridge.isModLoaded("journeymap"),
-                minecraft.getCameraEntity() != minecraft.player, bobbyFilter,
+                minecraft.getRenderViewEntity() != minecraft.player, bobbyFilter,
                 controller::tick));
         if (config.showChatMessages()) {
             bridge.sendChat(target.mode() == DownloadMode.RESUME
@@ -486,7 +486,7 @@ public final class Wdl {
         }
         RestoreOperation operation = RestoreOperation.create(savesDirectory, folderName, pinnedSource,
                 WdlConfig.load(configPath()).zipOnResume());
-        operation.publishLoadedWorld(loadedWorldPath(Minecraft.getInstance()));
+        operation.publishLoadedWorld(loadedWorldPath(Minecraft.getMinecraft()));
         CompletableFuture<RestoreOperation.Result> result = new CompletableFuture<>();
         activeRestore = operation;
         restoreResult = result;
@@ -509,7 +509,8 @@ public final class Wdl {
         // never fires there; that path self-heals inline.
         // Minecraft is not an Executor at this band; its schedule-on-main-thread method is the executor the marshal
         // needs, running the poke inline when already on the game thread and queuing it for the next frame otherwise.
-        CompletionMarshal.scheduleCompletionPoke(result, runnable -> Minecraft.getInstance().method_6635(runnable),
+        CompletionMarshal.scheduleCompletionPoke(result,
+                runnable -> Minecraft.getMinecraft().addScheduledTask(runnable),
                 Wdl::restoreTick);
         try {
             worker.start();
@@ -547,7 +548,8 @@ public final class Wdl {
             }
         }, "wdl-restore-sweep");
         worker.setDaemon(true);
-        CompletionMarshal.scheduleCompletionPoke(result, runnable -> Minecraft.getInstance().method_6635(runnable),
+        CompletionMarshal.scheduleCompletionPoke(result,
+                runnable -> Minecraft.getMinecraft().addScheduledTask(runnable),
                 Wdl::restoreTick);
         try {
             worker.start();
@@ -587,8 +589,8 @@ public final class Wdl {
 
     /** Build the MC-free browse model and show the screen; run from the deferral on the client main thread. */
     private static void showDownloadsScreen(boolean expandExistingList) {
-        Minecraft minecraft = Minecraft.getInstance();
-        Path savesDirectory = minecraft.getLevelSource().getLevelPath("");
+        Minecraft minecraft = Minecraft.getMinecraft();
+        Path savesDirectory = minecraft.gameDir.toPath().resolve("saves");
         Path loadedWorld = loadedWorldPath(minecraft);
         Supplier<List<DownloadEntry>> entries = () -> {
             try {
@@ -603,7 +605,7 @@ public final class Wdl {
         // by seconds, so warm the worldgen reconstruction now when the chosen generator needs it.
         WorldgenWarmup.dispatchForScreenOpen(config.worldOutput().worldType(),
                 adapter.levelDataWriter()::warmWorldgen, warmupWorker);
-        minecraft.setScreen(new WdlDownloadsScreen(minecraft.screen, savesDirectory, loadedWorld, entries,
+        minecraft.displayGuiScreen(new WdlDownloadsScreen(minecraft.currentScreen, savesDirectory, loadedWorld, entries,
                 expandExistingList, defaultDownloadName(minecraft), config.appendDateSuffix(), config.confirmResume(),
                 config.blockTaintedResume(), config.zipOnResume(), config.remapMapIds(),
                 CaptureToggleGuard.isCapturePartiallyDisabled(config), bridge.modVersion(), mcVersion(),
@@ -637,7 +639,7 @@ public final class Wdl {
     private static void restoreTick() {
         RestoreOperation operation = activeRestore;
         if (operation != null) {
-            operation.publishLoadedWorld(loadedWorldPath(Minecraft.getInstance()));
+            operation.publishLoadedWorld(loadedWorldPath(Minecraft.getMinecraft()));
             CompletableFuture<RestoreOperation.Result> result = restoreResult;
             if (result == null || !result.isDone()) {
                 return;
@@ -744,7 +746,7 @@ public final class Wdl {
 
     /** The kept-aside paths a swap failure names, shortened to saves-relative form where possible. */
     private static String describeSurvivingPaths(List<Path> survivingPaths) {
-        Path savesDirectory = Minecraft.getInstance().getLevelSource().getLevelPath("");
+        Path savesDirectory = Minecraft.getMinecraft().gameDir.toPath().resolve("saves");
         return survivingPaths.stream()
                 .map(path -> {
                     try {
@@ -771,17 +773,17 @@ public final class Wdl {
             outlineTracker.clear();
             return;
         }
-        Minecraft minecraft = Minecraft.getInstance();
-        MultiPlayerLevel level = minecraft.level;
-        LocalPlayer player = minecraft.player;
+        Minecraft minecraft = Minecraft.getMinecraft();
+        WorldClient level = minecraft.world;
+        EntityPlayerSP player = minecraft.player;
         if (level == null || player == null) {
             outlineTracker.clear();
             return;
         }
         // This band exposes no render Camera on the tick, so the view entity's eye position stands in for the camera
         // position; the outline uses it only as the center of its distance clamp.
-        Entity camera = minecraft.getCameraEntity();
-        Vec3 cameraPos = (camera != null ? camera : player).getEyePosition(1.0F);
+        Entity camera = minecraft.getRenderViewEntity();
+        Vec3d cameraPos = (camera != null ? camera : player).getPositionEyes(1.0F);
         outlineTracker.tick(level, cameraPos, currentConfig.outline(),
                 controller.aidToggles(currentConfig), controller.capturedContainers(),
                 controller.recoveredCoverage());
@@ -794,8 +796,8 @@ public final class Wdl {
 
     /** Open the in-mod settings screen from the pause-menu config button; edits commit on close. */
     private static void openSettingsScreen() {
-        Minecraft minecraft = Minecraft.getInstance();
-        minecraft.setScreen(createSettingsScreen(minecraft.screen));
+        Minecraft minecraft = Minecraft.getMinecraft();
+        minecraft.displayGuiScreen(createSettingsScreen(minecraft.currentScreen));
     }
 
     /**
@@ -803,7 +805,7 @@ public final class Wdl {
      * Fabric mod-list hook, the NeoForge config button) opens the same screen as the pause-menu button. Safe before a
      * world loads: the curated game-rule set reads the band's default rules, not a live level.
      */
-    public static Screen createSettingsScreen(@Nullable Screen parent) {
+    public static GuiScreen createSettingsScreen(@Nullable GuiScreen parent) {
         return new WdlSettingsScreen(parent, WdlConfig.load(configPath()), Wdl::saveConfig,
                 adapter.levelDataWriter().curatedGameRules(), bridge::isModLoaded);
     }
@@ -871,7 +873,7 @@ public final class Wdl {
                     bridge.sendChat(ChatCopy.saving());
                 }
                 controller.stop();
-                Minecraft.getInstance().setScreen(null);
+                Minecraft.getMinecraft().displayGuiScreen(null);
                 break;
             case SAVING:
                 break; // active == false makes this unreachable by click; the branch is defense in depth
@@ -886,16 +888,17 @@ public final class Wdl {
 
     /** The currently-loaded local world folder (refused as a target), or null when the world is remote. */
     static @Nullable Path loadedWorldPath(Minecraft minecraft) {
-        IntegratedServer server = minecraft.getSingleplayerServer();
+        IntegratedServer server = minecraft.getIntegratedServer();
         return server != null
-                ? server.getStorageSource().getLevelPath(server.getLevelIdName())
+                ? minecraft.gameDir.toPath().resolve("saves").resolve(server.getFolderName())
                 : null;
     }
 
     /** The in-capture screen label's fallback name: the current server's name, else a generic default. */
     private static String defaultDownloadName(Minecraft minecraft) {
-        ServerData server = minecraft.getCurrentServer();
-        return server != null && server.name != null && !server.name.trim().isEmpty() ? server.name : "download";
+        ServerData server = minecraft.getCurrentServerData();
+        return server != null && server.serverName != null && !server.serverName.trim().isEmpty() ? server.serverName
+                : "download";
     }
 
     /**
@@ -904,8 +907,8 @@ public final class Wdl {
      * name into {@link ResumeFlow#begin}.
      */
     private static String defaultBaseName() {
-        ServerData server = Minecraft.getInstance().getCurrentServer();
-        String name = server != null ? server.name : null;
+        ServerData server = Minecraft.getMinecraft().getCurrentServerData();
+        String name = server != null ? server.serverName : null;
         return name != null && TargetResolver.hasUsableName(name) ? name : "world";
     }
 
@@ -916,7 +919,7 @@ public final class Wdl {
      * that works today.
      */
     private static boolean hasSourceIdentity() {
-        return Minecraft.getInstance().getCurrentServer() != null;
+        return Minecraft.getMinecraft().getCurrentServerData() != null;
     }
 
     private static Path configPath() {

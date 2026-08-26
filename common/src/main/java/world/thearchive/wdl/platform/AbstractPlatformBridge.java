@@ -4,33 +4,28 @@
 package world.thearchive.wdl.platform;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.brigadier.arguments.ArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.brigadier.suggestion.Suggestions;
-import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
-import java.util.function.Function;
 import java.util.function.Supplier;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.toasts.SystemToast;
-import net.minecraft.client.gui.screens.ChatScreen;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.resources.language.I18n;
-import net.minecraft.commands.SharedSuggestionProvider;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
-import net.minecraft.realms.class_356;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiChat;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.toasts.SystemToast;
+import net.minecraft.client.resources.I18n;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.ICommand;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
+import net.minecraft.util.text.TextFormatting;
+import net.minecraft.util.text.event.ClickEvent;
+import net.minecraft.util.text.event.HoverEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -42,22 +37,22 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
 
 /**
  * Partial {@link PlatformBridge} carrying the methods that are pure vanilla on every loader: {@link #isRemoteWorld()},
- * {@link #sendChat(ChatCopy)}, and {@link #sendToast(ToastCopy)} use only {@code Minecraft}/{@code Component} APIs that
- * live on the {@code common} classpath, so each loader bridge inherits them instead of duplicating the logic. The
+ * {@link #sendChat(ChatCopy)}, and {@link #sendToast(ToastCopy)} use only {@code Minecraft}/{@code ITextComponent} APIs
+ * that live on the {@code common} classpath, so each loader bridge inherits them instead of duplicating the logic. The
  * loader-specific hooks (keybind, ticks, disconnect, config directory, command registration) stay abstract for the
  * per-loader subclass.
  */
 public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final Logger LOGGER = LogManager.getLogger(AbstractPlatformBridge.class);
 
-    // Below 1.20.3 SystemToast has no custom-id class, so these reuse two distinct vanilla toast categories
-    // (WORLD_BACKUP for job-done, TUTORIAL_HINT for refusals), which keep the vanilla default display
-    // time (which the accessibility notification-time multiplier scales). Job-done toasts are always constructed
-    // fresh, never addOrUpdate-reset, so each event surfaces its own toast. Refusals use their own category so a
-    // repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message, and
-    // vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body unwrapped).
-    private static final SystemToast.SystemToastIds TOAST_ID = SystemToast.SystemToastIds.WORLD_BACKUP;
-    private static final SystemToast.SystemToastIds REFUSAL_TOAST_ID = SystemToast.SystemToastIds.TUTORIAL_HINT;
+    // This band's SystemToast has no custom-id class, so these reuse two distinct vanilla toast categories from the
+    // SystemToast.Type enum (which carries only TUTORIAL_HINT and NARRATOR_TOGGLE here), which keep the vanilla
+    // default display time (which the accessibility notification-time multiplier scales). Job-done toasts are always
+    // constructed fresh, never addOrUpdate-reset, so each event surfaces its own toast. Refusals use their own
+    // category so a repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message,
+    // and vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body unwrapped).
+    private static final SystemToast.Type TOAST_ID = SystemToast.Type.NARRATOR_TOGGLE;
+    private static final SystemToast.Type REFUSAL_TOAST_ID = SystemToast.Type.TUTORIAL_HINT;
 
     // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
     // inside the methods, never the constructor, and isModLoaded is a loader call. Read only on the client
@@ -82,56 +77,56 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
 
     @Override
     public boolean isRemoteWorld() {
-        Minecraft mc = Minecraft.getInstance();
+        Minecraft mc = Minecraft.getMinecraft();
         // getConnection() is null until Minecraft.player is assigned, which is what keeps this false during
         // the world-load window where a replay server is already installed and the client is already ticking.
         if (mc.getConnection() == null) {
             return false;
         }
-        return !mc.isLocalServer() || isReplayPlayback();
+        return !mc.isSingleplayer() || isReplayPlayback();
     }
 
     // Kept private so nothing invites an off-main-thread read from the coverage overlay, which would break the
     // lazy init above. isInstance(null) is false, which is the sole guard over the shutdown window where the
-    // singleplayer server field is already cleared but isLocalServer is not.
+    // singleplayer server field is already cleared but isSingleplayer is not.
     private boolean isReplayPlayback() {
         if (replayProbe == null) {
             replayProbe = FlashbackReplayProbe.resolve(isModLoaded(FlashbackReplayProbe.MOD_ID));
         }
-        return replayProbe.isReplayServer(Minecraft.getInstance().getSingleplayerServer());
+        return replayProbe.isReplayServer(Minecraft.getMinecraft().getIntegratedServer());
     }
 
     @Override
     public boolean isBlockingScreenOpen() {
-        Screen screen = Minecraft.getInstance().screen;
-        return screen != null && !(screen instanceof ChatScreen);
+        GuiScreen screen = Minecraft.getMinecraft().currentScreen;
+        return screen != null && !(screen instanceof GuiChat);
     }
 
     @Override
     public boolean isHudHidden() {
-        return Minecraft.getInstance().options.hideGui;
+        return Minecraft.getMinecraft().gameSettings.hideGUI;
     }
 
     @Override
     public void sendChat(ChatCopy line) {
         StringBuilder linkTargets = new StringBuilder();
-        Component rendered = render(line, linkTargets);
-        LOGGER.info(rendered.getString() + linkTargets);
-        Minecraft mc = Minecraft.getInstance();
+        ITextComponent rendered = render(line, linkTargets);
+        LOGGER.info(rendered.getUnformattedText() + linkTargets);
+        Minecraft mc = Minecraft.getMinecraft();
         if (mc.player != null) {
-            mc.player.displayClientMessage(rendered, false);
+            mc.player.sendStatusMessage(rendered, false);
         }
     }
 
-    private static Component render(ChatCopy line, StringBuilder linkTargets) {
+    private static ITextComponent render(ChatCopy line, StringBuilder linkTargets) {
         Object[] renderedArguments = new Object[line.arguments().size()];
         int slot = 0;
         for (ChatCopy.Argument argument : line.arguments()) {
-            Component rendered = argument.translationKey() == null
-                    ? new TextComponent(argument.text())
+            ITextComponent rendered = argument.translationKey() == null
+                    ? new TextComponentString(argument.text())
                     : argument.text().isEmpty()
-                            ? new TranslatableComponent(argument.translationKey())
-                            : new TranslatableComponent(argument.translationKey(), argument.text());
+                            ? new TextComponentTranslation(argument.translationKey())
+                            : new TextComponentTranslation(argument.translationKey(), argument.text());
             if (argument.color().isPresent()) {
                 rendered.getStyle().setColor(nearestFormatting(argument.color().getAsInt()));
             }
@@ -141,12 +136,13 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                         ? new ClickEvent(ClickEvent.Action.OPEN_URL, click.target())
                         : new ClickEvent(ClickEvent.Action.OPEN_FILE, click.target());
                 rendered.getStyle().setClickEvent(clickEvent)
-                        .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new TextComponent(click.target())));
+                        .setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                new TextComponentString(click.target())));
                 linkTargets.append(" <").append(click.target()).append('>');
             }
             renderedArguments[slot++] = rendered;
         }
-        Component rendered = new TranslatableComponent(line.translationKey(), renderedArguments);
+        ITextComponent rendered = new TextComponentTranslation(line.translationKey(), renderedArguments);
         if (line.templateColor().isPresent()) {
             rendered.getStyle().setColor(nearestFormatting(line.templateColor().getAsInt()));
         }
@@ -155,20 +151,22 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
 
     /**
      * The nearest of the sixteen named colors to an arbitrary RGB value. Pre-1.16 {@code Style} carries only a
-     * {@link ChatFormatting} color, not the free RGB {@code TextColor} the shared copy supplies, so an exact color is
-     * quantized to the closest vanilla color by squared distance.
+     * {@link TextFormatting} color, not the free RGB {@code TextColor} the shared copy supplies, so an exact color is
+     * quantized to the closest vanilla color by squared distance. This band's {@code TextFormatting} exposes no RGB
+     * accessor either, so each named color's value is recomputed from its color index by the vanilla color-table
+     * formula.
      */
-    private static ChatFormatting nearestFormatting(int rgb) {
+    private static TextFormatting nearestFormatting(int rgb) {
         int red = (rgb >> 16) & 0xFF;
         int green = (rgb >> 8) & 0xFF;
         int blue = rgb & 0xFF;
-        ChatFormatting nearest = ChatFormatting.WHITE;
+        TextFormatting nearest = TextFormatting.WHITE;
         int best = Integer.MAX_VALUE;
-        for (ChatFormatting formatting : ChatFormatting.values()) {
-            Integer color = formatting.getColor();
-            if (color == null) {
+        for (TextFormatting formatting : TextFormatting.values()) {
+            if (!formatting.isColor()) {
                 continue;
             }
+            int color = colorTableRgb(formatting.getColorIndex());
             int deltaRed = ((color >> 16) & 0xFF) - red;
             int deltaGreen = ((color >> 8) & 0xFF) - green;
             int deltaBlue = (color & 0xFF) - blue;
@@ -181,40 +179,55 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         return nearest;
     }
 
+    // The RGB of a named color from its 0..15 index, the vanilla FontRenderer color-table computation: a base of
+    // 0 or 85 from bit 3, each channel then 0 or 170 above that base from its own bit, and the gold slot (index 6)
+    // biased 85 brighter on red.
+    private static int colorTableRgb(int index) {
+        int base = (index >> 3 & 1) * 85;
+        int red = (index >> 2 & 1) * 170 + base;
+        int green = (index >> 1 & 1) * 170 + base;
+        int blue = (index & 1) * 170 + base;
+        if (index == 6) {
+            red += 85;
+        }
+        return (red & 255) << 16 | (green & 255) << 8 | (blue & 255);
+    }
+
     @Override
     public void sendToast(ToastCopy toast) {
         Object[] renderedArguments = new Object[toast.arguments().size()];
         int slot = 0;
         for (ToastCopy.Argument argument : toast.arguments()) {
-            Component rendered = argument.translationKey() == null
-                    ? new TextComponent(argument.text())
+            ITextComponent rendered = argument.translationKey() == null
+                    ? new TextComponentString(argument.text())
                     : argument.text().isEmpty()
-                            ? new TranslatableComponent(argument.translationKey())
-                            : new TranslatableComponent(argument.translationKey(), argument.text());
+                            ? new TextComponentTranslation(argument.translationKey())
+                            : new TextComponentTranslation(argument.translationKey(), argument.text());
             if (argument.color().isPresent()) {
                 rendered.getStyle().setColor(nearestFormatting(argument.color().getAsInt()));
             }
             renderedArguments[slot++] = rendered;
         }
-        Component body = new TranslatableComponent(toast.bodyKey(), renderedArguments);
+        ITextComponent body = new TextComponentTranslation(toast.bodyKey(), renderedArguments);
         if (toast.bodyColor().isPresent()) {
             body.getStyle().setColor(nearestFormatting(toast.bodyColor().getAsInt()));
         }
-        Minecraft mc = Minecraft.getInstance();
-        SystemToast.SystemToastIds id = toast.refusal() ? REFUSAL_TOAST_ID : TOAST_ID;
-        if (toast.refusal() && mc.getToasts().getToast(SystemToast.class, id) != null) {
+        Minecraft mc = Minecraft.getMinecraft();
+        SystemToast.Type id = toast.refusal() ? REFUSAL_TOAST_ID : TOAST_ID;
+        if (toast.refusal() && mc.getToastGui().getToast(SystemToast.class, id) != null) {
             return;
         }
         if (toast.refusal()) {
             // Refusals are single-line; the vanilla SystemToast keeps the getToast dedup above.
-            mc.getToasts().addToast(new SystemToast(id, new TranslatableComponent(toast.titleKey()), body));
+            mc.getToastGui().add(new SystemToast(id, new TextComponentTranslation(toast.titleKey()), body));
             return;
         }
         // A job-done body can carry a newline (the chunk count then the save name), which this band's SystemToast
         // draws as one overrunning line; a multiline toast wraps it and stitches its own frame instead.
         int bodyRgb = toast.bodyColor().isPresent() ? 0xFF000000 | toast.bodyColor().getAsInt() : -1;
-        mc.getToasts().addToast(new WdlMultilineToast(mc.font,
-                new TranslatableComponent(toast.titleKey()).getString(), body.getString(), bodyRgb));
+        mc.getToastGui().add(new WdlMultilineToast(mc.fontRenderer,
+                new TextComponentTranslation(toast.titleKey()).getUnformattedText(), body.getUnformattedText(),
+                bodyRgb));
     }
 
     /**
@@ -223,7 +236,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
      * loader-agnostic. Returns none in the user's own local world, leaving the anchor unshifted so the vanilla menu
      * keeps its own spacing.
      */
-    protected List<class_356> buildPauseMenuRow(class_356 anchor,
+    protected List<GuiButton> buildPauseMenuRow(GuiButton anchor,
             Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled, Runnable onPrimary,
             Runnable onConfig) {
         // A local world refuses every action this row leads to, and the /wdl commands and downloads keybind
@@ -232,77 +245,145 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (!isRemoteWorld()) {
             return ImmutableList.of();
         }
-        int x = anchor.field_1051;
-        int y = anchor.field_1052;
-        int width = anchor.getWidth();
-        anchor.field_1052 = y + 24; // shift the bottom button (Disconnect) down to open a row above it
-        class_356 primary = new class_356(0, x, y, width - 24, 20, I18n.get(primaryLabelKey.get())) {
-            @Override
-            public void method_18374(double mouseX, double mouseY) {
-                onPrimary.run();
-            }
-        };
-        primary.field_1055 = primaryEnabled.getAsBoolean();
+        int x = anchor.x;
+        int y = anchor.y;
+        int width = anchor.width;
+        anchor.y = y + 24; // shift the bottom button (Disconnect) down to open a row above it
+        GuiButton primary = new WdlMenuButton(x, y, width - 24, 20, I18n.format(primaryLabelKey.get()), onPrimary);
+        primary.enabled = primaryEnabled.getAsBoolean();
         // This band's button carries no hover-tooltip parameter, so the settings button has no hover label.
-        class_356 config = new class_356(0, x + width - 20, y, 20, 20, "...") {
-            @Override
-            public void method_18374(double mouseX, double mouseY) {
-                onConfig.run();
-            }
-        };
+        GuiButton config = new WdlMenuButton(x + width - 20, y, 20, 20, "...", onConfig);
         return ImmutableList.of(primary, config);
     }
 
     /** The lowest existing pause-menu button (Disconnect), the anchor to insert the wdl row above. */
-    protected static @Nullable class_356 lowest(List<class_356> widgets) {
-        class_356 lowest = null;
-        for (class_356 widget : widgets) {
-            if (lowest == null || widget.field_1052 > lowest.field_1052) {
+    protected static @Nullable GuiButton lowest(List<GuiButton> widgets) {
+        GuiButton lowest = null;
+        for (GuiButton widget : widgets) {
+            if (lowest == null || widget.y > lowest.y) {
                 lowest = widget;
             }
         }
         return lowest;
     }
 
-    /** Run a /wdl action and report Brigadier success. */
-    private static int run(Runnable action) {
-        action.run();
-        return 1;
-    }
+    /**
+     * The pause-menu buttons this band builds: a plain {@link GuiButton} carrying its own press action, since below the
+     * 1.13 GUI rewrite {@code GuiButton} has no onPress callback and a click is dispatched by the screen's
+     * action-performed path off the button identity instead. The loader's action-performed hook calls {@link #press()}.
+     */
+    public static final class WdlMenuButton extends GuiButton {
+        // A pause-menu button id outside GuiIngameMenu's own 0..12 range, so the vanilla screen's actionPerformed
+        // switch never claims a click on this row; the press is dispatched by the loader's action-performed hook.
+        private static final int ID = 0x77646C01;
+        private final Runnable action;
 
-    /** Suggest the wdl-managed download names for {@code /wdl resume} tab-completion. */
-    private static CompletableFuture<Suggestions> suggestDownloads(SuggestionsBuilder builder) {
-        // 1.13.2 LevelStorageSource exposes no saves-root accessor (getBaseDir is a later addition), and the saves
-        // folder is the game directory's own saves child at this band, so it is resolved from there.
-        Path savesDirectory = Minecraft.getInstance().gameDirectory.toPath().resolve("saves");
-        try {
-            return SharedSuggestionProvider.suggest(DownloadFolders.listManaged(savesDirectory), builder);
-        } catch (IOException exception) {
-            return builder.buildFuture(); // no suggestions if the saves directory cannot be read
+        public WdlMenuButton(int x, int y, int width, int height, String label, Runnable action) {
+            super(ID, x, y, width, height, label);
+            this.action = action;
+        }
+
+        /** Run the button's action; called by the loader's action-performed hook when this button is clicked. */
+        public void press() {
+            action.run();
         }
     }
 
     /**
-     * Build the /wdl command tree once, source-generic, so each loader registers the same grammar with only its own
-     * literal and argument builder factories. The action lambdas never read the command source.
+     * Build the {@code /wdl} client command, source-generic over the loader-agnostic {@link WdlCommands} actions. Below
+     * the 1.13 command rewrite there is no Brigadier tree: this is a classic {@link CommandBase} whose {@code execute}
+     * and {@code getTabCompletions} branch on the raw argument array, and whose actions run on the client main thread
+     * (the client command handler dispatches there). The loader registers it through its own client-command surface.
      */
-    protected static <S> LiteralArgumentBuilder<S> wdlCommandTree(WdlCommands commands,
-            Function<String, LiteralArgumentBuilder<S>> literal,
-            BiFunction<String, ArgumentType<String>, RequiredArgumentBuilder<S, String>> argument) {
-        return literal.apply("wdl")
-                .executes(context -> run(commands.status())) // bare /wdl shows status, never auto-starts
-                .then(literal.apply("start")
-                        .executes(context -> run(commands.start()))
-                        .then(argument.apply("name", StringArgumentType.greedyString())
-                                .executes(context -> run(() -> commands.startNamed()
-                                        .accept(StringArgumentType.getString(context, "name"))))))
-                .then(literal.apply("stop").executes(context -> run(commands.stop())))
-                .then(literal.apply("status").executes(context -> run(commands.status())))
-                .then(literal.apply("config").executes(context -> run(commands.config())))
-                .then(literal.apply("downloads").executes(context -> run(commands.openDownloads())))
-                .then(literal.apply("resume").then(argument.apply("folder", StringArgumentType.greedyString())
-                        .suggests((context, builder) -> suggestDownloads(builder))
-                        .executes(context -> run(() -> commands.resume()
-                                .accept(StringArgumentType.getString(context, "folder"))))));
+    protected static ICommand wdlCommand(WdlCommands commands) {
+        return new WdlClientCommand(commands);
+    }
+
+    private static final class WdlClientCommand extends CommandBase {
+        private static final List<String> SUBCOMMANDS = ImmutableList.of("start", "stop", "status", "config",
+                "downloads", "resume");
+
+        private final WdlCommands commands;
+
+        WdlClientCommand(WdlCommands commands) {
+            this.commands = commands;
+        }
+
+        @Override
+        public String getName() {
+            return "wdl";
+        }
+
+        @Override
+        public String getUsage(ICommandSender sender) {
+            return "/wdl [start [name] | stop | status | config | downloads | resume <folder>]";
+        }
+
+        // A client command must run for any player on a foreign server, so it bypasses the vanilla
+        // operator-permission gate the default checkPermission applies.
+        @Override
+        public boolean checkPermission(MinecraftServer server, ICommandSender sender) {
+            return true;
+        }
+
+        @Override
+        public void execute(MinecraftServer server, ICommandSender sender, String[] args) {
+            if (args.length == 0) {
+                commands.status().run(); // bare /wdl shows status, never auto-starts
+                return;
+            }
+            switch (args[0]) {
+                case "start":
+                    if (args.length == 1) {
+                        commands.start().run();
+                    } else {
+                        commands.startNamed().accept(buildString(args, 1));
+                    }
+                    break;
+                case "stop":
+                    commands.stop().run();
+                    break;
+                case "status":
+                    commands.status().run();
+                    break;
+                case "config":
+                    commands.config().run();
+                    break;
+                case "downloads":
+                    commands.openDownloads().run();
+                    break;
+                case "resume":
+                    if (args.length >= 2) {
+                        commands.resume().accept(buildString(args, 1));
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        @Override
+        public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args,
+                @Nullable BlockPos targetPos) {
+            if (args.length == 1) {
+                return getListOfStringsMatchingLastWord(args, SUBCOMMANDS);
+            }
+            if (args.length >= 2 && "resume".equals(args[0])) {
+                return getListOfStringsMatchingLastWord(args, managedDownloadNames());
+            }
+            return ImmutableList.of();
+        }
+
+        /** The wdl-managed download names under the saves directory, empty if the folder cannot be read. */
+        private static List<String> managedDownloadNames() {
+            // This band's save format exposes no saves-root accessor, and the saves folder is the game directory's
+            // own saves child at this band, so it is resolved from there.
+            Path savesDirectory = Minecraft.getMinecraft().gameDir.toPath().resolve("saves");
+            try {
+                return DownloadFolders.listManaged(savesDirectory);
+            } catch (IOException exception) {
+                return ImmutableList.of(); // no suggestions if the saves directory cannot be read
+            }
+        }
     }
 }

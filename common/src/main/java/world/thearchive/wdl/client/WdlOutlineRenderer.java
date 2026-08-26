@@ -4,7 +4,6 @@
 package world.thearchive.wdl.client;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -73,7 +72,8 @@ public final class WdlOutlineRenderer {
             setupLineState(context.lineWidth());
             context.lines().begin(GL11.GL_LINES, DefaultVertexFormats.POSITION_COLOR);
             try {
-                ObjectIterator<Long2ObjectMap.Entry<List<OutlineRim>>> entries = Long2ObjectMaps.fastIterator(sections);
+                ObjectIterator<Long2ObjectMap.Entry<List<OutlineRim>>> entries = sections.long2ObjectEntrySet()
+                        .iterator();
                 while (entries.hasNext()) {
                     Long2ObjectMap.Entry<List<OutlineRim>> entry = entries.next();
                     if (frustum != null && !frustum.isBoundingBoxInFrustum(sectionBox(entry.getLongKey()))) {
