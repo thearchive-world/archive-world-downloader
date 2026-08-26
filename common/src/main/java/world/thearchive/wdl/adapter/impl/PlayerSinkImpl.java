@@ -3,32 +3,32 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.nbt.NBTTagCompound;
 
 import world.thearchive.wdl.adapter.PlayerSink;
 
 /**
- * 1.13.2 player sink: serializes the local player via vanilla's own {@code player.saveWithoutId} (the identical call
- * {@code PlayerDataStorage.save} uses), so the captured {@code "Player"} compound is byte-for-byte what a vanilla
+ * 1.12.2 player sink: serializes the local player via vanilla's own {@code player.writeToNBT} (the identical call
+ * {@code SaveHandler.writePlayerData} uses), so the captured {@code "Player"} compound is byte-for-byte what a vanilla
  * {@code playerdata/<uuid>.dat} would hold.
  *
- * <p>The single step is client-coupled (a live {@code Player}), mirroring
- * {@link world.thearchive.wdl.adapter.EntitySink}'s live {@code entity.save} step; the pure downstream (strips, scrub,
- * level.dat apply) carries the headless guard.
+ * <p>The single step is client-coupled (a live {@code EntityPlayer}), mirroring
+ * {@link world.thearchive.wdl.adapter.EntitySink}'s live {@code entity.writeToNBT} step; the pure downstream (strips,
+ * scrub, level.dat apply) carries the headless guard.
  */
 public final class PlayerSinkImpl implements PlayerSink {
     /**
-     * Below 1.15 vanilla {@code ItemStack.save} puts the live stack's own {@code tag} compound into its output, so the
-     * returned tag is detached before it is handed on: the caller owns it, and the client keeps nothing the map-id
-     * remap, the coordinate scrub or the save writer could reach.
+     * Below 1.15 vanilla {@code ItemStack.writeToNBT} puts the live stack's own {@code tag} compound into its output,
+     * so the returned tag is detached before it is handed on: the caller owns it, and the client keeps nothing the
+     * map-id remap, the coordinate scrub or the save writer could reach.
      */
     @Override
-    public CompoundTag capturePlayer(Player player) {
-        // saveWithoutId writes the Entity super fields (Pos/Rotation/UUID) plus Player.addAdditionalSaveData
+    public NBTTagCompound capturePlayer(EntityPlayer player) {
+        // writeToNBT writes the Entity super fields (Pos/Rotation/UUID) plus EntityPlayer.writeEntityToNBT
         // (Inventory/SelectedItemSlot/EnderItems/abilities), with no id.
-        CompoundTag tag = new CompoundTag();
-        player.saveWithoutId(tag);
+        NBTTagCompound tag = new NBTTagCompound();
+        player.writeToNBT(tag);
         return tag.copy();
     }
 }

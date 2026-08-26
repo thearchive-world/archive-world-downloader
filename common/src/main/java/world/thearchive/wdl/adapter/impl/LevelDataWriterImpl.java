@@ -3,9 +3,6 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -16,14 +13,15 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.world.level.GameRules;
-import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.LevelSettings;
-import net.minecraft.world.level.LevelType;
-import net.minecraft.world.level.storage.LevelStorage;
+import net.minecraft.init.Biomes;
+import net.minecraft.nbt.CompressedStreamTools;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.world.GameRules;
+import net.minecraft.world.GameType;
+import net.minecraft.world.WorldSettings;
+import net.minecraft.world.biome.Biome;
+import net.minecraft.world.storage.ISaveHandler;
+import net.minecraft.world.storage.WorldInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -37,8 +35,8 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.13.2 {@code level.dat} writer for the selected generator: the default superflat VOID (a single air layer over the
- * void biome), or the vanilla DEFAULT/FLAT presets. Pre-1.16 {@code level.dat} records only the generator name and its
+ * 1.12.2 {@code level.dat} writer for the selected generator: the default superflat VOID (a single air layer over the
+ * void biome), or the vanilla DEFAULT/FLAT presets. Pre-1.13 {@code level.dat} records only the generator name and its
  * options string, so no worldgen registries are reconstructed here. The captured chunks always supply the real terrain;
  * the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the server's
  * actual land (the server's seed is not recoverable from a client).
@@ -88,82 +86,69 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     @Override
     public LevelDataWriter.LevelData buildLevelData(WorldOutputConfig worldOutput, @Nullable String worldName) {
         WorldType worldType = worldOutput.worldType();
-        LevelType levelType = worldType == WorldType.DEFAULT ? LevelType.NORMAL : LevelType.FLAT;
+        net.minecraft.world.WorldType levelType = worldType == WorldType.DEFAULT ? net.minecraft.world.WorldType.DEFAULT
+                : net.minecraft.world.WorldType.FLAT;
         long seed = worldType == WorldType.VOID ? 0L : worldOutput.worldSeed();
         boolean generateMapFeatures = worldType != WorldType.VOID && worldOutput.generateFeatures();
 
-        LevelSettings settings = new LevelSettings(seed, GameType.SURVIVAL, generateMapFeatures, false, levelType);
+        WorldSettings settings = new WorldSettings(seed, GameType.SURVIVAL, generateMapFeatures, false, levelType);
         if (worldType == WorldType.VOID) {
-            settings.setLevelTypeOptions(voidGeneratorOptions());
+            settings.setGeneratorOptions(voidGeneratorOptions());
         }
         // Cheats and game mode are the world-defaults master's to impose; with it off the world opens vanilla,
         // so cheats fall back to off here. Noon is a fixed invariant, applied unconditionally below.
         if (worldOutput.overrideWorldDefaults() && worldOutput.allowCommands()) {
-            settings.enableSinglePlayerCommands();
+            settings.enableCommands();
         }
 
         String levelName = worldName == null || worldName.isEmpty() ? LEVEL_NAME : worldName;
-        net.minecraft.world.level.storage.LevelData levelData = new net.minecraft.world.level.storage.LevelData(
-                settings, levelName);
-        GameRuleResolution gameRuleResolution = applyGameRules(levelData.getGameRules(), worldOutput);
-        // Downloaded worlds always open at noon, a fixed world-open invariant. A fresh LevelData already opens clear
+        WorldInfo levelData = new WorldInfo(settings, levelName);
+        GameRuleResolution gameRuleResolution = applyGameRules(levelData.getGameRulesInstance(), worldOutput);
+        // Downloaded worlds always open at noon, a fixed world-open invariant. A fresh WorldInfo already opens clear
         // (raining, thundering, and their timers default off), so weather needs no write here.
-        levelData.setDayTime(NOON);
+        levelData.setWorldTime(NOON);
         return new LevelDataWriter.LevelData(levelData, gameRuleResolution);
     }
 
     /**
-     * The superflat options for a VOID world: a single air layer over the void biome. Empty layers cannot express it
-     * because {@code FlatLevelGeneratorSettings.fromObject} falls back to the default flat preset on an empty layer
-     * list, so the void is a one-block air layer, which leaves the whole column air.
+     * The superflat options string for a VOID world: a single air layer over the void biome. The grammar is
+     * {@code FlatGeneratorInfo}'s classic form, {@code "<version>;<layers>;<biome>;<features>"}: version 3 selects
+     * namespaced block names for the layers, a bare block name with no leading count defaults to one layer, the biome
+     * is the void biome's numeric id, and the trailing empty segment means no structures (an omitted segment would
+     * default to a village).
      */
-    private static JsonElement voidGeneratorOptions() {
-        JsonObject layer = new JsonObject();
-        layer.addProperty("height", 1);
-        layer.addProperty("block", "minecraft:air");
-        JsonArray layers = new JsonArray();
-        layers.add(layer);
-        JsonObject options = new JsonObject();
-        options.add("layers", layers);
-        options.addProperty("biome", "minecraft:the_void");
-        options.add("structures", new JsonObject());
-        return options;
+    private static String voidGeneratorOptions() {
+        return "3;minecraft:air;" + Biome.getIdForBiome(Biomes.VOID) + ";";
     }
 
     @Override
     public void warmWorldgen() {}
 
     /**
-     * Resolve the curated set with the user's overrides against this band's live rules, apply the effective rules to
-     * {@code gameRules} through the offline {@code loadFromTag} write, and log the dropped/unknown diagnostics. Returns
-     * the resolution.
+     * Resolve the curated set with the user's overrides against this band's live rules and apply the effective rules to
+     * {@code gameRules} through the per-key {@code setOrCreateGameRule}, logging the dropped/unknown diagnostics.
+     * Returns the resolution.
      */
     private static GameRuleResolution applyGameRules(GameRules gameRules, WorldOutputConfig worldOutput) {
-        Set<String> availableIds = gameRules.createTag().getAllKeys();
         GameRuleSchema schema = new GameRuleSchema() {
             @Override
             public boolean hasRule(String id) {
-                return availableIds.contains(id);
+                return gameRules.hasRule(id);
             }
 
             @Override
             public boolean acceptsValue(String id, String rawValue) {
-                GameRules.class_1440 rule = gameRules.method_16301(id);
-                return rule != null && valueParses(rule, rawValue);
+                return gameRules.hasRule(id) && valueParses(gameRules, id, rawValue);
             }
         };
         GameRuleResolution resolution = worldOutput.resolveGameRules(curatedByBandId(), schema);
-        // There is no public per-value string setter, so effective rules go through the offline loadFromTag. At this
-        // band that resets every rule from the tag: an absent id reads back from the empty string to false or zero, so
-        // the tag is seeded from the level's current defaults before the effective values are overlaid, leaving
-        // non-curated rules at their vanilla defaults.
-        CompoundTag ruleTag = gameRules.createTag();
+        // The curated set is merged in unconditionally by resolveGameRules, so a curated id absent from this band's
+        // own rule set (a curated rule only a higher band has) is still guarded here before the write.
         for (Map.Entry<String, String> rule : resolution.effective().entrySet()) {
-            if (availableIds.contains(rule.getKey())) {
-                ruleTag.putString(rule.getKey(), rule.getValue());
+            if (gameRules.hasRule(rule.getKey())) {
+                gameRules.setOrCreateGameRule(rule.getKey(), rule.getValue());
             }
         }
-        gameRules.loadFromTag(ruleTag);
         for (String id : resolution.droppedInvalidValues()) {
             LOGGER.warn("ignoring game-rule override gamerule.{}: its value does not parse for this rule", id);
         }
@@ -183,12 +168,11 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     }
 
     /** Whether the raw string is a valid value for this rule: true or false for a boolean, an int for an integer. */
-    private static boolean valueParses(GameRules.class_1440 rule, String rawValue) {
-        GameRules.class_2166 type = rule.method_8477();
-        if (type == GameRules.class_2166.field_17497) {
+    private static boolean valueParses(GameRules gameRules, String id, String rawValue) {
+        if (gameRules.areSameType(id, GameRules.ValueType.BOOLEAN_VALUE)) {
             return "true".equals(rawValue) || "false".equals(rawValue);
         }
-        if (type == GameRules.class_2166.field_17498) {
+        if (gameRules.areSameType(id, GameRules.ValueType.NUMERICAL_VALUE)) {
             try {
                 Integer.parseInt(rawValue);
                 return true;
@@ -204,24 +188,23 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         GameRules gameRules = new GameRules();
         List<CuratedGameRule> rules = new ArrayList<>();
         for (CuratedSpec spec : CURATED_GAME_RULES) {
-            GameRules.class_1440 rule = gameRules.method_16301(spec.bandId());
-            if (rule == null) {
+            if (!gameRules.hasRule(spec.bandId())) {
                 continue; // a curated rule with no rule at this band is omitted, and the menu skips its order slot
             }
-            if (rule.method_8477() == GameRules.class_2166.field_17497) {
+            if (gameRules.areSameType(spec.bandId(), GameRules.ValueType.BOOLEAN_VALUE)) {
                 rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(), "true", "false"));
             } else {
                 // An integer rule's enabled position is its band default, and disabled is 0.
-                String enabled = String.valueOf(rule.method_8476());
+                String enabled = String.valueOf(gameRules.getInt(spec.bandId()));
                 rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(), enabled, "0"));
             }
         }
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are the band-neutral curated keys; each maps to its 1.13.2 vanilla rule id here. A curated name
-    // with no rule at this band (the newer bands' fire and warden rules) is dropped at runtime, so this list is the
-    // superset.
+    // The WDL names are the band-neutral curated keys; each maps to its 1.12.2 vanilla rule id here. A curated name
+    // with no rule at this band (the wandering-trader, patrol, warden and vine-spread rules are all 1.14 and above) is
+    // dropped at runtime, so this list is the superset.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
@@ -237,31 +220,32 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     }
 
     @Override
-    public void save(LevelStorage storage, LevelDataWriter.LevelData data, @Nullable CapturedPlayer player) {
+    public void save(ISaveHandler storage, LevelDataWriter.LevelData data, @Nullable CapturedPlayer player) {
         if (player == null) {
-            storage.saveLevelData(data.worldData(), null);
+            storage.saveWorldInfo(data.worldData());
             return;
         }
-        net.minecraft.world.level.storage.LevelData levelData = data.worldData();
-        levelData.setGameType(player.gameType());
-        // 1.13.2 setSpawn takes only a position; the spawn yaw has no level.dat field at this band.
-        levelData.setSpawn(player.spawnPos());
-        levelData.setDifficulty(player.difficulty());
-        storage.saveLevelData(levelData, player.playerTag());
+        WorldInfo worldInfo = data.worldData();
+        worldInfo.setGameType(player.gameType());
+        // 1.12.2 setSpawn takes only a position; the spawn yaw has no level.dat field at this band.
+        worldInfo.setSpawn(player.spawnPos());
+        worldInfo.setDifficulty(player.difficulty());
+        storage.saveWorldInfoWithPlayer(worldInfo, player.playerTag());
     }
 
     @Override
-    public @Nullable CompoundTag readPriorPlayer(Path levelDatFile) {
+    public @Nullable NBTTagCompound readPriorPlayer(Path levelDatFile) {
         if (!Files.exists(levelDatFile)) {
             return null;
         }
-        // 1.13.2 NbtIo.readCompressed takes an InputStream, not a File.
+        // 1.12.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(levelDatFile)) {
-            CompoundTag root = NbtIo.readCompressed(input);
-            return root.get("Data") instanceof CompoundTag
-                    && ((CompoundTag) root.get("Data")).get("Player") instanceof CompoundTag
-                            ? (CompoundTag) ((CompoundTag) root.get("Data")).get("Player")
-                            : null;
+            NBTTagCompound root = CompressedStreamTools.readCompressed(input);
+            if (!root.hasKey("Data", 10)) {
+                return null;
+            }
+            NBTTagCompound data = root.getCompoundTag("Data");
+            return data.hasKey("Player", 10) ? data.getCompoundTag("Player") : null;
         } catch (IOException e) {
             throw new UncheckedIOException("failed to read the prior player data " + levelDatFile, e);
         }

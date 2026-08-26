@@ -3,11 +3,11 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.Difficulty;
-import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.DimensionType;
+import net.minecraft.world.EnumDifficulty;
+import net.minecraft.world.GameType;
 
 /**
  * The immutable finish-snapshot of the local player, assembled on the client main thread in {@code finish()} and read
@@ -15,8 +15,8 @@ import net.minecraft.world.level.dimension.DimensionType;
  * {@code playerTag} plus primitives and band-stable value types, so it crosses the thread boundary safely, the same
  * render-thread-snapshot discipline as the entity and container captures.
  *
- * @param playerTag  the processed {@code saveWithoutId} tag (strips, scrub, dimension, ender remap applied) written as
- *                   the band's saved player (a level.dat {@code "Player"} compound pre-26.x, a
+ * @param playerTag  the processed {@code writeToNBT} tag (strips, scrub, dimension, ender remap applied) written as the
+ *                   band's saved player (a level.dat {@code "Player"} compound pre-26.x, a
  *                   {@code players/data/<uuid>.dat} entry at 26.x)
  * @param spawnPos   the capture block position, written as the world spawn so a non-inheriting opener still lands at
  *                   the base
@@ -28,16 +28,16 @@ import net.minecraft.world.level.dimension.DimensionType;
  * @param difficulty the captured client difficulty for the level.dat {@code Difficulty}
  */
 public final class CapturedPlayer {
-    private final CompoundTag playerTag;
+    private final NBTTagCompound playerTag;
     private final BlockPos spawnPos;
     private final float yaw;
     private final float pitch;
     private final DimensionType dimension;
     private final GameType gameType;
-    private final Difficulty difficulty;
+    private final EnumDifficulty difficulty;
 
-    CapturedPlayer(CompoundTag playerTag, BlockPos spawnPos, float yaw, float pitch, DimensionType dimension,
-            GameType gameType, Difficulty difficulty) {
+    CapturedPlayer(NBTTagCompound playerTag, BlockPos spawnPos, float yaw, float pitch, DimensionType dimension,
+            GameType gameType, EnumDifficulty difficulty) {
         this.playerTag = playerTag;
         this.spawnPos = spawnPos;
         this.yaw = yaw;
@@ -47,7 +47,7 @@ public final class CapturedPlayer {
         this.difficulty = difficulty;
     }
 
-    public CompoundTag playerTag() {
+    public NBTTagCompound playerTag() {
         return playerTag;
     }
 
@@ -71,7 +71,7 @@ public final class CapturedPlayer {
         return gameType;
     }
 
-    public Difficulty difficulty() {
+    public EnumDifficulty difficulty() {
         return difficulty;
     }
 }

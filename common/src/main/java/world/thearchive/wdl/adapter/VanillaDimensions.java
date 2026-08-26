@@ -3,13 +3,13 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.DimensionType;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * Maps a captured dimension to the vanilla single-player dimension it is written under. At 1.15.2 the dimension key is
+ * Maps a captured dimension to the vanilla single-player dimension it is written under. At 1.12.2 the dimension key is
  * the {@link DimensionType} itself (the pre-1.16 model, before the level-key rework), so both the captured dimension
  * and the routed target are {@code DimensionType}s and every dimension a capture records is one of the three static
  * vanilla types.
@@ -31,10 +31,10 @@ final class VanillaDimensions {
         if (type == DimensionType.NETHER) {
             return DimensionType.NETHER;
         }
-        if (type == DimensionType.field_18956) {
-            return DimensionType.field_18956;
+        if (type == DimensionType.THE_END) {
+            return DimensionType.THE_END;
         }
-        return DimensionType.field_18954;
+        return DimensionType.OVERWORLD;
     }
 
     /**
@@ -44,14 +44,13 @@ final class VanillaDimensions {
      * download of ours wrote and a caller reading one has no dimension to route into.
      */
     static @Nullable DimensionType forId(String id) {
-        if (DimensionType.getName(DimensionType.NETHER).toString().equals(id)) {
+        if (DimensionType.NETHER.getName().equals(id)) {
             return DimensionType.NETHER;
         }
-        if (DimensionType.getName(DimensionType.field_18956).toString().equals(id)) {
-            return DimensionType.field_18956;
+        if (DimensionType.THE_END.getName().equals(id)) {
+            return DimensionType.THE_END;
         }
-        return DimensionType.getName(DimensionType.field_18954).toString().equals(id) ? DimensionType.field_18954
-                : null;
+        return DimensionType.OVERWORLD.getName().equals(id) ? DimensionType.OVERWORLD : null;
     }
 
     /**
@@ -61,6 +60,6 @@ final class VanillaDimensions {
      * than the raw dimension is what makes a Multiverse overworld under a custom key blend correctly.
      */
     static boolean shouldSynthesizeBlending(WorldType worldType, DimensionType targetDimension) {
-        return worldType == WorldType.DEFAULT && DimensionType.field_18954.equals(targetDimension);
+        return worldType == WorldType.DEFAULT && DimensionType.OVERWORLD.equals(targetDimension);
     }
 }

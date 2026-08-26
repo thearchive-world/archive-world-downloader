@@ -354,7 +354,31 @@ common/src/test/java/world/thearchive/wdl/testsupport/RegionRoundTrip.java
 common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
 
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList, getTag/removeTag/setTag rather than
+# get/remove/put). There is no separate equipment compound: armor and the offhand slot live inside the single
+# Inventory list, so applyStripKnobs drops only Inventory and SelectedItemSlot. The LastDeathLocation and
+# current_explosion_impact_pos keys do not exist yet (1.19 and 1.21 additions respectively), so stripDeathLocation is
+# a harmless no-op kept for signature parity. DimensionType is the classic three-constant net.minecraft.world enum
+# whose getById throws for an unregistered id rather than returning null, so dimensionOf checks the id against the
+# three known constants directly. The RootVehicle Attach UUID is written through NBTTagCompound.setUniqueId rather
+# than putUUID.
 common/src/main/java/world/thearchive/wdl/adapter/PlayerTag.java
+
+# Below 1.13 the level-storage write is ISaveHandler.saveWorldInfoWithPlayer(WorldInfo, playerTag) (or
+# saveWorldInfo(WorldInfo) with no player), the classic MCP save-handler pair, rather than a LevelStorage; the built
+# holder is a net.minecraft.world.storage.WorldInfo rather than a LevelData, and the prior-player read is
+# net.minecraft.nbt.NBTTagCompound rather than CompoundTag.
+common/src/main/java/world/thearchive/wdl/adapter/LevelDataWriter.java
+
+# Below 1.13 the field types are the classic MCP net.minecraft.world.DimensionType/GameType/EnumDifficulty
+# (EnumDifficulty renamed from Difficulty) and net.minecraft.nbt.NBTTagCompound/net.minecraft.util.math.BlockPos,
+# rather than the Mojmap level.dimension.DimensionType/level.GameType/Difficulty and core.BlockPos/nbt.CompoundTag.
+common/src/main/java/world/thearchive/wdl/adapter/CapturedPlayer.java
+
+# Below 1.13 the local player is serialized through EntityPlayer.writeToNBT(NBTTagCompound), the classic MCP save call
+# SaveHandler.writePlayerData also uses, rather than a saveWithoutId(ValueOutput)/CompoundTag form, and the player
+# type is net.minecraft.entity.player.EntityPlayer rather than net.minecraft.world.entity.player.Player.
+common/src/main/java/world/thearchive/wdl/adapter/PlayerSink.java
 
 # Below 1.20.2 there is no AdvancementProgress.CODEC, so the advancement value is serialized through vanilla's own
 # AdvancementProgress.Serializer Gson adapter rather than encoded through a codec.
@@ -650,6 +674,9 @@ common/src/main/java/world/thearchive/wdl/adapter/OpenClickTracker.java
 # Below the 1.19 registry-sync rework the client receives the dimension type inline (a keyless Holder.Direct), so
 # unwrapKey is empty and forType classifies the nether and end by the type's effects id rather than its registry key.
 # Above this band forType takes the ResourceKey the client resolves against the synced registry.
+# Below 1.13 DimensionType is the classic three-constant net.minecraft.world enum (OVERWORLD/NETHER/THE_END) with an
+# instance getName() returning a plain String, rather than a registry-keyed type resolved through a static
+# DimensionType.getName(DimensionType) accessor, so forId compares against that plain name directly.
 common/src/main/java/world/thearchive/wdl/adapter/VanillaDimensions.java
 
 # Below 1.19 there is no chiseled bookshelf, so the per-chunk bookshelf-occupancy producer is dropped and the
