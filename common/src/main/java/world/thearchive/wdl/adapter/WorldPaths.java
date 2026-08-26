@@ -5,11 +5,11 @@ package world.thearchive.wdl.adapter;
 
 import java.nio.file.Path;
 import java.util.Map;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.DimensionType;
 
 /**
  * Per-band save-layout axis: maps a dimension to its on-disk {@code region/} directory and opens the vanilla region
- * storage rooted at it. At 1.14.4 the dimension key is the {@link DimensionType} itself, and entities live inside the
+ * storage rooted at it. Below 1.17 the dimension key is the {@link DimensionType} itself, and entities live inside the
  * {@code region/} chunk, so there is no separate {@code entities/} region to map or open (that is 1.17 and above).
  *
  * <p>The per-band implementation pre-creates the {@code region/} directory before any region write.
@@ -28,10 +28,9 @@ public interface WorldPaths {
 
     /**
      * The dimension {@code region/} directories present on disk under the save root, keyed by dimension name (for
-     * example {@code minecraft:overworld}), for the completion-time save-total scan. Read-only: unlike
-     * {@link #regionDirectory} it never creates a directory, and it includes dimensions this session never visited. A
-     * custom-dimension candidate is listed only when it holds region files; the vanilla directories are listed on
-     * existence. The walked layout is per-band implementation knowledge, like the forward mapping.
+     * example {@code overworld}), for the completion-time save-total scan. Read-only: unlike {@link #regionDirectory}
+     * it never creates a directory, and it includes dimensions this session never visited. The walked layout is
+     * per-band implementation knowledge, like the forward mapping.
      */
     Map<String, Path> onDiskRegionDirectories();
 }

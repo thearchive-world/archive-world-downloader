@@ -4,9 +4,9 @@
 package world.thearchive.wdl.adapter;
 
 import java.io.IOException;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.math.ChunkPos;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -27,13 +27,13 @@ final class RegionChunkWriter {
      */
     @FunctionalInterface
     public interface ChunkReadMerge {
-        int merge(CompoundTag onDisk, CompoundTag fresh);
+        int merge(NBTTagCompound onDisk, NBTTagCompound fresh);
     }
 
     /** Fold detached open-time holders into an on-disk chunk tag in place; returns how many block entities got them. */
     @FunctionalInterface
     public interface ChunkRewrite {
-        int apply(CompoundTag onDisk);
+        int apply(NBTTagCompound onDisk);
     }
 
     /**
@@ -82,12 +82,12 @@ final class RegionChunkWriter {
      * would drop every entity a prior fold saved into that chunk.
      */
     public static MergeWriteResult writeMerging(WdlRegionStorage storage, ChunkPos pos,
-            @Nullable CompoundTag tag, ChunkReadMerge merge) {
+            @Nullable NBTTagCompound tag, ChunkReadMerge merge) {
         if (tag == null) {
             return new MergeWriteResult(MergeOutcome.NOTHING_TO_WRITE, 0);
         }
         @Nullable
-        CompoundTag onDisk;
+        NBTTagCompound onDisk;
         try {
             onDisk = storage.read(pos);
         } catch (IOException | RuntimeException e) {
@@ -122,13 +122,13 @@ final class RegionChunkWriter {
      * that lives inside the region chunk at this band survives a terrain re-write. A no-op above the entity-fold band,
      * where the region chunk holds no entities, and on a chunk with none.
      */
-    private static void preserveEntities(CompoundTag onDisk, CompoundTag fresh) {
-        CompoundTag freshLevel = fresh.getCompound("Level");
-        if (freshLevel.get("Entities") instanceof ListTag) {
+    private static void preserveEntities(NBTTagCompound onDisk, NBTTagCompound fresh) {
+        NBTTagCompound freshLevel = fresh.getCompoundTag("Level");
+        if (freshLevel.getTag("Entities") instanceof NBTTagList) {
             return; // the fresh tag already carries entities; do not clobber them with the on-disk set
         }
-        if (onDisk.getCompound("Level").get("Entities") instanceof ListTag) {
-            freshLevel.put("Entities", ((ListTag) onDisk.getCompound("Level").get("Entities")).copy());
+        if (onDisk.getCompoundTag("Level").getTag("Entities") instanceof NBTTagList) {
+            freshLevel.setTag("Entities", ((NBTTagList) onDisk.getCompoundTag("Level").getTag("Entities")).copy());
         }
     }
 
@@ -142,7 +142,7 @@ final class RegionChunkWriter {
      * a read, fold, or write failure isolates the chunk per the per-chunk discipline, never aborting the drain.
      */
     public static int rewriteExisting(WdlRegionStorage storage, ChunkPos pos, ChunkRewrite rewrite) {
-        CompoundTag onDisk;
+        NBTTagCompound onDisk;
         try {
             onDisk = storage.read(pos);
         } catch (IOException | RuntimeException e) {
@@ -182,8 +182,8 @@ final class RegionChunkWriter {
      * per-chunk discipline, never aborting the drain.
      */
     public static MergeWriteResult foldEntitiesIntoRegion(WdlRegionStorage regionStorage, ChunkPos pos,
-            CompoundTag freshEnvelope) {
-        CompoundTag onDisk;
+            NBTTagCompound freshEnvelope) {
+        NBTTagCompound onDisk;
         try {
             onDisk = regionStorage.read(pos);
         } catch (IOException | RuntimeException e) {
@@ -194,28 +194,28 @@ final class RegionChunkWriter {
             LOGGER.warn("chunk {}: no host chunk on disk; its captured entities are lost", pos);
             return new MergeWriteResult(MergeOutcome.FAILED, 0);
         }
-        if (!(onDisk.get("Level") instanceof CompoundTag)) {
+        if (!(onDisk.getTag("Level") instanceof NBTTagCompound)) {
             // A malformed host with no Level compound cannot hold the fold; count it lost rather than storing the
             // host unchanged and reporting a clean write, the way the null-host branch above does.
             LOGGER.warn("chunk {}: on-disk chunk has no Level compound; its captured entities are lost", pos);
             return new MergeWriteResult(MergeOutcome.FAILED, 0);
         }
-        CompoundTag level = onDisk.getCompound("Level");
-        ListTag diskEntities = level.get("Entities") instanceof ListTag
-                ? (ListTag) level.get("Entities")
-                : new ListTag();
+        NBTTagCompound level = onDisk.getCompoundTag("Level");
+        NBTTagList diskEntities = level.getTag("Entities") instanceof NBTTagList
+                ? (NBTTagList) level.getTag("Entities")
+                : new NBTTagList();
         boolean recaptured = !diskEntities.isEmpty();
         int mergeBacks;
         try {
-            CompoundTag onDiskEnvelope = new CompoundTag();
-            onDiskEnvelope.put("Entities", diskEntities);
+            NBTTagCompound onDiskEnvelope = new NBTTagCompound();
+            onDiskEnvelope.setTag("Entities", diskEntities);
             mergeBacks = EntityMerge.merge(onDiskEnvelope, freshEnvelope);
         } catch (RuntimeException e) {
             LOGGER.warn("preserving chunk {}: entity fold failed", pos, e);
             return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
         }
-        if (freshEnvelope.get("Entities") instanceof ListTag) {
-            level.put("Entities", freshEnvelope.get("Entities"));
+        if (freshEnvelope.getTag("Entities") instanceof NBTTagList) {
+            level.setTag("Entities", freshEnvelope.getTag("Entities"));
         }
         try {
             regionStorage.write(pos, onDisk);

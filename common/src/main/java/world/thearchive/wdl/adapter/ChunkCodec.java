@@ -3,11 +3,11 @@
 
 package world.thearchive.wdl.adapter;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.world.chunk.Chunk;
 
 /**
- * Per-band chunk serialization axis, split into two steps: capture a live client {@link LevelChunk} into an immutable
+ * Per-band chunk serialization axis, split into two steps: capture a live client {@link Chunk} into an immutable
  * {@link ChunkSnapshotSource}, then encode that snapshot into the vanilla region-file NBT (the minimal
  * {@code SerializableChunkData} slice, client-safe).
  *
@@ -19,16 +19,18 @@ import net.minecraft.world.level.chunk.LevelChunk;
  */
 public interface ChunkCodec {
     /**
-     * Snapshot {@code chunk} (with its level) into an immutable {@link ChunkSnapshotSource} on the main thread,
+     * Snapshot {@code chunk} (with its world) into an immutable {@link ChunkSnapshotSource} on the main thread,
      * detached so it may cross to the save writer thread for {@link #encode}.
      */
-    ChunkSnapshotSource capture(LevelChunk chunk);
+    ChunkSnapshotSource capture(Chunk chunk);
 
     /**
      * Encode an already-captured {@link ChunkSnapshotSource} to the vanilla region-file NBT (the tested slice). When
      * {@code synthesizeBlending} is set the chunk carries a synthesized {@code blending_data} marker so a freshly
      * generated neighbor blends against it instead of walling; the caller decides that per the target dimension and
-     * generator (see {@code VanillaDimensions.synthesizeBlending}).
+     * generator (see {@code VanillaDimensions.synthesizeBlending}). Below 1.18 there is no variable world height and
+     * therefore no blending to synthesize, so this band's {@link ChunkSnapshotSource} carries no marker and the encode
+     * ignores the flag.
      */
-    CompoundTag encode(ChunkSnapshotSource snapshot, boolean synthesizeBlending);
+    NBTTagCompound encode(ChunkSnapshotSource snapshot, boolean synthesizeBlending);
 }

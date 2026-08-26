@@ -5,30 +5,26 @@ package world.thearchive.wdl.adapter.impl;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.TreeMap;
-import net.minecraft.world.level.dimension.DimensionType;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.minecraft.world.DimensionType;
 
 import world.thearchive.wdl.adapter.WdlRegionStorage;
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * 1.13.2 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
+ * 1.12.2 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folder and
  * pre-creates {@code region/} before the region writer opens it. There is no {@code entities/} region at this band:
  * entities live inside the {@code region/} chunk under {@code Level.Entities}.
+ *
+ * <p>The dimension folder matches vanilla {@code WorldProvider.getSaveFolder()}: the overworld ({@code DimensionType}
+ * id 0) saves at the world root, and every other dimension saves under {@code "DIM" + id} (the fixed {@code DIM-1}/
+ * {@code DIM1} folders for the Nether and the End). Below 1.16 there is no per-dimension {@code dimensions/}
+ * resource-location tree to scan; the dimensions are the fixed, {@link DimensionType}-registered set.
  */
 public final class WorldPathsImpl implements WorldPaths {
-    private static final Logger LOGGER = LogManager.getLogger(WorldPathsImpl.class);
-
     private final Path saveRoot;
 
     public WorldPathsImpl(Path saveRoot) {
@@ -55,42 +51,8 @@ public final class WorldPathsImpl implements WorldPaths {
     @Override
     public Map<String, Path> onDiskRegionDirectories() {
         Map<String, Path> result = new LinkedHashMap<>();
-        putIfPresent(result, "minecraft:overworld", saveRoot.resolve("region"));
-        putIfPresent(result, "minecraft:the_nether", saveRoot.resolve("DIM-1").resolve("region"));
-        putIfPresent(result, "minecraft:the_end", saveRoot.resolve("DIM1").resolve("region"));
-        Path dimensions = saveRoot.resolve("dimensions");
-        if (Files.isDirectory(dimensions)) {
-            // dimensions/<namespace>/<path>/region; a ResourceLocation path may nest further, so any
-            // region-file-holding directory named region under the tree is taken, named by its parent's
-            // relative path. The holds-check lets a dimension whose path is literally "region" resolve to
-            // its real region directory one level deeper instead of its own root.
-            Map<String, Path> custom = new TreeMap<>();
-            try {
-                Files.walkFileTree(dimensions, new SimpleFileVisitor<Path>() {
-                    @Override
-                    public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
-                        Path parent = directory.getParent();
-                        if (parent == null || !directory.getFileName().toString().equals("region")
-                                || !holdsRegionFiles(directory)) {
-                            return FileVisitResult.CONTINUE;
-                        }
-                        custom.put(dimensionName(dimensions, parent), directory);
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-
-                    @Override
-                    public FileVisitResult visitFileFailed(Path file, IOException exception) {
-                        LOGGER.warn("skipping an unreadable entry under {}; save totals may be partial",
-                                dimensions, exception);
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
-            } catch (IOException | RuntimeException e) {
-                // Nothing thrown here may escape: a scan problem degrades the totals, never the save.
-                LOGGER.warn("cannot walk the dimensions directory {}; save totals will be partial",
-                        dimensions, e);
-            }
-            result.putAll(custom);
+        for (DimensionType dimension : DimensionType.values()) {
+            putIfPresent(result, dimension.getName(), dimensionRoot(dimension).resolve("region"));
         }
         return result;
     }
@@ -101,23 +63,10 @@ public final class WorldPathsImpl implements WorldPaths {
         }
     }
 
-    private static boolean holdsRegionFiles(Path directory) {
-        try (DirectoryStream<Path> files = Files.newDirectoryStream(directory, "r.*.mca")) {
-            return files.iterator().hasNext();
-        } catch (IOException e) {
-            return false;
-        }
-    }
-
-    private static String dimensionName(Path dimensions, Path dimensionRoot) {
-        String relative = dimensions.relativize(dimensionRoot).toString().replace('\\', '/');
-        int slash = relative.indexOf('/');
-        return slash < 0 ? relative : relative.substring(0, slash) + ':' + relative.substring(slash + 1);
-    }
-
-    /** Vanilla layout: overworld at the save root, Nether=DIM-1, End=DIM1. */
+    /** Vanilla layout: overworld at the save root, every other dimension at {@code "DIM" + getId()}. */
     private Path dimensionRoot(DimensionType dimension) {
-        return dimension.getStorageFolder(saveRoot.toFile()).toPath();
+        int id = dimension.getId();
+        return id == 0 ? saveRoot : saveRoot.resolve("DIM" + id);
     }
 
     private static Path ensureDirectory(Path directory) {

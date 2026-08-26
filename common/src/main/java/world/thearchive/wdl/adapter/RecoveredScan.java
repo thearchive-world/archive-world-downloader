@@ -11,12 +11,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagInt;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.DimensionType;
 
 import world.thearchive.wdl.core.RecoveredCoverage;
 
@@ -75,22 +75,22 @@ final class RecoveredScan {
     /**
      * Writer thread: collect every prior-captured container position in {@code onDiskChunkTag} for {@code dimension}.
      */
-    void record(DimensionType dimension, CompoundTag onDiskChunkTag) {
-        if (!(onDiskChunkTag.getCompound("Level").get("TileEntities") instanceof ListTag)) {
+    void record(DimensionType dimension, NBTTagCompound onDiskChunkTag) {
+        if (!(onDiskChunkTag.getCompoundTag("Level").getTag("TileEntities") instanceof NBTTagList)) {
             return;
         }
-        ListTag blockEntities = (ListTag) onDiskChunkTag.getCompound("Level").get("TileEntities");
+        NBTTagList blockEntities = (NBTTagList) onDiskChunkTag.getCompoundTag("Level").getTag("TileEntities");
         LongOpenHashSet recovered = recoveredByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
         Long2IntOpenHashMap bookshelves = bookshelfSlotsByDimension.computeIfAbsent(dimension,
                 key -> new Long2IntOpenHashMap());
         boolean grew = false;
-        for (Tag element : blockEntities) {
-            CompoundTag blockEntity = element instanceof CompoundTag ? (CompoundTag) element : null;
+        for (NBTBase element : blockEntities) {
+            NBTTagCompound blockEntity = element instanceof NBTTagCompound ? (NBTTagCompound) element : null;
             if (blockEntity == null || !hasCoordinates(blockEntity)) {
                 continue;
             }
-            long pos = new BlockPos(blockEntity.getInt("x"), blockEntity.getInt("y"),
-                    blockEntity.getInt("z")).asLong();
+            long pos = new BlockPos(blockEntity.getInteger("x"), blockEntity.getInteger("y"),
+                    blockEntity.getInteger("z")).toLong();
             if (CHISELED_BOOKSHELF_ID.equals(blockEntity.getString("id"))) {
                 int mask = bookshelfSavedSlotMask(blockEntity);
                 if (mask != 0 && bookshelves.put(pos, mask) != mask) {
@@ -107,22 +107,22 @@ final class RecoveredScan {
 
     /**
      * Writer thread: collect every prior-captured container-entity UUID in {@code onDiskChunkTag}'s
-     * {@code Level.Entities} (the 1.15.2 in-chunk entity location, sibling of the {@code Level.TileEntities} that
+     * {@code Level.Entities} (the below-1.17 in-chunk entity location, sibling of the {@code Level.TileEntities} that
      * {@link #record} reads). Keyed by the dimension being scanned so the current dimension's snapshot is republished
      * with the new ids; the ids themselves are globally unique, so the accumulator behind them is flat.
      */
-    void recordEntities(DimensionType dimension, CompoundTag onDiskChunkTag) {
-        if (!(onDiskChunkTag.getCompound("Level").get("Entities") instanceof ListTag)) {
+    void recordEntities(DimensionType dimension, NBTTagCompound onDiskChunkTag) {
+        if (!(onDiskChunkTag.getCompoundTag("Level").getTag("Entities") instanceof NBTTagList)) {
             return;
         }
-        ListTag entities = (ListTag) onDiskChunkTag.getCompound("Level").get("Entities");
+        NBTTagList entities = (NBTTagList) onDiskChunkTag.getCompoundTag("Level").getTag("Entities");
         boolean grew = false;
-        for (Tag element : entities) {
-            if (!(element instanceof CompoundTag)) {
+        for (NBTBase element : entities) {
+            if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
-            CompoundTag entity = (CompoundTag) element;
-            for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entity).entrySet()) {
+            NBTTagCompound entity = (NBTTagCompound) element;
+            for (Map.Entry<UUID, NBTTagCompound> node : EntityTreeWalk.byUuid(entity).entrySet()) {
                 if (EntityMerge.hasCapturedContent(node.getValue())) {
                     grew |= recoveredEntities.add(node.getKey());
                 }
@@ -145,18 +145,18 @@ final class RecoveredScan {
     }
 
     /** The mask of occupied slots a chiseled bookshelf saved on disk (bit n = slot n) from its {@code "Items"}. */
-    private static int bookshelfSavedSlotMask(CompoundTag blockEntity) {
-        if (!(blockEntity.get("Items") instanceof ListTag)) {
+    private static int bookshelfSavedSlotMask(NBTTagCompound blockEntity) {
+        if (!(blockEntity.getTag("Items") instanceof NBTTagList)) {
             return 0;
         }
-        ListTag items = (ListTag) blockEntity.get("Items");
+        NBTTagList items = (NBTTagList) blockEntity.getTag("Items");
         int mask = 0;
-        for (Tag element : items) {
-            if (element instanceof CompoundTag) {
-                CompoundTag entry = (CompoundTag) element;
+        for (NBTBase element : items) {
+            if (element instanceof NBTTagCompound) {
+                NBTTagCompound entry = (NBTTagCompound) element;
                 // 0xFF default, not 0: a malformed entry with no Slot must drop on the range check below, not
                 // phantom-mark slot 0. The range check also blocks a corrupt out-of-range Slot from 1 << 31.
-                int slot = (entry.contains("Slot") ? entry.getByte("Slot") : (byte) 0xFF) & 0xFF;
+                int slot = (entry.hasKey("Slot") ? entry.getByte("Slot") : (byte) 0xFF) & 0xFF;
                 if (slot < BOOKSHELF_SLOTS) {
                     mask |= 1 << slot;
                 }
@@ -181,8 +181,8 @@ final class RecoveredScan {
                 enderRecovered ? RecoveredCoverage.ENDER_ONLY : RecoveredCoverage.EMPTY);
     }
 
-    private static boolean hasCoordinates(CompoundTag blockEntity) {
-        return blockEntity.get("x") instanceof IntTag && blockEntity.get("y") instanceof IntTag
-                && blockEntity.get("z") instanceof IntTag;
+    private static boolean hasCoordinates(NBTTagCompound blockEntity) {
+        return blockEntity.getTag("x") instanceof NBTTagInt && blockEntity.getTag("y") instanceof NBTTagInt
+                && blockEntity.getTag("z") instanceof NBTTagInt;
     }
 }

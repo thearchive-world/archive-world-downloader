@@ -4,13 +4,10 @@
 package world.thearchive.wdl.adapter;
 
 import java.util.List;
-import java.util.Map;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.ChunkStatus;
-import net.minecraft.world.level.chunk.DataLayer;
-import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.chunk.NibbleArray;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -38,26 +35,29 @@ public interface ChunkSnapshotSource {
 
     long inhabitedTime();
 
-    /** The chunk's persisted status (FULL for captured client chunks); drives {@code heightmapsAfter()}. */
-    ChunkStatus status();
-
-    /** Whether the captured light is authoritative for this chunk; drives {@code isLightOn}. */
+    /**
+     * Whether the captured light is authoritative for this chunk; each band's encode maps it onto its own on-disk
+     * light-validity key ({@code isLightOn} at the newer bands, the pre-Flattening boolean {@code LightPopulated}
+     * here).
+     */
     boolean lightCorrect();
 
     /**
-     * Heightmaps present on the chunk, keyed by type (raw packed {@code long[]}). May include client-irrelevant entries
-     * (e.g. a zeroed {@code OCEAN_FLOOR}); the codec selects which to persist.
+     * The chunk's heightmap. Below 1.13 there is no keyed {@code Heightmap.Types}/{@code ChunkStatus}: a chunk carries
+     * exactly one flat heightmap, the raw {@code int[256]} a pre-Flattening save writes verbatim under
+     * {@code HeightMap}.
      */
-    Map<Heightmap.Types, long[]> heightmaps();
+    int[] heightmaps();
 
     /** Per-section snapshot: a section copy plus the captured block/sky light layers (either may be null). */
     List<SectionData> sections();
 
     /** Block-entity NBT in saved form (empty for synthetic terrain fixtures). */
-    List<CompoundTag> blockEntities();
+    List<NBTTagCompound> blockEntities();
 
     /**
-     * Per-chunk biome registry ids (vanilla {@code Level.Biomes}); below 1.18 biomes are per chunk, not per section.
+     * Per-chunk biome ids (vanilla {@code Level.Biomes}), widened to {@code int} for the interface; below 1.13 the
+     * on-disk array is a {@code byte[256]}, one id per column, which the encode narrows back down.
      */
     int[] biomes();
 
@@ -69,12 +69,12 @@ public interface ChunkSnapshotSource {
      */
     static final class SectionData {
         private final int y;
-        private final @Nullable LevelChunkSection chunkSection;
-        private final @Nullable DataLayer blockLight;
-        private final @Nullable DataLayer skyLight;
+        private final @Nullable ExtendedBlockStorage chunkSection;
+        private final @Nullable NibbleArray blockLight;
+        private final @Nullable NibbleArray skyLight;
 
-        public SectionData(int y, @Nullable LevelChunkSection chunkSection, @Nullable DataLayer blockLight,
-                @Nullable DataLayer skyLight) {
+        public SectionData(int y, @Nullable ExtendedBlockStorage chunkSection, @Nullable NibbleArray blockLight,
+                @Nullable NibbleArray skyLight) {
             this.y = y;
             this.chunkSection = chunkSection;
             this.blockLight = blockLight;
@@ -85,15 +85,15 @@ public interface ChunkSnapshotSource {
             return y;
         }
 
-        public @Nullable LevelChunkSection chunkSection() {
+        public @Nullable ExtendedBlockStorage chunkSection() {
             return chunkSection;
         }
 
-        public @Nullable DataLayer blockLight() {
+        public @Nullable NibbleArray blockLight() {
             return blockLight;
         }
 
-        public @Nullable DataLayer skyLight() {
+        public @Nullable NibbleArray skyLight() {
             return skyLight;
         }
     }

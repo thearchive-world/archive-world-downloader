@@ -15,9 +15,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.DimensionType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
@@ -29,10 +29,10 @@ import world.thearchive.wdl.core.SaveProgress;
  * client render thread never blocks on region I/O and never runs the heavy chunk serialize either. {@link #submitChunk}
  * hands over a lazy encode-and-fold {@link Supplier} that the writer thread resolves (the deferred but deterministic
  * encode of immutable, detached inputs); {@link #submitEntity} hands over a fully-encoded, immutable
- * {@link CompoundTag}. Either way the writer thread is the sole owner of the {@link WdlRegionStorage}s, the one-writer
- * invariant, and the reason only immutable or deferred-immutable work may cross the queue.
+ * {@link NBTTagCompound}. Either way the writer thread is the sole owner of the {@link WdlRegionStorage}s, the
+ * one-writer invariant, and the reason only immutable or deferred-immutable work may cross the queue.
  *
- * <p>At this band the store itself needs the single thread: vanilla {@code RegionFileStorage} keeps an unsynchronized
+ * <p>At this band the store itself needs the single thread: vanilla {@code RegionFileCache} keeps an unsynchronized
  * region-file cache and does synchronous I/O, so it is not safe to call from more than one thread. The mod's own paths
  * need it too. The per-dimension {@link Storages} are unsynchronized and open lazily by get-then-put, so a second
  * writer could open two storages over one directory. The merge, rewrite and entity-fold paths are read-modify-write per
@@ -41,7 +41,7 @@ import world.thearchive.wdl.core.SaveProgress;
  * <p>{@link #finish()} enqueues an end-of-stream marker; the writer drains the remaining tags, closes each storage
  * (which is what flushes its region files, there being no channel force at this band), runs the {@link Finalizer} (the
  * band's level.dat write), and completes the returned future with the per-target tallies (or the error that aborted
- * it). At 1.14.4 the vanilla {@code LevelStorage} holds no OS lock to release at finish (session.lock is advisory
+ * it). Below 1.16 the vanilla {@code SaveHandler} holds no OS lock to release at finish (session.lock is advisory
  * pre-1.16), so there is nothing to close here. The future is completed normally even on failure, so the caller polls
  * it with one branch.
  */
@@ -177,10 +177,10 @@ final class AsyncSaveWriter {
         private final Target target;
         private final DimensionType dimension;
         private final ChunkPos pos;
-        private final Supplier<CompoundTag> encode;
+        private final Supplier<NBTTagCompound> encode;
         private final RegionChunkWriter.ChunkReadMerge merge;
 
-        WriteTask(Target target, DimensionType dimension, ChunkPos pos, Supplier<CompoundTag> encode,
+        WriteTask(Target target, DimensionType dimension, ChunkPos pos, Supplier<NBTTagCompound> encode,
                 RegionChunkWriter.ChunkReadMerge merge) {
             this.target = target;
             this.dimension = dimension;
@@ -201,7 +201,7 @@ final class AsyncSaveWriter {
             return pos;
         }
 
-        Supplier<CompoundTag> encode() {
+        Supplier<NBTTagCompound> encode() {
             return encode;
         }
 
@@ -304,12 +304,12 @@ final class AsyncSaveWriter {
     // The recovered-coverage observer, or null on a fresh download. A passive outline side-channel run from the
     // read-only resume scan (scanResumeChunk), entirely off the chunk write path, so it can never affect a write.
     // Set on the main thread before the first submit, read on the writer thread.
-    private volatile @Nullable BiConsumer<DimensionType, CompoundTag> resumeReadObserver;
+    private volatile @Nullable BiConsumer<DimensionType, NBTTagCompound> resumeReadObserver;
 
     // The entity-part recovered observer, the entity sibling of resumeReadObserver: fed the prior on-disk region
     // chunk by an entity-targeted resume scan, and reads its Level.Entities part, off the chunk write path. Same
     // threading discipline.
-    private volatile @Nullable BiConsumer<DimensionType, CompoundTag> resumeEntityReadObserver;
+    private volatile @Nullable BiConsumer<DimensionType, NBTTagCompound> resumeEntityReadObserver;
 
     /**
      * The three writer-thread steps run around the drain, in lifecycle order: {@code preflight} before any chunk is
@@ -317,8 +317,8 @@ final class AsyncSaveWriter {
      * (the band's level.dat write), and {@code outputs} after the storages have closed (the export zip).
      * {@code preflight} and {@code outputs} are best-effort: a throw from either is caught and logged, never failing
      * the save, so a zip failure can never endanger the openable folder. A {@code finalizer} throw aborts the save the
-     * usual way (it is the level.dat write), except that 1.15.2 vanilla LevelStorage.saveLevelData catches and logs an
-     * IO failure rather than throwing, so a disk-level level.dat write failure is not surfaced here.
+     * usual way (it is the level.dat write), except that vanilla SaveHandler.saveWorldInfoWithPlayer catches and logs
+     * an IO failure rather than throwing, so a disk-level level.dat write failure is not surfaced here.
      */
     public AsyncSaveWriter(StorageOpener regionOpener, Preflight preflight,
             Finalizer finalizer, OutputFinalizer outputs, SaveProgress progress) {
@@ -337,7 +337,7 @@ final class AsyncSaveWriter {
      * recovered-coverage scan. Call on the main thread before the first submit; the observer runs on the writer thread,
      * which owns the on-disk read, entirely off the chunk write path.
      */
-    public void observeResumeReads(BiConsumer<DimensionType, CompoundTag> observer) {
+    public void observeResumeReads(BiConsumer<DimensionType, NBTTagCompound> observer) {
         this.resumeReadObserver = observer;
     }
 
@@ -346,7 +346,7 @@ final class AsyncSaveWriter {
      * the outline's recovered-entity scan; the observer reads the chunk's {@code Level.Entities} part. The entity
      * sibling of {@link #observeResumeReads}; same threading rules.
      */
-    public void observeEntityResumeReads(BiConsumer<DimensionType, CompoundTag> observer) {
+    public void observeEntityResumeReads(BiConsumer<DimensionType, NBTTagCompound> observer) {
         this.resumeEntityReadObserver = observer;
     }
 
@@ -407,7 +407,7 @@ final class AsyncSaveWriter {
      * codec/sinks, the frozen registries). {@code merge} is the on-disk read-merge the writer applies to that chunk,
      * supplied per chunk because it closes over what only the main thread can read off the captured snapshot.
      */
-    public void submitChunk(DimensionType dimension, ChunkPos pos, Supplier<CompoundTag> encode,
+    public void submitChunk(DimensionType dimension, ChunkPos pos, Supplier<NBTTagCompound> encode,
             RegionChunkWriter.ChunkReadMerge merge) {
         submitted++;
         queue.add(new WriteTask(Target.REGION, dimension, pos, encode, merge));
@@ -430,7 +430,7 @@ final class AsyncSaveWriter {
      * {@code Level.Entities} (main thread). The writer thread owns {@code tag} after this call; the caller must not
      * mutate it afterward.
      */
-    public void submitEntity(DimensionType dimension, ChunkPos pos, CompoundTag tag) {
+    public void submitEntity(DimensionType dimension, ChunkPos pos, NBTTagCompound tag) {
         submitted++;
         // The merge argument is inert for an entity task: the drain routes it through foldEntitiesIntoRegion, which
         // applies EntityMerge.merge against the host chunk's Level.Entities itself. WriteTask still requires one.
@@ -505,7 +505,7 @@ final class AsyncSaveWriter {
                 }
                 WriteTask task = (WriteTask) next;
                 progress.chunks(++drained, submitted); // both REGION and ENTITIES drain under the one chunks phase
-                CompoundTag tag;
+                NBTTagCompound tag;
                 try {
                     tag = task.encode().get(); // encode + stage-(a) fold on this thread (a no-op for entities)
                 } catch (RuntimeException e) {
@@ -558,7 +558,7 @@ final class AsyncSaveWriter {
                         entityChunksFailed++; // per chunk, as above
                         continue;
                     }
-                    // At 1.15.2 entities live inside the region/ chunk under Level.Entities, so the entity write is a
+                    // Below 1.17 entities live inside the region/ chunk under Level.Entities, so the entity write is a
                     // fold into the host chunk, not a separate entities/ store. The fold read-merges too: a
                     // re-captured host carries forward each on-disk vehicle's contents AND every on-disk entity the
                     // fresh capture lacks (EntityMerge unions, so a partial re-flush adds to rather than overwrites
@@ -630,7 +630,7 @@ final class AsyncSaveWriter {
      */
     private void scanResumeChunk(ScanTask scan, Storages regions) {
         boolean region = scan.target() == Target.REGION;
-        BiConsumer<DimensionType, CompoundTag> observer = region ? resumeReadObserver : resumeEntityReadObserver;
+        BiConsumer<DimensionType, NBTTagCompound> observer = region ? resumeReadObserver : resumeEntityReadObserver;
         if (observer == null) {
             return;
         }
@@ -639,7 +639,7 @@ final class AsyncSaveWriter {
             return; // the dimension logged its own open failure; a scan reads nothing and loses nothing
         }
         try {
-            CompoundTag onDisk = storage.read(scan.pos());
+            NBTTagCompound onDisk = storage.read(scan.pos());
             if (onDisk != null) {
                 observer.accept(scan.dimension(), onDisk);
             }
@@ -717,7 +717,7 @@ final class AsyncSaveWriter {
             } catch (Exception e) {
                 if (loggedFailures.add(dimension)) {
                     LOGGER.warn("cannot open the {} storage for {}; every chunk of that dimension is lost", target,
-                            DimensionType.getName(dimension), e);
+                            dimension.getName(), e);
                 }
                 return null;
             }

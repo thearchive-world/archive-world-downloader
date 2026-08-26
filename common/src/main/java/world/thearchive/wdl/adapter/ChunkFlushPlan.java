@@ -11,9 +11,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 
 /**
  * What a flushed chunk hands its writer thunks: the values read off the captured snapshot on the main thread, and the
@@ -61,7 +61,7 @@ final class ChunkFlushPlan {
     static LongSet replacedIn(ChunkPos pos, LongSet replacedBlockKeys) {
         LongOpenHashSet inChunk = new LongOpenHashSet();
         for (long posKey : replacedBlockKeys) {
-            if (new ChunkPos(BlockPos.method_10488(posKey)).equals(pos)) {
+            if (new ChunkPos(BlockPos.fromLong(posKey)).equals(pos)) {
                 inChunk.add(posKey);
             }
         }
@@ -74,9 +74,9 @@ final class ChunkFlushPlan {
      * isolated per stash. The merged count is returned beside the failed one that production reads, because it is what
      * lets a test tell the three merges apart.
      */
-    static MergeTally foldChunkStashes(CompoundTag tag, ChunkPos pos, ContainerSink containerSink,
-            LecternSink lecternSink, Map<BlockPos, CompoundTag> containers,
-            Map<BlockPos, CompoundTag> lecterns, Map<BlockPos, CompoundTag> holders) {
+    static MergeTally foldChunkStashes(NBTTagCompound tag, ChunkPos pos, ContainerSink containerSink,
+            LecternSink lecternSink, Map<BlockPos, NBTTagCompound> containers,
+            Map<BlockPos, NBTTagCompound> lecterns, Map<BlockPos, NBTTagCompound> holders) {
         MergeTally items = ContainerMerge.mergeChunkStash(containerSink, tag, pos, containers);
         MergeTally books = ContainerMerge.mergeLecternChunkStash(lecternSink, tag, pos, lecterns);
         MergeTally fields = ContainerMerge.mergeHolderChunkStash(tag, pos, holders);
@@ -88,9 +88,9 @@ final class ChunkFlushPlan {
      * buffer before its holder was drained. Returns the two merges summed, so the caller reports one merged and one
      * failed count for the rewrite.
      */
-    static MergeTally foldResidualHolders(CompoundTag onDisk, ChunkPos pos, ContainerSink containerSink,
-            LecternSink lecternSink, Map<BlockPos, CompoundTag> containers,
-            Map<BlockPos, CompoundTag> lecterns) {
+    static MergeTally foldResidualHolders(NBTTagCompound onDisk, ChunkPos pos, ContainerSink containerSink,
+            LecternSink lecternSink, Map<BlockPos, NBTTagCompound> containers,
+            Map<BlockPos, NBTTagCompound> lecterns) {
         MergeTally items = ContainerMerge.mergeChunkStash(containerSink, onDisk, pos, containers);
         MergeTally books = ContainerMerge.mergeLecternChunkStash(lecternSink, onDisk, pos, lecterns);
         return sum(items, books);
@@ -117,10 +117,10 @@ final class ChunkFlushPlan {
      * of a failure that already lost this visit's contents.
      */
     static List<BlockPos> landingHolderPositions(ChunkSnapshotSource snapshot,
-            Map<BlockPos, CompoundTag> holders) {
+            Map<BlockPos, NBTTagCompound> holders) {
         List<BlockPos> landing = new ArrayList<>();
-        for (Map.Entry<BlockPos, CompoundTag> holder : holders.entrySet()) {
-            for (CompoundTag blockEntity : snapshot.blockEntities()) {
+        for (Map.Entry<BlockPos, NBTTagCompound> holder : holders.entrySet()) {
+            for (NBTTagCompound blockEntity : snapshot.blockEntities()) {
                 if (NbtMerge.isBlockEntityAt(blockEntity, holder.getKey())
                         && ContainerMerge.recordedTypeMatches(holder.getValue(), blockEntity)) {
                     landing.add(holder.getKey());

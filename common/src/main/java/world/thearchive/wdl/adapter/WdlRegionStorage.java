@@ -9,10 +9,10 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.storage.RegionFile;
+import net.minecraft.nbt.CompressedStreamTools;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.chunk.storage.RegionFile;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -21,7 +21,8 @@ import org.jspecify.annotations.Nullable;
  * region coordinate opened on demand and reused. It is deliberately the raw NBT layer (no data fixing, matching the
  * higher band's raw {@code RegionFileStorage.read}/{@code write}): a chunk tag is written through the region file
  * exactly as given and read back verbatim, so what reaches disk is the anvil format a vanilla client of this band
- * reads.
+ * reads. Below 1.15 the pre-{@code IOWorker} region path calls no {@code force()} at all, so a finished write survives
+ * the process dying but not a mid-write power loss.
  */
 public class WdlRegionStorage implements AutoCloseable {
     private final File directory;
@@ -44,15 +45,15 @@ public class WdlRegionStorage implements AutoCloseable {
         return regionFile;
     }
 
-    public @Nullable CompoundTag read(ChunkPos pos) throws IOException {
-        try (DataInputStream input = regionFileFor(pos).method_3957(pos.x & 31, pos.z & 31)) {
-            return input == null ? null : NbtIo.read(input);
+    public @Nullable NBTTagCompound read(ChunkPos pos) throws IOException {
+        try (DataInputStream input = regionFileFor(pos).getChunkDataInputStream(pos.x & 31, pos.z & 31)) {
+            return input == null ? null : CompressedStreamTools.read(input);
         }
     }
 
-    public void write(ChunkPos pos, CompoundTag tag) throws IOException {
-        try (DataOutputStream output = regionFileFor(pos).method_3961(pos.x & 31, pos.z & 31)) {
-            NbtIo.write(tag, output);
+    public void write(ChunkPos pos, NBTTagCompound tag) throws IOException {
+        try (DataOutputStream output = regionFileFor(pos).getChunkDataOutputStream(pos.x & 31, pos.z & 31)) {
+            CompressedStreamTools.write(tag, output);
         }
     }
 

@@ -10,12 +10,12 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
 import java.util.Collection;
 import java.util.OptionalLong;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagInt;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTTagString;
+import net.minecraft.util.math.BlockPos;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -34,7 +34,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The on-disk layer beside {@link ContainerMerge}'s in-session stash merge: where {@link ContainerMerge} folds an
  * open-time stash holder into the fresh chunk on the main thread before the tag is queued, this folds the prior on-disk
- * chunk into the fresh one on the writer thread after the on-disk read. Pure {@code CompoundTag} in/out and
+ * chunk into the fresh one on the writer thread after the on-disk read. Pure {@code NBTTagCompound} in/out and
  * band-agnostic over the pre-1.18 {@code Level.TileEntities} layout: both tags are already in the region's own
  * serialized form, so a carry-forward is a direct tag copy with no per-band serialize. The fields carried are
  * {@link CapturedBlockField}, the same list the open-time write reads, so a datum this mod writes on one visit cannot
@@ -51,7 +51,7 @@ final class ChunkMerge {
      */
     static final String CHISELED_BOOKSHELF_ID = "minecraft:chiseled_bookshelf";
 
-    private static final Tag CHISELED_BOOKSHELF_ID_TAG = new StringTag(CHISELED_BOOKSHELF_ID);
+    private static final NBTBase CHISELED_BOOKSHELF_ID_TAG = new NBTTagString(CHISELED_BOOKSHELF_ID);
 
     /** Every slot occupied, the answer used where no occupancy was recorded for a position. */
     private static final int ALL_SLOTS = -1;
@@ -64,7 +64,7 @@ final class ChunkMerge {
     static LongSet capturedPositions(Collection<BlockPos> positions) {
         LongOpenHashSet packed = new LongOpenHashSet();
         for (BlockPos pos : positions) {
-            packed.add(pos.asLong());
+            packed.add(pos.toLong());
         }
         return packed;
     }
@@ -81,7 +81,7 @@ final class ChunkMerge {
      * returning how many block entities received a carry-forward. A fresh chunk with no {@code Level.TileEntities}
      * list, or an on-disk chunk with none, is a no-op.
      */
-    public static int merge(CompoundTag onDisk, CompoundTag fresh) {
+    public static int merge(NBTTagCompound onDisk, NBTTagCompound fresh) {
         return merge(onDisk, fresh, NO_OCCUPANCY, LongSets.EMPTY_SET, LongSets.EMPTY_SET);
     }
 
@@ -96,28 +96,28 @@ final class ChunkMerge {
      * landed in this session, where nothing carries at all: what is on disk there describes the block the placement
      * replaced.
      */
-    public static int merge(CompoundTag onDisk, CompoundTag fresh, Long2IntMap occupancyByPos,
+    public static int merge(NBTTagCompound onDisk, NBTTagCompound fresh, Long2IntMap occupancyByPos,
             LongSet openTimeCaptured, LongSet replaced) {
-        ListTag freshBlockEntities = fresh.getCompound("Level").get("TileEntities") instanceof ListTag
-                ? (ListTag) fresh.getCompound("Level").get("TileEntities")
+        NBTTagList freshBlockEntities = fresh.getCompoundTag("Level").getTag("TileEntities") instanceof NBTTagList
+                ? (NBTTagList) fresh.getCompoundTag("Level").getTag("TileEntities")
                 : null;
-        ListTag diskBlockEntities = onDisk.getCompound("Level").get("TileEntities") instanceof ListTag
-                ? (ListTag) onDisk.getCompound("Level").get("TileEntities")
+        NBTTagList diskBlockEntities = onDisk.getCompoundTag("Level").getTag("TileEntities") instanceof NBTTagList
+                ? (NBTTagList) onDisk.getCompoundTag("Level").getTag("TileEntities")
                 : null;
         if (freshBlockEntities == null || diskBlockEntities == null) {
             return 0;
         }
         int merged = 0;
-        for (Tag element : freshBlockEntities) {
-            if (!(element instanceof CompoundTag)) {
+        for (NBTBase element : freshBlockEntities) {
+            if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
-            CompoundTag freshBlockEntity = (CompoundTag) element;
+            NBTTagCompound freshBlockEntity = (NBTTagCompound) element;
             OptionalLong freshPos = packedPos(freshBlockEntity);
             if (!freshPos.isPresent()) {
                 continue; // no complete position: it matches nothing on disk and names neither occupancy nor open
             }
-            CompoundTag diskBlockEntity = matching(diskBlockEntities, freshBlockEntity);
+            NBTTagCompound diskBlockEntity = matching(diskBlockEntities, freshBlockEntity);
             if (diskBlockEntity != null && carryForward(diskBlockEntity, freshBlockEntity, freshPos.getAsLong(),
                     occupancyByPos, openTimeCaptured, replaced)) {
                 merged++;
@@ -136,7 +136,7 @@ final class ChunkMerge {
      * <p>Content on disk is not the same as content the carry-forward will preserve, and this answers only the first
      * question; {@link RecoveredScan} enumerates where the two part.
      */
-    static boolean hasCapturedContent(CompoundTag blockEntity) {
+    static boolean hasCapturedContent(NBTTagCompound blockEntity) {
         for (CapturedBlockField field : CapturedBlockField.fields()) {
             if (field.holdsContent(blockEntity)) {
                 return true;
@@ -146,7 +146,7 @@ final class ChunkMerge {
     }
 
     /** Carry forward every captured field the fresh block entity lacks from the disk one; true if any was. */
-    private static boolean carryForward(CompoundTag disk, CompoundTag fresh, long freshPos,
+    private static boolean carryForward(NBTTagCompound disk, NBTTagCompound fresh, long freshPos,
             Long2IntMap occupancyByPos, LongSet openTimeCaptured, LongSet replaced) {
         if (replaced.contains(freshPos)) {
             // A block was placed in this cell this session, so the block entity on disk is the one it replaced.
@@ -172,14 +172,14 @@ final class ChunkMerge {
      * not a sentinel long: every 64-bit value is a representable {@link BlockPos}, so a sentinel would be a position
      * rather than an absence.
      */
-    private static OptionalLong packedPos(CompoundTag blockEntity) {
-        IntTag x = blockEntity.get("x") instanceof IntTag ? (IntTag) blockEntity.get("x") : null;
-        IntTag y = blockEntity.get("y") instanceof IntTag ? (IntTag) blockEntity.get("y") : null;
-        IntTag z = blockEntity.get("z") instanceof IntTag ? (IntTag) blockEntity.get("z") : null;
+    private static OptionalLong packedPos(NBTTagCompound blockEntity) {
+        NBTTagInt x = blockEntity.getTag("x") instanceof NBTTagInt ? (NBTTagInt) blockEntity.getTag("x") : null;
+        NBTTagInt y = blockEntity.getTag("y") instanceof NBTTagInt ? (NBTTagInt) blockEntity.getTag("y") : null;
+        NBTTagInt z = blockEntity.getTag("z") instanceof NBTTagInt ? (NBTTagInt) blockEntity.getTag("z") : null;
         if (x == null || y == null || z == null) {
             return OptionalLong.empty();
         }
-        return OptionalLong.of(new BlockPos(x.getAsInt(), y.getAsInt(), z.getAsInt()).asLong());
+        return OptionalLong.of(new BlockPos(x.getInt(), y.getInt(), z.getInt()).toLong());
     }
 
     /** The occupancy mask recorded for {@code pos}, or every slot when none was recorded. */
@@ -195,30 +195,30 @@ final class ChunkMerge {
      * from an opened menu or a placed item's own component, which is the whole container and therefore ground truth, so
      * a fresh list there must replace the on-disk one or an item the player watched leave would come back.
      */
-    private static boolean capturesPerSlot(CompoundTag blockEntity) {
-        return CHISELED_BOOKSHELF_ID_TAG.equals(blockEntity.get("id"));
+    private static boolean capturesPerSlot(NBTTagCompound blockEntity) {
+        return CHISELED_BOOKSHELF_ID_TAG.equals(blockEntity.getTag("id"));
     }
 
     /**
      * The on-disk block entity sharing {@code freshBlockEntity}'s position and type, or null. Position is the
-     * {@code x/y/z} {@link IntTag} compare; type is the {@code id}, so a position whose block entity changed type
+     * {@code x/y/z} {@link NBTTagInt} compare; type is the {@code id}, so a position whose block entity changed type
      * between two visits (a chest replaced by a barrel at the same spot) is treated as new-and-empty rather than
      * inheriting the prior type's contents. A fresh block entity missing either its position or its {@code id} matches
      * nothing, so the carry-forward reaches only positions whose type is confirmed unchanged.
      */
-    private static @Nullable CompoundTag matching(ListTag diskBlockEntities, CompoundTag freshBlockEntity) {
-        Tag x = freshBlockEntity.get("x");
-        Tag y = freshBlockEntity.get("y");
-        Tag z = freshBlockEntity.get("z");
-        Tag id = freshBlockEntity.get("id");
-        if (!(x instanceof IntTag) || !(y instanceof IntTag) || !(z instanceof IntTag) || id == null) {
+    private static @Nullable NBTTagCompound matching(NBTTagList diskBlockEntities, NBTTagCompound freshBlockEntity) {
+        NBTBase x = freshBlockEntity.getTag("x");
+        NBTBase y = freshBlockEntity.getTag("y");
+        NBTBase z = freshBlockEntity.getTag("z");
+        NBTBase id = freshBlockEntity.getTag("id");
+        if (!(x instanceof NBTTagInt) || !(y instanceof NBTTagInt) || !(z instanceof NBTTagInt) || id == null) {
             return null;
         }
-        for (Tag element : diskBlockEntities) {
-            CompoundTag diskBlockEntity = element instanceof CompoundTag ? (CompoundTag) element : null;
-            if (diskBlockEntity != null && id.equals(diskBlockEntity.get("id"))
-                    && x.equals(diskBlockEntity.get("x")) && y.equals(diskBlockEntity.get("y"))
-                    && z.equals(diskBlockEntity.get("z"))) {
+        for (NBTBase element : diskBlockEntities) {
+            NBTTagCompound diskBlockEntity = element instanceof NBTTagCompound ? (NBTTagCompound) element : null;
+            if (diskBlockEntity != null && id.equals(diskBlockEntity.getTag("id"))
+                    && x.equals(diskBlockEntity.getTag("x")) && y.equals(diskBlockEntity.getTag("y"))
+                    && z.equals(diskBlockEntity.getTag("z"))) {
                 return diskBlockEntity;
             }
         }

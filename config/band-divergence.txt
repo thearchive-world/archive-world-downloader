@@ -25,6 +25,10 @@ common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 # Below the 1.21.2 chunk-serialization cut vanilla has no SerializableChunkData.SectionData record, so this
 # chunk-snapshot seam defines its own band-stable SectionData carrier for the static-write codec. Below 1.20.5
 # ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update.
+# Below 1.13 there is no Mojang mapping and no ChunkStatus or Heightmap type at all, so heightmaps() returns a flat
+# int[256] rather than a Map<Heightmap.Types, long[]> and the status() accessor is dropped entirely (the
+# pre-Flattening TerrainPopulated/LightPopulated booleans replace it); the section carrier holds classic
+# ExtendedBlockStorage/NibbleArray rather than LevelChunkSection/DataLayer.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 
 # Reads the captured section through the band's own ChunkSnapshotSource.SectionData rather than the vanilla
@@ -263,6 +267,8 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.
 # RegionChunkWriter.foldEntitiesIntoRegion rather than draining a second entities/ storage: the entities opener
 # and Storages are dropped, the resume scan reads the same region/ chunk, and a fold with no host chunk is a
 # counted loss.
+# Below 1.13 DimensionType is the classic enum with an instance getName() rather than a static
+# DimensionType.getName(DimensionType) accessor, and chunk tags are the classic MCP NBTTagCompound.
 common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the merge-write reads and writes through the vanilla
@@ -271,12 +277,19 @@ common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 # Level.Entities through EntityMerge and writes the chunk back, the entity sibling of the container rewrite path; and
 # the terrain merge-write preserves the on-disk Level.Entities the fresh terrain tag lacks, so a routine terrain
 # re-flush of a revisited chunk does not drop the entities a prior fold saved there.
+# Below 1.13 the NBT API is classic MCP, so a tag's Level compound and list children are read via
+# getCompoundTag/getTag/instanceof NBTTagCompound/NBTTagList rather than getCompound/get.
 common/src/main/java/world/thearchive/wdl/adapter/RegionChunkWriter.java
 
 # Below the 1.20.6 cut there is no RegionStorageInfo; instead of supplying one per dimension, this seam opens the
 # vanilla IOWorker directly (openRegionStorage). Below 1.17 (era E3) there is no separate entities/ region:
 # entities live inside the region/ chunk, so the entitiesDirectory/openEntitiesStorage members the E2a parent
 # carries are dropped and this maps and opens only region/.
+# Below 1.13 the dimension key is the classic three-constant net.minecraft.world.DimensionType enum (package
+# net.minecraft.world, not net.minecraft.world.level.dimension), and onDiskRegionDirectories walks
+# DimensionType.values() and its id-based folder (overworld root at id 0, else "DIM" + id, mirroring vanilla
+# WorldProvider.getSaveFolder()) rather than a fixed three-entry list, so a Forge-registered custom dimension's
+# folder is included too; there is no per-dimension dimensions/ resource-location tree to scan below 1.16.
 common/src/main/java/world/thearchive/wdl/adapter/WorldPaths.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the drain is proven against the vanilla IOWorker (a
@@ -566,6 +579,8 @@ common/src/main/java/world/thearchive/wdl/adapter/VanillaDimensions.java
 # Below 1.19 there is no chiseled bookshelf, so the per-chunk bookshelf-occupancy producer is dropped and the
 # read-merge composer passes an empty occupancy map (ChunkMerge.occupancyMap); the ChunkMerge per-slot union stays as
 # unused-but-compiling code, the way the crafter open-bind stays below 1.20.3.
+# Below 1.13 BlockPos/ChunkPos are classic MCP (net.minecraft.util.math), and a packed position unpacks via
+# BlockPos.fromLong rather than the modern core-package static.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
 
 # Below 1.19 the entity read-merge keys the captured-entity UUID through SerializableUUID.CODEC, the pre-1.19 name for
@@ -650,6 +665,8 @@ common/src/test/java/world/thearchive/wdl/WorldgenWarmupTest.java
 # 1.18, so the carry-forward read navigates the Level compound first.
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList/NBTBase, getTag/setTag rather than get/put), and
+# BlockPos packs to a long via toLong/fromLong rather than a core-package asLong/static.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkMerge.java
 
 # Below 1.18 the recovered-container scan reads block entities from Level.TileEntities, not the flat root block_entities.
@@ -657,6 +674,9 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkMerge.java
 # of that Level.TileEntities, rather than a separate entities/ region chunk's top-level Entities.
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
+# Below 1.13 the NBT API is classic MCP, so hasCoordinates checks getTag(key) instanceof NBTTagInt, coordinates are
+# read via getInteger, and bookshelfSavedSlotMask's occupancy check reads entry.hasKey("Slot") (classic
+# NBTTagCompound has no contains).
 common/src/main/java/world/thearchive/wdl/adapter/RecoveredScan.java
 
 # com.mojang.logging.LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is
@@ -784,3 +804,18 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityTreeWalk.java
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/NbtMerge.java
+
+# Below 1.13 Minecraft ships no Mojang mapping, so this interface names classic MCP NBTTagCompound/Chunk rather than
+# CompoundTag/LevelChunk; the encode contract stays the shared seam even though the section shape underneath is the
+# pre-Flattening numeric form (see ChunkCodecImpl).
+common/src/main/java/world/thearchive/wdl/adapter/ChunkCodec.java
+
+# Below 1.13 BlockPos has no core-package asLong/static-unpack pair; the packed section-coordinate long here
+# round-trips through classic BlockPos.toLong()/BlockPos.fromLong(long) instead.
+common/src/main/java/world/thearchive/wdl/adapter/SectionKey.java
+
+# Below 1.15 there is no IOWorker; this band's own instance-cached RegionFile store (the same shape the 1.13.2
+# parent already keeps, there being no RegionFileStorage base either) opens classic MCP
+# net.minecraft.world.chunk.storage.RegionFile and reads/writes through getChunkDataInputStream/
+# getChunkDataOutputStream and CompressedStreamTools, the pre-NbtIo name.
+common/src/main/java/world/thearchive/wdl/adapter/WdlRegionStorage.java
