@@ -701,21 +701,69 @@ common/src/test/java/world/thearchive/wdl/adapter/RiddenMountContentsFoldTest.ja
 # Below 1.18 the merge test reads chunk block entities from Level.TileEntities, not the flat root block_entities.
 common/src/test/java/world/thearchive/wdl/adapter/ContainerTypeGateMergeTest.java
 
-# The fastutil bundled with 1.17.1 (8.2.1) has no LongSet.of() factory, so the test builds sets via LongSets and
-# LongOpenHashSet.
+# This band's fastutil 8.2.1 has no LongSet.of() factory, so the test builds sets via LongSets and LongOpenHashSet;
+# the Java 8 floor also has no Set.of collection factory (Java 9), so the entity sets are Guava ImmutableSet.of.
 common/src/test/java/world/thearchive/wdl/core/CaptureControllerTest.java
 
-# The fastutil bundled with 1.17.1 (8.2.1) has no LongSet.of() factory, so the test builds sets via LongSets and
-# LongOpenHashSet.
+# This band's fastutil 8.2.1 has no LongSet.of() factory, so the test builds sets via LongSets and LongOpenHashSet;
+# the Java 8 floor also has no Set.of collection factory (Java 9), so the entity sets are Guava ImmutableSet.of.
 common/src/test/java/world/thearchive/wdl/core/CapturedContainersTest.java
 
-# The fastutil bundled with 1.17.1 (8.2.1) has no LongSet.of() factory, so the test builds sets via LongSets and
-# LongOpenHashSet.
+# This band's fastutil 8.2.1 has no LongSet.of() factory, so the test builds sets via LongSets and LongOpenHashSet;
+# the Java 8 floor also has no Set.of collection factory (Java 9), so the entity sets are Guava ImmutableSet.of.
 common/src/test/java/world/thearchive/wdl/core/OutlineClassifierTest.java
 
-# The fastutil bundled with 1.17.1 (8.2.1) has no LongSet.of() factory, so the test builds sets via LongSets and
-# LongOpenHashSet.
+# This band's fastutil 8.2.1 has no LongSet.of() factory, so the test builds sets via LongSets and LongOpenHashSet;
+# the Java 8 floor also has no Set.of collection factory (Java 9), so the entity sets are Guava ImmutableSet.of.
 common/src/test/java/world/thearchive/wdl/core/RecoveredCoverageTest.java
+
+# Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the expected lists are Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/ChatCopyTest.java
+
+# Below 1.17 the Java floor is 8, which has no Set.of collection factory (Java 9), so the moved-keys set is a Guava ImmutableSet.of.
+common/src/test/java/world/thearchive/wdl/core/ConfigSchemaTest.java
+
+# Below 1.17 the Java floor is 8, where Optional has no isEmpty() (Java 11), so the crafter-drop assertions negate isPresent() instead.
+common/src/test/java/world/thearchive/wdl/core/ContainerAssociationTest.java
+
+# Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the expected drain order is a Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/ReadyLatchTest.java
+
+# Below 1.17 the Java floor is 8, which has no List.of/Set.of collection factories (Java 9), so the derived-prefix list and the empty undeclared-key set use Guava ImmutableList.of/ImmutableSet.of.
+common/src/test/java/world/thearchive/wdl/core/SettingsLangTest.java
+
+# Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the expected tab-id list is a Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/SettingsLayoutTest.java
+
+# Below 1.17 the Java floor is 8, which has no List.of/Map.of collection factories (Java 9), so the expected lists use Guava ImmutableList.of and the seven-entry refusal map uses ImmutableMap.builder (past ImmutableMap.of's five-pair limit).
+common/src/test/java/world/thearchive/wdl/core/ToastCopyTest.java
+
+# Below 1.17 the Java floor is 8: no Files.readString/writeString (Java 11), no records (Java 16), no List.of (Java 9), so the config reads/writes go through readAllBytes/write with StandardCharsets.UTF_8, DefaultOnBoolean is a final class with explicit accessors, and the toggle list is a Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/WdlConfigTest.java
+
+# Below 1.17 the Java floor is 8, which has no no-argument Optional.orElseThrow (Java 10) nor List.of (Java 9), so the entry lookup uses Optional.get and the empty SaveChunks lists are Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/browse/DownloadCatalogTest.java
+
+# Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the expected managed-folder list is a Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/browse/DownloadFoldersTest.java
+
+# Below 1.17 the Java floor is 8, where there is no Path.of factory (Java 11), so the save path is built with Paths.get.
+common/src/test/java/world/thearchive/wdl/core/browse/SinglePlayerTaintTest.java
+
+# Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the expected surviving-paths lists are Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/export/RestoreOperationTest.java
+
+# Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the expected moved-back/relocated/deferred lists are Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/export/RestoreSweepTest.java
+
+# Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the DownloadCounts/SaveChunks and render-input lists are Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/report/DownloadReportFormatterTest.java
+
+# Below 1.17 the Java floor is 8: no List.of (Java 9) nor Files.readString/writeString (Java 11), so the SaveChunks lists are Guava ImmutableList.of and the corrupt-timestamp round trip reads/writes via readAllBytes/write with StandardCharsets.UTF_8.
+common/src/test/java/world/thearchive/wdl/core/report/DownloadReportLogTest.java
+
+# Below 1.17 the Java floor is 8, which has no no-argument Optional.orElseThrow (Java 10) nor List.of (Java 9), so SemVer.parse is unwrapped with Optional.get and the release/game-version lists are Guava ImmutableList.of.
+common/src/test/java/world/thearchive/wdl/core/update/LatestReleaseTest.java
 
 # Below Forge 40 the world-render hook is RenderWorldLastEvent (no render stage, no frustum), not the
 # RenderLevelStageEvent added at 1.18.2; the outline draws on it and uses the shared renderer's null-frustum path.
