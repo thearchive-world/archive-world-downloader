@@ -12,12 +12,12 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -61,11 +61,11 @@ class RiddenMountContentsFoldTest {
         LiveCaptureSession session = session(temporary);
         stashEntityContainer(session, MOUNT, capturedItems(new ItemStack(Items.DIAMOND, 5)));
 
-        CompoundTag folded = session.foldRidingVehicleContents(mountUnderCarrier());
+        NBTTagCompound folded = session.foldRidingVehicleContents(mountUnderCarrier());
 
-        assertEquals(1, items(passengerOf(folded)).size(),
+        assertEquals(1, items(passengerOf(folded)).tagCount(),
                 "the mule whose chest the player opened carries what the open captured, nested or not");
-        assertFalse(folded.contains("Items"),
+        assertFalse(folded.hasKey("Items"),
                 "and the minecart it was pushed under carries no contents of its own");
     }
 
@@ -74,10 +74,10 @@ class RiddenMountContentsFoldTest {
         LiveCaptureSession session = session(temporary);
         stashEntityContainer(session, MOUNT, capturedItems(new ItemStack(Items.DIAMOND, 5)));
 
-        CompoundTag folded = session.foldRidingVehicleContents(EntityFixtures.entity("minecraft:mule", MOUNT));
+        NBTTagCompound folded = session.foldRidingVehicleContents(EntityFixtures.entity("minecraft:mule", MOUNT));
 
-        CompoundTag expected = EntityFixtures.entity("minecraft:mule", MOUNT);
-        expected.put("Items", capturedItems(new ItemStack(Items.DIAMOND, 5)).getList("Items", 10));
+        NBTTagCompound expected = EntityFixtures.entity("minecraft:mule", MOUNT);
+        expected.setTag("Items", capturedItems(new ItemStack(Items.DIAMOND, 5)).getTagList("Items", 10));
         assertEquals(expected, folded,
                 "a mount standing on its own folds to the tag it always did, key for key");
     }
@@ -88,35 +88,35 @@ class RiddenMountContentsFoldTest {
         stashEntityContainer(session, UUID.fromString("11111111-2222-3333-4444-555555555555"),
                 capturedItems(new ItemStack(Items.DIAMOND, 5)));
 
-        CompoundTag folded = session.foldRidingVehicleContents(mountUnderCarrier());
+        NBTTagCompound folded = session.foldRidingVehicleContents(mountUnderCarrier());
 
-        assertFalse(folded.contains("Items"), "a container captured for another entity is not this record's");
-        assertFalse(passengerOf(folded).contains("Items"), "on neither node of it");
+        assertFalse(folded.hasKey("Items"), "a container captured for another entity is not this record's");
+        assertFalse(passengerOf(folded).hasKey("Items"), "on neither node of it");
         assertTrue(stash(session).containsKey(UUID.fromString("11111111-2222-3333-4444-555555555555")),
                 "and its stash entry is left for the chunk write that owns it");
     }
 
     /** The scenario shape: a chested mount that a plain minecart pushed itself under, so the mount is the passenger. */
-    private static CompoundTag mountUnderCarrier() {
+    private static NBTTagCompound mountUnderCarrier() {
         return EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:minecart", CARRIER),
                 EntityFixtures.entity("minecraft:mule", MOUNT));
     }
 
-    private static CompoundTag passengerOf(CompoundTag entity) {
-        return entity.getList("Passengers", 10).getCompound(0);
+    private static NBTTagCompound passengerOf(NBTTagCompound entity) {
+        return entity.getTagList("Passengers", 10).getCompoundTagAt(0);
     }
 
-    private static ListTag items(CompoundTag entity) {
-        return entity.getList("Items", 10);
+    private static NBTTagList items(NBTTagCompound entity) {
+        return entity.getTagList("Items", 10);
     }
 
-    private CompoundTag capturedItems(ItemStack stack) {
+    private NBTTagCompound capturedItems(ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, stack);
         return sink.captureItems(items);
     }
 
-    private static void stashEntityContainer(LiveCaptureSession session, UUID uuid, CompoundTag holder)
+    private static void stashEntityContainer(LiveCaptureSession session, UUID uuid, NBTTagCompound holder)
             throws Exception {
         stash(session).put(uuid, holder);
     }
@@ -127,10 +127,10 @@ class RiddenMountContentsFoldTest {
      * whole package for a test's convenience.
      */
     @SuppressWarnings("unchecked")
-    private static Map<UUID, CompoundTag> stash(LiveCaptureSession session) throws Exception {
+    private static Map<UUID, NBTTagCompound> stash(LiveCaptureSession session) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField("entityContainerStash");
         field.setAccessible(true);
-        return (Map<UUID, CompoundTag>) field.get(session);
+        return (Map<UUID, NBTTagCompound>) field.get(session);
     }
 
     /** A session with no bound level, which is all the pure fold reads beside its own stash. */
@@ -142,7 +142,7 @@ class RiddenMountContentsFoldTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.field_18954, DimensionType.field_18954,
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});

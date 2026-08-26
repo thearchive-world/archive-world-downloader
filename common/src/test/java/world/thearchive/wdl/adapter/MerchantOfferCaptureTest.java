@@ -8,14 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.village.class_1144;
-import net.minecraft.village.class_1145;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTUtil;
+import net.minecraft.village.MerchantRecipe;
+import net.minecraft.village.MerchantRecipeList;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -26,9 +26,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The headless guard for the merchant-offer capture transform: {@link MerchantOfferCapture#serialize} writes a
  * villager's offers to the vanilla-shaped {@code {Offers:{Recipes:[...]}}} holder through the trade list's own NBT
  * write, and {@link MerchantOfferCapture#scrubAndRemapOffers} runs each offer's {@code sell} item through the same
- * item-location scrub and map-id remap every captured item takes. This band writes no {@code "Xp"} trade-experience
- * key: trade experience is a 1.14 addition, absent here. Real {@link ItemStack}s carrying the tags drive the
- * round-trip, so a wrong key leaves the coordinate or the session map id and fails; no live menu or {@code Level} is
+ * item-location scrub and map-id remap every captured item takes. Real {@link ItemStack}s carrying the tags drive the
+ * round-trip, so a wrong key leaves the coordinate or the session map id and fails; no live menu or {@code World} is
  * needed.
  */
 class MerchantOfferCaptureTest {
@@ -45,61 +44,60 @@ class MerchantOfferCaptureTest {
     private static ItemStack lodestoneCompass() {
         ItemStack compass = new ItemStack(Items.COMPASS);
         BlockPos pos = new BlockPos(128, 64, -512);
-        CompoundTag tag = compass.getOrCreateTag();
-        tag.put("LodestonePos", NbtUtils.writeBlockPos(pos));
-        tag.putString("LodestoneDimension", DimensionType.getName(DimensionType.field_18954).toString());
-        tag.putBoolean("LodestoneTracked", true);
+        compass.setTagCompound(new NBTTagCompound());
+        NBTTagCompound tag = compass.getTagCompound();
+        tag.setTag("LodestonePos", NBTUtil.createPosTag(pos));
+        tag.setString("LodestoneDimension", DimensionType.OVERWORLD.getName());
+        tag.setBoolean("LodestoneTracked", true);
         return compass;
     }
 
-    /** A filled-map stack carrying {@code mapId} in its raw {@code "map"} tag (below 1.20.5, no {@code map_id}). */
+    /** A filled-map stack carrying {@code mapId} as its item-level {@code Damage} (this band's map id). */
     private static ItemStack filledMap(int mapId) {
-        ItemStack map = new ItemStack(Items.FILLED_MAP);
-        map.getOrCreateTag().putInt("map", mapId);
-        return map;
+        return new ItemStack(Items.FILLED_MAP, 1, mapId);
     }
 
-    private static class_1145 offering(ItemStack sell) {
+    private static MerchantRecipeList offering(ItemStack sell) {
         // This band's merchant offer takes a plain buy/sell ItemStack pair, no trade experience or price multiplier.
-        class_1145 offers = new class_1145();
-        offers.add(new class_1144(new ItemStack(Items.EMERALD, 1), sell));
+        MerchantRecipeList offers = new MerchantRecipeList();
+        offers.add(new MerchantRecipe(new ItemStack(Items.EMERALD, 1), sell));
         return offers;
     }
 
-    private static CompoundTag holderSelling(ItemStack sell) {
+    private static NBTTagCompound holderSelling(ItemStack sell) {
         return MerchantOfferCapture.serialize(offering(sell));
     }
 
-    /** The {@code sell} item's pre-component {@code tag} compound (below 1.20.5, no {@code components} map). */
-    private static CompoundTag sellItemTag(CompoundTag holder) {
-        return holder.getCompound("Offers").getList("Recipes", 10).getCompound(0)
-                .getCompound("sell").getCompound("tag");
+    /** The {@code sell} item's own serialized compound ({@code {id, Count, Damage, tag}}), no nesting below it. */
+    private static NBTTagCompound sellItem(NBTTagCompound holder) {
+        return holder.getCompoundTag("Offers").getTagList("Recipes", 10).getCompoundTagAt(0)
+                .getCompoundTag("sell");
     }
 
-    private static boolean sellHasLodestoneTarget(CompoundTag holder) {
-        return sellItemTag(holder).contains("LodestonePos");
+    private static boolean sellHasLodestoneTarget(NBTTagCompound holder) {
+        NBTTagCompound tag = sellItem(holder).getCompoundTag("tag");
+        return tag.hasKey("LodestonePos");
     }
 
     @Test
     void serializeRoundTripsOffersUnderRecipes() {
-        CompoundTag holder = MerchantOfferCapture.serialize(offering(new ItemStack(Items.DIAMOND)));
+        NBTTagCompound holder = MerchantOfferCapture.serialize(offering(new ItemStack(Items.DIAMOND)));
 
-        assertEquals(1, holder.getCompound("Offers").getList("Recipes", 10).size(),
+        assertEquals(1, holder.getCompoundTag("Offers").getTagList("Recipes", 10).tagCount(),
                 "one offer under Recipes");
-        assertFalse(holder.contains("Xp"),
-                "no trade-experience key: trade experience is a 1.14 addition, absent at this band");
+        assertFalse(holder.hasKey("Xp"), "the capture writes no top-level trade-experience key");
     }
 
     @Test
     void serializeWritesNoTradeExperienceKey() {
-        CompoundTag holder = MerchantOfferCapture.serialize(new class_1145());
+        NBTTagCompound holder = MerchantOfferCapture.serialize(new MerchantRecipeList());
 
-        assertFalse(holder.contains("Xp"), "the capture writes no trade-experience key at this band");
+        assertFalse(holder.hasKey("Xp"), "the capture writes no top-level trade-experience key");
     }
 
     @Test
     void scrubBlanksLodestoneTargetOnSellItem() {
-        CompoundTag holder = holderSelling(lodestoneCompass());
+        NBTTagCompound holder = holderSelling(lodestoneCompass());
         assertTrue(sellHasLodestoneTarget(holder), "precondition: the sell compass carries a target");
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, true, null);
@@ -109,7 +107,7 @@ class MerchantOfferCaptureTest {
 
     @Test
     void scrubLeavesTargetWhenCoordinatesKept() {
-        CompoundTag holder = holderSelling(lodestoneCompass());
+        NBTTagCompound holder = holderSelling(lodestoneCompass());
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, false, null);
 
@@ -118,25 +116,25 @@ class MerchantOfferCaptureTest {
 
     @Test
     void remapsSellFilledMapIdThroughArchive() {
-        CompoundTag holder = holderSelling(filledMap(7));
+        NBTTagCompound holder = holderSelling(filledMap(7));
         MapArchive archive = new MapArchive(MapManifest.empty(), sessionId -> null, (archiveId, dataTag) -> {});
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, false, archive);
 
-        assertNotEquals(7, sellItemTag(holder).getInt("map"),
+        assertNotEquals((short) 7, sellItem(holder).getShort("Damage"),
                 "the session map id was rewritten to an archive id");
     }
 
     @Test
     void remappingTheCapturedOffersLeavesTheLiveSellStackAlone() {
         ItemStack live = filledMap(7);
-        CompoundTag holder = holderSelling(live);
+        NBTTagCompound holder = holderSelling(live);
         MapArchive archive = new MapArchive(MapManifest.empty(), sessionId -> null, (archiveId, dataTag) -> {});
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, false, archive);
 
-        assertNotEquals(7, sellItemTag(holder).getInt("map"), "the captured holder carries the archive id");
-        assertEquals(7, live.getOrCreateTag().getInt("map"),
+        assertNotEquals((short) 7, sellItem(holder).getShort("Damage"), "the captured holder carries the archive id");
+        assertEquals(7, live.getMetadata(),
                 "the live offer keeps the server's map id, so the trade still sells the map it advertises");
     }
 
@@ -146,20 +144,20 @@ class MerchantOfferCaptureTest {
         ItemStack live = filledMap(7);
         MapArchive archive = new MapArchive(MapManifest.empty(), sessionId -> null, (archiveId, dataTag) -> {});
 
-        CompoundTag first = holderSelling(live);
+        NBTTagCompound first = holderSelling(live);
         MerchantOfferCapture.scrubAndRemapOffers(first, false, archive);
         // Read before the second pass: a holder that still aliases the live stack would report the later id here.
-        int firstId = sellItemTag(first).getInt("map");
-        CompoundTag second = holderSelling(live);
+        short firstId = sellItem(first).getShort("Damage");
+        NBTTagCompound second = holderSelling(live);
         MerchantOfferCapture.scrubAndRemapOffers(second, false, archive);
 
-        assertEquals(firstId, sellItemTag(second).getInt("map"),
+        assertEquals(firstId, sellItem(second).getShort("Damage"),
                 "a holder re-stashed on a later tick resolves to the same archive id rather than a fresh one");
     }
 
     @Test
     void scrubIgnoresHolderWithNoOffers() {
-        CompoundTag holder = new CompoundTag();
+        NBTTagCompound holder = new NBTTagCompound();
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, true, null);
 
@@ -168,8 +166,8 @@ class MerchantOfferCaptureTest {
 
     @Test
     void scrubSkipsRecipeWithNoSell() {
-        CompoundTag holder = holderSelling(new ItemStack(Items.DIAMOND));
-        holder.getCompound("Offers").getList("Recipes", 10).getCompound(0).remove("sell");
+        NBTTagCompound holder = holderSelling(new ItemStack(Items.DIAMOND));
+        holder.getCompoundTag("Offers").getTagList("Recipes", 10).getCompoundTagAt(0).removeTag("sell");
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, true, null); // must not throw; reaches the per-recipe skip
     }

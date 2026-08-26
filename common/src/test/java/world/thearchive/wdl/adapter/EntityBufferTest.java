@@ -14,8 +14,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -42,13 +42,13 @@ class EntityBufferTest {
         TestRegistries.bootstrap(); // ChunkPos static init needs the vanilla bootstrap (SharedConstants)
     }
 
-    private static CompoundTag tag(String marker) {
+    private static NBTTagCompound tag(String marker) {
         return EntityFixtures.entityTag(marker);
     }
 
-    private static List<String> markersOf(List<CompoundTag> tags) {
+    private static List<String> markersOf(List<NBTTagCompound> tags) {
         List<String> markers = new ArrayList<>();
-        for (CompoundTag tag : tags) {
+        for (NBTTagCompound tag : tags) {
             markers.add(tag.getString("id"));
         }
         return markers;
@@ -60,7 +60,7 @@ class EntityBufferTest {
         buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
         buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
 
-        List<CompoundTag> drained = buffer.drainChunk(new ChunkPos(0, 0));
+        List<NBTTagCompound> drained = buffer.drainChunk(new ChunkPos(0, 0));
 
         assertEquals(2, drained.size());
         assertTrue(buffer.isEmpty(), "the chunk drained completely");
@@ -73,7 +73,7 @@ class EntityBufferTest {
         buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("new")); // it walked into a new chunk
 
         assertTrue(buffer.drainChunk(new ChunkPos(0, 0)).isEmpty(), "the stale copy is gone from the old chunk");
-        List<CompoundTag> current = buffer.drainChunk(new ChunkPos(5, 5));
+        List<NBTTagCompound> current = buffer.drainChunk(new ChunkPos(5, 5));
         assertEquals(1, current.size(), "exactly one copy, in the newest chunk");
         assertEquals("new", current.get(0).getString("id"));
     }
@@ -187,7 +187,7 @@ class EntityBufferTest {
 
         List<String> markers = new ArrayList<>();
         for (ChunkPos pos : buffer.bufferedChunks()) {
-            List<CompoundTag> drained = buffer.drainChunk(pos);
+            List<NBTTagCompound> drained = buffer.drainChunk(pos);
             assertFalse(drained.isEmpty(), "a reported chunk holds at least one entity: " + pos);
             markers.addAll(markersOf(drained));
         }
@@ -219,7 +219,7 @@ class EntityBufferTest {
         buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
         buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
 
-        List<CompoundTag> drained = buffer.drainChunk(new ChunkPos(0, 0));
+        List<NBTTagCompound> drained = buffer.drainChunk(new ChunkPos(0, 0));
         drained.removeIf(tag -> "a".equals(tag.getString("id"))); // the caller filters the drain in place
 
         assertEquals(ImmutableList.of("b"), markersOf(drained));

@@ -10,8 +10,8 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.Properties;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -56,7 +56,7 @@ class LiveCaptureSessionDimensionRebindTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.field_18954, DimensionType.field_18954,
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -83,7 +83,7 @@ class LiveCaptureSessionDimensionRebindTest {
 
         session.rebindDimension(DimensionType.NETHER, DimensionType.NETHER);
 
-        assertFalse(capturedPositions(session).contains(shared.toLong()),
+        assertFalse(capturedPositions(session).contains(ChunkPos.asLong(shared.x, shared.z)),
                 "the entered dimension starts from its own set, or its first chunk reads as already captured and "
                         + "the capture skips a chunk that has never been written");
         capture(session, shared);
@@ -98,7 +98,7 @@ class LiveCaptureSessionDimensionRebindTest {
 
         assertEquals(DimensionType.NETHER, field(session, "targetDimension"),
                 "the layout follows the entered dimension's type, so the save writes DIM-1");
-        assertEquals("minecraft:the_nether", field(session, "liveDimensionId"),
+        assertEquals("the_nether", field(session, "liveDimensionId"),
                 "while the packet-side stores stay keyed by the name entities are announced under");
     }
 
@@ -106,7 +106,7 @@ class LiveCaptureSessionDimensionRebindTest {
     private static void capture(LiveCaptureSession session, ChunkPos... positions) throws Exception {
         LongOpenHashSet captured = capturedPositions(session);
         for (ChunkPos pos : positions) {
-            captured.add(pos.toLong());
+            captured.add(ChunkPos.asLong(pos.x, pos.z));
         }
     }
 

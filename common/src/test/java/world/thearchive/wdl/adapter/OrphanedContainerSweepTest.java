@@ -21,15 +21,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.inventory.ItemStackHelper;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.DimensionType;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -70,18 +70,18 @@ class OrphanedContainerSweepTest {
     }
 
     /** A mutable single-entry holder map, matching what the session's per-chunk drain hands the fold. */
-    private static Map<BlockPos, CompoundTag> holder(BlockPos pos, CompoundTag tag) {
-        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+    private static Map<BlockPos, NBTTagCompound> holder(BlockPos pos, NBTTagCompound tag) {
+        Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(pos, tag);
         return holders;
     }
 
-    private static @Nullable CompoundTag blockEntityAt(CompoundTag chunkTag, int x, int y, int z) {
-        ListTag list = chunkTag.getCompound("Level").getList("TileEntities", 10);
-        for (int i = 0; i < list.size(); i++) {
-            CompoundTag blockEntity = list.getCompound(i);
-            if (blockEntity.getInt("x") == x && blockEntity.getInt("y") == y
-                    && blockEntity.getInt("z") == z) {
+    private static @Nullable NBTTagCompound blockEntityAt(NBTTagCompound chunkTag, int x, int y, int z) {
+        NBTTagList list = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
+        for (int i = 0; i < list.tagCount(); i++) {
+            NBTTagCompound blockEntity = list.getCompoundTagAt(i);
+            if (blockEntity.getInteger("x") == x && blockEntity.getInteger("y") == y
+                    && blockEntity.getInteger("z") == z) {
                 return blockEntity;
             }
         }
@@ -92,22 +92,22 @@ class OrphanedContainerSweepTest {
     private NonNullList<ItemStack> itemsOnDisk(Path region, ChunkPos chunk, int x, int y, int z)
             throws IOException {
         try (WdlRegionStorage in = storage(region)) {
-            CompoundTag back = Optional.ofNullable(in.read(chunk))
+            NBTTagCompound back = Optional.ofNullable(in.read(chunk))
                     .orElseThrow(() -> new AssertionError("chunk missing on disk"));
-            CompoundTag blockEntity = blockEntityAt(back, x, y, z);
+            NBTTagCompound blockEntity = blockEntityAt(back, x, y, z);
             assertNotNull(blockEntity, "block entity present on disk at " + x + "," + y + "," + z);
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(blockEntity, decoded);
+            ItemStackHelper.loadAllItems(blockEntity, decoded);
             return decoded;
         }
     }
 
     /** Flush a chunk to disk carrying the given (empty, client-form) block entities: the pre-open orphaned state. */
     private void flushEmptyChunk(Path region, ChunkPos chunk,
-            List<CompoundTag> blockEntities)
+            List<NBTTagCompound> blockEntities)
             throws Exception {
         AsyncSaveWriter flush = regionWriter(region);
-        flush.submitChunk(DimensionType.field_18954, chunk,
+        flush.submitChunk(DimensionType.OVERWORLD, chunk,
                 () -> codec.encode(SyntheticChunks.fullWithBlockEntities(true, blockEntities),
                         false),
                 ChunkMerge::merge);
@@ -132,11 +132,11 @@ class OrphanedContainerSweepTest {
         // folds it onto the on-disk chest through the writer-thread rewrite.
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
-        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(chestPos, sink.captureItems(items));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(DimensionType.field_18954, chunk,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, chunk, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
@@ -158,22 +158,22 @@ class OrphanedContainerSweepTest {
         // sweep's LecternSink book fold writes "Book"/"Page" onto; the sweep-fold wiring is what is under test.
         flushEmptyChunk(region, chunk, ImmutableList.of(blockEntity("minecraft:ender_chest", 3, 64, 3)));
 
-        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(lecternPos, sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 7));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(DimensionType.field_18954, chunk,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
                 onDisk -> ContainerMerge.mergeLecternChunkStash(sink, onDisk, chunk, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
         try (WdlRegionStorage in = storage(region)) {
-            CompoundTag back = Optional.ofNullable(in.read(chunk))
+            NBTTagCompound back = Optional.ofNullable(in.read(chunk))
                     .orElseThrow(() -> new AssertionError("chunk missing on disk"));
-            CompoundTag lectern = blockEntityAt(back, 3, 64, 3);
+            NBTTagCompound lectern = blockEntityAt(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
-            assertEquals("minecraft:writable_book", lectern.getCompound("Book").getString("id"),
+            assertEquals("minecraft:writable_book", lectern.getCompoundTag("Book").getString("id"),
                     "the orphaned lectern book reached the on-disk lectern with its item identity");
-            assertEquals(7, (lectern.contains("Page") ? lectern.getInt("Page") : -1), "and its reading page");
+            assertEquals(7, (lectern.hasKey("Page") ? lectern.getInteger("Page") : -1), "and its reading page");
         }
     }
 
@@ -197,13 +197,13 @@ class OrphanedContainerSweepTest {
         rightItems.set(0, new ItemStack(Items.EMERALD, 3));
         NonNullList<ItemStack> leftItems = NonNullList.withSize(27, ItemStack.EMPTY);
         leftItems.set(0, new ItemStack(Items.GOLD_INGOT, 9));
-        Map<BlockPos, CompoundTag> rightHolder = holder(rightHalf, sink.captureItems(rightItems));
-        Map<BlockPos, CompoundTag> leftHolder = holder(leftHalf, sink.captureItems(leftItems));
+        Map<BlockPos, NBTTagCompound> rightHolder = holder(rightHalf, sink.captureItems(rightItems));
+        Map<BlockPos, NBTTagCompound> leftHolder = holder(leftHalf, sink.captureItems(leftItems));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(DimensionType.field_18954, rightChunk,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, rightChunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, rightChunk, rightHolder).merged());
-        sweep.submitChunkRewrite(DimensionType.field_18954, leftChunk,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, leftChunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, leftChunk, leftHolder).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
@@ -222,11 +222,11 @@ class OrphanedContainerSweepTest {
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos missing = new ChunkPos(5, 5);
-        Map<BlockPos, CompoundTag> holders = holder(new BlockPos(82, 64, 82),
+        Map<BlockPos, NBTTagCompound> holders = holder(new BlockPos(82, 64, 82),
                 sink.captureItems(NonNullList.withSize(27, ItemStack.EMPTY)));
 
         AsyncSaveWriter sweep = regionWriter(region);
-        sweep.submitChunkRewrite(DimensionType.field_18954, missing,
+        sweep.submitChunkRewrite(DimensionType.OVERWORLD, missing,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, missing, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(),
                 "a rewrite for a chunk with no on-disk prior does not fail the save");
@@ -250,14 +250,14 @@ class OrphanedContainerSweepTest {
         ChunkPos chunk = new ChunkPos(0, 0);
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
-        Map<BlockPos, CompoundTag> holders = holder(new BlockPos(2, 64, 2), sink.captureItems(items));
+        Map<BlockPos, NBTTagCompound> holders = holder(new BlockPos(2, 64, 2), sink.captureItems(items));
 
         AsyncSaveWriter writer = regionWriter(region);
-        writer.submitChunk(DimensionType.field_18954, chunk, () -> codec.encode(
+        writer.submitChunk(DimensionType.OVERWORLD, chunk, () -> codec.encode(
                 SyntheticChunks.fullWithBlockEntities(true,
                         ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2))),
                 false), ChunkMerge::merge);
-        writer.submitChunkRewrite(DimensionType.field_18954, chunk,
+        writer.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, chunk, holders).merged());
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 

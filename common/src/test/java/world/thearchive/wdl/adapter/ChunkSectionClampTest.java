@@ -6,21 +6,16 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.chunk.ChunkStatus;
-import net.minecraft.world.level.chunk.DataLayer;
-import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.init.Blocks;
+import net.minecraft.world.chunk.NibbleArray;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
@@ -28,10 +23,9 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * A downgrade proxy (ViaBackwards) can hand a 1.13.2 client sections outside the 0..255 column. A block section outside
- * 0..15 crashes vanilla's unchecked {@code sections[index]} on load, and this band has no light-pad column (light is
- * section-resident, not engine-driven, so a null-section light-only entry is a 1.14 shape that has no home here). The
- * codec therefore writes only the block sections inside 0..15 and drops every out-of-range or section-less entry.
+ * A block section outside 0..15 crashes vanilla's unchecked {@code sections[index]} on load, and this band has no
+ * light-pad column (light is section-resident, not engine-driven, so a null-section light-only entry has no home here).
+ * The codec therefore writes only the block sections inside 0..15 and drops every out-of-range or section-less entry.
  */
 class ChunkSectionClampTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
@@ -47,15 +41,16 @@ class ChunkSectionClampTest {
         sections.add(new ChunkSnapshotSource.SectionData(16, null, null, filledLight())); // section-less pad, dropped
         sections.add(new ChunkSnapshotSource.SectionData(17, blockSection(17), null, null)); // out of range, dropped
 
-        CompoundTag level = codec.encode(new ClampSnapshot(sections), false).getCompound("Level");
+        NBTTagCompound level = codec.encode(new ClampSnapshot(sections), false).getCompoundTag("Level");
 
         Set<Integer> writtenY = new HashSet<>();
         Set<Integer> withBlockData = new HashSet<>();
-        for (Tag sectionTag : level.getList("Sections", 10)) {
-            CompoundTag section = (CompoundTag) sectionTag;
+        int count = level.getTagList("Sections", 10).tagCount();
+        for (int i = 0; i < count; i++) {
+            NBTTagCompound section = level.getTagList("Sections", 10).getCompoundTagAt(i);
             int y = section.getByte("Y");
             writtenY.add(y);
-            if (section.contains("BlockStates")) {
+            if (section.hasKey("Blocks")) {
                 withBlockData.add(y);
             }
         }
@@ -64,14 +59,14 @@ class ChunkSectionClampTest {
         assertEquals(ImmutableSet.of(0, 15), withBlockData, "block data is written only inside the 0..15 block range");
     }
 
-    private static LevelChunkSection blockSection(int sectionY) {
-        LevelChunkSection section = new LevelChunkSection(sectionY, true);
-        section.setBlockState(0, 0, 0, Blocks.STONE.defaultBlockState());
+    private static ExtendedBlockStorage blockSection(int sectionY) {
+        ExtendedBlockStorage section = new ExtendedBlockStorage(sectionY, true);
+        section.set(0, 0, 0, Blocks.STONE.getDefaultState());
         return section;
     }
 
-    private static DataLayer filledLight() {
-        return new DataLayer(SyntheticChunks.lightFill((byte) 15));
+    private static NibbleArray filledLight() {
+        return new NibbleArray(SyntheticChunks.lightFill((byte) 15));
     }
 
     private static final class ClampSnapshot implements ChunkSnapshotSource {
@@ -107,22 +102,17 @@ class ChunkSectionClampTest {
         }
 
         @Override
-        public ChunkStatus status() {
-            return ChunkStatus.field_18865;
-        }
-
-        @Override
         public boolean lightCorrect() {
             return false;
         }
 
         @Override
-        public Map<Heightmap.Types, long[]> heightmaps() {
-            return ImmutableMap.of();
+        public int[] heightmaps() {
+            return new int[256];
         }
 
         @Override
-        public List<CompoundTag> blockEntities() {
+        public List<NBTTagCompound> blockEntities() {
             return ImmutableList.of();
         }
 

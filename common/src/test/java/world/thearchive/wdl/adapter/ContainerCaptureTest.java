@@ -6,9 +6,9 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-import net.minecraft.nbt.ByteTag;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ShortTag;
+import net.minecraft.nbt.NBTTagByte;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagShort;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -22,20 +22,20 @@ class ContainerCaptureTest {
 
     @Test
     void brewingStateRidesTheHolderWithVanillaTypes() {
-        CompoundTag holder = new CompoundTag();
+        NBTTagCompound holder = new NBTTagCompound();
         ContainerCapture.putBrewingState(holder, 123, 7);
         assertEquals((short) 123, holder.getShort("BrewTime"));
         assertEquals((byte) 7, holder.getByte("Fuel"));
         // The coercing getShortOr/getByteOr above would pass on a swapped short/byte too, so pin the on-disk
         // tag type directly: vanilla persists BrewTime as a short and Fuel as a byte, and the archive must match.
-        assertInstanceOf(ShortTag.class, holder.get("BrewTime"), "BrewTime must be a short tag");
-        assertInstanceOf(ByteTag.class, holder.get("Fuel"), "Fuel must be a byte tag");
+        assertInstanceOf(NBTTagShort.class, holder.getTag("BrewTime"), "BrewTime must be a short tag");
+        assertInstanceOf(NBTTagByte.class, holder.getTag("Fuel"), "Fuel must be a byte tag");
     }
 
     @Test
     void zeroStateStillWritesBothKeys() {
-        CompoundTag holder = new CompoundTag();
+        NBTTagCompound holder = new NBTTagCompound();
         ContainerCapture.putBrewingState(holder, 0, 0);
-        assertEquals(2, holder.getAllKeys().size());
+        assertEquals(2, holder.getKeySet().size());
     }
 }

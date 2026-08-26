@@ -6,7 +6,7 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import net.minecraft.core.BlockPos;
+import net.minecraft.util.math.BlockPos;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,7 +43,7 @@ class SectionKeyTest {
 
     @Test
     void blockKeyMapsToItsSectionByFlooringDivisionBySixteen() {
-        long blockKey = new BlockPos(33, -5, 16).asLong();
+        long blockKey = new BlockPos(33, -5, 16).toLong();
         long section = SectionKey.blockToSection(blockKey);
         assertEquals(2, SectionKey.x(section), "block x floor-divides by 16");
         assertEquals(-1, SectionKey.y(section), "a negative block y floors rather than truncating toward zero");

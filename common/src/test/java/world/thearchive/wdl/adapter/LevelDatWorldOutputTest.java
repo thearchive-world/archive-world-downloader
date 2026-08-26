@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Properties;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.GameRules;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.world.GameRules;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
@@ -30,13 +30,13 @@ class LevelDatWorldOutputTest {
         return writer.buildLevelData(worldOutput, null);
     }
 
-    private CompoundTag dataTag(LevelDataWriter.LevelData built) {
-        return built.worldData().createTag(null);
+    private NBTTagCompound dataTag(LevelDataWriter.LevelData built) {
+        return built.worldData().cloneNBTCompound(null);
     }
 
     private GameRules gameRules(LevelDataWriter.LevelData built) {
         GameRules rules = new GameRules();
-        rules.loadFromTag(dataTag(built).getCompound("GameRules"));
+        rules.readFromNBT(dataTag(built).getCompoundTag("GameRules"));
         return rules;
     }
 
@@ -55,7 +55,7 @@ class LevelDatWorldOutputTest {
 
     // At 1.15.2 the generator seed and structure toggle live directly in the Data tag (RandomSeed, MapFeatures),
     // not in a WorldGenSettings compound (that is 1.16 and later).
-    private CompoundTag worldGenTag(LevelDataWriter.LevelData built) {
+    private NBTTagCompound worldGenTag(LevelDataWriter.LevelData built) {
         return dataTag(built);
     }
 
@@ -86,7 +86,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void voidGeneratorKeepsSeedZeroAndStaysStructureless() {
-        CompoundTag voidSettings = worldGenTag(build(WorldOutputConfig.DEFAULTS));
+        NBTTagCompound voidSettings = worldGenTag(build(WorldOutputConfig.DEFAULTS));
 
         assertEquals(0L, voidSettings.getLong("RandomSeed"), "the default void world keeps seed 0 (byte-unchanged)");
         assertFalse(voidSettings.getBoolean("MapFeatures"), "the void world generates no structures");
@@ -94,7 +94,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void flatGeneratorBuildsAndRoundTripsItsSeed() {
-        CompoundTag flat = worldGenTag(build(with("worldType", "FLAT", "worldSeed", "777")));
+        NBTTagCompound flat = worldGenTag(build(with("worldType", "FLAT", "worldSeed", "777")));
 
         assertEquals(777L, flat.getLong("RandomSeed"), "the FLAT generator builds and its seed lands in level.dat");
     }
@@ -103,48 +103,48 @@ class LevelDatWorldOutputTest {
     void defaultsWriteTheCuratedSafeGameRules() {
         GameRules rules = gameRules(build(WorldOutputConfig.DEFAULTS));
 
-        assertFalse(rules.method_4671("doMobSpawning"), "no mob spawning");
-        assertTrue(rules.method_4671("keepInventory"), "keep inventory");
-        assertFalse(rules.method_4671("mobGriefing"), "no mob griefing");
-        assertFalse(rules.method_4671("doDaylightCycle"), "day frozen");
-        assertFalse(rules.method_4671("doWeatherCycle"), "weather frozen");
+        assertFalse(rules.getBoolean("doMobSpawning"), "no mob spawning");
+        assertTrue(rules.getBoolean("keepInventory"), "keep inventory");
+        assertFalse(rules.getBoolean("mobGriefing"), "no mob griefing");
+        assertFalse(rules.getBoolean("doDaylightCycle"), "day frozen");
+        assertFalse(rules.getBoolean("doWeatherCycle"), "weather frozen");
     }
 
     @Test
     void gameRuleMasterOffLeavesVanillaDefaults() {
         GameRules rules = gameRules(build(with("overrideGamerules", "false")));
 
-        assertTrue(rules.method_4671("doMobSpawning"),
+        assertTrue(rules.getBoolean("doMobSpawning"),
                 "master off: the vanilla default (mobs spawn) stands");
-        assertFalse(rules.method_4671("keepInventory"),
+        assertFalse(rules.getBoolean("keepInventory"),
                 "master off: keep-inventory stays at its vanilla default");
     }
 
     @Test
     void defaultsOpenTheWorldAtNoon() {
-        CompoundTag data = dataTag(build(WorldOutputConfig.DEFAULTS));
-        assertEquals(6000L, data.contains("DayTime") ? data.getLong("DayTime") : -1L);
+        NBTTagCompound data = dataTag(build(WorldOutputConfig.DEFAULTS));
+        assertEquals(6000L, data.hasKey("DayTime") ? data.getLong("DayTime") : -1L);
     }
 
     @Test
     void defaultsOpenTheWorldWithClearWeather() {
-        CompoundTag data = dataTag(build(WorldOutputConfig.DEFAULTS));
+        NBTTagCompound data = dataTag(build(WorldOutputConfig.DEFAULTS));
 
-        assertFalse((data.contains("raining") ? data.getBoolean("raining") : true), "not raining");
-        assertFalse((data.contains("thundering") ? data.getBoolean("thundering") : true), "not thundering");
-        assertEquals(0, (data.contains("clearWeatherTime") ? data.getInt("clearWeatherTime") : -1),
+        assertFalse((data.hasKey("raining") ? data.getBoolean("raining") : true), "not raining");
+        assertFalse((data.hasKey("thundering") ? data.getBoolean("thundering") : true), "not thundering");
+        assertEquals(0, (data.hasKey("clearWeatherTime") ? data.getInteger("clearWeatherTime") : -1),
                 "weather opens clear, not force-held; the curated advance_weather=false is what holds it");
     }
 
     @Test
     void worldDefaultsMasterOffStillOpensAtNoonAndClear() {
-        CompoundTag data = dataTag(build(with("overrideWorldDefaults", "false")));
+        NBTTagCompound data = dataTag(build(with("overrideWorldDefaults", "false")));
 
-        assertEquals(6000L, (data.contains("DayTime") ? data.getLong("DayTime") : -1L),
+        assertEquals(6000L, (data.hasKey("DayTime") ? data.getLong("DayTime") : -1L),
                 "noon is a fixed invariant, applied even with the world-defaults master off");
-        assertFalse((data.contains("raining") ? data.getBoolean("raining") : true),
+        assertFalse((data.hasKey("raining") ? data.getBoolean("raining") : true),
                 "the fresh world opens clear regardless of the master");
-        assertEquals(0, (data.contains("clearWeatherTime") ? data.getInt("clearWeatherTime") : -1),
+        assertEquals(0, (data.hasKey("clearWeatherTime") ? data.getInteger("clearWeatherTime") : -1),
                 "weather opens clear, not force-held, regardless of the master");
     }
 
@@ -156,15 +156,15 @@ class LevelDatWorldOutputTest {
 
     @Test
     void allowCommandsOffWritesCheatsOff() {
-        CompoundTag data = dataTag(build(with("allowCommands", "false")));
-        assertFalse(data.contains("allowCommands") ? data.getBoolean("allowCommands") : true,
+        NBTTagCompound data = dataTag(build(with("allowCommands", "false")));
+        assertFalse(data.hasKey("allowCommands") ? data.getBoolean("allowCommands") : true,
                 "with the knob off the saved world has cheats disabled");
     }
 
     @Test
     void worldDefaultsMasterOffDisablesCheats() {
-        CompoundTag data = dataTag(build(with("overrideWorldDefaults", "false")));
-        assertFalse(data.contains("allowCommands") ? data.getBoolean("allowCommands") : true,
+        NBTTagCompound data = dataTag(build(with("overrideWorldDefaults", "false")));
+        assertFalse(data.hasKey("allowCommands") ? data.getBoolean("allowCommands") : true,
                 "master off leaves the world vanilla: cheats are not forced on even with the cheats knob on");
     }
 
@@ -173,7 +173,7 @@ class LevelDatWorldOutputTest {
         LevelDataWriter.LevelData built = build(with("gamerule.keepInventory", "banana"));
 
         assertTrue(built.gameRules().droppedInvalidValues().contains("keepInventory"), "the typo is surfaced");
-        assertTrue(gameRules(built).method_4671("keepInventory"),
+        assertTrue(gameRules(built).getBoolean("keepInventory"),
                 "the curated value stands; the typo is not written");
     }
 
@@ -183,7 +183,7 @@ class LevelDatWorldOutputTest {
         LevelDataWriter.LevelData built = build(with("gamerule.spawn_mobs", "true"));
 
         assertTrue(built.gameRules().unknownIds().contains("spawn_mobs"), "the cross-band loss is surfaced");
-        assertFalse(gameRules(built).method_4671("doMobSpawning"), "the curated safe set still applies");
+        assertFalse(gameRules(built).getBoolean("doMobSpawning"), "the curated safe set still applies");
     }
 
     @Test
@@ -191,6 +191,6 @@ class LevelDatWorldOutputTest {
         // doLimitedCrafting is not in the curated set; a valid override of it passes through.
         GameRules rules = gameRules(build(with("gamerule.doLimitedCrafting", "true")));
 
-        assertTrue(rules.method_4671("doLimitedCrafting"), "an arbitrary valid rule passes through");
+        assertTrue(rules.getBoolean("doLimitedCrafting"), "an arbitrary valid rule passes through");
     }
 }

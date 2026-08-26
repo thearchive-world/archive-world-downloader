@@ -19,13 +19,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.init.Blocks;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -138,7 +138,7 @@ class CarryForwardWiringTest {
 
     /** The open-time container capture at {@code pos}, the stash the per-chunk flush drains and folds. */
     @SuppressWarnings("unchecked")
-    private static void stashContainer(LiveCaptureSession session, BlockPos pos, CompoundTag holder)
+    private static void stashContainer(LiveCaptureSession session, BlockPos pos, NBTTagCompound holder)
             throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField("containerStash");
         field.setAccessible(true);
@@ -160,7 +160,7 @@ class CarryForwardWiringTest {
 
     /** The open-time lectern capture at {@code pos}, which a placement in that cell must also drop. */
     @SuppressWarnings("unchecked")
-    private static void stashLectern(LiveCaptureSession session, BlockPos pos, CompoundTag holder)
+    private static void stashLectern(LiveCaptureSession session, BlockPos pos, NBTTagCompound holder)
             throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField("lecternStash");
         field.setAccessible(true);
@@ -175,7 +175,7 @@ class CarryForwardWiringTest {
     @Test
     void aPlacementDropsTheLecternCapturedInThatCell(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
-        stashLectern(session, chest, new CompoundTag());
+        stashLectern(session, chest, new NBTTagCompound());
 
         placeBlockAt(session, chest);
 
@@ -192,18 +192,18 @@ class CarryForwardWiringTest {
 
     /** A captured chunk holding one chest exactly as the client saves it, which is with no contents. */
     private ChunkSnapshotSource snapshotWithEmptyChest() {
-        return SyntheticChunks.withBlockEntityAt(chest, Blocks.CHEST.defaultBlockState(),
+        return SyntheticChunks.withBlockEntityAt(chest, Blocks.CHEST.getDefaultState(),
                 blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()));
     }
 
-    private CompoundTag chestHolding(String... itemIds) {
-        CompoundTag tag = blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ());
-        tag.put("Items", ItemFixtures.items(itemIds));
+    private NBTTagCompound chestHolding(String... itemIds) {
+        NBTTagCompound tag = blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ());
+        tag.setTag("Items", ItemFixtures.items(itemIds));
         return tag;
     }
 
-    private static void writePrior(WorldPaths paths, ChunkPos pos, CompoundTag blockEntity) throws Exception {
-        CompoundTag chunk = BlockEntityFixtures.chunkTagWith(blockEntity);
+    private static void writePrior(WorldPaths paths, ChunkPos pos, NBTTagCompound blockEntity) throws Exception {
+        NBTTagCompound chunk = BlockEntityFixtures.chunkTagWith(blockEntity);
         try (WdlRegionStorage storage = regionStorage(paths)) {
             storage.write(pos, chunk);
         }
@@ -211,14 +211,14 @@ class CarryForwardWiringTest {
 
     private List<String> itemsOnDisk(WorldPaths paths, ChunkPos pos) throws Exception {
         try (WdlRegionStorage storage = regionStorage(paths)) {
-            CompoundTag chunk = Optional.ofNullable(storage.read(pos))
+            NBTTagCompound chunk = Optional.ofNullable(storage.read(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
-            CompoundTag written = findByPos(chunk, chest.getX(), chest.getY(), chest.getZ());
+            NBTTagCompound written = findByPos(chunk, chest.getX(), chest.getY(), chest.getZ());
             List<String> ids = new ArrayList<>();
-            if (written.get("Items") instanceof ListTag) {
-                ListTag items = (ListTag) written.get("Items");
-                for (int i = 0; i < items.size(); i++) {
-                    ids.add(((CompoundTag) items.get(i)).getString("id"));
+            if (written.getTag("Items") instanceof NBTTagList) {
+                NBTTagList items = (NBTTagList) written.getTag("Items");
+                for (int i = 0; i < items.tagCount(); i++) {
+                    ids.add(((NBTTagCompound) items.get(i)).getString("id"));
                 }
             }
             return ids;
@@ -226,7 +226,7 @@ class CarryForwardWiringTest {
     }
 
     private static WdlRegionStorage regionStorage(WorldPaths paths) {
-        return paths.openRegionStorage(DimensionType.field_18954);
+        return paths.openRegionStorage(DimensionType.OVERWORLD);
     }
 
     private static LiveCaptureSession session(Path configDirectory) {
@@ -234,7 +234,7 @@ class CarryForwardWiringTest {
         properties.setProperty("captureEntities", "false");
         WdlConfig config = WdlConfig.parse(properties);
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.field_18954, DimensionType.field_18954,
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -242,7 +242,7 @@ class CarryForwardWiringTest {
 
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
-        Files.createDirectories(paths.regionDirectory(DimensionType.field_18954));
+        Files.createDirectories(paths.regionDirectory(DimensionType.OVERWORLD));
         return paths;
     }
 

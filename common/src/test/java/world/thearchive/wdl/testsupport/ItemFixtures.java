@@ -3,23 +3,22 @@
 
 package world.thearchive.wdl.testsupport;
 
-import net.minecraft.core.NonNullList;
-import net.minecraft.core.Registry;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTTagString;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.inventory.ItemStackHelper;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
 
 /**
- * Item NBT built by the vanilla writers rather than by hand: {@link ContainerHelper#saveAllItems} for an
- * {@code "Items"} list and {@code ItemStack#save} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
- * {@code "RecordItem"}).
+ * Item NBT built by the vanilla writers rather than by hand: {@link ItemStackHelper#saveAllItems} for an
+ * {@code "Items"} list and {@code ItemStack#writeToNBT} for a single stored stack (a lectern's {@code "Book"}, a
+ * jukebox's {@code "RecordItem"}).
  *
  * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: vanilla always writes {@code "Slot"}
  * and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under test sees
@@ -31,16 +30,14 @@ public final class ItemFixtures {
     /**
      * The stack for {@code itemId}, count 1.
      *
-     * <p>An unregistered id is rejected rather than resolved. At this band {@code Registry.ITEM} is a plain
-     * {@code MappedRegistry} with no default, so {@code get} throws {@code No default value} rather than returning air;
-     * {@code getOptional} returns null for an id the registry does not hold. A silently resolved id would build an air
-     * stack, and the vanilla writer skips empty stacks: the fixture would come back as an empty list that this gate
-     * then accepts, since an empty list is its own round trip. That is the degenerate fixture the gate exists to
-     * reject, arriving through the builder.
+     * <p>An unregistered id is rejected rather than resolved: {@code Item.REGISTRY.getObject} returns {@code null} for
+     * an id the registry does not hold, and a null item would build an empty stack, since the vanilla writer skips
+     * empty stacks the fixture would come back as an empty list that this gate then accepts, an empty list being its
+     * own round trip. That is the degenerate fixture the gate exists to reject, arriving through the builder.
      */
     public static ItemStack stack(String itemId) {
         ResourceLocation id = new ResourceLocation(itemId);
-        Item item = Registry.ITEM.getOptional(id);
+        Item item = Item.REGISTRY.getObject(id);
         if (item == null) {
             throw new AssertionError(
                     itemId + " is not a registered item, so this fixture would be silently empty");
@@ -51,43 +48,43 @@ public final class ItemFixtures {
     /** The stack for {@code itemId} carrying {@code customName}, count 1. */
     public static ItemStack namedStack(String itemId, String customName) {
         ItemStack stack = stack(itemId);
-        stack.setHoverName(new TextComponent(customName));
+        stack.setStackDisplayName(customName);
         return stack;
     }
 
     /** The {@code "Items"} list vanilla writes for {@code itemIds} at ascending slots from 0. */
-    public static ListTag items(String... itemIds) {
+    public static NBTTagList items(String... itemIds) {
         return items(stacks(itemIds));
     }
 
     /** The {@code "Items"} list vanilla writes for {@code stacks} at ascending slots from 0. */
-    public static ListTag items(ItemStack... stacks) {
+    public static NBTTagList items(ItemStack... stacks) {
         return itemsAtSlots(ascending(stacks.length), stacks);
     }
 
     /** The {@code "Items"} list vanilla writes for one {@code itemId} per named slot. */
-    public static ListTag itemsAtSlots(int[] slots, String... itemIds) {
+    public static NBTTagList itemsAtSlots(int[] slots, String... itemIds) {
         return itemsAtSlots(slots, stacks(itemIds));
     }
 
     /** The {@code "Items"} list vanilla writes for one stack per named slot. */
-    public static ListTag itemsAtSlots(int[] slots, ItemStack... stacks) {
-        return holder(slots, stacks).getList("Items", 10);
+    public static NBTTagList itemsAtSlots(int[] slots, ItemStack... stacks) {
+        return holder(slots, stacks).getTagList("Items", 10);
     }
 
     /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code itemIds} at ascending slots from 0. */
-    public static CompoundTag itemsHolder(String... itemIds) {
+    public static NBTTagCompound itemsHolder(String... itemIds) {
         return itemsHolder(stacks(itemIds));
     }
 
     /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code stacks} at ascending slots from 0. */
-    public static CompoundTag itemsHolder(ItemStack... stacks) {
+    public static NBTTagCompound itemsHolder(ItemStack... stacks) {
         return holder(ascending(stacks.length), stacks);
     }
 
     /** The single {@code "Items"} entry vanilla writes for {@code itemId} at {@code slot}. */
-    public static CompoundTag entryAtSlot(int slot, String itemId) {
-        return itemsAtSlots(new int[] { slot }, itemId).getCompound(0);
+    public static NBTTagCompound entryAtSlot(int slot, String itemId) {
+        return itemsAtSlots(new int[] { slot }, itemId).getCompoundTagAt(0);
     }
 
     /**
@@ -95,46 +92,47 @@ public final class ItemFixtures {
      * hold, and which its decode silently lands on slot 0. Only for a case whose subject is that entry; a fixture
      * standing in for producer output belongs on {@link #entryAtSlot}.
      */
-    public static CompoundTag malformedEntryWithoutSlot(String itemId) {
-        CompoundTag entry = entryAtSlot(0, itemId);
-        entry.remove("Slot");
+    public static NBTTagCompound malformedEntryWithoutSlot(String itemId) {
+        NBTTagCompound entry = entryAtSlot(0, itemId);
+        entry.removeTag("Slot");
         return entry;
     }
 
     /** The tag vanilla writes for a single stored stack, as a lectern's {@code "Book"} carries it. */
-    public static CompoundTag itemTag(String itemId) {
+    public static NBTTagCompound itemTag(String itemId) {
         return itemTag(stack(itemId));
     }
 
     /**
      * The tag vanilla writes for {@code stack}, as a lectern's {@code "Book"} or a jukebox's {@code "RecordItem"}
-     * carries it: {@code ItemStack#save}, the same call every 1.20.4 block-entity single-stack field uses (a
-     * {@code {id, Count, tag}} compound with {@code Count} as a byte). {@code ItemStack.CODEC} exists on this band but
-     * encodes {@code Count} as an int, which is not byte-for-byte what a real block entity's own save produces.
+     * carries it: {@code ItemStack#writeToNBT}, the same call every block-entity single-stack field uses (a
+     * {@code {id, Count, tag}} compound with {@code Count} as a byte).
      */
-    public static CompoundTag itemTag(ItemStack stack) {
-        return stack.save(new CompoundTag());
+    public static NBTTagCompound itemTag(ItemStack stack) {
+        return stack.writeToNBT(new NBTTagCompound());
     }
 
     /**
-     * A written book of {@code pageCount} pages. The page count is load-bearing wherever a lectern's {@code "Page"}
-     * matters: vanilla clamps the saved page into the book's own page range, so a book with no pages can only ever be
-     * on page -1. Below 1.20.5 a written book has no {@code WrittenBookContent} component; vanilla's own
-     * {@code WrittenBookItem} reads {@code title}/{@code author}/{@code generation}/{@code resolved} and a
-     * {@code "pages"} list of JSON-component strings straight off the item tag.
+     * A written book of {@code pageCount} pages, already marked {@code resolved} so the fixture stands in for a book a
+     * player has opened. The page count is load-bearing wherever a lectern's {@code "Page"} matters: vanilla clamps the
+     * saved page into the book's own page range, so a book with no pages can only ever be on page -1. Each page is a
+     * JSON-encoded text component string, the shape {@code ItemWrittenBook.resolveContents} leaves behind.
      */
     public static ItemStack writtenBook(int pageCount) {
-        ListTag pages = new ListTag();
+        NBTTagList pages = new NBTTagList();
         for (int page = 0; page < pageCount; page++) {
-            pages.add(new StringTag(Component.Serializer.toJson(new TextComponent("page " + page))));
+            pages.appendTag(
+                    new NBTTagString(
+                            ITextComponent.Serializer.componentToJson(new TextComponentString("page " + page))));
         }
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
-        CompoundTag tag = book.getOrCreateTag();
-        tag.putString("title", "title");
-        tag.putString("author", "author");
-        tag.putInt("generation", 0);
-        tag.putBoolean("resolved", true);
-        tag.put("pages", pages);
+        book.setTagCompound(new NBTTagCompound());
+        NBTTagCompound tag = book.getTagCompound();
+        tag.setString("title", "title");
+        tag.setString("author", "author");
+        tag.setInteger("generation", 0);
+        tag.setBoolean("resolved", true);
+        tag.setTag("pages", pages);
         return book;
     }
 
@@ -154,7 +152,7 @@ public final class ItemFixtures {
         return slots;
     }
 
-    private static CompoundTag holder(int[] slots, ItemStack[] contents) {
+    private static NBTTagCompound holder(int[] slots, ItemStack[] contents) {
         if (slots.length != contents.length) {
             throw new IllegalArgumentException("slots and contents differ in length");
         }
@@ -166,6 +164,6 @@ public final class ItemFixtures {
         for (int i = 0; i < slots.length; i++) {
             stacks.set(slots[i], contents[i]);
         }
-        return ContainerHelper.saveAllItems(new CompoundTag(), stacks);
+        return ItemStackHelper.saveAllItems(new NBTTagCompound(), stacks);
     }
 }

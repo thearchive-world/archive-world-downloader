@@ -15,8 +15,8 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -78,7 +78,7 @@ class LiveCaptureSessionMapTallyTest {
         assertTrue(config.remapMapIds(), "the manifest write path is the remap-on arm, so the fixture needs it on");
         TestRegistries.bootstrap();
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.field_18954, DimensionType.field_18954,
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -113,10 +113,10 @@ class LiveCaptureSessionMapTallyTest {
         return new MapArchive(MapManifest.empty(), id -> null, (archiveId, dataTag) -> {});
     }
 
-    private static CompoundTag mapData() {
-        CompoundTag data = new CompoundTag();
-        data.putString("dimension", "minecraft:overworld");
-        data.putByteArray("colors", new byte[16384]);
+    private static NBTTagCompound mapData() {
+        NBTTagCompound data = new NBTTagCompound();
+        data.setString("dimension", "minecraft:overworld");
+        data.setByteArray("colors", new byte[16384]);
         return data;
     }
 

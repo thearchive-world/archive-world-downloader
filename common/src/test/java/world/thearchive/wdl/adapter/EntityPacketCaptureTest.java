@@ -7,12 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.play.server.SPacketSpawnObject;
+import net.minecraft.network.play.server.SPacketEntity;
+import net.minecraft.entity.Entity;
+import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -46,7 +45,7 @@ class EntityPacketCaptureTest {
         capture.reposition(1, farChunk, entityPos(72.0, 64.0, 8.0));
 
         capture.onMove(2, (short) 0, (short) 0, (short) 0,
-                new ClientboundMoveEntityPacket.class_2030(2, (byte) 64, (byte) 0, true));
+                new SPacketEntity.S16PacketEntityLook(2, (byte) 64, (byte) 0, true));
 
         assertEquals(ImmutableSet.of(farChunk), capture.chunks(OVERWORLD),
                 "a head turn must not move the rider back to the chunk it boarded in");
@@ -63,7 +62,7 @@ class EntityPacketCaptureTest {
         // A relative move is a delta in 1/4096 of a block off the held position, so this walks seven blocks east,
         // across the chunk border at x=16.
         capture.onMove(1, (short) (7 * 4096), (short) 0, (short) 0,
-                new ClientboundMoveEntityPacket.class_2029(1, 7 * 4096, 0, 0,
+                new SPacketEntity.S17PacketEntityLookMove(1, 7 * 4096, 0, 0,
                         (byte) 0, (byte) 0, true));
 
         assertEquals(19.0, position(capture, 1).x(), "the delta resolves against the held position");
@@ -88,29 +87,29 @@ class EntityPacketCaptureTest {
         return new EntityPos(x, y, z, 0f, 0f);
     }
 
-    private static ClientboundAddEntityPacket addEntity(int id, UUID uuid) {
+    private static SPacketSpawnObject addEntity(int id, UUID uuid) {
         // This band's spawn packet is built from the spawned entity and an object-type id, not from an EntityType.
         // These tests store it as an opaque spawn payload without decoding it, so a bare entity spawned as a minecart
         // object stands in.
         Entity source = new PlaceholderEntity();
-        source.setId(id);
-        source.setUUID(uuid);
-        return new ClientboundAddEntityPacket(source, 10);
+        source.setEntityId(id);
+        source.setUniqueId(uuid);
+        return new SPacketSpawnObject(source, 10);
     }
 
     /** A bare entity double, all the spawn-packet constructor reads from its argument at this band. */
     private static final class PlaceholderEntity extends Entity {
         private PlaceholderEntity() {
-            super(EntityType.PIG, null);
+            super(null);
         }
 
         @Override
-        protected void defineSynchedData() {}
+        protected void entityInit() {}
 
         @Override
-        protected void readAdditionalSaveData(CompoundTag tag) {}
+        protected void readEntityFromNBT(NBTTagCompound tag) {}
 
         @Override
-        protected void addAdditionalSaveData(CompoundTag tag) {}
+        protected void writeEntityToNBT(NBTTagCompound tag) {}
     }
 }

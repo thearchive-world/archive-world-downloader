@@ -23,14 +23,14 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Fail-closed guard that new user-facing UI text lands as a translation key, not a hardcoded literal. Every user-facing
- * string is a {@code Component.translatable(...)} keyed under the {@code wdl} namespace; the
- * {@code new TextComponent(...)} calls left in the view layer render data or glyphs, never prose, and each is enrolled
- * below with the reason it is not text. This test pins that inventory per file, so a newly hardcoded literal fails the
- * build until it is classified: made a translation key if it is text, or enrolled here with a note if it is data or a
- * glyph. Same fail-closed enrollment shape as {@link PitestAllowlistEnrollmentTest}.
+ * string is a {@code TextComponentTranslation(...)} keyed under the {@code wdl} namespace; the
+ * {@code new TextComponentString(...)} calls left in the view layer render data or glyphs, never prose, and each is
+ * enrolled below with the reason it is not text. This test pins that inventory per file, so a newly hardcoded literal
+ * fails the build until it is classified: made a translation key if it is text, or enrolled here with a note if it is
+ * data or a glyph. Same fail-closed enrollment shape as {@link PitestAllowlistEnrollmentTest}.
  */
 class UiLiteralEnrollmentTest {
-    private static final String NEEDLE = "new TextComponent(";
+    private static final String NEEDLE = "new TextComponentString(";
 
     private static final List<Path> VIEW_ROOTS = ImmutableList.of(
             Paths.get("src/main/java/world/thearchive/wdl"),
@@ -54,7 +54,15 @@ class UiLiteralEnrollmentTest {
     void everyViewLayerLiteralIsAcknowledgedData() {
         Map<String, Integer> found = new TreeMap<>();
         for (Path root : VIEW_ROOTS) {
-            assertTrue(Files.isDirectory(root), "view-layer source root not found: " + root.toAbsolutePath());
+            if (root.startsWith("..")) {
+                // fabric/neoforge are stripped on this Forge-only band (0 tracked files); a present loader root
+                // (the inert neoforge/ dir the middle bands still carry) is still required and scanned.
+                if (!Files.isDirectory(root)) {
+                    continue;
+                }
+            } else {
+                assertTrue(Files.isDirectory(root), "view-layer source root not found: " + root.toAbsolutePath());
+            }
             for (Path file : javaFiles(root)) {
                 int count = literalCount(file);
                 if (count > 0) {
@@ -65,9 +73,9 @@ class UiLiteralEnrollmentTest {
         assertEquals(
                 new TreeMap<>(ACKNOWLEDGED_UI_LITERALS),
                 found,
-                "The view layer's new TextComponent(...) inventory changed. Every user-facing\n"
-                        + "string must be a Component.translatable(...) keyed under wdl.*, never a\n"
-                        + "hardcoded literal. Component.literal is only for a data value or a\n"
+                "The view layer's new TextComponentString(...) inventory changed. Every user-facing\n"
+                        + "string must be a TextComponentTranslation(...) keyed under wdl.*, never a\n"
+                        + "hardcoded literal. TextComponentString is only for a data value or a\n"
                         + "non-linguistic glyph. Classify the change: make it a translation key if it\n"
                         + "is text, or enroll it in ACKNOWLEDGED_UI_LITERALS with a note if it is not.");
     }

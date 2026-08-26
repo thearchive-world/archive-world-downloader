@@ -3,12 +3,12 @@
 
 package world.thearchive.wdl.testsupport;
 
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
@@ -26,32 +26,32 @@ public final class BlockEntityFixtures {
     private BlockEntityFixtures() {}
 
     /**
-     * The tag vanilla writes for a freshly placed block entity of type {@code id} at {@code x/y/z}: its metadata, its
-     * {@code components}, and every key its own save writes unconditionally.
+     * The tag vanilla writes for a freshly placed block entity of type {@code id} at {@code x/y/z}: its metadata and
+     * every key its own save writes unconditionally.
      */
-    public static CompoundTag blockEntity(String id, int x, int y, int z) {
+    public static NBTTagCompound blockEntity(String id, int x, int y, int z) {
         return FixtureFidelity.blockEntityShape(id, x, y, z);
     }
 
     /**
      * As {@link #blockEntity} for a block entity the player renamed, so a merge can be shown to leave a real sibling
-     * field alone. Below 1.20.5 only a {@link net.minecraft.world.level.block.entity.BaseContainerBlockEntity} (a chest
-     * and the like) carries an arbitrary name; the raw {@code "CustomName"} JSON key written here is exactly what its
+     * field alone. At 1.12.2 only a {@link net.minecraft.tileentity.TileEntityLockableLoot} (a chest and the like)
+     * carries an arbitrary name; the raw {@code "CustomName"} JSON key written here is exactly what its
      * {@code setCustomName} would write, so the fidelity round trip still passes for one.
      */
-    public static CompoundTag namedBlockEntity(String id, int x, int y, int z, String customName) {
-        CompoundTag tag = blockEntity(id, x, y, z);
-        tag.putString("CustomName", Component.Serializer.toJson(new TextComponent(customName)));
+    public static NBTTagCompound namedBlockEntity(String id, int x, int y, int z, String customName) {
+        NBTTagCompound tag = blockEntity(id, x, y, z);
+        tag.setString("CustomName", ITextComponent.Serializer.componentToJson(new TextComponentString(customName)));
         return tag;
     }
 
     /** The custom name a {@link #namedBlockEntity} tag carries, or {@code ""} when it carries none. */
-    public static String customNameOf(CompoundTag blockEntityTag) {
-        if (!blockEntityTag.contains("CustomName", 8)) {
+    public static String customNameOf(NBTTagCompound blockEntityTag) {
+        if (!blockEntityTag.hasKey("CustomName", 8)) {
             return "";
         }
-        Component name = Component.Serializer.fromJson(blockEntityTag.getString("CustomName"));
-        return name == null ? "" : name.getString();
+        ITextComponent name = ITextComponent.Serializer.jsonToComponent(blockEntityTag.getString("CustomName"));
+        return name == null ? "" : name.getUnformattedText();
     }
 
     /**
@@ -61,12 +61,12 @@ public final class BlockEntityFixtures {
      * that does have the block reaches; a registered type belongs on {@link #blockEntity}, where the shape is checked,
      * and a tag from here reaches a chunk through {@link #malformedChunkTagWith}.
      */
-    public static CompoundTag unhostedBlockEntity(String id, int x, int y, int z) {
-        CompoundTag tag = new CompoundTag();
-        tag.putString("id", id);
-        tag.putInt("x", x);
-        tag.putInt("y", y);
-        tag.putInt("z", z);
+    public static NBTTagCompound unhostedBlockEntity(String id, int x, int y, int z) {
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setString("id", id);
+        tag.setInteger("x", x);
+        tag.setInteger("y", y);
+        tag.setInteger("z", z);
         return tag;
     }
 
@@ -77,10 +77,10 @@ public final class BlockEntityFixtures {
      * codec that silently rebuilt every tag from vanilla's own load would still preserve it. Not for a fixture standing
      * in for producer output.
      */
-    public static CompoundTag blockEntityWithForeignKey(String id, int x, int y, int z, String key,
+    public static NBTTagCompound blockEntityWithForeignKey(String id, int x, int y, int z, String key,
             String value) {
-        CompoundTag tag = blockEntity(id, x, y, z);
-        tag.putString(key, value);
+        NBTTagCompound tag = blockEntity(id, x, y, z);
+        tag.setString(key, value);
         return tag;
     }
 
@@ -91,50 +91,50 @@ public final class BlockEntityFixtures {
      * used: an empty container serializes {@code "Items"} as a present empty list, which is what a re-captured
      * container that nobody opened also looks like.
      */
-    public static CompoundTag emptyContainerHolder(int containerSize, String blockEntityId) {
+    public static NBTTagCompound emptyContainerHolder(int containerSize, String blockEntityId) {
         TestRegistries.bootstrap();
-        CompoundTag holder = new ContainerSinkImpl()
+        NBTTagCompound holder = new ContainerSinkImpl()
                 .captureItems(NonNullList.withSize(containerSize, ItemStack.EMPTY));
-        holder.putString("wdl_block_entity_id", blockEntityId);
+        holder.setString("wdl_block_entity_id", blockEntityId);
         return holder;
     }
 
     /**
-     * A {@code "Bees"}-shaped list of one occupant per named {@code ticksInHive}, the pre-component
-     * {@code {EntityData, TicksInHive, MinOccupationTicks}} entry vanilla's {@code BeehiveBlockEntity.load} reads
-     * (below 1.20.5 there is no {@code Occupant} record to encode through).
+     * A {@code "Bees"}-shaped list of one occupant per named {@code ticksInHive}, the
+     * {@code {EntityData, TicksInHive, MinOccupationTicks}} entry vanilla's {@code TileEntityBeehive.readFromNBT}
+     * reads.
      */
-    public static ListTag bees(int... ticksInHive) {
-        ListTag list = new ListTag();
+    public static NBTTagList bees(int... ticksInHive) {
+        NBTTagList list = new NBTTagList();
         for (int ticks : ticksInHive) {
-            CompoundTag entityData = new CompoundTag();
-            entityData.putString("id", "minecraft:bee");
-            CompoundTag occupant = new CompoundTag();
-            occupant.put("EntityData", entityData);
-            occupant.putInt("TicksInHive", ticks);
-            occupant.putInt("MinOccupationTicks", 600);
-            list.add(occupant);
+            NBTTagCompound entityData = new NBTTagCompound();
+            entityData.setString("id", "minecraft:bee");
+            NBTTagCompound occupant = new NBTTagCompound();
+            occupant.setTag("EntityData", entityData);
+            occupant.setInteger("TicksInHive", ticks);
+            occupant.setInteger("MinOccupationTicks", 600);
+            list.appendTag(occupant);
         }
         return list;
     }
 
     /**
-     * A chunk tag whose {@code Level.TileEntities} list holds {@code blockEntities}, the pre-1.18 layout, each carrying
-     * the {@code keepPacked} the chunk layer writes around a live block entity.
+     * A chunk tag whose {@code Level.TileEntities} list holds {@code blockEntities}, each carrying the
+     * {@code keepPacked} the chunk layer writes around a live block entity.
      *
      * <p>Every tag is checked against its producer's shape first. This is the choke point: a fixture assembled anywhere
      * and handed to a chunk merge passes through here, so an omitted key fails the build at the test that would
      * otherwise have passed over it.
      */
-    public static CompoundTag chunkTagWith(CompoundTag... blockEntities) {
-        CompoundTag chunkTag = new CompoundTag();
-        ListTag list = new ListTag();
-        for (CompoundTag blockEntity : blockEntities) {
-            list.add(savedBlockEntity(blockEntity));
+    public static NBTTagCompound chunkTagWith(NBTTagCompound... blockEntities) {
+        NBTTagCompound chunkTag = new NBTTagCompound();
+        NBTTagList list = new NBTTagList();
+        for (NBTTagCompound blockEntity : blockEntities) {
+            list.appendTag(savedBlockEntity(blockEntity));
         }
-        CompoundTag level = new CompoundTag();
-        level.put("TileEntities", list);
-        chunkTag.put("Level", level);
+        NBTTagCompound level = new NBTTagCompound();
+        level.setTag("TileEntities", list);
+        chunkTag.setTag("Level", level);
         return chunkTag;
     }
 
@@ -144,17 +144,17 @@ public final class BlockEntityFixtures {
      * reader drops it. Reach for {@link #chunkTagWith} everywhere else; a fixture that merely stands in for producer
      * output belongs there, and routing it here is how the check stops meaning anything.
      */
-    public static CompoundTag malformedChunkTagWith(CompoundTag... blockEntities) {
-        CompoundTag chunkTag = new CompoundTag();
-        ListTag list = new ListTag();
-        for (CompoundTag blockEntity : blockEntities) {
-            CompoundTag saved = blockEntity.copy();
-            saved.putBoolean(FixtureFidelity.KEEP_PACKED, false);
-            list.add(saved);
+    public static NBTTagCompound malformedChunkTagWith(NBTTagCompound... blockEntities) {
+        NBTTagCompound chunkTag = new NBTTagCompound();
+        NBTTagList list = new NBTTagList();
+        for (NBTTagCompound blockEntity : blockEntities) {
+            NBTTagCompound saved = blockEntity.copy();
+            saved.setBoolean(FixtureFidelity.KEEP_PACKED, false);
+            list.appendTag(saved);
         }
-        CompoundTag level = new CompoundTag();
-        level.put("TileEntities", list);
-        chunkTag.put("Level", level);
+        NBTTagCompound level = new NBTTagCompound();
+        level.setTag("TileEntities", list);
+        chunkTag.setTag("Level", level);
         return chunkTag;
     }
 
@@ -163,18 +163,18 @@ public final class BlockEntityFixtures {
      * carrying the {@code keepPacked} that layer stamps beside every live block entity it saves. Use this where a
      * fixture reaches a chunk without going through {@link #chunkTagWith}.
      */
-    public static CompoundTag savedBlockEntity(CompoundTag blockEntityTag) {
+    public static NBTTagCompound savedBlockEntity(NBTTagCompound blockEntityTag) {
         FixtureFidelity.assertBlockEntityShape(blockEntityTag);
-        CompoundTag saved = blockEntityTag.copy();
-        saved.putBoolean(FixtureFidelity.KEEP_PACKED, false);
+        NBTTagCompound saved = blockEntityTag.copy();
+        saved.setBoolean(FixtureFidelity.KEEP_PACKED, false);
         return saved;
     }
 
     /** The block-entity tag in {@code list} at {@code x/y/z}, or an {@link AssertionError} when none matches. */
-    public static CompoundTag findByPos(ListTag list, int x, int y, int z) {
-        for (int i = 0; i < list.size(); i++) {
-            CompoundTag tag = list.getCompound(i);
-            if (tag.getInt("x") == x && tag.getInt("y") == y && tag.getInt("z") == z) {
+    public static NBTTagCompound findByPos(NBTTagList list, int x, int y, int z) {
+        for (int i = 0; i < list.tagCount(); i++) {
+            NBTTagCompound tag = list.getCompoundTagAt(i);
+            if (tag.getInteger("x") == x && tag.getInteger("y") == y && tag.getInteger("z") == z) {
                 return tag;
             }
         }
@@ -182,16 +182,16 @@ public final class BlockEntityFixtures {
     }
 
     /** The block-entity tag in {@code chunkTag} at {@code x/y/z}, or an {@link AssertionError} when none matches. */
-    public static CompoundTag findByPos(CompoundTag chunkTag, int x, int y, int z) {
-        return findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), x, y, z);
+    public static NBTTagCompound findByPos(NBTTagCompound chunkTag, int x, int y, int z) {
+        return findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), x, y, z);
     }
 
     /** The block-entity tag in {@code chunkTag} at {@code x/y/z}, or {@code null} when none matches. */
-    public static @Nullable CompoundTag findByPosOrNull(CompoundTag chunkTag, int x, int y, int z) {
-        ListTag list = chunkTag.getCompound("Level").getList("TileEntities", 10);
-        for (int i = 0; i < list.size(); i++) {
-            CompoundTag tag = list.getCompound(i);
-            if (tag.getInt("x") == x && tag.getInt("y") == y && tag.getInt("z") == z) {
+    public static @Nullable NBTTagCompound findByPosOrNull(NBTTagCompound chunkTag, int x, int y, int z) {
+        NBTTagList list = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
+        for (int i = 0; i < list.tagCount(); i++) {
+            NBTTagCompound tag = list.getCompoundTagAt(i);
+            if (tag.getInteger("x") == x && tag.getInteger("y") == y && tag.getInteger("z") == z) {
                 return tag;
             }
         }

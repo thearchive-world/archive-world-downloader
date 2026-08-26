@@ -16,16 +16,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.JukeboxBlock;
-import net.minecraft.world.level.block.ShulkerBoxBlock;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.inventory.ItemStackHelper;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.init.Blocks;
+import net.minecraft.block.BlockJukebox;
+import net.minecraft.block.BlockShulkerBox;
+import net.minecraft.block.state.IBlockState;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +38,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The automated guard for interaction-prediction's reconcile gate: a predicted interaction is captured optimistically
  * before the server acks it, so the gate ({@link InteractionCapture#confirm}) must persist content only when the
  * authoritative synced block-state confirms it and discard a prediction the server never confirmed. The decision is a
- * pure function of a {@link BlockState} and a {@code Candidate}, so it is proven headless with hand-built block-states
+ * pure function of a {@link IBlockState} and a {@code Candidate}, so it is proven headless with hand-built block-states
  * and candidates (no live client, no {@code Level}). The server-rejected discard is asserted directly on the pure
  * {@code confirm} decision.
  *
@@ -66,24 +66,25 @@ class InteractionStashMergeTest {
                 (posKey, slot, occupiedMask) -> {}, (posKey, blockTypeId) -> {}, posKey -> {});
     }
 
-    private CompoundTag itemsHolder(int slot, ItemStack stack) {
+    private NBTTagCompound itemsHolder(int slot, ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(slot, stack);
         return sink.captureItems(items);
     }
 
-    private static NonNullList<ItemStack> readItems(CompoundTag holder, int size) {
+    private static NonNullList<ItemStack> readItems(NBTTagCompound holder, int size) {
         NonNullList<ItemStack> back = NonNullList.withSize(size, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(holder, back);
+        ItemStackHelper.loadAllItems(holder, back);
         return back;
     }
 
     /** A placed shulker box item holding {@code contents} in its pre-component {@code BlockEntityTag.Items}. */
     private static ItemStack shulkerHolding(ItemStack... contents) {
-        ItemStack shulker = new ItemStack(Blocks.SHULKER_BOX);
-        CompoundTag blockEntityTag = new CompoundTag();
-        blockEntityTag.put("Items", ItemFixtures.items(contents));
-        shulker.getOrCreateTag().put("BlockEntityTag", blockEntityTag);
+        ItemStack shulker = new ItemStack(Blocks.PURPLE_SHULKER_BOX);
+        NBTTagCompound blockEntityTag = new NBTTagCompound();
+        blockEntityTag.setTag("Items", ItemFixtures.items(contents));
+        shulker.setTagCompound(new NBTTagCompound());
+        shulker.getTagCompound().setTag("BlockEntityTag", blockEntityTag);
         return shulker;
     }
 
@@ -91,11 +92,12 @@ class InteractionStashMergeTest {
 
     @Test
     void shulkerWithBlockPresentKeepsTheItemsHolder() {
-        CompoundTag holder = itemsHolder(2, new ItemStack(Items.EMERALD, 7));
+        NBTTagCompound holder = itemsHolder(2, new ItemStack(Items.EMERALD, 7));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.SHULKER, holder);
 
-        Optional<CompoundTag> confirmed = InteractionCapture.confirm(Blocks.SHULKER_BOX.defaultBlockState(), candidate);
+        Optional<NBTTagCompound> confirmed = InteractionCapture.confirm(Blocks.PURPLE_SHULKER_BOX.getDefaultState(),
+                candidate);
 
         assertTrue(confirmed.isPresent(), "a shulker present at the pos confirms the placement");
         assertSame(holder, confirmed.get(), "the confirmed shulker holder is the captured Items holder unchanged");
@@ -104,12 +106,12 @@ class InteractionStashMergeTest {
 
     @Test
     void jukeboxWithRecordKeepsTheRecordHolder() {
-        CompoundTag holder = InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT));
+        NBTTagCompound holder = InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_CAT));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.JUKEBOX, holder);
 
-        BlockState withRecord = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, true);
-        Optional<CompoundTag> confirmed = InteractionCapture.confirm(withRecord, candidate);
+        IBlockState withRecord = Blocks.JUKEBOX.getDefaultState().withProperty(BlockJukebox.HAS_RECORD, true);
+        Optional<NBTTagCompound> confirmed = InteractionCapture.confirm(withRecord, candidate);
 
         assertTrue(confirmed.isPresent(), "HAS_RECORD true confirms the inserted disc");
         assertSame(holder, confirmed.get());
@@ -119,37 +121,37 @@ class InteractionStashMergeTest {
 
     @Test
     void shulkerDiscardedWhenBlockAbsent() {
-        CompoundTag holder = itemsHolder(0, new ItemStack(Items.DIAMOND));
+        NBTTagCompound holder = itemsHolder(0, new ItemStack(Items.DIAMOND));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.SHULKER, holder);
 
         // The server refused the placement (or it was rolled back): the authoritative block is not a shulker.
-        assertTrue(!InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isPresent(),
+        assertTrue(!InteractionCapture.confirm(Blocks.STONE.getDefaultState(), candidate).isPresent(),
                 "a prediction the synced block-state never confirms is discarded, never persisted");
-        assertTrue(!InteractionCapture.confirm(Blocks.AIR.defaultBlockState(), candidate).isPresent(),
+        assertTrue(!InteractionCapture.confirm(Blocks.AIR.getDefaultState(), candidate).isPresent(),
                 "an air block at the pos (the placement never landed) also discards");
     }
 
     @Test
     void jukeboxDiscardedWhenNoRecord() {
-        CompoundTag holder = InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_11));
+        NBTTagCompound holder = InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_11));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.JUKEBOX, holder);
 
-        BlockState noRecord = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
+        IBlockState noRecord = Blocks.JUKEBOX.getDefaultState().withProperty(BlockJukebox.HAS_RECORD, false);
         assertTrue(!InteractionCapture.confirm(noRecord, candidate).isPresent(),
                 "HAS_RECORD false (the disc was ejected or never accepted) discards the disc");
     }
 
     @Test
     void jukeboxDiscardedAgainstWrongBlockType() {
-        CompoundTag holder = InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT));
+        NBTTagCompound holder = InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_CAT));
         InteractionCapture.HolderCandidate candidate = new InteractionCapture.HolderCandidate(
                 InteractionCapture.InteractionKind.JUKEBOX, holder);
 
         // The block at the pos is not a jukebox, so the instanceof short-circuits before reading HAS_RECORD: the
         // candidate is discarded rather than throwing on a property the block does not have.
-        assertTrue(!InteractionCapture.confirm(Blocks.STONE.defaultBlockState(), candidate).isPresent(),
+        assertTrue(!InteractionCapture.confirm(Blocks.STONE.getDefaultState(), candidate).isPresent(),
                 "a jukebox prediction against a non-jukebox block discards, it does not throw");
     }
     // Per-slot gate independence: one slot survives while another is dropped.
@@ -160,13 +162,13 @@ class InteractionStashMergeTest {
         BlockPos opened = new BlockPos(10, 70, 20);
         BlockPos placedOnly = new BlockPos(12, 70, 20);
 
-        Map<BlockPos, CompoundTag> openTimeBundle = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> openTimeBundle = new LinkedHashMap<>();
         openTimeBundle.put(opened, itemsHolder(0, new ItemStack(Items.DIAMOND))); // ground-truth, edited open
-        Map<BlockPos, CompoundTag> confirmedPlace = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> confirmedPlace = new LinkedHashMap<>();
         confirmedPlace.put(opened, itemsHolder(0, new ItemStack(Blocks.DIRT))); // stale place snapshot, must lose
         confirmedPlace.put(placedOnly, itemsHolder(0, new ItemStack(Items.GOLD_INGOT))); // place-only, must survive
 
-        Map<BlockPos, CompoundTag> surviving = ContainerMerge.mergePlaceCandidates(openTimeBundle, confirmedPlace);
+        Map<BlockPos, NBTTagCompound> surviving = ContainerMerge.mergePlaceCandidates(openTimeBundle, confirmedPlace);
 
         assertFalse(surviving.containsKey(opened), "the open-time holder wins; the place candidate at that pos drops");
         assertTrue(surviving.containsKey(placedOnly), "a place-and-never-open pos still merges");
@@ -179,19 +181,19 @@ class InteractionStashMergeTest {
     void blockStateAtReadsThePlacedBlockFromTheSnapshotSection() {
         BlockPos shulkerPos = new BlockPos(5, -60, 7); // a deliberately negative-Y, non-zero-local-coordinate pos
         ChunkSnapshotSource snapshot = SyntheticChunks.withBlockAt(shulkerPos,
-                Blocks.SHULKER_BOX.defaultBlockState());
+                Blocks.PURPLE_SHULKER_BOX.getDefaultState());
 
-        BlockState read = InteractionCapture.blockStateAt(snapshot, shulkerPos);
+        IBlockState read = InteractionCapture.blockStateAt(snapshot, shulkerPos);
 
         assertNotNull(read, "the section containing the pos is found");
-        assertTrue(read.getBlock() instanceof ShulkerBoxBlock, "the placed shulker is read back from the section copy");
+        assertTrue(read.getBlock() instanceof BlockShulkerBox, "the placed shulker is read back from the section copy");
     }
 
     @Test
     void blockStateAtFailsClosedWhenNoSectionCoversTheY() {
         BlockPos shulkerPos = new BlockPos(5, -60, 7);
         ChunkSnapshotSource snapshot = SyntheticChunks.withBlockAt(shulkerPos,
-                Blocks.SHULKER_BOX.defaultBlockState());
+                Blocks.PURPLE_SHULKER_BOX.getDefaultState());
 
         assertNull(InteractionCapture.blockStateAt(snapshot, new BlockPos(5, 5000, 7)),
                 "an out-of-range Y has no captured section, so the gate reads null and fails closed");
@@ -212,7 +214,7 @@ class InteractionStashMergeTest {
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(pos, new InteractionCapture.HolderCandidate(
                         InteractionCapture.InteractionKind.SHULKER, itemsHolder(0, new ItemStack(Items.DIAMOND)))),
-                SyntheticChunks.withBlockAt(pos, Blocks.SHULKER_BOX.defaultBlockState()));
+                SyntheticChunks.withBlockAt(pos, Blocks.PURPLE_SHULKER_BOX.getDefaultState()));
         assertTrue(bundles.items().containsKey(pos), "a confirmed shulker routes to the Items bundle");
         assertTrue(bundles.holders().isEmpty(), "and not to the holder-merge bundle");
     }
@@ -222,9 +224,9 @@ class InteractionStashMergeTest {
         BlockPos pos = new BlockPos(5, -60, 7);
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(pos, new InteractionCapture.HolderCandidate(InteractionCapture.InteractionKind.JUKEBOX,
-                        InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT)))),
+                        InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_CAT)))),
                 SyntheticChunks.withBlockAt(pos,
-                        Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, true)));
+                        Blocks.JUKEBOX.getDefaultState().withProperty(BlockJukebox.HAS_RECORD, true)));
         assertTrue(bundles.holders().containsKey(pos), "a confirmed jukebox routes to the holder-merge bundle");
         assertTrue(bundles.items().isEmpty(), "and not to the Items bundle");
     }
@@ -235,7 +237,7 @@ class InteractionStashMergeTest {
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(pos, new InteractionCapture.HolderCandidate(
                         InteractionCapture.InteractionKind.SHULKER, itemsHolder(0, new ItemStack(Items.DIAMOND)))),
-                SyntheticChunks.withBlockAt(pos, Blocks.STONE.defaultBlockState()));
+                SyntheticChunks.withBlockAt(pos, Blocks.STONE.getDefaultState()));
 
         assertTrue(bundles.items().isEmpty() && bundles.holders().isEmpty(),
                 "the snapshot block does not confirm a shulker, so the candidate is dropped from every bundle");
@@ -248,7 +250,7 @@ class InteractionStashMergeTest {
         InteractionCapture.ChunkBundles bundles = InteractionCapture.reconcile(
                 oneCandidate(elsewhere, new InteractionCapture.HolderCandidate(
                         InteractionCapture.InteractionKind.SHULKER, itemsHolder(0, new ItemStack(Items.DIAMOND)))),
-                SyntheticChunks.withBlockAt(placed, Blocks.SHULKER_BOX.defaultBlockState()));
+                SyntheticChunks.withBlockAt(placed, Blocks.PURPLE_SHULKER_BOX.getDefaultState()));
 
         assertTrue(bundles.items().isEmpty(), "no captured section covers the pos, so the gate fails closed");
     }
@@ -270,7 +272,7 @@ class InteractionStashMergeTest {
 
         capture.recordPlaceAt(pos, shulker);
 
-        assertEquals(pos.asLong(), sinkPos[0],
+        assertEquals(pos.toLong(), sinkPos[0],
                 "a placed content-bearing shulker marks the outline captured-set at its pos on record");
         assertEquals("minecraft:shulker_box", sinkType[0],
                 "and records its block-entity type so Gate 2 can re-rim a later cross-type replacement");
@@ -305,17 +307,17 @@ class InteractionStashMergeTest {
 
         capture.recordPlaceAt(pos, new ItemStack(Blocks.CHEST));
 
-        assertEquals(pos.asLong(), sinkPos[0],
+        assertEquals(pos.toLong(), sinkPos[0],
                 "the chunk re-captures with the new block, so the old block's capture is stale there");
     }
 
     @Test
     void jukeboxInsertRecognizesPlayableDisc() {
         InteractionCapture capture = plainCapture(sink, true);
-        BlockState emptyJukebox = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
+        IBlockState emptyJukebox = Blocks.JUKEBOX.getDefaultState().withProperty(BlockJukebox.HAS_RECORD, false);
 
         boolean recorded = capture.recordJukeboxInsert(emptyJukebox, new BlockPos(0, 70, 0),
-                new ItemStack(Items.MUSIC_DISC_CAT));
+                new ItemStack(Items.RECORD_CAT));
 
         assertTrue(recorded, "a playable disc into an empty jukebox is an insert");
         assertFalse(capture.pendingCandidateChunks().isEmpty(), "the disc insert candidate is stashed");
@@ -324,10 +326,10 @@ class InteractionStashMergeTest {
     @Test
     void jukeboxClickHoldingPlaceableBlockIsNotInsert() {
         InteractionCapture capture = plainCapture(sink, true);
-        BlockState emptyJukebox = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
+        IBlockState emptyJukebox = Blocks.JUKEBOX.getDefaultState().withProperty(BlockJukebox.HAS_RECORD, false);
 
         boolean recorded = capture.recordJukeboxInsert(emptyJukebox, new BlockPos(0, 70, 0),
-                new ItemStack(Blocks.SHULKER_BOX));
+                new ItemStack(Blocks.PURPLE_SHULKER_BOX));
 
         assertFalse(recorded, "a shulker clicked on a jukebox face is a placement, not a disc insert");
         assertTrue(capture.pendingCandidateChunks().isEmpty(), "no phantom jukebox candidate is stashed");
@@ -338,10 +340,10 @@ class InteractionStashMergeTest {
         // Without re-capture the reconcile gate never sees the post-insert block-state, so any candidate would be
         // silently discarded; the recognizer must record nothing rather than stash a doomed candidate.
         InteractionCapture capture = plainCapture(sink, false);
-        BlockState emptyJukebox = Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false);
+        IBlockState emptyJukebox = Blocks.JUKEBOX.getDefaultState().withProperty(BlockJukebox.HAS_RECORD, false);
 
         boolean recorded = capture.recordJukeboxInsert(emptyJukebox, new BlockPos(0, 70, 0),
-                new ItemStack(Items.MUSIC_DISC_CAT));
+                new ItemStack(Items.RECORD_CAT));
 
         assertFalse(recorded, "a disc insert is not recorded when re-capture (the gate's snapshot refresh) is off");
         assertTrue(capture.pendingCandidateChunks().isEmpty(), "no candidate is stashed when re-capture is off");
@@ -361,8 +363,8 @@ class InteractionStashMergeTest {
     void theResidualDrainDropsEveryPendingCandidateAndNamesWhereItStood() {
         InteractionCapture capture = plainCapture(sink, true);
         BlockPos pos = new BlockPos(0, 70, 0);
-        capture.recordJukeboxInsert(Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false),
-                pos, new ItemStack(Items.MUSIC_DISC_CAT));
+        capture.recordJukeboxInsert(Blocks.JUKEBOX.getDefaultState().withProperty(BlockJukebox.HAS_RECORD, false),
+                pos, new ItemStack(Items.RECORD_CAT));
         assertFalse(capture.pendingCandidateChunks().isEmpty(), "the disc insert is stashed");
 
         // A dimension rebind must drop every old-dimension candidate so none carries into the new ChunkPos space,
@@ -381,8 +383,8 @@ class InteractionStashMergeTest {
         InteractionCapture capture = plainCapture(sink, true, chunk -> false);
 
         boolean recorded = capture.recordJukeboxInsert(
-                Blocks.JUKEBOX.defaultBlockState().setValue(JukeboxBlock.HAS_RECORD, false),
-                new BlockPos(0, 70, 0), new ItemStack(Items.MUSIC_DISC_CAT));
+                Blocks.JUKEBOX.getDefaultState().withProperty(BlockJukebox.HAS_RECORD, false),
+                new BlockPos(0, 70, 0), new ItemStack(Items.RECORD_CAT));
 
         assertFalse(recorded, "a disc into a chunk nothing will capture again is not recorded");
         assertTrue(capture.pendingCandidateChunks().isEmpty(), "so no doomed candidate is stashed");

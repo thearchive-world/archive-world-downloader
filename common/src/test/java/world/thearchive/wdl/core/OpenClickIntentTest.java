@@ -20,12 +20,12 @@ import org.junit.jupiter.api.Test;
  * superseded marker: the overwritten click's own open may still be in flight, and pairing it with the latched click
  * would bind the wrong block (the first open would claim the second click's target), so each marker poisons exactly one
  * later open into SUPERSEDED, which binds nothing at all. All inputs are primitives (a packed
- * {@code BlockPos.asLong()}, an entity id, and a tick), so the whole decision is verified with hand-fed ticks and no
+ * {@code BlockPos.toLong()}, an entity id, and a tick), so the whole decision is verified with hand-fed ticks and no
  * running game; the clicked entity reference for an ENTITY intent lives in the adapter, the way
  * {@link ContainerAssociation} keeps the bound entity UUID there.
  */
 class OpenClickIntentTest {
-    private static final long POS = 1234567L; // an opaque packed BlockPos.asLong()
+    private static final long POS = 1234567L; // an opaque packed BlockPos.toLong()
     private static final long OTHER_POS = 7654321L; // a second, different packed pos
     private static final int ENTITY_ID = 42; // an opaque network entity id
     private static final int OTHER_ENTITY_ID = 43; // a second, different entity id

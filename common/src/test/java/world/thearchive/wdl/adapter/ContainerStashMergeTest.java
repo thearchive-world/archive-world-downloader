@@ -13,15 +13,15 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.inventory.ItemStackHelper;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -44,16 +44,16 @@ class ContainerStashMergeTest {
     // beside the sink rather than inside it.
     private static final ContainerSink ITEMS_ONLY_SINK = new ContainerSink() {
         @Override
-        public CompoundTag captureItems(NonNullList<ItemStack> items) {
+        public NBTTagCompound captureItems(NonNullList<ItemStack> items) {
             throw new AssertionError("not used in merge tests");
         }
 
         @Override
-        public CompoundTag merge(CompoundTag blockEntityTag, CompoundTag capturedItemsHolder) {
-            CompoundTag merged = blockEntityTag.copy();
-            Tag items = capturedItemsHolder.get("Items");
+        public NBTTagCompound merge(NBTTagCompound blockEntityTag, NBTTagCompound capturedItemsHolder) {
+            NBTTagCompound merged = blockEntityTag.copy();
+            NBTBase items = capturedItemsHolder.getTag("Items");
             if (items != null) {
-                merged.put("Items", items.copy());
+                merged.setTag("Items", items.copy());
             }
             return merged;
         }
@@ -64,7 +64,7 @@ class ContainerStashMergeTest {
         TestRegistries.bootstrap();
     }
 
-    private CompoundTag holderWith(int slot, ItemStack stack) {
+    private NBTTagCompound holderWith(int slot, ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(slot, stack);
         return sink.captureItems(items);
@@ -73,11 +73,11 @@ class ContainerStashMergeTest {
     @Test
     void mergeChunkStashFillsTheMatchingBlockEntityAndDrainsOnlyThatChunksEntries() {
         BlockPos chestPos = new BlockPos(10, 70, 20);
-        CompoundTag chunkTag = chunkTagWith(
+        NBTTagCompound chunkTag = chunkTagWith(
                 blockEntity("minecraft:chest", 10, 70, 20),
                 blockEntity("minecraft:furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(chestPos, holderWith(2, new ItemStack(Items.EMERALD, 7)));
         BlockPos elsewhere = new BlockPos(100, 70, 200); // a container in a different chunk, not being flushed
         stash.put(elsewhere, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
@@ -88,21 +88,21 @@ class ContainerStashMergeTest {
         assertFalse(stash.containsKey(chestPos), "the flushed chunk's stash entry is drained as the tag leaves memory");
         assertTrue(stash.containsKey(elsewhere), "another chunk's stash entry is left until its own flush");
 
-        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", 10);
+        NBTTagList blockEntities = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(findByPos(blockEntities, 10, 70, 20), back);
+        ItemStackHelper.loadAllItems(findByPos(blockEntities, 10, 70, 20), back);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest gains exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
-        assertTrue(findByPos(blockEntities, 11, 70, 20).getList("Items", 10).isEmpty(),
+        assertTrue(findByPos(blockEntities, 11, 70, 20).getTagList("Items", 10).isEmpty(),
                 "the neighbor block entity is untouched");
     }
 
     @Test
     void mergeChunkStashDrainsButDoesNotMergeWhenNoBlockEntityAtThePos() {
         BlockPos pos = new BlockPos(1, 64, 1);
-        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:chest", 2, 64, 1)); // a chest, but elsewhere
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 2, 64, 1)); // a chest, but elsewhere
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
@@ -111,8 +111,8 @@ class ContainerStashMergeTest {
         assertFalse(stash.containsKey(pos),
                 "the entry is still drained: the chunk is leaving memory, so it cannot wait");
         assertTrue(
-                findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), 2, 64, 1)
-                        .getList("Items", 10).isEmpty(),
+                findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 2, 64, 1)
+                        .getTagList("Items", 10).isEmpty(),
                 "the unrelated chest is left alone");
     }
 
@@ -123,19 +123,19 @@ class ContainerStashMergeTest {
         // partial save honestly instead of a clean one.
         ContainerSink throwingSink = new ContainerSink() {
             @Override
-            public CompoundTag captureItems(NonNullList<ItemStack> items) {
+            public NBTTagCompound captureItems(NonNullList<ItemStack> items) {
                 throw new AssertionError("the failure path never serializes items");
             }
 
             @Override
-            public CompoundTag merge(CompoundTag blockEntityTag, CompoundTag capturedItemsHolder) {
+            public NBTTagCompound merge(NBTTagCompound blockEntityTag, NBTTagCompound capturedItemsHolder) {
                 throw new IllegalStateException("a band merge blew up");
             }
         };
         BlockPos chestPos = new BlockPos(10, 70, 20);
-        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
-        stash.put(chestPos, new CompoundTag()); // an empty holder makes no type claim, so the merge is reached
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
+        stash.put(chestPos, new NBTTagCompound()); // an empty holder makes no type claim, so the merge is reached
 
         MergeTally tally = ContainerMerge.mergeChunkStash(throwingSink, chunkTag, new ChunkPos(chestPos), stash);
 
@@ -151,38 +151,38 @@ class ContainerStashMergeTest {
         // minecraft:brewing_stand to match the holder's claim, or all four state-key assertions would fail on correct
         // code.
         BlockPos pos = new BlockPos(10, 70, 20);
-        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:brewing_stand", 10, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:brewing_stand", 10, 70, 20));
 
-        CompoundTag holder = new CompoundTag();
-        holder.put("Items", new ListTag());
-        holder.putIntArray("disabled_slots", new int[] { 0, 4 });
-        holder.putInt("triggered", 1);
-        holder.putShort("BrewTime", (short) 123);
-        holder.putByte("Fuel", (byte) 7);
-        holder.putString("wdl_block_entity_id", "minecraft:brewing_stand");
-        holder.putString("junk", "never");
+        NBTTagCompound holder = new NBTTagCompound();
+        holder.setTag("Items", new NBTTagList());
+        holder.setIntArray("disabled_slots", new int[] { 0, 4 });
+        holder.setInteger("triggered", 1);
+        holder.setShort("BrewTime", (short) 123);
+        holder.setByte("Fuel", (byte) 7);
+        holder.setString("wdl_block_entity_id", "minecraft:brewing_stand");
+        holder.setString("junk", "never");
         // The three captured content keys the sink does not own. They are what tells a whitelist keyed on
         // open-time state apart from one that copies whatever it recognizes: a key this mod captures is not
         // thereby state, and only the sink decides what content reaches the block entity.
-        holder.put("Book", ItemFixtures.itemTag(ItemFixtures.writtenBook(1)));
-        holder.put("RecordItem", ItemFixtures.itemTag("minecraft:music_disc_cat"));
-        holder.put("bees", BlockEntityFixtures.bees(20));
+        holder.setTag("Book", ItemFixtures.itemTag(ItemFixtures.writtenBook(1)));
+        holder.setTag("RecordItem", ItemFixtures.itemTag("minecraft:record_cat"));
+        holder.setTag("bees", BlockEntityFixtures.bees(20));
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holder);
 
         ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(pos), stash);
 
-        CompoundTag mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
+        NBTTagCompound mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
         assertArrayEquals(new int[] { 0, 4 }, mergedBlockEntity.getIntArray("disabled_slots"));
-        assertEquals(1, mergedBlockEntity.getInt("triggered"));
+        assertEquals(1, mergedBlockEntity.getInteger("triggered"));
         assertEquals((short) 123, mergedBlockEntity.getShort("BrewTime"));
         assertEquals((byte) 7, mergedBlockEntity.getByte("Fuel"));
-        assertFalse(mergedBlockEntity.contains("wdl_block_entity_id"), "the internal holder key never reaches disk");
-        assertFalse(mergedBlockEntity.contains("junk"), "a non-whitelisted holder key never reaches disk");
-        assertFalse(mergedBlockEntity.contains("Book"), "a lectern book is content, not open-time state");
-        assertFalse(mergedBlockEntity.contains("RecordItem"), "and so is a jukebox disc");
-        assertFalse(mergedBlockEntity.contains("bees"), "and so are a beehive's occupants");
+        assertFalse(mergedBlockEntity.hasKey("wdl_block_entity_id"), "the internal holder key never reaches disk");
+        assertFalse(mergedBlockEntity.hasKey("junk"), "a non-whitelisted holder key never reaches disk");
+        assertFalse(mergedBlockEntity.hasKey("Book"), "a lectern book is content, not open-time state");
+        assertFalse(mergedBlockEntity.hasKey("RecordItem"), "and so is a jukebox disc");
+        assertFalse(mergedBlockEntity.hasKey("bees"), "and so are a beehive's occupants");
     }
 
     @Test
@@ -190,23 +190,23 @@ class ContainerStashMergeTest {
         BlockPos pos = new BlockPos(10, 70, 20);
         // The captured brewing stand carries NON-default state, so "the merge left it alone" is distinguishable from
         // "the merge rewrote it with defaults". At the producer defaults the two are the same tag.
-        CompoundTag brewingStand = blockEntity("minecraft:brewing_stand", 10, 70, 20);
-        brewingStand.putShort("BrewTime", (short) 220);
-        brewingStand.putByte("Fuel", (byte) 12);
-        CompoundTag chunkTag = chunkTagWith(brewingStand);
+        NBTTagCompound brewingStand = blockEntity("minecraft:brewing_stand", 10, 70, 20);
+        brewingStand.setShort("BrewTime", (short) 220);
+        brewingStand.setByte("Fuel", (byte) 12);
+        NBTTagCompound chunkTag = chunkTagWith(brewingStand);
 
-        CompoundTag holder = new CompoundTag();
-        holder.put("Items", new ListTag());
+        NBTTagCompound holder = new NBTTagCompound();
+        holder.setTag("Items", new NBTTagList());
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holder);
 
         ContainerMerge.mergeChunkStash(ITEMS_ONLY_SINK, chunkTag, new ChunkPos(pos), stash);
 
-        CompoundTag mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
+        NBTTagCompound mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
         assertEquals((short) 220, mergedBlockEntity.getShort("BrewTime"));
-        assertEquals((byte) 12, (mergedBlockEntity.contains("Fuel") ? mergedBlockEntity.getByte("Fuel") : (byte) -1));
-        assertFalse(mergedBlockEntity.contains("disabled_slots"));
-        assertFalse(mergedBlockEntity.contains("triggered"));
+        assertEquals((byte) 12, (mergedBlockEntity.hasKey("Fuel") ? mergedBlockEntity.getByte("Fuel") : (byte) -1));
+        assertFalse(mergedBlockEntity.hasKey("disabled_slots"));
+        assertFalse(mergedBlockEntity.hasKey("triggered"));
     }
 }

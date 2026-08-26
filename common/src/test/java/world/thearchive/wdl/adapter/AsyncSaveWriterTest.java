@@ -27,15 +27,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.inventory.ItemStackHelper;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -73,8 +73,8 @@ class AsyncSaveWriterTest {
      * inside the {@code region/} chunk under {@code Level.Entities}, so a fold with no host chunk is a lost fold.
      */
     private static void seedHostChunk(Path region, ChunkPos pos) throws IOException {
-        CompoundTag host = new CompoundTag();
-        host.put("Level", new CompoundTag());
+        NBTTagCompound host = new NBTTagCompound();
+        host.setTag("Level", new NBTTagCompound());
         try (WdlRegionStorage in = storage(region, "chunk")) {
             in.write(pos, host);
         }
@@ -93,9 +93,9 @@ class AsyncSaveWriterTest {
                 () -> null,                  // outputs: export + size
                 new SaveProgress());                 // the LevelStorageAccess close stand-in
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(31, 31),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(31, 31),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -147,7 +147,7 @@ class AsyncSaveWriterTest {
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         writer.submitChunk(DimensionType.NETHER, new ChunkPos(1, 1),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(2, 2),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(2, 2),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -196,7 +196,7 @@ class AsyncSaveWriterTest {
 
         writer.submitEntity(DimensionType.NETHER, new ChunkPos(0, 0), pigChunk(new ChunkPos(0, 0)));
         writer.submitEntity(DimensionType.NETHER, new ChunkPos(1, 1), pigChunk(new ChunkPos(1, 1)));
-        writer.submitEntity(DimensionType.field_18954, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(2, finalizedEntityChunksFailed.get(),
@@ -256,9 +256,9 @@ class AsyncSaveWriterTest {
                 () -> null,
                 progress);
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(31, 31),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(31, 31),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -281,7 +281,7 @@ class AsyncSaveWriterTest {
                 () -> null,
                 progress);
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0), () -> {
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
             order.add("chunk");
             return codec.encode(SyntheticChunks.full(true), false);
         }, ChunkMerge::merge);
@@ -341,7 +341,7 @@ class AsyncSaveWriterTest {
                 () -> null,
                 progress);
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         writer.submitMapBatch(ImmutableList.of());
         writer.finish().get(30, TimeUnit.SECONDS);
@@ -362,9 +362,9 @@ class AsyncSaveWriterTest {
                 new SaveProgress());
 
         // Terrain flushes first, then the entity folds into the same region/ chunk under Level.Entities.
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(2, 2),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(2, 2),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
-        writer.submitEntity(DimensionType.field_18954, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
@@ -372,8 +372,8 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.entityChunksWritten(), "the entity folded into its region/ chunk, tallied apart");
 
         try (WdlRegionStorage in = storage(region, "chunk")) {
-            CompoundTag chunk = Optional.ofNullable(in.read(new ChunkPos(2, 2))).get();
-            assertFalse(chunk.getCompound("Level").getList("Entities", 10).isEmpty(),
+            NBTTagCompound chunk = Optional.ofNullable(in.read(new ChunkPos(2, 2))).get();
+            assertFalse(chunk.getCompoundTag("Level").getTagList("Entities", 10).isEmpty(),
                     "the entity landed inside the region/ chunk's Level.Entities");
         }
     }
@@ -393,7 +393,7 @@ class AsyncSaveWriterTest {
 
         // The same chunk position in two dimensions: with a single storage these would collide; the writer
         // opens a storage per dimension on demand so each lands in its own folder.
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         writer.submitChunk(DimensionType.NETHER, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
@@ -427,9 +427,9 @@ class AsyncSaveWriterTest {
         // The same snapshot encoded two ways through the same region pipeline: the thunk resolved on the
         // writer thread and a direct on-thread encode. The disk results must be identical.
         ChunkSnapshotSource snapshot = SyntheticChunks.full(true);
-        CompoundTag onThread = codec.encode(snapshot, false);
+        NBTTagCompound onThread = codec.encode(snapshot, false);
         AtomicReference<Thread> encodedOn = new AtomicReference<>();
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0), () -> {
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
             encodedOn.set(Thread.currentThread());
             return codec.encode(snapshot, false);
         }, ChunkMerge::merge);
@@ -440,8 +440,8 @@ class AsyncSaveWriterTest {
         assertNotNull(encodedOn.get(), "the encode thunk was never resolved");
         assertEquals("wdl-save-writer", encodedOn.get().getName(),
                 "the chunk encode must be deferred to the writer thread, not run at submit on the caller's");
-        CompoundTag offThreadOnDisk;
-        CompoundTag onThreadOnDisk;
+        NBTTagCompound offThreadOnDisk;
+        NBTTagCompound onThreadOnDisk;
         try (WdlRegionStorage in = storage(overworldRegion, "chunk")) {
             offThreadOnDisk = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
         }
@@ -465,9 +465,9 @@ class AsyncSaveWriterTest {
                 () -> null,
                 new SaveProgress());
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(1, 1), () -> {
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(1, 1), () -> {
             throw new RuntimeException("encode blew up for this one chunk");
         }, ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
@@ -500,7 +500,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> new TestRegionStorage(region, false, "chunk") {
                     @Override
-                    public void write(ChunkPos pos, CompoundTag tag) {
+                    public void write(ChunkPos pos, NBTTagCompound tag) {
                         throw new IllegalStateException("the region store rejected the write");
                     }
                 },
@@ -509,7 +509,7 @@ class AsyncSaveWriterTest {
                 () -> null,
                 new SaveProgress());
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -535,7 +535,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> new TestRegionStorage(region, false, "chunk") {
                     @Override
-                    public void write(ChunkPos pos, CompoundTag tag) {
+                    public void write(ChunkPos pos, NBTTagCompound tag) {
                         throw new IllegalStateException("the region store rejected the write");
                     }
                 },
@@ -544,7 +544,7 @@ class AsyncSaveWriterTest {
                 () -> null,
                 new SaveProgress());
 
-        writer.submitEntity(DimensionType.field_18954, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(2, 2), pigChunk(new ChunkPos(2, 2)));
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed(), "one entity fold's write failing must not abort the save");
@@ -573,11 +573,11 @@ class AsyncSaveWriterTest {
                 ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
-        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(2, 64, 2), sink.captureItems(items));
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0), () -> {
-            CompoundTag tag = codec.encode(snapshot, false);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
+            NBTTagCompound tag = codec.encode(snapshot, false);
             ContainerMerge.mergeChunkStash(sink, tag, new ChunkPos(0, 0), holders);
             return tag;
         }, ChunkMerge::merge);
@@ -585,11 +585,11 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         try (WdlRegionStorage in = storage(region, "chunk")) {
-            CompoundTag back = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
-            CompoundTag chest = findByPosOrNull(back, 2, 64, 2);
+            NBTTagCompound back = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
+            NBTTagCompound chest = findByPosOrNull(back, 2, 64, 2);
             assertNotNull(chest, "the chest block entity is on disk");
             NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(chest, decoded);
+            ItemStackHelper.loadAllItems(chest, decoded);
             assertEquals(Items.DIAMOND, decoded.get(0).getItem(), "the writer-thread fold merged the captured Items");
             assertEquals(5, decoded.get(0).getCount());
         }
@@ -612,11 +612,11 @@ class AsyncSaveWriterTest {
         // LecternSink book fold writes "Book"/"Page" onto; the writer-thread fold wiring is what is under test.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(true,
                 ImmutableList.of(blockEntity("minecraft:ender_chest", 3, 64, 3)));
-        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(3, 64, 3), sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 4));
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0), () -> {
-            CompoundTag tag = codec.encode(snapshot, false);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
+            NBTTagCompound tag = codec.encode(snapshot, false);
             ContainerMerge.mergeLecternChunkStash(sink, tag, new ChunkPos(0, 0), holders);
             return tag;
         }, ChunkMerge::merge);
@@ -624,11 +624,11 @@ class AsyncSaveWriterTest {
 
         assertFalse(result.failed());
         try (WdlRegionStorage in = storage(region, "chunk")) {
-            CompoundTag back = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
-            CompoundTag lectern = findByPosOrNull(back, 3, 64, 3);
+            NBTTagCompound back = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
+            NBTTagCompound lectern = findByPosOrNull(back, 3, 64, 3);
             assertNotNull(lectern, "the lectern block entity is on disk");
-            assertTrue(lectern.getCompound("Book").contains("id"), "the writer-thread fold merged the Book");
-            assertEquals(4, (lectern.contains("Page") ? lectern.getInt("Page") : -1), "and its Page");
+            assertTrue(lectern.getCompoundTag("Book").hasKey("id"), "the writer-thread fold merged the Book");
+            assertEquals(4, (lectern.hasKey("Page") ? lectern.getInteger("Page") : -1), "and its Page");
         }
     }
 
@@ -650,7 +650,7 @@ class AsyncSaveWriterTest {
                 () -> null,                                        // outputs: export + size
                 new SaveProgress());                                       // access close
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -678,7 +678,7 @@ class AsyncSaveWriterTest {
                 },
                 new SaveProgress());
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -699,7 +699,7 @@ class AsyncSaveWriterTest {
                 () -> "world.zip", // outputs: the export reports the zip it wrote
                 new SaveProgress());
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -722,7 +722,7 @@ class AsyncSaveWriterTest {
                 },
                 new SaveProgress());
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -745,7 +745,7 @@ class AsyncSaveWriterTest {
                 () -> null,
                 new SaveProgress());
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -774,7 +774,7 @@ class AsyncSaveWriterTest {
                 },
                 new SaveProgress());
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -797,10 +797,10 @@ class AsyncSaveWriterTest {
                 ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
-        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(2, 64, 2), sink.captureItems(items));
-        first.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0), () -> {
-            CompoundTag tag = codec.encode(snapshot, false);
+        first.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
+            NBTTagCompound tag = codec.encode(snapshot, false);
             ContainerMerge.mergeChunkStash(sink, tag, new ChunkPos(0, 0), holders);
             return tag;
         }, ChunkMerge::merge);
@@ -808,7 +808,7 @@ class AsyncSaveWriterTest {
 
         // Resume: a read-only scan hands the prior on-disk chunk and its dimension to the observer, without writing.
         AtomicReference<DimensionType> observedDimension = new AtomicReference<>();
-        AtomicReference<CompoundTag> observed = new AtomicReference<>();
+        AtomicReference<NBTTagCompound> observed = new AtomicReference<>();
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
@@ -816,15 +816,15 @@ class AsyncSaveWriterTest {
             observedDimension.set(dimension);
             observed.set(onDisk);
         });
-        second.submitResumeScan(DimensionType.field_18954, new ChunkPos(0, 0));
+        second.submitResumeScan(DimensionType.OVERWORLD, new ChunkPos(0, 0));
         assertFalse(second.finish().get(30, TimeUnit.SECONDS).failed());
 
-        assertEquals(DimensionType.field_18954, observedDimension.get(), "the scan reported the chunk's dimension");
-        CompoundTag onDisk = observed.get();
+        assertEquals(DimensionType.OVERWORLD, observedDimension.get(), "the scan reported the chunk's dimension");
+        NBTTagCompound onDisk = observed.get();
         assertNotNull(onDisk, "the scan handed the prior on-disk chunk to the observer");
-        CompoundTag chest = findByPosOrNull(onDisk, 2, 64, 2);
+        NBTTagCompound chest = findByPosOrNull(onDisk, 2, 64, 2);
         assertNotNull(chest, "the observer saw the prior chest block entity");
-        assertFalse(chest.getList("Items", 10).isEmpty(), "the prior chest carries the captured Items");
+        assertFalse(chest.getTagList("Items", 10).isEmpty(), "the prior chest carries the captured Items");
     }
 
     @Test
@@ -838,12 +838,12 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
-        first.submitEntity(DimensionType.field_18954, new ChunkPos(0, 0), entityChunk(filledVehicle(cart)));
+        first.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(cart)));
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         // Resume: a read-only scan hands the prior on-disk region chunk and its dimension to the entity observer.
         AtomicReference<DimensionType> observedDimension = new AtomicReference<>();
-        AtomicReference<CompoundTag> observed = new AtomicReference<>();
+        AtomicReference<NBTTagCompound> observed = new AtomicReference<>();
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
@@ -851,15 +851,15 @@ class AsyncSaveWriterTest {
             observedDimension.set(dimension);
             observed.set(onDisk);
         });
-        second.submitEntityResumeScan(DimensionType.field_18954, new ChunkPos(0, 0));
+        second.submitEntityResumeScan(DimensionType.OVERWORLD, new ChunkPos(0, 0));
         assertFalse(second.finish().get(30, TimeUnit.SECONDS).failed());
 
-        assertEquals(DimensionType.field_18954, observedDimension.get(), "the scan reported the chunk's dimension");
-        CompoundTag onDisk = observed.get();
+        assertEquals(DimensionType.OVERWORLD, observedDimension.get(), "the scan reported the chunk's dimension");
+        NBTTagCompound onDisk = observed.get();
         assertNotNull(onDisk, "the scan handed the prior on-disk region chunk to the observer");
-        CompoundTag vehicle = onDisk.getCompound("Level").getList("Entities", 10).getCompound(0);
+        NBTTagCompound vehicle = onDisk.getCompoundTag("Level").getTagList("Entities", 10).getCompoundTagAt(0);
         assertEquals(cart, EntityMerge.readUuid(vehicle), "the prior container entity kept its UUID");
-        assertFalse(vehicle.getList("Items", 10).isEmpty(),
+        assertFalse(vehicle.getTagList("Items", 10).isEmpty(),
                 "the prior container entity carries the captured Items");
     }
 
@@ -889,16 +889,16 @@ class AsyncSaveWriterTest {
 
         // The open-after-flush recovery: the vehicle first flushed empty (seen but not opened), then the return
         // approach re-accumulated it and the re-flush folded in the contents the player then opened.
-        writer.submitEntity(DimensionType.field_18954, new ChunkPos(0, 0), entityChunk(emptyVehicle(openedAfterFlush)));
-        writer.submitEntity(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0), entityChunk(emptyVehicle(openedAfterFlush)));
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 entityChunk(filledVehicle(openedAfterFlush)));
 
         // The revisit clobber the recovery must not cause: the vehicle first flushed with its opened contents,
         // then a revisit re-accumulated it empty (the packet path carries no container items) and re-flushed;
         // the empty re-write must read-merge the on-disk items, not wipe them.
-        writer.submitEntity(DimensionType.field_18954, new ChunkPos(0, 1),
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 1),
                 entityChunk(filledVehicle(openedBeforeFlush)));
-        writer.submitEntity(DimensionType.field_18954, new ChunkPos(0, 1),
+        writer.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 1),
                 entityChunk(emptyVehicle(openedBeforeFlush)));
 
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
@@ -956,16 +956,16 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
-        first.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        first.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
-        second.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        second.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
-        second.submitChunk(DimensionType.field_18954, new ChunkPos(1, 1),
+        second.submitChunk(DimensionType.OVERWORLD, new ChunkPos(1, 1),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = second.finish().get(30, TimeUnit.SECONDS);
 
@@ -983,15 +983,15 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
-        first.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        first.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
-        second.submitChunkRewrite(DimensionType.field_18954, new ChunkPos(0, 0), onDisk -> {
-            onDisk.putString("wdl_test_folded", "contents");
+        second.submitChunkRewrite(DimensionType.OVERWORLD, new ChunkPos(0, 0), onDisk -> {
+            onDisk.setString("wdl_test_folded", "contents");
             return 2;
         });
         AsyncSaveWriter.SaveResult result = second.finish().get(30, TimeUnit.SECONDS);
@@ -999,10 +999,10 @@ class AsyncSaveWriterTest {
         assertFalse(result.failed());
         assertEquals(2, result.mergedContainers(), "the fold count reached the merged-containers tally");
         try (WdlRegionStorage in = storage(region, "chunk")) {
-            CompoundTag onDisk = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
+            NBTTagCompound onDisk = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
             assertEquals("contents", onDisk.getString("wdl_test_folded"),
                     "the folded chunk was written back to region/");
-            assertFalse(onDisk.getCompound("Level").getList("Sections", 10).isEmpty(),
+            assertFalse(onDisk.getCompoundTag("Level").getTagList("Sections", 10).isEmpty(),
                     "the prior terrain survived the read-modify-write");
         }
     }
@@ -1021,7 +1021,7 @@ class AsyncSaveWriterTest {
             ran.set(true);
             throw new IllegalStateException("an off-thread task failure the drain must absorb");
         });
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -1030,21 +1030,21 @@ class AsyncSaveWriterTest {
         assertTrue(ran.get(), "the task ran on the writer thread");
     }
 
-    private static CompoundTag filledVehicle(UUID uuid) {
+    private static NBTTagCompound filledVehicle(UUID uuid) {
         return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid, "minecraft:diamond");
     }
 
-    private static CompoundTag emptyVehicle(UUID uuid) {
+    private static NBTTagCompound emptyVehicle(UUID uuid) {
         return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid);
     }
 
-    private static ListTag vehicleItems(WdlRegionStorage storage, ChunkPos pos, UUID uuid) throws IOException {
-        CompoundTag chunk = Optional.ofNullable(storage.read(pos)).get();
-        ListTag list = chunk.getCompound("Level").getList("Entities", 10);
-        for (int i = 0; i < list.size(); i++) {
-            CompoundTag entity = list.getCompound(i);
+    private static NBTTagList vehicleItems(WdlRegionStorage storage, ChunkPos pos, UUID uuid) throws IOException {
+        NBTTagCompound chunk = Optional.ofNullable(storage.read(pos)).get();
+        NBTTagList list = chunk.getCompoundTag("Level").getTagList("Entities", 10);
+        for (int i = 0; i < list.tagCount(); i++) {
+            NBTTagCompound entity = list.getCompoundTagAt(i);
             if (uuid.equals(EntityMerge.readUuid(entity))) {
-                return entity.getList("Items", 10);
+                return entity.getTagList("Items", 10);
             }
         }
         throw new AssertionError("no entity " + uuid + " in " + pos);
@@ -1064,7 +1064,7 @@ class AsyncSaveWriterTest {
         }
 
         @Override
-        public CompoundTag read(ChunkPos pos) throws IOException {
+        public NBTTagCompound read(ChunkPos pos) throws IOException {
             if (failRead) {
                 throw new IOException("the region read failed");
             }
@@ -1094,7 +1094,7 @@ class AsyncSaveWriterTest {
                 () -> null,
                 new SaveProgress());
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(snapshot, false), ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
@@ -1124,7 +1124,7 @@ class AsyncSaveWriterTest {
                 () -> null,
                 new SaveProgress());
 
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0), () -> null, ChunkMerge::merge);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> null, ChunkMerge::merge);
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(0, result.chunksFailed(), "nothing was lost, so the download still reads clean");
@@ -1143,7 +1143,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
-        first.submitEntity(DimensionType.field_18954, new ChunkPos(0, 0), entityChunk(filledVehicle(parked)));
+        first.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(parked)));
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AtomicInteger finalizedEntityChunksFailed = new AtomicInteger(-1);
@@ -1153,7 +1153,7 @@ class AsyncSaveWriterTest {
                 (chunksFailed, entityChunksFailed) -> finalizedEntityChunksFailed.set(entityChunksFailed),
                 () -> null,
                 new SaveProgress());
-        second.submitEntity(DimensionType.field_18954, new ChunkPos(0, 0), entityChunk(emptyVehicle(parked)));
+        second.submitEntity(DimensionType.OVERWORLD, new ChunkPos(0, 0), entityChunk(emptyVehicle(parked)));
         AsyncSaveWriter.SaveResult result = second.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(1, result.entityChunksFailed(), "the capture never reached the save, so it counts lost");
@@ -1189,13 +1189,13 @@ class AsyncSaveWriterTest {
                 () -> null,
                 new SaveProgress());
         // Reaching one chest and then throwing is the state the real merges leave, since both carry in place.
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(snapshot, false),
                 (onDisk, fresh) -> {
                     merged.set(true);
-                    findByPos(fresh, carried.getX(), carried.getY(), carried.getZ()).put("Items",
+                    findByPos(fresh, carried.getX(), carried.getY(), carried.getZ()).setTag("Items",
                             findByPos(onDisk, carried.getX(), carried.getY(), carried.getZ())
-                                    .getList("Items", 10).copy());
+                                    .getTagList("Items", 10).copy());
                     throw new IllegalStateException("a carry-forward that throws part-way through the chunk");
                 });
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
@@ -1216,7 +1216,7 @@ class AsyncSaveWriterTest {
 
     /** A chunk snapshot carrying an empty chest block entity at each of {@code chests}. */
     private static ChunkSnapshotSource chunkWithChests(List<BlockPos> chests) {
-        List<CompoundTag> blockEntities = new ArrayList<>();
+        List<NBTTagCompound> blockEntities = new ArrayList<>();
         for (BlockPos chest : chests) {
             blockEntities.add(blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()));
         }
@@ -1233,25 +1233,25 @@ class AsyncSaveWriterTest {
         ContainerSink sink = new ContainerSinkImpl();
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
-        Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         for (BlockPos chest : chests) {
             holders.put(chest, sink.captureItems(items));
         }
         AsyncSaveWriter writer = newWriter(region);
-        writer.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0), () -> {
-            CompoundTag tag = codec.encode(snapshot, false);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
+            NBTTagCompound tag = codec.encode(snapshot, false);
             ContainerMerge.mergeChunkStash(sink, tag, new ChunkPos(0, 0), holders);
             return tag;
         }, ChunkMerge::merge);
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed());
-        CompoundTag revisit = codec.encode(snapshot, false);
+        NBTTagCompound revisit = codec.encode(snapshot, false);
         try (WdlRegionStorage in = storage(region, "chunk")) {
             for (BlockPos chest : chests) {
                 assertEquals(Items.DIAMOND, firstItemOf(in, new ChunkPos(0, 0), chest.getX(),
                         chest.getY(), chest.getZ()).getItem(),
                         "the prior session's stack reached the region file at " + chest);
                 assertTrue(findByPos(revisit, chest.getX(), chest.getY(), chest.getZ())
-                        .getList("Items", 10).isEmpty(),
+                        .getTagList("Items", 10).isEmpty(),
                         "the fold must not write back into the snapshot at " + chest + ", or a revisit would "
                                 + "re-capture the prior's contents and every on-disk assertion here is vacuous");
             }
@@ -1261,20 +1261,20 @@ class AsyncSaveWriterTest {
     /** Slot 0 of the block entity saved at {@code x/y/z} in {@code pos}'s on-disk chunk. */
     private static ItemStack firstItemOf(WdlRegionStorage storage, ChunkPos pos,
             int x, int y, int z) throws IOException {
-        CompoundTag chunk = Optional.ofNullable(storage.read(pos)).get();
-        CompoundTag blockEntity = findByPosOrNull(chunk, x, y, z);
+        NBTTagCompound chunk = Optional.ofNullable(storage.read(pos)).get();
+        NBTTagCompound blockEntity = findByPosOrNull(chunk, x, y, z);
         assertNotNull(blockEntity, "no block entity at " + x + "/" + y + "/" + z + " in " + pos);
         NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(blockEntity, decoded);
+        ItemStackHelper.loadAllItems(blockEntity, decoded);
         return decoded.get(0);
     }
 
     /** A one-entity entity-chunk tag at {@code pos}, the smallest payload an entities write task can carry. */
-    private static CompoundTag pigChunk(ChunkPos pos) {
+    private static NBTTagCompound pigChunk(ChunkPos pos) {
         return EntityFixtures.entityChunkTagAt(pos, EntityFixtures.entityTag("minecraft:pig"));
     }
 
-    private static CompoundTag entityChunk(CompoundTag... entities) {
+    private static NBTTagCompound entityChunk(NBTTagCompound... entities) {
         return EntityFixtures.entityChunkTagWith(entities);
     }
 
@@ -1293,13 +1293,13 @@ class AsyncSaveWriterTest {
         };
 
         AsyncSaveWriter first = newWriter(region);
-        first.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        first.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), recording);
         first.finish().get(30, TimeUnit.SECONDS);
         assertEquals(0, applied[0], "no prior on disk, so no read-merge runs");
 
         AsyncSaveWriter second = newWriter(region);
-        second.submitChunk(DimensionType.field_18954, new ChunkPos(0, 0),
+        second.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(true), false), recording);
         second.finish().get(30, TimeUnit.SECONDS);
 

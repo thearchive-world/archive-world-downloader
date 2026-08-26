@@ -13,9 +13,9 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +38,7 @@ class MapIdCollectorTest {
         TestRegistries.bootstrap();
     }
 
-    private static Set<Integer> collect(CompoundTag holder) {
+    private static Set<Integer> collect(NBTTagCompound holder) {
         Set<Integer> ids = new LinkedHashSet<>();
         MapIdCollector.collectFromItemList(holder, "Items", ids);
         return ids;
@@ -46,7 +46,7 @@ class MapIdCollectorTest {
 
     @Test
     void collectsTopLevelAndNestedShulkerMapIdsSkippingNonMaps() {
-        CompoundTag holder = holderOf(sink, filledMap(5), shulkerHolding(filledMap(7)),
+        NBTTagCompound holder = holderOf(sink, filledMap(5), shulkerHolding(filledMap(7)),
                 new ItemStack(Items.DIAMOND, 3));
 
         assertEquals(ImmutableSet.of(5, 7), collect(holder),
@@ -77,7 +77,7 @@ class MapIdCollectorTest {
     @Test
     void aMissingItemsListCollectsNothing() {
         Set<Integer> ids = new LinkedHashSet<>();
-        MapIdCollector.collectFromItemList(new CompoundTag(), "Items", ids);
+        MapIdCollector.collectFromItemList(new NBTTagCompound(), "Items", ids);
 
         assertTrue(ids.isEmpty(), "a holder with no Items list is a no-op");
     }

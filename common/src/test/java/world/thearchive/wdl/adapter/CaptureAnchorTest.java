@@ -5,12 +5,10 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import java.util.List;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.entity.Entity;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +16,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The deterministic guard for the seated position anchor: a seated player anchors to its vehicle, a standing player to
- * the camera anchor. This pins the decision that the anchor keys on {@code isPassenger()}, not on whether a RootVehicle
+ * the camera anchor. This pins the decision that the anchor keys on {@code isRiding()}, not on whether a RootVehicle
  * was written, so a regression re-keying it is caught headless rather than only at the live gate.
  */
 class CaptureAnchorTest {
@@ -49,12 +47,14 @@ class CaptureAnchorTest {
 
     private static void seat(Entity rider, Entity vehicle) {
         try {
-            Field vehicleField = Entity.class.getDeclaredField("vehicle");
-            vehicleField.setAccessible(true);
-            vehicleField.set(rider, vehicle);
-            Field passengersField = Entity.class.getDeclaredField("passengers");
-            passengersField.setAccessible(true);
-            passengersField.set(vehicle, ImmutableList.of(rider));
+            Field ridingEntityField = Entity.class.getDeclaredField("ridingEntity");
+            ridingEntityField.setAccessible(true);
+            ridingEntityField.set(rider, vehicle);
+            Field riddenByEntitiesField = Entity.class.getDeclaredField("riddenByEntities");
+            riddenByEntitiesField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            List<Entity> riddenBy = (List<Entity>) riddenByEntitiesField.get(vehicle);
+            riddenBy.add(rider);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("could not seat the test rider", e);
         }
@@ -62,21 +62,16 @@ class CaptureAnchorTest {
 
     private static final class BareEntity extends Entity {
         private BareEntity() {
-            super(EntityType.PIG, null);
+            super(null);
         }
 
         @Override
-        protected void defineSynchedData() {}
+        protected void entityInit() {}
 
         @Override
-        protected void readAdditionalSaveData(CompoundTag tag) {}
+        protected void readEntityFromNBT(NBTTagCompound tag) {}
 
         @Override
-        protected void addAdditionalSaveData(CompoundTag tag) {}
-
-        @Override
-        public boolean hurt(DamageSource source, float amount) {
-            return false;
-        }
+        protected void writeEntityToNBT(NBTTagCompound tag) {}
     }
 }

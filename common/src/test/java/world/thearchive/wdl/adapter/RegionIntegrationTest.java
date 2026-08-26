@@ -19,11 +19,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -47,18 +47,18 @@ class RegionIntegrationTest {
     private final LecternSink lecternSink = new LecternSinkImpl();
 
     private static WdlRegionStorage storage(WorldPaths paths, Path regionDirectory) {
-        return paths.openRegionStorage(DimensionType.field_18954);
+        return paths.openRegionStorage(DimensionType.OVERWORLD);
     }
 
     @Test
     void worldPathsPreCreatesDirectoriesAndOpensRegionStorage(@TempDir Path save) throws IOException {
         WorldPaths paths = new WorldPathsImpl(save);
 
-        Path region = paths.regionDirectory(DimensionType.field_18954);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
 
         assertTrue(Files.isDirectory(region), "region/ must be pre-created before any write");
         assertEquals(save.resolve("region"), region, "overworld region/ is at the save root");
-        try (WdlRegionStorage opened = paths.openRegionStorage(DimensionType.field_18954)) {
+        try (WdlRegionStorage opened = paths.openRegionStorage(DimensionType.OVERWORLD)) {
             assertNotNull(opened, "the overworld region storage must open");
         }
     }
@@ -67,7 +67,7 @@ class RegionIntegrationTest {
     void multiChunkAndRegionBoundaryRoundTrip(@TempDir Path save) {
         TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(DimensionType.field_18954);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
 
         // (0,0)+(31,31) share region 0,0; the others cross boundaries into r.1.0 / r.0.1 / r.-1.-1.
         List<ChunkPos> positions = ImmutableList.of(
@@ -76,8 +76,8 @@ class RegionIntegrationTest {
 
         try (WdlRegionStorage out = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag tag = codec.encode(SyntheticChunks.full(true), false);
-                tag.putInt("wdlTestId", i); // distinct marker -> proves each chunk lands at its own pos
+                NBTTagCompound tag = codec.encode(SyntheticChunks.full(true), false);
+                tag.setInteger("wdlTestId", i); // distinct marker -> proves each chunk lands at its own pos
                 out.write(positions.get(i), tag);
             }
         } catch (IOException e) {
@@ -87,9 +87,9 @@ class RegionIntegrationTest {
         // Reopen with a FRESH storage and read every chunk back at its position.
         try (WdlRegionStorage in = storage(paths, region)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag back = Optional.ofNullable(in.read(positions.get(i)))
+                NBTTagCompound back = Optional.ofNullable(in.read(positions.get(i)))
                         .orElseThrow(() -> new AssertionError("missing chunk"));
-                assertEquals(i, (back.contains("wdlTestId") ? back.getInt("wdlTestId") : -1),
+                assertEquals(i, (back.hasKey("wdlTestId") ? back.getInteger("wdlTestId") : -1),
                         "wrong chunk read back at " + positions.get(i));
             }
         } catch (IOException e) {
@@ -106,7 +106,7 @@ class RegionIntegrationTest {
     void writeMergingReadsThePriorChunkAndReportsNewVersusRecaptured(@TempDir Path save) throws IOException {
         TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(DimensionType.field_18954);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
         int[] mergeCalls = { 0 };
         RegionChunkWriter.ChunkReadMerge merge = (onDisk, fresh) -> {
             mergeCalls[0]++;
@@ -142,7 +142,7 @@ class RegionIntegrationTest {
     void aReWalkedChestKeepsWhatAnEarlierFlushWroteIntoTheRegionFile(@TempDir Path save) throws IOException {
         TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(DimensionType.field_18954);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 
@@ -157,9 +157,9 @@ class RegionIntegrationTest {
         }
 
         try (WdlRegionStorage in = storage(paths, region)) {
-            CompoundTag back = Optional.ofNullable(in.read(pos))
+            NBTTagCompound back = Optional.ofNullable(in.read(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
-            assertEquals(1, findByPos(back, 4, 64, 9).getList("Items", 10).size(),
+            assertEquals(1, findByPos(back, 4, 64, 9).getTagList("Items", 10).tagCount(),
                     "a chunk the player walked past again must not lose the chest an earlier flush archived");
         }
     }
@@ -173,7 +173,7 @@ class RegionIntegrationTest {
     void aChestOpenedAndFoundEmptyIsWrittenEmptyIntoTheRegionFile(@TempDir Path save) throws IOException {
         TestRegistries.bootstrap();
         WorldPaths paths = new WorldPathsImpl(save);
-        Path region = paths.regionDirectory(DimensionType.field_18954);
+        Path region = paths.regionDirectory(DimensionType.OVERWORLD);
         ChunkPos pos = new ChunkPos(0, 0);
         BlockPos chestPos = new BlockPos(4, 64, 9);
 
@@ -183,10 +183,10 @@ class RegionIntegrationTest {
                     ChunkFlushPlan.readMerge(captured, ImmutableList.of(), LongSets.EMPTY_SET));
 
             ChunkSnapshotSource emptied = chestSnapshot(chestPos);
-            Map<BlockPos, CompoundTag> containers = new LinkedHashMap<>();
+            Map<BlockPos, NBTTagCompound> containers = new LinkedHashMap<>();
             containers.put(chestPos, BlockEntityFixtures.emptyContainerHolder(27, "minecraft:chest"));
             List<BlockPos> landing = ChunkFlushPlan.landingHolderPositions(emptied, containers);
-            CompoundTag fresh = codec.encode(emptied, false);
+            NBTTagCompound fresh = codec.encode(emptied, false);
             MergeTally folded = ChunkFlushPlan.foldChunkStashes(fresh, pos, containerSink, lecternSink, containers,
                     ImmutableMap.of(), ImmutableMap.of());
             assertEquals(1, folded.merged(), "the open-time holder landed, so the fresh side is what the open saw");
@@ -201,10 +201,10 @@ class RegionIntegrationTest {
         }
 
         try (WdlRegionStorage in = storage(paths, region)) {
-            CompoundTag back = Optional.ofNullable(in.read(pos))
+            NBTTagCompound back = Optional.ofNullable(in.read(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
-            CompoundTag chest = findByPos(back, 4, 64, 9);
-            assertTrue(chest.get("Items") instanceof ListTag && ((ListTag) chest.get("Items")).isEmpty(),
+            NBTTagCompound chest = findByPos(back, 4, 64, 9);
+            assertTrue(chest.getTag("Items") instanceof NBTTagList && ((NBTTagList) chest.getTag("Items")).isEmpty(),
                     "the chest is left with the present-but-empty list a vanilla chest writes, not with the items "
                             + "the player watched leave");
         }
@@ -213,8 +213,8 @@ class RegionIntegrationTest {
     /** A captured chunk snapshot whose one chest at {@code pos} holds each named item. */
     private static ChunkSnapshotSource chestSnapshot(BlockPos pos,
             String... itemIds) {
-        CompoundTag chest = blockEntity("minecraft:chest", pos.getX(), pos.getY(), pos.getZ());
-        chest.put("Items", ItemFixtures.items(itemIds));
+        NBTTagCompound chest = blockEntity("minecraft:chest", pos.getX(), pos.getY(), pos.getZ());
+        chest.setTag("Items", ItemFixtures.items(itemIds));
         return SyntheticChunks.fullWithBlockEntities(true, ImmutableList.of(chest));
     }
 }

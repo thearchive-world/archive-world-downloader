@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NBTTagCompound;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.EntityFixtures;
@@ -27,10 +27,11 @@ class EntityTreeWalkTest {
 
     @Test
     void everyNodeOfTheTreeIsIndexedByItsOwnUuid() {
-        CompoundTag mount = EntityFixtures.entity("minecraft:mule", MOUNT);
-        CompoundTag tree = EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:minecart", CARRIER), mount);
+        NBTTagCompound mount = EntityFixtures.entity("minecraft:mule", MOUNT);
+        NBTTagCompound tree = EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:minecart", CARRIER),
+                mount);
 
-        Map<UUID, CompoundTag> nodes = EntityTreeWalk.byUuid(tree);
+        Map<UUID, NBTTagCompound> nodes = EntityTreeWalk.byUuid(tree);
 
         assertEquals(2, nodes.size(), "the record is a set of entities, not one entity");
         assertSame(tree, nodes.get(CARRIER), "the root is a node of its own record");
@@ -40,11 +41,11 @@ class EntityTreeWalkTest {
 
     @Test
     void aNodeWithNoReadableUuidIsNotIndexedAndDoesNotHideItsPassengers() {
-        CompoundTag mount = EntityFixtures.entity("minecraft:mule", MOUNT);
-        CompoundTag tree = EntityFixtures.entityCarrying(
+        NBTTagCompound mount = EntityFixtures.entity("minecraft:mule", MOUNT);
+        NBTTagCompound tree = EntityFixtures.entityCarrying(
                 EntityFixtures.entityWithShortUuid("minecraft:minecart", 1, 2), mount);
 
-        Map<UUID, CompoundTag> nodes = EntityTreeWalk.byUuid(tree);
+        Map<UUID, NBTTagCompound> nodes = EntityTreeWalk.byUuid(tree);
 
         assertEquals(1, nodes.size(), "a tag whose UUID does not decode is not one we wrote, so it keys nothing");
         assertFalse(nodes.containsValue(tree), "the unreadable root is absent");

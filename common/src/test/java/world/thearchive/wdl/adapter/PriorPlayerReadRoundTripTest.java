@@ -14,15 +14,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.util.datafix.DataFixers;
-import net.minecraft.world.Difficulty;
-import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.dimension.DimensionType;
-import net.minecraft.world.level.storage.LevelStorage;
-import net.minecraft.world.level.storage.class_99;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.world.EnumDifficulty;
+import net.minecraft.world.GameType;
+import net.minecraft.world.DimensionType;
+import net.minecraft.world.chunk.storage.AnvilSaveConverter;
+import net.minecraft.world.storage.ISaveHandler;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,28 +43,25 @@ class PriorPlayerReadRoundTripTest {
 
     private static final UUID PLAYER_UUID = UUID.fromString("11111111-2222-3333-4444-555555555555");
 
-    // Bind the item data components before any fixture builds an ItemStack: at 26.x the components bind in the
-    // resource reload TestRegistries.frozen drives, not in Bootstrap, so an EnderItems stack built first throws.
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.bootstrap();
     }
 
-    private static CompoundTag capturedPlayerTag(ListTag enderItems) {
-        CompoundTag tag = new CompoundTag();
-        tag.putUUID("UUID", PLAYER_UUID);
-        tag.put("Inventory", new ListTag());
-        tag.put("EnderItems", enderItems);
+    private static NBTTagCompound capturedPlayerTag(NBTTagList enderItems) {
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setUniqueId("UUID", PLAYER_UUID);
+        tag.setTag("Inventory", new NBTTagList());
+        tag.setTag("EnderItems", enderItems);
         return tag;
     }
 
-    private Path saveDownload(Path saves, String name, ListTag enderItems) throws IOException {
+    private Path saveDownload(Path saves, String name, NBTTagList enderItems) throws IOException {
         TestRegistries.bootstrap();
         LevelDataWriter.LevelData built = writer.buildLevelData(WorldOutputConfig.DEFAULTS, null);
-        CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(enderItems), BlockPos.ZERO, 0.0F, 0.0F,
-                DimensionType.field_18954, GameType.SURVIVAL, Difficulty.NORMAL);
-        LevelStorage storage = (LevelStorage) new class_99(saves, saves.resolve("backups"), DataFixers.getDataFixer())
-                .selectLevel(name, null);
+        CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(enderItems), BlockPos.ORIGIN, 0.0F, 0.0F,
+                DimensionType.OVERWORLD, GameType.SURVIVAL, EnumDifficulty.NORMAL);
+        ISaveHandler storage = new AnvilSaveConverter(saves.toFile(), null).getSaveLoader(name, true);
         writer.save(storage, built, captured);
         return saves.resolve(name).resolve("level.dat");
     }
@@ -74,7 +70,7 @@ class PriorPlayerReadRoundTripTest {
     void readPriorPlayerRecoversTheCapturedEnderChest(@TempDir Path saves) throws IOException {
         Path levelDat = saveDownload(saves, "resume", ItemFixtures.items("minecraft:diamond", "minecraft:emerald"));
 
-        CompoundTag prior = writer.readPriorPlayer(levelDat);
+        NBTTagCompound prior = writer.readPriorPlayer(levelDat);
 
         assertNotNull(prior, "the resume read finds the captured player from this band's own player home");
         assertEquals(ImmutableList.of("minecraft:diamond", "minecraft:emerald"), enderIds(prior),
@@ -85,11 +81,11 @@ class PriorPlayerReadRoundTripTest {
     void aResumeCarriesThePriorEnderChestIntoFreshEmptyPlayer(@TempDir Path saves) throws IOException {
         Path levelDat = saveDownload(saves, "carry", ItemFixtures.items("minecraft:diamond"));
 
-        CompoundTag prior = writer.readPriorPlayer(levelDat);
+        NBTTagCompound prior = writer.readPriorPlayer(levelDat);
         assertNotNull(prior, "the prior player is found, or the resume clobbers the ender chest with an empty one");
 
         // A resume that never reopens the ender chest serializes a fresh player with an empty EnderItems.
-        CompoundTag fresh = capturedPlayerTag(new ListTag());
+        NBTTagCompound fresh = capturedPlayerTag(new NBTTagList());
         boolean carried = PlayerTag.carryForwardEnderItems(prior, fresh);
 
         assertTrue(carried, "the prior ender chest is carried into the fresh empty player");
@@ -103,12 +99,12 @@ class PriorPlayerReadRoundTripTest {
                 "a folder with no prior save reads no player, so the resume skips the carry-forward");
     }
 
-    private static List<String> enderIds(CompoundTag player) {
+    private static List<String> enderIds(NBTTagCompound player) {
         List<String> ids = new ArrayList<>();
-        if (player.get("EnderItems") instanceof ListTag) {
-            ListTag items = (ListTag) player.get("EnderItems");
-            for (int i = 0; i < items.size(); i++) {
-                ids.add(((CompoundTag) items.get(i)).getString("id"));
+        if (player.getTag("EnderItems") instanceof NBTTagList) {
+            NBTTagList items = (NBTTagList) player.getTag("EnderItems");
+            for (int i = 0; i < items.tagCount(); i++) {
+                ids.add(((NBTTagCompound) items.get(i)).getString("id"));
             }
         }
         return ids;

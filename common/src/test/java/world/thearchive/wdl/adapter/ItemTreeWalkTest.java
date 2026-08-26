@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -17,48 +17,48 @@ import org.junit.jupiter.api.Test;
  * action to the item's own {@code tag} compound, then recurses into the items nested in a shulker box
  * ({@code tag.BlockEntityTag.Items}) and a bundle ({@code tag.Items}). It drives the walk over hand-built NBT keyed by
  * those pre-component keys. The visited compounds are matched by identity, so the assertions stay clear of the
- * band-varying CompoundTag accessors.
+ * band-varying NBTTagCompound accessors.
  */
 class ItemTreeWalkTest {
-    private static CompoundTag itemWithTag(CompoundTag tag) {
-        CompoundTag item = new CompoundTag();
-        item.put("tag", tag);
+    private static NBTTagCompound itemWithTag(NBTTagCompound tag) {
+        NBTTagCompound item = new NBTTagCompound();
+        item.setTag("tag", tag);
         return item;
     }
 
-    private static Set<CompoundTag> visitedTags(CompoundTag item) {
-        Set<CompoundTag> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    private static Set<NBTTagCompound> visitedTags(NBTTagCompound item) {
+        Set<NBTTagCompound> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         ItemTreeWalk.walkItem(item, visited::add);
         return visited;
     }
 
     @Test
     void walkVisitsAnItemsOwnComponents() {
-        CompoundTag tag = new CompoundTag();
+        NBTTagCompound tag = new NBTTagCompound();
         assertTrue(visitedTags(itemWithTag(tag)).contains(tag),
                 "the walk applies the leaf action to the item's own tag");
     }
 
     @Test
     void walkRecursesIntoContainer() {
-        CompoundTag nestedTag = new CompoundTag();
-        ListTag shulkerItems = new ListTag();
-        shulkerItems.add(itemWithTag(nestedTag));
-        CompoundTag blockEntityTag = new CompoundTag();
-        blockEntityTag.put("Items", shulkerItems);
-        CompoundTag tag = new CompoundTag();
-        tag.put("BlockEntityTag", blockEntityTag);
+        NBTTagCompound nestedTag = new NBTTagCompound();
+        NBTTagList shulkerItems = new NBTTagList();
+        shulkerItems.appendTag(itemWithTag(nestedTag));
+        NBTTagCompound blockEntityTag = new NBTTagCompound();
+        blockEntityTag.setTag("Items", shulkerItems);
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setTag("BlockEntityTag", blockEntityTag);
         assertTrue(visitedTags(itemWithTag(tag)).contains(nestedTag),
                 "an item nested in a shulker box container is visited");
     }
 
     @Test
     void walkRecursesIntoBundle() {
-        CompoundTag nestedTag = new CompoundTag();
-        ListTag bundleItems = new ListTag();
-        bundleItems.add(itemWithTag(nestedTag));
-        CompoundTag tag = new CompoundTag();
-        tag.put("Items", bundleItems);
+        NBTTagCompound nestedTag = new NBTTagCompound();
+        NBTTagList bundleItems = new NBTTagList();
+        bundleItems.appendTag(itemWithTag(nestedTag));
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setTag("Items", bundleItems);
         assertTrue(visitedTags(itemWithTag(tag)).contains(nestedTag),
                 "an item nested in a bundle is visited");
     }

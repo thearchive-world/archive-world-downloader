@@ -14,10 +14,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,7 +39,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * {@code Level} is needed. The two client/level-coupled steps are not exercised headless, exactly as for chunks
  * ({@link ChunkRoundTripTest}):
  * <ul>
- * <li>the live {@code entity.save(CompoundTag)} serialization needs a real {@code Entity}; and</li>
+ * <li>the live {@code entity.save(NBTTagCompound)} serialization needs a real {@code Entity}; and</li>
  * <li>{@code EntityType.loadEntityRecursive} parse-back needs a {@code Level}.</li>
  * </ul>
  * This test proves the in-chunk carrier + region IO self-consistency.
@@ -59,20 +59,20 @@ class EntityRoundTripTest {
     }
 
     private static WdlRegionStorage regionStorage(WorldPaths paths) {
-        return paths.openRegionStorage(DimensionType.field_18954);
+        return paths.openRegionStorage(DimensionType.OVERWORLD);
     }
 
     /** A host region chunk with an empty {@code Level} compound, the terrain an entity fold lands inside. */
-    private static CompoundTag hostChunk() {
-        CompoundTag host = new CompoundTag();
-        host.put("Level", new CompoundTag());
+    private static NBTTagCompound hostChunk() {
+        NBTTagCompound host = new NBTTagCompound();
+        host.setTag("Level", new NBTTagCompound());
         return host;
     }
 
     /** A minimal stand-in for a serialized entity tag: an {@code id} (its type) plus a placement marker. */
-    private static CompoundTag entityTag(String id, int marker) {
-        CompoundTag tag = EntityFixtures.entityTag(id);
-        tag.putInt("wdlMarker", marker);
+    private static NBTTagCompound entityTag(String id, int marker) {
+        NBTTagCompound tag = EntityFixtures.entityTag(id);
+        tag.setInteger("wdlMarker", marker);
         return tag;
     }
 
@@ -80,13 +80,13 @@ class EntityRoundTripTest {
     void encodeChunkBuildsTheEntityCarrier() {
         ChunkPos pos = new ChunkPos(3, -7);
 
-        CompoundTag tag = sink
+        NBTTagCompound tag = sink
                 .encodeChunk(ImmutableList.of(entityTag("minecraft:pig", 1), entityTag("minecraft:cow", 2)), pos);
 
-        ListTag entities = tag.getList("Entities", 10);
-        assertEquals(2, entities.size(), "both entity tags must be retained in the Entities list");
-        assertEquals("minecraft:pig", entities.getCompound(0).getString("id"));
-        assertEquals("minecraft:cow", entities.getCompound(1).getString("id"));
+        NBTTagList entities = tag.getTagList("Entities", 10);
+        assertEquals(2, entities.tagCount(), "both entity tags must be retained in the Entities list");
+        assertEquals("minecraft:pig", entities.getCompoundTagAt(0).getString("id"));
+        assertEquals("minecraft:cow", entities.getCompoundTagAt(1).getString("id"));
     }
 
     @Test
@@ -98,7 +98,7 @@ class EntityRoundTripTest {
     @Test
     void entityCarriersFoldIntoRegionChunksAcrossBoundaries(@TempDir Path save) throws IOException {
         WorldPaths paths = new WorldPathsImpl(save);
-        Path regionDirectory = paths.regionDirectory(DimensionType.field_18954);
+        Path regionDirectory = paths.regionDirectory(DimensionType.OVERWORLD);
 
         // Same boundary set the chunk path covers: (0,0)+(31,31) share r.0.0; the others cross into
         // r.1.0 / r.0.1 / r.-1.-1. A distinct marker per entity proves each lands in its own chunk.
@@ -110,7 +110,7 @@ class EntityRoundTripTest {
             for (int i = 0; i < positions.size(); i++) {
                 ChunkPos pos = positions.get(i);
                 out.write(pos, hostChunk()); // the host chunk the entities fold into
-                CompoundTag carrier = sink.encodeChunk(ImmutableList.of(entityTag("minecraft:item", i)), pos);
+                NBTTagCompound carrier = sink.encodeChunk(ImmutableList.of(entityTag("minecraft:item", i)), pos);
                 RegionChunkWriter.MergeWriteResult folded = RegionChunkWriter.foldEntitiesIntoRegion(out, pos, carrier);
                 assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_NEW, folded.outcome(),
                         "a first fold into a host chunk with no prior entities is a new write");
@@ -120,15 +120,16 @@ class EntityRoundTripTest {
         // Reopen with a FRESH storage and read every entity back from its chunk's Level.Entities.
         try (WdlRegionStorage in = regionStorage(paths)) {
             for (int i = 0; i < positions.size(); i++) {
-                CompoundTag back = Optional.ofNullable(in.read(positions.get(i)))
+                NBTTagCompound back = Optional.ofNullable(in.read(positions.get(i)))
                         .orElseThrow(() -> new AssertionError("missing chunk"));
-                ListTag entities = back.getCompound("Level").getList("Entities", 10);
-                assertEquals(1, entities.size());
+                NBTTagList entities = back.getCompoundTag("Level").getTagList("Entities", 10);
+                assertEquals(1, entities.tagCount());
                 assertEquals(i,
-                        entities.getCompound(0).contains("wdlMarker") ? entities.getCompound(0).getInt("wdlMarker")
+                        entities.getCompoundTagAt(0).hasKey("wdlMarker")
+                                ? entities.getCompoundTagAt(0).getInteger("wdlMarker")
                                 : -1,
                         "the right entity must land in the chunk at " + positions.get(i));
-                assertEquals("minecraft:item", entities.getCompound(0).getString("id"));
+                assertEquals("minecraft:item", entities.getCompoundTagAt(0).getString("id"));
             }
         }
 

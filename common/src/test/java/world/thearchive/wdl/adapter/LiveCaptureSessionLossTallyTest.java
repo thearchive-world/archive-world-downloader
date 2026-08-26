@@ -27,21 +27,19 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.village.class_1144;
-import net.minecraft.village.class_1145;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.network.play.server.SPacketSpawnObject;
+import net.minecraft.village.MerchantRecipe;
+import net.minecraft.village.MerchantRecipeList;
+import net.minecraft.entity.Entity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.init.Blocks;
+import net.minecraft.world.DimensionType;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -152,7 +150,7 @@ class LiveCaptureSessionLossTallyTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(adapter, new HeadlessPlatformBridge(configDirectory), config, null,
-                DimensionType.field_18954, DimensionType.field_18954,
+                DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW),
                 new SavedChunkIndex(), new CoveredChunkIndex(), new SendRangeEstimator(), false, false,
                 BobbyChunkFilter.INACTIVE, () -> {});
@@ -172,7 +170,7 @@ class LiveCaptureSessionLossTallyTest {
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         assertTrue(config.worldOutput().skipVoidChunks(), "the void skip is the whole subject, so it must be on");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.field_18954, DimensionType.field_18954,
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -180,21 +178,21 @@ class LiveCaptureSessionLossTallyTest {
 
     /** A captured chunk carrying nothing: all air, no block entities, the void-skip's own subject. */
     private ChunkSnapshotSource voidChunk() {
-        return SyntheticChunks.withBlockAt(new BlockPos(0, 64, 0), Blocks.AIR.defaultBlockState());
+        return SyntheticChunks.withBlockAt(new BlockPos(0, 64, 0), Blocks.AIR.getDefaultState());
     }
 
     /** The save layout for a fresh folder, with the region storage directory already present. */
     private static WorldPaths paths(Path save) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(save);
-        Files.createDirectories(paths.regionDirectory(DimensionType.field_18954));
+        Files.createDirectories(paths.regionDirectory(DimensionType.OVERWORLD));
         return paths;
     }
 
     /** Seed a host region chunk at {@code pos} so an entity fold has terrain to land inside. */
     private static void seedHost(WorldPaths paths, ChunkPos pos) throws Exception {
-        try (WdlRegionStorage region = paths.openRegionStorage(DimensionType.field_18954)) {
-            CompoundTag host = new CompoundTag();
-            host.put("Level", new CompoundTag());
+        try (WdlRegionStorage region = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+            NBTTagCompound host = new NBTTagCompound();
+            host.setTag("Level", new NBTTagCompound());
             region.write(pos, host);
         }
     }
@@ -271,12 +269,12 @@ class LiveCaptureSessionLossTallyTest {
             private final ContainerSink real = new ContainerSinkImpl();
 
             @Override
-            public CompoundTag captureItems(NonNullList<ItemStack> items) {
+            public NBTTagCompound captureItems(NonNullList<ItemStack> items) {
                 return real.captureItems(items);
             }
 
             @Override
-            public CompoundTag merge(CompoundTag blockEntityTag, CompoundTag capturedItemsHolder) {
+            public NBTTagCompound merge(NBTTagCompound blockEntityTag, NBTTagCompound capturedItemsHolder) {
                 throw new IllegalStateException("a band container merge blew up");
             }
         };
@@ -291,12 +289,12 @@ class LiveCaptureSessionLossTallyTest {
     private static final class ThrowingLecternMergeAdapter extends DelegatingAdapter {
         private final LecternSink throwingSink = new LecternSink() {
             @Override
-            public CompoundTag captureBook(ItemStack book, int page) {
+            public NBTTagCompound captureBook(ItemStack book, int page) {
                 throw new AssertionError("the fold path captures no book");
             }
 
             @Override
-            public CompoundTag merge(CompoundTag lecternBlockEntityTag, CompoundTag capturedBookHolder) {
+            public NBTTagCompound merge(NBTTagCompound lecternBlockEntityTag, NBTTagCompound capturedBookHolder) {
                 throw new IllegalStateException("a band lectern merge blew up");
             }
         };
@@ -314,18 +312,18 @@ class LiveCaptureSessionLossTallyTest {
     private static final class NullEnvelopeAdapter extends DelegatingAdapter {
         private final EntitySink nullEnvelopeSink = new EntitySink() {
             @Override
-            public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos,
+            public @Nullable NBTTagCompound encodeChunk(List<Entity> entities, ChunkPos pos,
                     boolean forceMobPersistence) {
                 throw new AssertionError("a headless drain has no live entity to serialize");
             }
 
             @Override
-            public @Nullable CompoundTag encodeChunk(List<CompoundTag> entityTags, ChunkPos pos) {
+            public @Nullable NBTTagCompound encodeChunk(List<NBTTagCompound> entityTags, ChunkPos pos) {
                 return null;
             }
 
             @Override
-            public @Nullable CompoundTag captureRootVehicle(Entity vehicle,
+            public @Nullable NBTTagCompound captureRootVehicle(Entity vehicle,
                     boolean forceMobPersistence) {
                 throw new AssertionError("a headless drain has no ridden vehicle to serialize");
             }
@@ -341,18 +339,18 @@ class LiveCaptureSessionLossTallyTest {
     private static final class ThrowingEntityEncodeAdapter extends DelegatingAdapter {
         private final EntitySink throwingSink = new EntitySink() {
             @Override
-            public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos,
+            public @Nullable NBTTagCompound encodeChunk(List<Entity> entities, ChunkPos pos,
                     boolean forceMobPersistence) {
                 throw new IllegalStateException("the vanilla save codec rejected this entity");
             }
 
             @Override
-            public @Nullable CompoundTag encodeChunk(List<CompoundTag> entityTags, ChunkPos pos) {
+            public @Nullable NBTTagCompound encodeChunk(List<NBTTagCompound> entityTags, ChunkPos pos) {
                 throw new AssertionError("the single-entity encode never reaches the tag envelope arm");
             }
 
             @Override
-            public @Nullable CompoundTag captureRootVehicle(Entity vehicle,
+            public @Nullable NBTTagCompound captureRootVehicle(Entity vehicle,
                     boolean forceMobPersistence) {
                 throw new AssertionError("this fixture drives no ridden vehicle");
             }
@@ -371,18 +369,18 @@ class LiveCaptureSessionLossTallyTest {
     private static final class RefusingEntityEncodeAdapter extends DelegatingAdapter {
         private final EntitySink refusingSink = new EntitySink() {
             @Override
-            public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos,
+            public @Nullable NBTTagCompound encodeChunk(List<Entity> entities, ChunkPos pos,
                     boolean forceMobPersistence) {
                 return null;
             }
 
             @Override
-            public @Nullable CompoundTag encodeChunk(List<CompoundTag> entityTags, ChunkPos pos) {
+            public @Nullable NBTTagCompound encodeChunk(List<NBTTagCompound> entityTags, ChunkPos pos) {
                 throw new AssertionError("the single-entity encode never reaches the tag envelope arm");
             }
 
             @Override
-            public @Nullable CompoundTag captureRootVehicle(Entity vehicle,
+            public @Nullable NBTTagCompound captureRootVehicle(Entity vehicle,
                     boolean forceMobPersistence) {
                 throw new AssertionError("this fixture drives no ridden vehicle");
             }
@@ -400,22 +398,17 @@ class LiveCaptureSessionLossTallyTest {
      */
     private static final class BareEntity extends Entity {
         private BareEntity() {
-            super(EntityType.PIG, null);
+            super(null);
         }
 
         @Override
-        protected void defineSynchedData() {}
+        protected void entityInit() {}
 
         @Override
-        protected void readAdditionalSaveData(CompoundTag tag) {}
+        protected void readEntityFromNBT(NBTTagCompound tag) {}
 
         @Override
-        protected void addAdditionalSaveData(CompoundTag tag) {}
-
-        @Override
-        public boolean hurt(DamageSource source, float amount) {
-            return false;
-        }
+        protected void writeEntityToNBT(NBTTagCompound tag) {}
     }
 
     /**
@@ -429,33 +422,33 @@ class LiveCaptureSessionLossTallyTest {
     }
 
     /** The block entity of the given type in the chunk written to {@code paths}, or null when absent. */
-    private static @Nullable CompoundTag blockEntityOnDisk(WorldPaths paths, ChunkPos pos, BlockPos at)
+    private static @Nullable NBTTagCompound blockEntityOnDisk(WorldPaths paths, ChunkPos pos, BlockPos at)
             throws Exception {
-        try (WdlRegionStorage storage = paths.openRegionStorage(DimensionType.field_18954)) {
-            CompoundTag chunkTag = Optional.ofNullable(storage.read(pos))
+        try (WdlRegionStorage storage = paths.openRegionStorage(DimensionType.OVERWORLD)) {
+            NBTTagCompound chunkTag = Optional.ofNullable(storage.read(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             return findByPosOrNull(chunkTag, at.getX(), at.getY(), at.getZ());
         }
     }
 
     /** A captured 27-slot container holder carrying one stack, the open-time bundle a fold merges. */
-    private CompoundTag capturedItems(ItemStack stack) {
+    private NBTTagCompound capturedItems(ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, stack);
         return sink.captureItems(items);
     }
 
     /** A serialized entity tag carrying just its UUID, which is all the folds and the envelope read. */
-    private static CompoundTag entity(UUID uuid) {
-        CompoundTag entity = new CompoundTag();
-        entity.putUUID("UUID", uuid);
+    private static NBTTagCompound entity(UUID uuid) {
+        NBTTagCompound entity = new NBTTagCompound();
+        entity.setUniqueId("UUID", uuid);
         return entity;
     }
 
     /** A serialized entity tag whose displayed {@code "Item"} is {@code stack} (a framed or dropped item). */
-    private CompoundTag entityDisplaying(UUID uuid, ItemStack stack) {
-        CompoundTag tag = entity(uuid);
-        tag.put("Item", (CompoundTag) ((ListTag) holderOf(sink, stack).get("Items")).get(0));
+    private NBTTagCompound entityDisplaying(UUID uuid, ItemStack stack) {
+        NBTTagCompound tag = entity(uuid);
+        tag.setTag("Item", (NBTTagCompound) ((NBTTagList) holderOf(sink, stack).getTag("Items")).get(0));
         return tag;
     }
 
@@ -490,7 +483,7 @@ class LiveCaptureSessionLossTallyTest {
     private static void assertBoundToStartingDimension(LiveCaptureSession session, String store,
             String byDimension) throws Exception {
         Map<DimensionType, ?> perDimension = state(session, byDimension);
-        Object bound = perDimension.get(DimensionType.field_18954);
+        Object bound = perDimension.get(DimensionType.OVERWORLD);
         assertNotNull(bound, byDimension + " must hold an instance for the bound dimension");
         assertSame(bound, state(session, store),
                 store + " must be the instance " + byDimension + " holds for the bound dimension, or everything"
@@ -540,10 +533,10 @@ class LiveCaptureSessionLossTallyTest {
     }
 
     /** A serialized offer holder whose one offer sells a filled map, so its flush-time remap reaches the archive. */
-    private CompoundTag merchantHolderSellingMap(int mapId) {
+    private NBTTagCompound merchantHolderSellingMap(int mapId) {
         // This band's merchant offer takes a plain buy/sell ItemStack pair, no trade experience or price multiplier.
-        class_1145 offers = new class_1145();
-        offers.add(new class_1144(new ItemStack(Items.EMERALD, 1), filledMap(mapId)));
+        MerchantRecipeList offers = new MerchantRecipeList();
+        offers.add(new MerchantRecipe(new ItemStack(Items.EMERALD, 1), filledMap(mapId)));
         return MerchantOfferCapture.serialize(offers);
     }
 
@@ -556,7 +549,7 @@ class LiveCaptureSessionLossTallyTest {
         // A villager whose sell item is a filled map, so the flush prepare's remap reaches the throwing archive; the
         // villager also sits in the entity buffer so its node is written and the fold drains its stash rather than
         // leaving an orphan, isolating the remap failure as the one loss.
-        Map<UUID, CompoundTag> merchantStash = state(session, "merchantStash");
+        Map<UUID, NBTTagCompound> merchantStash = state(session, "merchantStash");
         merchantStash.put(VEHICLE, merchantHolderSellingMap(9));
         bufferEntity(session, VEHICLE, chunk, entity(VEHICLE));
         seedHost(paths, chunk); // the villager folds into its host chunk
@@ -577,7 +570,7 @@ class LiveCaptureSessionLossTallyTest {
     @Test
     void anUnwrittenVillagersStashedTradesLandInTheOrphanTally(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
-        Map<UUID, CompoundTag> merchantStash = state(session, "merchantStash");
+        Map<UUID, NBTTagCompound> merchantStash = state(session, "merchantStash");
         merchantStash.put(VEHICLE, merchantHolderSellingMap(9));
         assertEquals(0, losses(session, "villagerTradesLost"), "nothing has been counted before the orphan report");
 
@@ -626,11 +619,11 @@ class LiveCaptureSessionLossTallyTest {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.DIAMOND, 5)));
 
-        CompoundTag folded = session.foldRidingVehicleContents(entity(VEHICLE));
+        NBTTagCompound folded = session.foldRidingVehicleContents(entity(VEHICLE));
 
-        assertNotNull(folded.get("Items"),
+        assertNotNull(folded.getTag("Items"),
                 "the contents the player opened are folded into the tag the mount saves as");
-        assertEquals(1, ((ListTag) folded.get("Items")).size(), "carrying the one stack that was stashed");
+        assertEquals(1, ((NBTTagList) folded.getTag("Items")).tagCount(), "carrying the one stack that was stashed");
         assertEquals(0, losses(session, "entityContainersFailed"), "and a fold that worked counts no loss");
         assertFalse(session.isPartialSave(0, 0), "so the finish reads clean");
     }
@@ -688,7 +681,7 @@ class LiveCaptureSessionLossTallyTest {
         WorldPaths paths = paths(temporary.resolve("save"));
         AsyncSaveWriter writer = saveWriter(paths);
         captureChunk(session, chunk, chestChunk());
-        stashLectern(session, lectern, new CompoundTag());
+        stashLectern(session, lectern, new NBTTagCompound());
         assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
 
         session.flushBuffer(writer, true, 0, 0, 0);
@@ -1029,7 +1022,7 @@ class LiveCaptureSessionLossTallyTest {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
         captureTerrain(session, DimensionType.NETHER, chunk); // captured THERE, deliberately not in the bound dimension
-        capture.enterDimension(DimensionType.getName(DimensionType.NETHER).toString());
+        capture.enterDimension(DimensionType.NETHER.getName());
         spawn(capture, 1, VEHICLE, chunk);
         spawn(capture, 2, FRAME, chunk);
         assertFalse(session.isPartialSave(0, 0), "nothing has drained, so the finish reads clean");
@@ -1059,7 +1052,7 @@ class LiveCaptureSessionLossTallyTest {
     void aFrameHeldForAnotherDimensionOnUncapturedTerrainStaysBenign(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
-        capture.enterDimension(DimensionType.getName(DimensionType.NETHER).toString());
+        capture.enterDimension(DimensionType.NETHER.getName());
         spawn(capture, 1, VEHICLE, chunk);
         spawn(capture, 2, FRAME, chunk);
 
@@ -1085,7 +1078,7 @@ class LiveCaptureSessionLossTallyTest {
             throws Exception {
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary);
         EntityPacketCapture capture = installPacketCapture(session);
-        String bound = DimensionType.getName(DimensionType.field_18954).toString();
+        String bound = DimensionType.OVERWORLD.getName();
         // Terrain deliberately NOT captured for this chunk, which is the whole subject: the gate refuses it.
         spawn(capture, 1, VEHICLE, chunk);
 
@@ -1122,7 +1115,7 @@ class LiveCaptureSessionLossTallyTest {
         field.setAccessible(true);
         EntityPacketCapture capture = new EntityPacketCapture(false, new SendRangeEstimator(),
                 new SendRangeSampler(System::nanoTime, false),
-                DimensionType.getName(DimensionType.field_18954).toString());
+                DimensionType.OVERWORLD.getName());
         field.set(session, capture);
         return capture;
     }
@@ -1138,8 +1131,9 @@ class LiveCaptureSessionLossTallyTest {
 
     /** Feed one held spawn frame, the state the finish drain consumes and an aborted one leaves behind. */
     private static void spawn(EntityPacketCapture capture, int id, UUID uuid, ChunkPos pos) {
-        capture.spawn(id, uuid, pos.toLong(), new EntityPos(pos.getMinBlockX(), 64.0, pos.getMinBlockZ(), 0f, 0f),
-                spawnPacket(id, uuid, pos.getMinBlockX(), 64.0, pos.getMinBlockZ()));
+        capture.spawn(id, uuid, ChunkPos.asLong(pos.x, pos.z),
+                new EntityPos(pos.getXStart(), 64.0, pos.getZStart(), 0f, 0f),
+                spawnPacket(id, uuid, pos.getXStart(), 64.0, pos.getZStart()));
     }
 
     /**
@@ -1147,12 +1141,12 @@ class LiveCaptureSessionLossTallyTest {
      * tallies only ever count the held frames by id, chunk, and dimension, so the accumulator stores the packet without
      * decoding it; a bare positioned entity spawned as a minecart object stands in.
      */
-    private static ClientboundAddEntityPacket spawnPacket(int id, UUID uuid, double x, double y, double z) {
+    private static SPacketSpawnObject spawnPacket(int id, UUID uuid, double x, double y, double z) {
         Entity source = new BareEntity();
-        source.setId(id);
-        source.setUUID(uuid);
-        source.moveTo(x, y, z, 0f, 0f);
-        return new ClientboundAddEntityPacket(source, MINECART_OBJECT_TYPE);
+        source.setEntityId(id);
+        source.setUniqueId(uuid);
+        source.setLocationAndAngles(x, y, z, 0f, 0f);
+        return new SPacketSpawnObject(source, MINECART_OBJECT_TYPE);
     }
 
     /**
@@ -1161,7 +1155,7 @@ class LiveCaptureSessionLossTallyTest {
      */
     private static void captureTerrain(LiveCaptureSession session, ChunkPos pos) throws Exception {
         LongOpenHashSet allCaptured = state(session, "allCaptured");
-        allCaptured.add(pos.toLong());
+        allCaptured.add(ChunkPos.asLong(pos.x, pos.z));
     }
 
     /**
@@ -1172,7 +1166,7 @@ class LiveCaptureSessionLossTallyTest {
     private static void captureTerrain(LiveCaptureSession session, DimensionType dimension, ChunkPos pos)
             throws Exception {
         Map<DimensionType, LongOpenHashSet> byDimension = state(session, "capturedByDimension");
-        byDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet()).add(pos.toLong());
+        byDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet()).add(ChunkPos.asLong(pos.x, pos.z));
     }
 
     /**
@@ -1182,7 +1176,7 @@ class LiveCaptureSessionLossTallyTest {
     private void flushPriorChunk(WorldPaths paths) throws Exception {
         AsyncSaveWriter prior = saveWriter(paths);
         ChunkCodec codec = new VersionAdapterImpl().chunkCodec();
-        prior.submitChunk(DimensionType.field_18954, chunk, () -> codec.encode(chestChunk(), false),
+        prior.submitChunk(DimensionType.OVERWORLD, chunk, () -> codec.encode(chestChunk(), false),
                 ChunkMerge::merge);
         assertFalse(prior.finish().get(30, TimeUnit.SECONDS).failed(), "the prior chunk reached disk");
     }
@@ -1204,25 +1198,25 @@ class LiveCaptureSessionLossTallyTest {
         captured.put(pos, snapshot);
     }
 
-    private static void stashContainer(LiveCaptureSession session, BlockPos pos, CompoundTag holder)
+    private static void stashContainer(LiveCaptureSession session, BlockPos pos, NBTTagCompound holder)
             throws Exception {
         Map<BlockPos, StashHolder> stash = state(session, "containerStash");
         stash.put(pos, StashHolder.of(holder));
     }
 
-    private static void stashLectern(LiveCaptureSession session, BlockPos pos, CompoundTag holder)
+    private static void stashLectern(LiveCaptureSession session, BlockPos pos, NBTTagCompound holder)
             throws Exception {
         Map<BlockPos, StashHolder> stash = state(session, "lecternStash");
         stash.put(pos, StashHolder.of(holder));
     }
 
-    private static void stashEntityContainer(LiveCaptureSession session, UUID uuid, CompoundTag holder)
+    private static void stashEntityContainer(LiveCaptureSession session, UUID uuid, NBTTagCompound holder)
             throws Exception {
-        Map<UUID, CompoundTag> stash = state(session, "entityContainerStash");
+        Map<UUID, NBTTagCompound> stash = state(session, "entityContainerStash");
         stash.put(uuid, holder);
     }
 
-    private static void bufferEntity(LiveCaptureSession session, UUID uuid, ChunkPos pos, CompoundTag tag)
+    private static void bufferEntity(LiveCaptureSession session, UUID uuid, ChunkPos pos, NBTTagCompound tag)
             throws Exception {
         EntityBuffer buffer = state(session, "entityBuffer");
         buffer.accumulate(uuid, pos, tag);

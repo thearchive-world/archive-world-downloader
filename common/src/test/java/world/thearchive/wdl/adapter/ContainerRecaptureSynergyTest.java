@@ -10,14 +10,14 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.inventory.ItemStackHelper;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -46,26 +46,26 @@ class ContainerRecaptureSynergyTest {
         TestRegistries.bootstrap();
     }
 
-    private CompoundTag stashHolderWith(int slot, ItemStack stack) {
+    private NBTTagCompound stashHolderWith(int slot, ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(slot, stack);
         return sink.captureItems(items);
     }
 
-    private static ItemStack mergedItemAt(ContainerSink sink, CompoundTag chunkTag, int slot) {
-        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", 10);
-        CompoundTag chest = blockEntities.getCompound(0);
+    private static ItemStack mergedItemAt(ContainerSink sink, NBTTagCompound chunkTag, int slot) {
+        NBTTagList blockEntities = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
+        NBTTagCompound chest = blockEntities.getCompoundTagAt(0);
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(chest, back);
+        ItemStackHelper.loadAllItems(chest, back);
         return back.get(slot);
     }
 
     @Test
     void withoutRecaptureNothingMergesOntoTheMissingChest() {
         // The snapshot-once gap: the chunk was captured before the chest was placed, so its tag has no chest.
-        CompoundTag snapshotOnceTag = codec.encode(SyntheticChunks.full(false), false);
+        NBTTagCompound snapshotOnceTag = codec.encode(SyntheticChunks.full(false), false);
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z), stashHolderWith(2, new ItemStack(Items.EMERALD, 7)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, snapshotOnceTag,
@@ -79,9 +79,9 @@ class ContainerRecaptureSynergyTest {
         // After re-capture the chunk's block entities include the placed chest, so the merge lands.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(false,
                 ImmutableList.of(blockEntity("minecraft:chest", CHEST_X, CHEST_Y, CHEST_Z)));
-        CompoundTag recapturedTag = codec.encode(snapshot, false);
+        NBTTagCompound recapturedTag = codec.encode(snapshot, false);
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z), stashHolderWith(2, new ItemStack(Items.EMERALD, 7)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, recapturedTag,
@@ -98,14 +98,14 @@ class ContainerRecaptureSynergyTest {
         // Re-capture re-encodes the chunk many times while it is hot; each fresh tag carries the (empty) chest
         // block entity. The contents come from the stash and merge only at the single flush, so the count and
         // contents are stable no matter how many re-encodes preceded it.
-        CompoundTag latestRecapture = null;
+        NBTTagCompound latestRecapture = null;
         for (int reencode = 0; reencode < 3; reencode++) {
             ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(false,
                     ImmutableList.of(blockEntity("minecraft:chest", CHEST_X, CHEST_Y, CHEST_Z)));
             latestRecapture = codec.encode(snapshot, false);
         }
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z), stashHolderWith(0, new ItemStack(Items.DIAMOND, 3)));
 
         ChunkPos chunkPos = new ChunkPos(new BlockPos(CHEST_X, CHEST_Y, CHEST_Z));

@@ -6,7 +6,7 @@ package world.thearchive.wdl.adapter.impl;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NBTTagCompound;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -27,12 +27,12 @@ import org.junit.jupiter.api.Test;
 class NamedMobPersistenceTest {
     @Test
     void namedMobGetsPersistenceRequiredTrueRegardlessOfKnob() {
-        CompoundTag knobOff = new CompoundTag();
+        NBTTagCompound knobOff = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOff, true, true, false, false);
         assertTrue(knobOff.getBoolean("PersistenceRequired"),
                 "a captured named mob must persist even with forceMobPersistence off (the unconditional fix)");
 
-        CompoundTag knobOn = new CompoundTag();
+        NBTTagCompound knobOn = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOn, true, true, false, true);
         assertTrue(knobOn.getBoolean("PersistenceRequired"),
                 "a captured named mob must persist with forceMobPersistence on as well");
@@ -40,12 +40,12 @@ class NamedMobPersistenceTest {
 
     @Test
     void lootEquippedMobGetsPersistenceRequiredTrueRegardlessOfKnob() {
-        CompoundTag knobOff = new CompoundTag();
+        NBTTagCompound knobOff = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOff, true, false, true, false);
         assertTrue(knobOff.getBoolean("PersistenceRequired"),
                 "a mob that picked up an impossible item must persist even with forceMobPersistence off");
 
-        CompoundTag knobOn = new CompoundTag();
+        NBTTagCompound knobOn = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOn, true, false, true, true);
         assertTrue(knobOn.getBoolean("PersistenceRequired"),
                 "a loot-equipped mob persists with the force knob on too");
@@ -53,12 +53,12 @@ class NamedMobPersistenceTest {
 
     @Test
     void unnamedMobWithNaturalGearPersistsOnlyWhenForceKnobIsOn() {
-        CompoundTag knobOff = new CompoundTag();
+        NBTTagCompound knobOff = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOff, true, false, false, false);
-        assertFalse(knobOff.contains("PersistenceRequired"),
+        assertFalse(knobOff.hasKey("PersistenceRequired"),
                 "an un-named mob with only natural-pool gear keeps vanilla despawn behavior while the knob is off");
 
-        CompoundTag knobOn = new CompoundTag();
+        NBTTagCompound knobOn = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOn, true, false, false, true);
         assertTrue(knobOn.getBoolean("PersistenceRequired"),
                 "an un-named mob must persist once forceMobPersistence is on");
@@ -66,14 +66,14 @@ class NamedMobPersistenceTest {
 
     @Test
     void nonMobIsNeverTouched() {
-        CompoundTag knobOff = new CompoundTag();
+        NBTTagCompound knobOff = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOff, false, false, false, false);
-        assertFalse(knobOff.contains("PersistenceRequired"),
+        assertFalse(knobOff.hasKey("PersistenceRequired"),
                 "a non-Mob entity never gets PersistenceRequired set");
 
-        CompoundTag knobOn = new CompoundTag();
+        NBTTagCompound knobOn = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOn, false, false, false, true);
-        assertFalse(knobOn.contains("PersistenceRequired"),
+        assertFalse(knobOn.hasKey("PersistenceRequired"),
                 "forceMobPersistence applies to mobs only; a non-Mob entity is left untouched");
     }
 }

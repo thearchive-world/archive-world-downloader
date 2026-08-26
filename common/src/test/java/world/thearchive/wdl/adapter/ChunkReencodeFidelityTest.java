@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPosOrNull;
 
 import com.google.common.collect.ImmutableList;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NBTTagCompound;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
@@ -31,7 +31,7 @@ class ChunkReencodeFidelityTest {
      * deliberately one no vanilla writer emits: a key vanilla itself round-trips would still survive a codec that
      * rebuilt every tag from vanilla's own load, so it could not prove the passthrough this names.
      */
-    private static CompoundTag sign(int x, int y, int z, String text) {
+    private static NBTTagCompound sign(int x, int y, int z, String text) {
         return BlockEntityFixtures.blockEntityWithForeignKey("minecraft:sign", x, y, z, "wdl_test_text", text);
     }
 
@@ -39,12 +39,12 @@ class ChunkReencodeFidelityTest {
     void aPopulatedClientHeldBlockEntitySurvivesReencode() {
         TestRegistries.bootstrap();
 
-        CompoundTag tag = codec.encode(
+        NBTTagCompound tag = codec.encode(
                 SyntheticChunks.fullWithMalformedBlockEntities(false,
                         ImmutableList.of(sign(2, 64, 2, "hello"))),
                 false);
 
-        CompoundTag blockEntity = findByPosOrNull(tag, 2, 64, 2);
+        NBTTagCompound blockEntity = findByPosOrNull(tag, 2, 64, 2);
         assertNotNull(blockEntity, "the captured sign block entity is present in the encoded tag");
         assertEquals("hello", blockEntity.getString("wdl_test_text"),
                 "its client-held data survives the re-encode (no regression to empty)");
@@ -54,11 +54,11 @@ class ChunkReencodeFidelityTest {
     void reencodeReflectsAnEditedBlockEntity() {
         TestRegistries.bootstrap();
 
-        CompoundTag before = codec.encode(
+        NBTTagCompound before = codec.encode(
                 SyntheticChunks.fullWithMalformedBlockEntities(false,
                         ImmutableList.of(sign(2, 64, 2, "hello"))),
                 false);
-        CompoundTag after = codec.encode(
+        NBTTagCompound after = codec.encode(
                 SyntheticChunks.fullWithMalformedBlockEntities(false,
                         ImmutableList.of(sign(2, 64, 2, "world"))),
                 false);
@@ -72,11 +72,11 @@ class ChunkReencodeFidelityTest {
     void aRemovedBlockEntityIsGoneFromTheReencodedTag() {
         TestRegistries.bootstrap();
 
-        CompoundTag withSign = codec.encode(
+        NBTTagCompound withSign = codec.encode(
                 SyntheticChunks.fullWithMalformedBlockEntities(false,
                         ImmutableList.of(sign(2, 64, 2, "hello"))),
                 false);
-        CompoundTag withoutSign = codec.encode(
+        NBTTagCompound withoutSign = codec.encode(
                 SyntheticChunks.fullWithBlockEntities(false, ImmutableList.of()), false);
 
         assertNotNull(findByPosOrNull(withSign, 2, 64, 2), "captured while present");

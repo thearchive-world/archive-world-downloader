@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -30,28 +30,28 @@ class FixtureFidelityTest {
     }
 
     /** The hand-built entry at the root of the recorded defect: no {@code "Slot"}, so every entry decodes to 0. */
-    private static CompoundTag handBuiltEntry(String itemId, boolean withSlot, boolean withCount) {
-        CompoundTag entry = new CompoundTag();
+    private static NBTTagCompound handBuiltEntry(String itemId, boolean withSlot, boolean withCount) {
+        NBTTagCompound entry = new NBTTagCompound();
         if (withSlot) {
-            entry.putByte("Slot", (byte) 1);
+            entry.setByte("Slot", (byte) 1);
         }
-        entry.putString("id", itemId);
+        entry.setString("id", itemId);
         if (withCount) {
-            // Vanilla's own ItemStack#save writes "Count" as a byte; a count under any other key or shape
-            // decodes to 0, which ItemStack.of reads as empty and ContainerHelper.saveAllItems then drops the
-            // entry entirely, so the deliberately-omitted key below stops being the fixture's only divergence.
-            entry.putByte("Count", (byte) 1);
+            // Vanilla's own ItemStack#writeToNBT writes "Count" as a byte; a count under any other key or shape
+            // decodes to 0, which reads as empty and ItemStackHelper.saveAllItems then drops the entry entirely,
+            // so the deliberately-omitted key below stops being the fixture's only divergence.
+            entry.setByte("Count", (byte) 1);
         }
         return entry;
     }
 
-    private static CompoundTag holderOf(CompoundTag... entries) {
-        ListTag items = new ListTag();
-        for (CompoundTag entry : entries) {
-            items.add(entry);
+    private static NBTTagCompound holderOf(NBTTagCompound... entries) {
+        NBTTagList items = new NBTTagList();
+        for (NBTTagCompound entry : entries) {
+            items.appendTag(entry);
         }
-        CompoundTag holder = new CompoundTag();
-        holder.put("Items", items);
+        NBTTagCompound holder = new NBTTagCompound();
+        holder.setTag("Items", items);
         return holder;
     }
 
@@ -83,9 +83,9 @@ class FixtureFidelityTest {
     @Test
     void anItemEntryWithoutCountIsRejected() {
         // Unlike a missing Slot (which still round-trips as a valid entry at slot 0, so the divergence names
-        // "Slot" directly), a missing Count decodes to 0 via ItemStack.of, which ItemStack#isEmpty treats as
-        // empty; ContainerHelper.saveAllItems then skips it entirely, so the producer's list comes back one
-        // element short rather than missing a single named key.
+        // "Slot" directly), a missing Count decodes to 0, which is treated as empty; ItemStackHelper.saveAllItems
+        // then skips it entirely, so the producer's list comes back one element short rather than missing a
+        // single named key.
         String message = reject(() -> FixtureFidelity
                 .assertItemsHolderShape(holderOf(handBuiltEntry("minecraft:diamond", true, false))));
         assertTrue(message.contains("element(s)"), "the divergence must name the lost entry: " + message);
@@ -99,11 +99,11 @@ class FixtureFidelityTest {
 
     @Test
     void aBlockEntityTagCarryingOnlyItsMetadataIsRejected() {
-        CompoundTag handBuilt = new CompoundTag();
-        handBuilt.putString("id", "minecraft:chest");
-        handBuilt.putInt("x", 10);
-        handBuilt.putInt("y", 70);
-        handBuilt.putInt("z", 20);
+        NBTTagCompound handBuilt = new NBTTagCompound();
+        handBuilt.setString("id", "minecraft:chest");
+        handBuilt.setInteger("x", 10);
+        handBuilt.setInteger("y", 70);
+        handBuilt.setInteger("z", 20);
 
         String message = reject(() -> FixtureFidelity.assertBlockEntityShape(handBuilt));
         assertTrue(message.contains("Items"),
@@ -112,8 +112,8 @@ class FixtureFidelityTest {
 
     @Test
     void aBlockEntityTagMissingAnAlwaysWrittenStateKeyIsRejected() {
-        CompoundTag brewingStand = BlockEntityFixtures.blockEntity("minecraft:brewing_stand", 6, 64, 6);
-        brewingStand.remove("BrewTime");
+        NBTTagCompound brewingStand = BlockEntityFixtures.blockEntity("minecraft:brewing_stand", 6, 64, 6);
+        brewingStand.removeTag("BrewTime");
 
         String message = reject(() -> FixtureFidelity.assertBlockEntityShape(brewingStand));
         assertTrue(message.contains("BrewTime"), "the divergence must name the omitted key: " + message);
@@ -121,8 +121,8 @@ class FixtureFidelityTest {
 
     @Test
     void aBlockEntityTagCarryingAnInventedKeyIsRejected() {
-        CompoundTag jukebox = BlockEntityFixtures.blockEntity("minecraft:jukebox", 1, 64, 1);
-        jukebox.putString("wdlProbeField", "keep-me");
+        NBTTagCompound jukebox = BlockEntityFixtures.blockEntity("minecraft:jukebox", 1, 64, 1);
+        jukebox.setString("wdlProbeField", "keep-me");
 
         String message = reject(() -> FixtureFidelity.assertBlockEntityShape(jukebox));
         assertTrue(message.contains("wdlProbeField"), "the divergence must name the invented key: " + message);
@@ -138,21 +138,21 @@ class FixtureFidelityTest {
 
     @Test
     void theChunkChokePointRejectsHandBuiltBlockEntities() {
-        CompoundTag handBuilt = new CompoundTag();
-        handBuilt.putString("id", "minecraft:chest");
-        handBuilt.putInt("x", 1);
-        handBuilt.putInt("y", 64);
-        handBuilt.putInt("z", 1);
+        NBTTagCompound handBuilt = new NBTTagCompound();
+        handBuilt.setString("id", "minecraft:chest");
+        handBuilt.setInteger("x", 1);
+        handBuilt.setInteger("y", 64);
+        handBuilt.setInteger("z", 1);
 
         reject(() -> BlockEntityFixtures.chunkTagWith(handBuilt));
     }
 
     @Test
     void theEntityChokePointRejectsHandBuiltItemsHolders() {
-        CompoundTag vehicle = new CompoundTag();
-        vehicle.putString("id", "minecraft:chest_minecart");
-        vehicle.put("Items",
-                holderOf(handBuiltEntry("minecraft:diamond", false, true)).getList("Items", 10));
+        NBTTagCompound vehicle = new NBTTagCompound();
+        vehicle.setString("id", "minecraft:chest_minecart");
+        vehicle.setTag("Items",
+                holderOf(handBuiltEntry("minecraft:diamond", false, true)).getTagList("Items", 10));
 
         reject(() -> EntityFixtures.entityChunkTagWith(vehicle));
     }
@@ -161,11 +161,11 @@ class FixtureFidelityTest {
     void theChunkChokePointStampsTheKeyThatOnlyTheChunkLayerWrites() {
         // The block entity's own save never writes keepPacked, so it is exempt from the round trip yet still part
         // of what lands on disk beside every saved block entity.
-        CompoundTag chunkTag = BlockEntityFixtures
+        NBTTagCompound chunkTag = BlockEntityFixtures
                 .chunkTagWith(BlockEntityFixtures.blockEntity("minecraft:chest", 1, 64, 1));
-        CompoundTag blockEntity = BlockEntityFixtures.findByPos(chunkTag, 1, 64, 1);
+        NBTTagCompound blockEntity = BlockEntityFixtures.findByPos(chunkTag, 1, 64, 1);
         assertEquals(false,
-                blockEntity.contains(FixtureFidelity.KEEP_PACKED) ? blockEntity.getBoolean(FixtureFidelity.KEEP_PACKED)
+                blockEntity.hasKey(FixtureFidelity.KEEP_PACKED) ? blockEntity.getBoolean(FixtureFidelity.KEEP_PACKED)
                         : true);
     }
 

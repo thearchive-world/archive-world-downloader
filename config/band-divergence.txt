@@ -786,9 +786,12 @@ common/src/main/java/world/thearchive/wdl/compat/xaeroplus/package-info.java
 # byte-identical.
 common/src/main/java/world/thearchive/wdl/adapter/BookshelfSlots.java
 
-# The view-layer literal inventory is band-specific: below 1.20 the GUI writes user-facing strings through the
-# new TextComponent(...) constructor rather than Component.literal, and the acknowledged-literals map (including the
-# empty no-phase HUD placeholder in WdlHudOverlay) reflects this band's set.
+# The view-layer literal inventory is band-specific: below 1.13 there is no Mojang mapping, so the GUI writes
+# user-facing strings through the classic new TextComponentString(...) constructor rather than Component.literal,
+# and the acknowledged-literals map (including the empty no-phase HUD placeholder in WdlHudOverlay) reflects this
+# band's set. fabric/ and neoforge/ are stripped on this Forge-only band (0 tracked files), so the VIEW_ROOTS loop's
+# loader-root checks are skip-if-absent rather than the mint parent's hard assertTrue; common's own root stays
+# required and scanned.
 common/src/test/java/world/thearchive/wdl/UiLiteralEnrollmentTest.java
 
 # Deleted on this band: the chiseled-bookshelf slot-mask helper it tests (BookshelfSlots) is dropped because
@@ -1055,3 +1058,9 @@ common/src/main/java/world/thearchive/wdl/client/WdlCaptureDisableConfirmScreen.
 # long) returning IToast.Visibility) rather than Toast/ToastComponent, stitches the frame with
 # Gui.drawTexturedModalRect, and draws its text through FontRenderer.
 common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
+
+# fabric/ and neoforge/ are stripped on this Forge-only band (0 tracked files), so the PRODUCTION_ROOTS loop's
+# loader-root checks are skip-if-absent (if (!Files.isDirectory(root)) { continue; }) rather than the mint
+# parent's hard assertTrue; common's own root stays required and scanned. forge/src carries zero wdl. translation
+# keys (verified on this band and on the ported 1.13.2 glue), so scanning common alone is complete.
+common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java

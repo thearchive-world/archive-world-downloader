@@ -12,12 +12,12 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -39,38 +39,38 @@ class InteractionMergeRoundTripTest {
     }
 
     /** A block entity fed through the fidelity gate as-is, so a marker stamped afterward never trips it. */
-    private static CompoundTag taggedBlockEntity(String id, int x, int y, int z) {
+    private static NBTTagCompound taggedBlockEntity(String id, int x, int y, int z) {
         return blockEntity(id, x, y, z);
     }
 
     /** Stamp an unrelated marker field onto the block entity at x/y/z, after the chunk tag's own fidelity check ran. */
-    private static void markBlockEntity(CompoundTag chunkTag, int x, int y, int z, String marker) {
-        findByPos(chunkTag, x, y, z).putString("wdl_test_marker", marker);
+    private static void markBlockEntity(NBTTagCompound chunkTag, int x, int y, int z, String marker) {
+        findByPos(chunkTag, x, y, z).setString("wdl_test_marker", marker);
     }
 
-    private static String markerOf(CompoundTag blockEntityTag) {
+    private static String markerOf(NBTTagCompound blockEntityTag) {
         return blockEntityTag.getString("wdl_test_marker");
     }
 
-    private static ItemStack readRecordItem(CompoundTag jukeboxBlockEntityTag) {
+    private static ItemStack readRecordItem(NBTTagCompound jukeboxBlockEntityTag) {
         // vanilla JukeboxBlockEntity.loadAdditional's exact read
-        ItemStack back = ItemStack.of(jukeboxBlockEntityTag.getCompound("RecordItem"));
-        assertTrue(!back.isEmpty(), "the merged RecordItem must decode via vanilla ItemStack.of");
+        ItemStack back = new ItemStack(jukeboxBlockEntityTag.getCompoundTag("RecordItem"));
+        assertTrue(!back.isEmpty(), "the merged RecordItem must decode via vanilla's ItemStack(NBTTagCompound)");
         return back;
     }
 
     @Test
     void jukeboxDiscRoundTripsThroughCaptureMergeAndVanillaCodec() {
         BlockPos jukeboxPos = new BlockPos(10, 70, 20);
-        CompoundTag chunkTag = chunkTagWith(
+        NBTTagCompound chunkTag = chunkTagWith(
                 taggedBlockEntity("minecraft:jukebox", 10, 70, 20),
                 taggedBlockEntity("minecraft:furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
         markBlockEntity(chunkTag, 10, 70, 20, "keep-me");
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
-        stash.put(jukeboxPos, InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT)));
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
+        stash.put(jukeboxPos, InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_CAT)));
         BlockPos elsewhere = new BlockPos(100, 70, 200); // a jukebox in a different chunk, not being flushed
-        stash.put(elsewhere, InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_13)));
+        stash.put(elsewhere, InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_13)));
 
         int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
 
@@ -78,29 +78,29 @@ class InteractionMergeRoundTripTest {
         assertFalse(stash.containsKey(jukeboxPos), "the flushed chunk's stash entry is drained");
         assertTrue(stash.containsKey(elsewhere), "another chunk's stash entry is left until its own flush");
 
-        ListTag blockEntities = chunkTag.getCompound("Level").getList("TileEntities", 10);
-        CompoundTag jukeboxBlockEntity = findByPos(blockEntities, 10, 70, 20);
+        NBTTagList blockEntities = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
+        NBTTagCompound jukeboxBlockEntity = findByPos(blockEntities, 10, 70, 20);
         assertEquals("minecraft:jukebox", jukeboxBlockEntity.getString("id"), "id survives");
         assertEquals("keep-me", markerOf(jukeboxBlockEntity), "an unrelated field is not clobbered");
-        assertEquals(Items.MUSIC_DISC_CAT, readRecordItem(jukeboxBlockEntity).getItem(),
+        assertEquals(Items.RECORD_CAT, readRecordItem(jukeboxBlockEntity).getItem(),
                 "the jukebox gains exactly the disc");
-        assertFalse(findByPos(blockEntities, 11, 70, 20).contains("RecordItem"),
+        assertFalse(findByPos(blockEntities, 11, 70, 20).hasKey("RecordItem"),
                 "the neighbor block entity is untouched");
     }
 
     @Test
     void jukeboxHolderCarriesPlayingStateSoItShowsNoteParticlesOnLoad() {
         BlockPos jukeboxPos = new BlockPos(10, 70, 20);
-        CompoundTag chunkTag = chunkTagWith(taggedBlockEntity("minecraft:jukebox", 10, 70, 20));
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
-        stash.put(jukeboxPos, InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_CAT)));
+        NBTTagCompound chunkTag = chunkTagWith(taggedBlockEntity("minecraft:jukebox", 10, 70, 20));
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
+        stash.put(jukeboxPos, InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_CAT)));
 
         ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
 
         // Vanilla JukeboxBlockEntity.tick spawns the note particles only while IsPlaying is set and a disc is
         // present, so the captured holder marks the just-inserted disc playing.
-        CompoundTag jukeboxBlockEntity = findByPos(
-                chunkTag.getCompound("Level").getList("TileEntities", 10), 10, 70, 20);
+        NBTTagCompound jukeboxBlockEntity = findByPos(
+                chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70, 20);
         assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"),
                 "the captured jukebox is marked playing so it shows note particles on load");
     }
@@ -109,18 +109,18 @@ class InteractionMergeRoundTripTest {
     void mergeDrainsButDoesNotMergeWhenNoBlockEntityAtThePos() {
         BlockPos pos = new BlockPos(1, 64, 1);
         // A jukebox, but in a different cell than the stashed pos
-        CompoundTag chunkTag = chunkTagWith(taggedBlockEntity("minecraft:jukebox", 2, 64, 1));
+        NBTTagCompound chunkTag = chunkTagWith(taggedBlockEntity("minecraft:jukebox", 2, 64, 1));
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
-        stash.put(pos, InteractionCapture.captureRecordItem(new ItemStack(Items.MUSIC_DISC_11)));
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
+        stash.put(pos, InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_11)));
 
         int merged = ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(pos), stash).merged();
 
         assertEquals(0, merged, "no captured block entity at the stashed pos -> nothing merges");
         assertFalse(stash.containsKey(pos), "the entry is still drained: the chunk is leaving memory");
         assertFalse(
-                findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), 2, 64, 1)
-                        .contains("RecordItem"),
+                findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 2, 64, 1)
+                        .hasKey("RecordItem"),
                 "the unrelated jukebox is left alone");
     }
 }

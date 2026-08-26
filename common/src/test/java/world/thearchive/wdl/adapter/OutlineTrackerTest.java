@@ -6,7 +6,7 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import net.minecraft.world.phys.AABB;
+import net.minecraft.util.math.AxisAlignedBB;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test;
 class OutlineTrackerTest {
     @Test
     void chestedRimBoxCapsTopToChestHeightKeepingFootprint() {
-        AABB llamaBox = new AABB(10.0, 64.0, -5.0, 10.9, 65.87, -4.1);
+        AxisAlignedBB llamaBox = new AxisAlignedBB(10.0, 64.0, -5.0, 10.9, 65.87, -4.1);
 
-        AABB rim = OutlineTracker.chestedRimBox(llamaBox);
+        AxisAlignedBB rim = OutlineTracker.chestedRimBox(llamaBox);
 
         assertEquals(10.0, rim.minX, 1.0e-9);
         assertEquals(10.9, rim.maxX, 1.0e-9);
@@ -31,9 +31,9 @@ class OutlineTrackerTest {
 
     @Test
     void chestedRimBoxLowersTheTop() {
-        AABB donkeyBox = new AABB(0.0, 0.0, 0.0, 1.4, 1.5, 1.4);
+        AxisAlignedBB donkeyBox = new AxisAlignedBB(0.0, 0.0, 0.0, 1.4, 1.5, 1.4);
 
-        AABB rim = OutlineTracker.chestedRimBox(donkeyBox);
+        AxisAlignedBB rim = OutlineTracker.chestedRimBox(donkeyBox);
 
         assertTrue(rim.maxY < donkeyBox.maxY);
         assertTrue(rim.maxY > donkeyBox.minY);
@@ -41,9 +41,9 @@ class OutlineTrackerTest {
 
     @Test
     void merchantRimBoxDropsTopBelowTheHeadKeepingFootprint() {
-        AABB villagerBox = new AABB(0.0, 64.0, 0.0, 0.6, 65.95, 0.6);
+        AxisAlignedBB villagerBox = new AxisAlignedBB(0.0, 64.0, 0.0, 0.6, 65.95, 0.6);
 
-        AABB rim = OutlineTracker.merchantRimBox(villagerBox);
+        AxisAlignedBB rim = OutlineTracker.merchantRimBox(villagerBox);
 
         assertEquals(0.0, rim.minX, 1.0e-9);
         assertEquals(0.6, rim.maxX, 1.0e-9);

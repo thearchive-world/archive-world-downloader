@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagString;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -29,11 +29,11 @@ class NbtMergeTest {
         TestRegistries.bootstrap();
     }
 
-    private static CompoundTag withBooks(int... slots) {
+    private static NBTTagCompound withBooks(int... slots) {
         String[] books = new String[slots.length];
         Arrays.fill(books, "minecraft:written_book");
-        CompoundTag tag = new CompoundTag();
-        tag.put("Items", ItemFixtures.itemsAtSlots(slots, books));
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setTag("Items", ItemFixtures.itemsAtSlots(slots, books));
         return tag;
     }
 
@@ -42,22 +42,22 @@ class NbtMergeTest {
         // The occupancy says slot 0 now reads empty, so nothing is carried; the write must then not happen at
         // all. A fresh side that already carries the key cannot see the difference, which is why this drives
         // one that does not.
-        CompoundTag disk = withBooks(0);
-        CompoundTag fresh = new CompoundTag();
+        NBTTagCompound disk = withBooks(0);
+        NBTTagCompound fresh = new NBTTagCompound();
 
         assertFalse(NbtMerge.carryListBySlot(disk, fresh, "Items", 0),
                 "no slot the disk names is still occupied, so nothing carries");
-        assertFalse(fresh.contains("Items"),
+        assertFalse(fresh.hasKey("Items"),
                 "and the fresh tag gains no key: a carry-forward that carried nothing writes nothing");
     }
 
     @Test
     void aCarryThatCarriesSomethingWritesTheUnion() {
-        CompoundTag disk = withBooks(0, 2);
-        CompoundTag fresh = withBooks(1);
+        NBTTagCompound disk = withBooks(0, 2);
+        NBTTagCompound fresh = withBooks(1);
 
         assertTrue(NbtMerge.carryListBySlot(disk, fresh, "Items", ALL_SLOTS));
-        assertEquals(3, fresh.getList("Items", 10).size(), "both disk slots joined the fresh one");
+        assertEquals(3, fresh.getTagList("Items", 10).tagCount(), "both disk slots joined the fresh one");
     }
 
     @Test
@@ -65,23 +65,23 @@ class NbtMergeTest {
         // The other half of the write side: the fresh tag has no list to add into, so the union builds one and the
         // write back is the only thing that puts it on the tag. Without it the carried books are assembled and
         // dropped, and the carry still reports true.
-        CompoundTag disk = withBooks(0, 2);
-        CompoundTag fresh = new CompoundTag();
+        NBTTagCompound disk = withBooks(0, 2);
+        NBTTagCompound fresh = new NBTTagCompound();
 
         assertTrue(NbtMerge.carryListBySlot(disk, fresh, "Items", ALL_SLOTS));
-        assertEquals(2, fresh.getList("Items", 10).size(), "both disk slots reach the fresh tag");
+        assertEquals(2, fresh.getTagList("Items", 10).tagCount(), "both disk slots reach the fresh tag");
     }
 
     @Test
     void aFreshValueOfTheWrongTypeIsLeftAloneWhenNothingCarries() {
         // The fresh side is read through an instanceof guard, so a value that is not a list falls back to an
         // empty one. Nothing carried means that empty list must not be written over what was there.
-        CompoundTag disk = withBooks(0);
-        CompoundTag fresh = new CompoundTag();
-        fresh.put("Items", new StringTag("not a list"));
+        NBTTagCompound disk = withBooks(0);
+        NBTTagCompound fresh = new NBTTagCompound();
+        fresh.setTag("Items", new NBTTagString("not a list"));
 
         assertFalse(NbtMerge.carryListBySlot(disk, fresh, "Items", 0));
-        assertEquals(new StringTag("not a list"), fresh.get("Items"),
+        assertEquals(new NBTTagString("not a list"), fresh.getTag("Items"),
                 "a malformed fresh value is not replaced by an empty list when nothing was carried");
     }
 }

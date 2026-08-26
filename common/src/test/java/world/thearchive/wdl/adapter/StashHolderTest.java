@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NBTTagCompound;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.ItemFixtures;
@@ -20,16 +20,16 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
  * twice is a no-op.
  */
 class StashHolderTest {
-    private static CompoundTag nestedHolder() {
-        CompoundTag holder = ItemFixtures
+    private static NBTTagCompound nestedHolder() {
+        NBTTagCompound holder = ItemFixtures
                 .itemsHolder(ItemFixtures.namedStack("minecraft:diamond_pickaxe", "Efficiency Pick"));
-        holder.putString("wdl_block_entity_id", "minecraft:chest");
+        holder.setString("wdl_block_entity_id", "minecraft:chest");
         return holder;
     }
 
     @Test
     void freshHolderHandsBackItsLiveTree() throws IOException {
-        CompoundTag tag = nestedHolder();
+        NBTTagCompound tag = nestedHolder();
         StashHolder holder = StashHolder.of(tag);
 
         assertFalse(holder.isPacked());
@@ -39,7 +39,7 @@ class StashHolderTest {
 
     @Test
     void compactedHolderRoundTripsDeepEqual() throws IOException {
-        CompoundTag tag = nestedHolder();
+        NBTTagCompound tag = nestedHolder();
         StashHolder holder = StashHolder.of(tag);
 
         holder.compact();

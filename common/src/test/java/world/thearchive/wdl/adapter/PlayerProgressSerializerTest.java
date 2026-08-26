@@ -14,20 +14,25 @@ import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.advancements.Criterion;
-import net.minecraft.stats.Stats;
-import net.minecraft.stats.StatsCounter;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.stats.StatBase;
+import net.minecraft.stats.StatList;
+import net.minecraft.stats.StatisticsManager;
+import net.minecraft.init.Blocks;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.TestRegistries;
 
+/**
+ * The headless guard for {@link PlayerProgressSerializer}: at 1.12.2 neither the stats nor the advancements JSON
+ * carries a {@code DataVersion} stamp (that is a 1.13+ addition), the stats blob is the flat
+ * {@code {"stat.<id>": <count>}} shape enumerated over {@link StatList#ALL_STATS}, and a zero-valued stat is filtered
+ * out.
+ */
 class PlayerProgressSerializerTest {
-    private static final int DATA_VERSION = 4189;
-
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // boots BuiltInRegistries + the Stats statics (side effect only)
+        TestRegistries.bootstrap(); // boots the StatList statics (side effect only)
     }
 
     private static JsonObject parse(byte[] json) {
@@ -35,27 +40,28 @@ class PlayerProgressSerializerTest {
     }
 
     @Test
-    void statsJsonGroupsByTypeFiltersZeroAndStampsDataVersion() {
-        StatsCounter counter = new StatsCounter();
-        counter.setValue(null, Stats.CUSTOM.get(Stats.PLAY_ONE_MINUTE), 1200); // base setValue ignores the player
-        counter.setValue(null, Stats.BLOCK_MINED.get(Blocks.STONE), 5);
-        counter.setValue(null, Stats.BLOCK_MINED.get(Blocks.DIRT), 0); // a zero must be filtered out
+    void statsJsonIsAFlatIdToCountObjectFilteringZero() {
+        StatisticsManager counter = new StatisticsManager();
+        counter.increaseStat(null, StatList.PLAY_ONE_MINUTE, 1200); // base increaseStat ignores the player
+        StatBase stoneMined = StatList.getBlockStats(Blocks.STONE);
+        StatBase dirtMined = StatList.getBlockStats(Blocks.DIRT);
+        assertNotNull(stoneMined, "vanilla registers a mine-block stat for every block");
+        assertNotNull(dirtMined, "vanilla registers a mine-block stat for every block");
+        counter.increaseStat(null, stoneMined, 5);
+        counter.increaseStat(null, dirtMined, 0); // a zero must be filtered out
 
-        byte[] bytes = PlayerProgressSerializer.statsJson(counter, DATA_VERSION);
+        byte[] bytes = PlayerProgressSerializer.statsJson(counter);
         assertNotNull(bytes, "a populated counter yields a blob");
-        JsonObject root = parse(bytes);
+        JsonObject stats = parse(bytes);
 
-        assertEquals(DATA_VERSION, root.get("DataVersion").getAsInt());
-        JsonObject stats = root.getAsJsonObject("stats");
-        assertEquals(1200, stats.getAsJsonObject("minecraft:custom").get("minecraft:play_one_minute").getAsInt());
-        JsonObject mined = stats.getAsJsonObject("minecraft:mined");
-        assertEquals(5, mined.get("minecraft:stone").getAsInt());
-        assertTrue(!mined.has("minecraft:dirt"), "a zero-valued stat is filtered out");
+        assertEquals(1200, stats.get(StatList.PLAY_ONE_MINUTE.statId).getAsInt());
+        assertEquals(5, stats.get(stoneMined.statId).getAsInt());
+        assertTrue(!stats.has(dirtMined.statId), "a zero-valued stat is filtered out");
     }
 
     @Test
     void statsJsonReturnsNullForAnEmptyCounter() {
-        assertNull(PlayerProgressSerializer.statsJson(new StatsCounter(), DATA_VERSION),
+        assertNull(PlayerProgressSerializer.statsJson(new StatisticsManager()),
                 "no stat > 0 means no reply landed, so write nothing");
     }
 
@@ -63,14 +69,13 @@ class PlayerProgressSerializerTest {
     void advancementsJsonKeysByIdStringWithDoneAndRealTimestamp() {
         AdvancementProgress progress = new AdvancementProgress();
         progress.update(ImmutableMap.of("minecraft:foo", new Criterion()), new String[][] { { "minecraft:foo" } });
-        progress.grantProgress("minecraft:foo");
+        progress.grantCriterion("minecraft:foo");
         assertTrue(progress.isDone(), "precondition: the constructed advancement is genuinely done");
 
-        byte[] bytes = PlayerProgressSerializer.advancementsJson(
-                ImmutableMap.of("minecraft:story/root", progress), DATA_VERSION);
+        byte[] bytes = PlayerProgressSerializer
+                .advancementsJson(ImmutableMap.of("minecraft:story/root", progress));
         JsonObject root = parse(bytes);
 
-        assertEquals(DATA_VERSION, root.get("DataVersion").getAsInt());
         JsonObject entry = root.getAsJsonObject("minecraft:story/root");
         assertTrue(entry.get("done").getAsBoolean(), "a genuinely-done advancement serializes done=true");
         String obtained = entry.getAsJsonObject("criteria").get("minecraft:foo").getAsString();

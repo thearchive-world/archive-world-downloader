@@ -75,9 +75,11 @@ class LangKeyCoverageTest {
             "wdl.settings.value.");
 
     // The controls heading MC derives from the wdl:downloader category identifier, and the two entries
-    // ModMenu reads off the mod id.
+    // ModMenu reads off the mod id. key.wdl.peek_hud is constructed in the forge/ island (WdlForge), outside
+    // this test's PRODUCTION_ROOTS.
     private static final Set<String> EXTERNAL_CONSUMERS = ImmutableSet.of(
             "key.categories.wdl.downloader",
+            "key.wdl.peek_hud",
             "modmenu.descriptionTranslation.wdl",
             "modmenu.summaryTranslation.wdl");
 
@@ -178,7 +180,15 @@ class LangKeyCoverageTest {
     private static Set<String> productionKeyLiterals() {
         Set<String> literals = new TreeSet<>();
         for (Path root : PRODUCTION_ROOTS) {
-            assertTrue(Files.isDirectory(root), "production source root not found: " + root.toAbsolutePath());
+            if (root.startsWith("..")) {
+                // fabric/neoforge are stripped on this Forge-only band (0 tracked files); a present loader root
+                // (the inert neoforge/ dir the middle bands still carry) is still required and scanned.
+                if (!Files.isDirectory(root)) {
+                    continue;
+                }
+            } else {
+                assertTrue(Files.isDirectory(root), "production source root not found: " + root.toAbsolutePath());
+            }
             for (Path file : javaFiles(root)) {
                 Matcher matcher = keyLiteral.matcher(readString(file));
                 while (matcher.find()) {

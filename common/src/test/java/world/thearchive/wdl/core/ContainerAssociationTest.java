@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
  * and no running game.
  */
 class ContainerAssociationTest {
-    private static final long POS = 1234567L; // an opaque packed BlockPos.asLong()
+    private static final long POS = 1234567L; // an opaque packed BlockPos.toLong()
     private static final int CHEST = 27;
     private static final int LECTERN = 1;
     private static final int ENDER = 27;
@@ -521,7 +521,7 @@ class ContainerAssociationTest {
     // is always (RIGHT, LEFT), so menu slots 0..n/2 are the RIGHT-typed half: boundPos = the first/RIGHT half,
     // boundSecondaryPos = the second/LEFT half. The adapter feeds a single atRightHalf primitive, so the
     // load-bearing left/right ordering is decided here and is unit-testable both look directions.
-    private static final long PARTNER_POS = 7654321L; // the other half's packed BlockPos.asLong()
+    private static final long PARTNER_POS = 7654321L; // the other half's packed BlockPos.toLong()
     private static final int DOUBLE = 54; // the 54-slot double-chest menu = 27 (RIGHT) + 27 (LEFT)
 
     /** A normal double-chest open: a 54-slot menu over two 27-slot halves summing to 54 -> BIND. */

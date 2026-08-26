@@ -20,11 +20,11 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.item.ItemStack;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -88,7 +88,7 @@ class LiveCaptureSessionLossLogWiringTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), new HeadlessPlatformBridge(configDirectory),
-                config, null, DimensionType.field_18954, DimensionType.field_18954,
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -130,22 +130,22 @@ class LiveCaptureSessionLossLogWiringTest {
         }, (archiveId, dataTag) -> {});
     }
 
-    private static CompoundTag mapData() {
-        CompoundTag data = new CompoundTag();
-        data.putString("dimension", "minecraft:overworld");
-        data.putByteArray("colors", new byte[16384]);
+    private static NBTTagCompound mapData() {
+        NBTTagCompound data = new NBTTagCompound();
+        data.setString("dimension", "minecraft:overworld");
+        data.setByteArray("colors", new byte[16384]);
         return data;
     }
 
     /** An encoded entity-chunk tag holding one entity whose displayed {@code "Item"} is {@code stack}. */
-    private CompoundTag entityChunkDisplaying(UUID uuid, ItemStack stack) {
-        CompoundTag entity = EntityFixtures.entity("minecraft:item_frame", uuid);
-        entity.put("Item", itemTagOf(stack));
+    private NBTTagCompound entityChunkDisplaying(UUID uuid, ItemStack stack) {
+        NBTTagCompound entity = EntityFixtures.entity("minecraft:item_frame", uuid);
+        entity.setTag("Item", itemTagOf(stack));
         return EntityFixtures.entityChunkTagWith(entity);
     }
 
-    private CompoundTag itemTagOf(ItemStack stack) {
-        return (CompoundTag) ((ListTag) holderOf(sink, stack).get("Items")).get(0);
+    private NBTTagCompound itemTagOf(ItemStack stack) {
+        return (NBTTagCompound) ((NBTTagList) holderOf(sink, stack).getTag("Items")).get(0);
     }
 
     @Test
@@ -307,13 +307,13 @@ class LiveCaptureSessionLossLogWiringTest {
         }
     }
 
-    private static void remapHolderItems(LiveCaptureSession session, CompoundTag holder, Object identifier) {
-        drive(session, "scrubAndRemapItems", new Class<?>[] { CompoundTag.class, Object.class }, holder, identifier);
+    private static void remapHolderItems(LiveCaptureSession session, NBTTagCompound holder, Object identifier) {
+        drive(session, "scrubAndRemapItems", new Class<?>[] { NBTTagCompound.class, Object.class }, holder, identifier);
     }
 
-    private static void remapEntityItems(LiveCaptureSession session, CompoundTag entityChunkTag,
+    private static void remapEntityItems(LiveCaptureSession session, NBTTagCompound entityChunkTag,
             MapArchive archive) {
-        drive(session, "remapEntityItems", new Class<?>[] { CompoundTag.class, MapArchive.class },
+        drive(session, "remapEntityItems", new Class<?>[] { NBTTagCompound.class, MapArchive.class },
                 entityChunkTag, archive);
     }
 

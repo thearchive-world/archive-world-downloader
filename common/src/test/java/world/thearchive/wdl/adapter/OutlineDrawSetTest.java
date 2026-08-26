@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.util.math.AxisAlignedBB;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.core.MarkerHue;
@@ -19,7 +19,7 @@ import world.thearchive.wdl.core.MarkerHue;
  */
 class OutlineDrawSetTest {
     private static OutlineRim rim() {
-        return new OutlineRim(MarkerHue.RED, new AABB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0), new long[] { 0L });
+        return new OutlineRim(MarkerHue.RED, new AxisAlignedBB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0), new long[] { 0L });
     }
 
     private static int totalRims(OutlineDrawSet drawSet) {

@@ -6,8 +6,8 @@ package world.thearchive.wdl.testsupport;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Optional;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.math.ChunkPos;
 
 import world.thearchive.wdl.adapter.WdlRegionStorage;
 
@@ -28,7 +28,7 @@ public final class RegionRoundTrip {
      * Write {@code tag} at {@code pos}, drain to disk, then read it back through a <em>fresh</em> storage instance: a
      * pass then proves the bytes survived a real serialize -> disk -> deserialize.
      */
-    public static CompoundTag writeThenRead(Path directory, ChunkPos pos, CompoundTag tag) {
+    public static NBTTagCompound writeThenRead(Path directory, ChunkPos pos, NBTTagCompound tag) {
         try (WdlRegionStorage writer = open(directory)) {
             writer.write(pos, tag);
         } catch (IOException e) {

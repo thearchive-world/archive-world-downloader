@@ -15,11 +15,11 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.Difficulty;
-import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.world.EnumDifficulty;
+import net.minecraft.world.GameType;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -97,7 +97,7 @@ class LiveCaptureSessionFailSoftTest {
         assertFalse(config.captureEntities(), "the fixture must not publish an entity capture");
         assertFalse(config.captureContainers(), "the fixture must not publish an interaction capture");
         return new LiveCaptureSession(new VersionAdapterImpl(), bridge,
-                config, null, DimensionType.field_18954, DimensionType.field_18954,
+                config, null, DimensionType.OVERWORLD, DimensionType.OVERWORLD,
                 new DownloadTarget("headless", null, DownloadMode.NEW), new SavedChunkIndex(),
                 new CoveredChunkIndex(), new SendRangeEstimator(), false, false, BobbyChunkFilter.INACTIVE,
                 () -> {});
@@ -115,8 +115,8 @@ class LiveCaptureSessionFailSoftTest {
     @Test
     void failSoftPassesThroughSuccessfulAssembly(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
-        CapturedPlayer captured = new CapturedPlayer(new CompoundTag(), BlockPos.ZERO, 0.0F, 0.0F,
-                DimensionType.field_18954, GameType.CREATIVE, Difficulty.NORMAL);
+        CapturedPlayer captured = new CapturedPlayer(new NBTTagCompound(), BlockPos.ORIGIN, 0.0F, 0.0F,
+                DimensionType.OVERWORLD, GameType.CREATIVE, EnumDifficulty.NORMAL);
 
         assertSame(captured, session.failSoft("player", () -> captured), "a successful assembly passes through");
         assertEquals(0, losses(session), "and a step that worked counts no loss");

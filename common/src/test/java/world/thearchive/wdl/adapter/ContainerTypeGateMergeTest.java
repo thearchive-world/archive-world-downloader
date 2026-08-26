@@ -12,12 +12,12 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -41,12 +41,12 @@ class ContainerTypeGateMergeTest {
     }
 
     /** A 27-slot {@code "Items"} holder carrying {@code stack} at {@code slot}, tagged with the recorded type. */
-    private CompoundTag holder(String recordedTypeId, int slot, ItemStack stack) {
+    private NBTTagCompound holder(String recordedTypeId, int slot, ItemStack stack) {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(slot, stack);
-        CompoundTag holder = sink.captureItems(items);
+        NBTTagCompound holder = sink.captureItems(items);
         if (recordedTypeId != null) {
-            holder.putString("wdl_block_entity_id", recordedTypeId);
+            holder.setString("wdl_block_entity_id", recordedTypeId);
         }
         return holder;
     }
@@ -54,9 +54,9 @@ class ContainerTypeGateMergeTest {
     @Test
     void aStaleBarrelHolderDoesNotOverlayTheReplacementChest() {
         BlockPos pos = new BlockPos(10, 70, 20);
-        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holder("minecraft:shulker_box", 2, new ItemStack(Items.EMERALD, 7)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
@@ -64,51 +64,51 @@ class ContainerTypeGateMergeTest {
         assertEquals(0, merged, "a shulker box's items must not merge onto a chest at the same pos");
         assertFalse(stash.containsKey(pos), "the stale entry is still drained as the chunk leaves memory");
         assertTrue(
-                findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), 10, 70, 20)
-                        .getList("Items", 10).isEmpty(),
+                findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70, 20)
+                        .getTagList("Items", 10).isEmpty(),
                 "the replacement chest keeps its own (empty) contents, not the shulker box's");
     }
 
     @Test
     void aMatchingTypeStillOverlaysAndNeverWritesTheMarker() {
         BlockPos pos = new BlockPos(10, 70, 20);
-        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:shulker_box", 10, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:shulker_box", 10, 70, 20));
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holder("minecraft:shulker_box", 2, new ItemStack(Items.EMERALD, 7)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
 
         assertEquals(1, merged, "a shulker box holder merges onto a shulker box at the same pos");
-        CompoundTag shulkerBox = findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), 10, 70,
+        NBTTagCompound shulkerBox = findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70,
                 20);
-        assertFalse(shulkerBox.getList("Items", 10).isEmpty(), "the shulker box gains its captured contents");
-        assertFalse(shulkerBox.contains("wdl_block_entity_id"),
+        assertFalse(shulkerBox.getTagList("Items", 10).isEmpty(), "the shulker box gains its captured contents");
+        assertFalse(shulkerBox.hasKey("wdl_block_entity_id"),
                 "the type marker rides only on the holder, never onto disk");
     }
 
     @Test
     void aHolderWithoutRecordedTypeOverlaysUnchanged() {
         BlockPos pos = new BlockPos(10, 70, 20);
-        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holder(null, 2, new ItemStack(Items.EMERALD, 7))); // the interaction path carries no type
 
         int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
 
         assertEquals(1, merged, "a holder that makes no type claim overlays as before the gate");
-        assertFalse(findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), 10, 70, 20)
-                .getList("Items", 10).isEmpty());
+        assertFalse(findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70, 20)
+                .getTagList("Items", 10).isEmpty());
     }
 
     @Test
     void aMismatchedHolderBrokenToAirStillNoOpsAndDrains() {
         BlockPos pos = new BlockPos(10, 70, 20);
         // The block was broken to air: no block entity at pos, only an unrelated chest elsewhere in the chunk.
-        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:chest", 11, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 11, 70, 20));
 
-        Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
+        Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holder("minecraft:shulker_box", 0, new ItemStack(Items.DIAMOND, 1)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(pos), stash).merged();
@@ -116,8 +116,8 @@ class ContainerTypeGateMergeTest {
         assertEquals(0, merged, "no block entity at the pos (broken to air) -> nothing merges");
         assertFalse(stash.containsKey(pos), "still drained as the chunk leaves memory");
         assertTrue(
-                findByPos(chunkTag.getCompound("Level").getList("TileEntities", 10), 11, 70, 20)
-                        .getList("Items", 10).isEmpty(),
+                findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 11, 70, 20)
+                        .getTagList("Items", 10).isEmpty(),
                 "the unrelated chest is left untouched");
     }
 }

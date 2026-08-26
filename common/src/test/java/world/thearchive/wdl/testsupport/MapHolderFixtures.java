@@ -3,11 +3,11 @@
 
 package world.thearchive.wdl.testsupport;
 
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.init.Blocks;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
@@ -20,28 +20,29 @@ public final class MapHolderFixtures {
     private MapHolderFixtures() {}
 
     /**
-     * A filled-map stack carrying {@code id} in its raw {@code "map"} tag (below 1.20.5, no {@code map_id} component).
+     * A filled-map stack carrying {@code id} as its item-level {@code Damage} (this band's map id, an item metadata
+     * value, not an inner {@code tag."map"} compound).
      */
     public static ItemStack filledMap(int id) {
-        ItemStack map = new ItemStack(Items.FILLED_MAP);
-        map.getOrCreateTag().putInt("map", id);
-        return map;
+        return new ItemStack(Items.FILLED_MAP, 1, id);
     }
 
     /**
-     * A shulker box whose {@code tag.BlockEntityTag.Items} nests {@code contents} (below 1.20.5, no container
-     * component).
+     * A shulker box whose {@code tag.BlockEntityTag.Items} nests {@code contents}. At this band shulker boxes are
+     * sixteen per-color blocks with no colorless variant; the color is incidental to the fixture.
      */
     public static ItemStack shulkerHolding(ItemStack... contents) {
-        ItemStack shulker = new ItemStack(Blocks.SHULKER_BOX);
-        CompoundTag blockEntityTag = new CompoundTag();
-        blockEntityTag.put("Items", ItemFixtures.items(contents));
-        shulker.getOrCreateTag().put("BlockEntityTag", blockEntityTag);
+        ItemStack shulker = new ItemStack(Blocks.PURPLE_SHULKER_BOX);
+        NBTTagCompound blockEntityTag = new NBTTagCompound();
+        blockEntityTag.setTag("Items", ItemFixtures.items(contents));
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setTag("BlockEntityTag", blockEntityTag);
+        shulker.setTagCompound(tag);
         return shulker;
     }
 
     /** The captured {@code Items} holder tag for {@code stacks}, serialized through {@code sink}. */
-    public static CompoundTag holderOf(ContainerSink sink, ItemStack... stacks) {
+    public static NBTTagCompound holderOf(ContainerSink sink, ItemStack... stacks) {
         NonNullList<ItemStack> items = NonNullList.withSize(stacks.length, ItemStack.EMPTY);
         for (int i = 0; i < stacks.length; i++) {
             items.set(i, stacks[i]);
@@ -50,7 +51,7 @@ public final class MapHolderFixtures {
     }
 
     /** A holder whose items are filled maps referencing {@code mapIds}, in order. */
-    public static CompoundTag holderReferencing(ContainerSink sink, int... mapIds) {
+    public static NBTTagCompound holderReferencing(ContainerSink sink, int... mapIds) {
         ItemStack[] maps = new ItemStack[mapIds.length];
         for (int i = 0; i < mapIds.length; i++) {
             maps[i] = filledMap(mapIds[i]);

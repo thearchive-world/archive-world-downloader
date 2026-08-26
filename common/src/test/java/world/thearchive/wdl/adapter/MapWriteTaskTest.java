@@ -15,8 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.CompressedStreamTools;
 import org.apache.logging.log4j.LogManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -43,10 +43,10 @@ class MapWriteTaskTest {
                 "failed to write map data {}", "it renders blank in the reopened world");
     }
 
-    private static CompoundTag mapData() {
-        CompoundTag data = new CompoundTag();
-        data.putString("dimension", "minecraft:overworld");
-        data.putByteArray("colors", new byte[16384]);
+    private static NBTTagCompound mapData() {
+        NBTTagCompound data = new NBTTagCompound();
+        data.setString("dimension", "minecraft:overworld");
+        data.setByteArray("colors", new byte[16384]);
         return data;
     }
 
@@ -58,11 +58,11 @@ class MapWriteTaskTest {
         LiveCaptureSession.mapWriteTask(dataDirectory, "map_7", mapData(), failures, lossLog()).run();
 
         assertEquals(0, failures.get(), "a successful write counts no failure");
-        CompoundTag envelope;
+        NBTTagCompound envelope;
         try (InputStream in = Files.newInputStream(dataDirectory.resolve("map_7.dat"))) {
-            envelope = NbtIo.readCompressed(in);
+            envelope = CompressedStreamTools.readCompressed(in);
         }
-        assertEquals("minecraft:overworld", envelope.getCompound("data").getString("dimension"),
+        assertEquals("minecraft:overworld", envelope.getCompoundTag("data").getString("dimension"),
                 "the map reached disk under its key carrying the caller's own tag");
     }
 

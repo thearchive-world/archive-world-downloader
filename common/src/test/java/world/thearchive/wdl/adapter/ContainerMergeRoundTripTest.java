@@ -8,12 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.customNameOf;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.namedBlockEntity;
 
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.util.NonNullList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.inventory.ItemStackHelper;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.init.Blocks;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for container capture: the {@link ContainerSink} 1.21.11 path (captureItems -> merge) plus
- * vanilla's own {@code ContainerHelper.loadAllItems} read-back is a self-consistent round-trip: the captured slots
+ * vanilla's own {@code ItemStackHelper.loadAllItems} read-back is a self-consistent round-trip: the captured slots
  * survive serialization, land on the block-entity tag under {@code "Items"}, and decode to the same stacks at the same
  * slots, with no other block-entity field clobbered.
  *
@@ -40,7 +41,7 @@ class ContainerMergeRoundTripTest {
     }
 
     /** A captured client chest BE tag carrying a real non-Items field, to assert no clobber. */
-    private static CompoundTag chestTag(int x, int y, int z) {
+    private static NBTTagCompound chestTag(int x, int y, int z) {
         return namedBlockEntity("minecraft:chest", x, y, z, "keep-me");
     }
 
@@ -59,30 +60,30 @@ class ContainerMergeRoundTripTest {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 5));
         items.set(13, new ItemStack(Items.STICK, 2));
-        items.set(26, new ItemStack(Blocks.OAK_PLANKS, 64));
+        items.set(26, new ItemStack(Blocks.PLANKS, 64));
 
-        CompoundTag holder = sink.captureItems(items);
-        assertTrue(holder.contains("Items"), "captureItems must build the vanilla Items holder");
+        NBTTagCompound holder = sink.captureItems(items);
+        assertTrue(holder.hasKey("Items"), "captureItems must build the vanilla Items holder");
 
-        CompoundTag merged = sink.merge(chestTag(10, 64, -7), holder);
+        NBTTagCompound merged = sink.merge(chestTag(10, 64, -7), holder);
 
         // No field clobber: id / pos / unrelated fields survive.
         assertEquals("minecraft:chest", merged.getString("id"));
-        assertEquals(10, merged.getInt("x"));
-        assertEquals(64, merged.getInt("y"));
-        assertEquals(-7, merged.getInt("z"));
+        assertEquals(10, merged.getInteger("x"));
+        assertEquals(64, merged.getInteger("y"));
+        assertEquals(-7, merged.getInteger("z"));
         assertEquals("keep-me", customNameOf(merged));
 
         // The merged "Items" decode via vanilla loadAllItems back to the same stacks at the same slots.
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(merged, back);
+        ItemStackHelper.loadAllItems(merged, back);
 
         assertEquals(3, countNonEmpty(back), "exactly the three captured stacks come back");
         assertEquals(Items.DIAMOND, back.get(0).getItem());
         assertEquals(5, back.get(0).getCount());
         assertEquals(Items.STICK, back.get(13).getItem());
         assertEquals(2, back.get(13).getCount());
-        assertEquals(Blocks.OAK_PLANKS.asItem(), back.get(26).getItem());
+        assertEquals(Item.getItemFromBlock(Blocks.PLANKS), back.get(26).getItem());
         assertEquals(64, back.get(26).getCount());
     }
 
@@ -90,12 +91,12 @@ class ContainerMergeRoundTripTest {
     void mergeDoesNotMutateTheCapturedBlockEntityTag() {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
         items.set(0, new ItemStack(Items.DIAMOND, 1));
-        CompoundTag holder = sink.captureItems(items);
+        NBTTagCompound holder = sink.captureItems(items);
 
-        CompoundTag blockEntity = chestTag(0, 0, 0);
+        NBTTagCompound blockEntity = chestTag(0, 0, 0);
         sink.merge(blockEntity, holder);
 
-        assertTrue(blockEntity.getList("Items", 10).isEmpty(),
+        assertTrue(blockEntity.getTagList("Items", 10).isEmpty(),
                 "merge must write a copy, never mutate the input BE tag");
     }
 
@@ -103,10 +104,10 @@ class ContainerMergeRoundTripTest {
     void openedButEmptyContainerMergesToNoItems() {
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
 
-        CompoundTag merged = sink.merge(chestTag(1, 1, 1), sink.captureItems(items));
+        NBTTagCompound merged = sink.merge(chestTag(1, 1, 1), sink.captureItems(items));
 
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(merged, back);
+        ItemStackHelper.loadAllItems(merged, back);
         assertEquals(0, countNonEmpty(back), "an opened-but-empty container stays empty and uncorrupted");
     }
 }

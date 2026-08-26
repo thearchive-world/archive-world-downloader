@@ -20,11 +20,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.nbt.ByteArrayTag;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.nbt.NBTTagByteArray;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTBase;
+import net.minecraft.item.ItemStack;
+import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,24 +52,24 @@ class MapArchiveTest {
      * {@code "locked"} and the {@code "xCenter"}/{@code "zCenter"} vanilla always writes, so a fixture that varies
      * either one is comparing realistic tags.
      */
-    private static CompoundTag mapData(int colorFill, int scale, DimensionType dimension, boolean locked) {
+    private static NBTTagCompound mapData(int colorFill, int scale, DimensionType dimension, boolean locked) {
         byte[] colors = new byte[16384];
         Arrays.fill(colors, (byte) colorFill);
-        CompoundTag data = new CompoundTag();
-        data.put("colors", new ByteArrayTag(colors));
-        data.putByte("scale", (byte) scale);
-        data.putInt("dimension", dimension.getId()); // at 1.15.2 vanilla writes the map dimension as an int id
-        data.putBoolean("locked", locked);
-        data.putInt("xCenter", 0);
-        data.putInt("zCenter", 0);
+        NBTTagCompound data = new NBTTagCompound();
+        data.setTag("colors", new NBTTagByteArray(colors));
+        data.setByte("scale", (byte) scale);
+        data.setInteger("dimension", dimension.getId()); // at 1.15.2 vanilla writes the map dimension as an int id
+        data.setBoolean("locked", locked);
+        data.setInteger("xCenter", 0);
+        data.setInteger("zCenter", 0);
         return data;
     }
 
-    private static CompoundTag picture(int colorFill) {
-        return mapData(colorFill, 0, DimensionType.field_18954, true);
+    private static NBTTagCompound picture(int colorFill) {
+        return mapData(colorFill, 0, DimensionType.OVERWORLD, true);
     }
 
-    private static Set<Integer> collect(CompoundTag holder) {
+    private static Set<Integer> collect(NBTTagCompound holder) {
         Set<Integer> ids = new LinkedHashSet<>();
         MapIdCollector.collectFromItemList(holder, "Items", ids);
         return ids;
@@ -77,11 +77,11 @@ class MapArchiveTest {
 
     /** A collecting sink: records each streamed (archiveId, dataTag), in order, and counts fires. */
     private static final class CollectingSink implements MapArchive.MapDataSink {
-        final Map<Integer, Tag> streamed = new LinkedHashMap<>();
+        final Map<Integer, NBTBase> streamed = new LinkedHashMap<>();
         int fires;
 
         @Override
-        public void accept(int archiveId, Tag dataTag) {
+        public void accept(int archiveId, NBTBase dataTag) {
             fires++;
             streamed.put(archiveId, dataTag);
         }
@@ -96,7 +96,7 @@ class MapArchiveTest {
                 throw new RuntimeException(e);
             }
         });
-        Tag idCounts = archive.idCountsTag();
+        NBTBase idCounts = archive.idCountsTag();
         if (idCounts != null) {
             try {
                 MapDataWriter.write(dataDirectory, "idcounts", idCounts);
@@ -108,15 +108,15 @@ class MapArchiveTest {
 
     @Test
     void hashIgnoresLockedAndCentersButTracksColorsScaleDimension() {
-        String base = MapArchive.hashOf(mapData(7, 1, DimensionType.field_18954, true));
-        assertEquals(base, MapArchive.hashOf(mapData(7, 1, DimensionType.field_18954, false)),
+        String base = MapArchive.hashOf(mapData(7, 1, DimensionType.OVERWORLD, true));
+        assertEquals(base, MapArchive.hashOf(mapData(7, 1, DimensionType.OVERWORLD, false)),
                 "a lock-state flip resolves to the same id");
-        CompoundTag recentered = mapData(7, 1, DimensionType.field_18954, true);
-        recentered.putInt("xCenter", 512);
-        recentered.putInt("zCenter", -512);
+        NBTTagCompound recentered = mapData(7, 1, DimensionType.OVERWORLD, true);
+        recentered.setInteger("xCenter", 512);
+        recentered.setInteger("zCenter", -512);
         assertEquals(base, MapArchive.hashOf(recentered), "a recentered map resolves to the same id");
-        assertNotEquals(base, MapArchive.hashOf(mapData(8, 1, DimensionType.field_18954, true)), "colors matter");
-        assertNotEquals(base, MapArchive.hashOf(mapData(7, 2, DimensionType.field_18954, true)), "scale matters");
+        assertNotEquals(base, MapArchive.hashOf(mapData(8, 1, DimensionType.OVERWORLD, true)), "colors matter");
+        assertNotEquals(base, MapArchive.hashOf(mapData(7, 2, DimensionType.OVERWORLD, true)), "scale matters");
         assertNotEquals(base, MapArchive.hashOf(mapData(7, 1, DimensionType.NETHER, true)), "dimension matters");
     }
 
@@ -177,7 +177,7 @@ class MapArchiveTest {
     void remapRewritesHolderItemsToArchiveIds() {
         CollectingSink stream = new CollectingSink();
         MapArchive archive = new MapArchive(MapManifest.empty(), id -> id == 1988 ? picture(1) : picture(2), stream);
-        CompoundTag holder = holderReferencing(sink, 1988, 1993);
+        NBTTagCompound holder = holderReferencing(sink, 1988, 1993);
 
         archive.remap(holder, "Items");
 
@@ -191,20 +191,20 @@ class MapArchiveTest {
         // Below 1.15 vanilla ItemStack.save shares the live stack's tag compound instead of copying it, so a
         // capture that does not detach hands the remap the player's own held item.
         ItemStack live = filledMap(1988);
-        CompoundTag holder = holderOf(sink, live);
+        NBTTagCompound holder = holderOf(sink, live);
 
         archive.remap(holder, "Items");
 
         assertEquals(ImmutableSet.of(archive.archiveIdFor(1988)), collect(holder),
                 "the captured holder carries the archive id");
-        assertEquals(1988, live.getOrCreateTag().getInt("map"),
+        assertEquals(1988, live.getMetadata(),
                 "the live stack keeps the server's map id, so a held map still renders");
     }
 
     @Test
     void renumberingServerResumeReResolvesToTheSameArchiveIds(@TempDir Path directory) throws IOException {
-        CompoundTag pictureP = picture(1);
-        CompoundTag pictureQ = picture(2);
+        NBTTagCompound pictureP = picture(1);
+        NBTTagCompound pictureQ = picture(2);
         Path manifestA = directory.resolve("a").resolve("wdl").resolve("map-ids");
         Path dataA = directory.resolve("a").resolve("data");
         Path manifestB = directory.resolve("b").resolve("wdl").resolve("map-ids");
@@ -214,7 +214,7 @@ class MapArchiveTest {
         CollectingSink sinkA = new CollectingSink();
         MapArchive archiveA = new MapArchive(MapManifest.empty(),
                 id -> id == 1988 ? pictureP : id == 1993 ? pictureQ : null, sinkA);
-        CompoundTag holderA = holderReferencing(sink, 1988, 1993);
+        NBTTagCompound holderA = holderReferencing(sink, 1988, 1993);
         archiveA.remap(holderA, "Items");
         writeDataFiles(dataA, sinkA, archiveA);
         archiveA.manifest().save(manifestA);
@@ -226,7 +226,7 @@ class MapArchiveTest {
         resumed.raiseCounterAbove(MapManifest.highestDataFileId(dataA));
         CollectingSink sinkB = new CollectingSink();
         MapArchive archiveB = new MapArchive(resumed, id -> id == 0 ? pictureQ : id == 1 ? pictureP : null, sinkB);
-        CompoundTag holderB = holderReferencing(sink, 0, 1);
+        NBTTagCompound holderB = holderReferencing(sink, 0, 1);
         archiveB.remap(holderB, "Items");
         writeDataFiles(dataB, sinkB, archiveB);
         archiveB.manifest().save(manifestB);

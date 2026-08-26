@@ -11,12 +11,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.village.class_1144;
-import net.minecraft.village.class_1145;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.village.MerchantRecipe;
+import net.minecraft.village.MerchantRecipeList;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -43,39 +43,39 @@ class MerchantStashMergeTest {
         TestRegistries.bootstrap();
     }
 
-    private static CompoundTag villager(UUID uuid) {
+    private static NBTTagCompound villager(UUID uuid) {
         return EntityFixtures.entity("minecraft:villager", uuid);
     }
 
-    private static CompoundTag wanderingTrader(UUID uuid) {
+    private static NBTTagCompound wanderingTrader(UUID uuid) {
         return EntityFixtures.entity("minecraft:wandering_trader", uuid);
     }
 
-    private static CompoundTag entitiesChunk(CompoundTag... entities) {
+    private static NBTTagCompound entitiesChunk(NBTTagCompound... entities) {
         return EntityFixtures.entityChunkTagWith(entities);
     }
 
     /** The Recipes offers holder vanilla's own trade-list NBT write produces, one offer selling the item. */
-    private static CompoundTag offersWith(String sellId) {
+    private static NBTTagCompound offersWith(String sellId) {
         // This band's merchant offer takes a plain buy/sell ItemStack pair, no trade experience or price multiplier.
-        class_1145 offers = new class_1145();
-        offers.add(new class_1144(new ItemStack(Items.EMERALD, 1), ItemFixtures.stack(sellId)));
-        return offers.method_3557();
+        MerchantRecipeList offers = new MerchantRecipeList();
+        offers.add(new MerchantRecipe(new ItemStack(Items.EMERALD, 1), ItemFixtures.stack(sellId)));
+        return offers.getRecipiesAsTags();
     }
 
-    private static CompoundTag merchantHolder(CompoundTag offers, @Nullable Integer xp) {
-        CompoundTag holder = new CompoundTag();
-        holder.put("Offers", offers);
+    private static NBTTagCompound merchantHolder(NBTTagCompound offers, @Nullable Integer xp) {
+        NBTTagCompound holder = new NBTTagCompound();
+        holder.setTag("Offers", offers);
         if (xp != null) {
-            holder.putInt("Xp", xp);
+            holder.setInteger("Xp", xp);
         }
         return holder;
     }
 
-    private static CompoundTag node(CompoundTag chunk, UUID uuid) {
-        ListTag entities = chunk.getList("Entities", 10);
-        for (int i = 0; i < entities.size(); i++) {
-            CompoundTag found = EntityTreeWalk.byUuid(entities.getCompound(i)).get(uuid);
+    private static NBTTagCompound node(NBTTagCompound chunk, UUID uuid) {
+        NBTTagList entities = chunk.getTagList("Entities", 10);
+        for (int i = 0; i < entities.tagCount(); i++) {
+            NBTTagCompound found = EntityTreeWalk.byUuid(entities.getCompoundTagAt(i)).get(uuid);
             if (found != null) {
                 return found;
             }
@@ -83,54 +83,54 @@ class MerchantStashMergeTest {
         throw new AssertionError("no node " + uuid);
     }
 
-    private static String firstSellId(CompoundTag entity) {
-        return entity.getCompound("Offers").getList("Recipes", 10).getCompound(0)
-                .getCompound("sell").getString("id");
+    private static String firstSellId(NBTTagCompound entity) {
+        return entity.getCompoundTag("Offers").getTagList("Recipes", 10).getCompoundTagAt(0)
+                .getCompoundTag("sell").getString("id");
     }
 
     @Test
     void mergeMerchantStashSetsOffersAndXpOnMatchingNode() {
-        CompoundTag chunk = entitiesChunk(villager(UUID_A), villager(UUID_B));
-        Map<UUID, CompoundTag> stash = new HashMap<>();
+        NBTTagCompound chunk = entitiesChunk(villager(UUID_A), villager(UUID_B));
+        Map<UUID, NBTTagCompound> stash = new HashMap<>();
         stash.put(UUID_A, merchantHolder(offersWith("minecraft:emerald"), 12));
 
         MergeTally tally = EntityContainerMerge.mergeMerchantStash(chunk, stash);
 
         assertEquals(1, tally.merged(), "only the villager present in this chunk folds");
         assertEquals(0, tally.failed(), "a plain-copy fold never fails");
-        assertEquals(12, node(chunk, UUID_A).getInt("Xp"), "the experience folds");
+        assertEquals(12, node(chunk, UUID_A).getInteger("Xp"), "the experience folds");
         assertEquals("minecraft:emerald", firstSellId(node(chunk, UUID_A)), "the trades fold");
-        assertFalse(node(chunk, UUID_B).contains("Offers"), "the neighbor villager is untouched");
+        assertFalse(node(chunk, UUID_B).hasKey("Offers"), "the neighbor villager is untouched");
         assertTrue(stash.isEmpty(), "the merged entry is drained");
     }
 
     @Test
     void mergeMerchantStashWanderingTraderHolderHasNoXp() {
-        CompoundTag chunk = entitiesChunk(wanderingTrader(UUID_A));
-        Map<UUID, CompoundTag> stash = new HashMap<>();
+        NBTTagCompound chunk = entitiesChunk(wanderingTrader(UUID_A));
+        Map<UUID, NBTTagCompound> stash = new HashMap<>();
         stash.put(UUID_A, merchantHolder(offersWith("minecraft:emerald"), null)); // no Xp for a wandering trader
 
         EntityContainerMerge.mergeMerchantStash(chunk, stash);
 
-        assertTrue(node(chunk, UUID_A).get("Offers") instanceof CompoundTag, "the trades fold");
-        assertFalse(node(chunk, UUID_A).contains("Xp"), "a wandering trader gets no experience");
+        assertTrue(node(chunk, UUID_A).getTag("Offers") instanceof NBTTagCompound, "the trades fold");
+        assertFalse(node(chunk, UUID_A).hasKey("Xp"), "a wandering trader gets no experience");
     }
 
     @Test
     void mergeMerchantStashOnAnEmptyStashFoldsNothing() {
-        CompoundTag chunk = entitiesChunk(villager(UUID_A));
+        NBTTagCompound chunk = entitiesChunk(villager(UUID_A));
 
         MergeTally tally = EntityContainerMerge.mergeMerchantStash(chunk, new HashMap<>());
 
         assertEquals(0, tally.merged(), "an empty stash folds nothing");
         assertEquals(0, tally.failed());
-        assertFalse(node(chunk, UUID_A).contains("Offers"), "the villager is untouched");
+        assertFalse(node(chunk, UUID_A).hasKey("Offers"), "the villager is untouched");
     }
 
     @Test
     void refoldFlushedMerchantsReappliesToAnotherChunkCopy() {
-        CompoundTag chunkB = entitiesChunk(villager(UUID_A)); // the same trader, in another entity-chunk
-        Map<UUID, CompoundTag> folded = new LinkedHashMap<>();
+        NBTTagCompound chunkB = entitiesChunk(villager(UUID_A)); // the same trader, in another entity-chunk
+        Map<UUID, NBTTagCompound> folded = new LinkedHashMap<>();
         folded.put(UUID_A, merchantHolder(offersWith("minecraft:emerald"), 3)); // already folded in chunk A
 
         MergeTally tally = EntityContainerMerge.refoldFlushedMerchants(chunkB, folded, new HashMap<>());
@@ -142,25 +142,25 @@ class MerchantStashMergeTest {
 
     @Test
     void refoldFlushedMerchantsSkipsUuidWithFresherStashedCapture() {
-        CompoundTag chunkB = entitiesChunk(villager(UUID_A));
-        Map<UUID, CompoundTag> folded = new LinkedHashMap<>();
+        NBTTagCompound chunkB = entitiesChunk(villager(UUID_A));
+        Map<UUID, NBTTagCompound> folded = new LinkedHashMap<>();
         folded.put(UUID_A, merchantHolder(offersWith("minecraft:emerald"), 3));
-        Map<UUID, CompoundTag> stash = new HashMap<>();
+        Map<UUID, NBTTagCompound> stash = new HashMap<>();
         stash.put(UUID_A, merchantHolder(offersWith("minecraft:diamond"), 9)); // reopened; its own fold runs next
 
         EntityContainerMerge.refoldFlushedMerchants(chunkB, folded, stash);
 
-        assertFalse(node(chunkB, UUID_A).contains("Offers"), "the stale fold is skipped, not applied");
+        assertFalse(node(chunkB, UUID_A).hasKey("Offers"), "the stale fold is skipped, not applied");
     }
 
     @Test
     void refoldFlushedMerchantsOnEmptyFoldedFoldsNothing() {
-        CompoundTag chunkB = entitiesChunk(villager(UUID_A));
+        NBTTagCompound chunkB = entitiesChunk(villager(UUID_A));
 
         MergeTally tally = EntityContainerMerge.refoldFlushedMerchants(chunkB, new LinkedHashMap<>(), new HashMap<>());
 
         assertEquals(0, tally.merged(), "nothing folded yet, nothing to re-apply");
         assertEquals(0, tally.failed());
-        assertFalse(node(chunkB, UUID_A).contains("Offers"));
+        assertFalse(node(chunkB, UUID_A).hasKey("Offers"));
     }
 }
