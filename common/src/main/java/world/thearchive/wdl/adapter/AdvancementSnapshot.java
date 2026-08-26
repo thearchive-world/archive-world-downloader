@@ -7,44 +7,44 @@ import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementProgress;
-import net.minecraft.client.multiplayer.ClientAdvancements;
+import net.minecraft.client.multiplayer.ClientAdvancementManager;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Snapshots the client's advancement progress into an id-string keyed map. The progress map inside
- * {@link ClientAdvancements} is private; {@link ClientAdvancements#setListener} is the only public enumeration path and
- * synchronously replays every stored entry to the listener, so we install a harvesting listener, copy what it replays,
- * then clear it (restoring the no-listener state the advancements screen expects when closed). The id is taken as a
- * {@code String} so the band-renamed id type ({@code ResourceLocation} vs {@code Identifier}) never appears here.
+ * {@link ClientAdvancementManager} is private; {@link ClientAdvancementManager#setListener} is the only public
+ * enumeration path and synchronously replays every stored entry to the listener, so we install a harvesting listener,
+ * copy what it replays, then clear it (restoring the no-listener state the advancements screen expects when closed).
+ * The id is taken as a {@code String} so the band-renamed id type never appears here.
  */
 final class AdvancementSnapshot {
     private AdvancementSnapshot() {}
 
-    static Map<String, AdvancementProgress> byId(ClientAdvancements advancements) {
+    static Map<String, AdvancementProgress> byId(ClientAdvancementManager advancements) {
         Map<String, AdvancementProgress> byId = new HashMap<>();
-        advancements.setListener(new ClientAdvancements.Listener() {
+        advancements.setListener(new ClientAdvancementManager.IListener() {
             @Override
             public void onUpdateAdvancementProgress(Advancement advancement, AdvancementProgress progress) {
                 byId.put(advancement.getId().toString(), progress);
             }
 
             @Override
-            public void onSelectedTabChanged(@Nullable Advancement advancement) {}
+            public void setSelectedTab(@Nullable Advancement advancement) {}
 
             @Override
-            public void onAddAdvancementRoot(Advancement advancement) {}
+            public void rootAdvancementAdded(Advancement advancement) {}
 
             @Override
-            public void onRemoveAdvancementRoot(Advancement advancement) {}
+            public void rootAdvancementRemoved(Advancement advancement) {}
 
             @Override
-            public void onAddAdvancementTask(Advancement advancement) {}
+            public void nonRootAdvancementAdded(Advancement advancement) {}
 
             @Override
-            public void onRemoveAdvancementTask(Advancement advancement) {}
+            public void nonRootAdvancementRemoved(Advancement advancement) {}
 
             @Override
-            public void onAdvancementsCleared() {}
+            public void advancementsCleared() {}
         });
         advancements.setListener(null);
         return byId;

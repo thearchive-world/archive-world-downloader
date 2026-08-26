@@ -2983,35 +2983,27 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Throwing is the caller's fail-soft contract.
      */
     private CapturedProgress assembleCapturedProgress(EntityPlayerSP player, Minecraft minecraft) {
-        int dataVersion = currentDataVersion();
         byte[] advancements = null;
         if (config.captureAdvancements()) {
             // Per-surface fail-soft: an advancement-encode throw nulls only this blob, so the sibling stats
             // surface still lands (mirroring the writer's per-file isolation). The outer failSoft on the whole
-            // assembly stays the backstop for the shared steps, the data version and the uuid.
+            // assembly stays the backstop for the shared step, the uuid.
             advancements = failSoft("advancements", () -> {
                 NetHandlerPlayClient connection = minecraft.getConnection();
                 Map<String, AdvancementProgress> byId = connection != null
-                        ? AdvancementSnapshot.byId(connection.getAdvancements())
+                        ? AdvancementSnapshot.byId(connection.getAdvancementManager())
                         : ImmutableMap.of();
-                return PlayerProgressSerializer.advancementsJson(byId, dataVersion);
+                return PlayerProgressSerializer.advancementsJson(byId);
             });
         }
         boolean captureStatistics = config.captureStatistics();
         byte[] stats = captureStatistics
-                ? PlayerProgressSerializer.statsJson(player.getStats(), dataVersion)
+                ? PlayerProgressSerializer.statsJson(player.getStatFileWriter())
                 : null;
         if (captureStatistics && stats == null) {
             LOGGER.warn("statistics not captured: no stats reply received before finish");
         }
         return new CapturedProgress(player.getUUID(), advancements, stats);
-    }
-
-    /** The data version, the band-stable stamp the region chunks also carry. */
-    private static int currentDataVersion() {
-        // This band's SharedConstants exposes no version object (getCurrentVersion is a later addition), so the value
-        // is the 1.13.2 world data version constant, the same one the chunk codec stamps on every region chunk.
-        return 1631;
     }
 
     /**

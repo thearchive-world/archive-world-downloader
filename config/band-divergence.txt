@@ -94,8 +94,11 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # ChunkStatus promotion (a classic client chunk is always full); the double chest is recognized by the
 # pre-Flattening neighbor probe (no ChestType property) with the lower-coordinate half taking slots 0-26; the
 # villager trades are read off GuiMerchant.getMerchant().getRecipes as a MerchantRecipeList; the by-key map data
-# loads through World.getMapStorage; and the NBT/dimension/save-format API is classic MCP (NBTTagCompound,
-# DimensionType.getName, AnvilSaveConverter/ISaveFormat).
+# loads through World.getMapStorage; the NBT/dimension/save-format API is classic MCP (NBTTagCompound,
+# DimensionType.getName, AnvilSaveConverter/ISaveFormat); the advancement manager is read through
+# NetHandlerPlayClient.getAdvancementManager (ClientAdvancementManager) rather than getAdvancements; the player's stat
+# holder is EntityPlayerSP.getStatFileWriter (StatisticsManager) rather than getStats; and neither progress surface
+# carries a DataVersion stamp, so the assembly step drops the shared data-version local entirely.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
@@ -381,7 +384,10 @@ common/src/main/java/world/thearchive/wdl/adapter/CapturedPlayer.java
 common/src/main/java/world/thearchive/wdl/adapter/PlayerSink.java
 
 # Below 1.20.2 there is no AdvancementProgress.CODEC, so the advancement value is serialized through vanilla's own
-# AdvancementProgress.Serializer Gson adapter rather than encoded through a codec.
+# AdvancementProgress.Serializer Gson adapter rather than encoded through a codec. Below 1.13 there is no
+# Registry.STAT_TYPE or generic StatType, only the flat StatBase/StatCrafting hierarchy, so the stats shape is a flat
+# {stat.id: count} object enumerated over StatList.ALL_STATS rather than grouped by stat type, and neither progress
+# surface stamps a DataVersion (both are 1.13+ additions, added alongside the Flattening's stat id rename).
 common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressSerializer.java
 
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
@@ -618,7 +624,12 @@ common/src/test/java/world/thearchive/wdl/adapter/ContainerMapCollectionTest.jav
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 
 # Below 1.20.2 there is no AdvancementHolder/AdvancementNode split (the advancement datapack rewrite is 1.20.2),
-# so the harvesting ClientAdvancements.Listener works in Advancement and reads the id via Advancement.getId().
+# so the harvesting ClientAdvancements.Listener works in Advancement and reads the id via Advancement.getId(). Below
+# 1.13 the harvesting listener is ClientAdvancementManager.IListener (the ClientAdvancements rename target), whose
+# add/remove-root/task callbacks are named rootAdvancementAdded/rootAdvancementRemoved and
+# nonRootAdvancementAdded/nonRootAdvancementRemoved rather than onAddAdvancementRoot/onRemoveAdvancementRoot and
+# onAddAdvancementTask/onRemoveAdvancementTask, and whose selected-tab callback is setSelectedTab rather than
+# onSelectedTabChanged.
 common/src/main/java/world/thearchive/wdl/adapter/AdvancementSnapshot.java
 
 # Below 1.20.2 there is no configuration phase, so the connection tee does not observe
