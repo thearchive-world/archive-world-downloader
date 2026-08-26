@@ -193,6 +193,39 @@ tasks.named<ProcessResources>("processResources") {
     filesMatching("wdl-publishing.properties") { expand(tokens) }
 }
 
+// --- Lang catalog conversion (JSON -> .lang) ---
+// MC 1.12.2 loads .lang (key=value), the format Mojang replaced at 1.13. The JSON catalog under
+// common/src/main/resources/assets/wdl/lang stays the source of truth (LangFidelityTest/LangKeyCoverageTest/etc.
+// keep reading it, unaffected by this task); this task converts a copy to .lang at package time so the shipped
+// jar carries the format 1.12.2 expects. Uses Gradle's bundled groovy.json.JsonSlurper, no new buildscript
+// dependency; keys are sorted for byte-reproducibility.
+abstract class ConvertLangToProperties : DefaultTask() {
+    @get:InputDirectory abstract val jsonDir: DirectoryProperty
+    @get:OutputDirectory abstract val outDir: DirectoryProperty
+
+    @TaskAction fun convert() {
+        val out = outDir.get().asFile
+        out.deleteRecursively(); out.mkdirs()
+        jsonDir.get().asFile.listFiles { f -> f.extension == "json" }?.sortedBy { it.name }?.forEach { json ->
+            @Suppress("UNCHECKED_CAST")
+            val map = groovy.json.JsonSlurper().parse(json) as Map<String, Any?>
+            val lang = out.resolve(json.nameWithoutExtension + ".lang")
+            lang.bufferedWriter(Charsets.UTF_8).use { w ->
+                map.toSortedMap().forEach { (k, v) ->
+                    w.write("$k=${v.toString().replace("\n", " ")}"); w.write("\n")
+                }
+            }
+        }
+    }
+}
+
+val convertLang = tasks.register<ConvertLangToProperties>("convertLang") {
+    group = "build"
+    description = "Converts the JSON lang catalog to 1.12.2 .lang (key=value) for the ship jar."
+    jsonDir.set(layout.projectDirectory.dir("../common/src/main/resources/assets/wdl/lang"))
+    outDir.set(layout.buildDirectory.dir("generated-lang/assets/wdl/lang"))
+}
+
 // --- Reobf fixture packaging ---
 // Unimined reobfs main natively (verified in the spike: the production jar carries SRG func_74762_e), so unlike
 // the 1.13.2 island there is no hand-rolled ReobfMojmapToSrg pass standing between the reobftest source set and
@@ -217,13 +250,17 @@ tasks.named<Jar>("remapJar") {
 // --- Ship jar (modJar) + the checkShipJar class-file health gate ---
 // The shipped Forge jar must be the reobf'd, searge-named artifact. Unimined's defaultRemapJar produces that jar
 // natively (the "remapJar" task; the plain `jar` task stays the MCP-named dev jar), so modJar wraps it under the
-// island's own archive-name convention rather than re-deriving reobf: it sources Unimined's own remapped output
-// plus the token-expanded resources (mcmod.info, accesstransformer.cfg, pack.mcmeta, common lang/assets) from
-// processResources, mirroring the higher bands' remapJar-as-ship-artifact split.
+// island's own archive-name convention rather than re-deriving reobf: it sources Unimined's own remapped output,
+// which already carries the token-expanded resources (mcmod.info, accesstransformer.cfg, pack.mcmeta, common
+// assets) since remapJar repackages the "jar" task's own sourceSet output; a direct from(processResources) would
+// only re-add the identical bytes a second time. The one resource this island packages differently from
+// processResources' own output is the lang directory: MC 1.12.2 loads .lang, not the JSON Mojang adopted at
+// 1.13, so the source lang JSON is excluded here and convertLang's converted .lang output takes its place.
 val modJar = tasks.register<Jar>("modJar") {
     group = "build"
     description = "Assembles the shippable Forge mod jar: Unimined's native reobf'd (searge) classes + resources."
     dependsOn("remapJar")
+    dependsOn(convertLang)
     // A fresh Jar defaults archiveBaseName to the project name; restate the -forge coordinate base sets on the
     // default jar so the ship artifact is archive-wdl-forge-<version>.jar.
     archiveBaseName.set("${band("mod_archives_base")}-forge")
@@ -238,8 +275,11 @@ val modJar = tasks.register<Jar>("modJar") {
     }
     from(zipTree(tasks.named<Jar>("remapJar").flatMap { it.archiveFile })) {
         exclude("META-INF/MANIFEST.MF")
+        exclude("assets/wdl/lang/*.json")
     }
-    from(tasks.named("processResources"))
+    from(convertLang.map { it.outputs.files.singleFile }) {
+        into("assets/wdl/lang")
+    }
 }
 
 // The default jar carries a dev classifier so it never collides with modJar's ship name. It stays the
