@@ -697,10 +697,21 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.j
 # Forge did not introduce the TOML-based mods.toml manifest until the 25.x line at 1.13.2; below that floor
 # the loader still scans the legacy JSON mcmod.info this band ships instead (see forge/build.gradle.kts's
 # processResources token expansion). The forge/ tree diverges per band across its shim, platform bridge,
-# connection tee and mount reader; the access transformer is re-pinned for this band to the classic SRG
-# field_NNNNN_ member scheme (the 1.17-and-above bands use TSRGv2 f_NNNNN_) with the xa/ya/za move-delta widenings.
-# forge/build.gradle.kts is excluded from the diff as a *.gradle.kts.
+# connection tee and mount reader. forge/build.gradle.kts is excluded from the diff as a *.gradle.kts.
 forge/src/main/resources/mcmod.info
+
+# The other half of the same manifest split: the parent bands ship only mods.toml, which the loader at this band
+# cannot read, so this band ships only the mcmod.info above and mods.toml is absent. Listed so the propagation diff
+# reads its absence as the intended band shape rather than as a dropped file.
+forge/src/main/resources/META-INF/mods.toml
+
+# The access transformer is re-pinned per band. This band keeps the classic SRG field_NNNNN_ member scheme (the
+# 1.17-and-above bands use TSRGv2 f_NNNNN_), and it carries no NetworkManager channel widening, since NetworkManager
+# exposes a public channel() getter here that the connection tee reads directly; the SPacketEntity entity id and the
+# ContainerHorseInventory horse are the only widened members left. Legacy FML also does not auto-discover the file
+# from its META-INF path the way the ModLauncher-era loaders do, so the shipped jar's manifest carries an
+# FMLAT attribute naming it, which the file's own header records.
+forge/src/main/resources/META-INF/accesstransformer.cfg
 
 # The Forge connection tee names the one member the Forge access transformer widens: the SPacketEntity entity id,
 # which is non-public with no getter. NetworkManager's channel needs no widening at this band, since it carries a
@@ -727,9 +738,10 @@ forge/src/main/resources/pack.mcmeta
 # fixture, kept separate from the real merged-main reobf path. Below the Mojmap floor there is no hand-rolled
 # Mojmap -> SRG remap to validate: Unimined's native reobf (defaultRemapJar) reobfuscates the shipped jar
 # MCP -> searge directly, so checkShipJar and checkReobfNegative instead scan this fixture's own class output
-# to prove that native pass and the searge-literal scan around it both fire correctly (checkShipJar stands in
-# for the real ship jar until the seam port re-vocabularizes common and lets modJar build). New at this
-# band; no higher band carries a hand-rolled Forge reobf island, so nothing to diff against on dev.
+# to prove that native pass and the searge-literal scan around it both fire correctly. checkShipJar itself scans
+# the real reobf'd ship jar; checkReobfNegative keeps this fixture as the inverted meta-test that proves the
+# searge scan still fires. New at this band; no higher band carries a hand-rolled Forge reobf island, so nothing
+# to diff against on dev.
 forge/src/reobftest/**
 
 # Below the 1.19 registry split the code-defined registries are static fields on Registry (Registry.ENTITY_TYPE),
