@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Recupera",
   "wdl.screen.downloads.restore": "⟲ Ripristina",
   "wdl.screen.downloads.restore_action": "Ripristina",
+  "wdl.screen.downloads.proceed_action": "Continua",
   "wdl.screen.downloads.tainted": "Giocatore singolo",
   "wdl.screen.downloads.partial": "Parziale",
   "wdl.screen.downloads.summary.chunks": "chunk",

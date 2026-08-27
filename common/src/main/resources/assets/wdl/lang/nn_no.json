@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Skipa opp att",
   "wdl.screen.downloads.restore": "⟲ Set attende",
   "wdl.screen.downloads.restore_action": "Set attende",
+  "wdl.screen.downloads.proceed_action": "Haldt fram",
   "wdl.screen.downloads.tainted": "Einspelar",
   "wdl.screen.downloads.partial": "Uheilsleg",
   "wdl.screen.downloads.summary.chunks": "Verdsbitar",

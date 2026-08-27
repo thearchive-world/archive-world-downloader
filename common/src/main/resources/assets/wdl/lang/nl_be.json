@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Herstellen",
   "wdl.screen.downloads.restore": "⟲ Terugzetten",
   "wdl.screen.downloads.restore_action": "Terugzetten",
+  "wdl.screen.downloads.proceed_action": "Doorgaan",
   "wdl.screen.downloads.tainted": "Alleen spelen",
   "wdl.screen.downloads.partial": "Incompleet",
   "wdl.screen.downloads.summary.chunks": "chunks",

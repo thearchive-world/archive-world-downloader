@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ 復元",
   "wdl.screen.downloads.restore": "⟲ 復旧",
   "wdl.screen.downloads.restore_action": "復旧",
+  "wdl.screen.downloads.proceed_action": "続ける",
   "wdl.screen.downloads.tainted": "シングルプレイ",
   "wdl.screen.downloads.partial": "不完全",
   "wdl.screen.downloads.summary.chunks": "チャンク",

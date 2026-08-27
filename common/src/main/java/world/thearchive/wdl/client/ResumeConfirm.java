@@ -40,7 +40,7 @@ public final class ResumeConfirm {
         } else {
             message = new TextComponentTranslation(keyPrefix + ".message_no_backup", amber(folderName));
         }
-        return create(keyPrefix, message, new TextComponentTranslation("gui.proceed"),
+        return create(keyPrefix, message, new TextComponentTranslation("wdl.screen.downloads.proceed_action"),
                 new TextComponentTranslation("gui.cancel"),
                 onContinue, onCancel);
     }
@@ -105,7 +105,8 @@ public final class ResumeConfirm {
                     amber(folderName), amber(sourceZipName));
         }
         return create("wdl.screen.downloads.confirm_tainted", message,
-                new TextComponentTranslation("gui.proceed"), new TextComponentTranslation("gui.cancel"), onContinue,
+                new TextComponentTranslation("wdl.screen.downloads.proceed_action"),
+                new TextComponentTranslation("gui.cancel"), onContinue,
                 onCancel);
     }
 

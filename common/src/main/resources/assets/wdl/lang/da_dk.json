@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Gendan",
   "wdl.screen.downloads.restore": "⟲ Genopret",
   "wdl.screen.downloads.restore_action": "Genopret",
+  "wdl.screen.downloads.proceed_action": "Fortsæt",
   "wdl.screen.downloads.tainted": "Singleplayer",
   "wdl.screen.downloads.partial": "Ufuldstændig",
   "wdl.screen.downloads.summary.chunks": "klodser",

@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Zachránit",
   "wdl.screen.downloads.restore": "⟲ Obnovit",
   "wdl.screen.downloads.restore_action": "Obnovit",
+  "wdl.screen.downloads.proceed_action": "Pokračovat",
   "wdl.screen.downloads.tainted": "Hra jednoho hráče",
   "wdl.screen.downloads.partial": "Částečné",
   "wdl.screen.downloads.summary.chunks": "chunky",

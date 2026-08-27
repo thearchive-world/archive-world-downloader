@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Відновити",
   "wdl.screen.downloads.restore": "⟲ Відновити з копії",
   "wdl.screen.downloads.restore_action": "Відновити",
+  "wdl.screen.downloads.proceed_action": "Продовжити",
   "wdl.screen.downloads.tainted": "Гра наодинці",
   "wdl.screen.downloads.partial": "Частково",
   "wdl.screen.downloads.summary.chunks": "чанки",

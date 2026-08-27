@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Gjenopprett",
   "wdl.screen.downloads.restore": "⟲ Tilbakestill",
   "wdl.screen.downloads.restore_action": "Tilbakestill",
+  "wdl.screen.downloads.proceed_action": "Fortsett",
   "wdl.screen.downloads.tainted": "Enkeltspiller",
   "wdl.screen.downloads.partial": "Ufullstendig",
   "wdl.screen.downloads.summary.chunks": "Verdensstykker",

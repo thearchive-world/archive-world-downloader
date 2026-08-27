@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Восстановить",
   "wdl.screen.downloads.restore": "⟲ Вернуть",
   "wdl.screen.downloads.restore_action": "Вернуть",
+  "wdl.screen.downloads.proceed_action": "Продолжить",
   "wdl.screen.downloads.tainted": "Одиночная игра",
   "wdl.screen.downloads.partial": "Неполное",
   "wdl.screen.downloads.summary.chunks": "Чанки",

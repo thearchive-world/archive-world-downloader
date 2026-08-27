@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Kurtar",
   "wdl.screen.downloads.restore": "⟲ Geri Yükle",
   "wdl.screen.downloads.restore_action": "Geri Yükle",
+  "wdl.screen.downloads.proceed_action": "Devam et",
   "wdl.screen.downloads.tainted": "Tek Oyunculu",
   "wdl.screen.downloads.partial": "Kısmi",
   "wdl.screen.downloads.summary.chunks": "yığın",

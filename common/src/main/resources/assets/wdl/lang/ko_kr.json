@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ 복구",
   "wdl.screen.downloads.restore": "⟲ 복원",
   "wdl.screen.downloads.restore_action": "복원",
+  "wdl.screen.downloads.proceed_action": "진행",
   "wdl.screen.downloads.tainted": "싱글플레이",
   "wdl.screen.downloads.partial": "불완전",
   "wdl.screen.downloads.summary.chunks": "청크",

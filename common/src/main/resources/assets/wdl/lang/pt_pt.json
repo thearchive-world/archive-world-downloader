@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Recuperar",
   "wdl.screen.downloads.restore": "⟲ Restaurar",
   "wdl.screen.downloads.restore_action": "Restaurar",
+  "wdl.screen.downloads.proceed_action": "Avançar",
   "wdl.screen.downloads.tainted": "Um jogador",
   "wdl.screen.downloads.partial": "Incompleta",
   "wdl.screen.downloads.summary.chunks": "chunks",

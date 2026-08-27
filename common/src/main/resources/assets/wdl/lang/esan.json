@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Recuperâh",
   "wdl.screen.downloads.restore": "⟲ Rêttaurâh",
   "wdl.screen.downloads.restore_action": "Rêttaurâh",
+  "wdl.screen.downloads.proceed_action": "Çegîh",
   "wdl.screen.downloads.tainted": "Un hugadôh",
   "wdl.screen.downloads.partial": "Incompleta",
   "wdl.screen.downloads.summary.chunks": "chunks",

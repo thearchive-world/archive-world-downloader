@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Återhämta",
   "wdl.screen.downloads.restore": "⟲ Återställ",
   "wdl.screen.downloads.restore_action": "Återställ",
+  "wdl.screen.downloads.proceed_action": "Fortsätt",
   "wdl.screen.downloads.tainted": "Enspelarläge",
   "wdl.screen.downloads.partial": "Delvis",
   "wdl.screen.downloads.summary.chunks": "datablock",

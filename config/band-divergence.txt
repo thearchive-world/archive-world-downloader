@@ -623,6 +623,8 @@ common/src/main/java/world/thearchive/wdl/adapter/StashHolder.java
 # Below 1.13 there is no Screen or ConfirmScreen, so the resume confirms are the classic GuiYesNo built with
 # plain-string title, message, and labels through ITextComponent.getFormattedText/getUnformattedText, and the amber
 # styling rides the legacy section codes getFormattedText emits.
+# Below 1.13 vanilla carries no gui.proceed key (added in 1.13), so the Continue verb resolves through the
+# wdl-owned wdl.screen.downloads.proceed_action key rather than the vanilla one the higher bands use.
 common/src/main/java/world/thearchive/wdl/client/ResumeConfirm.java
 
 # Below 1.20.3 there is no Crafter menu or block entity, so the crafter capture tests are dropped.
@@ -1139,3 +1141,10 @@ common/src/test/java/world/thearchive/wdl/adapter/StashHolderTest.java
 # This MC-free core test names the classic accessor in its prose: below 1.13 a packed position is BlockPos.toLong()
 # rather than the 1.13+ core-package BlockPos.asLong(), so the Javadoc and the opaque-packed-key comment say toLong().
 common/src/test/java/world/thearchive/wdl/core/OpenClickIntentTest.java
+
+# Below 1.13 vanilla carries no gui.proceed key, so this band's resume-confirm Continue button reads a wdl-owned
+# key instead: every locale carries an added wdl.screen.downloads.proceed_action entry (right after
+# restore_action) that the higher bands do not, its value copied from that locale's own vanilla gui.proceed
+# translation (en_us "Proceed") since the higher bands resolve the vanilla key directly and never gained an
+# equivalent wdl key.
+common/src/main/resources/assets/wdl/lang/*.json

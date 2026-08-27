@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Odzyskaj",
   "wdl.screen.downloads.restore": "⟲ Przywróć",
   "wdl.screen.downloads.restore_action": "Przywróć",
+  "wdl.screen.downloads.proceed_action": "Kontynuuj",
   "wdl.screen.downloads.tainted": "Tryb jednoosobowy",
   "wdl.screen.downloads.partial": "Niekompletne",
   "wdl.screen.downloads.summary.chunks": "chunki",

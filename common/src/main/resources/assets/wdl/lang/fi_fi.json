@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Korjaa",
   "wdl.screen.downloads.restore": "⟲ Palauta",
   "wdl.screen.downloads.restore_action": "Palauta",
+  "wdl.screen.downloads.proceed_action": "Jatka",
   "wdl.screen.downloads.tainted": "Yksinpeli",
   "wdl.screen.downloads.partial": "Osittainen",
   "wdl.screen.downloads.summary.chunks": "lohkot",

@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Restaurer",
   "wdl.screen.downloads.restore": "⟲ Rétablir",
   "wdl.screen.downloads.restore_action": "Rétablir",
+  "wdl.screen.downloads.proceed_action": "Procéder",
   "wdl.screen.downloads.tainted": "Partie solo",
   "wdl.screen.downloads.partial": "Incomplet",
   "wdl.screen.downloads.summary.chunks": "chunks",

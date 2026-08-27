@@ -33,6 +33,7 @@
   "wdl.screen.downloads.recover": "⟲ Salvage",
   "wdl.screen.downloads.restore": "⟲ Haul back",
   "wdl.screen.downloads.restore_action": "Haul back",
+  "wdl.screen.downloads.proceed_action": "Pruseed!",
   "wdl.screen.downloads.tainted": "Lonely voyage",
   "wdl.screen.downloads.partial": "Half-done",
   "wdl.screen.downloads.summary.chunks": "chunks",
