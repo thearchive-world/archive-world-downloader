@@ -696,11 +696,11 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.j
 # forge/build.gradle.kts is excluded from the diff as a *.gradle.kts.
 forge/src/main/resources/mcmod.info
 
-# The Forge connection tee names two members the Forge access transformer widens: NetworkManager's channel field and
-# the SPacketEntity entity id. NetworkManager has a public channel() getter at this band, so reading the widened field
-# is harmless conservatism; the entity-id field is non-public with no getter. It also narrows the packet's int
-# move-deltas to the shared ConnectionTee contract's short: at this band the deltas are int with public getters and
-# are read as a sign-extended short off the wire, so the narrowing is exact. New at this band.
+# The Forge connection tee names the one member the Forge access transformer widens: the SPacketEntity entity id,
+# which is non-public with no getter. NetworkManager's channel needs no widening at this band, since it carries a
+# public channel() getter the tee reads directly. It also narrows the packet's int move-deltas to the shared
+# ConnectionTee contract's short: at this band the deltas are int with public getters and are read as a
+# sign-extended short off the wire, so the narrowing is exact. New at this band.
 forge/src/main/java/world/thearchive/wdl/forge/ForgeConnectionTee.java
 
 # The Forge mount-menu read names the non-public ContainerHorseInventory.horse the Forge access transformer widens,

@@ -13,16 +13,15 @@ import world.thearchive.wdl.adapter.ConnectionTee;
 
 /**
  * The Forge connection tee: {@link ConnectionTee}'s shared Netty plumbing plus the non-public reads it needs. The
- * connection's channel and the relative-move packet's entity id are non-public with no getter. This band has no
- * compile-time access-widening step (there is no Architectury Loom or Mojmap compile view), so unlike the Fabric
- * access widener and the higher-band NeoForge transformer, the shipped accesstransformer.cfg is a runtime-only FMLAT
- * and cannot be read as a direct field access at compile. The two fields are read reflectively instead, resolving each
- * once by its dev (MCP) name with its production (searge) name as the fallback; the position deltas have public
- * getters at this band and are read through those.
+ * relative-move packet's entity id is non-public with no getter; the connection's channel has a public getter
+ * ({@link NetworkManager#channel()}) and is read directly. This band has no compile-time access-widening step
+ * (there is no Architectury Loom or Mojmap compile view), so unlike the Fabric access widener and the higher-band
+ * NeoForge transformer, the shipped accesstransformer.cfg is a runtime-only FMLAT and cannot be read as a direct
+ * field access at compile. The entity id field is read reflectively instead, resolving once by its dev (MCP) name
+ * with its production (searge) name as the fallback; the position deltas have public getters at this band and are
+ * read through those.
  */
 final class ForgeConnectionTee extends ConnectionTee {
-    private static final Field CHANNEL_FIELD =
-            ReflectionHelper.findField(NetworkManager.class, "channel", "field_150746_k");
     private static final Field ENTITY_ID_FIELD =
             ReflectionHelper.findField(SPacketEntity.class, "entityId", "field_149074_a");
 
@@ -35,11 +34,7 @@ final class ForgeConnectionTee extends ConnectionTee {
 
     @Override
     protected Channel channel(NetworkManager connection) {
-        try {
-            return (Channel) CHANNEL_FIELD.get(connection);
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException("could not read the connection channel", e);
-        }
+        return connection.channel();
     }
 
     @Override
