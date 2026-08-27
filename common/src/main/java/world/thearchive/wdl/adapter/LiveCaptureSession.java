@@ -676,7 +676,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int idCountsFailed;
 
     /**
-     * The voice for a captured map lost to its own write. These three are instance fields on purpose: each bounds its
+     * The voice for a captured map lost to its own write. These voices are instance fields on purpose: each bounds its
      * stacks over one download, so hoisting any of them to a static leaves every download after the first with no stack
      * for a cause the first already spent.
      */
@@ -706,6 +706,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private final CaptureLossLog chunkCaptureLoss = new CaptureLossLog(LOGGER,
             "failed to capture chunk {}", "the reopened world has none of that chunk's terrain");
+
+    /**
+     * The voice for an entity the sink's encode threw on. One rejected item component fails every entity carrying it
+     * alike, so a stack per drop would bury the one cause a reader needs under a trace per lost entity.
+     */
+    private final CaptureLossLog entityEncodeLoss = new CaptureLossLog(LOGGER,
+            "failed to encode entity {}", "it is missing from the reopened world");
 
     /**
      * Where {@link #streamMapData} puts a map write once the finish drain has begun, instead of submitting it as its
@@ -4246,7 +4253,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             envelope = adapter.entitySink().encodeChunk(List.of(entity), pos, registries, config.forceMobPersistence());
         } catch (RuntimeException e) {
             recordEntityEncodeFailure(source);
-            LOGGER.warn("skipping entity {}: capture failed", entity.getUUID(), e);
+            entityEncodeLoss.lost(entity.getUUID(), e);
             return null;
         }
         if (envelope == null) {
