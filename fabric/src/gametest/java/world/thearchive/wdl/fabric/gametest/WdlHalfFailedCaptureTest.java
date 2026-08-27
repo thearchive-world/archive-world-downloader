@@ -17,7 +17,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.gamerules.GameRules;
-import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.LogEvent;
 
 import world.thearchive.wdl.core.DownloadMode;
@@ -60,16 +59,15 @@ import world.thearchive.wdl.core.report.DownloadSession;
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
-    /** The per-class logger name {@code LiveCaptureSession} reports a prime drop under (its WARN channel). */
+    /** The per-class logger name {@code LiveCaptureSession} reports a prime drop under. */
     private static final String SESSION_LOGGER = "world.thearchive.wdl.adapter.LiveCaptureSession";
-    /** The per-entity drop WARN's prefix, matched with {@link #CAPTURE_FAILED} to pin one of its two users. */
-    private static final String DROP_WARNING = "skipping entity";
     /**
-     * The drop WARN's suffix ({@code "skipping entity {}: capture failed"}). What it excludes is the sibling on this
-     * same logger reading {@code "skipping entity {}: the entity sink returned an envelope without it"}; the
-     * container-merge WARNs share the prefix but sit on another logger the name filter already drops.
+     * The per-entity drop line's opening, which matches no sibling on this logger: the malformed-envelope WARN reads
+     * {@code "skipping entity {}: the entity sink returned an envelope without it"}, and the container-merge WARNs sit
+     * on another logger the name filter already drops. Matched on text alone rather than with a level, since a level
+     * filter that fell out of step with the loss voices would empty this list without failing anything.
      */
-    private static final String CAPTURE_FAILED = "capture failed";
+    private static final String DROP_LINE = "failed to encode entity";
     /** An entity id the fixture's client never loads, so the leash holder stays unresolved through the encode. */
     private static final int UNLOADED_HOLDER_ID = Integer.MAX_VALUE;
 
@@ -220,14 +218,10 @@ public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
                 .orElse(false);
     }
 
-    /** The captured per-entity drop WARNs ({@code "skipping entity ..."}); the strip surfaces none. */
+    /** The captured per-entity drop lines ({@code "failed to encode entity ..."}); the strip surfaces none. */
     private static List<LogEvent> encodeFailures(LogCapture logs) {
         return logs.events().stream()
-                .filter(event -> event.getLevel() == Level.WARN)
-                .filter(event -> {
-                    String message = event.getMessage().getFormattedMessage();
-                    return message.contains(DROP_WARNING) && message.contains(CAPTURE_FAILED);
-                })
+                .filter(event -> event.getMessage().getFormattedMessage().contains(DROP_LINE))
                 .toList();
     }
 
