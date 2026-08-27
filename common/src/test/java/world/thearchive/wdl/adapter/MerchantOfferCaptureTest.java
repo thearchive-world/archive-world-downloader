@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.core.MapManifest;
+import world.thearchive.wdl.testsupport.BadStacks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -138,5 +139,34 @@ class MerchantOfferCaptureTest {
         holder.getCompound("Offers").getList("Recipes", 10).getCompound(0).remove("sell");
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, true, null); // must not throw; reaches the per-recipe skip
+    }
+
+    @Test
+    void anOfferWhoseSellBookHasBadComponentIsRepairedNotSkipped() {
+        // On this band ItemEnchantments.LEVEL_CODEC is intRange(0,255), so a level-0 enchant saves fine; DAMAGE = -1
+        // is what NON_NEGATIVE_INT actually rejects here.
+        ItemStack book = new ItemStack(Items.ENCHANTED_BOOK);
+        book.set(DataComponents.DAMAGE, -1);
+        MerchantOffers offers = new MerchantOffers();
+        offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, 5), book, 12, 0, 0.05f));
+        assertTrue(ItemStack.CODEC.encodeStart(BadStacks.ops(registries), book).error().isPresent(),
+                "precondition: the sell book is genuinely unsavable");
+
+        CompoundTag holder = MerchantOfferCapture.serialize(offers, 0, true, registries);
+
+        assertTrue(holder.contains("Offers"), "the trade is kept, not dropped");
+        assertTrue(ItemStack.CODEC.encodeStart(BadStacks.ops(registries), book).error().isPresent(),
+                "the live offer's book is unchanged (only a snapshot was repaired)");
+    }
+
+    @Test
+    void aCleanOfferStillSerializes() {
+        MerchantOffers offers = new MerchantOffers();
+        offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, 3), new ItemStack(Items.DIAMOND), 7, 0, 0.05f));
+
+        CompoundTag holder = MerchantOfferCapture.serialize(offers, 5, true, registries);
+
+        assertTrue(holder.contains("Offers"), "a clean offer still serializes");
+        assertEquals(5, holder.getInt("Xp"), "villager trade experience is written");
     }
 }
