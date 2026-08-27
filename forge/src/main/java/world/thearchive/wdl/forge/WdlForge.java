@@ -47,7 +47,9 @@ public final class WdlForge {
         Wdl.initialize(new ForgePlatformBridge(modEventBus));
         MountMenuReader.install(new ForgeMountMenuReader());
         // At this band the config-screen factory is an ExtensionPoint carrying a BiFunction, not the
-        // ConfigGuiHandler.ConfigGuiFactory wrapper the 1.17-and-above bands register.
+        // ConfigGuiHandler.ConfigGuiFactory wrapper the 1.17-and-above bands register. Forge 25.0.223 greys the
+        // mods-list config button out for every mod, gating it on ModInfo.hasConfigUI, a hardcoded false that 1.14
+        // replaced with a getGuiFactoryFor presence check; the press path itself already resolves this registration.
         ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.CONFIGGUIFACTORY,
                 () -> (minecraft, modListScreen) -> Wdl.createSettingsScreen(modListScreen));
         // ClientPlayerNetworkEvent does not exist at this band, so the tee installs on the first client tick that
