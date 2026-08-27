@@ -10,9 +10,15 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Leashable;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.Nullable;
 
@@ -65,19 +71,24 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     /**
-     * Save the entity, first detaching any leash the client cannot save from the entity and its passengers. A leash
-     * with neither a resolved holder nor a delayed attachment is what vanilla's {@link Leashable.LeashData} codec
+     * Save the entity, first detaching any leash the client cannot save and swapping in a sanitized copy of any
+     * equipment or carried-item stack the client cannot save, both from the entity and its passengers. A leash with
+     * neither a resolved holder nor a delayed attachment is what vanilla's {@link Leashable.LeashData} codec
      * requireNonNulls on, so {@link Entity#save} throws on it; and because save recurses into passengers, a passenger's
      * unsavable leash aborts the whole vehicle group, dropping a chested mob's container with it. Detaching just those
      * unsavable leash links loses only the leash, mirroring the reconstruct path which leaves an unresolved leash link
-     * unset. Capture runs on the client main thread, so the detach is unobservable, and every detached leash is
+     * unset. An item component the disk codec rejects costs either the entity or the whole field being written, so
+     * {@link #sanitizeStacks} repairs the stack up front rather than recovering from either outcome. Capture runs on
+     * the client main thread, so both kinds of swap are unobservable, and every detached leash and swapped stack is
      * restored before returning so the live entities are unchanged.
      */
     private static boolean saveDroppingUnsavableLeashes(Entity entity, CompoundTag out) {
         List<DetachedLeash> detached = detachIfUnsavable(entity, null);
+        List<Runnable> stackRestores = sanitizeStacks(entity, null);
         if (entity.isVehicle()) {
             for (Entity passenger : entity.getIndirectPassengers()) {
                 detached = detachIfUnsavable(passenger, detached);
+                stackRestores = sanitizeStacks(passenger, stackRestores);
             }
         }
         try {
@@ -88,7 +99,58 @@ public final class EntitySinkImpl implements EntitySink {
                     restore.leashable().setLeashData(restore.leashData());
                 }
             }
+            if (stackRestores != null) {
+                for (Runnable restore : stackRestores) {
+                    restore.run();
+                }
+            }
         }
+    }
+
+    /**
+     * Swap each of the entity's live stacks the disk codec would reject (equipment on a {@link LivingEntity}, the
+     * carried item on an {@link ItemEntity}) for a sanitized copy, returning restores that put the originals back. Only
+     * a stack that fails the encode is swapped, so a clean entity is never mutated.
+     *
+     * <p>Keep {@code ops} lazy: {@code entity.registryAccess()} reaches through the entity's level, so hoisting the
+     * build into the wrapper would charge every captured entity for it and would demand a level of entities this method
+     * otherwise never touches.
+     */
+    private static @Nullable List<Runnable> sanitizeStacks(Entity entity, @Nullable List<Runnable> restores) {
+        if (entity instanceof LivingEntity living) {
+            RegistryOps<Tag> ops = null;
+            for (EquipmentSlot slot : EquipmentSlot.values()) {
+                ItemStack original = living.getItemBySlot(slot);
+                if (original.isEmpty()) {
+                    continue;
+                }
+                if (ops == null) {
+                    ops = RegistryOps.create(NbtOps.INSTANCE, entity.registryAccess());
+                }
+                ItemStack clean = ItemStackSanitizer.sanitizeForSave(original, ops);
+                if (clean != original) {
+                    living.setItemSlot(slot, clean);
+                    restores = addRestore(restores, () -> living.setItemSlot(slot, original));
+                }
+            }
+        } else if (entity instanceof ItemEntity item) {
+            ItemStack original = item.getItem();
+            if (!original.isEmpty()) {
+                RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, entity.registryAccess());
+                ItemStack clean = ItemStackSanitizer.sanitizeForSave(original, ops);
+                if (clean != original) {
+                    item.setItem(clean);
+                    restores = addRestore(restores, () -> item.setItem(original));
+                }
+            }
+        }
+        return restores;
+    }
+
+    private static List<Runnable> addRestore(@Nullable List<Runnable> restores, Runnable restore) {
+        List<Runnable> list = restores != null ? restores : new ArrayList<>();
+        list.add(restore);
+        return list;
     }
 
     private static @Nullable List<DetachedLeash> detachIfUnsavable(Entity entity,
