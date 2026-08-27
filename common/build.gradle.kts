@@ -415,7 +415,7 @@ tasks.named("check") {
 
 repositories {
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
-    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
+    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
     // Legacy Fabric intermediary (obf->intermediary) for this pre-1.14 band; the modern Fabric maven has none.
     maven("https://maven.legacyfabric.net/")
     // Unimined's own published artifacts, plus the classic searge/MCP mapping files it resolves against.
@@ -425,8 +425,8 @@ repositories {
 }
 
 dependencies {
-    // JourneyMap public API for the overlay binding (compat/journeymap), compile-only (never a runtime require).
-    // The binding compiles against the journeymap.client.api 1.8 surface, its own API types rather than Minecraft
-    // signatures; the -SNAPSHOT suffix is appended here.
-    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
+    // JourneyMap 2.0 API for the overlay binding (compat/journeymap/v2), compile-only (never a runtime require;
+    // JourneyMap provides it jar-in-jar). The -forge flavor carries classic MCP names, matching this build (see
+    // gradle.properties); the Forge island reads the same key and pins the same flavor.
+    compileOnly("info.journeymap:journeymap-api-forge:${property("journeymap_api_v2_coordinate")}")
 }

@@ -59,7 +59,7 @@ java {
 
 repositories {
     mavenCentral()
-    maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
+    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
     // The pinned searge oracle below (mcp_config) resolves from here, not from Unimined's own internal repo
     // handling: a project-level dependency needs its own repository, even though Unimined's minecraftForge
     // loader block already reaches this same host to provision the toolchain.
@@ -155,10 +155,13 @@ dependencies {
     // source compiles.
     compileOnly("org.jspecify:jspecify:1.0.0")
 
-    // JourneyMap public API for the source-merged binding (compat/journeymap), compile-only, never a runtime
-    // require. The island compiles under the same MCP classpath :common resolves; JourneyMap discovers the
-    // plugin by annotation scan. No XaeroPlus binding on this band, matching :common.
-    compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
+    // JourneyMap 2.0 API for the source-merged binding (compat/journeymap/v2), compile-only, never a runtime
+    // require (JourneyMap provides it jar-in-jar). The island compiles under the same classic-MCP classpath
+    // :common resolves, so it takes the -forge flavor, not -common: -forge carries MCP names
+    // (net.minecraft.util.math.BlockPos) matching this island, while -common carries official Mojang names that
+    // do not exist below the Mojmap floor. JourneyMap discovers the plugin by annotation scan. No XaeroPlus
+    // binding on this band, matching :common.
+    compileOnly("info.journeymap:journeymap-api-forge:${band("journeymap_api_v2_coordinate")}")
 }
 
 // Source-merge :common the way a loader subproject does on the higher bands, but by direct path

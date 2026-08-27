@@ -251,27 +251,33 @@ common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 # slotIndex IGuiListEntry rows, keys forwarded from keyTyped to the focused GuiTextField.
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 
-# JourneyMap at this band is Forge-only and ships the 1.8 API generation (journeymap.client.api; the artifact the
-# band's journeymap_api_coordinate resolves), not the 2.0 API (journeymap.api.v2) the deeper bands bind, so the
-# overlay binding is the old-API form under compat/journeymap. This entry point implements
-# journeymap.client.api.IClientPlugin under the journeymap.client.api.ClientPlugin annotation, discovered by
-# JourneyMap's annotation scan on Forge; this Forge-only band ships no Fabric jar, so there is no Fabric journeymap
-# entrypoint.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
+# JourneyMap 6.x for 1.12.2 carries the 2.0 API (journeymap.api.v2), not the 1.x/5.x API (journeymap.client.api)
+# the old binding here bound, so the binding is re-homed under compat/journeymap/v2, ported from the 1.16.5
+# branch's v2 plugin. This entry point implements journeymap.api.v2.client.IClientPlugin under the
+# journeymap.api.v2.common.JourneyMapPlugin annotation, discovered by JourneyMap's annotation scan on Forge; this
+# Forge-only band ships no Fabric jar, so there is no Fabric journeymap entrypoint.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/WdlJourneyMapPlugin.java
 
-# The overlay driver binds the journeymap.client.api 1.8 surface directly through its imported PolygonOverlay,
-# MapPolygon and ShapeProperties types (no reflection at this band; the API jar's Minecraft-typed constructors
-# resolve against this band's classic MCP compile view), reading the dimension as a classic
-# net.minecraft.world.DimensionType off the world provider.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDriver.java
+# The overlay driver binds the journeymap.api.v2 API: it subscribes the mapping events through
+# ClientEventRegistry.MAPPING_EVENT and shows each PolygonOverlay on the v2 IClientAPI, rather than the 1.x
+# IClientAPI.subscribe/onClientEvent push model the old binding used. It reads the dimension as a classic
+# net.minecraft.world.DimensionType off the world provider (mc.world.provider.getDimensionType(), not the
+# ResourceKey<Level> the Mojmap bands hold), and this band's PolygonOverlay constructor takes that dimension as a
+# plain int id (dimension.getId()) rather than the ResourceKey overload the Mojmap bands call.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/JourneyMapOverlayDriver.java
 
-# The polygon builder targets the journeymap.client.api.model package and feeds JourneyMap one convex MapPolygon per
-# coverage rectangle rather than the merged holed hulls CoveragePolygonTracer produces, because this API generation
-# neither subtracts a hole nor fills a concave polygon; the rectangles are disjoint and abut, so their translucent
-# fills tile seamlessly and the uncovered gaps stay uncovered.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.java
+# The polygon builder binds the journeymap.api.v2.client.model package for MapPolygon, MapPolygonWithHoles and
+# ShapeProperties, the 2.0-API model rather than the 1.x journeymap.client.api.model the old binding used, and
+# builds points with the classic net.minecraft.util.math.BlockPos rather than the Mojmap bands'
+# net.minecraft.core.BlockPos. The 2.0 API supports holed hulls directly, so this binds
+# CoveragePolygonTracer's merged MapPolygonWithHoles output with no reflection and no rectangle-only fallback.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/CoveragePolygons.java
 
-# The shared coverage-polygon tracer keeps the public visibility it took on the parent band, and its JDK collection
+# The v2 plugin package's @NullMarked marker; new at this band with the journeymap.api.v2 binding.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/package-info.java
+
+# The shared coverage-polygon tracer keeps the public visibility it took on the parent band, needed so the
+# re-homed compat/journeymap/v2 plugin package can reach it across the package boundary, and its JDK collection
 # factory is a Guava ImmutableList for the Java 8 floor.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygonTracer.java
 

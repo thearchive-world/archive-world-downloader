@@ -1,23 +1,19 @@
 // Copyright (C) Archive World Downloader contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-package world.thearchive.wdl.compat.journeymap;
+package world.thearchive.wdl.compat.journeymap.v2;
 
-import journeymap.client.api.ClientPlugin;
-import journeymap.client.api.IClientAPI;
-import journeymap.client.api.IClientPlugin;
-import journeymap.client.api.event.ClientEvent;
+import journeymap.api.v2.client.IClientAPI;
+import journeymap.api.v2.client.IClientPlugin;
+import journeymap.api.v2.common.JourneyMapPlugin;
 
 import world.thearchive.wdl.Wdl;
 
 /**
- * JourneyMap discovers this through the {@code journeymap} entrypoint (Fabric) or the {@code ClientPlugin}-annotated
- * classpath scan (Forge) only when it is installed, so it never loads without JourneyMap present; the JourneyMap API is
- * compile-only and never ships.
+ * JourneyMap discovers this through its {@code JourneyMapPlugin}-annotated classpath scan, and only when JourneyMap
+ * itself is present, so this never loads without it; the JourneyMap API is compile-only and never ships.
  */
-// ClientPlugin is deprecated by JourneyMap in favor of the Fabric entrypoint, but it is the Forge discovery scan.
-@SuppressWarnings("deprecation")
-@ClientPlugin
+@JourneyMapPlugin(apiVersion = "2.0.0")
 public final class WdlJourneyMapPlugin implements IClientPlugin {
     private final JourneyMapOverlayDriver driver = new JourneyMapOverlayDriver();
 
@@ -30,17 +26,13 @@ public final class WdlJourneyMapPlugin implements IClientPlugin {
 
     @Override
     public void initialize(IClientAPI jmClientApi) {
-        driver.initialize(jmClientApi);
+        driver.setApi(jmClientApi);
+        driver.subscribeMappingEvents();
         Wdl.runWhenReady(driver::wireOnce);
     }
 
     @Override
     public String getModId() {
         return "wdl";
-    }
-
-    @Override
-    public void onEvent(ClientEvent event) {
-        driver.onClientEvent(event);
     }
 }
