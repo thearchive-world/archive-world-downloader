@@ -182,12 +182,11 @@ tasks.named<ProcessResources>("processResources") {
         exclude("**/.gitkeep")
     }
     // Keep mcmod.info's and wdl-publishing.properties' templated fields in sync with the band coordinates,
-    // matching the higher bands' loader processResources. The Forge floor (forge_version_min) is a deliberate value
-    // distinct from the build coordinate forge_version.
+    // matching the higher bands' loader processResources. Only the tokens those two files actually name are listed:
+    // the Forge runtime floor rides WdlForge's own @Mod annotation at this band rather than a manifest field, so
+    // there is nothing here to expand it into and checkForgeFloor gates it against forge_version_min instead.
     val tokens = mapOf(
         "version" to version.toString(),
-        "minecraft_version" to band("minecraft_version"),
-        "forge_version_min" to band("forge_version_min"),
         "modrinth_id" to band("modrinth_id"),
         "mod_id" to band("mod_id"),
     )
@@ -579,8 +578,40 @@ val checkReobfNegative = tasks.register<CheckSeargeSurface>("checkReobfNegative"
     expectClean.set(false)
 }
 
+// The Forge runtime floor is written twice and no compiler sees both: forge_version_min in ../gradle.properties is
+// the band coordinate, and WdlForge's @Mod(dependencies = ...) is the string legacy FML actually enforces
+// (FMLModContainer.bindMetadata takes dependencies off the annotation descriptor unless mcmod.info opts into
+// useDependencyInformation, which this mod does not). An annotation value must be a compile-time constant, so the
+// literal cannot read the property and the duplication is structural. Without this gate a bumped property changes
+// nothing the loader sees, silently.
+val checkForgeFloor = tasks.register("checkForgeFloor") {
+    group = "verification"
+    description = "Fails if WdlForge's @Mod dependencies floor does not match forge_version_min"
+    // Captured by value at configuration time, like checkPlugBand's own locals, so no Project reference survives
+    // into task execution.
+    val forgeVersionMin = band("forge_version_min")
+    val entrypointSource = layout.projectDirectory
+        .file("src/main/java/world/thearchive/wdl/forge/WdlForge.java")
+    inputs.property("forgeVersionMin", forgeVersionMin)
+    inputs.file(entrypointSource)
+    doLast {
+        val declared = Regex("""required-after:forge@\[([^,\]]+),""")
+            .find(entrypointSource.asFile.readText())?.groupValues?.get(1)
+            ?: throw GradleException(
+                "WdlForge declares no required-after:forge floor in its @Mod dependencies; legacy FML then "
+                    + "enforces no Forge version at all"
+            )
+        if (declared != forgeVersionMin) {
+            throw GradleException(
+                "Forge floor mismatch: forge_version_min is $forgeVersionMin but WdlForge's @Mod dependencies "
+                    + "declares $declared. The annotation is the one legacy FML enforces, so change both."
+            )
+        }
+    }
+}
+
 tasks.named("check") {
-    dependsOn("checkReobf", checkShipJar, checkReobfNegative)
+    dependsOn("checkReobf", checkShipJar, checkReobfNegative, checkForgeFloor)
 }
 
 // Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge
