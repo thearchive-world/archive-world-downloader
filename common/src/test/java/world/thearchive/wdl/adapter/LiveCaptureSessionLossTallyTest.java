@@ -71,6 +71,7 @@ import world.thearchive.wdl.core.SendRangeSampler;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
+import world.thearchive.wdl.testsupport.LogCapture;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
@@ -95,8 +96,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * a partial one. The chunk case is likewise two, since the counted unit is the distinct position: the square retries a
  * failing chunk every tick it stays loaded, so a per-attempt tally would report tens of losses for one lost chunk.
  *
- * <p>One test here is not a tally test: the loss it guards, a dimension-scoped store detached from its per-dimension
- * map, has no counter at all.
+ * <p>Two tests here are not tally tests. The loss one guards, a dimension-scoped store detached from its per-dimension
+ * map, has no counter at all; the other reads what the single-entity encode's catch logged rather than what it counted.
  *
  * <p>Two mechanisms, split on what each reaches. The drain and mount-fold entry points are driven directly,
  * package-private for that, since every production caller runs behind the client singleton. The capture state they
@@ -807,6 +808,32 @@ class LiveCaptureSessionLossTallyTest {
         assertEquals(1, losses(session, "structuralEntitiesLost"),
                 "and it is structural, the arm of the reconciliation the partial verdict reads");
         assertTrue(session.isPartialSave(0, 0), "so the finish is partial rather than clean");
+    }
+
+    /**
+     * The log shape of that same catch, which no tally can see: the stack rides on the first loss of a cause type and
+     * every later one keeps its line alone.
+     */
+    @Test
+    void aSecondEntityLostTheSameWayAddsNoSecondStack(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(new ThrowingEntityEncodeAdapter(), temporary);
+        Entity first = new BareEntity();
+        Entity second = new BareEntity();
+        try (LogCapture captured = LogCapture.attach(LiveCaptureSession.class.getName())) {
+            assertNull(session.encodeSingleEntity(first, chunk, LiveCaptureSession.EntitySource.RECONSTRUCTED),
+                    "a throwing encode degrades to no tag rather than aborting the drain around it");
+            assertNull(session.encodeSingleEntity(second, chunk, LiveCaptureSession.EntitySource.RECONSTRUCTED),
+                    "and so does the second, whose cause is of the type the first already spent the stack on");
+
+            assertEquals(2, captured.count(), "every dropped entity keeps its own line, so none becomes invisible");
+            assertEquals("INFO", captured.level(0),
+                    "a dropped entity is a per-item capture loss, and field reports read those at INFO");
+            assertTrue(captured.rendered(1).startsWith("failed to encode entity " + second.getUUID()),
+                    "the second line names the entity it lost");
+            assertNotNull(captured.thrown(0), "the first entity lost this download carries the cause's stack");
+            assertNull(captured.thrown(1),
+                    "one voice spans the whole download, so a second entity lost the same way adds no second stack");
+        }
     }
 
     /**
