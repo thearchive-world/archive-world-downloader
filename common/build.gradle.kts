@@ -37,6 +37,7 @@ spotless {
 val minecraftVersion = providers.gradleProperty("minecraft_version").get()
 val mcpMappingsChannel = providers.gradleProperty("mcp_mappings_channel").get()
 val mcpMappingsVersion = providers.gradleProperty("mcp_mappings_version").get()
+val forgeVersion = providers.gradleProperty("forge_version").get()
 
 // useGlobalCache=false keeps every provisioned artifact under this project's own build directory rather than a
 // shared user-home cache, matching genBridge's old per-project provisioning and keeping a stale cache from one
@@ -48,10 +49,18 @@ unimined.minecraft {
         searge()
         mcp(mcpMappingsChannel, mcpMappingsVersion)
     }
+    // Provision the same Forge view the island uses. This is a Forge-only band, and the ported pre-1.13 client
+    // screens are Forge-view-dependent: Forge patches GuiScreen.mouseClicked/keyTyped/handleMouseInput to throw
+    // IOException, which the loader-less vanilla view lacks, so a screen that overrides them and calls super cannot
+    // compile against vanilla. Sharing the island's compile view (Forge-patched Minecraft over the MCP names) is
+    // what lets :common compile the screens standalone for its gates and tests.
+    minecraftForge {
+        loader(forgeVersion)
+    }
     // Forge-only band: common is built standalone for its gates and tests alone; it ships no jar of its own,
     // since the shippable artifact is the forge island's jar (the separate forge/ build, which compiles
     // common's source directly and reobfuscates natively through its own Unimined provision). common keeps
-    // Unimined's MCP (dev) names, so there is nothing here for Unimined to remap.
+    // Unimined's MCP (dev) names and never reobfuscates, so defaultRemapJar stays off; only the island ships.
     defaultRemapJar = false
 }
 
@@ -276,6 +285,11 @@ val checkCoreImports = tasks.register("checkCoreImports") {
 val checkCoreJava8 = tasks.register<JavaCompile>("checkCoreJava8") {
     group = "verification"
     description = "Fails if core/ uses any construct unavailable on the Java 8 floor"
+    val javaVersion = providers.gradleProperty("java_version").get().toInt()
+    // Only the modern (Java 21) bands run this cross-check: on a Java-8-toolchain band compileJava already
+    // builds core/ on Java 8, so the floor is enforced there directly, and javac 8 has no --release flag to run
+    // this check with anyway (a local Int captured by value, so the onlyIf stays configuration-cache-safe).
+    onlyIf { javaVersion > 8 }
     source = fileTree("src/main/java/world/thearchive/wdl/core") { include("**/*.java") }
     classpath = sourceSets["main"].compileClasspath
     destinationDirectory = layout.buildDirectory.dir("core-java8-check")
@@ -285,7 +299,7 @@ val checkCoreJava8 = tasks.register<JavaCompile>("checkCoreJava8") {
     // --release enforcement is wanted; leaving Error Prone on would run its default checks under --release 8.
     options.errorprone.enabled = false
     javaCompiler = javaToolchains.compilerFor {
-        languageVersion = JavaLanguageVersion.of(providers.gradleProperty("java_version").get().toInt())
+        languageVersion = JavaLanguageVersion.of(javaVersion)
     }
 }
 // --- band guard: the plug's declared era-band floor must cover the targeted minecraft_version ---
