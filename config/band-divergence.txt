@@ -180,6 +180,12 @@ common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
 # offer's buy cost is a plain ItemStack.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
 
+# The furnace-capture regression guard, driving the real bindOpenedContainer against a classic-MCP TileEntityFurnace
+# and its ContainerFurnace menu: the loot-only bind gate it pins is this band's own (bindOpenedContainer reads the size
+# through TileEntityLockableLoot, so a lockable that carries no loot table reports 0 and the size-match guard refuses
+# it), and the types it names exist only below the Mojmap floor. New at this band.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLockableContainerBindTest.java
+
 # The headless mob double overrides hurt(DamageSource, float) (hurtServer with a ServerLevel is 1.21.2 and above) and
 # is built against the HeadlessLevel, since below 1.21.2 the Mob constructor needs a non-null level.
 common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest.java
