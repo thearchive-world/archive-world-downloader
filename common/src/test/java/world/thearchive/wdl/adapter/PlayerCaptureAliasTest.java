@@ -9,9 +9,9 @@ import static world.thearchive.wdl.testsupport.MapHolderFixtures.filledMap;
 
 import com.mojang.authlib.GameProfile;
 import java.util.UUID;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 

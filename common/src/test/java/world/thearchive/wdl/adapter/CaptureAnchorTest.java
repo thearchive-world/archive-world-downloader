@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.lang.reflect.Field;
 import java.util.List;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.entity.Entity;
+import net.minecraft.nbt.NBTTagCompound;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 

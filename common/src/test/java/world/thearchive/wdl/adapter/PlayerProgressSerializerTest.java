@@ -14,10 +14,10 @@ import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.advancements.Criterion;
+import net.minecraft.init.Blocks;
 import net.minecraft.stats.StatBase;
 import net.minecraft.stats.StatList;
 import net.minecraft.stats.StatisticsManager;
-import net.minecraft.init.Blocks;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -40,7 +40,7 @@ class PlayerProgressSerializerTest {
     }
 
     @Test
-    void statsJsonIsAFlatIdToCountObjectFilteringZero() {
+    void statsJsonIsFlatIdToCountObjectFilteringZero() {
         StatisticsManager counter = new StatisticsManager();
         counter.increaseStat(null, StatList.PLAY_ONE_MINUTE, 1200); // base increaseStat ignores the player
         StatBase stoneMined = StatList.getBlockStats(Blocks.STONE);

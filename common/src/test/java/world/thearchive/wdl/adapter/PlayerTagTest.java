@@ -9,13 +9,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.NonNullList;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
+import net.minecraft.init.Items;
 import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
-import net.minecraft.init.Items;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.NonNullList;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -79,7 +79,7 @@ class PlayerTagTest {
     }
 
     @Test
-    void stripDeathLocationIsANoOpAtThisBand() {
+    void stripDeathLocationIsNoOpAtThisBand() {
         // Neither key exists in a 1.12.2 player tag (LastDeathLocation is 1.19, current_explosion_impact_pos is
         // 1.21), so the strip has nothing to remove and the rest of the tag is untouched either way.
         NBTTagCompound tag = playerTag();
@@ -252,7 +252,7 @@ class PlayerTagTest {
         UUID mount = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
         NBTTagCompound prior = playerSeatedIn(
                 mountRootVehicle(mount, itemList("minecraft:diamond", "minecraft:gold_ingot")));
-        NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount, new NBTTagList())); // seated, container not reopened
+        NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount, new NBTTagList())); // seated, mount not reopened
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -292,7 +292,7 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsRestoresNothingWhenThePriorMountHeldNothing() {
         UUID mount = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        NBTTagCompound prior = playerSeatedIn(mountRootVehicle(mount, new NBTTagList())); // the prior mount was empty too
+        NBTTagCompound prior = playerSeatedIn(mountRootVehicle(mount, new NBTTagList())); // prior mount was empty too
         NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount, new NBTTagList()));
 
         assertFalse(PlayerTag.restorePriorMountContents(prior, fresh), "an empty prior mount is not a recovery");
@@ -371,7 +371,7 @@ class PlayerTagTest {
     @Test
     void aFreshEnderChestIsKeptOverThePrior() {
         NBTTagCompound prior = priorPlayer(itemList("minecraft:dirt"));
-        NBTTagCompound fresh = priorPlayer(itemList("minecraft:diamond", "minecraft:emerald")); // re-opened this session
+        NBTTagCompound fresh = priorPlayer(itemList("minecraft:diamond", "minecraft:emerald")); // reopened this session
 
         boolean carried = PlayerTag.carryForwardEnderItems(prior, fresh);
 

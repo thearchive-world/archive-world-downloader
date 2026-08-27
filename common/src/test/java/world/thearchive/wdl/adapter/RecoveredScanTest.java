@@ -12,9 +12,9 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.unhostedBlock
 
 import java.util.Arrays;
 import java.util.UUID;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;

@@ -8,12 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
+import net.minecraft.init.Items;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.village.MerchantRecipe;
 import net.minecraft.village.MerchantRecipeList;
-import net.minecraft.item.ItemStack;
-import net.minecraft.init.Items;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -211,7 +211,7 @@ class EntityMergeTest {
         // must not overwrite the entities a prior flush already wrote. Union by UUID so both survive; the bug
         // was that only "Items" carried forward, so the fresh (partial) write replaced the on-disk full set.
         NBTTagCompound onDisk = entities(vehicle(UUID_A, "minecraft:diamond")); // a prior flush saved A
-        NBTTagCompound fresh = entities(vehicle(UUID_B)); // a later partial flush of the same chunk; A not in this batch
+        NBTTagCompound fresh = entities(vehicle(UUID_B)); // later partial flush of same chunk; A not in this batch
 
         EntityMerge.merge(onDisk, fresh);
 
