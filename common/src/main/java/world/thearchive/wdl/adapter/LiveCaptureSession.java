@@ -68,7 +68,7 @@ import net.minecraft.network.play.client.CPacketClientStatus;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityChest;
 import net.minecraft.tileentity.TileEntityEnderChest;
-import net.minecraft.tileentity.TileEntityLockableLoot;
+import net.minecraft.tileentity.TileEntityLockable;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -1958,11 +1958,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // The client builds the menu from its MenuType with a generic SimpleContainer (never the block's
             // TileEntity, nor a CompoundContainer for a double chest), so identity can't tie the menu to the
             // block. Instead bind only when the target block has its own storage container (size > 0,
-            // excludes non-container blocks and ender chests, which are not TileEntityLockableLoot) whose
+            // excludes non-container blocks and ender chests, which are not TileEntityLockable) whose
             // size matches the menu's block-slot count; the guard drops the rest (a double chest is a 54-slot
             // menu over a 27-slot half -> mismatch).
-            if (level().getTileEntity(target) instanceof TileEntityLockableLoot) {
-                TileEntityLockableLoot blockContainer = (TileEntityLockableLoot) level().getTileEntity(target);
+            if (level().getTileEntity(target) instanceof TileEntityLockable) {
+                TileEntityLockable blockContainer = (TileEntityLockable) level().getTileEntity(target);
                 blockContainerSize = blockContainer.getSizeInventory();
             }
         }
