@@ -36,16 +36,11 @@ import world.thearchive.wdl.client.WdlKeyBinds;
  * {@code useDependencyInformation}, which this one does not; both stay on the annotation rather than
  * mcmod.info. Client-only is declared by this jar shipping no dedicated-server entrypoint; a client-only mod
  * needs no {@code side} attribute at this band.
- *
- * <p>The mods-list config-GUI hook ({@code IModGuiFactory} plus the {@code @Mod(guiFactory = ...)} attribute,
- * this band's form of the {@code ExtensionPoint}/{@code ConfigGuiHandler} mechanisms newer bands use) is left
- * unwired: the in-mod settings screen {@link Wdl#createSettingsScreen} builds is already reached through the
- * pause-menu settings button and {@code /wdl config}, so the mods-list entry point is a redundant second path this
- * band does without.
  */
 @Mod(
         modid = "wdl",
         useMetadata = true,
+        guiFactory = "world.thearchive.wdl.forge.ForgeConfigGuiFactory",
         dependencies = "required-after:forge@[14.23.5.2768,);",
         acceptedMinecraftVersions = "[1.12.2]")
 public final class WdlForge {

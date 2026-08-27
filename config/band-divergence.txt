@@ -707,6 +707,12 @@ forge/src/main/java/world/thearchive/wdl/forge/ForgeConnectionTee.java
 # the one member MountMenuReader needs that this band exposes no getter for. New at this band.
 forge/src/main/java/world/thearchive/wdl/forge/ForgeMountMenuReader.java
 
+# The mods-list config-screen hook below the 1.13 ExtensionPoint floor. Legacy FML instantiates an IModGuiFactory
+# named by the @Mod(guiFactory = ...) attribute and GuiModList enables its config button only for a factory whose
+# hasConfigGui answers true, where the parent bands register ExtensionPoint.CONFIGGUIFACTORY from WdlForge itself and
+# need no class of their own. New at this band.
+forge/src/main/java/world/thearchive/wdl/forge/ForgeConfigGuiFactory.java
+
 # The resource pack_format tracks this band's Minecraft version: 4 for 1.13.2 (PackCompatibility.forFormat
 # accepts only 4 at this band, treating 3 and below as too old and 5 and above as too new).
 forge/src/main/resources/pack.mcmeta
