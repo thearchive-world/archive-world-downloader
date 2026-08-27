@@ -256,6 +256,14 @@ tasks.named<Jar>("remapJar") {
 // only re-add the identical bytes a second time. The one resource this island packages differently from
 // processResources' own output is the lang directory: MC 1.12.2 loads .lang, not the JSON Mojang adopted at
 // 1.13, so the source lang JSON is excluded here and convertLang's converted .lang output takes its place.
+// Ship the license inside the jar: GPL-3.0 section 4, which LGPL-3.0 section 0 incorporates, asks that every
+// recipient get a copy of the License with the Program, and a mod jar travels on its own far from any listing page
+// (modpacks, mirrors, a copied mods/ folder). The modern bands package it in wdl.common-merge, which this band
+// does not carry, and the island packages no license of its own, so modJar carries it. Captured into a val
+// of plain Files, resolved at configuration time, so no Project reference survives into task execution
+// (configuration cache), mirroring how the island already reads ../gradle.properties and ../common.
+val licenseTexts = listOf(rootDir.resolve("../LICENSE"), rootDir.resolve("../GPL-3.0.txt"))
+
 val modJar = tasks.register<Jar>("modJar") {
     group = "build"
     description = "Assembles the shippable Forge mod jar: Unimined's native reobf'd (searge) classes + resources."
@@ -280,6 +288,7 @@ val modJar = tasks.register<Jar>("modJar") {
     from(convertLang.map { it.outputs.files.singleFile }) {
         into("assets/wdl/lang")
     }
+    from(licenseTexts) { into("META-INF") }
 }
 
 // The default jar carries a dev classifier so it never collides with modJar's ship name. It stays the
@@ -526,14 +535,14 @@ abstract class CheckSeargeSurface : DefaultTask() {
 val checkShipJar = tasks.register<CheckSeargeSurface>("checkShipJar") {
     group = "verification"
     description = "Fails if a shipped class fails to parse (arm a), a TYPE_USE-annotated member names an unknown net/minecraft class (arm b), or a searge-shaped string constant/AT entry does not resolve in the pinned oracle (arm c)."
-    dependsOn(reobfFixtureJar)
-    // main stays seam-red pending the seam port that re-vocabularizes common's net.minecraft-facing files to MCP names (see
-    // compileJava's -Xmaxerrs note above), so modJar cannot build yet: this scans the pass fixture instead of
-    // the real ship jar until that port lands and a follow-up repoints jarToScan at modJar. The fixture already
-    // exercises the full arm (c) surface, a real searge member id carried as a string literal, that a
-    // production class would carry.
-    jarToScan.set(reobfFixtureJar.flatMap { it.archiveFile })
-    excludedEntryText.set("ReobfNegativeFixture")
+    dependsOn(modJar)
+    // common is re-vocabularized to MCP names and modJar builds, so this scans the real reobf'd ship jar rather
+    // than the reobftest fixture: every shipped class parses (arm a), no TYPE_USE-annotated member names a
+    // net/minecraft class outside the pinned oracle (arm b), and every searge-shaped string literal plus every
+    // accesstransformer.cfg and mcmod.info entry resolves against the oracle (arm c). checkReobfNegative keeps
+    // the fixture as the inverted meta-test that proves the arm (c) scan still fires, so no excludedEntryText is
+    // needed here: the real ship jar carries no negative fixture class.
+    jarToScan.set(modJar.flatMap { it.archiveFile })
     seargeOracleFile.set(extractSeargeOracle.flatMap { it.joinedTsrg })
     textFilesToScan.from(layout.projectDirectory.file("src/main/resources/META-INF/accesstransformer.cfg"))
     layout.projectDirectory.file("src/main/resources/mcmod.info").asFile.let { mcmodInfo ->

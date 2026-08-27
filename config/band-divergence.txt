@@ -34,7 +34,9 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 # Reads the captured section through the band's own ChunkSnapshotSource.SectionData rather than the vanilla
 # SerializableChunkData.SectionData that exists only at 1.21.2 and above. Below the 1.21 update there is no
 # jukebox_playable item component (a playable disc is a RecordItem instance), and a captured jukebox carries the
-# pre-JukeboxSongPlayer playing state (IsPlaying, RecordStartTick, TickCount). Below 1.20.5 there are no item
+# playing state (IsPlaying, RecordStartTick, TickCount) our capture always writes; below 1.19 a vanilla jukebox
+# writes none of those keys (they are 1.19 additions), so at this band they are a benign rename-only carry, harmless
+# on read. Below 1.20.5 there are no item
 # components: the RecordItem write is ItemStack#save rather than ItemStack.CODEC, a placed shulker's contents are
 # read via BlockItem.getBlockEntityData plus ContainerHelper.loadAllItems rather than DataComponents.CONTAINER,
 # and a placed beehive's occupants are its BlockEntityTag.Bees list rather than DataComponents.BEES. This band's
@@ -48,7 +50,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
 # Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
-# ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying. Below 1.20.5 the
+# ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying (one of the three
+# IsPlaying/RecordStartTick/TickCount keys our capture writes; a vanilla 1.12.2 jukebox writes none, a benign carry). Below 1.20.5 the
 # beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so this field
 # carries that key rather than bees.
 # Below 1.13 the NBT API is classic MCP, so the client-default tags are NBTTagInt/NBTTagShort/NBTTagByte/
@@ -80,7 +83,8 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # the reconstruct path rebinds a saved leash via Mob.setLeashedTo. Below 1.20.5 ChunkStatus is in
 # net.minecraft.world.level.chunk, not the .status subpackage, and Level.getMapData is keyed by the raw String
 # MapItem.makeKey returns rather than a MapId. Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer
-# opens the vanilla IOWorker through WorldPaths (openRegionStorage) rather than constructing one directly. Below 1.17
+# opens the region store through WorldPaths (openRegionStorage) rather than constructing one directly; and below 1.15
+# there is no IOWorker either, so that store is the band's own synchronous WdlRegionStorage (classic MCP RegionFile). Below 1.17
 # (era E3) entities live inside the region/ chunk, so the writer is built with the region opener alone (the
 # openEntitiesStorage argument is dropped) and the entity flush folds into the host chunk's Level.Entities.
 # Below 1.20.3 there is no Crafter menu or block entity, so the crafter open-bind and stash legs are
@@ -95,7 +99,8 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # pre-Flattening neighbor probe (no ChestType property) with the lower-coordinate half taking slots 0-26; the
 # villager trades are read off GuiMerchant.getMerchant().getRecipes as a MerchantRecipeList; the by-key map data
 # loads through World.getMapStorage; the NBT/dimension/save-format API is classic MCP (NBTTagCompound,
-# DimensionType.getName, AnvilSaveConverter/ISaveFormat); the advancement manager is read through
+# DimensionType.getName, and Minecraft.getSaveLoader (ISaveFormat) whose getSaveLoader(name, false) returns the
+# ISaveHandler the level-data write targets, not AnvilSaveConverter); the advancement manager is read through
 # NetHandlerPlayClient.getAdvancementManager (ClientAdvancementManager) rather than getAdvancements; the player's stat
 # holder is EntityPlayerSP.getStatFileWriter (StatisticsManager) rather than getStats; and neither progress surface
 # carries a DataVersion stamp, so the assembly step drops the shared data-version local entirely.
@@ -149,8 +154,8 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
 # SerializableChunkData.SectionData that exists only at 1.21.2 and above.
 common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkCodecImplTest.java
 
-# Below the 1.20.6 cut there is no SimpleRegionStorage or RegionStorageInfo, so the round trip opens the vanilla
-# IOWorker through WorldPaths (store/load) rather than constructing one directly. Below 1.17 (era E3) there is no
+# Below the 1.20.6 cut there is no SimpleRegionStorage or RegionStorageInfo, so the round trip opens the band's
+# WdlRegionStorage through WorldPaths (store/load) rather than constructing one directly (no IOWorker below 1.15). Below 1.17 (era E3) there is no
 # separate entities/ region: entities live inside the region/ chunk, so the round trip seeds a host region chunk and
 # folds the entity carrier into its Level.Entities through RegionChunkWriter.foldEntitiesIntoRegion, then reads the
 # entity back from that chunk. The sink's carrier is a bare {Entities:[...]} with no DataVersion or Position (those
@@ -171,7 +176,7 @@ common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
 # The headless entity double overrides hurt(DamageSource, float), the pre-1.21.2 damage entry point (the
 # ServerLevel-taking hurtServer is 1.21.2 and above). Below 1.20.5 Entity.defineSynchedData is no-arg, so the
 # double overrides that form too; below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the
-# read-back open the vanilla IOWorker through WorldPaths; and below 1.20.5 there is no ItemCost, so a merchant
+# read-back open the band's WdlRegionStorage (classic MCP RegionFile, no IOWorker below 1.15) through WorldPaths; and below 1.20.5 there is no ItemCost, so a merchant
 # offer's buy cost is a plain ItemStack.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
 
@@ -246,36 +251,24 @@ common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 # slotIndex IGuiListEntry rows, keys forwarded from keyTyped to the focused GuiTextField.
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 
-# Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the HUD-layer id is built with the
-# public ResourceLocation(String, String) constructor. NeoForge 20.4 registers the HUD through
-# RegisterGuiOverlaysEvent plus an IGuiOverlay (RegisterGuiLayersEvent is later), the config screen through
-# ConfigScreenHandler.ConfigScreenFactory (not IConfigScreenFactory), and @Mod has no dist element; the
-# client-only declaration lives in mods.toml's side = "CLIENT" dependency entries instead.
-neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
-
-# NeoForge 20.4 scans META-INF/mods.toml for the mod manifest; it was renamed to META-INF/neoforge.mods.toml above
-# this band. The template content is unchanged, only the path, so this band ships the manifest under the 20.4 name.
-neoforge/src/main/resources/META-INF/mods.toml
-
-# The counterpart to the above: the dev branch's manifest name has no file on this band, which uses the 20.4
-# META-INF/mods.toml name instead.
-neoforge/src/main/resources/META-INF/neoforge.mods.toml
-
-# The 1.15.2 JourneyMap (5.7.0) is Forge-only and ships the 1.8 API generation (journeymap.client.api), not the 2.0
-# API (journeymap.api.v2) the 1.16.5 band binds, so the overlay binding is the old-API form ported from the 1.17.1
-# branch, back under compat/journeymap. This entry point implements journeymap.client.api.IClientPlugin under the
-# journeymap.client.api.ClientPlugin annotation, discovered by JourneyMap's annotation scan on Forge; the Fabric jar
-# carries no journeymap entrypoint, as no Fabric JourneyMap exists at this band.
+# JourneyMap at this band is Forge-only and ships the 1.8 API generation (journeymap.client.api; the artifact the
+# band's journeymap_api_coordinate resolves), not the 2.0 API (journeymap.api.v2) the deeper bands bind, so the
+# overlay binding is the old-API form under compat/journeymap. This entry point implements
+# journeymap.client.api.IClientPlugin under the journeymap.client.api.ClientPlugin annotation, discovered by
+# JourneyMap's annotation scan on Forge; this Forge-only band ships no Fabric jar, so there is no Fabric journeymap
+# entrypoint.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
 
-# The overlay driver binds the journeymap.client.api 1.8 surface, and because the pinned 1.16.5-1.8 API jar's
-# MapPolygon and PolygonOverlay constructors name Minecraft types that differ under 1.15.2 Mojmap, it constructs them
-# reflectively against the live 5.7.0 shapes (an int dimension from DimensionType.getId, holes as a trailing List).
+# The overlay driver binds the journeymap.client.api 1.8 surface directly through its imported PolygonOverlay,
+# MapPolygon and ShapeProperties types (no reflection at this band; the API jar's Minecraft-typed constructors
+# resolve against this band's classic MCP compile view), reading the dimension as a classic
+# net.minecraft.world.DimensionType off the world provider.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDriver.java
 
-# The polygon builder targets the journeymap.client.api.model package. MapPolygonWithHoles is absent from JourneyMap
-# 5.7.0, so a local HoledPolygon holder carries the hull and holes to the reflected multi-argument PolygonOverlay
-# constructor instead.
+# The polygon builder targets the journeymap.client.api.model package and feeds JourneyMap one convex MapPolygon per
+# coverage rectangle rather than the merged holed hulls CoveragePolygonTracer produces, because this API generation
+# neither subtracts a hole nor fills a concave polygon; the rectangles are disjoint and abut, so their translucent
+# fills tile seamlessly and the uncovered gaps stay uncovered.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.java
 
 # The shared coverage-polygon tracer keeps the public visibility it took on the parent band, and its JDK collection
@@ -311,7 +304,7 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
 common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage or RegionStorageInfo, so the region storage this writer
-# drains against is the vanilla IOWorker (store/load/synchronize/close), opened per dimension through
+# drains against is the band's WdlRegionStorage (store/load/close, synchronous, no IOWorker below 1.15), opened per dimension through
 # WorldPaths. Below 1.17 (era E3) entities live inside the region/ chunk under Level.Entities, not in a separate
 # entities/ region, so the ENTITIES write task folds into the host region chunk through
 # RegionChunkWriter.foldEntitiesIntoRegion rather than draining a second entities/ storage: the entities opener
@@ -321,8 +314,8 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.
 # DimensionType.getName(DimensionType) accessor, and chunk tags are the classic MCP NBTTagCompound.
 common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 
-# Below the 1.20.6 cut there is no SimpleRegionStorage, so the merge-write reads and writes through the vanilla
-# IOWorker's load and store rather than read and write. Below 1.17 (era E3) entities live inside the region/ chunk,
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the merge-write reads and writes through the band's
+# WdlRegionStorage load and store rather than the newer read and write (no IOWorker below 1.15). Below 1.17 (era E3) entities live inside the region/ chunk,
 # so this carries foldEntitiesIntoRegion, the entity fold that unions a captured entity carrier into the host chunk's
 # Level.Entities through EntityMerge and writes the chunk back, the entity sibling of the container rewrite path; and
 # the terrain merge-write preserves the on-disk Level.Entities the fresh terrain tag lacks, so a routine terrain
@@ -332,7 +325,7 @@ common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 common/src/main/java/world/thearchive/wdl/adapter/RegionChunkWriter.java
 
 # Below the 1.20.6 cut there is no RegionStorageInfo; instead of supplying one per dimension, this seam opens the
-# vanilla IOWorker directly (openRegionStorage). Below 1.17 (era E3) there is no separate entities/ region:
+# band's WdlRegionStorage directly (openRegionStorage; there is no IOWorker below 1.15). Below 1.17 (era E3) there is no separate entities/ region:
 # entities live inside the region/ chunk, so the entitiesDirectory/openEntitiesStorage members the E2a parent
 # carries are dropped and this maps and opens only region/.
 # Below 1.13 the dimension key is the classic three-constant net.minecraft.world.DimensionType enum (package
@@ -342,8 +335,8 @@ common/src/main/java/world/thearchive/wdl/adapter/RegionChunkWriter.java
 # folder is included too; there is no per-dimension dimensions/ resource-location tree to scan below 1.16.
 common/src/main/java/world/thearchive/wdl/adapter/WorldPaths.java
 
-# Below the 1.20.6 cut there is no SimpleRegionStorage, so the drain is proven against the vanilla IOWorker (a
-# test-local subclass reaches its protected constructor) rather than constructing one via
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the drain is proven against the band's WdlRegionStorage (a
+# test-local subclass of it; no vanilla IOWorker or protected constructor below 1.15) rather than constructing one via
 # RegionStorageInfo/DataFixers. Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
 common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
 
@@ -351,32 +344,34 @@ common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
 # not exist below 1.19.
 common/src/test/java/world/thearchive/wdl/adapter/BookshelfOccupancyFlushTest.java
 
-# Below the 1.20.6 cut there is no SimpleRegionStorage, so the prior-write and read-back open the vanilla IOWorker
-# through WorldPaths rather than constructing one directly.
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the prior-write and read-back open the band's WdlRegionStorage
+# through WorldPaths rather than constructing one directly (no IOWorker below 1.15).
 common/src/test/java/world/thearchive/wdl/adapter/CarryForwardWiringTest.java
 
-# Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the entity read-back open the vanilla
-# IOWorker through WorldPaths. Below 1.20.5 a filled map's id is the raw int tag."map", not a components entry,
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the entity read-back open the band's
+# WdlRegionStorage through WorldPaths (no IOWorker below 1.15). Below 1.20.5 a filled map's id is the raw int tag."map", not a components entry,
 # and DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+# Below 1.13 a filled map's id is the item-level Damage short behind the id == minecraft:filled_map identity gate, not
+# the inner tag."map" (the test reads getShort("Damage") and builds new ItemStack(Items.FILLED_MAP, 1, id)).
 common/src/test/java/world/thearchive/wdl/adapter/EntityVehicleRelocationTest.java
 
-# Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the entity read-back open the vanilla
-# IOWorker through WorldPaths. Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the entity read-back open the band's
+# WdlRegionStorage through WorldPaths (no IOWorker below 1.15). Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the
 # no-argument form.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
 
-# Below the 1.20.6 cut there is no SimpleRegionStorage, so the sweep is proven against the vanilla IOWorker (a
-# test-local subclass reaches its protected constructor). Below 1.20.5 ContainerHelper.loadAllItems takes no
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so the sweep is proven against the band's WdlRegionStorage (a
+# test-local subclass of it; no vanilla IOWorker or protected constructor below 1.15). Below 1.20.5 ContainerHelper.loadAllItems takes no
 # registries argument.
 common/src/test/java/world/thearchive/wdl/adapter/OrphanedContainerSweepTest.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage or RegionStorageInfo, so this integration test drives the
-# vanilla IOWorker opened through WorldPaths (store/loadAsync/synchronize/close) rather than constructing one
+# band's WdlRegionStorage opened through WorldPaths (store/load/close, synchronous, no IOWorker below 1.15) rather than constructing one
 # directly.
 common/src/test/java/world/thearchive/wdl/adapter/RegionIntegrationTest.java
 
-# Below the 1.20.6 cut there is no SimpleRegionStorage, so this drives the vanilla IOWorker directly (a test-local
-# subclass reaches its protected constructor) rather than the newer wrapper.
+# Below the 1.20.6 cut there is no SimpleRegionStorage, so this drives the band's WdlRegionStorage directly (a test-local
+# subclass of it; no vanilla IOWorker or protected constructor below 1.15) rather than the newer wrapper.
 common/src/test/java/world/thearchive/wdl/testsupport/RegionRoundTrip.java
 
 # Below 1.20.5 ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update.
@@ -568,6 +563,8 @@ common/src/test/java/world/thearchive/wdl/adapter/MenuChangeTrackerTest.java
 # LodestoneTracked keys, a filled map's id is the raw int tag."map", and there is no ItemCost, so a merchant
 # offer's buy cost is a plain ItemStack. The sell item's fields are read off its tag rather than its components
 # map.
+# Below 1.13 a filled map's id is the item-level Damage short behind the id == minecraft:filled_map identity gate, not
+# the inner tag."map" (the fixture reads getShort("Damage") and builds new ItemStack(Items.FILLED_MAP, 1, id)).
 common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
 
 # Below 1.20.5 there is no ItemCost, so a merchant offer's buy cost is a plain ItemStack, and MerchantOffers has
@@ -575,8 +572,8 @@ common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
 common/src/test/java/world/thearchive/wdl/adapter/MerchantStashMergeTest.java
 
 # Below 1.20.5 a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and
-# vanilla's JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount alongside a present
-# RecordItem, so the fixtures carry those too and the beehive fixture goes through the unchecked
+# our capture writes IsPlaying/RecordStartTick/TickCount alongside a present RecordItem (a benign carry of keys a
+# vanilla 1.12.2 jukebox never writes, since they are 1.19 additions), so the fixtures carry those too and the beehive fixture goes through the unchecked
 # malformedChunkTagWith instead of the fidelity-checked chunkTagWith.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredScanTest.java
 
@@ -592,16 +589,9 @@ common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelityTest.java
 
 # Below 1.20.5 there are no item components: a filled map's id is the raw int tag."map", and a shulker's/bundle's
 # nested contents live under tag.BlockEntityTag.Items and tag.Items.
+# Below 1.13 a filled map's id is the item-level Damage short behind the id == minecraft:filled_map identity gate, not
+# the inner tag."map" (the fixture reads getShort("Damage") and builds new ItemStack(Items.FILLED_MAP, 1, id)).
 common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
-
-# NeoForge 20.4's tick event is TickEvent.ClientTickEvent gated by a phase check (event.phase ==
-# TickEvent.Phase.END) rather than ClientTickEvent.Post.
-neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgePlatformBridge.java
-
-# This band leaves the FML-module test tier off (no junit-fml for FancyModLoader 2.0.x), so this lone FML-module
-# ServiceLoader smoke test is excluded from the build; it carries the 1.20.4 @Mod form (no dist element) for when
-# the tier returns.
-neoforge/src/test/java/world/thearchive/wdl/neoforge/NeoForgeServiceResolutionTest.java
 
 # Below 1.20.3 there is no Crafter block, block entity or menu (the Bats and Pots update added them, experimental),
 # so this band drops the crafter open-bind leg, the crafter stash and the crafter menu-only ContainerData; the
@@ -698,14 +688,15 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.j
 # forge/build.gradle.kts is excluded from the diff as a *.gradle.kts.
 forge/src/main/resources/mcmod.info
 
-# The Forge connection tee names two members the Forge access transformer widens (net.minecraft.network.Connection
-# channel and the ClientboundMoveEntityPacket entity id, both non-public with no getter at this band) and narrows the
-# packet's int move-deltas to the shared ConnectionTee contract's short: at this band the deltas are int with public
-# getters and are read as a sign-extended short off the wire, so the narrowing is exact. New at this band.
+# The Forge connection tee names two members the Forge access transformer widens: NetworkManager's channel field and
+# the SPacketEntity entity id. NetworkManager has a public channel() getter at this band, so reading the widened field
+# is harmless conservatism; the entity-id field is non-public with no getter. It also narrows the packet's int
+# move-deltas to the shared ConnectionTee contract's short: at this band the deltas are int with public getters and
+# are read as a sign-extended short off the wire, so the narrowing is exact. New at this band.
 forge/src/main/java/world/thearchive/wdl/forge/ForgeConnectionTee.java
 
-# The Forge mount-menu read names the non-public HorseInventoryMenu.horse the Forge access transformer widens, the one
-# member MountMenuReader needs that this band exposes no getter for. New at this band.
+# The Forge mount-menu read names the non-public ContainerHorseInventory.horse the Forge access transformer widens,
+# the one member MountMenuReader needs that this band exposes no getter for. New at this band.
 forge/src/main/java/world/thearchive/wdl/forge/ForgeMountMenuReader.java
 
 # The resource pack_format tracks this band's Minecraft version: 4 for 1.13.2 (PackCompatibility.forFormat
@@ -813,20 +804,27 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.j
 # registries rather than the *_LOCATION keys, and the caves variant routes to the overworld by its overworld effects.
 common/src/test/java/world/thearchive/wdl/adapter/VanillaDimensionsTest.java
 
-# Below 1.19 the Forge client-registration APIs differ: the config screen is ConfigGuiHandler.ConfigGuiFactory (in the
-# fmlclient package at Forge 37) rather than the ConfigScreenHandler added at 1.19, keys register through
-# ClientRegistry.registerKeyBinding (fmlclient.registry at Forge 37) during FMLClientSetupEvent rather than the
-# RegisterKeyMappingsEvent added at 1.19, the HUD registers through OverlayRegistry.registerOverlayTop with a
-# PoseStack draw callback rather than RegisterGuiOverlaysEvent, the login event is
-# ClientPlayerNetworkEvent.LoggedInEvent (getNetworkManager) rather than LoggingIn, and PlayerInteractEvent exposes
-# getPlayer/getWorld rather than getEntity/getLevel.
+# This band predates ModLauncher: Forge 14.23.5 (Legacy FML) carries one event bus, so this entrypoint registers on
+# MinecraftForge.EVENT_BUS via @SubscribeEvent instance methods and is instantiated by a bare no-arg constructor FML
+# discovers from @Mod (useMetadata reads the display fields from mcmod.info; a client-only mod needs no side
+# attribute). The keybind registers through ClientRegistry.registerKeyBinding (fml.client.registry) directly in the
+# constructor rather than a client-setup event or RegisterKeyMappingsEvent; the HUD draws from a
+# RenderGameOverlayEvent.Post (ElementType.ALL) handler rather than OverlayRegistry or a RegisterGuiOverlays/Layers
+# event; the mods-list config-GUI hook is IModGuiFactory plus @Mod(guiFactory=...) (left unwired) rather than
+# ConfigGuiHandler/ConfigScreenHandler; the connection tee is installed off the client-tick edge; and
+# PlayerInteractEvent.RightClickBlock/EntityInteract expose getEntityPlayer/getWorld/getHitVec/getFace/getPos/getTarget/
+# getHand rather than the Mojmap getEntity/getLevel.
 forge/src/main/java/world/thearchive/wdl/forge/WdlForge.java
 
-# Below 1.19 keys register through ClientRegistry.registerKeyBinding (fmlclient.registry at Forge 37) during
-# FMLClientSetupEvent rather than the RegisterKeyMappingsEvent added at 1.19, the screen-init event is
-# GuiScreenEvent.InitGuiEvent.Post (getGui/addWidget) rather than the 1.18.2 ScreenEvent.InitScreenEvent.Post, the
-# login and logout events are ClientPlayerNetworkEvent.LoggedInEvent and LoggedOutEvent, and the /wdl client command
-# is a no-op because Forge 37 has no client-command event (RegisterClientCommandsEvent is a 1.18.2 addition).
+# This band predates ModLauncher: Forge 14.23.5 (Legacy FML) carries one event bus (MinecraftForge.EVENT_BUS,
+# dispatching to @SubscribeEvent instance methods, no functional addListener), so this bridge registers itself once
+# and polls every keybind and tick-end/connect/disconnect callback from a single shared TickEvent.ClientTickEvent
+# (phase END) listener. Keys register through ClientRegistry.registerKeyBinding (fml.client.registry) immediately,
+# there being no client-setup event to defer to; the pause-menu row is built on GuiScreenEvent.InitGuiEvent.Post
+# (getGui/getButtonList) and dispatched through GuiScreenEvent.ActionPerformedEvent.Pre, the classic action-performed
+# path (a GuiButton has no onPress); the join/disconnect edge is the tick-edge probe of Minecraft.getConnection();
+# and the /wdl client command registers through Forge's ClientCommandHandler as a classic ICommand rather than a
+# Brigadier tree or a RegisterClientCommandsEvent.
 forge/src/main/java/world/thearchive/wdl/forge/ForgePlatformBridge.java
 
 # Below 1.19 the void generator reconstructs the vanilla worldgen registries too (its biome needs a Forge registry name
@@ -1064,3 +1062,80 @@ common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
 # parent's hard assertTrue; common's own root stays required and scanned. forge/src carries zero wdl. translation
 # keys (verified on this band and on the ported 1.13.2 glue), so scanning common alone is complete.
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
+
+# New at this band: the Unimined MCP-provision boot smoke test. It loads the provisioned MCP-named Minecraft jar and
+# runs its static initializers on the Java 8 toolchain to prove the provision composes (a NoClassDefFoundError or
+# NoSuchMethodError here means the classic-MCP compile view and the runtime jar disagree); no higher band carries a
+# hand-rolled MCP provision, so there is nothing to diff against on dev.
+common/src/bootsmoke/java/world/thearchive/wdl/bootsmoke/BootSmokeTest.java
+
+# New at this band: the @NullMarked package marker for the new bootsmoke source set above.
+common/src/bootsmoke/java/world/thearchive/wdl/bootsmoke/package-info.java
+
+# Below 1.13 there is no Mojang mapping, so this per-tick entity-buffer test names classic MCP NBTTagCompound and
+# ChunkPos (net.minecraft.util.math), mirroring EntityBuffer.
+common/src/test/java/world/thearchive/wdl/adapter/EntityBufferTest.java
+
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound rather than CompoundTag), so this passenger-walk test names
+# those types, mirroring EntityTreeWalk.
+common/src/test/java/world/thearchive/wdl/adapter/EntityTreeWalkTest.java
+
+# Below 1.13 DimensionType is the classic three-constant net.minecraft.world enum, so this completion-record test
+# feeds DimensionType.OVERWORLD rather than a registry-keyed dimension.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionCompletionRecordTest.java
+
+# Below 1.13 the classic MCP types: DimensionType is the three-constant net.minecraft.world enum (OVERWORLD),
+# GameType/EnumDifficulty and NBTTagCompound/BlockPos are the classic CapturedPlayer field types, so this fail-soft
+# test builds its captured player from those.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionFailSoftTest.java
+
+# Below 1.13 DimensionType is the classic three-constant net.minecraft.world enum, so this finish-loss-line test
+# feeds DimensionType.OVERWORLD.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionFinishLossLineTest.java
+
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound, setString/setByteArray/setTag rather than put) and
+# DimensionType is the classic three-constant net.minecraft.world enum, so this loss-log wiring test names those.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossLogWiringTest.java
+
+# Below 1.13 there is no Mojang mapping, so this map-archive test names classic MCP NBTTagCompound/NBTBase and writes
+# the map dimension as an int via setInteger (getId), mirroring MapArchive.
+common/src/test/java/world/thearchive/wdl/adapter/MapArchiveTest.java
+
+# Below 1.13 a filled map's id is the item-level Damage short behind the id == minecraft:filled_map identity gate,
+# not the inner tag."map", and the NBT/item API is classic MCP, so this collector test drives that shape, mirroring
+# MapIdCollector.
+common/src/test/java/world/thearchive/wdl/adapter/MapIdCollectorTest.java
+
+# Below 1.13 a filled map's id is the item-level Damage short behind the id == minecraft:filled_map identity gate,
+# not the inner tag."map", and the NBT/item API is classic MCP, so this remap test drives that shape, mirroring
+# MapIdRemap.
+common/src/test/java/world/thearchive/wdl/adapter/MapIdRemapTest.java
+
+# Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagString, setTag/hasKey/getTagList/tagCount/getTag
+# rather than put/contains/getList/get), so this NBT-merge test names those, mirroring NbtMerge.
+common/src/test/java/world/thearchive/wdl/adapter/NbtMergeTest.java
+
+# Below 1.13 there is no VoxelShape or AABB: a block outline is the classic box type AxisAlignedBB, so this draw-set
+# test builds its rims from AxisAlignedBB, mirroring OutlineDrawSet/OutlineRim.
+common/src/test/java/world/thearchive/wdl/adapter/OutlineDrawSetTest.java
+
+# Below 1.13 there is no AABB: a rim box is the classic net.minecraft.util.math.AxisAlignedBB, so this outline-tracker
+# test names AxisAlignedBB, mirroring OutlineTracker.
+common/src/test/java/world/thearchive/wdl/adapter/OutlineTrackerTest.java
+
+# Below 1.13 the local player is the classic MCP net.minecraft.entity.player.EntityPlayer (inventory.mainInventory,
+# not inventory.items), and a filled map's id is the item-level Damage short (ItemStack.getMetadata) rather than the
+# inner tag."map", so this player-capture alias test names those, mirroring PlayerSink and MapIdRemap.
+common/src/test/java/world/thearchive/wdl/adapter/PlayerCaptureAliasTest.java
+
+# Below 1.13 BlockPos has no core-package asLong/static-unpack pair, so this test round-trips the packed
+# section-coordinate long through the classic BlockPos.toLong()/fromLong(long), mirroring SectionKey.
+common/src/test/java/world/thearchive/wdl/adapter/SectionKeyTest.java
+
+# Below 1.13 the compressed NBT round trip is classic MCP CompressedStreamTools and the NBT API is classic MCP
+# (NBTTagCompound, setString), so this stash-holder test names those, mirroring StashHolder.
+common/src/test/java/world/thearchive/wdl/adapter/StashHolderTest.java
+
+# This MC-free core test names the classic accessor in its prose: below 1.13 a packed position is BlockPos.toLong()
+# rather than the 1.13+ core-package BlockPos.asLong(), so the Javadoc and the opaque-packed-key comment say toLong().
+common/src/test/java/world/thearchive/wdl/core/OpenClickIntentTest.java
