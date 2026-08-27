@@ -282,6 +282,21 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/CoveragePolygons.
 # The v2 plugin package's @NullMarked marker; new at this band with the journeymap.api.v2 binding.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/package-info.java
 
+# The other half of the same re-homing: the 1.x entry point the parent bands still carry is deleted here, since the
+# journeymap.client.api surface it implements is absent from every JourneyMap build that serves 1.12.2. Listed so the
+# propagation diff reads its absence as the intended band shape; the v2 entry point above replaces it.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
+
+# The 1.x overlay driver, deleted with the rest of that binding: it drove the IClientAPI.subscribe/onClientEvent push
+# model the 2.0 API replaced, against a journeymap.client.api surface no JourneyMap build for this band carries. The
+# v2 driver above replaces it.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDriver.java
+
+# The 1.x polygon builder, deleted with the rest of that binding: it bound journeymap.client.api.model and carried the
+# reflective construction and rectangle-only fallback the 1.x API forced, none of which the 2.0 API needs. The v2
+# builder above replaces it.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.java
+
 # The shared coverage-polygon tracer keeps the public visibility it took on the parent band, needed so the
 # re-homed compat/journeymap/v2 plugin package can reach it across the package boundary, and its JDK collection
 # factory is a Guava ImmutableList for the Java 8 floor.
