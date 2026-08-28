@@ -6,6 +6,9 @@ package world.thearchive.wdl.adapter.impl;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.TagValueOutput;
@@ -27,7 +30,7 @@ public final class ContainerSinkImpl implements ContainerSink {
         // the world-scoped collector (the same choice EntitySink made). saveAllItems writes the
         // non-empty stacks under "Items" as ItemStackWithSlot (slot index = list position) via the codec.
         TagValueOutput out = DiscardingTagOutput.create(registries);
-        ContainerHelper.saveAllItems(out, items);
+        ContainerHelper.saveAllItems(out, sanitize(items, registries));
         return out.buildResult();
     }
 
@@ -38,5 +41,14 @@ public final class ContainerSinkImpl implements ContainerSink {
         CompoundTag merged = blockEntityTag.copy();
         merged.put("Items", capturedItemsHolder.getListOrEmpty("Items"));
         return merged;
+    }
+
+    private static NonNullList<ItemStack> sanitize(NonNullList<ItemStack> items, RegistryAccess registries) {
+        RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+        NonNullList<ItemStack> clean = NonNullList.withSize(items.size(), ItemStack.EMPTY);
+        for (int i = 0; i < items.size(); i++) {
+            clean.set(i, ItemStackSanitizer.sanitizeForSave(items.get(i), ops));
+        }
+        return clean;
     }
 }
