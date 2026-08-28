@@ -177,3 +177,4 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCapture
 # The shared capture driver's new entity-rim readback reads the camera through GameRenderer.getMainCamera, not the
 # 26.2 mainCamera rename.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
+

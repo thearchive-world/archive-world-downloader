@@ -3,9 +3,17 @@
 
 package world.thearchive.wdl.adapter.impl;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.TagValueOutput;
 
 import world.thearchive.wdl.adapter.PlayerSink;
@@ -27,7 +35,35 @@ public final class PlayerSinkImpl implements PlayerSink {
         // Entity super fields (Pos/Rotation/UUID) + Player.addAdditionalSaveData (Inventory/SelectedItemSlot/
         // EnderItems/abilities/...), with no id.
         TagValueOutput out = DiscardingTagOutput.create(registries);
-        player.saveWithoutId(out);
+        List<Runnable> restores = new ArrayList<>();
+        try {
+            sanitizeEquipment(player, registries, restores);
+            player.saveWithoutId(out);
+        } finally {
+            // The swaps land on the live player, so a throw from either call above must still put every original back.
+            for (Runnable restore : restores) {
+                restore.run();
+            }
+        }
         return out.buildResult();
+    }
+
+    private static void sanitizeEquipment(Player player, RegistryAccess registries, List<Runnable> restores) {
+        RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            swapIfUnsavable(player.getItemBySlot(slot), ops, stack -> player.setItemSlot(slot, stack), restores);
+        }
+    }
+
+    private static void swapIfUnsavable(ItemStack original, RegistryOps<Tag> ops, Consumer<ItemStack> write,
+            List<Runnable> restores) {
+        if (original.isEmpty()) {
+            return;
+        }
+        ItemStack clean = ItemStackSanitizer.sanitizeForSave(original, ops);
+        if (clean != original) {
+            write.accept(clean);
+            restores.add(() -> write.accept(original));
+        }
     }
 }
