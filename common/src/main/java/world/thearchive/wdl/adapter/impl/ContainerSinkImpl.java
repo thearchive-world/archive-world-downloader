@@ -6,7 +6,9 @@ package world.thearchive.wdl.adapter.impl;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.item.ItemStack;
 
@@ -25,8 +27,17 @@ public final class ContainerSinkImpl implements ContainerSink {
     public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
         // saveAllItems writes the non-empty stacks under "Items", each a compound carrying its slot index.
         CompoundTag tag = new CompoundTag();
-        ContainerHelper.saveAllItems(tag, items, registries);
+        ContainerHelper.saveAllItems(tag, sanitize(items, registries), registries);
         return tag;
+    }
+
+    private static NonNullList<ItemStack> sanitize(NonNullList<ItemStack> items, RegistryAccess registries) {
+        RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+        NonNullList<ItemStack> clean = NonNullList.withSize(items.size(), ItemStack.EMPTY);
+        for (int i = 0; i < items.size(); i++) {
+            clean.set(i, ItemStackSanitizer.sanitizeForSave(items.get(i), ops));
+        }
+        return clean;
     }
 
     @Override
