@@ -4,6 +4,7 @@
 package world.thearchive.wdl.adapter.impl;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,6 +18,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.ItemStackWithSlot;
 import net.minecraft.world.entity.EntityEquipment;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
@@ -36,13 +38,16 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the equipment loss an item component the disk codec rejects causes on the player capture.
- * Where the save absorbs that error instead of throwing, the whole field the codec was writing goes missing, and the
- * worn slots can share one field, so the capture returns a tag that reports nothing while every worn item is gone.
- * {@link PlayerSinkImpl} repairs the stack before the save, so these tests read the captured NBT back rather than
- * checking that a tag came out, and they cover the restore left behind by a failure partway through the swap pass.
+ * The automated guard for the item loss an item component the disk codec rejects causes on the player capture. Where
+ * the save absorbs that error instead of throwing, the worn slots go as one field and are lost together while a stowed
+ * slot loses only its own entry, and either way the capture returns a tag that reports nothing. {@link PlayerSinkImpl}
+ * repairs the stack before the save, so these tests read the captured NBT back rather than checking that a tag came
+ * out, and they cover the held slot both passes reach and the restore left behind by a failure partway through the swap
+ * pass.
  */
 class PlayerSinkItemDegradationTest {
+    private static final int STOWED_SLOT = 5;
+
     private final PlayerSink sink = new PlayerSinkImpl();
 
     @BeforeAll
@@ -57,6 +62,16 @@ class PlayerSinkItemDegradationTest {
         assertTrue(ItemStack.CODEC.encodeStart(BadStacks.ops(registries), bow).error().isPresent(),
                 "precondition: the crafted bow is genuinely unsavable");
         return bow;
+    }
+
+    private static ItemStack capturedInventorySlot(RegistryAccess registries, CompoundTag captured, int slot) {
+        ValueInput in = TagValueInput.create(ProblemReporter.DISCARDING, registries, captured);
+        for (ItemStackWithSlot entry : in.listOrEmpty("Inventory", ItemStackWithSlot.CODEC)) {
+            if (entry.slot() == slot) {
+                return entry.stack();
+            }
+        }
+        return ItemStack.EMPTY;
     }
 
     private static void assertSavable(RegistryAccess registries, ItemStack stack, String message) {
@@ -86,6 +101,49 @@ class PlayerSinkItemDegradationTest {
         assertTrue(ItemStack.CODEC.encodeStart(BadStacks.ops(registries),
                 player.getItemBySlot(EquipmentSlot.OFFHAND)).error().isPresent(),
                 "and still carries the level-0 enchant, so the repair never landed on the live stack");
+    }
+
+    @Test
+    void anUnsavableStowedStackIsCapturedRepaired() {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
+        sword.set(DataComponents.DAMAGE, -1); // a damage below zero is rejected on save
+        HeadlessPlayer player = new HeadlessPlayer();
+        player.getInventory().setItem(STOWED_SLOT, sword);
+        assertNotEquals(STOWED_SLOT, player.getInventory().getSelectedSlot(),
+                "precondition: the stowed slot is not the held one, so only the Inventory pass reaches it");
+        assertTrue(ItemStack.CODEC.encodeStart(BadStacks.ops(registries), sword).error().isPresent(),
+                "precondition: the stowed sword is genuinely unsavable");
+
+        CompoundTag captured = sink.capturePlayer(player, registries);
+
+        ItemStack savedSword = capturedInventorySlot(registries, captured, STOWED_SLOT);
+        assertFalse(savedSword.isEmpty(), "the repaired sword reached the captured Inventory, not silently dropped");
+        assertSavable(registries, savedSword, "the captured sword is savable (repaired)");
+        assertSame(sword, player.getInventory().getItem(STOWED_SLOT),
+                "the live slot is restored to the original instance");
+        assertTrue(ItemStack.CODEC.encodeStart(BadStacks.ops(registries),
+                player.getInventory().getItem(STOWED_SLOT)).error().isPresent(),
+                "and still carries the rejected damage, so the repair never landed on the live stack");
+    }
+
+    @Test
+    void anUnsavableHeldStackIsCapturedRepaired() {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        ItemStack bow = badBow(registries);
+        HeadlessPlayer player = new HeadlessPlayer();
+        int held = player.getInventory().getSelectedSlot();
+        player.setItemSlot(EquipmentSlot.MAINHAND, bow);
+        assertSame(bow, player.getInventory().getItem(held),
+                "precondition: the held slot is reached by both the equipment pass and the Inventory pass");
+
+        CompoundTag captured = sink.capturePlayer(player, registries);
+
+        ItemStack savedBow = capturedInventorySlot(registries, captured, held);
+        assertFalse(savedBow.isEmpty(), "the repaired bow reached the captured Inventory, not silently dropped");
+        assertSavable(registries, savedBow, "the captured bow is savable (repaired)");
+        assertSame(bow, player.getInventory().getItem(held), "the live held slot is restored to the original");
+        assertSame(bow, player.getItemBySlot(EquipmentSlot.MAINHAND), "and reads back as the original either way");
     }
 
     @Test
