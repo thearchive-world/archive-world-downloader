@@ -36,10 +36,7 @@ import net.minecraft.world.ticks.LevelTickAccess;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A do-nothing client-side {@link Level} for headless entity fixtures. Below 1.21.2 the {@code Mob} constructor reads
- * {@code level.getProfilerSupplier()}, so a mob can no longer be built against a null level; this supplies the
- * overworld dimension type and the vanilla registries the constructor and its {@code DamageSources} need, an inactive
- * profiler, and inert stubs for the abstract members no fixture calls.
+ * Headless vanilla {@link Level} for plain JUnit tests: it carries only what constructing a live entity double needs.
  */
 public final class HeadlessLevel extends Level {
     private HeadlessLevel(RegistryAccess registries) {
