@@ -36,3 +36,7 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCapture
 # The shared capture driver reads the camera through GameRenderer.getMainCamera().getPosition(), the pre-26.2,
 # pre-1.21.11 forms.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
+
+# The headless Level is band-local: every band declares a different abstract Level surface, so the stub is
+# written against this one. New at this band.
+common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
