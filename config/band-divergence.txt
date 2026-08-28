@@ -333,3 +333,7 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSm
 # JourneyMap plugin annotation: the beta-generation API this band's runtime bundles carries JourneyMapPlugin under
 # journeymap.api.v2.client, not the v2.common the 1.21.11 release added, so the plugin names the client-package annotation.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
+
+# The headless Level is band-local: every band declares a different abstract Level surface, so the stub is
+# written against this one. New at this band.
+common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
