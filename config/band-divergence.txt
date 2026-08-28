@@ -34,3 +34,7 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCapture
 # The shared capture driver's new entity-rim readback reads the camera through GameRenderer.getMainCamera, not the
 # 26.2 mainCamera rename.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
+
+# The headless Level is band-local: every band declares a different abstract Level surface, so the stub is
+# written against this one. New at this band.
+common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
