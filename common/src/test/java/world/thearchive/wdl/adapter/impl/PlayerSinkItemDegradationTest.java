@@ -4,6 +4,7 @@
 package world.thearchive.wdl.adapter.impl;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,12 +32,12 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The automated guard for the equipment loss an item component the disk codec rejects causes on the player capture. On
  * this band the save throws on such a stack rather than absorbing it, so the capture loses the whole player rather than
  * one entry. {@link PlayerSinkImpl} repairs the stack before the save, so these tests read the captured NBT back rather
- * than checking that a tag came out, and they cover the restore left behind by a failure partway through the swap
- * pass.
+ * than checking that a tag came out, and they cover the restore left behind by a failure partway through the swap pass.
  */
 class PlayerSinkItemDegradationTest {
     /** This band writes worn items into the Inventory list: armor at 100 plus its index, the offhand at 150. */
     private static final int OFFHAND_SLOT = 150;
+    private static final int STOWED_SLOT = 5;
     private static final int HEAD_SLOT = 103;
 
     private final PlayerSink sink = new PlayerSinkImpl();
@@ -90,6 +91,49 @@ class PlayerSinkItemDegradationTest {
         assertTrue(ItemStack.CODEC.encodeStart(BadStacks.ops(registries),
                 player.getItemBySlot(EquipmentSlot.OFFHAND)).error().isPresent(),
                 "and still carries the rejected damage, so the repair never landed on the live stack");
+    }
+
+    @Test
+    void anUnsavableStowedStackIsCapturedRepaired() {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
+        sword.set(DataComponents.DAMAGE, -1); // a damage below zero is rejected on save
+        HeadlessPlayer player = new HeadlessPlayer();
+        player.getInventory().setItem(STOWED_SLOT, sword);
+        assertNotEquals(STOWED_SLOT, player.getInventory().selected,
+                "precondition: the stowed slot is not the held one, so only the Inventory pass reaches it");
+        assertTrue(ItemStack.CODEC.encodeStart(BadStacks.ops(registries), sword).error().isPresent(),
+                "precondition: the stowed sword is genuinely unsavable");
+
+        CompoundTag captured = sink.capturePlayer(player, registries);
+
+        ItemStack savedSword = capturedInventorySlot(registries, captured, STOWED_SLOT);
+        assertFalse(savedSword.isEmpty(), "the repaired sword reached the captured Inventory, not silently dropped");
+        assertSavable(registries, savedSword, "the captured sword is savable (repaired)");
+        assertSame(sword, player.getInventory().getItem(STOWED_SLOT),
+                "the live slot is restored to the original instance");
+        assertTrue(ItemStack.CODEC.encodeStart(BadStacks.ops(registries),
+                player.getInventory().getItem(STOWED_SLOT)).error().isPresent(),
+                "and still carries the rejected damage, so the repair never landed on the live stack");
+    }
+
+    @Test
+    void anUnsavableHeldStackIsCapturedRepaired() {
+        RegistryAccess.Frozen registries = TestRegistries.frozen();
+        ItemStack bow = badBow(registries);
+        HeadlessPlayer player = new HeadlessPlayer();
+        int held = player.getInventory().selected;
+        player.setItemSlot(EquipmentSlot.MAINHAND, bow);
+        assertSame(bow, player.getInventory().getItem(held),
+                "precondition: the held slot is reached by both the equipment pass and the Inventory pass");
+
+        CompoundTag captured = sink.capturePlayer(player, registries);
+
+        ItemStack savedBow = capturedInventorySlot(registries, captured, held);
+        assertFalse(savedBow.isEmpty(), "the repaired bow reached the captured Inventory, not silently dropped");
+        assertSavable(registries, savedBow, "the captured bow is savable (repaired)");
+        assertSame(bow, player.getInventory().getItem(held), "the live held slot is restored to the original");
+        assertSame(bow, player.getItemBySlot(EquipmentSlot.MAINHAND), "and reads back as the original either way");
     }
 
     @Test
