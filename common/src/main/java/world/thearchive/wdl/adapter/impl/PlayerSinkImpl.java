@@ -12,6 +12,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.TagValueOutput;
@@ -37,21 +38,27 @@ public final class PlayerSinkImpl implements PlayerSink {
         TagValueOutput out = DiscardingTagOutput.create(registries);
         List<Runnable> restores = new ArrayList<>();
         try {
-            sanitizeEquipment(player, registries, restores);
+            sanitizeCarriedStacks(player, registries, restores);
             player.saveWithoutId(out);
         } finally {
-            // The swaps land on the live player, so a throw from either call above must still put every original back.
-            for (Runnable restore : restores) {
-                restore.run();
+            // Newest first: both passes below reach the held slot, and undoing them in that order puts the
+            // original back on the live player even if a slot were ever swapped twice.
+            for (int i = restores.size() - 1; i >= 0; i--) {
+                restores.get(i).run();
             }
         }
         return out.buildResult();
     }
 
-    private static void sanitizeEquipment(Player player, RegistryAccess registries, List<Runnable> restores) {
+    private static void sanitizeCarriedStacks(Player player, RegistryAccess registries, List<Runnable> restores) {
         RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             swapIfUnsavable(player.getItemBySlot(slot), ops, stack -> player.setItemSlot(slot, stack), restores);
+        }
+        Inventory inventory = player.getInventory();
+        for (int slot = 0; slot < Inventory.INVENTORY_SIZE; slot++) {
+            int index = slot;
+            swapIfUnsavable(inventory.getItem(index), ops, stack -> inventory.setItem(index, stack), restores);
         }
     }
 
