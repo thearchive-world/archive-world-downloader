@@ -45,9 +45,7 @@ import net.minecraft.world.ticks.LevelTickAccess;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Headless vanilla {@link Level} for plain JUnit tests. At 26.2 {@link Entity} construction dereferences its level for
- * the entity id, so an entity double needs a real level; this one carries no world state and throws from every abstract
- * accessor a save does not touch.
+ * Headless vanilla {@link Level} for plain JUnit tests: it carries only what constructing a live entity double needs.
  */
 public final class HeadlessLevel extends Level {
     private static @Nullable Level instance;
