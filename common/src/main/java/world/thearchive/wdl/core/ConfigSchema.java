@@ -56,9 +56,9 @@ public final class ConfigSchema {
             + "# NEARBY: Keep the area around you up to date, but leave already-downloaded areas as you first\n"
             + "# saved them.\n"
             + "# EVERYWHERE (default): Keep areas you revisit up to date too, re-saving terrain that changed\n"
-            + "# while you were away. Contents are the exception: a Chest, Barrel, or Lectern can only be\n"
-            + "# saved by opening it, so a revisit refreshes the blocks but keeps the items from the last\n"
-            + "# time you opened it. Reopen a container to bring its contents up to date.\n";
+            + "# while you were away. Contents are the exception: a Chest is saved only when you open it, so\n"
+            + "# a revisit refreshes the blocks but keeps the items from the last time you opened it. Open it\n"
+            + "# again to bring its contents up to date.\n";
 
     private static final String RECAPTURE_SECONDS_PREAMBLE = ""
             + "# How often (seconds, 5 to 60) the full set of nearby chunks is refreshed. Higher is cheaper\n"
@@ -87,18 +87,21 @@ public final class ConfigSchema {
 
     private static final String SAVE_ITEM_COORDINATES_PREAMBLE = ""
             + "# Item coordinates are blanked by default for privacy: some items store a location that can point\n"
-            + "# to a base the download does not otherwise reveal. Covers Lodestone-compass targets and the flower\n"
-            + "# positions of Bees inside a silk-touched Beehive, on items in your inventory, your Ender Chest, any\n"
-            + "# container you open, ones stored in a display block such as a decorated pot, and ones held by\n"
-            + "# entities such as item frames, item displays, and mob equipment, including ones nested inside\n"
-            + "# Shulker Boxes and Bundles. Set true to keep them pointing at their locations.\n";
+            + "# to a base the download does not otherwise reveal. Where your Minecraft version has them, this covers\n"
+            + "# a lodestone compass's target and the flower positions a silk-touched beehive remembers,\n"
+            + "# wherever the item sits: in your inventory, your Ender Chest, any container you open, a block\n"
+            + "# that displays an item, or an entity that holds one, including items nested inside Shulker\n"
+            + "# Boxes. Set true to keep them pointing at their locations; on a version with neither, the\n"
+            + "# settings menu leaves the row out.\n";
 
     private static final String LOCK_DOWNLOADED_MAPS_PREAMBLE = ""
             + "\n"
             + "# Filled maps you carried or saw framed during the download are written so they render their\n"
-            + "# picture instead of blank. They are locked by default, which freezes that picture: an unlocked\n"
-            + "# map repaints from live terrain when held, and the download's world is empty void, so an unlocked\n"
-            + "# map would repaint to blank. Set false to keep maps live and extendable (and accept that risk).\n";
+            + "# picture instead of blank. Where your Minecraft version can lock a map, they are locked by\n"
+            + "# default, which freezes that picture: an unlocked map repaints from live terrain when held, and\n"
+            + "# the download's world is empty void, so an unlocked map would repaint to blank. Set false to keep\n"
+            + "# maps live and extendable (and accept that risk); a version with no map lock ignores this and the\n"
+            + "# settings menu leaves the row out.\n";
 
     private static final String REMAP_MAP_IDS_PREAMBLE = ""
             + "# Filled maps you downloaded are re-keyed to stable IDs so a server that renumbers map IDs each\n"
@@ -276,7 +279,9 @@ public final class ConfigSchema {
 
     private static final String OUTLINE_LINE_WIDTH_SCALE_PREAMBLE = ""
             + "# Rim line thickness as a multiple of the game's default outline width (0.5 to 4.0); 1.0 is the\n"
-            + "# same weight as the block-selection outline, higher is bolder, lower is finer.\n";
+            + "# same weight as the block-selection outline, higher is bolder, lower is finer. Some Minecraft\n"
+            + "# versions draw every line at one fixed width; there this does nothing and the settings menu\n"
+            + "# leaves the slider out.\n";
 
     private static final String OUTLINE_DEBUG_TIMING_PREAMBLE = ""
             + "# Diagnostic (advanced, default off): log the outline's per-frame render-thread cost and per-tick\n"
