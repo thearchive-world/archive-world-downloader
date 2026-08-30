@@ -8,7 +8,10 @@ import com.google.common.collect.Maps;
 import com.mojang.blaze3d.platform.GlStateManager;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,6 +71,13 @@ public final class WdlSettingsScreen extends Screen {
     private static final String REVERT_ICON = "revert";
     private static final int REVERT_ICON_WIDTH = 10;
     private static final int REVERT_ICON_HEIGHT = 10;
+
+    /**
+     * The keys stay declared in {@link ConfigSchema} and laid out in {@link SettingsLayout}, which ship byte-identical
+     * to every band, so refusing the row here is what keeps them unforked.
+     */
+    private static final Set<String> HIDDEN_ROWS = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList("lockDownloadedMaps", "saveItemCoordinates")));
 
     private final @Nullable Screen parent;
     private final SettingsDraft draft;
@@ -302,7 +312,7 @@ public final class WdlSettingsScreen extends Screen {
             }
             boolean hasGameRuleRows = section.isGameRuleGroup() && !this.curatedById.isEmpty();
             if (visibleKeys.isEmpty() && !hasGameRuleRows) {
-                continue; // an install-gated section with nothing left to show drops its header too
+                continue; // a section left with no row to show, install-gated or hidden here, drops its header
             }
             if (section.labelKey() != null) {
                 settingsList.add(new HeaderRow(section.labelKey()));
@@ -324,8 +334,14 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /** Whether {@code key}'s row shows: a row that names required mods appears only when one of them is loaded. */
+    /**
+     * Whether {@code key}'s row shows: a hidden row never appears, and a row that names required mods appears only when
+     * one of them is loaded.
+     */
     private boolean isRowVisible(String key) {
+        if (HIDDEN_ROWS.contains(key)) {
+            return false;
+        }
         Set<String> required = SettingsLayout.requiredMods(key);
         if (!required.isEmpty() && required.stream().noneMatch(this.modLoaded)) {
             return false;
