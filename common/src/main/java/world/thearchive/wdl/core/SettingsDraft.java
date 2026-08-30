@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Predicate;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -63,8 +64,17 @@ public final class SettingsDraft {
 
     /** Whether the staged state already equals defaults, so {@link #revertAllToDefaults} would be a no-op. */
     public boolean isAtDefaults() {
+        return isAtDefaults(key -> true);
+    }
+
+    /**
+     * The same, counting only the option rows {@code drawn} admits. The screen passes its own row-visibility test,
+     * because a row it does not draw has no revert control and no way for the player to see what is off default, so a
+     * Defaults button lit by one would offer a change nothing on screen explains.
+     */
+    public boolean isAtDefaults(Predicate<String> drawn) {
         for (ConfigOption option : ConfigSchema.OPTIONS) {
-            if (isModifiedFromDefault(option.key())) {
+            if (drawn.test(option.key()) && isModifiedFromDefault(option.key())) {
                 return false;
             }
         }
