@@ -66,6 +66,24 @@ class SettingsDraftTest {
     }
 
     @Test
+    void aRowTheScreenDoesNotDrawCannotLightTheDefaultsButton() {
+        SettingsDraft draft = SettingsDraft.of(live("outlineLineWidthScale", "2.5"));
+
+        assertTrue(draft.isModifiedFromDefault("outlineLineWidthScale"), "the staged value is off default");
+        assertFalse(draft.isAtDefaults(), "and the unfiltered read still sees it");
+        assertTrue(draft.isAtDefaults(key -> !key.equals("outlineLineWidthScale")),
+                "a band that hides the row offers no revert for it, so it must not light Defaults");
+    }
+
+    @Test
+    void aRowTheScreenDrawsStillLightsTheDefaultsButton() {
+        SettingsDraft draft = SettingsDraft.of(live("recaptureSeconds", "45"));
+
+        assertFalse(draft.isAtDefaults(key -> !key.equals("outlineLineWidthScale")),
+                "hiding one row must not blind the check to every other row, which a negated predicate would");
+    }
+
+    @Test
     void revertResetsScalarToItsDescriptorDefault() {
         SettingsDraft draft = SettingsDraft.of(live("recaptureSeconds", "45"));
 
