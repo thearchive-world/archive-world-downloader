@@ -196,7 +196,7 @@ public final class WdlSettingsScreen extends Screen {
         // a tooltip on the gray state says why. Kept current with live edits by resolving before the widgets
         // draw; the equality check gates the write so the tooltip is rebuilt only when the state flips.
         if (this.defaults != null) {
-            boolean atDefaults = this.draft.isAtDefaults();
+            boolean atDefaults = this.draft.isAtDefaults(this::isRowVisible);
             if (this.defaults.active == atDefaults) {
                 this.defaults.active = !atDefaults;
             }
