@@ -35,9 +35,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Pure {@code NBTTagCompound} in/out, operating on a {@code {Entities:[...]}} envelope regardless of where the chunk
  * stores it (the {@code region/} {@code Level.Entities} at this band, a separate {@code entities/} region above it).
- * The UUID-keyed sibling of {@link ChunkMerge}. The 1.21.4-only saddle ({@code "SaddleItem"}, an inventory slot below
- * the 1.21.5 equipment-slot cut) is an additional content carry-forward key the 1.21.4 port adds here; on this band the
- * saddle is a synced equipment slot and needs no guard, so only {@code "Items"} carries forward.
+ * The UUID-keyed sibling of {@link ChunkMerge}. The saddle needs no carry-forward key on either side of the 1.21.5
+ * equipment-slot cut: above it the saddle rides in the synced equipment every capture re-reads, and below it capture
+ * re-derives {@code "SaddleItem"} from the synced saddled flag on every pass, so only {@code "Items"} carries forward.
  */
 final class EntityMerge {
     private EntityMerge() {}
@@ -111,8 +111,9 @@ final class EntityMerge {
      * Whether {@code entity}'s on-disk tag holds interaction-captured content: a non-empty {@code "Items"} list, or a
      * villager's non-empty trade {@code "Offers"}. The single definition of prior-captured entity content, shared with
      * {@link RecoveredScan} so the outline's recovered-entity set tracks exactly what the carry-forward preserves, the
-     * UUID-keyed sibling of {@link ChunkMerge#hasCapturedContent}. A future band's added content key (the pre-1.21.5
-     * saddle slot) extends this and the carry-forward together.
+     * UUID-keyed sibling of {@link ChunkMerge#hasCapturedContent}. The pre-1.21.5 saddle is deliberately not one of
+     * them: capture re-derives it from the synced saddled flag on every pass, so it needs neither this nor the
+     * carry-forward.
      */
     static boolean hasCapturedContent(NBTTagCompound entity) {
         return NbtMerge.isNonEmptyList(entity, "Items") || hasCapturedOffers(entity);

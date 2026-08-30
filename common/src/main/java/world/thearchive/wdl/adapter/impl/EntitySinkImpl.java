@@ -4,10 +4,16 @@
 package world.thearchive.wdl.adapter.impl;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
+import net.minecraft.entity.passive.AbstractHorse;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.init.Items;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.ChunkPos;
@@ -52,6 +58,7 @@ public final class EntitySinkImpl implements EntitySink {
             }
             NBTTagCompound entityTag = new NBTTagCompound();
             if (entity.writeToNBTOptional(entityTag)) {
+                applySaddleItem(entityTag, entity);
                 applyMobPersistence(entityTag, entity, forceMobPersistence);
                 entityTags.add(entityTag.copy());
             }
@@ -76,8 +83,74 @@ public final class EntitySinkImpl implements EntitySink {
         if (!vehicle.writeToNBTOptional(tag)) {
             return null;
         }
+        applySaddleItem(tag, vehicle);
         applyMobPersistence(tag, vehicle, forceMobPersistence);
         return tag.copy();
+    }
+
+    /**
+     * Write the saddle a horse-family mount is wearing, which vanilla's own writer cannot see. Below the 1.21.5
+     * equipment-slot cut the saddle is a real stack in the mount's inventory slot 0, and the server never sends that
+     * container to the client, so vanilla finds slot 0 empty and emits no {@code SaddleItem}: a saddled mount archives
+     * unsaddled. What does arrive is the saddled bit of the synced entity-data flags, for every saddled mount and with
+     * no interaction, so the capture writes a plain saddle from it and vanilla's load path takes it from there, keeping
+     * the stack only if it is a saddle and re-deriving the flag itself.
+     *
+     * <p>Re-derived from synced state on every capture, so a partial re-flush cannot drop it and {@code EntityMerge}
+     * needs no carry-forward key for it. A renamed or component-bearing saddle saves as a plain one, the accepted
+     * residual: outside an open mount menu the client holds no source for a saddle's components. An existing key is
+     * left alone rather than overwritten, so a stack that did reach slot 0 keeps whatever it carries.
+     */
+    static void applySaddleItem(NBTTagCompound entityTag, boolean saddled) {
+        if (saddled && !entityTag.hasKey("SaddleItem", 10)) {
+            entityTag.setTag("SaddleItem", new ItemStack(Items.SADDLE).writeToNBT(new NBTTagCompound()));
+        }
+    }
+
+    /**
+     * Stamp every saddled horse-family mount in a saved entity group, matched by UUID rather than by position.
+     *
+     * <p>The nested half is the reason this is not a one-liner on the root tag. The entity save has already recursed
+     * into {@code "Passengers"} by the time it returns, so a mount that is itself a passenger reaches disk only as a
+     * nested compound, and a mount picked up by a plain minecart is exactly that. Position cannot be trusted to find
+     * it, because vanilla drops any passenger whose own save is refused and the surviving list is then shorter than the
+     * live one, so the walk keys on the {@code "UUID"} every entity tag carries.
+     */
+    static void applySaddleItem(NBTTagCompound entityTag, Entity entity) {
+        Set<UUID> saddled = collectSaddled(entity, null);
+        if (entity.isBeingRidden()) {
+            for (Entity passenger : entity.getRecursivePassengers()) {
+                saddled = collectSaddled(passenger, saddled);
+            }
+        }
+        if (saddled != null) {
+            stampSaddled(entityTag, saddled);
+        }
+    }
+
+    private static @Nullable Set<UUID> collectSaddled(Entity entity, @Nullable Set<UUID> saddled) {
+        if (entity instanceof AbstractHorse && ((AbstractHorse) entity).isHorseSaddled()) {
+            Set<UUID> set = saddled != null ? saddled : new HashSet<>();
+            set.add(entity.getUniqueID());
+            return set;
+        }
+        return saddled;
+    }
+
+    private static void stampSaddled(NBTTagCompound entityTag, Set<UUID> saddled) {
+        UUID uuid = readUuid(entityTag);
+        if (uuid != null && saddled.contains(uuid)) {
+            applySaddleItem(entityTag, true);
+        }
+        NBTTagList passengers = entityTag.getTagList("Passengers", 10);
+        for (int i = 0; i < passengers.tagCount(); i++) {
+            stampSaddled(passengers.getCompoundTagAt(i), saddled);
+        }
+    }
+
+    /** The band's own entity-tag UUID read, the same one {@code EntityMerge} uses. */
+    private static @Nullable UUID readUuid(NBTTagCompound tag) {
+        return tag.hasUniqueId("UUID") ? tag.getUniqueId("UUID") : null;
     }
 
     /**
