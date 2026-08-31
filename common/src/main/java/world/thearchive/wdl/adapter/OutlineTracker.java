@@ -9,6 +9,7 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.multiplayer.ChunkProviderClient;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.entity.Entity;
@@ -423,9 +424,18 @@ public final class OutlineTracker {
     }
 
     private static AxisAlignedBB boxOf(WorldClient level, BlockPos pos) {
-        // Below the Flattening a block state has no VoxelShape; its collision bounding box stands in for the
-        // outline shape, block-local, and is offset to world coordinates.
-        return level.getBlockState(pos).getBoundingBox(level, pos).offset(pos);
+        // Below the Flattening a block state has no VoxelShape, and getBoundingBox returns a single box that
+        // need not span the model: a brewing stand's is its base plate, two sixteenths of a block against the
+        // fourteen its post reaches, so a top-face rim would sit at the foot. The parts that box omits arrive
+        // only through the collision list, which yields them already offset to world coordinates.
+        IBlockState state = level.getBlockState(pos);
+        AxisAlignedBB box = state.getBoundingBox(level, pos).offset(pos);
+        List<AxisAlignedBB> parts = new ArrayList<>(4);
+        state.addCollisionBoxToList(level, pos, new AxisAlignedBB(pos), parts, null, false);
+        for (int i = 0; i < parts.size(); i++) {
+            box = box.union(parts.get(i));
+        }
+        return box;
     }
 
     /**

@@ -403,7 +403,8 @@ common/src/test/java/world/thearchive/wdl/testsupport/RegionRoundTrip.java
 
 # Below 1.20.5 ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update.
 # Below 1.13 there is no Mojang mapping, and two absent types are reimplemented here: a block state has no
-# VoxelShape (its collision AxisAlignedBB, offset to world, stands in for the outline shape), and there is no
+# VoxelShape (its bounding box unioned with its collision boxes, offset to world, stands in for the outline
+# shape, since one box alone need not span the model: a brewing stand's is its base plate), and there is no
 # unified Registry (the block-entity id is TileEntity.getKey(getClass())). A chest carries no left/right pair
 # property either, so the double-chest partner is the capture side's inventory pairing,
 # ContainerCapture.doubleChestPartner (a getChestType equality test in the recon section 6 probe order), so the
