@@ -4,8 +4,10 @@
 package world.thearchive.wdl.adapter.impl;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.RegistryAccess;
@@ -19,6 +21,10 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.horse.AbstractHorse;
+import net.minecraft.world.entity.animal.horse.Horse;
+import net.minecraft.world.entity.animal.horse.Llama;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
@@ -35,6 +41,13 @@ import world.thearchive.wdl.adapter.EntitySink;
  * {@link #captureRootVehicle(Entity, RegistryAccess, boolean)}, a single-live gate-bypassing vehicle serialize.
  */
 public final class EntitySinkImpl implements EntitySink {
+    /** Carpet items in {@link DyeColor#getId()} order, vanilla shipping no inverse of its carpet-to-color map. */
+    private static final List<Item> CARPETS_BY_DYE_ID = List.of(
+            Items.WHITE_CARPET, Items.ORANGE_CARPET, Items.MAGENTA_CARPET, Items.LIGHT_BLUE_CARPET,
+            Items.YELLOW_CARPET, Items.LIME_CARPET, Items.PINK_CARPET, Items.GRAY_CARPET,
+            Items.LIGHT_GRAY_CARPET, Items.CYAN_CARPET, Items.PURPLE_CARPET, Items.BLUE_CARPET,
+            Items.BROWN_CARPET, Items.GREEN_CARPET, Items.RED_CARPET, Items.BLACK_CARPET);
+
     @Override
     public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, RegistryAccess registries,
             boolean forceMobPersistence) {
@@ -49,6 +62,7 @@ public final class EntitySinkImpl implements EntitySink {
             CompoundTag entityTag = new CompoundTag();
             if (entity.save(entityTag)) {
                 applySaddleItem(entityTag, entity);
+                applyMountArmor(entityTag, entity);
                 applyMobPersistence(entityTag, entity, forceMobPersistence);
                 entityTags.add(entityTag);
             }
@@ -69,6 +83,7 @@ public final class EntitySinkImpl implements EntitySink {
             return null;
         }
         applySaddleItem(tag, vehicle);
+        applyMountArmor(tag, vehicle);
         applyMobPersistence(tag, vehicle, forceMobPersistence);
         return tag;
     }
@@ -136,6 +151,90 @@ public final class EntitySinkImpl implements EntitySink {
     /** The band's own entity-tag UUID read, the same one {@code EntityMerge} uses. */
     private static @Nullable UUID readUuid(CompoundTag tag) {
         return UUIDUtil.CODEC.parse(NbtOps.INSTANCE, tag.get("UUID")).result().orElse(null);
+    }
+
+    /**
+     * Write what a mount wears in its own inventory slot 1, which vanilla's own writer cannot see. Below the 1.20.5
+     * body-armor cut a horse's armor and a llama's carpet are both real stacks in that slot, a container the server
+     * never sends to the client, so vanilla finds the slot empty and emits neither {@code ArmorItem} nor
+     * {@code DecorItem}, the two keys it saves that one slot under. The horse needs the write even though its armor
+     * already reaches the archive as synced chest equipment, because vanilla's load side re-derives that mirror from
+     * the empty slot 1 and wipes it.
+     *
+     * <p>A horse's armor is written whole, the client holding the real stack; a llama's carpet reconstructs from the
+     * synced dye color alone, so it is written plain. An existing key is left alone rather than overwritten, and the
+     * write is re-derived from synced state on every capture, so {@code EntityMerge} needs no carry-forward key.
+     */
+    static void applyMountArmor(CompoundTag entityTag, CompoundTag worn) {
+        for (String key : worn.getAllKeys()) {
+            if (!entityTag.contains(key, Tag.TAG_COMPOUND)) {
+                entityTag.put(key, worn.getCompound(key));
+            }
+        }
+    }
+
+    /**
+     * Stamp each horse's armor and each llama's carpet in a saved group, by UUID rather than by position: the descent
+     * {@link #applySaddleItem(CompoundTag, Entity)} makes, and for the same reason.
+     */
+    static void applyMountArmor(CompoundTag entityTag, Entity entity) {
+        Map<UUID, CompoundTag> worn = collectMountArmor(entity, null);
+        if (entity.isVehicle()) {
+            for (Entity passenger : entity.getIndirectPassengers()) {
+                worn = collectMountArmor(passenger, worn);
+            }
+        }
+        if (worn != null) {
+            stampMountArmor(entityTag, worn);
+        }
+    }
+
+    private static @Nullable Map<UUID, CompoundTag> collectMountArmor(Entity entity,
+            @Nullable Map<UUID, CompoundTag> worn) {
+        CompoundTag item = wornMountArmor(entity);
+        if (item == null) {
+            return worn;
+        }
+        Map<UUID, CompoundTag> collected = worn != null ? worn : new HashMap<>();
+        collected.put(entity.getUUID(), item);
+        return collected;
+    }
+
+    /** The single-key patch a live mount's saved tag owes. */
+    private static @Nullable CompoundTag wornMountArmor(Entity entity) {
+        String key;
+        ItemStack stack;
+        if (entity instanceof Horse horse) {
+            key = "ArmorItem";
+            stack = horse.getArmor();
+        } else if (entity instanceof Llama llama) {
+            DyeColor color = llama.getSwag();
+            if (color == null) {
+                return null;
+            }
+            key = "DecorItem";
+            stack = new ItemStack(CARPETS_BY_DYE_ID.get(color.getId()));
+        } else {
+            return null;
+        }
+        if (stack.isEmpty()) {
+            return null;
+        }
+        CompoundTag worn = new CompoundTag();
+        worn.put(key, stack.save(new CompoundTag()));
+        return worn;
+    }
+
+    private static void stampMountArmor(CompoundTag entityTag, Map<UUID, CompoundTag> worn) {
+        UUID uuid = readUuid(entityTag);
+        CompoundTag item = uuid != null ? worn.get(uuid) : null;
+        if (item != null) {
+            applyMountArmor(entityTag, item);
+        }
+        ListTag passengers = entityTag.getList("Passengers", Tag.TAG_COMPOUND);
+        for (int i = 0; i < passengers.size(); i++) {
+            stampMountArmor(passengers.getCompound(i), worn);
+        }
     }
 
     /**
