@@ -17,12 +17,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Proves the Unimined-provisioned MCP 1.12.2 jar actually runs under the Java 8 target, isolated from both {@code main}
- * (seam-red on the net.minecraft-facing files) and {@code test} (Mojmap-typed, will not compile against this jar). This
- * does not prove a mapping is correct the way a remapped band's registry smoke test does; MCP names bind directly with
- * no remap step. It proves the provision composes: the jar loads, its static initializers run, and its classes bind the
- * descriptors the compiled bytecode expects. A {@link NoClassDefFoundError} or {@link NoSuchMethodError} here means the
- * provision is wrong.
+ * Proves the Unimined-provisioned MCP 1.12.2 jar actually runs under the Java 8 target: the jar loads, its static
+ * initializers run, and its classes bind the descriptors the compiled bytecode expects. A {@link NoClassDefFoundError}
+ * or {@link NoSuchMethodError} here means the provision is wrong.
  */
 class BootSmokeTest {
     @BeforeAll

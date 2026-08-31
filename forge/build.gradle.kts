@@ -170,9 +170,9 @@ dependencies {
 // configureEach), so the isolated reobftest compile never picks up common's source too.
 tasks.named<JavaCompile>("compileJava") {
     source(rootDir.resolve("../common/src/main/java"))
-    // This compile is intentionally seam-red (common's net.minecraft-facing files still name Mojmap-era types
-    // the seam port has not yet re-vocabularized this band to MCP names); javac's default 100-error cap would otherwise
-    // truncate the seam-vs-toolchain distinction the island's own verification depends on.
+    // This compile source-merges the whole of common, so a red run here produces errors by the file rather
+    // than by the line, and javac prints only the first hundred of them. Raising the cap is what keeps the
+    // list readable; it is inert on a green compile rather than spent.
     options.compilerArgs.add("-Xmaxerrs")
     options.compilerArgs.add("100000")
 }

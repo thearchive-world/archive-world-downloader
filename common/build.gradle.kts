@@ -65,12 +65,9 @@ unimined.minecraft {
 }
 
 // --- bootsmoke: isolated boot-proof source set (./gradlew :common:bootSmoke) ---
-// Proves the Unimined provision above actually runs under the Java 8 target. It cannot live in main (seam-red
-// on the 75 net.minecraft-facing files, so compileJava is intentionally red and main's output does not exist)
-// or in test (76 of its files import Mojmap types the MCP jar does not carry, so compileTestJava cannot run
-// until the seam port). This source set reads main's COMPILE classpath for the Minecraft jar and libraries, never
-// main's output, mirroring the forge island's reobftest isolation: nothing on main/test depends on bootsmoke,
-// and bootsmoke depends on nothing of theirs.
+// Proves the Unimined provision above actually runs under the Java 8 target. It reads main's COMPILE classpath
+// for the Minecraft jar and libraries, never main's output, mirroring the forge island's reobftest isolation:
+// nothing on main/test depends on bootsmoke, and bootsmoke depends on nothing of theirs.
 val bootsmoke = sourceSets.create("bootsmoke")
 val libsCatalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
