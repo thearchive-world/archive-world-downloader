@@ -3,19 +3,28 @@
 
 package world.thearchive.wdl.adapter.impl;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import net.minecraft.entity.passive.class_2976;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.horse.AbstractHorse;
+import net.minecraft.world.entity.animal.horse.Horse;
+import net.minecraft.world.entity.animal.horse.Llama;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.EntitySink;
@@ -31,6 +40,13 @@ import world.thearchive.wdl.adapter.EntitySink;
  * gate-bypassing vehicle serialize.
  */
 public final class EntitySinkImpl implements EntitySink {
+    /** Carpet blocks in {@link DyeColor#getId()} order, vanilla shipping no inverse of its carpet-to-color map. */
+    private static final List<Block> CARPETS_BY_DYE_ID = ImmutableList.of(
+            Blocks.WHITE_CARPET, Blocks.ORANGE_CARPET, Blocks.MAGENTA_CARPET, Blocks.LIGHT_BLUE_CARPET,
+            Blocks.YELLOW_CARPET, Blocks.LIME_CARPET, Blocks.PINK_CARPET, Blocks.GRAY_CARPET,
+            Blocks.LIGHT_GRAY_CARPET, Blocks.CYAN_CARPET, Blocks.PURPLE_CARPET, Blocks.BLUE_CARPET,
+            Blocks.BROWN_CARPET, Blocks.GREEN_CARPET, Blocks.RED_CARPET, Blocks.BLACK_CARPET);
+
     // 1.16.5 has no Entity.shouldBeSaved(); reproduce its predicate from the primitives it composes: a removed,
     // riding, or single-player-vehicle entity is not written standalone.
     private static boolean shouldSaveEntity(Entity entity) {
@@ -56,6 +72,7 @@ public final class EntitySinkImpl implements EntitySink {
             CompoundTag entityTag = new CompoundTag();
             if (entity.save(entityTag)) {
                 applySaddleItem(entityTag, entity);
+                applyMountArmor(entityTag, entity);
                 applyMobPersistence(entityTag, entity, forceMobPersistence);
                 entityTags.add(entityTag.copy());
             }
@@ -80,6 +97,7 @@ public final class EntitySinkImpl implements EntitySink {
             return null;
         }
         applySaddleItem(tag, vehicle);
+        applyMountArmor(tag, vehicle);
         applyMobPersistence(tag, vehicle, forceMobPersistence);
         return tag.copy();
     }
@@ -147,6 +165,113 @@ public final class EntitySinkImpl implements EntitySink {
     /** The band's own entity-tag UUID read, the same one {@code EntityMerge} uses. */
     private static @Nullable UUID readUuid(CompoundTag tag) {
         return tag.hasUUID("UUID") ? tag.getUUID("UUID") : null;
+    }
+
+    /**
+     * Write what a mount wears in its own inventory slot 1, which vanilla's own writer cannot see. Below the 1.20.5
+     * body-armor cut a horse's armor and a llama's carpet are both real stacks in that slot, a container the server
+     * never sends to the client, so vanilla finds the slot empty and emits neither {@code ArmorItem} nor
+     * {@code DecorItem}, the two keys it saves that one slot under.
+     *
+     * <p>This band mirrors neither into an equipment slot, so both are rebuilt from a synced proxy: the horse's
+     * four-value armor tier and the llama's dye color. Neither proxy carries the stack it stands for, so both are
+     * written plain. An existing key is left alone rather than overwritten, and the write is re-derived from synced
+     * state on every capture, so {@code EntityMerge} needs no carry-forward key.
+     */
+    static void applyMountArmor(CompoundTag entityTag, CompoundTag worn) {
+        for (String key : worn.getAllKeys()) {
+            if (!entityTag.contains(key, 10)) {
+                entityTag.put(key, worn.getCompound(key));
+            }
+        }
+    }
+
+    /**
+     * Stamp each horse's armor and each llama's carpet in a saved group, by UUID rather than by position: the descent
+     * {@link #applySaddleItem(CompoundTag, Entity)} makes, and for the same reason.
+     */
+    static void applyMountArmor(CompoundTag entityTag, Entity entity) {
+        Map<UUID, CompoundTag> worn = collectMountArmor(entity, null);
+        if (entity.isVehicle()) {
+            for (Entity passenger : entity.getIndirectPassengers()) {
+                worn = collectMountArmor(passenger, worn);
+            }
+        }
+        if (worn != null) {
+            stampMountArmor(entityTag, worn);
+        }
+    }
+
+    private static @Nullable Map<UUID, CompoundTag> collectMountArmor(Entity entity,
+            @Nullable Map<UUID, CompoundTag> worn) {
+        CompoundTag item = wornMountArmor(entity);
+        if (item == null) {
+            return worn;
+        }
+        Map<UUID, CompoundTag> collected = worn != null ? worn : new HashMap<>();
+        collected.put(entity.getUUID(), item);
+        return collected;
+    }
+
+    /** The single-key patch a live mount's saved tag owes. */
+    private static @Nullable CompoundTag wornMountArmor(Entity entity) {
+        String key;
+        ItemStack stack;
+        if (entity instanceof Horse) {
+            key = "ArmorItem";
+            stack = horseArmor((Horse) entity);
+        } else if (entity instanceof Llama) {
+            DyeColor color = ((Llama) entity).getSwag();
+            if (color == null) {
+                return null;
+            }
+            key = "DecorItem";
+            stack = new ItemStack(CARPETS_BY_DYE_ID.get(color.getId()));
+        } else {
+            return null;
+        }
+        if (stack.isEmpty()) {
+            return null;
+        }
+        CompoundTag worn = new CompoundTag();
+        worn.put(key, stack.save(new CompoundTag()));
+        return worn;
+    }
+
+    /**
+     * The armor a horse's synced tier names, this band shipping exactly one armor per tier. The tier accessor indexes
+     * the enum's own values array with no bounds check, so a value outside the vanilla range throws rather than reading
+     * as NONE; catching it costs one horse's armor where letting it out would cost the whole chunk's entities.
+     */
+    private static ItemStack horseArmor(Horse horse) {
+        class_2976 tier;
+        try {
+            tier = horse.getArmor();
+        } catch (ArrayIndexOutOfBoundsException e) {
+            return ItemStack.EMPTY;
+        }
+        switch (tier) {
+            case IRON:
+                return new ItemStack(Items.IRON_HORSE_ARMOR);
+            case GOLD:
+                return new ItemStack(Items.GOLDEN_HORSE_ARMOR);
+            case DIAMOND:
+                return new ItemStack(Items.DIAMOND_HORSE_ARMOR);
+            default:
+                return ItemStack.EMPTY;
+        }
+    }
+
+    private static void stampMountArmor(CompoundTag entityTag, Map<UUID, CompoundTag> worn) {
+        UUID uuid = readUuid(entityTag);
+        CompoundTag item = uuid != null ? worn.get(uuid) : null;
+        if (item != null) {
+            applyMountArmor(entityTag, item);
+        }
+        ListTag passengers = entityTag.getList("Passengers", 10);
+        for (int i = 0; i < passengers.size(); i++) {
+            stampMountArmor(passengers.getCompound(i), worn);
+        }
     }
 
     /**
