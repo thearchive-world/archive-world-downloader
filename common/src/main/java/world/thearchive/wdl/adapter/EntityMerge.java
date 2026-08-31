@@ -35,9 +35,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Pure {@code NBTTagCompound} in/out, operating on a {@code {Entities:[...]}} envelope regardless of where the chunk
  * stores it (the {@code region/} {@code Level.Entities} at this band, a separate {@code entities/} region above it).
- * The UUID-keyed sibling of {@link ChunkMerge}. The saddle needs no carry-forward key on either side of the 1.21.5
- * equipment-slot cut: above it the saddle rides in the synced equipment every capture re-reads, and below it capture
- * re-derives {@code "SaddleItem"} from the synced saddled flag on every pass, so only {@code "Items"} carries forward.
+ * The UUID-keyed sibling of {@link ChunkMerge}. The tack a mount wears needs no carry-forward key on either side of the
+ * cuts that turn it into synced equipment (1.20.5 for the body, 1.21.5 for the saddle): above them it rides in the
+ * equipment every capture re-reads, and below them capture re-derives {@code "SaddleItem"} from the synced saddled flag
+ * and slot 1's {@code "ArmorItem"} or {@code "DecorItem"} from the horse's synced armor or the llama's synced dye
+ * color, on every pass, so only {@code "Items"} carries forward.
  */
 final class EntityMerge {
     private EntityMerge() {}
@@ -111,9 +113,9 @@ final class EntityMerge {
      * Whether {@code entity}'s on-disk tag holds interaction-captured content: a non-empty {@code "Items"} list, or a
      * villager's non-empty trade {@code "Offers"}. The single definition of prior-captured entity content, shared with
      * {@link RecoveredScan} so the outline's recovered-entity set tracks exactly what the carry-forward preserves, the
-     * UUID-keyed sibling of {@link ChunkMerge#hasCapturedContent}. The pre-1.21.5 saddle is deliberately not one of
-     * them: capture re-derives it from the synced saddled flag on every pass, so it needs neither this nor the
-     * carry-forward.
+     * UUID-keyed sibling of {@link ChunkMerge#hasCapturedContent}. A mount's tack is deliberately not one of them:
+     * capture re-derives the saddle, a horse's armor and a llama's carpet from synced state on every pass, so none of
+     * them needs this or the carry-forward.
      */
     static boolean hasCapturedContent(NBTTagCompound entity) {
         return NbtMerge.isNonEmptyList(entity, "Items") || hasCapturedOffers(entity);
