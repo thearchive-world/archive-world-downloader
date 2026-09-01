@@ -7,8 +7,7 @@ package world.thearchive.wdl.reobftest;
 // checkReobf reference scan is largely redundant here), so the residual mis-bind surface is a reflective,
 // SRG-shaped string literal, the kind a runtime binder feeding Class.getDeclaredField/getDeclaredMethod uses
 // to reach a Forge-obfuscated member by name. This literal names net/minecraft/entity/Entity's "world" field
-// (MCP name) under its searge id; checkShipJar resolves it against the pinned joined.srg oracle, where it must
-// succeed.
+// (MCP name) under its searge id, a name that resolves in the pinned joined.srg oracle.
 public final class ReobfFixture {
 
     private ReobfFixture() {}
