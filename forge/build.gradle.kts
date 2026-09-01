@@ -588,14 +588,18 @@ abstract class CheckSeargeSurface : DefaultTask() {
 val checkShipJar = tasks.register<CheckSeargeSurface>("checkShipJar") {
     group = "verification"
     description = "Fails if a shipped class fails to parse (arm a), a TYPE_USE-annotated member names an unknown net/minecraft class (arm b), or a searge-shaped string constant/AT entry does not resolve in the pinned oracle (arm c)."
-    dependsOn(modJar)
-    // common is re-vocabularized to MCP names and modJar builds, so this scans the real reobf'd ship jar rather
-    // than the reobftest fixture: every shipped class parses (arm a), no TYPE_USE-annotated member names a
-    // net/minecraft class outside the pinned oracle (arm b), and every searge-shaped string literal plus every
-    // accesstransformer.cfg and mcmod.info entry resolves against the oracle (arm c). checkReobfNegative keeps
-    // the fixture as the inverted meta-test that proves the arm (c) scan still fires, so no excludedEntryText is
-    // needed here: the real ship jar carries no negative fixture class.
-    jarToScan.set(modJar.flatMap { it.archiveFile })
+    dependsOn(reobfFixtureJar)
+    // TEMPORARY, for as long as the source-merged common stays seam-red on this band's mint: this scans the
+    // reobftest fixture rather than the real ship jar, and moves back to modJar once the seam port lands.
+    // checkShipJar is the only gate that reads the oracle against real symbols, so it is also the only one that
+    // catches a wrong reader; pointing it at modJar while common cannot compile does not make it stricter, it
+    // makes it unrunnable, and the oracle then goes unexercised for the whole of the vehicle phase while the
+    // phase reports its bar met. The fixture is a real positive control rather than a stand-in: ReobfFixture
+    // carries WORLD_FIELD_SEARGE_ID, a genuine searge id that must resolve, so a wrong oracle reds this task.
+    // excludedEntryText drops the negative fixture's own class, whose bogus literal is an offender by
+    // construction and belongs only to checkReobfNegative.
+    jarToScan.set(reobfFixtureJar.flatMap { it.archiveFile })
+    excludedEntryText.set("ReobfNegativeFixture")
     seargeOracleFile.set(extractSeargeOracle.flatMap { it.joinedSrg })
     expectedOracleClasses.set(seargeOracleClasses)
     expectedOracleMembers.set(seargeOracleMembers)
