@@ -64,6 +64,18 @@ unimined.minecraft {
     defaultRemapJar = false
 }
 
+// A band mint drives its port off this compile's own error list, and javac prints only the first hundred
+// diagnostics, a cap a mint passes early. Raising it is inert on a green compile, matching what the Forge
+// island already does with its own source-merged compile. Note a second truncator this cannot reach: Gradle's
+// constants analyzer throws NullPointerException out of ConstantsTreeVisitor.getBinaryClassName as soon as it
+// walks a class declaration whose type did not resolve, which aborts the compilation and reports that in place
+// of the errors javac had left to print. It is installed for in-process javac regardless of the incremental
+// and build-cache switches, so reading a full worklist during a mint means running javac outside Gradle.
+tasks.named<JavaCompile>("compileJava") {
+    options.compilerArgs.add("-Xmaxerrs")
+    options.compilerArgs.add("100000")
+}
+
 // --- bootsmoke: isolated boot-proof source set (./gradlew :common:bootSmoke) ---
 // Proves the Unimined provision above actually runs under the Java 8 target. It reads main's COMPILE classpath
 // for the Minecraft jar and libraries, never main's output, mirroring the forge island's reobftest isolation:
