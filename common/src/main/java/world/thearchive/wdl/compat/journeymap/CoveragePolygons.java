@@ -54,7 +54,12 @@ final class CoveragePolygons {
             int z0 = rectangles[i + 1] << 4;
             int x1 = (rectangles[i + 2] + 1) << 4;
             int z1 = (rectangles[i + 3] + 1) << 4;
-            result.add(toPolygon(new int[] { x0, z0, x1, z0, x1, z1, x0, z1 }));
+            // Counter-clockwise in screen space (north-west, south-west, south-east, north-east), which is what
+            // makes the fill front-facing. JourneyMap draws the fill as a GL_POLYGON without disabling face
+            // culling, so a clockwise ring is culled away while the stroke, a GL_LINE_STRIP, is not: the overlay
+            // then renders as an outline with no tint, or as nothing at all when the stroke is suppressed the way
+            // toneStyle suppresses it. Field-confirmed on this band's JourneyMap build.
+            result.add(toPolygon(new int[] { x0, z0, x0, z1, x1, z1, x1, z0 }));
         }
         return result;
     }
