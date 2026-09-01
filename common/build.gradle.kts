@@ -128,7 +128,7 @@ tasks.register<Test>("bootSmoke") {
 // CI-gated by .github/workflows/mutation-testing.yml on dev and version-branch pushes; a new survivor is
 // triaged (killed, suppressed, or rewritten away) rather than absorbed by lowering the floor.
 pitest {
-    pitestVersion = "1.22.1"
+    pitestVersion = "1.17.4"
     junit5PluginVersion = "1.2.2" // required: the test platform is JUnit 5; this is PIT's JUnit-Platform bridge
 
     // The fidelity-critical registry. Exact FQNs, never a package glob (see the rationale above).

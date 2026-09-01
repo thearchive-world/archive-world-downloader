@@ -38,20 +38,33 @@ checkstyle {
 // Checkstyle 10.x requires Java 11+ to run, which the deep Java-8 bands cannot host on their own toolchain.
 // Checkstyle analyzes source text, so its runner JVM is independent of the Java-8 language level the sources
 // compile at; point the Checkstyle tasks at a modern launcher there while the compile stays on the band toolchain.
-// PITest 1.22.1 is Java-11 bytecode for the same reason: it analyzes and forks against compiled class files,
-// not the language level, so it can run against Java-8-compiled sources from a newer launcher. The pitest task
-// is selected by name off JavaExec (its actual supertype), not by the PitestTask type, since the pitest plugin
-// is applied after this convention plugin and is never on build-logic's classpath.
-if (providers.gradleProperty("java_version").get().toInt() < 11) {
+// PITest forks the suite rather than only reading class files, so unlike Checkstyle its launcher has to be one
+// the tests themselves can run on. On the Loom Java-8 bands that is still the modern launcher. On a classic-MCP
+// band it is not: legacy FML's GameData static-initializer reaches sun.reflect.ReflectionFactory.newFieldAccessor,
+// which exists only on Java 8, so every test that bootstraps the vanilla registries dies on a newer JVM. Those
+// bands therefore run PITest on their own Java-8 toolchain, against a Java-8 PITest release pinned in
+// common/build.gradle.kts. mcp_mappings_version is the discriminator: only a classic-MCP band sets it. The pitest
+// task is selected by name off JavaExec (its actual supertype), not by the PitestTask type, since the pitest
+// plugin is applied after this convention plugin and is never on build-logic's classpath.
+val bandJavaVersion = providers.gradleProperty("java_version").get().toInt()
+if (bandJavaVersion < 11) {
     val modernLauncher = javaToolchains.launcherFor {
         languageVersion = JavaLanguageVersion.of(17)
         vendor = JvmVendorSpec.ADOPTIUM
+    }
+    val pitestLauncher = if (providers.gradleProperty("mcp_mappings_version").isPresent) {
+        javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(bandJavaVersion)
+            vendor = JvmVendorSpec.ADOPTIUM
+        }
+    } else {
+        modernLauncher
     }
     tasks.withType<Checkstyle>().configureEach {
         javaLauncher = modernLauncher
     }
     tasks.withType<JavaExec>().matching { it.name == "pitest" }.configureEach {
-        javaLauncher = modernLauncher
+        javaLauncher = pitestLauncher
     }
 }
 
