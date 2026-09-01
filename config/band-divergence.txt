@@ -117,6 +117,9 @@ common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 # from TextComponentString/TextComponentTranslation with Style.setColor(TextFormatting); the toast host is
 # Minecraft.getToastGui with the two streams reusing SystemToast.Type categories; and the nearest-named-color
 # quantizer recomputes each color's RGB from its color index, since TextFormatting exposes no RGB accessor.
+# Below 1.12 there is no vanilla toast host at all, so both streams go to WdlToastOverlay instead: the refusal
+# branch loses the SystemToast it rode and the dedup its two categories provided, which the tray now owns, and the
+# job-done branch loses the multi-line toast type.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
 # The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
@@ -679,7 +682,10 @@ common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 # add/remove-root/task callbacks are named rootAdvancementAdded/rootAdvancementRemoved and
 # nonRootAdvancementAdded/nonRootAdvancementRemoved rather than onAddAdvancementRoot/onRemoveAdvancementRoot and
 # onAddAdvancementTask/onRemoveAdvancementTask, and whose selected-tab callback is setSelectedTab rather than
-# onSelectedTabChanged.
+# onSelectedTabChanged. Below 1.12 the file is deleted outright: net/minecraft/advancements yields no classes at
+# all, advancements being a 1.12 addition, and this era's achievements are ordinary achievement.* keys inside the
+# statistics file rather than a second surface. Listed so the propagation diff reads its absence as the intended
+# band shape.
 common/src/main/java/world/thearchive/wdl/adapter/AdvancementSnapshot.java
 
 # Below 1.20.2 there is no configuration phase, so the connection tee does not observe
@@ -1091,7 +1097,10 @@ common/src/main/java/world/thearchive/wdl/client/WdlCaptureDisableConfirmScreen.
 
 # Below 1.13 there is no Mojang mapping, so this multi-line toast implements the classic IToast SPI (draw(GuiToast,
 # long) returning IToast.Visibility) rather than Toast/ToastComponent, stitches the frame with
-# Gui.drawTexturedModalRect, and draws its text through FontRenderer.
+# Gui.drawTexturedModalRect, and draws its text through FontRenderer. Below 1.12 the file is deleted outright:
+# net/minecraft/client/gui/toasts yields no classes at all, so there is no IToast to implement and no GuiToast to
+# draw into, and WdlToastOverlay draws both notification streams itself. Listed so the propagation diff reads its
+# absence as the intended band shape.
 common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
 
 # fabric/ and neoforge/ are stripped on this Forge-only band (0 tracked files), so the PRODUCTION_ROOTS loop's
@@ -1183,3 +1192,59 @@ common/src/test/java/world/thearchive/wdl/core/OpenClickIntentTest.java
 # translation (en_us "Proceed") since the higher bands resolve the vanilla key directly and never gained an
 # equivalent wdl key.
 common/src/main/resources/assets/wdl/lang/*.json
+
+# Below 1.12 the progress snapshot carries one blob rather than two: advancements are a 1.12 addition, so there is
+# no advancements/<uuid>.json to render and the constructor and accessor for that blob are gone with it.
+common/src/main/java/world/thearchive/wdl/adapter/CapturedProgress.java
+
+# New at this band. Below 1.12 net/minecraft/client/gui/toasts yields no classes, so the notification surface has no
+# vanilla host and WDL draws its own tray: a top-right slot stack with an absolute per-toast deadline, an
+# always-painted panel independent of the HUD background setting, and the refusal dedup the two vanilla
+# SystemToast.Type categories used to provide. Drawn from the loader HUD pass while no blocking screen is open and
+# from each WDL screen's own render when one is, since the HUD pass runs before the screen.
+common/src/main/java/world/thearchive/wdl/client/WdlToastOverlay.java
+
+# The 2.0-API plugin entry point, deleted here with the rest of that binding: the JourneyMap build serving this band
+# bundles the 1.x journeymap.client.api surface and no journeymap.api.v2 at all, so the 1.x binding in the parent
+# package replaces it. Listed so the propagation diff reads its absence as the intended band shape.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/WdlJourneyMapPlugin.java
+
+# The 2.0-API overlay driver, deleted with the rest of that binding: it drove ClientEventRegistry.MAPPING_EVENT and
+# the v2 IClientAPI, neither of which this band's JourneyMap carries. The 1.x driver replaces it.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/JourneyMapOverlayDriver.java
+
+# The 2.0-API polygon builder, deleted with the rest of that binding: it bound journeymap.api.v2.client.model and
+# the holed-hull type the 1.x API has no equivalent for. The 1.x builder replaces it.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/CoveragePolygons.java
+
+# The v2 plugin package's @NullMarked marker, deleted with the package it marked.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/package-info.java
+
+# Below 1.12 the pitest allowlist drops its AdvancementSnapshot entry, that class being deleted at this band. The
+# reference is a string literal, so nothing but this test's own staleness check sees it.
+common/src/test/java/world/thearchive/wdl/PitestAllowlistEnrollmentTest.java
+
+# Below 1.12 the progress writer has one surface rather than two, advancements being a 1.12 addition, so the tests
+# that exercised two files exercise one and the cross-surface fail-soft case becomes a plain swallowed-failure case.
+common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressWriterTest.java
+
+# This band's Minecraft carries log4j 2.0-beta9 rather than the 2.8.1 of the bands above, where Configuration has no
+# addLogger or removeLogger and LogEvent has no toImmutable. The appender is added to the logger itself, which splits
+# a configuration off for its name, the additive flag stops the captured output also reaching what it was
+# inheriting, and each event's three read values are copied out as it arrives rather than held as an immutable copy.
+common/src/test/java/world/thearchive/wdl/testsupport/LogCapture.java
+
+# The CI shape legitimately differs per era and is not unified across bands. Recorded only so the propagation diff
+# reads it as explained rather than unexplained: a Java-8 band installs two JDKs and bridges Gradle's toolchain
+# detection between them, and its build steps carry a provision retry the modern bands have no use for.
+.github/workflows/ci.yml
+
+# Same reason, other file: the byte-reproducibility job is a documented no-op on a Forge-only band, exiting early
+# with a message rather than comparing two loaders' jars, because there is only one jar to compare.
+.github/workflows/reproducibility.yml
+
+# New at this band. This band's Minecraft ships a 355-class trimmed cut of fastutil that omits nine of the types
+# WDL binds, so unlike every band above it this one bundles the missing classes rather than reading the game's own
+# copy. fastutil is Apache 2.0 and its jar carries no NOTICE file, so section 4(a)'s license copy is the whole
+# obligation: modJar packages this file into META-INF as APACHE-2.0-fastutil.txt, renamed to name what it covers.
+APACHE-2.0.txt
