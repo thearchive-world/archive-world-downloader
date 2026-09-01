@@ -23,9 +23,9 @@ import world.thearchive.wdl.adapter.ChunkSnapshotSource;
  * Vanilla's write reads from a {@code World} a multiplayer client never fully has, so {@link #encode} rebuilds the tag
  * field by field from the captured snapshot. Below the Flattening (this band's own cut) a section stores block state as
  * a numeric id plus a 4-bit metadata nibble rather than a palette, light is section-resident (each
- * {@link ExtendedBlockStorage} carries its own block and sky {@link NibbleArray}), and the root tag stamps this
- * band's own {@code DataVersion}, not the post-Flattening 1631; there being no light engine yet, capture reads light
- * straight off the sections.
+ * {@link ExtendedBlockStorage} carries its own block and sky {@link NibbleArray}), and the root tag stamps this band's
+ * own {@code DataVersion}, not the post-Flattening 1631; there being no light engine yet, capture reads light straight
+ * off the sections.
  *
  * <p>Two steps (see {@link ChunkCodec}): {@link #capture(Chunk)} captures a live client chunk into a
  * {@link ChunkSnapshotSource}, and {@link #encode(ChunkSnapshotSource, boolean)} encodes that snapshot to NBT (pure, so

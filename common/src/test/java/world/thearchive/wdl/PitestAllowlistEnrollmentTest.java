@@ -98,7 +98,6 @@ class PitestAllowlistEnrollmentTest {
             "world.thearchive.wdl.core.ToastCopy",
             "world.thearchive.wdl.core.WorldType",
             // adapter/ SPI interfaces, IO/threading, packet/render/tracker plumbing, value types:
-            "world.thearchive.wdl.adapter.AdvancementSnapshot",
             "world.thearchive.wdl.adapter.AsyncSaveWriter",
             "world.thearchive.wdl.adapter.CapturedPlayer",
             "world.thearchive.wdl.adapter.ChunkCodec",

@@ -38,7 +38,6 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.GuiMerchant;
@@ -2977,25 +2976,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Assemble the immutable progress finish-snapshot from the live client (main thread): the advancement progress
-     * (client-held) and, if a stats reply has landed, the enumerated statistics, each rendered to detached JSON bytes
-     * so the writer thread never touches the still-mutating live structures. Gated per surface on its config toggle.
-     * Throwing is the caller's fail-soft contract.
+     * Assemble the immutable progress finish-snapshot from the live client (main thread): if a stats reply has landed,
+     * the enumerated statistics, rendered to detached JSON bytes so the writer thread never touches the still-mutating
+     * live structure. Gated on its config toggle. Throwing is the caller's fail-soft contract.
+     *
+     * <p>Statistics are the whole surface at this band. Advancements arrive at 1.12, and this band's achievements are
+     * ordinary {@code achievement.*} keys inside the same statistics file rather than a second one.
      */
     private CapturedProgress assembleCapturedProgress(EntityPlayerSP player, Minecraft minecraft) {
-        byte[] advancements = null;
-        if (config.captureAdvancements()) {
-            // Per-surface fail-soft: an advancement-encode throw nulls only this blob, so the sibling stats
-            // surface still lands (mirroring the writer's per-file isolation). The outer failSoft on the whole
-            // assembly stays the backstop for the shared step, the uuid.
-            advancements = failSoft("advancements", () -> {
-                NetHandlerPlayClient connection = minecraft.getConnection();
-                Map<String, AdvancementProgress> byId = connection != null
-                        ? AdvancementSnapshot.byId(connection.getAdvancementManager())
-                        : ImmutableMap.of();
-                return PlayerProgressSerializer.advancementsJson(byId);
-            });
-        }
         boolean captureStatistics = config.captureStatistics();
         byte[] stats = captureStatistics
                 ? PlayerProgressSerializer.statsJson(player.getStatFileWriter())
@@ -3003,7 +2991,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (captureStatistics && stats == null) {
             LOGGER.warn("statistics not captured: no stats reply received before finish");
         }
-        return new CapturedProgress(player.getUniqueID(), advancements, stats);
+        return new CapturedProgress(player.getUniqueID(), stats);
     }
 
     /**
@@ -3228,14 +3216,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Run a finish-time capture assembly and degrade a throw to a null snapshot (fail-soft): a serialize or scrub bug
      * in one step then drops that step to absent (the player path opens at the default spawn with no EntityPlayer tag,
-     * taking the inventory, the ender chest and the game mode with it; the progress path writes no advancement or
-     * statistics file) instead of aborting the save after chunks have committed and leaving a chunks-without-level.dat
-     * unopenable world.
+     * taking the inventory, the ender chest and the game mode with it; the progress path writes no statistics file)
+     * instead of aborting the save after chunks have committed and leaving a chunks-without-level.dat unopenable world.
      *
      * <p>The degradation is deliberate and stays. What does not is reporting the download that took it as clean, so
      * every degraded step counts toward the partial-finish verdict, and {@code step} names on the line which one it
      * was: several steps share this, and a line naming none of them leaves a reader unable to tell a lost player from
-     * lost advancements.
+     * lost statistics.
      *
      * <p>Package-private and an instance method, so the tally it feeds and the fail-soft contract are both
      * headless-testable on one session.

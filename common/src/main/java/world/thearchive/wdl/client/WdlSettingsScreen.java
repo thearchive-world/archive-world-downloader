@@ -78,7 +78,7 @@ public final class WdlSettingsScreen extends GuiScreen {
      * to every band, so refusing the row here is what keeps them unforked.
      */
     private static final Set<String> HIDDEN_ROWS = Collections.unmodifiableSet(
-            new HashSet<>(Arrays.asList("lockDownloadedMaps", "saveItemCoordinates")));
+            new HashSet<>(Arrays.asList("captureAdvancements", "lockDownloadedMaps", "saveItemCoordinates")));
 
     private final @Nullable GuiScreen parent;
     private final SettingsDraft draft;

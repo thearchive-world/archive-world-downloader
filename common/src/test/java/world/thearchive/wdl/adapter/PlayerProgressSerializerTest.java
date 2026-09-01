@@ -8,12 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;
-import net.minecraft.advancements.AdvancementProgress;
-import net.minecraft.advancements.Criterion;
 import net.minecraft.init.Blocks;
 import net.minecraft.stats.StatBase;
 import net.minecraft.stats.StatList;
@@ -24,10 +21,11 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The headless guard for {@link PlayerProgressSerializer}: at 1.12.2 neither the stats nor the advancements JSON
- * carries a {@code DataVersion} stamp (that is a 1.13+ addition), the stats blob is the flat
- * {@code {"stat.<id>": <count>}} shape enumerated over {@link StatList#ALL_STATS}, and a zero-valued stat is filtered
- * out.
+ * The headless guard for {@link PlayerProgressSerializer}: the stats JSON carries no {@code DataVersion} stamp at this
+ * era (that is a 1.13+ addition), the blob is the flat {@code {"stat.<id>": <count>}} shape enumerated over
+ * {@link StatList#ALL_STATS}, and a zero-valued stat is filtered out. There is no advancements blob to guard beside it:
+ * advancements are a 1.12 addition, and this band's achievements enumerate through the same StatList as ordinary
+ * {@code achievement.*} keys.
  */
 class PlayerProgressSerializerTest {
     @BeforeAll
@@ -63,23 +61,5 @@ class PlayerProgressSerializerTest {
     void statsJsonReturnsNullForAnEmptyCounter() {
         assertNull(PlayerProgressSerializer.statsJson(new StatisticsManager()),
                 "no stat > 0 means no reply landed, so write nothing");
-    }
-
-    @Test
-    void advancementsJsonKeysByIdStringWithDoneAndRealTimestamp() {
-        AdvancementProgress progress = new AdvancementProgress();
-        progress.update(ImmutableMap.of("minecraft:foo", new Criterion()), new String[][] { { "minecraft:foo" } });
-        progress.grantCriterion("minecraft:foo");
-        assertTrue(progress.isDone(), "precondition: the constructed advancement is genuinely done");
-
-        byte[] bytes = PlayerProgressSerializer
-                .advancementsJson(ImmutableMap.of("minecraft:story/root", progress));
-        JsonObject root = parse(bytes);
-
-        JsonObject entry = root.getAsJsonObject("minecraft:story/root");
-        assertTrue(entry.get("done").getAsBoolean(), "a genuinely-done advancement serializes done=true");
-        String obtained = entry.getAsJsonObject("criteria").get("minecraft:foo").getAsString();
-        assertTrue(obtained.matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} [+-]\\d{4}"),
-                "criterion timestamp is 'yyyy-MM-dd HH:mm:ss Z', not ISO-8601: " + obtained);
     }
 }

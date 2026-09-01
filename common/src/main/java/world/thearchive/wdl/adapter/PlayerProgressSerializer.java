@@ -4,37 +4,24 @@
 package world.thearchive.wdl.adapter;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
-import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.stats.StatBase;
 import net.minecraft.stats.StatList;
 import net.minecraft.stats.StatisticsManager;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Pure JSON builders for the player's progress surfaces: data in, detached JSON bytes out, no {@code Minecraft} or live
- * client state, so the logic is headless-testable. The advancement value shape is vanilla's own
- * {@code AdvancementProgress.Serializer} Gson adapter; the stats shape is hand-built (the vanilla serializer,
- * {@code StatisticsManagerServer.dumpJson}, is server-only). Neither surface carries a {@code DataVersion} stamp at
- * this era; that is a 1.13+ addition. The advancement id is keyed as a plain {@code String} so the band-renamed id type
- * never appears here.
+ * Pure JSON builder for the player's statistics surface: data in, detached JSON bytes out, no {@code Minecraft} or live
+ * client state, so the logic is headless-testable. The shape is hand-built (the vanilla serializer,
+ * {@code StatisticsManagerServer.dumpJson}, is server-only). It carries no {@code DataVersion} stamp at this era; that
+ * is a 1.13+ addition. There is no advancement builder beside it: advancements are a 1.12 addition and this band's
+ * achievements ride the statistics surface as ordinary {@code achievement.*} keys.
  */
 final class PlayerProgressSerializer {
-    private static final Gson gson = new GsonBuilder()
-            .registerTypeAdapter(AdvancementProgress.class, new AdvancementProgress.Serializer())
-            .create();
+    private static final Gson gson = new Gson();
 
     private PlayerProgressSerializer() {}
-
-    /** The {@code advancements/<uuid>.json} bytes: id-string keyed progress, this era's own flat on-disk shape. */
-    static byte[] advancementsJson(Map<String, AdvancementProgress> progressById) {
-        JsonObject root = new JsonObject();
-        progressById.forEach((id, progress) -> root.add(id, gson.toJsonTree(progress)));
-        return gson.toJson(root).getBytes(StandardCharsets.UTF_8);
-    }
 
     /**
      * The {@code stats/<uuid>.json} bytes: a flat {@code {"stat.<id>": <count>}} object, no namespace nesting (that

@@ -25,19 +25,16 @@ class PlayerProgressWriterTest {
     }
 
     @Test
-    void writesBothFilesUnderTheSaveRoot(@TempDir Path saveRoot) {
-        byte[] advancements = "{\"DataVersion\":1}".getBytes();
+    void writesTheStatsFileUnderTheSaveRoot(@TempDir Path saveRoot) {
         byte[] stats = "{\"stats\":{},\"DataVersion\":1}".getBytes();
-        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, advancements, stats));
+        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, stats));
 
-        assertArrayEquals(advancements, readAll(saveRoot.resolve("advancements").resolve(UUID_A + ".json")));
         assertArrayEquals(stats, readAll(saveRoot.resolve("stats").resolve(UUID_A + ".json")));
     }
 
     @Test
-    void aNullBlobSkipsThatFile(@TempDir Path saveRoot) {
-        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, "{}".getBytes(), null));
-        assertTrue(Files.isRegularFile(saveRoot.resolve("advancements").resolve(UUID_A + ".json")));
+    void aNullBlobSkipsTheFile(@TempDir Path saveRoot) {
+        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, null));
         assertFalse(Files.exists(saveRoot.resolve("stats").resolve(UUID_A + ".json")),
                 "a null stats blob writes no stats file");
     }
@@ -45,32 +42,31 @@ class PlayerProgressWriterTest {
     @Test
     void aNullProgressIsNoop(@TempDir Path saveRoot) {
         PlayerProgressWriter.write(saveRoot, null); // disconnect-flush path
-        assertFalse(Files.exists(saveRoot.resolve("advancements")));
         assertFalse(Files.exists(saveRoot.resolve("stats")));
     }
 
     @Test
-    void anIoFailureOnOneSurfaceDoesNotThrowNorBlockTheOther(@TempDir Path saveRoot) throws Exception {
-        // Pre-create the stats directory path AS A FILE so createDirectories/write throws for stats only.
+    void anIoFailureIsSwallowedRatherThanThrown(@TempDir Path saveRoot) throws Exception {
+        // Pre-create the stats directory path AS A FILE so createDirectories/write throws.
         Files.createFile(saveRoot.resolve("stats"));
 
-        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, "{}".getBytes(), "{}".getBytes()));
+        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, "{}".getBytes()));
 
-        assertTrue(Files.isRegularFile(saveRoot.resolve("advancements").resolve(UUID_A + ".json")),
-                "fail-soft: the advancements surface still landed despite the stats IO failure");
-        // And the call returned normally (no throw); reaching this line is the assertion.
+        // Returning normally is the assertion: this runs inside the save finalizer, where a throw would mark an
+        // otherwise-complete download FAILED and skip its backup zip.
+        assertTrue(Files.isRegularFile(saveRoot.resolve("stats")), "the pre-created blocker is still a file");
     }
 
     @Test
     void aFailedRewriteLeavesThePriorArchivedFileIntact(@TempDir Path saveRoot) throws Exception {
         byte[] prior = "{\"stats\":{\"kept\":1},\"DataVersion\":1}".getBytes();
-        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, null, prior));
+        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, prior));
         Path stats = saveRoot.resolve("stats").resolve(UUID_A + ".json");
         // A directory where the staged sibling belongs: only the staged route fails here, so this is what
         // separates it from a direct write.
         Files.createDirectory(saveRoot.resolve("stats").resolve(UUID_A + ".json.tmp"));
 
-        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, null, "{}".getBytes()));
+        PlayerProgressWriter.write(saveRoot, new CapturedProgress(UUID_A, "{}".getBytes()));
 
         assertArrayEquals(prior, readAll(stats),
                 "a failed rewrite leaves the progress file a resume found on disk readable");
