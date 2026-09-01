@@ -22,6 +22,7 @@ import world.thearchive.wdl.adapter.MountMenuReader;
 import world.thearchive.wdl.adapter.OpenClickTracker;
 import world.thearchive.wdl.client.WdlHudOverlay;
 import world.thearchive.wdl.client.WdlKeyBinds;
+import world.thearchive.wdl.client.WdlToastOverlay;
 
 /**
  * Forge client entrypoint, the analog of {@code WdlFabricClient} and the NeoForge {@code WdlNeoForge}. This band
@@ -99,6 +100,13 @@ public final class WdlForge {
     public void onRenderGameOverlay(RenderGameOverlayEvent.Post event) {
         if (event.getType() == RenderGameOverlayEvent.ElementType.ALL) {
             WdlHudOverlay.render(event.getPartialTicks());
+            // The notification tray, which this band draws itself for want of a vanilla toast host. Guarded on the
+            // same blocking-screen test the HUD overlay applies internally, because this pass runs before the
+            // screen and a screen would paint over anything drawn here; a WDL screen draws the tray from its own
+            // render instead, so exactly one path draws it per frame.
+            if (!Wdl.platformBridge().isBlockingScreenOpen()) {
+                WdlToastOverlay.render();
+            }
         }
     }
 }

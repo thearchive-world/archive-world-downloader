@@ -31,4 +31,13 @@ final class WdlCaptureDisableConfirmScreen extends GuiYesNo {
         super.initGui();
         setButtonDelay(DANGER_DELAY_TICKS);
     }
+
+    @Override
+    public void drawScreen(int mouseX, int mouseY, float partialTick) {
+        super.drawScreen(mouseX, mouseY, partialTick);
+        // The notification tray, which this band draws itself. The loader's HUD pass runs before any screen
+        // and would be painted over by this one, so a WDL screen draws the tray from its own render and the
+        // HUD hook stands down while a screen is open; exactly one path draws it per frame.
+        WdlToastOverlay.render();
+    }
 }

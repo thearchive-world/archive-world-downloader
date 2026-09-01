@@ -13,7 +13,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.toasts.SystemToast;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommand;
@@ -30,6 +29,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
 
+import world.thearchive.wdl.client.WdlToastOverlay;
 import world.thearchive.wdl.compat.flashback.FlashbackReplayProbe;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
@@ -44,15 +44,6 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
  */
 public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final Logger LOGGER = LogManager.getLogger(AbstractPlatformBridge.class);
-
-    // This band's SystemToast has no custom-id class, so these reuse two distinct vanilla toast categories from the
-    // SystemToast.Type enum (which carries only TUTORIAL_HINT and NARRATOR_TOGGLE here), which keep the vanilla
-    // default display time (which the accessibility notification-time multiplier scales). Job-done toasts are always
-    // constructed fresh, never addOrUpdate-reset, so each event surfaces its own toast. Refusals use their own
-    // category so a repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message,
-    // and vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body unwrapped).
-    private static final SystemToast.Type TOAST_ID = SystemToast.Type.NARRATOR_TOGGLE;
-    private static final SystemToast.Type REFUSAL_TOAST_ID = SystemToast.Type.TUTORIAL_HINT;
 
     // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
     // inside the methods, never the constructor, and isModLoaded is a loader call. Read only on the client
@@ -212,22 +203,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (toast.bodyColor().isPresent()) {
             body.getStyle().setColor(nearestFormatting(toast.bodyColor().getAsInt()));
         }
-        Minecraft mc = Minecraft.getMinecraft();
-        SystemToast.Type id = toast.refusal() ? REFUSAL_TOAST_ID : TOAST_ID;
-        if (toast.refusal() && mc.getToastGui().getToast(SystemToast.class, id) != null) {
-            return;
-        }
-        if (toast.refusal()) {
-            // Refusals are single-line; the vanilla SystemToast keeps the getToast dedup above.
-            mc.getToastGui().add(new SystemToast(id, new TextComponentTranslation(toast.titleKey()), body));
-            return;
-        }
-        // A job-done body can carry a newline (the chunk count then the save name), which this band's SystemToast
-        // draws as one overrunning line; a multiline toast wraps it and stitches its own frame instead.
+        // There is no vanilla toast host at this band, so both halves of the path go to WDL's own tray: the
+        // multi-line job-done notification and the single-line refusal that rode a vanilla SystemToast above 1.12.
+        // The tray owns the dedup that the two SystemToast categories used to provide, on the same rule.
         int bodyRgb = toast.bodyColor().isPresent() ? 0xFF000000 | toast.bodyColor().getAsInt() : -1;
-        mc.getToastGui().add(new WdlMultilineToast(mc.fontRenderer,
-                new TextComponentTranslation(toast.titleKey()).getUnformattedText(), body.getUnformattedText(),
-                bodyRgb));
+        WdlToastOverlay.show(new TextComponentTranslation(toast.titleKey()).getUnformattedText(),
+                body.getUnformattedText(), bodyRgb, toast.refusal());
     }
 
     /**

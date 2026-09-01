@@ -301,6 +301,10 @@ public final class WdlSettingsScreen extends GuiScreen {
                 break;
             }
         }
+        // The notification tray, which this band draws itself. The loader's HUD pass runs before any screen
+        // and would be painted over by this one, so a WDL screen draws the tray from its own render and the
+        // HUD hook stands down while a screen is open; exactly one path draws it per frame.
+        WdlToastOverlay.render();
     }
 
     // Below 1.13 GuiButton and GuiTextField share only the Gui base, so a row's control is held as Gui and narrowed
