@@ -524,7 +524,11 @@ final class EntityPacketCapture
             return EntityMinecart.create(level, x, y, z, EntityMinecart.Type.getById(add.getData()));
         }
         if (spawnObjectType == SPAWN_OBJECT_ITEM_FRAME) {
-            return new EntityItemFrame(level, new BlockPos(x, y, z), EnumFacing.byIndex(add.getData()));
+            // The packet field is a HORIZONTAL index, 0 to 3, which is what the server writes
+            // (EntityItemFrame.facingDirection.getHorizontalIndex()) and what the vanilla client reads back. The
+            // all-six lookup would map 0 and 1 onto down and up, which a hanging entity rejects outright, and 3 onto
+            // south where the server meant east.
+            return new EntityItemFrame(level, new BlockPos(x, y, z), EnumFacing.byHorizontalIndex(add.getData()));
         }
         if (spawnObjectType == SPAWN_OBJECT_LEASH_KNOT) {
             return new EntityLeashKnot(level,
