@@ -8,15 +8,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.common.collect.ImmutableSet;
 import java.util.UUID;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.item.EntityItemFrame;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.play.server.SPacketEntity;
 import net.minecraft.network.play.server.SPacketSpawnObject;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.SendRangeSampler;
+import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -111,5 +115,26 @@ class EntityPacketCaptureTest {
 
         @Override
         protected void writeEntityToNBT(NBTTagCompound tag) {}
+    }
+
+    /**
+     * An item frame's spawn-object payload carries a HORIZONTAL facing index, not the all-six one. Reading it with the
+     * all-six lookup maps 0 and 1 onto down and up, which a hanging entity rejects outright, so the frame is dropped
+     * from the download entirely; and it maps 3 onto south where the server meant east, so the frame is saved facing
+     * the wrong way with nothing logged. Half of every wall's frames go one way, a quarter the other.
+     */
+    @Test
+    void anItemFrameKeepsTheFacingTheServerSent() {
+        for (EnumFacing sent : EnumFacing.HORIZONTALS) {
+            BlockPos pos = new BlockPos(4, 64, 8);
+            EntityItemFrame source = new EntityItemFrame(HeadlessLevel.get(), pos, sent);
+            // Exactly what the server writes: object type 71 with the facing as a horizontal index.
+            SPacketSpawnObject add = new SPacketSpawnObject(source, 71, sent.getHorizontalIndex(), pos);
+
+            Entity rebuilt = EntityPacketCapture.createSpawnObject(add, HeadlessLevel.get());
+
+            assertEquals(sent, ((EntityItemFrame) rebuilt).facingDirection,
+                    "an item frame reconstructed from its spawn packet keeps the facing the server sent");
+        }
     }
 }
