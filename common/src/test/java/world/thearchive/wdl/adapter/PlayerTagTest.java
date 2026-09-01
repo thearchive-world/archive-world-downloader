@@ -92,6 +92,21 @@ class PlayerTagTest {
     }
 
     @Test
+    void stripDeathLocationRemovesBothKeysWhenTheyArePresent() {
+        // Neither key is ever present in a player tag at this band, so the no-op case passes just as well with both
+        // removeTag calls deleted. Planting them pins what the strip promises rather than what the band contains.
+        NBTTagCompound tag = playerTag();
+        tag.setTag("LastDeathLocation", new NBTTagCompound());
+        tag.setTag("current_explosion_impact_pos", new NBTTagList());
+
+        PlayerTag.stripDeathLocation(tag);
+
+        assertFalse(tag.hasKey("LastDeathLocation"));
+        assertFalse(tag.hasKey("current_explosion_impact_pos"));
+        assertTrue(tag.hasKey("Air"), "the strip removes only the two location keys");
+    }
+
+    @Test
     void setDimensionWritesCanonicalVanillaIdForCanonicalKey() {
         NBTTagCompound tag = playerTag();
         PlayerTag.setDimension(tag, DimensionType.NETHER);
