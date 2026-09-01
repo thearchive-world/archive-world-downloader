@@ -69,7 +69,7 @@ repositories {
 // --- Minecraft + Forge toolchain: native Unimined provision, classic MCP mappings, native reobf ---
 // Below the Mojmap floor there is no Mojang mapping to target, so the island mirrors common/build.gradle.kts:
 // classic MCP names over the searge intermediary. Unlike common (loader-less), this island also carries the
-// minecraftForge loader block, so Unimined provisions the real Forge 1.12.2 API on the compile classpath (no
+// minecraftForge loader block, so Unimined provisions the real Forge API on the compile classpath (no
 // hand-rolled Mojmap view of the universal jar) and defaultRemapJar reobfuscates the shipped jar MCP -> searge
 // natively (no hand-rolled tiny-remapper pass). useGlobalCache=false keeps the provision under this project's own
 // build directory, matching common's provision and keeping a stale cache from one band out of another's classpath.

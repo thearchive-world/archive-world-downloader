@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.EntitySink;
 
 /**
- * 1.12.2 entity sink: a client-safe per-entity serialize ({@code Entity.writeToNBTOptional}), the write half of what
+ * 1.11.2 entity sink: a client-safe per-entity serialize ({@code Entity.writeToNBTOptional}), the write half of what
  * vanilla's {@code AnvilChunkLoader} folds into a chunk's {@code Level.Entities}. There is no separate
  * {@code entities/} region at this band (that is 1.17 and above), so the writer folds this sink's carrier into the
  * region chunk.

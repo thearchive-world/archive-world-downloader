@@ -19,7 +19,7 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.12.2 chunk codec: replicates the client-safe slice of vanilla {@code AnvilChunkLoader}'s chunk write to NBT.
+ * 1.11.2 chunk codec: replicates the client-safe slice of vanilla {@code AnvilChunkLoader}'s chunk write to NBT.
  * Vanilla's write reads from a {@code World} a multiplayer client never fully has, so {@link #encode} rebuilds the tag
  * field by field from the captured snapshot. Below the Flattening (this band's own cut) a section stores block state as
  * a numeric id plus a 4-bit metadata nibble rather than a palette, light is section-resident (each

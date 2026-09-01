@@ -41,8 +41,8 @@ import world.thearchive.wdl.client.WdlKeyBinds;
         modid = "wdl",
         useMetadata = true,
         guiFactory = "world.thearchive.wdl.forge.ForgeConfigGuiFactory",
-        dependencies = "required-after:forge@[14.23.5.2768,);",
-        acceptedMinecraftVersions = "[1.12.2]")
+        dependencies = "required-after:forge@[13.20.0.2262,);",
+        acceptedMinecraftVersions = "[1.11.2]")
 public final class WdlForge {
     private boolean teeConnected;
 

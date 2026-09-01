@@ -9,7 +9,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import world.thearchive.wdl.adapter.LecternSink;
 
 /**
- * 1.12.2 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.writeToNBT} and merges it into a
+ * 1.11.2 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.writeToNBT} and merges it into a
  * captured lectern block-entity tag.
  *
  * <p>Documented limit: the lectern is a 1.14 block, absent at this band (it does not exist even at the 1.13.2 parent),

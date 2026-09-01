@@ -9,7 +9,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import world.thearchive.wdl.adapter.PlayerSink;
 
 /**
- * 1.12.2 player sink: serializes the local player via vanilla's own {@code player.writeToNBT} (the identical call
+ * 1.11.2 player sink: serializes the local player via vanilla's own {@code player.writeToNBT} (the identical call
  * {@code SaveHandler.writePlayerData} uses), so the captured {@code "Player"} compound is byte-for-byte what a vanilla
  * {@code playerdata/<uuid>.dat} would hold.
  *
