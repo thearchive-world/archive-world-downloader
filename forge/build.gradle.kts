@@ -610,8 +610,44 @@ val checkForgeFloor = tasks.register("checkForgeFloor") {
     }
 }
 
+// The band's Minecraft version is written twice and no compiler sees both: minecraft_version in
+// ../gradle.properties is the coordinate the whole toolchain provisions against, and WdlForge's
+// @Mod(acceptedMinecraftVersions = ...) is the string legacy FML actually enforces (FMLModContainer.bindMetadata
+// takes it off the annotation descriptor unconditionally; mcmod.info carries no mcversion field in this FML
+// release, so there is nothing to cross-check it against). An annotation value must be a compile-time constant,
+// so the literal cannot read the property and the duplication is structural. Nothing else covers it: the
+// searge scan reads only func_*/field_*-shaped tokens, and a mod re-pinned to a new band while this literal
+// names the old one compiles, packages and passes every other gate, then fails to load at all in a real client.
+val checkAcceptedMinecraftVersions = tasks.register("checkAcceptedMinecraftVersions") {
+    group = "verification"
+    description = "Fails if WdlForge's @Mod acceptedMinecraftVersions does not name minecraft_version"
+    // Captured by value at configuration time, like checkForgeFloor's own locals, so no Project reference
+    // survives into task execution.
+    val minecraftVersion = band("minecraft_version")
+    val entrypointSource = layout.projectDirectory
+        .file("src/main/java/world/thearchive/wdl/forge/WdlForge.java")
+    inputs.property("minecraftVersion", minecraftVersion)
+    inputs.file(entrypointSource)
+    doLast {
+        val declared = Regex("acceptedMinecraftVersions\\s*=\\s*\"([^\"]+)\"")
+            .find(entrypointSource.asFile.readText())?.groupValues?.get(1)
+            ?: throw GradleException(
+                "WdlForge declares no acceptedMinecraftVersions in its @Mod annotation; legacy FML then loads "
+                    + "the mod on any Minecraft version, including ones whose save shape this plug cannot write"
+            )
+        val expected = "[$minecraftVersion]"
+        if (declared != expected) {
+            throw GradleException(
+                "Accepted-version mismatch: minecraft_version is $minecraftVersion so the annotation must read "
+                    + "$expected but WdlForge declares $declared. The annotation is the one legacy FML enforces, "
+                    + "and a wrong value stops the mod loading entirely."
+            )
+        }
+    }
+}
+
 tasks.named("check") {
-    dependsOn("checkReobf", checkShipJar, checkReobfNegative, checkForgeFloor)
+    dependsOn("checkReobf", checkShipJar, checkReobfNegative, checkForgeFloor, checkAcceptedMinecraftVersions)
 }
 
 // Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge
