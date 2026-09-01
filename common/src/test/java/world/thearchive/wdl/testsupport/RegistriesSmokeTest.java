@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockStone;
 import net.minecraft.init.Blocks;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
@@ -37,6 +38,10 @@ class RegistriesSmokeTest {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setString("wdl_test_marker", "archive");
         assertEquals("archive", tag.getString("wdl_test_marker"));
+        // The integer accessors are a separate tag type from the string pair above, so a mis-mapped
+        // NBTTagInt would survive the round-trip beside it.
+        tag.setInteger("wdl_test_marker_int", 42);
+        assertEquals(42, tag.getInteger("wdl_test_marker_int"));
 
         // BlockPos construct-and-read: the coordinate accessors come off Vec3i at this band.
         BlockPos pos = new BlockPos(1, 2, 3);
@@ -55,5 +60,8 @@ class RegistriesSmokeTest {
         // pre-Flattening host of the granite/diorite metadata variants), so minecraft:cobblestone carries the
         // exact-class check: it is registered as a bare new Block(Material.ROCK).
         assertSame(Block.class, Block.REGISTRY.getObject(new ResourceLocation("minecraft", "cobblestone")).getClass());
+        // Cobblestone above pins that a plain Block stays plain; stone pins the other direction, that a block
+        // with a dedicated subclass still binds to it rather than collapsing to the base type.
+        assertSame(BlockStone.class, Blocks.STONE.getClass());
     }
 }
