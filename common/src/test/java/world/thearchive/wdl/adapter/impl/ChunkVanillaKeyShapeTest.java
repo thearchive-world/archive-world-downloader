@@ -17,10 +17,12 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.NibbleArray;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
+import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The chunk vanilla-key byte-gate: pins the pre-Flattening numeric shape {@link ChunkCodecImpl} must encode, which a
@@ -30,6 +32,15 @@ import world.thearchive.wdl.adapter.ChunkSnapshotSource;
  */
 class ChunkVanillaKeyShapeTest {
     private static final int NON_EMPTY_SECTION_Y = 0;
+
+    @BeforeAll
+    static void bootstrapVanilla() {
+        // This fixture reads Blocks, which throws "Accessed Blocks before Bootstrap!" from its own class
+        // initializer if nothing has registered yet, and a failed initializer stays failed for the life of the JVM.
+        // Without this the class passed only when some other test class happened to run first and bootstrap for it,
+        // and when the runner started here instead it took the whole suite down with it.
+        TestRegistries.bootstrap();
+    }
 
     private final ChunkCodec codec = new ChunkCodecImpl();
 
