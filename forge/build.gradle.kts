@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import org.objectweb.asm.AnnotationVisitor
 import org.objectweb.asm.ClassReader
@@ -7,6 +8,8 @@ import org.objectweb.asm.FieldVisitor
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.TypePath
+import org.objectweb.asm.commons.ClassRemapper
+import org.objectweb.asm.commons.Remapper
 
 // ASM (the checkShipJar constant-pool scan) on the island's buildscript classpath, pinned to the version
 // common/build.gradle.kts's buildscript classpath uses for its own compile-side annotation strip.
@@ -60,6 +63,10 @@ java {
 repositories {
     mavenCentral()
     maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
+    // The band's own Minecraft library host, asked only for the trimmed fastutil cut this band's version manifest
+    // names (see the fastutil bundling section below). It is the reference set the bundle subtracts against, so it
+    // has to be the game's exact artifact rather than a same-version stand-in from Maven Central.
+    maven("https://libraries.minecraft.net/") { content { includeModule("it.unimi.dsi", "fastutil") } }
     // The pinned searge oracle below (the mcp srg zip) resolves from here, not from Unimined's own internal repo
     // handling: a project-level dependency needs its own repository, even though Unimined's minecraftForge
     // loader block already reaches this same host to provision the toolchain.
@@ -189,6 +196,12 @@ dependencies {
     // do not exist below the Mojmap floor. JourneyMap discovers the plugin by annotation scan. No XaeroPlus
     // binding on this band, matching :common.
     compileOnly("info.journeymap:journeymap-api-forge:${band("journeymap_api_v2_coordinate")}")
+
+    // fastutil, compile-only and mirroring :common's own pin: this compile source-merges common, whose core/
+    // subtree binds types this band's trimmed Minecraft fastutil leaves out. Compile-only because the classes
+    // that are actually missing are packaged into the ship jar by bundleFastutil below rather than pulled in
+    // wholesale; the game supplies the rest at runtime.
+    compileOnly("it.unimi.dsi:fastutil:${band("fastutil_bundle_version")}")
 }
 
 // Source-merge :common the way a loader subproject does on the higher bands, but by direct path
@@ -276,6 +289,175 @@ tasks.named<Jar>("remapJar") {
     archiveClassifier.set("searge")
 }
 
+// --- fastutil bundling ---
+// Minecraft stops carrying the fastutil classes core/ binds, and this band is where that starts. 1.12.2 and every
+// band above it ship a full fastutil on the game's own classpath (7.1.0 there, 8.5.x on the modern bands) and the
+// mod has always relied on that, declaring the dependency nowhere. 1.11.2 ships it.unimi.dsi:fastutil:7.0.12_mojang
+// instead, a 355-class trimmed cut whose only primitive sets are the linear-scanning LongArraySet and IntArraySet
+// and whose only long-keyed maps are Long2Object; nine of the twenty fastutil types the mod binds are absent from
+// it, seven of those nine used from core/.
+//
+// Rewriting core/ to the trimmed surface was measured and rejected. It would mean either O(n) membership scans
+// over thousands of chunks or a Long2ObjectOpenHashMap holding boxed values, and it would fork core/ (byte-
+// identical across every branch by construction) permanently across this band and the four below it. The absent
+// classes ride in the ship jar instead, unrelocated, at their own package path.
+//
+// Unrelocated is only safe because nothing is duplicated. fastutilShipped below resolves the exact artifact this
+// band's own Minecraft version manifest names, and only classes ABSENT from it are packaged, so no class in the
+// ship jar shadows one the game already loads and no load order has to be reasoned about. The two are the same
+// fastutil release, Mojang's a trimmed recompile of 7.0.12, so a bundled class links correctly against the
+// game's own copies of its supertypes.
+//
+// The bundled set is enumerated mechanically rather than hand-listed. The roots are whatever fastutil types the
+// shipped source imports, and the closure is walked over the full jar's own bytecode. A hand-curated absent list
+// would go stale the first time core/ binds another type, and on this project such a list has been found
+// incomplete twice.
+val fastutilBundleSource: Configuration by configurations.creating { isTransitive = false }
+val fastutilShipped: Configuration by configurations.creating { isTransitive = false }
+
+dependencies {
+    fastutilBundleSource("it.unimi.dsi:fastutil:${band("fastutil_bundle_version")}@jar")
+    fastutilShipped("it.unimi.dsi:fastutil:${band("fastutil_shipped_version")}@jar")
+}
+
+// Walks the fastutil classes the shipped source imports, plus everything their bytecode reaches, and writes out
+// only those the band's Minecraft does not already carry. Shared by the packaging step and by the gate that reads
+// the finished jar, which is why the root and closure logic lives in one place.
+abstract class FastutilClosure : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sourceTrees: ConfigurableFileCollection
+
+    @get:InputFiles
+    abstract val bundleSourceJar: ConfigurableFileCollection
+
+    @get:InputFiles
+    abstract val shippedJar: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    companion object {
+        const val PACKAGE_PREFIX = "it/unimi/dsi/fastutil/"
+        private val IMPORT = Regex("""^\s*import\s+(it\.unimi\.dsi\.fastutil\.[A-Za-z0-9_.]+)\s*;""")
+
+        // A source import is dotted all the way down, so a nested type reads the same as a top-level one. Resolve
+        // it by trying the plain form first and then folding trailing dots into '$' until an entry matches.
+        fun resolveImport(imported: String, present: Set<String>): String? {
+            var candidate = imported.replace('.', '/')
+            while (true) {
+                if (present.contains("$candidate.class")) {
+                    return candidate
+                }
+                val lastSlash = candidate.lastIndexOf('/')
+                if (lastSlash < 0) {
+                    return null
+                }
+                candidate = candidate.substring(0, lastSlash) + "$" + candidate.substring(lastSlash + 1)
+            }
+        }
+
+        fun importedTypes(files: Iterable<File>): Set<String> {
+            val imports = sortedSetOf<String>()
+            for (file in files) {
+                if (file.isFile && file.name.endsWith(".java")) {
+                    file.forEachLine { line -> IMPORT.find(line)?.let { imports.add(it.groupValues[1]) } }
+                }
+            }
+            return imports
+        }
+
+        // Every internal name ASM sees while visiting the class, which is what a Remapper is asked to map:
+        // supertypes, field and method descriptors, generic signatures, instruction owners, LDC class constants
+        // and the InnerClasses attribute all pass through it.
+        fun referencedTypes(bytes: ByteArray): Set<String> {
+            val referenced = HashSet<String>()
+            val collector = object : Remapper() {
+                override fun map(internalName: String): String {
+                    referenced.add(internalName)
+                    return internalName
+                }
+            }
+            ClassReader(bytes).accept(ClassRemapper(object : ClassVisitor(Opcodes.ASM9) {}, collector), 0)
+            return referenced
+        }
+    }
+
+    @TaskAction
+    fun bundle() {
+        val out = outputDir.get().asFile
+        out.deleteRecursively()
+        out.mkdirs()
+        ZipFile(shippedJar.singleFile).use { shipped ->
+            ZipFile(bundleSourceJar.singleFile).use { full ->
+                val shippedNames = shipped.entries().toList().map { it.name }.toSet()
+                val fullNames = full.entries().toList().map { it.name }.toSet()
+
+                // A type plus its nested siblings, since a nested class is a separate entry with its own name.
+                fun entriesFor(internalName: String): List<String> =
+                    fullNames.filter { it == "$internalName.class" || it.startsWith("$internalName$") && it.endsWith(".class") }
+
+                val imports = importedTypes(sourceTrees.asFileTree.files)
+                val roots = ArrayList<String>()
+                for (imported in imports) {
+                    val resolved = resolveImport(imported, fullNames)
+                        ?: throw GradleException(
+                            "$name: the shipped source imports $imported but ${bundleSourceJar.singleFile.name} "
+                                + "carries no such class, so the bundle cannot be completed from it"
+                        )
+                    if (!shippedNames.contains("$resolved.class")) {
+                        roots.add(resolved)
+                    }
+                }
+
+                val bundled = sortedSetOf<String>()
+                val queue = ArrayDeque<String>()
+                roots.forEach { queue.addAll(entriesFor(it)) }
+                while (queue.isNotEmpty()) {
+                    val entryName = queue.removeFirst()
+                    if (!bundled.add(entryName)) {
+                        continue
+                    }
+                    val bytes = full.getInputStream(full.getEntry(entryName)).use { it.readBytes() }
+                    for (reference in referencedTypes(bytes)) {
+                        if (!reference.startsWith(PACKAGE_PREFIX)) {
+                            continue
+                        }
+                        for (candidate in entriesFor(reference)) {
+                            if (!shippedNames.contains(candidate) && !bundled.contains(candidate)) {
+                                queue.add(candidate)
+                            }
+                        }
+                    }
+                }
+
+                var bytesWritten = 0L
+                for (entryName in bundled) {
+                    val target = out.resolve(entryName)
+                    target.parentFile.mkdirs()
+                    val bytes = full.getInputStream(full.getEntry(entryName)).use { it.readBytes() }
+                    target.writeBytes(bytes)
+                    bytesWritten += bytes.size
+                }
+                logger.lifecycle(
+                    "$name: ${imports.size} fastutil type(s) imported by the shipped source, ${roots.size} of them "
+                        + "absent from ${shippedJar.singleFile.name}; bundled ${bundled.size} class file(s) "
+                        + "($bytesWritten bytes) from ${bundleSourceJar.singleFile.name}"
+                )
+            }
+        }
+    }
+}
+
+val bundleFastutil = tasks.register<FastutilClosure>("bundleFastutil") {
+    group = "build"
+    description = "Extracts the fastutil classes the shipped source needs and this band's Minecraft does not carry."
+    sourceTrees.from(rootDir.resolve("../common/src/main/java"), layout.projectDirectory.dir("src/main/java"))
+    bundleSourceJar.from(fastutilBundleSource)
+    shippedJar.from(fastutilShipped)
+    outputDir.set(layout.buildDirectory.dir("bundled-fastutil"))
+}
+
 // --- Ship jar (modJar) + the checkShipJar class-file health gate ---
 // The shipped Forge jar must be the reobf'd, searge-named artifact. Unimined's defaultRemapJar produces that jar
 // natively (the "remapJar" task; the plain `jar` task stays the MCP-named dev jar), so modJar wraps it under the
@@ -318,6 +500,17 @@ val modJar = tasks.register<Jar>("modJar") {
         into("assets/wdl/lang")
     }
     from(licenseTexts) { into("META-INF") }
+    // The fastutil classes this band's Minecraft leaves out, at their own package path and unrelocated (see
+    // bundleFastutil). They come from a plain directory rather than through remapJar's tree: they are third-party
+    // bytecode with no Minecraft references, so reobfuscating them would be wrong as well as pointless.
+    from(bundleFastutil)
+    // fastutil is Apache 2.0 and ships no license file of its own, so section 4(a)'s copy travels with the jar
+    // beside WDL's own two. Renamed on the way in to name the dependency it covers, since three license files in
+    // one META-INF otherwise say nothing about which applies to what.
+    from(rootDir.resolve("../APACHE-2.0.txt")) {
+        into("META-INF")
+        rename { "APACHE-2.0-fastutil.txt" }
+    }
 }
 
 // The default jar carries a dev classifier so it never collides with modJar's ship name. It stays the
@@ -705,8 +898,94 @@ val checkAcceptedMinecraftVersions = tasks.register("checkAcceptedMinecraftVersi
     }
 }
 
+// Reads the finished ship jar and proves the fastutil bundle actually shipped. Every other gate on this island
+// passes whether or not those classes are in the jar: checkShipJar scans for mapping leaks and searge-shaped
+// literals, the compile resolves fastutil off the game's own classpath either way, and the reobf pass has nothing
+// to say about a third-party package. Without a check that opens the artifact, the defect is invisible until a
+// real client throws NoClassDefFoundError on the first download.
+abstract class CheckFastutilBundle : DefaultTask() {
+    @get:InputFile
+    abstract val jarToScan: RegularFileProperty
+
+    @get:InputDirectory
+    abstract val bundledClasses: DirectoryProperty
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sourceTrees: ConfigurableFileCollection
+
+    @get:InputFiles
+    abstract val shippedJar: ConfigurableFileCollection
+
+    @TaskAction
+    fun check() {
+        val bundleRoot = bundledClasses.get().asFile
+        val expected = bundleRoot.walkTopDown()
+            .filter { it.isFile }
+            .map { it.relativeTo(bundleRoot).invariantSeparatorsPath }
+            .toSortedSet()
+        val inJar = sortedSetOf<String>()
+        ZipInputStream(jarToScan.get().asFile.inputStream().buffered()).use { zin ->
+            var entry = zin.nextEntry
+            while (entry != null) {
+                if (entry.name.startsWith(FastutilClosure.PACKAGE_PREFIX) && entry.name.endsWith(".class")) {
+                    inJar.add(entry.name)
+                }
+                entry = zin.nextEntry
+            }
+        }
+        val scanned = jarToScan.get().asFile.name
+        val failures = ArrayList<String>()
+
+        // (1) Packaging carried the whole bundle through, and added nothing of its own.
+        (expected - inJar).forEach { failures.add("missing from $scanned: $it") }
+        (inJar - expected).forEach { failures.add("in $scanned but not in the computed bundle: $it") }
+
+        ZipFile(shippedJar.singleFile).use { shipped ->
+            val shippedNames = shipped.entries().toList().map { it.name }.toSet()
+
+            // (2) Nothing shadows a class the game already loads. The bundle is unrelocated, so a duplicate would
+            // leave which copy wins to classloader source order.
+            inJar.filter { shippedNames.contains(it) }.forEach {
+                failures.add("$scanned duplicates a class ${shippedJar.singleFile.name} already carries: $it")
+            }
+
+            // (3) Every fastutil type the shipped source imports resolves at runtime, from one side or the other.
+            // Independent of how the bundle was computed: this reads the artifact and the game's own library.
+            val available = inJar + shippedNames
+            for (imported in FastutilClosure.importedTypes(sourceTrees.asFileTree.files)) {
+                if (FastutilClosure.resolveImport(imported, available) == null) {
+                    failures.add(
+                        "the shipped source imports $imported but it is in neither $scanned nor "
+                            + "${shippedJar.singleFile.name}, so it throws NoClassDefFoundError on first use"
+                    )
+                }
+            }
+        }
+
+        if (failures.isNotEmpty()) {
+            throw GradleException("$name: ${failures.size} problem(s):\n" + failures.joinToString("\n"))
+        }
+        logger.lifecycle(
+            "$name: $scanned carries ${inJar.size} bundled fastutil class(es), none of them duplicating "
+                + "${shippedJar.singleFile.name}, and every fastutil type the shipped source imports resolves"
+        )
+    }
+}
+
+val checkFastutilBundle = tasks.register<CheckFastutilBundle>("checkFastutilBundle") {
+    group = "verification"
+    description = "Fails if the ship jar does not carry the fastutil classes this band's Minecraft leaves out."
+    dependsOn(modJar)
+    jarToScan.set(modJar.flatMap { it.archiveFile })
+    bundledClasses.set(bundleFastutil.flatMap { it.outputDir })
+    sourceTrees.from(rootDir.resolve("../common/src/main/java"), layout.projectDirectory.dir("src/main/java"))
+    shippedJar.from(fastutilShipped)
+}
+
 tasks.named("check") {
-    dependsOn("checkReobf", checkShipJar, checkReobfNegative, checkForgeFloor, checkAcceptedMinecraftVersions)
+    dependsOn("checkReobf", checkShipJar, checkReobfNegative, checkForgeFloor, checkAcceptedMinecraftVersions,
+        checkFastutilBundle)
 }
 
 // Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge

@@ -422,6 +422,12 @@ repositories {
 }
 
 dependencies {
+    // fastutil, compile-only. Minecraft carries fastutil at runtime on every band, but this band's cut is trimmed
+    // and leaves out nine of the types the mod binds, seven of them used from core/, so without this the seam-free
+    // core/ tree does not compile here. Nothing is bundled from this project: the Forge island packages the absent
+    // classes into the ship jar and gates that they arrived, since only the island produces an artifact.
+    compileOnly("it.unimi.dsi:fastutil:${property("fastutil_bundle_version")}")
+
     // JourneyMap 2.0 API for the overlay binding (compat/journeymap/v2), compile-only (never a runtime require;
     // JourneyMap provides it jar-in-jar). The -forge flavor carries classic MCP names, matching this build (see
     // gradle.properties); the Forge island reads the same key and pins the same flavor.
