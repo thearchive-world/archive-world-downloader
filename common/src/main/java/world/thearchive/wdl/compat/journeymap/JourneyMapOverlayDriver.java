@@ -1,19 +1,19 @@
 // Copyright (C) Archive World Downloader contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-package world.thearchive.wdl.compat.journeymap.v2;
+package world.thearchive.wdl.compat.journeymap;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import journeymap.api.v2.client.IClientAPI;
-import journeymap.api.v2.client.display.DisplayType;
-import journeymap.api.v2.client.display.PolygonOverlay;
-import journeymap.api.v2.client.event.MappingEvent;
-import journeymap.api.v2.client.model.MapPolygonWithHoles;
-import journeymap.api.v2.client.model.ShapeProperties;
-import journeymap.api.v2.common.event.ClientEventRegistry;
+import journeymap.client.api.IClientAPI;
+import journeymap.client.api.display.DisplayType;
+import journeymap.client.api.display.PolygonOverlay;
+import journeymap.client.api.event.ClientEvent;
+import journeymap.client.api.model.MapPolygon;
+import journeymap.client.api.model.ShapeProperties;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.DimensionType;
 import org.apache.logging.log4j.LogManager;
@@ -36,8 +36,8 @@ import world.thearchive.wdl.platform.PlatformBridge;
  *
  * <p>Threading: the client tick reads the coverage facade and applies finished geometry, both on the client main
  * thread. Each rebuild is handed to a single background worker (one at a time) that reduces the chunk sets to
- * rectangles and traces polygons, then parks the result in {@link #pendingBatch} for the next tick to show. The mapping
- * and disconnect callbacks run on the client thread as well, so the overlay removals they issue are safe.
+ * rectangles and builds their polygons, then parks the result in {@link #pendingBatch} for the next tick to show. The
+ * mapping and disconnect callbacks run on the client thread as well, so the overlay removals they issue are safe.
  */
 public final class JourneyMapOverlayDriver {
     private static final Logger LOGGER = LogManager.getLogger(JourneyMapOverlayDriver.class);
@@ -65,8 +65,8 @@ public final class JourneyMapOverlayDriver {
         return thread;
     });
 
-    private boolean wired;             // wireOnce guard
-    private boolean mappingSubscribed; // subscribeMappingEvents guard
+    private boolean wired;      // wireOnce guard
+    private boolean subscribed;
 
     // True between JourneyMap MAPPING_STARTED and MAPPING_STOPPED. The tick never rebuilds while false. Volatile
     // because it is set from the mapping callback and read from the tick.
@@ -78,9 +78,10 @@ public final class JourneyMapOverlayDriver {
 
     // Rebuild debounce: the overlay rebuilds at most once per this many client ticks, coalescing the rapid
     // coverage changes of active movement into one remove-and-show so it does not redraw every tick. About a half
-    // second at twenty ticks per second. clientTicks counts every tick; lastDispatchTick is when the last rebuild
-    // was dispatched, seeded one interval in the past so the first change dispatches at once. Both stay small and
-    // non-negative, so their difference never overflows. Client thread only.
+    // second at twenty ticks per second, near the sibling provider's own refresh cadence. clientTicks counts every
+    // tick; lastDispatchTick is when the last rebuild was dispatched, seeded one interval in the past so the first
+    // change dispatches at once. Both stay small and non-negative, so their difference never overflows. Client
+    // thread only.
     private static final long REBUILD_DEBOUNCE_TICKS = 10L;
     private long clientTicks;
     private long lastDispatchTick = -REBUILD_DEBOUNCE_TICKS;
@@ -104,17 +105,13 @@ public final class JourneyMapOverlayDriver {
     // read on the client thread. A batch whose layers are null means the build threw, and the map is left as is.
     private volatile @Nullable OverlayBatch pendingBatch;
 
-    void setApi(IClientAPI api) {
+    void initialize(IClientAPI api) {
         this.api = api;
-    }
-
-    void subscribeMappingEvents() {
-        if (mappingSubscribed) {
+        if (subscribed) {
             return;
         }
-        // MAPPING_EVENT.subscribe registers permanently with no unsubscribe, so a repeat init must not re-add.
-        mappingSubscribed = true;
-        ClientEventRegistry.MAPPING_EVENT.subscribe(MOD_ID, this::onMappingEvent);
+        subscribed = true;
+        api.subscribe(MOD_ID, EnumSet.of(ClientEvent.Type.MAPPING_STARTED, ClientEvent.Type.MAPPING_STOPPED));
     }
 
     void wireOnce() {
@@ -132,13 +129,13 @@ public final class JourneyMapOverlayDriver {
         bridge.onDisconnect(this::onDisconnect);
     }
 
-    private void onMappingEvent(MappingEvent event) {
-        if (event.getStage() == MappingEvent.Stage.MAPPING_STARTED) {
+    void onClientEvent(ClientEvent event) {
+        if (event.type == ClientEvent.Type.MAPPING_STARTED) {
             mapping = true;
             // Force the next tick to rebuild from scratch for the freshly mapped world.
             lastGeneration = NO_GENERATION;
             lastDimension = null;
-        } else {
+        } else if (event.type == ClientEvent.Type.MAPPING_STOPPED) {
             mapping = false;
             hideAll(api);
         }
@@ -226,13 +223,16 @@ public final class JourneyMapOverlayDriver {
      * it frozen at the first geometry, and the tone's hull count varies per rebuild anyway, so a clear and re-show is
      * the reliable path. A failing overlay is isolated from the rest of the batch.
      */
-    private void applyBatch(IClientAPI localApi, DimensionType dimension, List<ToneLayer> layers, long generation) {
+    private void applyBatch(IClientAPI localApi, DimensionType dimension, List<ToneLayer> layers,
+            long generation) {
         localApi.removeAll(MOD_ID, DisplayType.Polygon);
         int dimensionId = dimension.getId();
         int count = 0;
         for (ToneLayer layer : layers) {
-            for (MapPolygonWithHoles hull : layer.hulls()) {
-                showQuietly(localApi, new PolygonOverlay(MOD_ID, dimensionId, layer.style(), hull));
+            for (MapPolygon polygon : layer.polygons()) {
+                PolygonOverlay overlay = new PolygonOverlay(MOD_ID, "wdl-coverage-" + count, dimensionId,
+                        layer.style(), polygon);
+                showQuietly(localApi, overlay);
                 count++;
             }
         }
@@ -313,9 +313,9 @@ public final class JourneyMapOverlayDriver {
     }
 
     private static void addLayer(List<ToneLayer> layers, int[] rectangles, int rgb) {
-        List<MapPolygonWithHoles> hulls = CoveragePolygons.hulls(rectangles);
-        if (!hulls.isEmpty()) {
-            layers.add(new ToneLayer(CoveragePolygons.toneStyle(rgb), hulls));
+        List<MapPolygon> polygons = CoveragePolygons.polygons(rectangles);
+        if (!polygons.isEmpty()) {
+            layers.add(new ToneLayer(CoveragePolygons.toneStyle(rgb), polygons));
         }
     }
 
@@ -332,19 +332,19 @@ public final class JourneyMapOverlayDriver {
 
     private static final class ToneLayer {
         private final ShapeProperties style;
-        private final List<MapPolygonWithHoles> hulls;
+        private final List<MapPolygon> polygons;
 
-        ToneLayer(ShapeProperties style, List<MapPolygonWithHoles> hulls) {
+        ToneLayer(ShapeProperties style, List<MapPolygon> polygons) {
             this.style = style;
-            this.hulls = hulls;
+            this.polygons = polygons;
         }
 
         ShapeProperties style() {
             return style;
         }
 
-        List<MapPolygonWithHoles> hulls() {
-            return hulls;
+        List<MapPolygon> polygons() {
+            return polygons;
         }
     }
 

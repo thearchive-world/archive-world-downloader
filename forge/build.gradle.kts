@@ -62,7 +62,6 @@ java {
 
 repositories {
     mavenCentral()
-    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
     // The band's own Minecraft library host, asked only for the trimmed fastutil cut this band's version manifest
     // names (see the fastutil bundling section below). It is the reference set the bundle subtracts against, so it
     // has to be the game's exact artifact rather than a same-version stand-in from Maven Central.
@@ -189,13 +188,13 @@ dependencies {
     // source compiles.
     compileOnly("org.jspecify:jspecify:1.0.0")
 
-    // JourneyMap 2.0 API for the source-merged binding (compat/journeymap/v2), compile-only, never a runtime
-    // require (JourneyMap provides it jar-in-jar). The island compiles under the same classic-MCP classpath
-    // :common resolves, so it takes the -forge flavor, not -common: -forge carries MCP names
-    // (net.minecraft.util.math.BlockPos) matching this island, while -common carries official Mojang names that
-    // do not exist below the Mojmap floor. JourneyMap discovers the plugin by annotation scan. No XaeroPlus
-    // binding on this band, matching :common.
-    compileOnly("info.journeymap:journeymap-api-forge:${band("journeymap_api_v2_coordinate")}")
+    // JourneyMap 1.x API for the source-merged binding (compat/journeymap), compile-only, never a runtime require
+    // (JourneyMap provides it itself). The build serving this band bundles the 1.x journeymap.client.api surface
+    // and no journeymap.api.v2, and the jar names its Minecraft types in classic MCP, which is what this island
+    // compiles in. It resolves from Maven Central rather than from blamejared, which publishes only the 2.0 line
+    // and nothing on 1.11.x. JourneyMap discovers the plugin by annotation scan. No XaeroPlus binding on this
+    // band, matching :common.
+    compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}")
 
     // fastutil, compile-only and mirroring :common's own pin: this compile source-merges common, whose core/
     // subtree binds types this band's trimmed Minecraft fastutil leaves out. Compile-only because the classes

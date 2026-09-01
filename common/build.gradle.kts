@@ -424,7 +424,6 @@ tasks.named("check") {
 
 repositories {
     maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
-    maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
     // Legacy Fabric intermediary (obf->intermediary) for this pre-1.14 band; the modern Fabric maven has none.
     maven("https://maven.legacyfabric.net/")
     // Unimined's own published artifacts, plus the classic searge/MCP mapping files it resolves against.
@@ -440,8 +439,9 @@ dependencies {
     // classes into the ship jar and gates that they arrived, since only the island produces an artifact.
     compileOnly("it.unimi.dsi:fastutil:${property("fastutil_bundle_version")}")
 
-    // JourneyMap 2.0 API for the overlay binding (compat/journeymap/v2), compile-only (never a runtime require;
-    // JourneyMap provides it jar-in-jar). The -forge flavor carries classic MCP names, matching this build (see
-    // gradle.properties); the Forge island reads the same key and pins the same flavor.
-    compileOnly("info.journeymap:journeymap-api-forge:${property("journeymap_api_v2_coordinate")}")
+    // JourneyMap 1.x API for the overlay binding (compat/journeymap), compile-only (never a runtime require;
+    // JourneyMap provides it itself). It resolves from Maven Central, declared below, rather than from the
+    // blamejared repository the 2.0 line publishes to, which carries nothing on 1.11.x. The Forge island reads the
+    // same key and pins the same artifact.
+    compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}")
 }
