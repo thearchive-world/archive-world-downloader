@@ -37,8 +37,12 @@ class ChunkVanillaKeyShapeTest {
     void encodesTheVanillaPreFlatteningShape() {
         NBTTagCompound root = codec.encode(nonEmptyChunk(), false);
 
-        assertEquals(1343, root.getInteger("DataVersion"), "root DataVersion must be the 1.12.2 Anvil version");
-        assertNotEquals(1631, root.getInteger("DataVersion"), "root DataVersion must not be the post-Flattening 1631");
+        assertEquals(922, root.getInteger("DataVersion"), "root DataVersion must be the 1.11.2 Anvil version");
+        // The negative arm names the parent band's 1343 rather than the post-Flattening 1631, because 1343 is the
+        // value a port down from 1.12.2 actually leaves behind and 1631 is a mistake no band here can make. A chunk
+        // stamped 1343 loads fine in a 1.11.2 client and only breaks on a later upgrade, so the field test is blind
+        // to it and this assertion is the only thing that catches it.
+        assertNotEquals(1343, root.getInteger("DataVersion"), "root DataVersion must not be the parent band's 1343");
 
         NBTTagCompound level = root.getCompoundTag("Level");
         assertFalse(level.hasKey("V"), "the legacy McRegion V byte must not be written");
