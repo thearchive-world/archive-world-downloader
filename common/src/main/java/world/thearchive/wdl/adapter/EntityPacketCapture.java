@@ -524,7 +524,7 @@ final class EntityPacketCapture
             return EntityMinecart.create(level, x, y, z, EntityMinecart.Type.getById(add.getData()));
         }
         if (spawnObjectType == SPAWN_OBJECT_ITEM_FRAME) {
-            return new EntityItemFrame(level, new BlockPos(x, y, z), EnumFacing.byIndex(add.getData()));
+            return new EntityItemFrame(level, new BlockPos(x, y, z), EnumFacing.getFront(add.getData()));
         }
         if (spawnObjectType == SPAWN_OBJECT_LEASH_KNOT) {
             return new EntityLeashKnot(level,

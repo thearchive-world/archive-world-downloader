@@ -13,6 +13,7 @@ import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraftforge.fml.client.config.GuiUtils;
 import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.RenderSurface;
@@ -105,8 +106,7 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void tooltip(FontRenderer font, ITextComponent content, int wrapWidth, int mouseX, int mouseY) {
-        requireScreen().drawHoveringText(font.listFormattedStringToWidth(content.getUnformattedText(), wrapWidth),
-                mouseX, mouseY);
+        drawTooltip(font, font.listFormattedStringToWidth(content.getUnformattedText(), wrapWidth), mouseX, mouseY);
     }
 
     @Override
@@ -115,7 +115,18 @@ public final class RenderSurfaceImpl implements RenderSurface {
         for (ITextComponent line : lines) {
             flattened.add(line.getUnformattedText());
         }
-        requireScreen().drawHoveringText(flattened, mouseX, mouseY);
+        drawTooltip(font, flattened, mouseX, mouseY);
+    }
+
+    /**
+     * Draw a tooltip through Forge's own helper rather than {@code GuiScreen.drawHoveringText}. Every overload of that
+     * method is protected at this band, where the higher bands ship two of them widened to public, and this surface is
+     * not a screen subclass. Forge's helper is what the protected method delegates to anyway, and the width, height and
+     * unlimited-wrap arguments below are the ones it passes.
+     */
+    private void drawTooltip(FontRenderer font, List<String> lines, int mouseX, int mouseY) {
+        GuiScreen screen = requireScreen();
+        GuiUtils.drawHoveringText(lines, mouseX, mouseY, screen.width, screen.height, -1, font);
     }
 
     private GuiScreen requireScreen() {

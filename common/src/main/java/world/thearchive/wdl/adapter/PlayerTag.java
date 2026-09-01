@@ -147,13 +147,13 @@ final class PlayerTag {
      */
     static boolean carryForwardEnderItems(NBTTagCompound priorPlayer, NBTTagCompound freshRaw) {
         if (freshRaw.getTag("EnderItems") instanceof NBTTagList
-                && !((NBTTagList) freshRaw.getTag("EnderItems")).isEmpty()) {
+                && !((NBTTagList) freshRaw.getTag("EnderItems")).hasNoTags()) {
             return false;
         }
         NBTTagList prior = priorPlayer.getTag("EnderItems") instanceof NBTTagList
                 ? (NBTTagList) priorPlayer.getTag("EnderItems")
                 : null;
-        if (prior == null || prior.isEmpty()) {
+        if (prior == null || prior.hasNoTags()) {
             return false;
         }
         freshRaw.setTag("EnderItems", prior.copy());

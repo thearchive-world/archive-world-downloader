@@ -204,7 +204,7 @@ final class RegionChunkWriter {
         NBTTagList diskEntities = level.getTag("Entities") instanceof NBTTagList
                 ? (NBTTagList) level.getTag("Entities")
                 : new NBTTagList();
-        boolean recaptured = !diskEntities.isEmpty();
+        boolean recaptured = !diskEntities.hasNoTags();
         int mergeBacks;
         try {
             NBTTagCompound onDiskEnvelope = new NBTTagCompound();

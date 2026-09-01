@@ -3,7 +3,7 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.client.renderer.VertexBuffer;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.Vec3d;
 
@@ -32,7 +32,7 @@ public final class RimRendererImpl implements RimRenderer {
         if (face == RimFace.NONE) {
             return;
         }
-        BufferBuilder lines = context.lines();
+        VertexBuffer lines = context.lines();
         Vec3d camera = context.cameraPos();
         // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, lifted
         // outward by the standoff, so a recessed model is framed while a flush one is drawn on its own surface.
@@ -78,7 +78,7 @@ public final class RimRendererImpl implements RimRenderer {
         }
     }
 
-    private void quad(BufferBuilder lines, int colorArgb, float ax, float ay, float az, float bx, float by, float bz,
+    private void quad(VertexBuffer lines, int colorArgb, float ax, float ay, float az, float bx, float by, float bz,
             float cx, float cy, float cz, float dx, float dy, float dz) {
         edge(lines, colorArgb, ax, ay, az, bx, by, bz);
         edge(lines, colorArgb, bx, by, bz, cx, cy, cz);
@@ -86,12 +86,12 @@ public final class RimRendererImpl implements RimRenderer {
         edge(lines, colorArgb, dx, dy, dz, ax, ay, az);
     }
 
-    private void edge(BufferBuilder lines, int colorArgb, float x1, float y1, float z1, float x2, float y2, float z2) {
+    private void edge(VertexBuffer lines, int colorArgb, float x1, float y1, float z1, float x2, float y2, float z2) {
         vertex(lines, x1, y1, z1, colorArgb);
         vertex(lines, x2, y2, z2, colorArgb);
     }
 
-    private void vertex(BufferBuilder lines, float x, float y, float z, int colorArgb) {
+    private void vertex(VertexBuffer lines, float x, float y, float z, int colorArgb) {
         lines.pos(x, y, z)
                 .color((colorArgb >> 16) & 0xFF, (colorArgb >> 8) & 0xFF, colorArgb & 0xFF, (colorArgb >>> 24) & 0xFF)
                 .endVertex();

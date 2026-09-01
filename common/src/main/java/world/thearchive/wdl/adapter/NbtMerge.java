@@ -24,13 +24,13 @@ final class NbtMerge {
 
     /** Whether {@code tag}'s value at {@code key} is a non-empty list. */
     static boolean isNonEmptyList(NBTTagCompound tag, String key) {
-        return tag.getTag(key) instanceof NBTTagList && !((NBTTagList) tag.getTag(key)).isEmpty();
+        return tag.getTag(key) instanceof NBTTagList && !((NBTTagList) tag.getTag(key)).hasNoTags();
     }
 
     /** Copy {@code key}'s list from {@code disk} when {@code fresh}'s is absent or empty; true if a copy happened. */
     static boolean carryList(NBTTagCompound disk, NBTTagCompound fresh, String key) {
         NBTTagList diskList = disk.getTag(key) instanceof NBTTagList ? (NBTTagList) disk.getTag(key) : null;
-        if (isNonEmptyList(fresh, key) || diskList == null || diskList.isEmpty()) {
+        if (isNonEmptyList(fresh, key) || diskList == null || diskList.hasNoTags()) {
             return false;
         }
         fresh.setTag(key, diskList.copy());
@@ -49,7 +49,7 @@ final class NbtMerge {
      */
     static boolean carryListBySlot(NBTTagCompound disk, NBTTagCompound fresh, String key, int occupiedSlots) {
         NBTTagList diskList = disk.getTag(key) instanceof NBTTagList ? (NBTTagList) disk.getTag(key) : null;
-        if (diskList == null || diskList.isEmpty()) {
+        if (diskList == null || diskList.hasNoTags()) {
             return false;
         }
         NBTTagList freshList = fresh.getTag(key) instanceof NBTTagList ? (NBTTagList) fresh.getTag(key)

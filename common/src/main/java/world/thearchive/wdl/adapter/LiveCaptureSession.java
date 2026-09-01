@@ -3188,7 +3188,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         NBTTagCompound priorPlayer = readPriorPlayerTag();
         if (priorPlayer != null && priorPlayer.getTag("EnderItems") instanceof NBTTagList
-                && !((NBTTagList) priorPlayer.getTag("EnderItems")).isEmpty()) {
+                && !((NBTTagList) priorPlayer.getTag("EnderItems")).hasNoTags()) {
             recoveredScan.markEnderRecovered();
         }
     }
@@ -3525,7 +3525,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // disk. toRealPath canonicalizes the base so a symlinked saves directory cannot defeat the lexical check.
             // This band's save format has no saves-root accessor; the saves base is the game directory's saves folder,
             // the same root it constructs the level source over.
-            Path savesBase = minecraft.gameDir.toPath().resolve("saves").toRealPath();
+            Path savesBase = minecraft.mcDataDir.toPath().resolve("saves").toRealPath();
             Path resolved = savesBase.resolve(saveName).normalize();
             // A download folder is a single component directly under saves; requiring the parent to be exactly
             // the saves base rejects both a parent-escape and any multi-component name (whose first segment could
@@ -4194,7 +4194,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         NBTTagList entities = envelope.getTag("Entities") instanceof NBTTagList
                 ? (NBTTagList) envelope.getTag("Entities")
                 : null;
-        if (entities != null && !entities.isEmpty() && entities.get(0) instanceof NBTTagCompound) {
+        if (entities != null && !entities.hasNoTags() && entities.get(0) instanceof NBTTagCompound) {
             return (NBTTagCompound) entities.get(0);
         }
         // A non-null envelope means the sink did save this entity, so failing to lift it back out loses one it
@@ -4338,7 +4338,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 EntityLiving mob = (EntityLiving) promoted.entity();
                 Entity holder = byId.get(promoted.frame().leashHolderId());
                 if (holder != null) {
-                    mob.setLeashHolder(holder, false); // saved as the holder's UUID, or a fence knot's block pos
+                    mob.setLeashedToEntity(holder, false); // saved as the holder's UUID, or a fence knot's block pos
                 }
                 // A holder in a different drained chunk is not resolved here (resolution is within this batch by
                 // int id), so a cross-chunk leashed mob saves unleashed, the leash sibling of the
@@ -4541,7 +4541,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (partial) {
                 bridge.sendChat(ChatCopy.downloadIncomplete(failed));
             }
-            Path saveFolder = Minecraft.getMinecraft().gameDir.toPath().resolve("saves").resolve(saveName)
+            Path saveFolder = Minecraft.getMinecraft().mcDataDir.toPath().resolve("saves").resolve(saveName)
                     .toAbsolutePath();
             bridge.sendChat(ChatCopy.savedTo(saveName, saveFolder.toString()));
         }

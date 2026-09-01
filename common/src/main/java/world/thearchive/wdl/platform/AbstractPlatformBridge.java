@@ -378,7 +378,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         private static List<String> managedDownloadNames() {
             // This band's save format exposes no saves-root accessor, and the saves folder is the game directory's
             // own saves child at this band, so it is resolved from there.
-            Path savesDirectory = Minecraft.getMinecraft().gameDir.toPath().resolve("saves");
+            Path savesDirectory = Minecraft.getMinecraft().mcDataDir.toPath().resolve("saves");
             try {
                 return DownloadFolders.listManaged(savesDirectory);
             } catch (IOException exception) {

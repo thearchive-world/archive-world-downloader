@@ -469,9 +469,9 @@ public final class OutlineTracker {
             // through fromLong and repack the neighbor through a BlockPos. isFullBlock is the solid-cube test
             // standing in for isCollisionShapeFullBlock, which is a cosmetic rim-face seal, not saved data.
             BlockPos cellPos = BlockPos.fromLong(cell);
-            int nx = cellPos.getX() + direction.getXOffset();
-            int ny = cellPos.getY() + direction.getYOffset();
-            int nz = cellPos.getZ() + direction.getZOffset();
+            int nx = cellPos.getX() + direction.getFrontOffsetX();
+            int ny = cellPos.getY() + direction.getFrontOffsetY();
+            int nz = cellPos.getZ() + direction.getFrontOffsetZ();
             if (cells.length > 1 && containsCell(cells, new BlockPos(nx, ny, nz).toLong())) {
                 continue;
             }

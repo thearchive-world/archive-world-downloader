@@ -322,16 +322,16 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
 
         @Override
-        public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTick) {
+        public void drawButton(Minecraft minecraft, int mouseX, int mouseY) {
             if (!this.visible) {
                 return;
             }
             this.hovered = mouseX >= this.x && mouseY >= this.y && mouseX < this.x + this.width
                     && mouseY < this.y + this.height;
-            draw(mouseX, mouseY, partialTick);
+            draw(mouseX, mouseY);
         }
 
-        abstract void draw(int mouseX, int mouseY, float partialTick);
+        abstract void draw(int mouseX, int mouseY);
 
         @Override
         public void press() {}
@@ -841,7 +841,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
 
         @Override
-        void draw(int mouseX, int mouseY, float partialTick) {
+        void draw(int mouseX, int mouseY) {
             new RenderSurfaceImpl().text(fontRenderer, this.text, this.x,
                     this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2, NAME_ARGB);
         }
@@ -854,7 +854,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
 
         @Override
-        void draw(int mouseX, int mouseY, float partialTick) {
+        void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
             String triangle = listCollapsed ? TRIANGLE_COLLAPSED : TRIANGLE_EXPANDED;
             ITextComponent header = new TextComponentString(triangle)
@@ -877,7 +877,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
 
         @Override
-        void draw(int mouseX, int mouseY, float partialTick) {
+        void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
             int color = hovered ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             surface.text(fontRenderer, openSavesText(), this.x + 4,
@@ -901,7 +901,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
 
         @Override
-        void draw(int mouseX, int mouseY, float partialTick) {
+        void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
             surface.fill(this.x, this.y, this.x + getButtonWidth(),
                     this.y + this.height, BANNER_FILL_ARGB);
@@ -926,7 +926,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
 
         @Override
-        void draw(int mouseX, int mouseY, float partialTick) {
+        void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
             int color = hovered ? BANNER_LINK_HOVER_ARGB : BANNER_LINK_ARGB;
             surface.text(fontRenderer, this.label, this.x,
@@ -950,7 +950,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
 
         @Override
-        void draw(int mouseX, int mouseY, float partialTick) {
+        void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
             int color = hovered ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             // The glyph comes from the fallback font, whose ink sits high in its line box, so the shared
@@ -977,7 +977,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
 
         @Override
-        void draw(int mouseX, int mouseY, float partialTick) {
+        void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
             int textY = this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2;
             surface.text(fontRenderer, WARNING_GLYPH, this.x, textY, BANNER_GLYPH_ARGB);
@@ -1296,15 +1296,15 @@ public final class WdlDownloadsScreen extends GuiScreen {
 
             @Override
             public void drawEntry(int slotIndex, int x, int y, int listWidth, int slotHeight, int mouseX, int mouseY,
-                    boolean isSelected, float partialTicks) {
+                    boolean isSelected) {
                 this.contentX = x;
                 this.contentY = y;
                 this.contentWidth = listWidth;
-                renderContent(mouseX, mouseY, isSelected, partialTicks);
+                renderContent(mouseX, mouseY, isSelected);
             }
 
             @Override
-            public void updatePosition(int slotIndex, int x, int y, float partialTicks) {}
+            public void setSelected(int slotIndex, int x, int y) {}
 
             @Override
             public void mouseReleased(int slotIndex, int x, int y, int mouseEvent, int relativeX, int relativeY) {}
@@ -1321,7 +1321,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
                 return contentWidth;
             }
 
-            private void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick) {
+            private void renderContent(int mouseX, int mouseY, boolean hovering) {
                 RenderSurface surface = new RenderSurfaceImpl(WdlDownloadsScreen.this);
                 // Probe or walk only visible rows, on disjoint domains: a tainted row is availability-probed
                 // for its restore chip and never walked, a complete row is walked for its size.

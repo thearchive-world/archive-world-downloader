@@ -331,9 +331,9 @@ public final class WdlSettingsScreen extends GuiScreen {
         return control instanceof GuiButton ? ((GuiButton) control).getButtonWidth() : CONTROL_WIDTH;
     }
 
-    private static void renderControl(Gui control, int mouseX, int mouseY, float partialTick) {
+    private static void renderControl(Gui control, int mouseX, int mouseY) {
         if (control instanceof GuiButton) {
-            ((GuiButton) control).drawButton(Minecraft.getMinecraft(), mouseX, mouseY, partialTick);
+            ((GuiButton) control).drawButton(Minecraft.getMinecraft(), mouseX, mouseY);
         } else {
             ((GuiTextField) control).drawTextBox();
         }
@@ -694,15 +694,15 @@ public final class WdlSettingsScreen extends GuiScreen {
 
         @Override
         public void drawEntry(int slotIndex, int x, int y, int listWidth, int slotHeight, int mouseX, int mouseY,
-                boolean isSelected, float partialTicks) {
+                boolean isSelected) {
             this.contentX = x;
             this.contentY = y;
             this.contentWidth = listWidth;
-            renderContent(mouseX, mouseY, isSelected, partialTicks);
+            renderContent(mouseX, mouseY, isSelected);
         }
 
         @Override
-        public void updatePosition(int slotIndex, int x, int y, float partialTicks) {}
+        public void setSelected(int slotIndex, int x, int y) {}
 
         @Override
         public boolean mousePressed(int slotIndex, int mouseX, int mouseY, int mouseEvent, int relativeX,
@@ -721,7 +721,7 @@ public final class WdlSettingsScreen extends GuiScreen {
 
         void clearFocus() {}
 
-        abstract void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick);
+        abstract void renderContent(int mouseX, int mouseY, boolean hovering);
 
         int getContentX() {
             return contentX;
@@ -745,7 +745,7 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
 
         @Override
-        public void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick) {
+        public void renderContent(int mouseX, int mouseY, boolean hovering) {
             RenderSurface surface = new RenderSurfaceImpl();
             int textY = getContentY() + (ROW_HEIGHT - fontRenderer.FONT_HEIGHT) / 2 + 2;
             surface.text(fontRenderer, this.label, getContentX(), textY, BrandColors.opaque(BrandColors.AMBER));
@@ -780,7 +780,7 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
 
         @Override
-        public void renderContent(int mouseX, int mouseY, boolean hovering, float partialTick) {
+        public void renderContent(int mouseX, int mouseY, boolean hovering) {
             RenderSurface surface = new RenderSurfaceImpl();
             Gui control = control();
             boolean enabled = this.masterKey == null || draft.getBoolean(this.masterKey);
@@ -796,7 +796,7 @@ public final class WdlSettingsScreen extends GuiScreen {
 
             setControlActive(control, enabled);
             setControlPosition(control, controlX, controlY);
-            renderControl(control, mouseX, mouseY, partialTick);
+            renderControl(control, mouseX, mouseY);
 
             // Passive indicator: an amber caution mark sits just left of an off core-capture toggle, a
             // defense-in-depth reminder that the download will be missing that data beyond the confirm-at-change.
@@ -814,7 +814,7 @@ public final class WdlSettingsScreen extends GuiScreen {
             this.revert.enabled = enabled && modified;
             this.revert.x = revertX;
             this.revert.y = controlY;
-            this.revert.drawButton(Minecraft.getMinecraft(), mouseX, mouseY, partialTick);
+            this.revert.drawButton(Minecraft.getMinecraft(), mouseX, mouseY);
 
             // The revert icon is a bundled sprite, not a font glyph: the revert codepoint resolves only through
             // the tiny unifont fallback, which no scale renders crisply. The button carries a blank label so
@@ -841,9 +841,17 @@ public final class WdlSettingsScreen extends GuiScreen {
         public boolean mousePressed(int slotIndex, int mouseX, int mouseY, int mouseEvent, int relativeX,
                 int relativeY) {
             Gui control = control();
-            boolean controlHit = control instanceof GuiButton
-                    ? ((GuiButton) control).mousePressed(Minecraft.getMinecraft(), mouseX, mouseY)
-                    : ((GuiTextField) control).mouseClicked(mouseX, mouseY, mouseEvent);
+            boolean controlHit;
+            if (control instanceof GuiButton) {
+                controlHit = ((GuiButton) control).mousePressed(Minecraft.getMinecraft(), mouseX, mouseY);
+            } else {
+                // GuiTextField.mouseClicked returns void at this band, where the higher bands hand the hit back.
+                // It sets its own focus from the bounds test, so isFocused after the call is that bounds test,
+                // which holds because nothing here clears canLoseFocus.
+                GuiTextField field = (GuiTextField) control;
+                field.mouseClicked(mouseX, mouseY, mouseEvent);
+                controlHit = field.isFocused();
+            }
             if (controlHit) {
                 return true;
             }

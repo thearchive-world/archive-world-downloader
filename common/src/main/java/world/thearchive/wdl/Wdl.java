@@ -405,7 +405,7 @@ public final class Wdl {
         }
         WdlConfig config = WdlConfig.load(configPath());
         currentConfig = config;
-        Path savesDirectory = minecraft.gameDir.toPath().resolve("saves");
+        Path savesDirectory = minecraft.mcDataDir.toPath().resolve("saves");
         if (target.mode() == DownloadMode.NEW
                 && RestoreOperation.attemptReferences(savesDirectory, target.folderName())) {
             // A torn restore attempt still stages this name under the temporary root; a NEW download landing on
@@ -590,7 +590,7 @@ public final class Wdl {
     /** Build the MC-free browse model and show the screen; run from the deferral on the client main thread. */
     private static void showDownloadsScreen(boolean expandExistingList) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        Path savesDirectory = minecraft.gameDir.toPath().resolve("saves");
+        Path savesDirectory = minecraft.mcDataDir.toPath().resolve("saves");
         Path loadedWorld = loadedWorldPath(minecraft);
         Supplier<List<DownloadEntry>> entries = () -> {
             try {
@@ -746,7 +746,7 @@ public final class Wdl {
 
     /** The kept-aside paths a swap failure names, shortened to saves-relative form where possible. */
     private static String describeSurvivingPaths(List<Path> survivingPaths) {
-        Path savesDirectory = Minecraft.getMinecraft().gameDir.toPath().resolve("saves");
+        Path savesDirectory = Minecraft.getMinecraft().mcDataDir.toPath().resolve("saves");
         return survivingPaths.stream()
                 .map(path -> {
                     try {
@@ -890,7 +890,7 @@ public final class Wdl {
     static @Nullable Path loadedWorldPath(Minecraft minecraft) {
         IntegratedServer server = minecraft.getIntegratedServer();
         return server != null
-                ? minecraft.gameDir.toPath().resolve("saves").resolve(server.getFolderName())
+                ? minecraft.mcDataDir.toPath().resolve("saves").resolve(server.getFolderName())
                 : null;
     }
 

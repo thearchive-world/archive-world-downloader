@@ -141,7 +141,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public Path configDirectory() {
-        return Minecraft.getMinecraft().gameDir.toPath().resolve("config");
+        return Minecraft.getMinecraft().mcDataDir.toPath().resolve("config");
     }
 
     @Override

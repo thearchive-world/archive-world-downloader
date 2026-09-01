@@ -11,7 +11,6 @@ import net.minecraft.entity.passive.AbstractHorse;
 import net.minecraft.entity.passive.EntityVillager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntityEnderChest;
-import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
@@ -139,9 +138,10 @@ public final class OpenClickTracker {
      */
     private static boolean enderChestObstructed(World level, BlockPos pos) {
         BlockPos above = pos.up();
-        // doesSideBlockChestOpening is the obstruction test the vanilla BlockEnderChest use handler applies to the
-        // block above (its downward face), returning before opening anything when it blocks.
-        return level.getBlockState(above).doesSideBlockChestOpening(level, above, EnumFacing.DOWN);
+        // isNormalCube is the obstruction test the vanilla BlockEnderChest use handler applies to the block above,
+        // returning before opening anything when it answers true. The per-face doesSideBlockChestOpening the higher
+        // bands read is a later Forge addition and does not exist here, so this reads what vanilla itself reads.
+        return level.getBlockState(above).isNormalCube();
     }
 
     /**
@@ -167,7 +167,7 @@ public final class OpenClickTracker {
         // There is no EntityType registry before 1.13, so the entity's vanilla-ness is read from its classic
         // EntityList registry name; a null key (a player, lightning, an unregistered entity) is not vanilla.
         ResourceLocation key = EntityList.getKey(entity);
-        boolean vanilla = key != null && "minecraft".equals(key.getNamespace());
+        boolean vanilla = key != null && "minecraft".equals(key.getResourceDomain());
         boolean villager = entity instanceof EntityVillager;
         boolean baby = villager && ((EntityVillager) entity).isChild();
         // At this band the villager profession is an int (getProfession); nitwit is profession id 5, the same
