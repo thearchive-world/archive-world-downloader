@@ -53,7 +53,12 @@ final class CoveragePolygons {
             int z0 = rectangles[i + 1] << 4;
             int x1 = (rectangles[i + 2] + 1) << 4;
             int z1 = (rectangles[i + 3] + 1) << 4;
-            result.add(toPolygon(new int[] { x0, z0, x1, z0, x1, z1, x0, z1 }));
+            // Counter-clockwise in screen space (north-west, south-west, south-east, north-east), which is what
+            // makes the fill front-facing. JourneyMap draws the fill as a GL_POLYGON without disabling face
+            // culling, so a clockwise ring is culled wherever the surrounding pass leaves culling on: the minimap
+            // draws inside the in-world HUD pass and the full-screen map inside a GUI screen, which is why a
+            // clockwise ring can survive on one and vanish on the other.
+            result.add(toPolygon(new int[] { x0, z0, x0, z1, x1, z1, x1, z0 }));
         }
         return result;
     }
