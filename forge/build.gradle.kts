@@ -283,9 +283,12 @@ val reobfFixtureJar = tasks.register<Jar>("reobfFixtureJar") {
 // Unimined's remapJar otherwise defaults to the same archiveBaseName/version as modJar below (no classifier),
 // which collides with modJar's own ship-name output path: modJar's from(zipTree(remapJar.archiveFile)) would
 // then open its own output file for writing before reading it back, truncating the very jar it is trying to
-// read. Classifying remapJar's output "searge" gives modJar a distinct file to read from.
+// read. Classifying remapJar's output "searge" gives modJar a distinct file to read from. It also leaves
+// build/libs, because both workflows select this island's jars by globbing that directory and skipping the
+// classifiers they know about: an intermediate sitting beside modJar's output is published as if it were the mod.
 tasks.named<Jar>("remapJar") {
     archiveClassifier.set("searge")
+    destinationDirectory.set(layout.buildDirectory.dir("intermediates"))
 }
 
 // --- fastutil bundling ---
