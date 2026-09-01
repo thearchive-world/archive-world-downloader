@@ -206,7 +206,7 @@ class ChunkFlushPlanTest {
 
         assertEquals(3, tally.merged(), "each of the three stashes folded its own block entity");
         assertEquals(0, tally.failed());
-        assertFalse(findByPos(chunkTag, 1, 64, 1).getTagList("Items", 10).isEmpty(),
+        assertFalse(findByPos(chunkTag, 1, 64, 1).getTagList("Items", 10).hasNoTags(),
                 "the chest gained its items");
         assertTrue(findByPos(chunkTag, 2, 64, 2).hasKey("Book"), "the lectern gained its book");
         assertTrue(findByPos(chunkTag, 3, 64, 3).hasKey("RecordItem"), "the jukebox gained its disc");
@@ -257,7 +257,7 @@ class ChunkFlushPlanTest {
 
         assertEquals(2, tally.merged(), "both the container and the lectern rewrite land");
         assertEquals(0, tally.failed());
-        assertFalse(findByPos(onDisk, 1, 64, 1).getTagList("Items", 10).isEmpty());
+        assertFalse(findByPos(onDisk, 1, 64, 1).getTagList("Items", 10).hasNoTags());
         assertTrue(findByPos(onDisk, 2, 64, 2).hasKey("Book"));
     }
 

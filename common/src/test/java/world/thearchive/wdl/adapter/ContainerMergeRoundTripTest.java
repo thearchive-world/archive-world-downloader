@@ -96,7 +96,7 @@ class ContainerMergeRoundTripTest {
         NBTTagCompound blockEntity = chestTag(0, 0, 0);
         sink.merge(blockEntity, holder);
 
-        assertTrue(blockEntity.getTagList("Items", 10).isEmpty(),
+        assertTrue(blockEntity.getTagList("Items", 10).hasNoTags(),
                 "merge must write a copy, never mutate the input BE tag");
     }
 

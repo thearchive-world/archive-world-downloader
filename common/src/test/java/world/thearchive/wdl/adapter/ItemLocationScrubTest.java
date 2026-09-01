@@ -131,7 +131,7 @@ class ItemLocationScrubTest {
     /** Whether the first occupant's flower_pos is present. */
     private static boolean beeFlowerPresent(ItemStack hive) {
         NBTTagList bees = beesOf(hive);
-        return !bees.isEmpty() && bees.getCompoundTagAt(0).getTag(ENTITY_DATA) instanceof NBTTagCompound
+        return !bees.hasNoTags() && bees.getCompoundTagAt(0).getTag(ENTITY_DATA) instanceof NBTTagCompound
                 && ((NBTTagCompound) bees.getCompoundTagAt(0).getTag(ENTITY_DATA)).hasKey(FLOWER_POS);
     }
 
@@ -381,7 +381,7 @@ class ItemLocationScrubTest {
         NonNullList<ItemStack> back = readBack(holder, 2);
         assertFalse(hiveFlowerPosPresent(back.get(0)), "the hive's own flower_pos is blanked too");
         NBTTagList bees = beesOf(back.get(0));
-        assertFalse(bees.isEmpty(), "the bees component is kept");
+        assertFalse(bees.hasNoTags(), "the bees component is kept");
         assertEquals(1, bees.tagCount(), "the occupant is kept");
         assertFalse(
                 bees.getCompoundTagAt(0).getTag(ENTITY_DATA) instanceof NBTTagCompound

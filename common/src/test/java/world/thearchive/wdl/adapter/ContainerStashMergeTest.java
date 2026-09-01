@@ -93,7 +93,7 @@ class ContainerStashMergeTest {
         ItemStackHelper.loadAllItems(findByPos(blockEntities, 10, 70, 20), back);
         assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest gains exactly the captured stack");
         assertEquals(7, back.get(2).getCount());
-        assertTrue(findByPos(blockEntities, 11, 70, 20).getTagList("Items", 10).isEmpty(),
+        assertTrue(findByPos(blockEntities, 11, 70, 20).getTagList("Items", 10).hasNoTags(),
                 "the neighbor block entity is untouched");
     }
 
@@ -112,7 +112,7 @@ class ContainerStashMergeTest {
                 "the entry is still drained: the chunk is leaving memory, so it cannot wait");
         assertTrue(
                 findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 2, 64, 1)
-                        .getTagList("Items", 10).isEmpty(),
+                        .getTagList("Items", 10).hasNoTags(),
                 "the unrelated chest is left alone");
     }
 

@@ -204,7 +204,7 @@ class RegionIntegrationTest {
             NBTTagCompound back = Optional.ofNullable(in.read(pos))
                     .orElseThrow(() -> new AssertionError("chunk not on disk"));
             NBTTagCompound chest = findByPos(back, 4, 64, 9);
-            assertTrue(chest.getTag("Items") instanceof NBTTagList && ((NBTTagList) chest.getTag("Items")).isEmpty(),
+            assertTrue(chest.getTag("Items") instanceof NBTTagList && ((NBTTagList) chest.getTag("Items")).hasNoTags(),
                     "the chest is left with the present-but-empty list a vanilla chest writes, not with the items "
                             + "the player watched leave");
         }

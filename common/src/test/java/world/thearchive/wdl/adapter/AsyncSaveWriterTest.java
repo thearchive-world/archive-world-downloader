@@ -373,7 +373,7 @@ class AsyncSaveWriterTest {
 
         try (WdlRegionStorage in = storage(region, "chunk")) {
             NBTTagCompound chunk = Optional.ofNullable(in.read(new ChunkPos(2, 2))).get();
-            assertFalse(chunk.getCompoundTag("Level").getTagList("Entities", 10).isEmpty(),
+            assertFalse(chunk.getCompoundTag("Level").getTagList("Entities", 10).hasNoTags(),
                     "the entity landed inside the region/ chunk's Level.Entities");
         }
     }
@@ -824,7 +824,7 @@ class AsyncSaveWriterTest {
         assertNotNull(onDisk, "the scan handed the prior on-disk chunk to the observer");
         NBTTagCompound chest = findByPosOrNull(onDisk, 2, 64, 2);
         assertNotNull(chest, "the observer saw the prior chest block entity");
-        assertFalse(chest.getTagList("Items", 10).isEmpty(), "the prior chest carries the captured Items");
+        assertFalse(chest.getTagList("Items", 10).hasNoTags(), "the prior chest carries the captured Items");
     }
 
     @Test
@@ -859,7 +859,7 @@ class AsyncSaveWriterTest {
         assertNotNull(onDisk, "the scan handed the prior on-disk region chunk to the observer");
         NBTTagCompound vehicle = onDisk.getCompoundTag("Level").getTagList("Entities", 10).getCompoundTagAt(0);
         assertEquals(cart, EntityMerge.readUuid(vehicle), "the prior container entity kept its UUID");
-        assertFalse(vehicle.getTagList("Items", 10).isEmpty(),
+        assertFalse(vehicle.getTagList("Items", 10).hasNoTags(),
                 "the prior container entity carries the captured Items");
     }
 
@@ -908,9 +908,9 @@ class AsyncSaveWriterTest {
         assertEquals(1, result.entitiesCarriedForward(),
                 "exactly the one prior-contents carry (the revisit clobber case) reached the tally");
         try (WdlRegionStorage in = storage(region, "chunk")) {
-            assertFalse(vehicleItems(in, new ChunkPos(0, 0), openedAfterFlush).isEmpty(),
+            assertFalse(vehicleItems(in, new ChunkPos(0, 0), openedAfterFlush).hasNoTags(),
                     "the re-flush folded the opened contents onto the on-disk vehicle (open-after-flush recovers)");
-            assertFalse(vehicleItems(in, new ChunkPos(0, 1), openedBeforeFlush).isEmpty(),
+            assertFalse(vehicleItems(in, new ChunkPos(0, 1), openedBeforeFlush).hasNoTags(),
                     "the empty re-flush read-merged the prior on-disk items rather than overwriting them");
         }
     }
@@ -933,7 +933,7 @@ class AsyncSaveWriterTest {
             // Terrain flushes, then a captured chest minecart folds into the chunk's Level.Entities.
             io.write(pos, codec.encode(SyntheticChunks.full(true), false));
             RegionChunkWriter.foldEntitiesIntoRegion(io, pos, entityChunk(filledVehicle(cart)));
-            assertFalse(vehicleItems(io, pos, cart).isEmpty(), "the fold placed the vehicle in Level.Entities");
+            assertFalse(vehicleItems(io, pos, cart).hasNoTags(), "the fold placed the vehicle in Level.Entities");
 
             // A revisit re-flushes fresh terrain over the same chunk; the terrain tag carries no Entities of its own.
             RegionChunkWriter.MergeWriteResult reWrite = RegionChunkWriter.writeMerging(io, pos,
@@ -943,7 +943,7 @@ class AsyncSaveWriterTest {
         }
 
         try (WdlRegionStorage in = storage(region, "chunk")) {
-            assertFalse(vehicleItems(in, pos, cart).isEmpty(),
+            assertFalse(vehicleItems(in, pos, cart).hasNoTags(),
                     "the terrain re-write preserved the folded vehicle in Level.Entities rather than dropping it");
         }
     }
@@ -1002,7 +1002,7 @@ class AsyncSaveWriterTest {
             NBTTagCompound onDisk = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
             assertEquals("contents", onDisk.getString("wdl_test_folded"),
                     "the folded chunk was written back to region/");
-            assertFalse(onDisk.getCompoundTag("Level").getTagList("Sections", 10).isEmpty(),
+            assertFalse(onDisk.getCompoundTag("Level").getTagList("Sections", 10).hasNoTags(),
                     "the prior terrain survived the read-modify-write");
         }
     }
@@ -1160,7 +1160,7 @@ class AsyncSaveWriterTest {
         assertEquals(0, result.entityChunksWritten(), "and it is not counted as written");
         assertEquals(1, finalizedEntityChunksFailed.get(), "the finalize sees it on its own target's term");
         try (WdlRegionStorage in = storage(region, "chunk")) {
-            assertFalse(vehicleItems(in, new ChunkPos(0, 0), parked).isEmpty(),
+            assertFalse(vehicleItems(in, new ChunkPos(0, 0), parked).hasNoTags(),
                     "the prior the writer refused to overwrite is still on disk");
         }
     }
@@ -1251,7 +1251,7 @@ class AsyncSaveWriterTest {
                         chest.getY(), chest.getZ()).getItem(),
                         "the prior session's stack reached the region file at " + chest);
                 assertTrue(findByPos(revisit, chest.getX(), chest.getY(), chest.getZ())
-                        .getTagList("Items", 10).isEmpty(),
+                        .getTagList("Items", 10).hasNoTags(),
                         "the fold must not write back into the snapshot at " + chest + ", or a revisit would "
                                 + "re-capture the prior's contents and every on-disk assertion here is vacuous");
             }

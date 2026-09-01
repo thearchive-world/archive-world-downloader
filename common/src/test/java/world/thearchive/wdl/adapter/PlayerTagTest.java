@@ -286,7 +286,7 @@ class PlayerTagTest {
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
         assertFalse(carried, "a cross-resume mount switch never grafts one mount's contents onto another");
-        assertTrue(mountItems(fresh).isEmpty(), "the different fresh mount is left empty");
+        assertTrue(mountItems(fresh).hasNoTags(), "the different fresh mount is left empty");
     }
 
     @Test
@@ -296,7 +296,7 @@ class PlayerTagTest {
         NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount, new NBTTagList()));
 
         assertFalse(PlayerTag.restorePriorMountContents(prior, fresh), "an empty prior mount is not a recovery");
-        assertTrue(mountItems(fresh).isEmpty(), "the fresh seated mount stays empty");
+        assertTrue(mountItems(fresh).hasNoTags(), "the fresh seated mount stays empty");
     }
 
     /**
@@ -344,7 +344,7 @@ class PlayerTagTest {
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
         assertFalse(carried, "a genuine mount switch matches no node on either side, so nothing grafts");
-        assertTrue(nestedMountItems(fresh).isEmpty(), "the different fresh mount is left empty");
+        assertTrue(nestedMountItems(fresh).hasNoTags(), "the different fresh mount is left empty");
     }
 
     private static NBTTagList itemList(String... ids) {

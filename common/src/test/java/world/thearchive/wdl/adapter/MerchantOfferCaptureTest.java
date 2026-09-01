@@ -161,7 +161,7 @@ class MerchantOfferCaptureTest {
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, true, null);
 
-        assertTrue(holder.isEmpty(), "a holder with no Offers is left untouched, no throw");
+        assertTrue(holder.hasNoTags(), "a holder with no Offers is left untouched, no throw");
     }
 
     @Test

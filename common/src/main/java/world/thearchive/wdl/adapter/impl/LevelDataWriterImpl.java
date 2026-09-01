@@ -202,7 +202,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are the band-neutral curated keys; each maps to its 1.12.2 vanilla rule id here. A curated name
+    // The WDL names are the band-neutral curated keys; each maps to its 1.11.2 vanilla rule id here. A curated name
     // with no rule at this band (the wandering-trader, patrol, warden and vine-spread rules are all 1.14 and above) is
     // dropped at runtime, so this list is the superset.
     private static List<CuratedSpec> buildCuratedGameRules() {

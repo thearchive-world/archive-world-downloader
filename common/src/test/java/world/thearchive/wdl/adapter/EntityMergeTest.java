@@ -243,7 +243,7 @@ class EntityMergeTest {
         NBTTagList list = fresh.getTag("Entities") instanceof NBTTagList ? (NBTTagList) fresh.getTag("Entities") : null;
         assertFalse(list != null
                 && ((NBTTagCompound) list.get(0)).getTag("Items") instanceof NBTTagList
-                && !((NBTTagList) ((NBTTagCompound) list.get(0)).getTag("Items")).isEmpty());
+                && !((NBTTagList) ((NBTTagCompound) list.get(0)).getTag("Items")).hasNoTags());
     }
 
     @Test

@@ -183,7 +183,7 @@ class ChunkMergeTest {
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
         assertEquals(0, mergeBacks);
-        assertTrue(((NBTTagList) fresh.getCompoundTag("Level").getTag("TileEntities")).isEmpty(),
+        assertTrue(((NBTTagList) fresh.getCompoundTag("Level").getTag("TileEntities")).hasNoTags(),
                 "a removed container is not resurrected");
     }
 
@@ -275,7 +275,7 @@ class ChunkMergeTest {
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh));
         assertFalse(findByPos(fresh, 1, 64, 1).getTag("Items") instanceof NBTTagList
-                && !((NBTTagList) findByPos(fresh, 1, 64, 1).getTag("Items")).isEmpty());
+                && !((NBTTagList) findByPos(fresh, 1, 64, 1).getTag("Items")).hasNoTags());
     }
 
     @Test
@@ -301,7 +301,7 @@ class ChunkMergeTest {
 
         assertEquals(0, mergeBacks, "the chest's items must not ghost into a furnace at the same position");
         assertFalse(findByPos(fresh, 10, 70, 20).getTag("Items") instanceof NBTTagList
-                && !((NBTTagList) findByPos(fresh, 10, 70, 20).getTag("Items")).isEmpty(),
+                && !((NBTTagList) findByPos(fresh, 10, 70, 20).getTag("Items")).hasNoTags(),
                 "the replacement furnace stays empty, not the chest's 27 slots");
     }
 
@@ -329,7 +329,7 @@ class ChunkMergeTest {
         assertEquals(1, mergeBacks, "only the surviving chest carries forward");
         assertEquals(1, itemCount(findByPos(fresh, 10, 70, 20)), "the chest keeps its earlier-saved diamond");
         assertFalse(findByPos(fresh, 11, 70, 20).getTag("Items") instanceof NBTTagList
-                && !((NBTTagList) findByPos(fresh, 11, 70, 20).getTag("Items")).isEmpty(),
+                && !((NBTTagList) findByPos(fresh, 11, 70, 20).getTag("Items")).hasNoTags(),
                 "the newly placed furnace is present and empty (the revisit change is reflected)");
     }
 
@@ -542,7 +542,7 @@ class ChunkMergeTest {
         assertEquals(0, ChunkMerge.merge(onDisk, fresh, ChunkMerge.occupancyMap(), opened, LongSets.EMPTY_SET),
                 "an opened menu is ground truth for every slot, so nothing carries back over it");
         NBTTagCompound merged = findByPos(fresh, 10, 70, 20);
-        assertTrue(merged.getTag("Items") instanceof NBTTagList && ((NBTTagList) merged.getTag("Items")).isEmpty(),
+        assertTrue(merged.getTag("Items") instanceof NBTTagList && ((NBTTagList) merged.getTag("Items")).hasNoTags(),
                 "the chest is written with the present-but-empty list vanilla's own chest writer emits, so the "
                         + "items the player watched leave stay gone");
     }

@@ -18,7 +18,6 @@ import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.ContainerFurnace;
 import net.minecraft.profiler.Profiler;
-import net.minecraft.stats.RecipeBook;
 import net.minecraft.stats.StatisticsManager;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityFurnace;
@@ -83,7 +82,8 @@ class LiveCaptureSessionLockableContainerBindTest {
     /** A headless {@code EntityPlayerSP}, guarded against the two abstract members that reach the client singleton. */
     private static final class HeadlessPlayerSp extends EntityPlayerSP {
         HeadlessPlayerSp(WorldClient level, NetHandlerPlayClient connection) {
-            super(null, level, connection, new StatisticsManager(), new RecipeBook());
+            // The recipe book is a 1.12 addition, so this band's constructor takes four arguments, not five.
+            super(null, level, connection, new StatisticsManager());
         }
 
         @Override

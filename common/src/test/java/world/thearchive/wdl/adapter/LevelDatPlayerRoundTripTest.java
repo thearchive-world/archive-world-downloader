@@ -72,7 +72,7 @@ class LevelDatPlayerRoundTripTest {
                 "the Player slot is exactly the captured tag");
         assertEquals(GameType.CREATIVE.getID(), (data.hasKey("GameType") ? data.getInteger("GameType") : -99),
                 "GameType flips to creative");
-        assertEquals((byte) EnumDifficulty.HARD.getId(),
+        assertEquals((byte) EnumDifficulty.HARD.getDifficultyId(),
                 (data.hasKey("Difficulty") ? data.getByte("Difficulty") : (byte) -1), "captured difficulty");
 
         BlockPos spawn = new BlockPos(data.getInteger("SpawnX"), data.getInteger("SpawnY"), data.getInteger("SpawnZ"));

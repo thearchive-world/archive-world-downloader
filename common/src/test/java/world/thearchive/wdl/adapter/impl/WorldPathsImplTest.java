@@ -33,9 +33,12 @@ class WorldPathsImplTest {
         Map<String, Path> directories = new WorldPathsImpl(saveRoot).onDiskRegionDirectories();
 
         List<String> names = new ArrayList<>(directories.keySet());
-        assertEquals(ImmutableList.of("overworld", "the_nether", "the_end"), names,
+        // DimensionType.getName() returns the display name at this band, not the lowercase id the 1.12 rename
+        // introduced. The key is internal, and the on-disk layout is DIM plus the numeric id either way, so only the
+        // spelling moves; the folder assertion below is what pins the layout.
+        assertEquals(ImmutableList.of("Overworld", "Nether", "The End"), names,
                 "the fixed vanilla dimension set, in DimensionType id order");
-        assertEquals(saveRoot.resolve("DIM-1").resolve("region"), directories.get("the_nether"));
+        assertEquals(saveRoot.resolve("DIM-1").resolve("region"), directories.get("Nether"));
     }
 
     @Test
@@ -44,7 +47,7 @@ class WorldPathsImplTest {
 
         Map<String, Path> directories = new WorldPathsImpl(saveRoot).onDiskRegionDirectories();
 
-        assertEquals(ImmutableList.of("overworld"), new ArrayList<>(directories.keySet()));
+        assertEquals(ImmutableList.of("Overworld"), new ArrayList<>(directories.keySet()));
         assertTrue(Files.notExists(saveRoot.resolve("DIM-1")), "enumeration must not create directories");
     }
 }

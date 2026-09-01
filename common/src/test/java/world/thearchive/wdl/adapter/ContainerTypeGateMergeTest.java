@@ -65,7 +65,7 @@ class ContainerTypeGateMergeTest {
         assertFalse(stash.containsKey(pos), "the stale entry is still drained as the chunk leaves memory");
         assertTrue(
                 findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70, 20)
-                        .getTagList("Items", 10).isEmpty(),
+                        .getTagList("Items", 10).hasNoTags(),
                 "the replacement chest keeps its own (empty) contents, not the shulker box's");
     }
 
@@ -82,7 +82,7 @@ class ContainerTypeGateMergeTest {
         assertEquals(1, merged, "a shulker box holder merges onto a shulker box at the same pos");
         NBTTagCompound shulkerBox = findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70,
                 20);
-        assertFalse(shulkerBox.getTagList("Items", 10).isEmpty(), "the shulker box gains its captured contents");
+        assertFalse(shulkerBox.getTagList("Items", 10).hasNoTags(), "the shulker box gains its captured contents");
         assertFalse(shulkerBox.hasKey("wdl_block_entity_id"),
                 "the type marker rides only on the holder, never onto disk");
     }
@@ -99,7 +99,7 @@ class ContainerTypeGateMergeTest {
 
         assertEquals(1, merged, "a holder that makes no type claim overlays as before the gate");
         assertFalse(findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70, 20)
-                .getTagList("Items", 10).isEmpty());
+                .getTagList("Items", 10).hasNoTags());
     }
 
     @Test
@@ -117,7 +117,7 @@ class ContainerTypeGateMergeTest {
         assertFalse(stash.containsKey(pos), "still drained as the chunk leaves memory");
         assertTrue(
                 findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 11, 70, 20)
-                        .getTagList("Items", 10).isEmpty(),
+                        .getTagList("Items", 10).hasNoTags(),
                 "the unrelated chest is left untouched");
     }
 }

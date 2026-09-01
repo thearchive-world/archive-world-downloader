@@ -213,7 +213,7 @@ class MountArmorCaptureTest {
 
         EntitySinkImpl.applyMountArmor(saved, new NBTTagCompound());
 
-        assertTrue(saved.isEmpty(), "an empty patch authorizes no write at all");
+        assertTrue(saved.hasNoTags(), "an empty patch authorizes no write at all");
     }
 
     private static NBTTagCompound onlyEntityOf(@Nullable NBTTagCompound chunk) {

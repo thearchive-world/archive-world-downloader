@@ -98,7 +98,9 @@ class LiveCaptureSessionDimensionRebindTest {
 
         assertEquals(DimensionType.NETHER, field(session, "targetDimension"),
                 "the layout follows the entered dimension's type, so the save writes DIM-1");
-        assertEquals("the_nether", field(session, "liveDimensionId"),
+        // DimensionType.getName() is the display name at this band, not the lowercase id the 1.12 rename brought
+        // in. It is an internal key, used the same way on both sides of the rebind, so only its spelling moves.
+        assertEquals("Nether", field(session, "liveDimensionId"),
                 "while the packet-side stores stay keyed by the name entities are announced under");
     }
 
