@@ -230,8 +230,10 @@ common/src/main/java/world/thearchive/wdl/adapter/RenderSurface.java
 # Screen.setInitialFocus below 1.17), so the name field is focused directly through EditBox.setFocus(true) at init,
 # not by the screen's setFocused alone, which the higher bands' focus rework handles. And below 1.17 there is no
 # per-entry updateNarration hook, so the download row narrates through the list's setSelected override calling
-# NarratorChatListener.INSTANCE.sayNow, the way vanilla WorldSelectionList narrates its rows; the shared lang key
-# wdl.screen.downloads.narration stays live and identical across all bands.
+# NarratorChatListener.INSTANCE.sayNow, the way vanilla WorldSelectionList narrates its rows. Below 1.12 there is no
+# narrator to call at all: neither NarratorChatListener nor ChatType exists and the text-to-speech library they drive
+# is not in the band's library set, so the row selection is silent there and the shared lang key
+# wdl.screen.downloads.narration is enrolled as band-dropped rather than reached.
 # Below 1.13 the whole screen is reimplemented on the pre-GuiScreen event model, which has no Screen.children,
 # onPress, or AbstractSelectionList: it extends GuiScreen, so its buttons are GuiButton subclasses dispatched
 # through actionPerformed (custom-drawn widgets ride a WidgetButton base), the name field is a hand-managed

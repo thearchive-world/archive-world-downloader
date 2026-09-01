@@ -37,12 +37,10 @@ import net.minecraft.client.gui.GuiListExtended;
 import net.minecraft.client.gui.GuiPageButtonList;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
-import net.minecraft.client.gui.chat.NarratorChatListener;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.text.ChatType;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
@@ -1220,12 +1218,15 @@ public final class WdlDownloadsScreen extends GuiScreen {
             return super.mouseClicked(mouseX, mouseY, mouseEvent);
         }
 
+        /**
+         * Select a row. The higher bands also narrate it here; this band has no narrator to reach. There is no
+         * NarratorChatListener and no ChatType below 1.12, and the text-to-speech library the narrator drives is not in
+         * this band's library set either, so the row selection is silent and the key it would have spoken is enrolled
+         * as band-dropped rather than left looking unreached.
+         */
         void setSelected(@Nullable Row entry) {
             this.selectedRow = entry;
             if (entry != null) {
-                NarratorChatListener.INSTANCE.say(ChatType.SYSTEM,
-                        new TextComponentTranslation("wdl.screen.downloads.narration", entry.displayName,
-                                entry.lastPlayed));
                 if (!this.suppressPrefill) { // a body click prefills; an edge click only highlights
                     onRowSelected(entry.entry);
                 }

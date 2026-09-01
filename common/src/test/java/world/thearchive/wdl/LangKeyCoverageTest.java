@@ -92,6 +92,10 @@ class LangKeyCoverageTest {
     // AbstractPlatformBridge. Their en_us strings stay so the catalog matches the higher bands, but no consumer reaches
     // them on this band.
     private static final Set<String> BAND_DROPPED_KEYS = ImmutableSet.of(
+            // No narrator exists below 1.12: neither NarratorChatListener nor ChatType is in this band's Minecraft,
+            // and the text-to-speech library they drive is not in its library set, so the downloads list is not
+            // narrated here and the key it would have spoken reaches nothing.
+            "wdl.screen.downloads.narration",
             "wdl.pause.settings.tooltip",
             "wdl.screen.downloads.download.tooltip",
             "wdl.screen.downloads.name",
