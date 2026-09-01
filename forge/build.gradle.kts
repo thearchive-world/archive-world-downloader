@@ -60,7 +60,7 @@ java {
 repositories {
     mavenCentral()
     maven("https://maven.blamejared.com") { content { includeGroup("info.journeymap") } }
-    // The pinned searge oracle below (mcp_config) resolves from here, not from Unimined's own internal repo
+    // The pinned searge oracle below (the mcp srg zip) resolves from here, not from Unimined's own internal repo
     // handling: a project-level dependency needs its own repository, even though Unimined's minecraftForge
     // loader block already reaches this same host to provision the toolchain.
     maven("https://maven.minecraftforge.net/") { content { includeGroup("de.oceanlabs.mcp") } }
@@ -86,58 +86,85 @@ unimined.minecraft {
     defaultRemapJar = true
 }
 
-// --- Pinned 1.12.2 searge oracle ---
+// --- Pinned 1.11.2 searge oracle ---
 // The mis-bind surface below the Mojmap floor is SRG names (func_*/field_*) carried as reflection string
 // literals and in AT/manifest strings, invisible to a constant-pool reference scan since the compiler never
 // sees them as Minecraft references. Unimined's own searge mapping lives under this project's disposable
 // .gradle/unimined cache, which a fresh checkout or a cache wipe can reshape or empty; a gate keyed on it is
 // not trustworthy. This configuration instead pins the same underlying artifact Unimined's searge() mapping
-// itself resolves, de.oceanlabs.mcp:mcp_config for this band's exact Minecraft version, and extracts its
-// config/joined.tsrg to a stable build/ path via a real Gradle dependency (backed by the ordinary Gradle module
-// cache), independent of Unimined's own provisioning.
+// itself resolves and extracts it to a stable build/ path via a real Gradle dependency (backed by the ordinary
+// Gradle module cache), independent of Unimined's own provisioning.
+//
+// The artifact is de.oceanlabs.mcp:mcp:<mc>:srg, not the parent band's de.oceanlabs.mcp:mcp_config:<mc>.
+// mcp_config has no 1.11.x publication at all: sorted ascending its oldest release is 1.12.2, so the parent band
+// sits exactly on that floor and every band below it takes the older mcp:<mc>:srg line instead. That is a format
+// change as well as a coordinate change, from TSRG to SRG v1; see the grammar note above ExtractSeargeOracle.
 val seargeOracle: Configuration by configurations.creating { isTransitive = false }
 
+// This band's joined.srg parses to exactly these counts under a correct SRG v1 reader: 3122 CL: records, and
+// 18826 distinct searge member ids (9941 field_* and 8885 func_*). The member figure is corroborated
+// independently by the mapping-coverage measurement recorded in ../gradle.properties, which counts the same
+// 8885 methods and 9941 fields from the 32-1.11 MCP export. Both check tasks assert them; see the note on
+// CheckSeargeSurface.expectedOracleClasses for why an unasserted parse is the silent failure here.
+val seargeOracleClasses = 3122
+val seargeOracleMembers = 18826
+
 dependencies {
-    seargeOracle("de.oceanlabs.mcp:mcp_config:${band("minecraft_version")}@zip")
+    seargeOracle("de.oceanlabs.mcp:mcp:${band("minecraft_version")}:srg@zip")
 }
 
-// joined.tsrg maps obfuscated names to real names class-by-class: a class line ("<obf> <realClass>") introduces
-// a block of tab-indented member lines below it, each "<obf> <srgField>" for a field or "<obf> <desc> <srgMethod>"
-// for a method, so a member's searge id is always its line's last token. Below the Mojmap floor a class's dev
-// (MCP) name already equals its real (searge) name (no separate class-renaming layer), so the class column
-// itself is a valid, self-contained oracle of real net/minecraft class names too.
+// joined.srg maps obfuscated names to real names one self-contained line at a time, in SRG v1: every line carries
+// its own record type as a prefix and there is no indentation and no scoping anywhere in the file, unlike the
+// TSRG the 1.12.2-and-above bands read, where a class line opens a block of tab-indented member lines beneath it.
+// The four record types and their columns:
+//
+//   PK: <obfPackage> <realPackage>
+//   CL: <obfClass> <realClass>
+//   FD: <obfOwner>/<obfField> <realOwner>/<seargeField>
+//   MD: <obfOwner>/<obfMethod> <obfDescriptor> <realOwner>/<seargeMethod> <realDescriptor>
+//
+// Two column facts decide whether a reader is right, and getting either wrong yields exactly zero ids rather than
+// a loud failure. A member name is fully qualified, so the searge id is the last SLASH-separated segment of its
+// target column, never the whole token. And on an MD: line the target column is field 4, not the line's last
+// token, which is the trailing descriptor; a last-token parse over this file returns no searge ids at all.
+// Keying a record on its token count instead of its prefix is the other trap: PK: and FD: lines both carry three
+// tokens, so an arity test sweeps package names into the class set.
+//
+// Below the Mojmap floor a class's dev (MCP) name already equals its real (searge) name (no separate
+// class-renaming layer), so the CL: target column is a valid, self-contained oracle of real net/minecraft class
+// names too. Inner classes carry $ verbatim there and must stay unnormalized, since arm (b) matches the $ form.
 abstract class ExtractSeargeOracle : DefaultTask() {
     @get:InputFiles
-    abstract val mcpConfigZip: ConfigurableFileCollection
+    abstract val seargeZip: ConfigurableFileCollection
 
     @get:OutputFile
-    abstract val joinedTsrg: RegularFileProperty
+    abstract val joinedSrg: RegularFileProperty
 
     @TaskAction
     fun extract() {
-        val zip = mcpConfigZip.singleFile
-        val out = joinedTsrg.get().asFile
+        val zip = seargeZip.singleFile
+        val out = joinedSrg.get().asFile
         out.parentFile.mkdirs()
         ZipInputStream(zip.inputStream().buffered()).use { zin ->
             var entry = zin.nextEntry
             while (entry != null) {
-                if (entry.name == "config/joined.tsrg") {
+                if (entry.name == "joined.srg") {
                     out.outputStream().buffered().use { zin.copyTo(it) }
-                    logger.lifecycle("searge oracle: extracted config/joined.tsrg from ${zip.name} -> ${out.path}")
+                    logger.lifecycle("searge oracle: extracted joined.srg from ${zip.name} -> ${out.path}")
                     return
                 }
                 entry = zin.nextEntry
             }
         }
-        throw GradleException("config/joined.tsrg not found in ${zip.name}")
+        throw GradleException("joined.srg not found in ${zip.name}")
     }
 }
 
 val extractSeargeOracle = tasks.register<ExtractSeargeOracle>("extractSeargeOracle") {
     group = "verification"
-    description = "Extracts config/joined.tsrg (the 1.12.2 searge oracle) from the pinned mcp_config zip to a stable build/ path."
-    mcpConfigZip.from(seargeOracle)
-    joinedTsrg.set(layout.buildDirectory.file("searge-oracle/joined.tsrg"))
+    description = "Extracts joined.srg (the 1.11.2 searge oracle) from the pinned mcp srg zip to a stable build/ path."
+    seargeZip.from(seargeOracle)
+    joinedSrg.set(layout.buildDirectory.file("searge-oracle/joined.srg"))
 }
 
 // The reobf fixture set: two small classes carrying real and bogus SRG-shaped string literals for the
@@ -336,6 +363,20 @@ abstract class CheckSeargeSurface : DefaultTask() {
     @get:Input
     abstract val excludedEntryText: Property<String>
 
+    // The oracle's pinned parse yield, asserted on every parse. A wrong SRG v1 reader is the one failure in this
+    // area that no arm of the scan can report: an under-permissive reader (the TSRG parser left in place, say)
+    // yields an empty oracle, which makes arm (b) and arm (c) flag everything and reads as ordinary seam fallout,
+    // while an OVER-permissive one (harvesting the obfuscated column, or every token on the line) yields a
+    // populated but wrong member set that admits bad literals and passes green. checkReobfNegative cannot
+    // distinguish either case, since it demands an offender and a broken oracle manufactures one. Asserting the
+    // exact counts catches both directions, and it is checked here rather than in a gate of its own so that every
+    // consumer of the oracle validates it, including the inverted meta-test.
+    @get:Input
+    abstract val expectedOracleClasses: Property<Int>
+
+    @get:Input
+    abstract val expectedOracleMembers: Property<Int>
+
     // True (the default): this is a positive gate, fails when an offender is found. False: this is the
     // inverted meta-test checkReobfNegative runs, over a fixture that permanently carries one offender by
     // construction; it fails only if the scan does NOT find it (the detector regressed), and otherwise passes
@@ -348,30 +389,40 @@ abstract class CheckSeargeSurface : DefaultTask() {
         expectClean.convention(true)
     }
 
-    // Parses joined.tsrg per the class/member line shapes noted above ExtractSeargeOracle, into the real
+    // Parses joined.srg per the SRG v1 record shapes noted above ExtractSeargeOracle, into the real
     // net/minecraft class names and the valid searge member ids. A member of this task class rather than a
     // script-level function: a script-level helper closes over the implicit script instance, which turns a
     // class that calls it into a non-static inner class Gradle's task instantiator refuses to construct.
     private class SeargeOracle(val classes: Set<String>, val members: Set<String>)
 
-    private fun parseSeargeOracle(tsrg: File): SeargeOracle {
+    private fun parseSeargeOracle(srg: File): SeargeOracle {
         val classes = HashSet<String>()
         val members = HashSet<String>()
-        tsrg.forEachLine { line ->
-            if (line.isEmpty()) {
-                return@forEachLine
+        // Records are keyed on the line's prefix, never on its token count: PK: and FD: lines both carry three
+        // tokens. Only field_*/func_* names are kept, since FD: also names enum constants and synthetics verbatim.
+        fun addMember(qualified: String) {
+            val id = qualified.substringAfterLast('/')
+            if (id.startsWith("field_") || id.startsWith("func_")) {
+                members.add(id)
             }
-            if (line[0] == '\t') {
-                val srg = line.trim().substringAfterLast(' ')
-                if (srg.startsWith("field_") || srg.startsWith("func_")) {
-                    members.add(srg)
-                }
-            } else {
-                val parts = line.split(' ')
-                if (parts.size == 2) {
-                    classes.add(parts[1])
-                }
+        }
+        srg.forEachLine { line ->
+            val parts = line.split(' ')
+            when (parts[0]) {
+                "CL:" -> if (parts.size >= 3) classes.add(parts[2])
+                "FD:" -> if (parts.size >= 3) addMember(parts[2])
+                "MD:" -> if (parts.size >= 5) addMember(parts[3])
             }
+        }
+        val expectedClasses = expectedOracleClasses.get()
+        val expectedMembers = expectedOracleMembers.get()
+        if (classes.size != expectedClasses || members.size != expectedMembers) {
+            throw GradleException(
+                "$name: the searge oracle parsed to ${classes.size} class(es) and ${members.size} member id(s), "
+                    + "but ${srg.name} for this band pins $expectedClasses and $expectedMembers. Too few means "
+                    + "the reader is not reading SRG v1 at all; too many means it is harvesting the obfuscated "
+                    + "column or the trailing descriptor, which would let a wrong searge literal ship green."
+            )
         }
         return SeargeOracle(classes, members)
     }
@@ -545,7 +596,9 @@ val checkShipJar = tasks.register<CheckSeargeSurface>("checkShipJar") {
     // the fixture as the inverted meta-test that proves the arm (c) scan still fires, so no excludedEntryText is
     // needed here: the real ship jar carries no negative fixture class.
     jarToScan.set(modJar.flatMap { it.archiveFile })
-    seargeOracleFile.set(extractSeargeOracle.flatMap { it.joinedTsrg })
+    seargeOracleFile.set(extractSeargeOracle.flatMap { it.joinedSrg })
+    expectedOracleClasses.set(seargeOracleClasses)
+    expectedOracleMembers.set(seargeOracleMembers)
     textFilesToScan.from(layout.projectDirectory.file("src/main/resources/META-INF/accesstransformer.cfg"))
     layout.projectDirectory.file("src/main/resources/mcmod.info").asFile.let { mcmodInfo ->
         if (mcmodInfo.exists()) {
@@ -574,7 +627,9 @@ val checkReobfNegative = tasks.register<CheckSeargeSurface>("checkReobfNegative"
     description = "Proves the arm (c) scan fires: passes when it flags the fixture's bogus searge literal, fails if the detector misses it."
     dependsOn(reobfFixtureJar)
     jarToScan.set(reobfFixtureJar.flatMap { it.archiveFile })
-    seargeOracleFile.set(extractSeargeOracle.flatMap { it.joinedTsrg })
+    seargeOracleFile.set(extractSeargeOracle.flatMap { it.joinedSrg })
+    expectedOracleClasses.set(seargeOracleClasses)
+    expectedOracleMembers.set(seargeOracleMembers)
     expectClean.set(false)
 }
 
