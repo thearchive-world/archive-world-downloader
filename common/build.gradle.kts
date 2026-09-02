@@ -263,9 +263,11 @@ val checkCoreJava8 = tasks.register<JavaCompile>("checkCoreJava8") {
     // A plain floor compile: NullAway/Error Prone already ran on the real compileJava, so here only javac's
     // --release enforcement is wanted; leaving Error Prone on would run its default checks under --release 8.
     options.errorprone.enabled = false
-    javaCompiler = javaToolchains.compilerFor {
-        languageVersion = JavaLanguageVersion.of(providers.gradleProperty("java_version").get().toInt())
-    }
+
+    // The floor is --release 8, not the compiler's own version, so this reuses the toolchain the project already
+    // declares rather than naming a version a second time. A band overriding its compile toolchain is then
+    // followed automatically and the two coordinates cannot drift apart.
+    javaCompiler = javaToolchains.compilerFor(java.toolchain)
 }
 // --- band guard: the plug's declared era-band floor must cover the targeted minecraft_version ---
 // A sibling of checkCoreImports above: a plug cherry-picked onto a branch whose minecraft_version predates
@@ -305,23 +307,26 @@ val checkPlugBand = tasks.register("checkPlugBand") {
         }
     }
 }
-// CI installs java_build_version while the Gradle toolchain resolves java_version, and nothing else makes the
-// two agree: bump one without the other and local builds use a different JDK than CI does.
+// CI installs java_build_version while Gradle resolves the compile toolchain, and nothing else makes the two
+// agree: bump one without the other and local builds use a different JDK than CI does. The toolchain is
+// java_version unless the band overrides it with java_toolchain_version (see wdl.java-conventions), so the
+// comparison is against that, not against the language target.
 val checkJavaVersion = tasks.register("checkJavaVersion") {
     group = "verification"
-    description = "Fails if java_build_version's major disagrees with java_version"
-    val javaVersion = providers.gradleProperty("java_version").get()
+    description = "Fails if java_build_version's major disagrees with the compile toolchain"
+    val toolchainVersion = providers.gradleProperty("java_toolchain_version").orNull
+        ?: providers.gradleProperty("java_version").get()
     val buildVersion = providers.gradleProperty("java_build_version").get()
-    inputs.property("javaVersion", javaVersion)
+    inputs.property("toolchainVersion", toolchainVersion)
     inputs.property("buildVersion", buildVersion)
     doLast {
         // takeWhile, not substringBefore('.'), because setup-java accepts an early-access value like 25-ea
         // that has no dot to split on. A legacy 1.8.0_442 still reads as major 1 either way.
         val buildMajor = buildVersion.takeWhile { it.isDigit() }
-        if (buildMajor != javaVersion) {
+        if (buildMajor != toolchainVersion) {
             throw GradleException(
-                "java toolchain mismatch: java_build_version=$buildVersion (major $buildMajor) but " +
-                    "java_version=$javaVersion; CI and Gradle would use different JDKs"
+                "java toolchain mismatch: java_build_version=$buildVersion (major $buildMajor) but the compile " +
+                    "toolchain is $toolchainVersion; CI and Gradle would use different JDKs"
             )
         }
     }
