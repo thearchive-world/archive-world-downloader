@@ -77,19 +77,45 @@ jobs:
         run: |
           version="$(sed -n 's/^java_build_version=//p' gradle.properties | tail -n1 | tr -d '[:space:]')"
           [ -n "$version" ] || { echo "no java_build_version=<jdk> line in gradle.properties" >&2; exit 1; }
+          major="${version%%[!0-9]*}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          # Temurin publishes detached signatures for every line this project builds on except 16, which is
-          # end of life at 16.0.2+7 and will never gain them, so setup-java's signature check has to be
-          # waived there and only there. Deriving the flag from the coordinate this step already read keeps
-          # every workflow file byte-identical across the bands instead of forking one of them.
-          case "$version" in 16.*) echo "verify=false" ;; *) echo "verify=true" ;; esac >> "$GITHUB_OUTPUT"
+          # The language target's own JDK is installed alongside the toolchain's wherever the two differ, because
+          # era-specific build tooling still asks for that one: ForgeGradle runs its MCP steps on the Minecraft
+          # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it
+          # takes the default JAVA_HOME, which is what launches the daemon, and fabric-loom 1.17.19 publishes
+          # org.gradle.jvm.version=21 that a daemon below it cannot resolve at all.
+          target="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
+          jdks="$version"
+          if [ "$target" != "$major" ]; then jdks="$(printf '%s\n%s' "$jdks" "$target")"; fi
+          if [ "$major" -lt 21 ]; then jdks="$(printf '%s\n21' "$jdks")"; fi
+          printf 'jdks<<EOF\n%s\nEOF\n' "$jdks" >> "$GITHUB_OUTPUT"
+          # One signature flag covers every install in that list, and Temurin 16 is end of life at 16.0.2+7 with
+          # no detached signature ever published, so the check is waived whenever a 16 is among them, never
+          # otherwise. Reading the finished list rather than one coordinate is what keeps the two in step.
+          verify=true
+          for j in $jdks; do case "$j" in 16 | 16.*) verify=false ;; esac; done
+          echo "verify=$verify" >> "$GITHUB_OUTPUT"
+          # fabric-loom 1.17.19 publishes org.gradle.jvm.version=21, so a daemon below 21 cannot resolve it
+          # at all and the build dies while configuring the root project, which declares the plugin apply-false
+          # even on a band that ships no Fabric module. A band whose own build JDK is older therefore installs
+          # 21 beside it and lets 21 be the default JAVA_HOME, since that is what launches the daemon and
+          # setup-java hands the default to the last entry of a multi-version list. The real build JDK is then
+          # reached only through its JAVA_HOME_<major>_X64 variable and the fromEnv bridge below, a genuine
+          # toolchain resolution rather than a same-JVM --release target. A warm dependency cache hides the
+          # failure entirely, so it shows up only on a clean checkout.
+          # Gradle auto-detects the installation JAVA_HOME names plus whatever
+          # org.gradle.java.installations.fromEnv names, but nothing scans the GitHub Actions tool-cache paths
+          # setup-java installs into, and auto-download stays off per gradle.properties, so without this bridge
+          # there is nothing to fall back to. GRADLE_OPTS applies to every gradlew invocation in the job, so one
+          # line covers the root build and any separate island wrapper alike.
+          echo "GRADLE_OPTS=-Dorg.gradle.java.installations.fromEnv=JAVA_HOME_${major}_X64" >> "$GITHUB_ENV"
 
-      - name: Set up the build JDK (Temurin)
+      - name: Set up the build JDKs (Temurin)
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
         with:
           distribution: temurin
           verify-signature: ${{ steps.jdk.outputs.verify }}
-          java-version: ${{ steps.jdk.outputs.version }}
+          java-version: ${{ steps.jdk.outputs.jdks }}
 
       - name: Set up Gradle
         # basic is the MIT caching provider. The v6 default routes caching through the proprietary
