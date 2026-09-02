@@ -27,7 +27,7 @@ abstract class PauseScreenMixin {
         ScreenAccessor screen = (ScreenAccessor) (Object) this;
         List<AbstractWidget> buttons = screen.wdlButtons();
         List<GuiEventListener> children = screen.wdlChildren();
-        for (AbstractWidget widget : FabricPlatformBridge.pauseMenuRow(buttons)) {
+        for (AbstractWidget widget : FabricPlatformBridge.pauseMenuRow((PauseScreen) (Object) this, buttons)) {
             buttons.add(widget);
             children.add(widget);
         }

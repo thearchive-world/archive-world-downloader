@@ -7,8 +7,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -16,6 +16,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.screens.Screen;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
@@ -34,7 +35,7 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
     // screen hook; PauseScreenMixin injects it at the tail of PauseScreen.init() and reads this factory, which
     // addPauseMenuButtons binds to the live callbacks once at startup. Set on the client thread before any pause
     // screen opens and read on that same thread, so no synchronization is needed.
-    private static @Nullable Function<List<AbstractWidget>, List<AbstractWidget>> pauseMenuRowFactory;
+    private static @Nullable BiFunction<Screen, List<AbstractWidget>, List<AbstractWidget>> pauseMenuRowFactory;
 
     @Override
     protected void registerKeybind(String keyId, Runnable onPress) {
@@ -50,11 +51,8 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
     @Override
     public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
             Runnable onPrimary, Runnable onConfig) {
-        pauseMenuRowFactory = buttons -> {
-            AbstractWidget anchor = lowest(buttons);
-            return anchor == null ? Collections.emptyList()
-                    : buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig);
-        };
+        pauseMenuRowFactory = (screen, buttons) -> buildPauseMenuRow(screen, buttons, primaryLabelKey, primaryEnabled,
+                onPrimary, onConfig);
     }
 
     /**
@@ -62,9 +60,9 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
      * the callbacks {@link #addPauseMenuButtons} stored above {@code existingButtons}. Empty before that runs, and in
      * the user's own local world, where the row is hidden.
      */
-    public static List<AbstractWidget> pauseMenuRow(List<AbstractWidget> existingButtons) {
-        Function<List<AbstractWidget>, List<AbstractWidget>> factory = pauseMenuRowFactory;
-        return factory == null ? Collections.emptyList() : factory.apply(existingButtons);
+    public static List<AbstractWidget> pauseMenuRow(Screen screen, List<AbstractWidget> existingButtons) {
+        BiFunction<Screen, List<AbstractWidget>, List<AbstractWidget>> factory = pauseMenuRowFactory;
+        return factory == null ? Collections.emptyList() : factory.apply(screen, existingButtons);
     }
 
     @Override
