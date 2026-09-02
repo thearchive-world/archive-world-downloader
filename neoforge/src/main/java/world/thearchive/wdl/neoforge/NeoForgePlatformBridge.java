@@ -86,11 +86,7 @@ final class NeoForgePlatformBridge extends AbstractPlatformBridge {
                     widgets.add(widget);
                 }
             }
-            AbstractWidget anchor = lowest(widgets);
-            if (anchor == null) {
-                return;
-            }
-            buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
+            buildPauseMenuRow(event.getScreen(), widgets, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
                     .forEach(event::addListener);
         });
     }
