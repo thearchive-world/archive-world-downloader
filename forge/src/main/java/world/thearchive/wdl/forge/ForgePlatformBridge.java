@@ -76,11 +76,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
         if (primaryLabelKey == null || !(event.getGui() instanceof GuiIngameMenu)) {
             return;
         }
-        GuiButton anchor = lowest(event.getButtonList());
-        if (anchor == null) {
-            return;
-        }
-        buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
+        buildPauseMenuRow(event.getButtonList(), primaryLabelKey, primaryEnabled, onPrimary, onConfig)
                 .forEach(event.getButtonList()::add);
     }
 
