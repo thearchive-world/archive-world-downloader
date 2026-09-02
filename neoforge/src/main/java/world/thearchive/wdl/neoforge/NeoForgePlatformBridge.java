@@ -15,6 +15,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.neoforged.bus.api.IEventBus;
@@ -26,6 +27,7 @@ import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
@@ -83,13 +85,15 @@ final class NeoForgePlatformBridge extends AbstractPlatformBridge {
                     widgets.add(widget);
                 }
             }
-            AbstractWidget anchor = lowest(widgets);
-            if (anchor == null) {
-                return;
-            }
-            buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
+            buildPauseMenuRow(event.getScreen(), widgets, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
                     .forEach(event::addListener);
         });
+    }
+
+    @Override
+    protected @Nullable AbstractWidget disconnectButton(Screen pauseScreen) {
+        // access-transformed: net.minecraft.client.gui.screens.PauseScreen disconnectButton
+        return pauseScreen instanceof PauseScreen pause ? pause.disconnectButton : null;
     }
 
     @Override
