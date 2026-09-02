@@ -50,11 +50,8 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
     @Override
     public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
             Runnable onPrimary, Runnable onConfig) {
-        pauseMenuRowFactory = buttons -> {
-            AbstractWidget anchor = lowest(buttons);
-            return anchor == null ? Collections.emptyList()
-                    : buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig);
-        };
+        pauseMenuRowFactory = buttons ->
+                buildPauseMenuRow(buttons, primaryLabelKey, primaryEnabled, onPrimary, onConfig);
     }
 
     /**

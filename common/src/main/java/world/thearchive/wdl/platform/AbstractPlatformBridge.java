@@ -59,10 +59,19 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final SystemToast.SystemToastIds TOAST_ID = SystemToast.SystemToastIds.WORLD_BACKUP;
     private static final SystemToast.SystemToastIds REFUSAL_TOAST_ID = SystemToast.SystemToastIds.TUTORIAL_HINT;
 
+    private static final int ROW_PITCH = 24;
+
+    // Above vanilla's half-row button width (98 on every band) and below its full-row width (200 through 1.13.2,
+    // 204 from 1.14.4), so the floor admits a full-row button on every band and no half-row one.
+    private static final int MIN_ANCHOR_WIDTH = 100;
+
     // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
     // inside the methods, never the constructor, and isModLoaded is a loader call. Read only on the client
     // main thread, so the lazy init needs no synchronization.
     private @Nullable FlashbackReplayProbe replayProbe;
+
+    // The row this bridge last built, held to recognize a widget list that was never rebuilt. Client main thread only.
+    private @Nullable class_356 lastPrimary;
 
     @Override
     public final void registerToggleKeybind(Runnable onToggle) {
@@ -218,12 +227,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     }
 
     /**
-     * Build the wdl pause-menu row (a primary action button plus a settings button) above {@code anchor}, shifting the
-     * anchor down to open the row. Returns the widgets for the loader to add through its own screen hook; the layout is
-     * loader-agnostic. Returns none in the user's own local world, leaving the anchor unshifted so the vanilla menu
-     * keeps its own spacing.
+     * Build the wdl pause-menu row (a primary action button plus a settings button) above the lowest button of the menu
+     * column, shifting that button and everything below it in the same column down to open the row. Returns the widgets
+     * for the loader to add through its own screen hook; the layout is loader-agnostic. Returns none in the user's own
+     * local world and on a pause screen with no identifiable anchor, shifting nothing in those cases.
      */
-    protected List<class_356> buildPauseMenuRow(class_356 anchor,
+    protected List<class_356> buildPauseMenuRow(List<class_356> widgets,
             Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled, Runnable onPrimary,
             Runnable onConfig) {
         // A local world refuses every action this row leads to, and the /wdl commands and downloads keybind
@@ -232,10 +241,27 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (!isRemoteWorld()) {
             return ImmutableList.of();
         }
+        // This band's bridged Screen exposes no width field; the window's scaled width is the same number and
+        // is what the rest of the band reads for screen dimensions.
+        // A loader can fire its screen-init hook against a widget list that was never rebuilt, and building again
+        // against the surviving list stacks a second row and shifts the column another 24 on every open.
+        if (lastPrimary != null && widgets.contains(lastPrimary)) {
+            return ImmutableList.of();
+        }
+        class_356 anchor = lowestColumnButton(widgets, Minecraft.getInstance().window.getGuiScaledWidth());
+        if (anchor == null) {
+            return ImmutableList.of();
+        }
         int x = anchor.field_1051;
         int y = anchor.field_1052;
         int width = anchor.getWidth();
-        anchor.field_1052 = y + 24; // shift the bottom button (Disconnect) down to open a row above it
+        // Bounded to the anchor's own column. Shifting everything lower drags a corner button off the screen edge;
+        // shifting only what spans the center strands the half-width and non-button rows a mod appends below.
+        for (class_356 widget : widgets) {
+            if (movesWithAnchor(widget, x, y, width)) {
+                widget.field_1052 = widget.field_1052 + ROW_PITCH;
+            }
+        }
         class_356 primary = new class_356(0, x, y, width - 24, 20, I18n.get(primaryLabelKey.get())) {
             @Override
             public void method_18374(double mouseX, double mouseY) {
@@ -250,13 +276,29 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                 onConfig.run();
             }
         };
+        lastPrimary = primary;
         return ImmutableList.of(primary, config);
     }
 
-    /** The lowest existing pause-menu button (Disconnect), the anchor to insert the wdl row above. */
-    protected static @Nullable class_356 lowest(List<class_356> widgets) {
+    static boolean movesWithAnchor(class_356 widget, int anchorX, int anchorY, int anchorWidth) {
+        return widget.field_1052 >= anchorY && widget.field_1051 < anchorX + anchorWidth
+                && widget.field_1051 + widget.getWidth() > anchorX;
+    }
+
+    /**
+     * The lowest button of the centered menu column. This band's pause screen names no disconnect button, so geometry
+     * is the only signal available. Center-containment and the width floor are what separate a menu button from a
+     * corner button or a half-row pair: vanilla's half-row width is 98 on every band, and a half-row button never spans
+     * the center.
+     */
+    static @Nullable class_356 lowestColumnButton(List<class_356> widgets, int screenWidth) {
+        int center = screenWidth / 2;
         class_356 lowest = null;
         for (class_356 widget : widgets) {
+            if (widget.getWidth() < MIN_ANCHOR_WIDTH || widget.field_1051 > center
+                    || widget.field_1051 + widget.getWidth() < center) {
+                continue;
+            }
             if (lowest == null || widget.field_1052 > lowest.field_1052) {
                 lowest = widget;
             }
