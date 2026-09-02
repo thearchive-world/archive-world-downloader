@@ -13,3 +13,8 @@ accessible	field	net/minecraft/network/protocol/game/ClientboundMoveEntityPacket
 # the open-container bind reads it rather than inferring the animal from the crosshair or the ridden vehicle.
 # Read-only, so accessible alone suffices (final stays final).
 accessible	field	net/minecraft/world/inventory/HorseInventoryMenu	horse	Lnet/minecraft/world/entity/animal/horse/AbstractHorse;
+
+# WDL: the pause menu row anchors to vanilla's own disconnect button, named in a private field with no getter.
+# Vanilla's reference is the one signal a mod adding a same-styled button below it cannot forge. Read-only, so
+# accessible alone suffices. The NeoForge analog is the access transformer.
+accessible	field	net/minecraft/client/gui/screens/PauseScreen	disconnectButton	Lnet/minecraft/client/gui/components/Button;
