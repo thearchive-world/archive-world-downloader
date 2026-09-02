@@ -56,8 +56,18 @@ base {
     archivesName.set("${band("mod_archives_base")}-forge")
 }
 
+// Mirrors wdl.java-conventions: the JDK that compiles is the language target unless the band overrides it
+// through java_toolchain_version, and --release then pins this island's bytecode back to that target. band()
+// errors on a missing key, so the optional coordinate is read off the properties directly.
+val islandTarget = band("java_version").toInt()
+val islandToolchain = band.getProperty("java_toolchain_version")?.toInt() ?: islandTarget
+
 java {
-    toolchain { languageVersion.set(JavaLanguageVersion.of(band("java_version").toInt())) }
+    toolchain { languageVersion.set(JavaLanguageVersion.of(islandToolchain)) }
+}
+
+if (islandToolchain != islandTarget) {
+    tasks.withType<JavaCompile>().configureEach { options.release.set(islandTarget) }
 }
 
 repositories {
