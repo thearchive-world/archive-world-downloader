@@ -51,11 +51,8 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
                 return;
             }
             List<AbstractWidget> buttons = Screens.getButtons(screen);
-            AbstractWidget anchor = lowest(buttons);
-            if (anchor == null) {
-                return;
-            }
-            buttons.addAll(buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig));
+            buttons.addAll(buildPauseMenuRow(screen, buttons, primaryLabelKey, primaryEnabled, onPrimary,
+                    onConfig));
         });
     }
 

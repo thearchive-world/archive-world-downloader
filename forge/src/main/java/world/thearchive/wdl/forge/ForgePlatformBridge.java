@@ -77,11 +77,8 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
                     widgets.add(widget);
                 }
             }
-            AbstractWidget anchor = lowest(widgets);
-            if (anchor == null) {
-                return;
-            }
-            buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
+            buildPauseMenuRow(event.getGui(), widgets, primaryLabelKey, primaryEnabled, onPrimary,
+                    onConfig)
                     .forEach(event::addWidget);
         });
     }
