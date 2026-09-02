@@ -20,11 +20,23 @@ repositories {
     maven("https://maven.neoforged.net/releases")
 }
 
+// The JDK that COMPILES, normally the language target itself. A band overrides it through
+// java_toolchain_version only where the target's own JDK cannot be used: javac 16 assigns local variable slots
+// non-deterministically, so a band targeting 16 compiles on 17 and keeps its jar byte-reproducible. Where the
+// two differ, --release pins the bytecode to the language target so a newer compiler does not move the
+// artifact; where they agree no release flag is set and compilation is byte-identical to before this existed.
+val javaTarget = providers.gradleProperty("java_version").get().toInt()
+val javaToolchain = providers.gradleProperty("java_toolchain_version").orNull?.toInt() ?: javaTarget
+
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(providers.gradleProperty("java_version").get().toInt())
+        languageVersion = JavaLanguageVersion.of(javaToolchain)
         vendor = JvmVendorSpec.ADOPTIUM
     }
+}
+
+if (javaToolchain != javaTarget) {
+    tasks.withType<JavaCompile>().configureEach { options.release.set(javaTarget) }
 }
 
 // Lint-only Checkstyle, wired into check via the built-in plugin's checkstyleMain/checkstyleTest.
