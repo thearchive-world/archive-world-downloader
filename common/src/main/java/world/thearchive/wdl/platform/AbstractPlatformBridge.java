@@ -57,10 +57,19 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final SystemToast.SystemToastIds TOAST_ID = SystemToast.SystemToastIds.PERIODIC_NOTIFICATION;
     private static final SystemToast.SystemToastIds REFUSAL_TOAST_ID = SystemToast.SystemToastIds.TUTORIAL_HINT;
 
+    private static final int ROW_PITCH = 24;
+
+    // Above vanilla's half-row button width (98 on every band) and below its full-row width (200 through 1.13.2,
+    // 204 from 1.14.4), so the floor admits a full-row button on every band and no half-row one.
+    private static final int MIN_ANCHOR_WIDTH = 100;
+
     // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
     // inside the methods, never the constructor, and isModLoaded is a loader call. Read only on the client
     // main thread, so the lazy init needs no synchronization.
     private @Nullable FlashbackReplayProbe replayProbe;
+
+    // The row this bridge last built, held to recognize a widget list that was never rebuilt. Client main thread only.
+    private @Nullable AbstractWidget lastPrimary;
 
     @Override
     public final void registerToggleKeybind(Runnable onToggle) {
@@ -181,12 +190,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     }
 
     /**
-     * Build the wdl pause-menu row (a primary action button plus a settings button) above {@code anchor}, shifting the
-     * anchor down to open the row. Returns the widgets for the loader to add through its own screen hook; the layout is
-     * loader-agnostic. Returns none in the user's own local world, leaving the anchor unshifted so the vanilla menu
-     * keeps its own spacing.
+     * Build the wdl pause-menu row (a primary action button plus a settings button) above the lowest button of the menu
+     * column, shifting that button and everything below it in the same column down to open the row. Returns the widgets
+     * for the loader to add through its own screen hook; the layout is loader-agnostic. Returns none in the user's own
+     * local world and on a pause screen with no identifiable anchor, shifting nothing in those cases.
      */
-    protected List<AbstractWidget> buildPauseMenuRow(AbstractWidget anchor,
+    protected List<AbstractWidget> buildPauseMenuRow(Screen screen, List<AbstractWidget> widgets,
             Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled, Runnable onPrimary,
             Runnable onConfig) {
         // A local world refuses every action this row leads to, and the /wdl commands and downloads keybind
@@ -195,28 +204,59 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (!isRemoteWorld()) {
             return List.of();
         }
+        // A loader can fire its screen-init hook against a widget list that was never rebuilt, and building again
+        // against the surviving list stacks a second row and shifts the column another 24 on every open.
+        if (lastPrimary != null && widgets.contains(lastPrimary)) {
+            return List.of();
+        }
+        AbstractWidget anchor = lowestColumnButton(widgets, screen.width);
+        if (anchor == null) {
+            return List.of();
+        }
         int x = anchor.x;
         int y = anchor.y;
         int width = anchor.getWidth();
-        anchor.y = y + 24; // shift the bottom button (Disconnect) down to open a row above it
+        // Bounded to the anchor's own column. Shifting everything lower drags a corner button off the screen edge;
+        // shifting only what spans the center strands the half-width and non-button rows a mod appends below.
+        for (AbstractWidget widget : widgets) {
+            if (movesWithAnchor(widget, x, y, width)) {
+                widget.y = widget.y + ROW_PITCH;
+            }
+        }
         Button primary = new Button(x, y, width - 24, 20, new TranslatableComponent(primaryLabelKey.get()),
                 button -> onPrimary.run());
         primary.active = primaryEnabled.getAsBoolean();
         Button config = new Button(x + width - 20, y, 20, 20, new TextComponent("..."), button -> onConfig.run(),
                 (button, poseStack, mouseX, mouseY) -> {
-                    Screen screen = Minecraft.getInstance().screen;
-                    if (screen != null) {
-                        screen.renderTooltip(poseStack,
+                    Screen current = Minecraft.getInstance().screen;
+                    if (current != null) {
+                        current.renderTooltip(poseStack,
                                 new TranslatableComponent("wdl.pause.settings.tooltip"), mouseX, mouseY);
                     }
                 });
+        lastPrimary = primary;
         return List.of(primary, config);
     }
 
-    /** The lowest existing pause-menu button (Disconnect), the anchor to insert the wdl row above. */
-    protected static @Nullable AbstractWidget lowest(List<AbstractWidget> widgets) {
+    static boolean movesWithAnchor(AbstractWidget widget, int anchorX, int anchorY, int anchorWidth) {
+        return widget.y >= anchorY && widget.x < anchorX + anchorWidth
+                && widget.x + widget.getWidth() > anchorX;
+    }
+
+    /**
+     * The lowest button of the centered menu column. This band's pause screen names no disconnect button, so geometry
+     * is the only signal available. Center-containment and the width floor are what separate a menu button from a
+     * corner button or a half-row pair: vanilla's half-row width is 98 on every band, and a half-row button never spans
+     * the center.
+     */
+    static @Nullable AbstractWidget lowestColumnButton(List<AbstractWidget> widgets, int screenWidth) {
+        int center = screenWidth / 2;
         AbstractWidget lowest = null;
         for (AbstractWidget widget : widgets) {
+            if (!(widget instanceof Button) || widget.getWidth() < MIN_ANCHOR_WIDTH
+                    || widget.x > center || widget.x + widget.getWidth() < center) {
+                continue;
+            }
             if (lowest == null || widget.y > lowest.y) {
                 lowest = widget;
             }
