@@ -19,6 +19,8 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
@@ -51,12 +53,14 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
                 return;
             }
             List<AbstractWidget> buttons = Screens.getButtons(screen);
-            AbstractWidget anchor = lowest(buttons);
-            if (anchor == null) {
-                return;
-            }
-            buttons.addAll(buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig));
+            buttons.addAll(buildPauseMenuRow(screen, buttons, primaryLabelKey, primaryEnabled,
+                    onPrimary, onConfig));
         });
+    }
+
+    @Override
+    protected @Nullable AbstractWidget disconnectButton(Screen pauseScreen) {
+        return pauseScreen instanceof PauseScreen pause ? pause.disconnectButton : null; // widened
     }
 
     @Override
