@@ -15,6 +15,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
@@ -26,6 +27,7 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLPaths;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
@@ -77,13 +79,15 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
                     widgets.add(widget);
                 }
             }
-            AbstractWidget anchor = lowest(widgets);
-            if (anchor == null) {
-                return;
-            }
-            buildPauseMenuRow(anchor, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
+            buildPauseMenuRow(event.getScreen(), widgets, primaryLabelKey, primaryEnabled, onPrimary, onConfig)
                     .forEach(event::addListener);
         });
+    }
+
+    @Override
+    protected @Nullable AbstractWidget disconnectButton(Screen pauseScreen) {
+        // access-transformed: net.minecraft.client.gui.screens.PauseScreen f_252482_ (disconnectButton)
+        return pauseScreen instanceof PauseScreen pause ? pause.disconnectButton : null;
     }
 
     @Override
