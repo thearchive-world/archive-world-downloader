@@ -57,10 +57,19 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final SystemToast.SystemToastId TOAST_ID = new SystemToast.SystemToastId();
     private static final SystemToast.SystemToastId REFUSAL_TOAST_ID = new SystemToast.SystemToastId();
 
+    private static final int ROW_PITCH = 24;
+
+    // Above vanilla's half-row button width (98 on every band) and below its full-row width (200 through 1.13.2,
+    // 204 from 1.14.4), so the floor admits a full-row button on every band and no half-row one.
+    private static final int MIN_ANCHOR_WIDTH = 100;
+
     // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
     // inside the methods, never the constructor, and isModLoaded is a loader call. Read only on the client
     // main thread, so the lazy init needs no synchronization.
     private @Nullable FlashbackReplayProbe replayProbe;
+
+    // The row this bridge last built, held to recognize a widget list that was never rebuilt. Client main thread only.
+    private @Nullable AbstractWidget lastPrimary;
 
     @Override
     public final void registerToggleKeybind(Runnable onToggle) {
@@ -182,12 +191,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     }
 
     /**
-     * Build the wdl pause-menu row (a primary action button plus a settings button) above {@code anchor}, shifting the
-     * anchor down to open the row. Returns the widgets for the loader to add through its own screen hook; the layout is
-     * loader-agnostic. Returns none in the user's own local world, leaving the anchor unshifted so the vanilla menu
-     * keeps its own spacing.
+     * Build the wdl pause-menu row (a primary action button plus a settings button) above the vanilla disconnect
+     * button, shifting that button and everything below it in the same column down to open the row. Returns the widgets
+     * for the loader to add through its own screen hook; the layout is loader-agnostic. Returns none in the user's own
+     * local world and on a pause screen whose anchor cannot be identified, shifting nothing in those cases.
      */
-    protected List<AbstractWidget> buildPauseMenuRow(AbstractWidget anchor,
+    protected List<AbstractWidget> buildPauseMenuRow(Screen screen, List<AbstractWidget> widgets,
             Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled, Runnable onPrimary,
             Runnable onConfig) {
         // A local world refuses every action this row leads to, and the /wdl commands and downloads keybind
@@ -196,29 +205,86 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (!isRemoteWorld()) {
             return List.of();
         }
+        // A loader can fire its screen-init hook against a widget list that was never rebuilt, and building again
+        // against the surviving list stacks a second row and shifts the column another 24 on every open.
+        if (lastPrimary != null && widgets.contains(lastPrimary)) {
+            return List.of();
+        }
+        AbstractWidget anchor = anchor(screen, widgets);
+        if (anchor == null) {
+            return List.of();
+        }
         int x = anchor.getX();
         int y = anchor.getY();
         int width = anchor.getWidth();
-        anchor.setY(y + 24); // shift the bottom button (Disconnect) down to open a row above it
+        // Bounded to the anchor's own column. Shifting everything lower drags a corner button off the screen edge;
+        // shifting only what spans the center strands the half-width and non-button rows a mod appends below.
+        for (AbstractWidget widget : widgets) {
+            if (movesWithAnchor(widget, x, y, width)) {
+                widget.setY(widget.getY() + ROW_PITCH);
+            }
+        }
         Button primary = Button.builder(Component.translatable(primaryLabelKey.get()), button -> onPrimary.run())
                 .bounds(x, y, width - 24, 20).build();
         primary.active = primaryEnabled.getAsBoolean();
         Button config = Button.builder(Component.literal("..."), button -> onConfig.run())
                 .tooltip(Tooltip.create(Component.translatable("wdl.pause.settings.tooltip")))
                 .bounds(x + width - 20, y, 20, 20).build();
+        lastPrimary = primary;
         return List.of(primary, config);
     }
 
-    /** The lowest existing pause-menu button (Disconnect), the anchor to insert the wdl row above. */
-    protected static @Nullable AbstractWidget lowest(List<AbstractWidget> widgets) {
+    static boolean movesWithAnchor(AbstractWidget widget, int anchorX, int anchorY, int anchorWidth) {
+        return widget.getY() >= anchorY && widget.getX() < anchorX + anchorWidth
+                && widget.getX() + widget.getWidth() > anchorX;
+    }
+
+    private @Nullable AbstractWidget anchor(Screen screen, List<AbstractWidget> widgets) {
+        return anchor(disconnectButton(screen), widgets, screen.width, screen.height);
+    }
+
+    static @Nullable AbstractWidget anchor(@Nullable AbstractWidget disconnect, List<AbstractWidget> widgets,
+            int screenWidth, int screenHeight) {
+        // The named button is read off the screen rather than out of the list, and Init.Post can fire on a loader
+        // where another mod cancelled Init.Pre so init() never ran, leaving a stale field beside a cleared list.
+        if (disconnect != null && usable(disconnect, screenWidth, screenHeight) && widgets.contains(disconnect)) {
+            return disconnect;
+        }
+        return lowestColumnButton(widgets, screenWidth, screenHeight);
+    }
+
+    // Vanilla's own half-row button is 98 wide on every band and never spans the center, so these tests reject it
+    // and every corner button. They do not separate the column from a mod's own full-width centered button, which is
+    // why the named button wins where the band has one. The Button test excludes the screen title, a StringWidget.
+    private static @Nullable AbstractWidget lowestColumnButton(List<AbstractWidget> widgets, int screenWidth,
+            int screenHeight) {
+        int center = screenWidth / 2;
         AbstractWidget lowest = null;
         for (AbstractWidget widget : widgets) {
+            if (!(widget instanceof Button) || !usable(widget, screenWidth, screenHeight)
+                    || widget.getX() > center || widget.getX() + widget.getWidth() < center) {
+                continue;
+            }
             if (lowest == null || widget.getY() > lowest.getY()) {
                 lowest = widget;
             }
         }
         return lowest;
     }
+
+    // A mod may leave vanilla's disconnect button in the list but park it off the screen and put its own button in
+    // the slot, so a candidate not wholly on screen carries the row off screen with it.
+    private static boolean usable(AbstractWidget widget, int screenWidth, int screenHeight) {
+        return widget.getWidth() >= MIN_ANCHOR_WIDTH
+                && widget.getX() >= 0 && widget.getX() + widget.getWidth() <= screenWidth
+                && widget.getY() >= 0 && widget.getY() + widget.getHeight() <= screenHeight;
+    }
+
+    /**
+     * Vanilla's own reference to the pause screen's disconnect button, or null on a band whose pause screen keeps no
+     * such field. The per-loader plug widens or transforms the non-public field.
+     */
+    protected abstract @Nullable AbstractWidget disconnectButton(Screen pauseScreen);
 
     /** Run a /wdl action and report Brigadier success. */
     private static int run(Runnable action) {
