@@ -187,20 +187,24 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          # What the record names, and what this guard checks, is the compile toolchain, which is java_version
+          # unless the band overrides it with java_toolchain_version. Checking the language target instead would
+          # reject exactly the band that overrides, and would print a JDK the build never used.
+          EXPECT="$(sed -n 's/^java_toolchain_version=//p' gradle.properties | tr -d '[:space:]')"
+          [ -n "$EXPECT" ] || EXPECT="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
           if grep -E '^[[:space:]]*include\(' settings.gradle.kts | grep -q '"fabric"'; then
             JDK="$(./gradlew -q :fabric:printCompileJavaVersion | grep -E '\(Java [0-9]+\)$' | tail -n1)"
           else
-            # Forge-only band: no :fabric project. The island compiles to java_version, so name that JDK directly.
-            JDK="(Java $(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]'))"
+            # Forge-only band: no :fabric project, so name the toolchain the island compiles on directly.
+            JDK="(Java ${EXPECT})"
           fi
           JDK_MAJOR="$(printf '%s' "$JDK" | sed -n 's/.*(Java \([0-9]\+\)).*/\1/p')"
-          EXPECT="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
           if [ "$JDK_MAJOR" != "$EXPECT" ]; then
-            echo "::error::compile toolchain Java $JDK_MAJOR != java_version $EXPECT"; exit 1
+            echo "::error::compile toolchain Java $JDK_MAJOR != the declared toolchain $EXPECT"; exit 1
           fi
           # One SHA-256 line per jar this band ships (band-dependent set from the resolve step above), so the
           # forge jar carries a published, verifiable hash exactly like fabric/neoforge. The compile-toolchain
-          # JDK is a per-band build fact (the island compiles to the same java_version), so one line covers all.
+          # JDK is a per-band build fact (the island compiles on the same toolchain), so one line covers all.
           IFS=',' read -ra JARS <<< "$PATHS"
           RECORD="reproducibility-${VERSION}.txt"
           {
