@@ -19,7 +19,7 @@ import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
 /**
- * 1.11.2 chunk codec: replicates the client-safe slice of vanilla {@code AnvilChunkLoader}'s chunk write to NBT.
+ * 1.10.2 chunk codec: replicates the client-safe slice of vanilla {@code AnvilChunkLoader}'s chunk write to NBT.
  * Vanilla's write reads from a {@code World} a multiplayer client never fully has, so {@link #encode} rebuilds the tag
  * field by field from the captured snapshot. Below the Flattening (this band's own cut) a section stores block state as
  * a numeric id plus a 4-bit metadata nibble rather than a palette, light is section-resident (each
@@ -32,11 +32,11 @@ import world.thearchive.wdl.adapter.ChunkSnapshotSource;
  * the headless round-trip guards it).
  */
 public final class ChunkCodecImpl implements ChunkCodec {
-    // The 1.11.2 chunk NBT version, the Anvil DataVersion AnvilChunkLoader.saveChunk stamps at the root. It is a
-    // per-band value and the parent band's 1343 is the live hazard: a chunk stamped 1343 opens without complaint in a
-    // 1.11.2 client, because a future version reads as already-upgraded, and only breaks later, on an upgrade to
-    // 1.12.2 or above, where the fixer that gives every bed its block entity is skipped and the beds go plain.
-    private static final int CHUNK_DATA_VERSION = 922;
+    // The 1.10.2 chunk NBT version, the Anvil DataVersion AnvilChunkLoader.saveChunk stamps at the root. It is a
+    // per-band value and the parent band's 922 is the live hazard: a chunk stamped 922 loads without complaint in
+    // this band's own client, because a higher version reads as already-upgraded, and only breaks later, on a
+    // future upgrade past this band, which a client-side capture here never runs and so cannot catch.
+    private static final int CHUNK_DATA_VERSION = 512;
 
     private static final int BLOCKS_BYTES = 4096;
     private static final int SECTION_LAYER_BYTES = 2048;

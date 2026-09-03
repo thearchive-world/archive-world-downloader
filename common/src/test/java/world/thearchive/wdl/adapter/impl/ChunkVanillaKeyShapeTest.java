@@ -27,7 +27,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The chunk vanilla-key byte-gate: pins the pre-Flattening numeric shape {@link ChunkCodecImpl} must encode, which a
  * wrong-but-self-consistent encode (a copied 1.13+ {@code DataVersion}, or a palette key) would still pass a purely
- * symmetric round-trip test. Every key asserted here is a real 1.12.2 on-disk key or its explicit absence, both taken
+ * symmetric round-trip test. Every key asserted here is a real 1.10.2 on-disk key or its explicit absence, both taken
  * from the recon's vanilla {@code AnvilChunkLoader.writeChunkToNBT} key table, not from this band's own naming.
  */
 class ChunkVanillaKeyShapeTest {
@@ -48,12 +48,12 @@ class ChunkVanillaKeyShapeTest {
     void encodesTheVanillaPreFlatteningShape() {
         NBTTagCompound root = codec.encode(nonEmptyChunk(), false);
 
-        assertEquals(922, root.getInteger("DataVersion"), "root DataVersion must be the 1.11.2 Anvil version");
-        // The negative arm names the parent band's 1343 rather than the post-Flattening 1631, because 1343 is the
-        // value a port down from 1.12.2 actually leaves behind and 1631 is a mistake no band here can make. A chunk
-        // stamped 1343 loads fine in a 1.11.2 client and only breaks on a later upgrade, so the field test is blind
+        assertEquals(512, root.getInteger("DataVersion"), "root DataVersion must be the 1.10.2 Anvil version");
+        // The negative arm names the parent band's 922 rather than the post-Flattening 1631, because 922 is the
+        // value a port down from 1.11.2 actually leaves behind and 1631 is a mistake no band here can make. A chunk
+        // stamped 922 loads fine in a 1.10.2 client and only breaks on a later upgrade, so the field test is blind
         // to it and this assertion is the only thing that catches it.
-        assertNotEquals(1343, root.getInteger("DataVersion"), "root DataVersion must not be the parent band's 1343");
+        assertNotEquals(922, root.getInteger("DataVersion"), "root DataVersion must not be the parent band's 922");
 
         NBTTagCompound level = root.getCompoundTag("Level");
         assertFalse(level.hasKey("V"), "the legacy McRegion V byte must not be written");
