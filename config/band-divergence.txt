@@ -103,7 +103,7 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # ISaveHandler the level-data write targets, not AnvilSaveConverter); the advancement manager is read through
 # NetHandlerPlayClient.getAdvancementManager (ClientAdvancementManager) rather than getAdvancements; the player's stat
 # holder is EntityPlayerSP.getStatFileWriter (StatisticsManager) rather than getStats; and neither progress surface
-# carries a DataVersion stamp, so the assembly step drops the shared data-version local entirely.
+# carries a DataVersion stamp, so the assembly step drops the shared data-version local entirely. Below 1.11 ChunkPos names its coordinate fields chunkXPos and chunkZPos rather than x and z.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
@@ -187,7 +187,7 @@ common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
 # ServerLevel-taking hurtServer is 1.21.2 and above). Below 1.20.5 Entity.defineSynchedData is no-arg, so the
 # double overrides that form too; below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the
 # read-back open the band's WdlRegionStorage (classic MCP RegionFile, no IOWorker below 1.15) through WorldPaths; and below 1.20.5 there is no ItemCost, so a merchant
-# offer's buy cost is a plain ItemStack.
+# offer's buy cost is a plain ItemStack. Below 1.11 ChunkPos names its coordinate fields chunkXPos and chunkZPos rather than x and z.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
 
 # The furnace-capture regression guard, driving the real bindOpenedContainer against a classic-MCP TileEntityFurnace
@@ -302,7 +302,7 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.jav
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygonTracer.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
-# with the public ResourceLocation(String, String) constructor.
+# with the public ResourceLocation(String, String) constructor. Below 1.11 ChunkPos names its coordinate fields chunkXPos and chunkZPos rather than x and z.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
@@ -1055,7 +1055,7 @@ common/src/main/java/world/thearchive/wdl/adapter/SectionKey.java
 # Below 1.15 there is no IOWorker; this band's own instance-cached RegionFile store (the same shape the 1.13.2
 # parent already keeps, there being no RegionFileStorage base either) opens classic MCP
 # net.minecraft.world.chunk.storage.RegionFile and reads/writes through getChunkDataInputStream/
-# getChunkDataOutputStream and CompressedStreamTools, the pre-NbtIo name.
+# getChunkDataOutputStream and CompressedStreamTools, the pre-NbtIo name. Below 1.11 ChunkPos names its coordinate fields chunkXPos and chunkZPos rather than x and z.
 common/src/main/java/world/thearchive/wdl/adapter/WdlRegionStorage.java
 
 # Below 1.13 there is no Mojang mapping, so this container-capture seam names classic MCP NBTTagCompound/ItemStack and

@@ -33,8 +33,8 @@ public class WdlRegionStorage implements AutoCloseable {
     }
 
     private RegionFile regionFileFor(ChunkPos pos) {
-        int regionX = pos.x >> 5;
-        int regionZ = pos.z >> 5;
+        int regionX = pos.chunkXPos >> 5;
+        int regionZ = pos.chunkZPos >> 5;
         long key = ChunkPos.asLong(regionX, regionZ);
         RegionFile cached = regionCache.get(key);
         if (cached != null) {
@@ -46,13 +46,15 @@ public class WdlRegionStorage implements AutoCloseable {
     }
 
     public @Nullable NBTTagCompound read(ChunkPos pos) throws IOException {
-        try (DataInputStream input = regionFileFor(pos).getChunkDataInputStream(pos.x & 31, pos.z & 31)) {
+        try (DataInputStream input = regionFileFor(pos).getChunkDataInputStream(pos.chunkXPos & 31,
+                pos.chunkZPos & 31)) {
             return input == null ? null : CompressedStreamTools.read(input);
         }
     }
 
     public void write(ChunkPos pos, NBTTagCompound tag) throws IOException {
-        try (DataOutputStream output = regionFileFor(pos).getChunkDataOutputStream(pos.x & 31, pos.z & 31)) {
+        try (DataOutputStream output = regionFileFor(pos).getChunkDataOutputStream(pos.chunkXPos & 31,
+                pos.chunkZPos & 31)) {
             CompressedStreamTools.write(tag, output);
         }
     }

@@ -923,7 +923,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * it leaves the rim armed, which is what a re-visit needs to see.
      */
     private boolean isInteractionChunkCapturable(ChunkPos chunk) {
-        return captured.containsKey(chunk) || !allCaptured.contains(ChunkPos.asLong(chunk.x, chunk.z))
+        return captured.containsKey(chunk) || !allCaptured.contains(ChunkPos.asLong(chunk.chunkXPos, chunk.chunkZPos))
                 || config.recaptureChunks().overwritesRevisitedChunks();
     }
 
@@ -1161,7 +1161,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 // deferral). Entities already loaded before the download began are back-filled once by the prime
                 // poll in captureLoadedChunks.
                 int keepHot = capChunks + KEEP_HOT_MARGIN;
-                promotePacketEntities(PromotePass.KEEP_HOT, hotCenter.x, hotCenter.z, keepHot);
+                promotePacketEntities(PromotePass.KEEP_HOT, hotCenter.chunkXPos, hotCenter.chunkZPos, keepHot);
             }
             encodeDeadlineNanos = tickStartNanos + budgetNanos;
             captureLoadedChunks(minecraft, player, hotCenter);
@@ -1217,8 +1217,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (lastCoveredCenter != null && lastCoveredCenter.equals(hotCenter)) {
             return;
         }
-        coveredIndex.recordTrail(dimensionId, hotCenter.x, hotCenter.z, capChunks);
-        coveredIndex.addDisc(dimensionId, hotCenter.x, hotCenter.z, radius);
+        coveredIndex.recordTrail(dimensionId, hotCenter.chunkXPos, hotCenter.chunkZPos, capChunks);
+        coveredIndex.addDisc(dimensionId, hotCenter.chunkXPos, hotCenter.chunkZPos, radius);
         lastCoveredCenter = hotCenter;
     }
 
@@ -1332,7 +1332,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // chunk or null. A 1.12.2 client chunk is always full (there is no ProtoChunk or ChunkStatus concept before
         // 1.13), so no status promotion is needed: the saved chunk's TerrainPopulated and LightPopulated flags carry
         // the completeness the higher bands' Status string does.
-        Chunk chunk = chunkSource.getLoadedChunk(pos.x, pos.z);
+        Chunk chunk = chunkSource.getLoadedChunk(pos.chunkXPos, pos.chunkZPos);
         if (chunk == null || bobbyFilter.isBobbyChunk(chunk)) {
             return null;
         }
@@ -1375,8 +1375,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         RecaptureMode recaptureMode = config.recaptureChunks();
         int[] offsets = ringOffsets(radius);
         for (int i = 0; i < offsets.length; i += 2) {
-            ChunkPos pos = new ChunkPos(center.x + offsets[i], center.z + offsets[i + 1]);
-            long posKey = ChunkPos.asLong(pos.x, pos.z);
+            ChunkPos pos = new ChunkPos(center.chunkXPos + offsets[i], center.chunkZPos + offsets[i + 1]);
+            long posKey = ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos);
             // The cheap in-memory checks come before getChunk, so a stationary player in a captured area never
             // pays a per-tick getChunk: a still-hot chunk is left to the hot re-capture path, and a chunk captured
             // earlier and since flushed is re-buffered only on revisit, and only when the mode overwrites
@@ -1446,7 +1446,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     void recordChunkCaptureLoss(ChunkPos pos, Throwable cause) {
         LongOpenHashSet counted = captureFailedByDimension.computeIfAbsent(targetDimension,
                 dimension -> new LongOpenHashSet());
-        if (counted.add(ChunkPos.asLong(pos.x, pos.z))) {
+        if (counted.add(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos))) {
             chunksCaptureFailed++;
             chunkCaptureLoss.lost(pos, cause);
         }
@@ -1559,7 +1559,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     continue;
                 }
                 ChunkPos pos = new ChunkPos(new BlockPos(entity));
-                if (!allCaptured.contains(ChunkPos.asLong(pos.x, pos.z))) {
+                if (!allCaptured.contains(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos))) {
                     continue; // the captured-chunk privacy gate, which the prime got from the chunk it ran for
                 }
                 if (entityBuffer.chunkOf(uuid) != null) {
@@ -1590,7 +1590,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * post-capture block-STATE change re-sets the flag and {@link #pollDirtyChunks} picks it up on the next tick.
      */
     private void attachRecapture(Chunk chunk, ChunkPos pos) {
-        capturedThisTick.add(ChunkPos.asLong(pos.x, pos.z));
+        capturedThisTick.add(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos));
         chunk.setModified(false);
     }
 
@@ -1633,7 +1633,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // This band's Chunk exposes no isUnsaved reader; needsSaving(false) is the should-save query, which
             // for a client chunk (no last-save entity timer) reduces to the unsaved flag isUnsaved returned.
             if (chunk != null && chunk.needsSaving(false)) {
-                dirtySet.add(ChunkPos.asLong(pos.x, pos.z));
+                dirtySet.add(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos));
             }
         }
     }
@@ -1647,7 +1647,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void recaptureEditZone(ChunkPos center, ChunkCodec codec, ChunkProviderClient chunkSource,
             LongOpenHashSet reencodedThisTick) {
         for (ChunkPos pos : captured.keySet()) {
-            if (!RecapturePolicy.isInEditZone(pos.x, pos.z, center.x, center.z, EDIT_ZONE_RADIUS)) {
+            if (!RecapturePolicy.isInEditZone(pos.chunkXPos, pos.chunkZPos, center.chunkXPos, center.chunkZPos,
+                    EDIT_ZONE_RADIUS)) {
                 continue;
             }
             if (!hasEncodeBudget()) {
@@ -1708,7 +1709,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private void reencode(ChunkPos pos, ChunkCodec codec, ChunkProviderClient chunkSource,
             LongOpenHashSet reencodedThisTick) {
-        long key = ChunkPos.asLong(pos.x, pos.z);
+        long key = ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos);
         if (reencodedThisTick.contains(key) || capturedThisTick.contains(key)) {
             return;
         }
@@ -2300,7 +2301,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         int keepHot = Minecraft.getMinecraft().gameSettings.renderDistanceChunks + KEEP_HOT_MARGIN;
-        flushBuffer(activeWriter, false, hotCenter.x, hotCenter.z, keepHot);
+        flushBuffer(activeWriter, false, hotCenter.chunkXPos, hotCenter.chunkZPos, keepHot);
     }
 
     @Override
@@ -3684,7 +3685,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // recovered set feeds only the outline, so the read is skipped whole when the outline is off, and each
             // axis is gated on its own capture switch (an off axis draws no rim, so its prior is never consulted).
             if (resumeDownload && config.outline().renderUnsavedOutline()
-                    && recoveryScanned.add(ChunkPos.asLong(pos.x, pos.z))) {
+                    && recoveryScanned.add(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos))) {
                 if (config.captureContainers()) {
                     activeWriter.submitResumeScan(targetDimension, pos);
                 }
@@ -3692,7 +3693,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     activeWriter.submitEntityResumeScan(targetDimension, pos);
                 }
             }
-            if (!all && !FlushPolicy.shouldFlush(pos.x, pos.z, centerX, centerZ, keepHot)) {
+            if (!all && !FlushPolicy.shouldFlush(pos.chunkXPos, pos.chunkZPos, centerX, centerZ, keepHot)) {
                 continue;
             }
             ChunkSnapshotSource snapshot = entry.getValue();
@@ -3703,7 +3704,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 // allCaptured position) keeps the count and resume honest. The live overlay keeps the position
                 // (the indexes have no per-position remove); presence-only, cleared once the save completes,
                 // and a resume re-seeds from disk, so the overstatement never survives the session.
-                allCaptured.remove(ChunkPos.asLong(pos.x, pos.z));
+                allCaptured.remove(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos));
                 entries.remove();
                 continue;
             }
@@ -3801,7 +3802,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private boolean isVoidChunk(ChunkPos pos, ChunkSnapshotSource snapshot, Set<ChunkPos> bufferedEntityChunks,
             LongSet accumulatedEntityChunks, Set<ChunkPos> pendingInteractionChunks) {
         boolean hasEntities = bufferedEntityChunks.contains(pos)
-                || accumulatedEntityChunks.contains(ChunkPos.asLong(pos.x, pos.z));
+                || accumulatedEntityChunks.contains(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos));
         boolean hasContainers = anyHolderInChunk(containerStash, pos) || anyHolderInChunk(lecternStash, pos)
                 || pendingInteractionChunks.contains(pos);
         return VoidChunkPolicy.isVoidChunk(
@@ -3950,7 +3951,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         prepareEntityContainers(); // scrub + map-remap any new vehicle holders once, before the merge drains them
         prepareMerchantHolders(); // and the merchant offer holders, on the same once-per-holder discipline
         for (ChunkPos pos : entityBuffer.bufferedChunks()) {
-            if (all || FlushPolicy.shouldFlush(pos.x, pos.z, centerX, centerZ, keepHot)) {
+            if (all || FlushPolicy.shouldFlush(pos.chunkXPos, pos.chunkZPos, centerX, centerZ, keepHot)) {
                 flushEntityChunk(activeWriter, pos);
             }
         }
@@ -4236,7 +4237,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             long chunkKey = chunkKeys.nextLong();
             ChunkPos pos = new ChunkPos((int) chunkKey, (int) (chunkKey >> 32));
             if (pass == PromotePass.KEEP_HOT
-                    && !FlushPolicy.shouldFlush(pos.x, pos.z, centerX, centerZ, keepHot)) {
+                    && !FlushPolicy.shouldFlush(pos.chunkXPos, pos.chunkZPos, centerX, centerZ, keepHot)) {
                 continue; // still near the player: hold it, it has not left the keep-hot window yet
             }
             if (!allCaptured.contains(chunkKey)) {

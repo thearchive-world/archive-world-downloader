@@ -96,8 +96,8 @@ public final class ChunkCodecImpl implements ChunkCodec {
     public NBTTagCompound encode(ChunkSnapshotSource snapshot, boolean synthesizeBlending) {
         ChunkPos pos = snapshot.chunkPos();
         NBTTagCompound levelTag = new NBTTagCompound();
-        levelTag.setInteger("xPos", pos.x);
-        levelTag.setInteger("zPos", pos.z);
+        levelTag.setInteger("xPos", pos.chunkXPos);
+        levelTag.setInteger("zPos", pos.chunkZPos);
         levelTag.setLong("LastUpdate", snapshot.gameTime());
         levelTag.setIntArray("HeightMap", snapshot.heightmaps());
         levelTag.setBoolean("TerrainPopulated", true);

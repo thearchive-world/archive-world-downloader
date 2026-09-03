@@ -1131,7 +1131,7 @@ class LiveCaptureSessionLossTallyTest {
 
     /** Feed one held spawn frame, the state the finish drain consumes and an aborted one leaves behind. */
     private static void spawn(EntityPacketCapture capture, int id, UUID uuid, ChunkPos pos) {
-        capture.spawn(id, uuid, ChunkPos.asLong(pos.x, pos.z),
+        capture.spawn(id, uuid, ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos),
                 new EntityPos(pos.getXStart(), 64.0, pos.getZStart(), 0f, 0f),
                 spawnPacket(id, uuid, pos.getXStart(), 64.0, pos.getZStart()));
     }
@@ -1155,7 +1155,7 @@ class LiveCaptureSessionLossTallyTest {
      */
     private static void captureTerrain(LiveCaptureSession session, ChunkPos pos) throws Exception {
         LongOpenHashSet allCaptured = state(session, "allCaptured");
-        allCaptured.add(ChunkPos.asLong(pos.x, pos.z));
+        allCaptured.add(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos));
     }
 
     /**
@@ -1166,7 +1166,8 @@ class LiveCaptureSessionLossTallyTest {
     private static void captureTerrain(LiveCaptureSession session, DimensionType dimension, ChunkPos pos)
             throws Exception {
         Map<DimensionType, LongOpenHashSet> byDimension = state(session, "capturedByDimension");
-        byDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet()).add(ChunkPos.asLong(pos.x, pos.z));
+        byDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet())
+                .add(ChunkPos.asLong(pos.chunkXPos, pos.chunkZPos));
     }
 
     /**
