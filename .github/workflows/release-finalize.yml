@@ -111,9 +111,17 @@ jobs:
             exit 0
           fi
           NOTES="$(awk -v v="$VERSION" '/^##[[:space:]]/ { if (inblk) exit; inblk = ($2 == v); next } inblk { print }' CHANGELOG.md)"
-          # Discord caps an embed description at 4096 characters. Trim rather than fail: the release is already
-          # published by this point, and a truncated announcement is a better outcome than a red finalize.
-          NOTES="$(printf '%s' "$NOTES" | head -c 3800)"
+          # Where to get it, appended below the notes. These are store fronts rather than release-specific links,
+          # so they are constant here rather than derived. The Modrinth line states the listing is still in
+          # review and is the one line to change when it clears.
+          LINKS="$(printf '%s\n' "" "**Get it**" \
+            "- CurseForge: <https://www.curseforge.com/minecraft/mc-mods/wdl>" \
+            "- GitHub Releases: <https://github.com/thearchive-world/archive-world-downloader/releases>" \
+            "- Modrinth: coming once review clears")"
+          # Discord caps an embed description at 4096 characters. Trim the notes, never the links: the release is
+          # already published by this point, and a truncated announcement beats a red finalize.
+          NOTES="$(printf '%s' "$NOTES" | head -c 3400)"
+          NOTES="$(printf '%s\n%s' "$NOTES" "$LINKS")"
           # No username or avatar_url: those override the webhook's own identity, which is configured in Discord
           # where the name and icon belong. The payload carries only the announcement itself.
           jq -n --arg t "Archive World Downloader $VERSION" \
