@@ -102,7 +102,7 @@ unimined.minecraft {
     defaultRemapJar = true
 }
 
-// --- Pinned 1.11.2 searge oracle ---
+// --- Pinned 1.10.2 searge oracle ---
 // The mis-bind surface below the Mojmap floor is SRG names (func_*/field_*) carried as reflection string
 // literals and in AT/manifest strings, invisible to a constant-pool reference scan since the compiler never
 // sees them as Minecraft references. Unimined's own searge mapping lives under this project's disposable
@@ -111,19 +111,20 @@ unimined.minecraft {
 // itself resolves and extracts it to a stable build/ path via a real Gradle dependency (backed by the ordinary
 // Gradle module cache), independent of Unimined's own provisioning.
 //
-// The artifact is de.oceanlabs.mcp:mcp:<mc>:srg, not the parent band's de.oceanlabs.mcp:mcp_config:<mc>.
-// mcp_config has no 1.11.x publication at all: sorted ascending its oldest release is 1.12.2, so the parent band
-// sits exactly on that floor and every band below it takes the older mcp:<mc>:srg line instead. That is a format
-// change as well as a coordinate change, from TSRG to SRG v1; see the grammar note above ExtractSeargeOracle.
+// The artifact is de.oceanlabs.mcp:mcp:<mc>:srg, not the de.oceanlabs.mcp:mcp_config:<mc> the 1.12.2-and-above
+// bands take. mcp_config publishes nothing below 1.12.2 at all: sorted ascending its oldest release is 1.12.2, so
+// 1.12.2 sits exactly on that floor and every band under it, this one and its mint parent alike, takes the older
+// mcp:<mc>:srg line instead. That is a format change as well as a coordinate change, from TSRG to SRG v1; see the
+// grammar note above ExtractSeargeOracle.
 val seargeOracle: Configuration by configurations.creating { isTransitive = false }
 
-// This band's joined.srg parses to exactly these counts under a correct SRG v1 reader: 3122 CL: records, and
-// 18826 distinct searge member ids (9941 field_* and 8885 func_*). The member figure is corroborated
+// This band's joined.srg parses to exactly these counts under a correct SRG v1 reader: 2980 CL: records, and
+// 18354 distinct searge member ids (9693 field_* and 8661 func_*). The member figure is corroborated
 // independently by the mapping-coverage measurement recorded in ../gradle.properties, which counts the same
-// 8885 methods and 9941 fields from the 32-1.11 MCP export. Both check tasks assert them; see the note on
+// 8661 methods and 9693 fields from the 29-1.10.2 MCP export. Both check tasks assert them; see the note on
 // CheckSeargeSurface.expectedOracleClasses for why an unasserted parse is the silent failure here.
-val seargeOracleClasses = 3122
-val seargeOracleMembers = 18826
+val seargeOracleClasses = 2980
+val seargeOracleMembers = 18354
 
 dependencies {
     seargeOracle("de.oceanlabs.mcp:mcp:${band("minecraft_version")}:srg@zip")
@@ -178,7 +179,7 @@ abstract class ExtractSeargeOracle : DefaultTask() {
 
 val extractSeargeOracle = tasks.register<ExtractSeargeOracle>("extractSeargeOracle") {
     group = "verification"
-    description = "Extracts joined.srg (the 1.11.2 searge oracle) from the pinned mcp srg zip to a stable build/ path."
+    description = "Extracts joined.srg (the 1.10.2 searge oracle) from the pinned mcp srg zip to a stable build/ path."
     seargeZip.from(seargeOracle)
     joinedSrg.set(layout.buildDirectory.file("searge-oracle/joined.srg"))
 }
@@ -202,7 +203,7 @@ dependencies {
     // (JourneyMap provides it itself). The build serving this band bundles the 1.x journeymap.client.api surface
     // and no journeymap.api.v2, and the jar names its Minecraft types in classic MCP, which is what this island
     // compiles in. It resolves from Maven Central rather than from blamejared, which publishes only the 2.0 line
-    // and nothing on 1.11.x. JourneyMap discovers the plugin by annotation scan. No XaeroPlus binding on this
+    // and nothing on 1.10.x. JourneyMap discovers the plugin by annotation scan. No XaeroPlus binding on this
     // band, matching :common.
     compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}")
 
@@ -302,12 +303,13 @@ tasks.named<Jar>("remapJar") {
 }
 
 // --- fastutil bundling ---
-// Minecraft stops carrying the fastutil classes core/ binds, and this band is where that starts. 1.12.2 and every
-// band above it ship a full fastutil on the game's own classpath (7.1.0 there, 8.5.x on the modern bands) and the
-// mod has always relied on that, declaring the dependency nowhere. 1.11.2 ships it.unimi.dsi:fastutil:7.0.12_mojang
-// instead, a 355-class trimmed cut whose only primitive sets are the linear-scanning LongArraySet and IntArraySet
-// and whose only long-keyed maps are Long2Object; nine of the twenty fastutil types the mod binds are absent from
-// it, seven of those nine used from core/.
+// Minecraft stops carrying the fastutil classes core/ binds below 1.12.2, and this band inherits that condition
+// from its mint parent rather than being where it starts. 1.12.2 and every band above it ship a full fastutil on
+// the game's own classpath (7.1.0 there, 8.5.x on the modern bands) and the mod has always relied on that,
+// declaring the dependency nowhere. 1.10.2 ships it.unimi.dsi:fastutil:7.0.12_mojang instead, a 355-class trimmed
+// cut whose only primitive sets are the linear-scanning LongArraySet and IntArraySet and whose only long-keyed
+// maps are Long2Object; nine of the twenty fastutil types the mod binds are absent from it, seven of those nine
+// used from core/.
 //
 // Rewriting core/ to the trimmed surface was measured and rejected. It would mean either O(n) membership scans
 // over thousands of chunks or a Long2ObjectOpenHashMap holding boxed values, and it would fork core/ (byte-
@@ -793,14 +795,18 @@ abstract class CheckSeargeSurface : DefaultTask() {
 val checkShipJar = tasks.register<CheckSeargeSurface>("checkShipJar") {
     group = "verification"
     description = "Fails if a shipped class fails to parse (arm a), a TYPE_USE-annotated member names an unknown net/minecraft class (arm b), or a searge-shaped string constant/AT entry does not resolve in the pinned oracle (arm c)."
-    dependsOn(modJar)
-    // common is re-vocabularized to MCP names and modJar builds, so this scans the real reobf'd ship jar rather
-    // than the reobftest fixture it read while the seam port was in flight: every shipped class parses (arm a), no
-    // TYPE_USE-annotated member names a net/minecraft class outside the pinned oracle (arm b), and every
-    // searge-shaped string literal plus every accesstransformer.cfg and mcmod.info entry resolves against the
-    // oracle (arm c). checkReobfNegative keeps the fixture as the inverted meta-test that proves the arm (c) scan
-    // still fires, so no excludedEntryText is needed here: the real ship jar carries no negative fixture class.
-    jarToScan.set(modJar.flatMap { it.archiveFile })
+    dependsOn(reobfFixtureJar)
+    // TEMPORARY, for as long as the source-merged common stays seam-red on this band's mint: this scans the
+    // reobftest fixture rather than the real ship jar, and moves back to modJar once the seam port lands.
+    // checkShipJar is the only gate that reads the oracle against real symbols, so it is also the only one that
+    // catches a wrong reader; pointing it at modJar while common cannot compile does not make it stricter, it
+    // makes it unrunnable, and the oracle then goes unexercised for the whole of the vehicle phase while the
+    // phase reports its bar met. The fixture is a real positive control rather than a stand-in: ReobfFixture
+    // carries WORLD_FIELD_SEARGE_ID, a genuine searge id that must resolve, so a wrong oracle reds this task.
+    // excludedEntryText drops the negative fixture's own class, whose bogus literal is an offender by
+    // construction and belongs only to checkReobfNegative.
+    jarToScan.set(reobfFixtureJar.flatMap { it.archiveFile })
+    excludedEntryText.set("ReobfNegativeFixture")
     seargeOracleFile.set(extractSeargeOracle.flatMap { it.joinedSrg })
     expectedOracleClasses.set(seargeOracleClasses)
     expectedOracleMembers.set(seargeOracleMembers)

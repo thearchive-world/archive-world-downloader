@@ -446,7 +446,7 @@ dependencies {
 
     // JourneyMap 1.x API for the overlay binding (compat/journeymap), compile-only (never a runtime require;
     // JourneyMap provides it itself). It resolves from Maven Central, declared below, rather than from the
-    // blamejared repository the 2.0 line publishes to, which carries nothing on 1.11.x. The Forge island reads the
+    // blamejared repository the 2.0 line publishes to, which carries nothing on 1.10.x. The Forge island reads the
     // same key and pins the same artifact.
     compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}")
 }

@@ -42,8 +42,8 @@ import world.thearchive.wdl.client.WdlToastOverlay;
         modid = "wdl",
         useMetadata = true,
         guiFactory = "world.thearchive.wdl.forge.ForgeConfigGuiFactory",
-        dependencies = "required-after:forge@[13.20.0.2262,);",
-        acceptedMinecraftVersions = "[1.11.2]")
+        dependencies = "required-after:Forge@[12.18.3.2511,);",
+        acceptedMinecraftVersions = "[1.10.2]")
 public final class WdlForge {
     private boolean teeConnected;
 
