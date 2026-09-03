@@ -57,8 +57,11 @@ public final class ChunkCodecImpl implements ChunkCodec {
     @Override
     public ChunkSnapshotSource capture(Chunk chunk) {
         World world = chunk.getWorld();
-        ChunkPos pos = chunk.getPos();
-        boolean hasSkyLight = world.provider.hasSkyLight();
+        ChunkPos pos = chunk.getChunkCoordIntPair();
+        // There is no hasSkyLight() at this band, so the read is the inverse of hasNoSky(). The negation is
+        // load-bearing: without it every Overworld section captures a zero-filled SkyLight while LightPopulated
+        // stays true, and vanilla relights only an unlit populated chunk, so reopening the save cannot repair it.
+        boolean hasSkyLight = !world.provider.hasNoSky();
 
         ExtendedBlockStorage[] sections = chunk.getBlockStorageArray();
         int minSectionY = 0;
@@ -69,8 +72,8 @@ public final class ChunkCodecImpl implements ChunkCodec {
             if (live == null) {
                 continue;
             }
-            NibbleArray blockLight = copyLayer(live.getBlockLight());
-            NibbleArray skyLight = hasSkyLight ? copyLayer(live.getSkyLight()) : null;
+            NibbleArray blockLight = copyLayer(live.getBlocklightArray());
+            NibbleArray skyLight = hasSkyLight ? copyLayer(live.getSkylightArray()) : null;
             sectionData.add(new ChunkSnapshotSource.SectionData(sectionY,
                     copySection(sectionY, hasSkyLight, live), blockLight, skyLight));
         }

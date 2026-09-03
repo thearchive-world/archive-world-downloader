@@ -129,11 +129,13 @@ common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
 
 # Below 1.21.2 the Mob constructor reads level.getProfilerSupplier(), so a mob cannot be built against a null level;
-# this headless Level supplies the overworld dimension type, the vanilla registries, and an inactive profiler. New at
+# this headless Level supplies a real per-dimension provider, the vanilla registries, and an inactive profiler. New at
 # this band. Below 1.20.5 LevelAccessor.gameEvent takes a raw GameEvent rather than a Holder<GameEvent>,
 # Level.getMapData/setMapData are keyed by a String rather than a MapId, getFreeMapId returns an int rather than a
 # MapId, and Level has no potionBrewing accessor to override. Below 1.20.3 Level has no tickRateManager() accessor
-# to override either.
+# to override either. Below 1.11 WorldProvider.setWorld is named registerWorld, and it is that call that runs
+# createBiomeProvider and therefore what sets hasNoSky on the nether and the end, so the factory takes a DimensionType
+# and binds the dimension's own provider rather than stubbing one.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
 
 # Builds the section's biome registry via registryOrThrow, the pre-1.21.2 form (lookupOrThrow returns a
@@ -156,6 +158,11 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
 # The snapshot fixture carries the band's ChunkSnapshotSource.SectionData rather than the vanilla
 # SerializableChunkData.SectionData that exists only at 1.21.2 and above.
 common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkCodecImplTest.java
+
+# The sky-light content gate, new at this band. Below 1.11 WorldProvider has no hasSkyLight, so the capture reads the
+# inverse of hasNoSky; the gate drives capture through the real per-dimension provider in all three dimensions and
+# asserts the section SkyLight content a dropped negation would silently zero-fill.
+common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkSkyLightCaptureTest.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage or RegionStorageInfo, so the round trip opens the band's
 # WdlRegionStorage through WorldPaths (store/load) rather than constructing one directly (no IOWorker below 1.15). Below 1.17 (era E3) there is no

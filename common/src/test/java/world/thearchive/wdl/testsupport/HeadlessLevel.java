@@ -14,22 +14,32 @@ import net.minecraft.world.storage.WorldInfo;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A do-nothing overworld {@link World} for headless entity fixtures. The {@code EntityLiving} constructor binds a
- * world, so a mob cannot be built against a null one; this supplies the overworld provider and a fresh profiler through
- * the 1.12.2 {@code World} constructor, with a null save handler and inert stubs for its two abstract members.
+ * A do-nothing {@link World} for headless fixtures. The {@code EntityLiving} constructor binds a world, so a mob cannot
+ * be built against a null one; this supplies a real {@code WorldProvider} and a fresh profiler through the 1.10.2
+ * {@code World} constructor, with a null save handler and inert stubs for its two abstract members.
+ *
+ * <p>The provider is the dimension's own, built by {@link DimensionType#createDimension()} and bound with
+ * {@code registerWorld}, which is what runs {@code createBiomeProvider} and therefore what sets {@code hasNoSky} on the
+ * Nether and the End. A test that reads a per-dimension provider flag must go through {@link #get(DimensionType)} and
+ * must not stub the provider, or it asserts the mod's own reading of that flag against itself.
  */
 public final class HeadlessLevel extends World {
-    private HeadlessLevel() {
+    private HeadlessLevel(DimensionType dimension) {
         super(null,
                 new WorldInfo(new WorldSettings(0L, GameType.SURVIVAL, false, false, WorldType.DEFAULT), "MpServer"),
-                DimensionType.OVERWORLD.createDimension(), new Profiler(), true);
-        this.provider.setWorld(this);
+                dimension.createDimension(), new Profiler(), true);
+        this.provider.registerWorld(this);
     }
 
     /** A fresh headless overworld; runs the vanilla bootstrap first so the block/item registries are populated. */
     public static HeadlessLevel get() {
+        return get(DimensionType.OVERWORLD);
+    }
+
+    /** A fresh headless world in {@code dimension}, carrying that dimension's real provider. */
+    public static HeadlessLevel get(DimensionType dimension) {
         TestRegistries.bootstrap();
-        return new HeadlessLevel();
+        return new HeadlessLevel(dimension);
     }
 
     @Override
