@@ -27,6 +27,12 @@ defaults:
 jobs:
   finalize:
     runs-on: ubuntu-latest
+    # The announcement webhook is an environment secret rather than a repository one, which every collaborator
+    # with write access could read. It sits in its own environment instead of beside the publishing tokens: those
+    # are gated to release tags, and widening that gate to reach a branch-dispatched job would hand the platform
+    # credentials to anything running from a branch. This environment is gated to dev, which is the ref this
+    # workflow is dispatched on, and holds nothing but the webhook.
+    environment: announce
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -88,3 +94,31 @@ jobs:
           gh release edit "$VERSION" --notes "$NOTES"
           gh release edit "$VERSION" --draft=false
           echo "published release '$VERSION'."
+
+      # GitHub's Discord integration carries no release body, only a fixed compact embed of the tag and a link,
+      # so the announcement is sent from here instead, out of the same changelog section the release body uses.
+      # It runs after the publish so a failed announcement cannot leave a release unpublished, and it no-ops
+      # without the secret, so a fork or a mirror announces nothing until one is configured.
+      - name: Announce the release on Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          VERSION: ${{ inputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+            echo "no DISCORD_WEBHOOK secret configured; skipping the announcement."
+            exit 0
+          fi
+          NOTES="$(awk -v v="$VERSION" '/^##[[:space:]]/ { if (inblk) exit; inblk = ($2 == v); next } inblk { print }' CHANGELOG.md)"
+          # Discord caps an embed description at 4096 characters. Trim rather than fail: the release is already
+          # published by this point, and a truncated announcement is a better outcome than a red finalize.
+          NOTES="$(printf '%s' "$NOTES" | head -c 3800)"
+          # No username or avatar_url: those override the webhook's own identity, which is configured in Discord
+          # where the name and icon belong. The payload carries only the announcement itself.
+          jq -n --arg t "Archive World Downloader $VERSION" \
+                --arg d "$NOTES" \
+                --arg u "https://github.com/$REPO/releases/tag/$VERSION" \
+                '{embeds:[{title:$t,url:$u,description:$d,color:3066993}]}' > discord.json
+          curl -sS -f -X POST -H "Content-Type: application/json" -d @discord.json "$DISCORD_WEBHOOK"
+          echo "announced $VERSION on Discord."
