@@ -17,7 +17,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.NonNullList;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import org.jspecify.annotations.Nullable;
 
@@ -43,7 +42,7 @@ public final class FixtureFidelity {
      */
     public static final String KEEP_PACKED = "keepPacked";
 
-    private static @Nullable Map<ResourceLocation, IBlockState> representativeStates;
+    private static @Nullable Map<String, IBlockState> representativeStates;
 
     private FixtureFidelity() {}
 
@@ -140,8 +139,7 @@ public final class FixtureFidelity {
 
     /** The default state of some block hosting {@code blockEntityId}, for the load side of the round trip. */
     private static IBlockState representativeState(String blockEntityId) {
-        ResourceLocation id = new ResourceLocation(blockEntityId);
-        IBlockState state = representativeStates().get(id);
+        IBlockState state = representativeStates().get(blockEntityId);
         if (state == null) {
             throw new AssertionError("Fixture fidelity: no block hosts block-entity type " + blockEntityId
                     + "; a fixture naming a type vanilla does not register cannot carry a producer's shape");
@@ -149,12 +147,12 @@ public final class FixtureFidelity {
         return state;
     }
 
-    private static synchronized Map<ResourceLocation, IBlockState> representativeStates() {
+    private static synchronized Map<String, IBlockState> representativeStates() {
         if (representativeStates != null) {
             return representativeStates;
         }
         TestRegistries.bootstrap();
-        Map<ResourceLocation, IBlockState> states = new HashMap<>();
+        Map<String, IBlockState> states = new HashMap<>();
         for (Block block : Block.REGISTRY) {
             if (!(block instanceof ITileEntityProvider)) {
                 continue;
@@ -164,8 +162,16 @@ public final class FixtureFidelity {
             if (blockEntity == null) {
                 continue;
             }
-            ResourceLocation key = TileEntity.getKey(blockEntity.getClass());
-            if (key == null) {
+            // This band publishes no class-to-id accessor, so the id is read off the save vanilla itself writes,
+            // which throws for a class it maps no id for rather than returning nothing. That throw is unreachable
+            // over this registry: its 31 provider blocks yield 22 block-entity classes, every one among vanilla's
+            // 23 registrations, and the moving piston, the one provider that creates no block entity, is dropped
+            // above. Skipping rather than propagating keeps one unmappable class from failing every fixture check
+            // instead of only the fixtures that name it.
+            String key;
+            try {
+                key = save(blockEntity).getString("id");
+            } catch (RuntimeException unmapped) {
                 continue;
             }
             states.putIfAbsent(key, state);

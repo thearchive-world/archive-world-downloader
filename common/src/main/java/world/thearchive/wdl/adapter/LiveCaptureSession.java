@@ -35,6 +35,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -173,6 +174,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /** The wdl-private subfolder under the save root (mirrors the download report's location). */
     private static final String WDL_SUBFOLDER = "wdl";
+
+    // One block-entity type id per class, probed once and kept for the run. This band publishes no class-to-id
+    // accessor and keeps vanilla's own class-to-id map private, so the id is read back off the serializer that
+    // writes it, which serializes the whole block entity (a chest's 27 slots included) to read one string. The
+    // outline rescan asks for an id per container per rescan on the tick thread, so the answer is cached against
+    // the class vanilla itself keys the id by, and one probe per block-entity type covers every instance of it.
+    // A class vanilla maps no id for makes that serializer throw rather than return nothing, so the empty string
+    // is cached for it too; without that the throw would repeat on every rescan the block entity stays in.
+    private static final Map<Class<?>, String> blockEntityTypeIds = new ConcurrentHashMap<>();
 
     private final VersionAdapter adapter;
     private final PlatformBridge bridge;
@@ -2135,17 +2145,48 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Record the captured block-entity type at {@code pos} for both staleness gates: stamp it on the drained
      * {@code holder} as {@code wdl_block_entity_id} for the writer-thread merge gate (Gate 1) and into the
      * per-dimension type map the outline reads for the rim gate (Gate 2). A missing block entity (the open menu's block
-     * already gone) leaves the holder untyped, so both gates fall back to their pre-gate behavior.
+     * already gone), or one whose class vanilla maps no id for, leaves the holder untyped, so both gates fall back to
+     * their pre-gate behavior.
      */
-    @SuppressWarnings("NullAway") // getKey is non-null for a live block entity's registered type
     private void recordBlockType(BlockPos pos, NBTTagCompound holder) {
         TileEntity blockEntity = level().getTileEntity(pos);
-        if (blockEntity != null) {
-            // There is no BlockEntityType registry object before 1.13; the classic id is the block entity's own
-            // registry name keyed by its class through TileEntity.getKey.
-            String typeId = TileEntity.getKey(blockEntity.getClass()).toString();
+        if (blockEntity == null) {
+            return;
+        }
+        String typeId = blockEntityTypeId(blockEntity);
+        if (typeId != null) {
             holder.setString("wdl_block_entity_id", typeId);
             capturedBlockTypes.put(pos.toLong(), typeId);
+        }
+    }
+
+    /**
+     * The block-entity registry id string for {@code blockEntity}, the key the chunk tag writes as {@code "id"} and the
+     * same one a recorded capture type holds, or null for a class vanilla registers no id for. Kept as a String, never
+     * the band-renamed id type (ResourceLocation vs Identifier), so its callers stay band-portable.
+     */
+    static @Nullable String blockEntityTypeId(TileEntity blockEntity) {
+        Class<?> type = blockEntity.getClass();
+        String cached = blockEntityTypeIds.get(type);
+        if (cached == null) {
+            cached = probeBlockEntityTypeId(blockEntity);
+            blockEntityTypeIds.put(type, cached);
+            if (cached.isEmpty()) {
+                // Once per class, since the sentinel is cached: a serializer that raised for a reason of its own
+                // rather than a missing mapping would otherwise disable both staleness gates for that class in
+                // silence for the rest of the run.
+                LOGGER.debug("no block-entity id read for {}; both staleness gates fall back for every instance of it",
+                        type.getName());
+            }
+        }
+        return cached.isEmpty() ? null : cached;
+    }
+
+    private static String probeBlockEntityTypeId(TileEntity blockEntity) {
+        try {
+            return blockEntity.writeToNBT(new NBTTagCompound()).getString("id");
+        } catch (RuntimeException unmapped) {
+            return "";
         }
     }
 

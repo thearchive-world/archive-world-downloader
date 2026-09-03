@@ -93,8 +93,8 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # id would otherwise misplace the export zip). Below 1.20.2 ClientPacketListener has no serverBrand, so the
 # report environment reads the server brand through LocalPlayer.getServerBrand(). Below 1.20 Entity.level is a
 # public field rather than the level() accessor, so the camera-anchor level guard reads camera.level directly.
-# Below 1.13 there is no EntityType or unified Registry: a captured block entity's type id is
-# TileEntity.getKey(be.getClass()); the client chunk is fetched through ChunkProviderClient.getLoadedChunk with no
+# Below 1.13 there is no EntityType or unified Registry, so a captured block entity's type id is a plain String; the
+# client chunk is fetched through ChunkProviderClient.getLoadedChunk with no
 # ChunkStatus promotion (a classic client chunk is always full); the double chest is recognized by the
 # pre-Flattening neighbor probe (no ChestType property) with the lower-coordinate half taking slots 0-26; the
 # villager trades are read off GuiMerchant.getMerchant().getRecipes as a MerchantRecipeList; the by-key map data
@@ -104,6 +104,12 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # NetHandlerPlayClient.getAdvancementManager (ClientAdvancementManager) rather than getAdvancements; the player's stat
 # holder is EntityPlayerSP.getStatFileWriter (StatisticsManager) rather than getStats; and neither progress surface
 # carries a DataVersion stamp, so the assembly step drops the shared data-version local entirely. Below 1.11 ChunkPos names its coordinate fields chunkXPos and chunkZPos rather than x and z.
+# Below 1.11 there is also no class-to-id accessor for a block entity, and vanilla keeps its own class-to-id map
+# private, so this file owns the replacement the outline scan shares: a per-class memoized probe reading the id back
+# off the serializer vanilla writes it with, writeToNBT(new NBTTagCompound()) then getString("id"). An unregistered
+# class makes that serializer throw rather than answer nothing, so the empty string is cached for it and the probe
+# reports null. The ids it yields are unnamespaced CamelCase (Chest, Cauldron, Airportal) rather than the namespaced
+# snake_case of the bands above.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
@@ -310,8 +316,10 @@ common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionReb
 # registries argument.
 common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 
-# Below the 1.21 update ResourceLocation has no parse factory, so a block-entity id string is built with the public
-# ResourceLocation(String) constructor. Below 1.20.5 BlockEntity.saveWithFullMetadata and loadStatic take no
+# Below 1.11 a block-entity id carries no namespace and there is no class-to-id accessor, so the representative-state
+# map is keyed by the raw id string with no ResourceLocation left in the file, and each provider block's id is read off
+# vanilla's own save, whose throw for a class it maps no id for stands in for the null return the bands above skip on.
+# Below 1.20.5 BlockEntity.saveWithFullMetadata and loadStatic take no
 # Provider, and ContainerHelper.loadAllItems/saveAllItems take no registries argument.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
 
@@ -404,7 +412,9 @@ common/src/test/java/world/thearchive/wdl/testsupport/RegionRoundTrip.java
 # Below 1.13 there is no Mojang mapping, and two absent types are reimplemented here: a block state has no
 # VoxelShape (its bounding box unioned with its collision boxes, offset to world, stands in for the outline
 # shape, since one box alone need not span the model: a brewing stand's is its base plate), and there is no
-# unified Registry (the block-entity id is TileEntity.getKey(getClass())). A chest carries no left/right pair
+# unified Registry, so the block-entity id is a plain String. Below 1.11 there is no class-to-id accessor either, so
+# that String comes from the memoized serializer probe LiveCaptureSession.blockEntityTypeId, whose null answer for an
+# unregistered class makes the cached live type id nullable. A chest carries no left/right pair
 # property either, so the double-chest partner is the capture side's inventory pairing,
 # ContainerCapture.doubleChestPartner (a getChestType equality test in the recon section 6 probe order), so the
 # outline reflects exactly what an open would capture rather than vanilla's render-shape pairing. The client level

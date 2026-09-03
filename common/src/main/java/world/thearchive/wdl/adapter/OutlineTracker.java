@@ -98,15 +98,17 @@ public final class OutlineTracker {
         final OutlineRim rim;
         final boolean ender;
         // The live block-entity type id at scan time, compared against the recorded capture type so a
-        // same-position block replacement re-rims the stale capture (Gate 2).
-        final String liveTypeId;
+        // same-position block replacement re-rims the stale capture (Gate 2). Null for a class vanilla
+        // registers no id for, which records no captured type either, so the comparison falls back to bare
+        // membership; a null against a recorded type is a replacement, and re-rims as one.
+        final @Nullable String liveTypeId;
         final long sectionKey;
         final long secondSectionKey;
         final double centerX;
         final double centerY;
         final double centerZ;
 
-        CachedContainer(OutlineRim rim, boolean ender, String liveTypeId,
+        CachedContainer(OutlineRim rim, boolean ender, @Nullable String liveTypeId,
                 long sectionKey, long secondSectionKey, double centerX, double centerY, double centerZ) {
             this.rim = rim;
             this.ender = ender;
@@ -298,17 +300,9 @@ public final class OutlineTracker {
         OutlineRim rim = new OutlineRim(config.unscannedColor(), box, cells);
         long sectionKey = SectionKey.blockToSection(cells[0]);
         long secondSectionKey = cells.length > 1 ? SectionKey.blockToSection(cells[1]) : sectionKey;
-        entry.containers.add(new CachedContainer(rim, ender, blockEntityTypeId(blockEntity), sectionKey,
-                secondSectionKey, (box.minX + box.maxX) * 0.5, (box.minY + box.maxY) * 0.5,
+        entry.containers.add(new CachedContainer(rim, ender, LiveCaptureSession.blockEntityTypeId(blockEntity),
+                sectionKey, secondSectionKey, (box.minX + box.maxX) * 0.5, (box.minY + box.maxY) * 0.5,
                 (box.minZ + box.maxZ) * 0.5));
-    }
-
-    // The block-entity registry id string, the key the chunk tag writes as "id" and the same one the recorded
-    // capture type holds. Kept as a String, never the band-renamed id type (ResourceLocation vs Identifier), so
-    // this shared file stays band-portable.
-    @SuppressWarnings("NullAway") // getKey is non-null for a live block entity's registered type
-    private static String blockEntityTypeId(TileEntity blockEntity) {
-        return TileEntity.getKey(blockEntity.getClass()).toString();
     }
 
     private void emit(WorldClient level, ChunkContainers entry, Vec3d cameraPos, double clamp, OutlineConfig config,
