@@ -410,13 +410,19 @@ class RestoreOperationTest {
         Path aside = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-1")
                 .resolve("aside").resolve("World");
         FileChannel[] holder = new FileChannel[1];
+        // The lock is held through this array for the same reason the sibling probe tests hold theirs in a
+        // try-with-resources local: on a Java-8 toolchain sun.nio.ch.FileLockTable keeps only a weak reference,
+        // so a discarded FileLock can be collected mid-test, the probe's same-JVM OverlappingFileLockException
+        // never fires, and the operation relocates over a lock that is still held at the OS level. From JDK 9 the
+        // table also holds the lock strongly, which is why this only ever failed on the Java-8 bands.
+        FileLock[] heldLock = new FileLock[1];
         Throwable[] setUpFailure = new Throwable[1];
         RestoreOperation operation = opWithMoveHook("World", betweenMoves(() -> {
             try {
                 Files.createDirectories(saves.resolve("World"));
                 Path lock = Files.write(aside.resolve("session.lock"), new byte[] { 0x2A });
                 holder[0] = FileChannel.open(lock, StandardOpenOption.WRITE);
-                holder[0].lock();
+                heldLock[0] = holder[0].lock();
             } catch (IOException | RuntimeException | Error e) {
                 setUpFailure[0] = e;
                 throw e;
@@ -426,6 +432,9 @@ class RestoreOperationTest {
         try {
             result = operation.run();
         } finally {
+            if (heldLock[0] != null) {
+                heldLock[0].release();
+            }
             if (holder[0] != null) {
                 holder[0].close();
             }
