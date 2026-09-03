@@ -6,6 +6,7 @@ package world.thearchive.wdl.testsupport;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import net.minecraft.entity.EntityList;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagDouble;
 import net.minecraft.nbt.NBTTagList;
@@ -20,14 +21,41 @@ import world.thearchive.wdl.adapter.impl.EntitySinkImpl;
  * serializable live entity, so the {@code id} and {@code "UUID"} metadata a merge matches on is built directly. Its
  * {@code "Items"} holder does have one ({@code ItemStackHelper.saveAllItems}, the same writer
  * {@code ContainerSink.captureItems} calls), so {@link #entityChunkTagWith} checks that part of every tag handed to it.
+ * The {@code id} is checked against the registry instead, by {@link #stampId}, which every entry point here routes
+ * through.
  */
 public final class EntityFixtures {
     private EntityFixtures() {}
 
+    /**
+     * Stamp the {@code id} a serialized entity tag carries, refusing a name this band does not register.
+     *
+     * <p>This is the one thing about an entity fixture that no producer checks. Vanilla writes the key from
+     * {@code EntityList.getEntityString} on the way out and reads it back through {@code NAME_TO_CLASS}, so a fixture
+     * naming anything outside that set describes an archive this band never writes, and the test built on it then
+     * passes for a reason unrelated to what it names. At 1.10.2 the registered names are unnamespaced CamelCase, so
+     * every namespaced literal is stale by construction, and several of them differ from the namespaced spelling by
+     * more than case. A stale name is not inert either: a load resolves the saved id through
+     * {@code EntityList.createEntityFromNBT}, which finds no class for it, warns that it is skipping an entity with
+     * that id, and returns null, and {@code AnvilChunkLoader.readChunkEntity} returns on that null before it recurses,
+     * so the entity's passengers go with it.
+     *
+     * <p>{@code getEntityNameList} is the membership source because it is built from {@code NAME_TO_CLASS}, the map a
+     * load resolves the saved id against.
+     */
+    private static void stampId(NBTTagCompound tag, String id) {
+        TestRegistries.bootstrap();
+        if (!EntityList.getEntityNameList().contains(id)) {
+            throw new AssertionError("Entity fixture: " + id + " is no entity id at 1.10.2, where EntityList"
+                    + " registers unnamespaced CamelCase names and a load skips an entity it can name no class for");
+        }
+        tag.setString("id", id);
+    }
+
     /** An entity tag carrying only its {@code id}, the key a recursive load reads before anything else. */
     public static NBTTagCompound entityTag(String id) {
         NBTTagCompound tag = new NBTTagCompound();
-        tag.setString("id", id);
+        stampId(tag, id);
         return tag;
     }
 
@@ -100,7 +128,7 @@ public final class EntityFixtures {
      */
     public static NBTTagCompound entityWithoutUuid(String id) {
         NBTTagCompound tag = new NBTTagCompound();
-        tag.setString("id", id);
+        stampId(tag, id);
         return tag;
     }
 

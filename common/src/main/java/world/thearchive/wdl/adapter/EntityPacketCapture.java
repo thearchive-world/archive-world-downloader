@@ -38,7 +38,6 @@ import net.minecraft.network.play.server.SPacketSpawnMob;
 import net.minecraft.network.play.server.SPacketSpawnObject;
 import net.minecraft.network.play.server.SPacketSpawnPainting;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
@@ -443,64 +442,68 @@ final class EntityPacketCapture
 
     /**
      * The {@link EntityList} registry name a spawn-object packet's object-type id names, or null for an id this band
-     * does not spawn as an object (the fishing bobber has no registry entry, the trident does not exist below 1.13).
-     * Mirrors the vanilla client handleSpawnObject resolution; the minecart id defers its subtype to the packet data,
-     * so the caller resolves that ahead of this default resolution.
+     * does not spawn as an object (the fishing bobber has no registry entry, the llama spit and the evocation fangs
+     * arrive at 1.11, and the trident does not exist below 1.13). Mirrors the vanilla client handleSpawnObject
+     * resolution; the minecart id defers its subtype to the packet data, so the caller resolves that ahead of this
+     * default resolution.
+     *
+     * <p>These are this band's own unnamespaced CamelCase registration names, taken from the {@code EntityList} mapping
+     * table rather than re-cased from the namespaced ids the bands above name: several differ by more than case
+     * ({@code PrimedTnt}, {@code FallingSand}, {@code ThrownEnderpearl}, {@code FireworksRocketEntity}), so a
+     * mechanical transform is wrong on them. A name this band does not register costs more than a lost entity:
+     * {@code createEntityByIDFromName} builds {@code createEntityByName("Pig", level)} whenever the name it is handed
+     * resolves to no class, so a stale row would archive a pig at the object's position.
      */
-    static @Nullable ResourceLocation objectEntityName(int spawnObjectType) {
+    static @Nullable String objectEntityName(int spawnObjectType) {
         switch (spawnObjectType) {
             case 1:
-                return new ResourceLocation("boat");
+                return "Boat";
             case 2:
-                return new ResourceLocation("item");
+                return "Item";
             case 3:
-                return new ResourceLocation("area_effect_cloud");
+                return "AreaEffectCloud";
             case SPAWN_OBJECT_MINECART:
-                return new ResourceLocation("minecart");
+                return "MinecartRideable";
             case 50:
-                return new ResourceLocation("tnt");
+                return "PrimedTnt";
             case 51:
-                return new ResourceLocation("ender_crystal");
+                return "EnderCrystal";
             case 60:
-                return new ResourceLocation("arrow");
+                return "Arrow";
             case 61:
-                return new ResourceLocation("snowball");
+                return "Snowball";
             case 62:
-                return new ResourceLocation("egg");
+                return "ThrownEgg";
             case 63:
-                return new ResourceLocation("fireball");
+                return "Fireball";
             case 64:
-                return new ResourceLocation("small_fireball");
+                return "SmallFireball";
             case 65:
-                return new ResourceLocation("ender_pearl");
+                return "ThrownEnderpearl";
             case 66:
-                return new ResourceLocation("wither_skull");
+                return "WitherSkull";
             case 67:
-                return new ResourceLocation("shulker_bullet");
-            case 68:
-                return new ResourceLocation("llama_spit");
+                return "ShulkerBullet";
             case 70:
-                return new ResourceLocation("falling_block");
+                return "FallingSand";
             case SPAWN_OBJECT_ITEM_FRAME:
-                return new ResourceLocation("item_frame");
+                return "ItemFrame";
             case 72:
-                return new ResourceLocation("eye_of_ender_signal");
+                return "EyeOfEnderSignal";
             case 73:
-                return new ResourceLocation("potion");
+                return "ThrownPotion";
             case 75:
-                return new ResourceLocation("xp_bottle");
+                return "ThrownExpBottle";
             case 76:
-                return new ResourceLocation("fireworks_rocket");
+                return "FireworksRocketEntity";
             case SPAWN_OBJECT_LEASH_KNOT:
-                return new ResourceLocation("leash_knot");
+                return "LeashKnot";
             case SPAWN_OBJECT_ARMOR_STAND:
-                return new ResourceLocation("armor_stand");
-            case 79:
-                return new ResourceLocation("evocation_fangs");
+                return "ArmorStand";
             case 91:
-                return new ResourceLocation("spectral_arrow");
+                return "SpectralArrow";
             case 93:
-                return new ResourceLocation("dragon_fireball");
+                return "DragonFireball";
             default:
                 return null;
         }
@@ -534,7 +537,7 @@ final class EntityPacketCapture
             return new EntityLeashKnot(level,
                     new BlockPos(MathHelper.floor(x), MathHelper.floor(y), MathHelper.floor(z)));
         }
-        ResourceLocation name = objectEntityName(spawnObjectType);
+        String name = objectEntityName(spawnObjectType);
         return name == null ? null : EntityList.createEntityByIDFromName(name, level);
     }
 

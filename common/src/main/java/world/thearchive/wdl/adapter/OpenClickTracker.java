@@ -11,7 +11,6 @@ import net.minecraft.entity.passive.AbstractHorse;
 import net.minecraft.entity.passive.EntityVillager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntityEnderChest;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.ILockableContainer;
@@ -165,9 +164,14 @@ public final class OpenClickTracker {
      */
     private static boolean menuIncapable(Entity entity) {
         // There is no EntityType registry before 1.13, so the entity's vanilla-ness is read from its classic
-        // EntityList registry name; a null key (a player, lightning, an unregistered entity) is not vanilla.
-        ResourceLocation key = EntityList.getKey(entity);
-        boolean vanilla = key != null && "minecraft".equals(key.getResourceDomain());
+        // EntityList registry name; a null name (a player, lightning, an unregistered entity) is not vanilla. The
+        // name carries no namespace at this band, and Forge 12.18.3.2511 publishes no ENTITIES registry to read a
+        // domain from either, so membership in EntityList's own registered name set stands in for the domain
+        // comparison. Forge does put mod entities in that set, under a "modid.name" no vanilla registration spells,
+        // so the dot rules them out; a modded entity read as vanilla would have its superseded marker suppressed and
+        // would steal the next container open's provenance.
+        String key = EntityList.getEntityString(entity);
+        boolean vanilla = key != null && key.indexOf('.') < 0 && EntityList.getEntityNameList().contains(key);
         boolean villager = entity instanceof EntityVillager;
         boolean baby = villager && ((EntityVillager) entity).isChild();
         // At this band the villager profession is an int (getProfession); nitwit is profession id 5, the same

@@ -71,6 +71,10 @@ common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 # arrives inline (SPacketSpawnMob.getDataManagerEntries), the dimension marker reads the classic DimensionType by
 # id, the lightning bolt SPacketSpawnGlobalEntity is present but deliberately unread, and the NBT/packet API is
 # classic MCP (EntityDataManager.DataEntry, MathHelper, Vec3d).
+# Below 1.11 the EntityList names are unnamespaced CamelCase and createEntityByIDFromName takes that bare String
+# rather than a ResourceLocation, so objectEntityName returns a String and every one of its rows carries this band's
+# own spelling (PrimedTnt, FallingSand, ThrownEnderpearl, FireworksRocketEntity), the llama spit and the evocation
+# fangs having no row at all here.
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 
 # The Java 8 floor has no records, so this MC-free packet-position carrier, accepted as a record on the higher bands
@@ -461,7 +465,15 @@ common/src/main/java/world/thearchive/wdl/adapter/PlayerSink.java
 common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressSerializer.java
 
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+# Below 1.11 the entity id a fixture stamps is an unnamespaced CamelCase EntityList name, and an id outside that set
+# is not inert, a load naming no class for it and skipping the entity and every passenger under it, so the id choke
+# point here checks every fixture id against the live registry rather than taking the literal on trust.
 common/src/test/java/world/thearchive/wdl/testsupport/EntityFixtures.java
+
+# New at this band. Pins the entity-id gate the fixtures stamp through and the band fact behind it: the registered
+# names are unnamespaced CamelCase, and a saved id outside that set is skipped on load rather than read as something
+# else. No band above needs it, the namespaced ids there being what the fixtures already carry.
+common/src/test/java/world/thearchive/wdl/testsupport/EntityIdRegistryTest.java
 
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
 common/src/test/java/world/thearchive/wdl/adapter/PriorPlayerReadRoundTripTest.java
@@ -779,6 +791,10 @@ forge/src/reobftest/**
 # EntityList registry name, the villager profession is the classic int getProfession, the lockable-container
 # recognizer is ILootContainer, and the ender-chest obstruction is the classic doesSideBlockChestOpening test; the
 # world/hit/BlockPos API is classic MCP.
+# Below 1.11 EntityList.getKey is absent and its replacement getEntityString returns a bare unnamespaced name, and
+# this band's Forge publishes no ENTITIES registry to read a domain from, so the vanilla-namespace test becomes
+# membership in EntityList's own registered name set, less the modid-qualified names Forge adds to it for mod
+# entities.
 common/src/main/java/world/thearchive/wdl/adapter/OpenClickTracker.java
 
 # Below the 1.19 registry-sync rework the client receives the dimension type inline (a keyless Holder.Direct), so
