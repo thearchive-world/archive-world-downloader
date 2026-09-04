@@ -70,7 +70,7 @@ class MenuChangeTrackerTest {
         List<Slot> slots = slotsOver(container);
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));
 
-        stack.setCount(5);
+        stack.stackSize = 5;
 
         assertTrue(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA), "an in-place count change is a change");
         assertFalse(tracker.changedSince(slots, 0, MenuChangeTracker.NO_DATA));

@@ -28,11 +28,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.DimensionType;
@@ -41,6 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.ItemListNbt;
 import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SaveStage;
@@ -588,10 +587,10 @@ class AsyncSaveWriterTest {
             NBTTagCompound back = Optional.ofNullable(in.read(new ChunkPos(0, 0))).get();
             NBTTagCompound chest = findByPosOrNull(back, 2, 64, 2);
             assertNotNull(chest, "the chest block entity is on disk");
-            NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ItemStackHelper.loadAllItems(chest, decoded);
-            assertEquals(Items.DIAMOND, decoded.get(0).getItem(), "the writer-thread fold merged the captured Items");
-            assertEquals(5, decoded.get(0).getCount());
+            ItemStack[] decoded = new ItemStack[27];
+            ItemListNbt.loadAllItems(chest, decoded);
+            assertEquals(Items.DIAMOND, decoded[0].getItem(), "the writer-thread fold merged the captured Items");
+            assertEquals(5, decoded[0].stackSize);
         }
     }
 
@@ -1231,8 +1230,8 @@ class AsyncSaveWriterTest {
     private void writeOpenedChests(Path region, ChunkSnapshotSource snapshot,
             List<BlockPos> chests) throws Exception {
         ContainerSink sink = new ContainerSinkImpl();
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(0, new ItemStack(Items.DIAMOND, 5));
+        ItemStack[] items = new ItemStack[27];
+        items[0] = new ItemStack(Items.DIAMOND, 5);
         Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         for (BlockPos chest : chests) {
             holders.put(chest, sink.captureItems(items));
@@ -1264,9 +1263,9 @@ class AsyncSaveWriterTest {
         NBTTagCompound chunk = Optional.ofNullable(storage.read(pos)).get();
         NBTTagCompound blockEntity = findByPosOrNull(chunk, x, y, z);
         assertNotNull(blockEntity, "no block entity at " + x + "/" + y + "/" + z + " in " + pos);
-        NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(blockEntity, decoded);
-        return decoded.get(0);
+        ItemStack[] decoded = new ItemStack[27];
+        ItemListNbt.loadAllItems(blockEntity, decoded);
+        return decoded[0];
     }
 
     /** A one-entity entity-chunk tag at {@code pos}, the smallest payload an entities write task can carry. */

@@ -16,21 +16,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import net.minecraft.block.BlockChest;
 import net.minecraft.block.BlockJukebox;
 import net.minecraft.block.BlockShulkerBox;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
-import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
@@ -67,8 +65,8 @@ class InteractionStashMergeTest {
     }
 
     private NBTTagCompound itemsHolder(int slot, ItemStack stack) {
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(slot, stack);
+        ItemStack[] items = new ItemStack[27];
+        items[slot] = stack;
         return sink.captureItems(items);
     }
 
@@ -252,7 +250,7 @@ class InteractionStashMergeTest {
                         InteractionCapture.InteractionKind.SHULKER, itemsHolder(0, new ItemStack(Items.DIAMOND)))),
                 SyntheticChunks.withBlockAt(placed, Blocks.PURPLE_SHULKER_BOX.getDefaultState()));
 
-        assertTrue(bundles.items().isEmpty(), "no captured section covers the pos, so the gate fails closed");
+        assertTrue(bundles.holders().isEmpty(), "no captured section covers the pos, so the gate fails closed");
     }
 
     // Recognition: a right-click on a bookshelf or jukebox records an insert candidate only when the block would

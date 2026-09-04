@@ -11,11 +11,9 @@ import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
@@ -23,6 +21,7 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.ItemListNbt;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
@@ -47,17 +46,17 @@ class ContainerRecaptureSynergyTest {
     }
 
     private NBTTagCompound stashHolderWith(int slot, ItemStack stack) {
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(slot, stack);
+        ItemStack[] items = new ItemStack[27];
+        items[slot] = stack;
         return sink.captureItems(items);
     }
 
     private static ItemStack mergedItemAt(ContainerSink sink, NBTTagCompound chunkTag, int slot) {
         NBTTagList blockEntities = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
         NBTTagCompound chest = blockEntities.getCompoundTagAt(0);
-        NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(chest, back);
-        return back.get(slot);
+        ItemStack[] back = new ItemStack[27];
+        ItemListNbt.loadAllItems(chest, back);
+        return back[slot];
     }
 
     @Test
@@ -90,7 +89,7 @@ class ContainerRecaptureSynergyTest {
         assertEquals(1, merged, "the re-captured chest block entity gives the stash something to merge onto");
         ItemStack landed = mergedItemAt(sink, recapturedTag, 2);
         assertEquals(Items.EMERALD, landed.getItem(), "the stashed contents land on the re-captured chest");
-        assertEquals(7, landed.getCount());
+        assertEquals(7, landed.stackSize);
     }
 
     @Test

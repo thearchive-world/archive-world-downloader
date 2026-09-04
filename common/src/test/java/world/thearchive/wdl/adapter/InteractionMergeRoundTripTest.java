@@ -5,6 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.chunkTagWith;
@@ -54,8 +55,8 @@ class InteractionMergeRoundTripTest {
 
     private static ItemStack readRecordItem(NBTTagCompound jukeboxBlockEntityTag) {
         // vanilla JukeboxBlockEntity.loadAdditional's exact read
-        ItemStack back = new ItemStack(jukeboxBlockEntityTag.getCompoundTag("RecordItem"));
-        assertTrue(!back.isEmpty(), "the merged RecordItem must decode via vanilla's ItemStack(NBTTagCompound)");
+        ItemStack back = ItemStack.loadItemStackFromNBT(jukeboxBlockEntityTag.getCompoundTag("RecordItem"));
+        assertNotNull(back, "the merged RecordItem must decode via vanilla's ItemStack.loadItemStackFromNBT");
         return back;
     }
 

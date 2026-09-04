@@ -52,7 +52,7 @@ class PlayerCaptureAliasTest {
     void remappingTheCapturedInventoryLeavesTheHeldStackAlone() {
         ItemStack live = filledMap(1988);
         HeadlessPlayer player = new HeadlessPlayer();
-        player.inventory.mainInventory.set(0, live);
+        player.inventory.mainInventory[0] = live;
         NBTTagCompound raw = new PlayerSinkImpl().capturePlayer(player);
         MapArchive archive = new MapArchive(MapManifest.empty(), sessionId -> null, (archiveId, dataTag) -> {});
 

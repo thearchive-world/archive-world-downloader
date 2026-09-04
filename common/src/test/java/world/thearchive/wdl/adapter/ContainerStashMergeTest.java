@@ -14,18 +14,17 @@ import static world.thearchive.wdl.testsupport.BlockEntityFixtures.findByPos;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.ItemListNbt;
 import world.thearchive.wdl.testsupport.BlockEntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
@@ -44,7 +43,7 @@ class ContainerStashMergeTest {
     // beside the sink rather than inside it.
     private static final ContainerSink ITEMS_ONLY_SINK = new ContainerSink() {
         @Override
-        public NBTTagCompound captureItems(NonNullList<ItemStack> items) {
+        public NBTTagCompound captureItems(ItemStack[] items) {
             throw new AssertionError("not used in merge tests");
         }
 
@@ -65,8 +64,8 @@ class ContainerStashMergeTest {
     }
 
     private NBTTagCompound holderWith(int slot, ItemStack stack) {
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(slot, stack);
+        ItemStack[] items = new ItemStack[27];
+        items[slot] = stack;
         return sink.captureItems(items);
     }
 
@@ -89,10 +88,10 @@ class ContainerStashMergeTest {
         assertTrue(stash.containsKey(elsewhere), "another chunk's stash entry is left until its own flush");
 
         NBTTagList blockEntities = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
-        NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(findByPos(blockEntities, 10, 70, 20), back);
-        assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest gains exactly the captured stack");
-        assertEquals(7, back.get(2).getCount());
+        ItemStack[] back = new ItemStack[27];
+        ItemListNbt.loadAllItems(findByPos(blockEntities, 10, 70, 20), back);
+        assertEquals(Items.EMERALD, back[2].getItem(), "the chest gains exactly the captured stack");
+        assertEquals(7, back[2].stackSize);
         assertTrue(findByPos(blockEntities, 11, 70, 20).getTagList("Items", 10).hasNoTags(),
                 "the neighbor block entity is untouched");
     }
@@ -123,7 +122,7 @@ class ContainerStashMergeTest {
         // partial save honestly instead of a clean one.
         ContainerSink throwingSink = new ContainerSink() {
             @Override
-            public NBTTagCompound captureItems(NonNullList<ItemStack> items) {
+            public NBTTagCompound captureItems(ItemStack[] items) {
                 throw new AssertionError("the failure path never serializes items");
             }
 

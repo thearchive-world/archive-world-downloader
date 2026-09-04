@@ -656,8 +656,10 @@ common/src/test/java/world/thearchive/wdl/adapter/RecoveredScanTest.java
 # 1.18 the chunk tag wraps its block entities under Level.TileEntities rather than the flat root block_entities.
 common/src/test/java/world/thearchive/wdl/testsupport/BlockEntityFixtures.java
 
-# Below 1.20.5 an item's count is the raw Count byte (not a components-map int), so a hand-built entry without it
-# is silently dropped by ContainerHelper.saveAllItems rather than round-tripping with a single named key missing.
+# Below 1.20.5 an item's count is the raw Count byte (not a components-map int). Below 1.11 the count is not an
+# emptiness test either: ItemStack.loadItemStackFromNBT keeps the stack whenever its id resolves and never reads the
+# count, so a hand-built entry without Count round-trips as a live stack carrying Count 0 rather than being dropped.
+# The gate therefore names the omitted key instead of a lost element, which is the assertion that changes here.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelityTest.java
 
 # Below 1.20.5 there are no item components: a filled map's id is the raw int tag."map", and a shulker's/bundle's

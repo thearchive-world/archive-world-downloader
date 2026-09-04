@@ -14,7 +14,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.EntityMinecartEmpty;
 import net.minecraft.entity.passive.AbstractHorse;
 import net.minecraft.entity.passive.EntityHorse;
-import net.minecraft.entity.passive.EntityLlama;
 import net.minecraft.entity.passive.HorseArmorType;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.IInventory;
@@ -64,10 +63,10 @@ class MountArmorCaptureTest {
 
         assertTrue(saved.hasKey("ArmorItem", 10),
                 "a horse the client sees armored must reach disk carrying the key vanilla reads its armor from");
-        ItemStack loaded = new ItemStack(saved.getCompoundTag("ArmorItem"));
+        ItemStack loaded = ItemStack.loadItemStackFromNBT(saved.getCompoundTag("ArmorItem"));
         assertTrue(loaded.getItem() == Items.DIAMOND_HORSE_ARMOR,
                 "the tier names the item exactly, this band shipping one armor per tier and no leather one");
-        assertEquals(1, loaded.getCount(), "one armor, the stack a horse wears");
+        assertEquals(1, loaded.stackSize, "one armor, the stack a horse wears");
         assertFalse(loaded.hasTagCompound(),
                 "a plain armor: the synced tier is all the write has, so an anvil name cannot survive it");
     }
@@ -246,14 +245,14 @@ class MountArmorCaptureTest {
 
     /**
      * Whether the mount's own inventory slot 1 is empty. This band exposes no public reader for that container, so the
-     * protected field is reached directly; the assertion it backs is what stops the fixture from letting vanilla's own
+     * private field is reached directly; the assertion it backs is what stops the fixture from letting vanilla's own
      * writer emit the key.
      */
     private static boolean mountSlotOneIsEmpty(AbstractHorse mount) {
         try {
             Field field = AbstractHorse.class.getDeclaredField("horseChest");
             field.setAccessible(true);
-            return ((IInventory) field.get(mount)).getStackInSlot(1).isEmpty();
+            return ((IInventory) field.get(mount)).getStackInSlot(1) == null;
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("could not reach the mount inventory", e);
         }

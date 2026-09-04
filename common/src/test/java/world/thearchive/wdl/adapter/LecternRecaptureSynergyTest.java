@@ -4,6 +4,7 @@
 package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 
@@ -71,8 +72,8 @@ class LecternRecaptureSynergyTest {
     private static String mergedTitle(NBTTagCompound chunkTag) {
         NBTTagList blockEntities = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
         NBTTagCompound lectern = blockEntities.getCompoundTagAt(0);
-        ItemStack back = new ItemStack(lectern.getCompoundTag("Book"));
-        assertTrue(!back.isEmpty(), "the re-captured lectern carries a decodable Book");
+        ItemStack back = ItemStack.loadItemStackFromNBT(lectern.getCompoundTag("Book"));
+        assertNotNull(back, "the re-captured lectern carries a decodable Book");
         return back.getTagCompound().getString("title");
     }
 

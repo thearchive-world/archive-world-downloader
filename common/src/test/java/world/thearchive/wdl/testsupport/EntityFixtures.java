@@ -19,7 +19,7 @@ import world.thearchive.wdl.adapter.impl.EntitySinkImpl;
  *
  * <p>An entity tag has no producer callable here, because capture derives it from a server packet rather than from a
  * serializable live entity, so the {@code id} and {@code "UUID"} metadata a merge matches on is built directly. Its
- * {@code "Items"} holder does have one ({@code ItemStackHelper.saveAllItems}, the same writer
+ * {@code "Items"} holder does have one ({@code ItemListNbt.saveAllItems}, the same writer
  * {@code ContainerSink.captureItems} calls), so {@link #entityChunkTagWith} checks that part of every tag handed to it.
  * The {@code id} is checked against the registry instead, by {@link #stampId}, which every entry point here routes
  * through.

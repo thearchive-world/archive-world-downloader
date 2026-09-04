@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  * when every slot was empty, and the read takes the slot byte unsigned and drops an out-of-range one in silence. A
  * captured container therefore loads as a vanilla-written one.
  */
-final class ItemListNbt {
+public final class ItemListNbt {
     private ItemListNbt() {}
 
     /**
@@ -27,7 +27,7 @@ final class ItemListNbt {
      * the stack's own keys. Empty (null) slots contribute nothing, and the key is set even when the list came out
      * empty.
      */
-    static void saveAllItems(NBTTagCompound tag, @Nullable ItemStack[] items) {
+    public static void saveAllItems(NBTTagCompound tag, @Nullable ItemStack[] items) {
         NBTTagList list = new NBTTagList();
         for (int i = 0; i < items.length; i++) {
             ItemStack stack = items[i];
@@ -46,7 +46,7 @@ final class ItemListNbt {
      * unsigned, an entry naming a slot outside {@code items} is dropped without a word and a repeated slot overwrites;
      * a slot no entry names keeps whatever the caller left in it.
      */
-    static void loadAllItems(NBTTagCompound tag, @Nullable ItemStack[] items) {
+    public static void loadAllItems(NBTTagCompound tag, @Nullable ItemStack[] items) {
         NBTTagList list = tag.getTagList("Items", 10);
         for (int i = 0; i < list.tagCount(); i++) {
             NBTTagCompound entry = list.getCompoundTagAt(i);

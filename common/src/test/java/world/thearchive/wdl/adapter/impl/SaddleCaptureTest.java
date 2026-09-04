@@ -62,10 +62,10 @@ class SaddleCaptureTest {
         NBTTagCompound saved = chunk.getTagList("Entities", 10).getCompoundTagAt(0);
         assertTrue(saved.hasKey("SaddleItem", 10),
                 "a mount the client sees as saddled must reach disk carrying the key vanilla reads its saddle from");
-        ItemStack loaded = new ItemStack(saved.getCompoundTag("SaddleItem"));
+        ItemStack loaded = ItemStack.loadItemStackFromNBT(saved.getCompoundTag("SaddleItem"));
         assertTrue(loaded.getItem() == Items.SADDLE,
                 "vanilla keeps the stack only when it is a saddle, so anything else is silently dropped on load");
-        assertEquals(1, loaded.getCount(), "one saddle, the stack a mount wears");
+        assertEquals(1, loaded.stackSize, "one saddle, the stack a mount wears");
         assertTrue(!loaded.hasTagCompound(),
                 "a plain saddle: the client holds no source for a saddle's components, so none may be invented");
     }
@@ -155,14 +155,14 @@ class SaddleCaptureTest {
 
     /**
      * Whether the mount's own inventory slot 0 is empty. This band exposes no public reader for that container, so the
-     * protected field is reached directly; the assertion it backs is what stops the fixture from letting vanilla's own
+     * private field is reached directly; the assertion it backs is what stops the fixture from letting vanilla's own
      * writer emit the key.
      */
     private static boolean saddleSlotIsEmpty(AbstractHorse horse) {
         try {
             Field field = AbstractHorse.class.getDeclaredField("horseChest");
             field.setAccessible(true);
-            return ((IInventory) field.get(horse)).getStackInSlot(0).isEmpty();
+            return ((IInventory) field.get(horse)).getStackInSlot(0) == null;
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("could not reach the mount inventory", e);
         }

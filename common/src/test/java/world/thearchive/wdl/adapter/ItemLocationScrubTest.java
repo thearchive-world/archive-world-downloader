@@ -14,14 +14,12 @@ import java.util.Optional;
 import java.util.Properties;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTUtil;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.DimensionType;
 import org.jspecify.annotations.Nullable;
@@ -30,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.ItemListNbt;
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
 import world.thearchive.wdl.compat.bobby.BobbyChunkFilter;
 import world.thearchive.wdl.core.CoveredChunkIndex;
@@ -174,16 +173,16 @@ class ItemLocationScrubTest {
     }
 
     private NBTTagCompound holderOf(ItemStack... stacks) {
-        NonNullList<ItemStack> items = NonNullList.withSize(stacks.length, ItemStack.EMPTY);
+        ItemStack[] items = new ItemStack[stacks.length];
         for (int i = 0; i < stacks.length; i++) {
-            items.set(i, stacks[i]);
+            items[i] = stacks[i];
         }
         return sink.captureItems(items);
     }
 
-    private NonNullList<ItemStack> readBack(NBTTagCompound holder, int size) {
-        NonNullList<ItemStack> back = NonNullList.withSize(size, ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(holder, back);
+    private ItemStack[] readBack(NBTTagCompound holder, int size) {
+        ItemStack[] back = new ItemStack[size];
+        ItemListNbt.loadAllItems(holder, back);
         return back;
     }
 
@@ -231,7 +230,7 @@ class ItemLocationScrubTest {
     }
 
     private ItemStack itemOf(NBTTagCompound blockEntity) {
-        return new ItemStack(blockEntity.getCompoundTag("item"));
+        return ItemStack.loadItemStackFromNBT(blockEntity.getCompoundTag("item"));
     }
 
     private NBTTagCompound itemNbt(ItemStack stack) {
@@ -239,7 +238,7 @@ class ItemLocationScrubTest {
     }
 
     private ItemStack itemFrom(NBTBase itemNbt) {
-        return new ItemStack((NBTTagCompound) itemNbt);
+        return ItemStack.loadItemStackFromNBT((NBTTagCompound) itemNbt);
     }
 
     private NBTTagCompound entity(String id) {
@@ -256,22 +255,22 @@ class ItemLocationScrubTest {
     @Test
     void scrubBlanksTheLodestoneTargetButKeepsTheCompass() {
         NBTTagCompound holder = holderOf(lodestoneCompass(), new ItemStack(Items.DIAMOND, 3));
-        NonNullList<ItemStack> before = readBack(holder, 2);
-        assertTrue(targetOf(before.get(0)).isPresent(), "precondition: the fixture compass has a target");
-        assertTrue(targetDimensionOf(before.get(0)).isPresent(),
+        ItemStack[] before = readBack(holder, 2);
+        assertTrue(targetOf(before[0]).isPresent(), "precondition: the fixture compass has a target");
+        assertTrue(targetDimensionOf(before[0]).isPresent(),
                 "precondition: and names the dimension that target is in");
 
         ItemLocationScrub.scrub(holder, "Items");
 
-        NonNullList<ItemStack> back = readBack(holder, 2);
-        assertTrue(!targetOf(back.get(0)).isPresent(), "the lodestone target is blanked");
-        assertTrue(!targetDimensionOf(back.get(0)).isPresent(),
+        ItemStack[] back = readBack(holder, 2);
+        assertTrue(!targetOf(back[0]).isPresent(), "the lodestone target is blanked");
+        assertTrue(!targetDimensionOf(back[0]).isPresent(),
                 "and so is the dimension it named, which alone still narrows the base to one world");
-        assertNotNull(lodestoneTrackerOf(back.get(0)),
+        assertNotNull(lodestoneTrackerOf(back[0]),
                 "the lodestone_tracker component is kept: the compass stays a valid compass pointing nowhere");
-        assertEquals(Items.COMPASS, back.get(0).getItem(), "still a compass");
-        assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-lodestone item is untouched");
-        assertEquals(3, back.get(1).getCount());
+        assertEquals(Items.COMPASS, back[0].getItem(), "still a compass");
+        assertEquals(Items.DIAMOND, back[1].getItem(), "a non-lodestone item is untouched");
+        assertEquals(3, back[1].stackSize);
     }
 
     @Test
@@ -300,21 +299,21 @@ class ItemLocationScrubTest {
     @Test
     void theHolderCallSiteScrubsByDefault(@TempDir Path configDirectory) {
         NBTTagCompound holder = holderOf(lodestoneCompass());
-        assertTrue(targetOf(readBack(holder, 1).get(0)).isPresent(), "precondition: the fixture compass has a target");
+        assertTrue(targetOf(readBack(holder, 1)[0]).isPresent(), "precondition: the fixture compass has a target");
 
         scrubAndRemapItems(session(configDirectory, false), holder);
 
-        assertTrue(!targetOf(readBack(holder, 1).get(0)).isPresent(), "the default blanks the target at the call site");
+        assertTrue(!targetOf(readBack(holder, 1)[0]).isPresent(), "the default blanks the target at the call site");
     }
 
     @Test
     void theHolderCallSiteKeepsTheTargetWhenTheUserOptsIn(@TempDir Path configDirectory) {
         NBTTagCompound holder = holderOf(lodestoneCompass());
-        assertTrue(targetOf(readBack(holder, 1).get(0)).isPresent(), "precondition: the fixture compass has a target");
+        assertTrue(targetOf(readBack(holder, 1)[0]).isPresent(), "precondition: the fixture compass has a target");
 
         scrubAndRemapItems(session(configDirectory, true), holder);
 
-        assertTrue(targetOf(readBack(holder, 1).get(0)).isPresent(), "the opt-in keeps the target at the call site");
+        assertTrue(targetOf(readBack(holder, 1)[0]).isPresent(), "the opt-in keeps the target at the call site");
     }
 
     @Test
@@ -337,10 +336,10 @@ class ItemLocationScrubTest {
 
         ItemLocationScrub.scrubBlockEntity(blockEntity);
 
-        NonNullList<ItemStack> back = readBack(blockEntity, 2);
-        assertTrue(!targetOf(back.get(0)).isPresent(), "a lodestone in the block entity's Items list is blanked");
-        assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-lodestone item is untouched");
-        assertEquals(3, back.get(1).getCount());
+        ItemStack[] back = readBack(blockEntity, 2);
+        assertTrue(!targetOf(back[0]).isPresent(), "a lodestone in the block entity's Items list is blanked");
+        assertEquals(Items.DIAMOND, back[1].getItem(), "a non-lodestone item is untouched");
+        assertEquals(3, back[1].stackSize);
     }
 
     @Test
@@ -372,23 +371,23 @@ class ItemLocationScrubTest {
     @Test
     void scrubBlanksBeeFlowerPosButKeepsTheOccupant() {
         NBTTagCompound holder = holderOf(beehiveWithBeeFlowerPos(), new ItemStack(Items.DIAMOND, 3));
-        ItemStack precondition = readBack(holder, 2).get(0);
+        ItemStack precondition = readBack(holder, 2)[0];
         assertTrue(hiveFlowerPosPresent(precondition), "precondition: the fixture hive has its own flower_pos");
         assertTrue(beeFlowerPresent(precondition), "precondition: the fixture bee has a flower_pos");
 
         ItemLocationScrub.scrub(holder, "Items");
 
-        NonNullList<ItemStack> back = readBack(holder, 2);
-        assertFalse(hiveFlowerPosPresent(back.get(0)), "the hive's own flower_pos is blanked too");
-        NBTTagList bees = beesOf(back.get(0));
+        ItemStack[] back = readBack(holder, 2);
+        assertFalse(hiveFlowerPosPresent(back[0]), "the hive's own flower_pos is blanked too");
+        NBTTagList bees = beesOf(back[0]);
         assertFalse(bees.hasNoTags(), "the bees component is kept");
         assertEquals(1, bees.tagCount(), "the occupant is kept");
         assertFalse(
                 bees.getCompoundTagAt(0).getTag(ENTITY_DATA) instanceof NBTTagCompound
                         && ((NBTTagCompound) bees.getCompoundTagAt(0).getTag(ENTITY_DATA)).hasKey(FLOWER_POS),
                 "the bee flower_pos is blanked");
-        assertEquals(Item.getItemFromBlock(Blocks.CHEST), back.get(0).getItem(), "the carrier item is unchanged");
-        assertEquals(Items.DIAMOND, back.get(1).getItem(), "an item carrying no such NBT is untouched");
+        assertEquals(Item.getItemFromBlock(Blocks.CHEST), back[0].getItem(), "the carrier item is unchanged");
+        assertEquals(Items.DIAMOND, back[1].getItem(), "an item carrying no such NBT is untouched");
     }
 
     @Test

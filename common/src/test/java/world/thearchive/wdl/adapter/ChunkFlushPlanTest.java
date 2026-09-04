@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
@@ -56,8 +55,8 @@ class ChunkFlushPlanTest {
     }
 
     private NBTTagCompound itemsHolder(String itemId) {
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(0, ItemFixtures.stack(itemId));
+        ItemStack[] items = new ItemStack[27];
+        items[0] = ItemFixtures.stack(itemId);
         return containerSink.captureItems(items);
     }
 
@@ -76,7 +75,7 @@ class ChunkFlushPlanTest {
     /** A sink whose merge throws, the band-merge failure the fold has to isolate and count. */
     private static final ContainerSink THROWING_CONTAINER_SINK = new ContainerSink() {
         @Override
-        public NBTTagCompound captureItems(NonNullList<ItemStack> items) {
+        public NBTTagCompound captureItems(ItemStack[] items) {
             throw new AssertionError("the failure path never serializes items");
         }
 

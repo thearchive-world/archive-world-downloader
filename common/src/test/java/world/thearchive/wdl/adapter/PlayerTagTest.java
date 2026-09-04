@@ -10,17 +10,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.ItemListNbt;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
@@ -153,8 +152,8 @@ class PlayerTagTest {
     @Test
     void setEnderItemsRemapsTheCapturedItemsListIntoEnderItems() {
         NBTTagCompound tag = playerTag(); // EnderItems starts as the empty list writeToNBT wrote
-        NonNullList<ItemStack> ender = NonNullList.withSize(27, ItemStack.EMPTY);
-        ender.set(5, new ItemStack(Items.ENDER_PEARL, 9));
+        ItemStack[] ender = new ItemStack[27];
+        ender[5] = new ItemStack(Items.ENDER_PEARL, 9);
         NBTTagCompound holder = sink.captureItems(ender); // an "Items" list in slot-tagged form
 
         PlayerTag.setEnderItems(tag, holder);
@@ -162,10 +161,10 @@ class PlayerTagTest {
         assertTrue(tag.getTag("EnderItems") instanceof NBTTagList, "EnderItems is now the captured list");
         NBTTagCompound probe = new NBTTagCompound();
         probe.setTag("Items", tag.getTagList("EnderItems", 10)); // read the remapped list via the same codec
-        NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(probe, back);
-        assertEquals(Items.ENDER_PEARL, back.get(5).getItem(), "the captured ender item lands at its EnderItems slot");
-        assertEquals(9, back.get(5).getCount());
+        ItemStack[] back = new ItemStack[27];
+        ItemListNbt.loadAllItems(probe, back);
+        assertEquals(Items.ENDER_PEARL, back[5].getItem(), "the captured ender item lands at its EnderItems slot");
+        assertEquals(9, back[5].stackSize);
     }
 
     @Test

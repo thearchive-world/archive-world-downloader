@@ -37,9 +37,6 @@ class FixtureFidelityTest {
         }
         entry.setString("id", itemId);
         if (withCount) {
-            // Vanilla's own ItemStack#writeToNBT writes "Count" as a byte; a count under any other key or shape
-            // decodes to 0, which reads as empty and ItemStackHelper.saveAllItems then drops the entry entirely,
-            // so the deliberately-omitted key below stops being the fixture's only divergence.
             entry.setByte("Count", (byte) 1);
         }
         return entry;
@@ -82,13 +79,13 @@ class FixtureFidelityTest {
 
     @Test
     void anItemEntryWithoutCountIsRejected() {
-        // Unlike a missing Slot (which still round-trips as a valid entry at slot 0, so the divergence names
-        // "Slot" directly), a missing Count decodes to 0, which is treated as empty; ItemStackHelper.saveAllItems
-        // then skips it entirely, so the producer's list comes back one element short rather than missing a
-        // single named key.
+        // A count of zero is a live stack here: ItemStack.loadItemStackFromNBT keeps whatever readFromNBT built
+        // whenever its item resolves, and never reads the count, so the entry survives the round trip carrying
+        // Count 0 rather than being dropped as empty. The divergence is therefore the key itself, and a port that
+        // expects a lost element is reading the band above.
         String message = reject(() -> FixtureFidelity
                 .assertItemsHolderShape(holderOf(handBuiltEntry("minecraft:diamond", true, false))));
-        assertTrue(message.contains("element(s)"), "the divergence must name the lost entry: " + message);
+        assertTrue(message.contains("Count"), "the divergence must name the omitted key: " + message);
     }
 
     @Test

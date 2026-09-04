@@ -6,6 +6,7 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.customNameOf;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.namedBlockEntity;
@@ -26,7 +27,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for lectern-book capture: the {@link LecternSink} path (captureBook -> merge) plus vanilla's own
- * {@code new ItemStack(NBTTagCompound)} read-back (the exact form {@code TileEntityLectern.readFromNBT} uses) is a
+ * {@code ItemStack.loadItemStackFromNBT} read-back (the decode every stored-stack reader runs at this band) is a
  * self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity tag under
  * {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field
  * clobbered. Runs for both a signed <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern
@@ -95,8 +96,8 @@ class LecternSinkRoundTripTest {
 
     private static ItemStack readBackBook(NBTTagCompound merged) {
         // vanilla readFromNBT's exact read
-        ItemStack back = new ItemStack(merged.getCompoundTag("Book"));
-        assertTrue(!back.isEmpty(), "the merged Book must decode via vanilla's ItemStack(NBTTagCompound)");
+        ItemStack back = ItemStack.loadItemStackFromNBT(merged.getCompoundTag("Book"));
+        assertNotNull(back, "the merged Book must decode via vanilla's ItemStack.loadItemStackFromNBT");
         return back;
     }
 

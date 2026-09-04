@@ -6,7 +6,6 @@ package world.thearchive.wdl.testsupport;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jspecify.annotations.Nullable;
@@ -94,7 +93,7 @@ public final class BlockEntityFixtures {
     public static NBTTagCompound emptyContainerHolder(int containerSize, String blockEntityId) {
         TestRegistries.bootstrap();
         NBTTagCompound holder = new ContainerSinkImpl()
-                .captureItems(NonNullList.withSize(containerSize, ItemStack.EMPTY));
+                .captureItems(new ItemStack[containerSize]);
         holder.setString("wdl_block_entity_id", blockEntityId);
         return holder;
     }

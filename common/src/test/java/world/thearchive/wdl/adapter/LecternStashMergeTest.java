@@ -5,6 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.chunkTagWith;
@@ -72,8 +73,8 @@ class LecternStashMergeTest {
     }
 
     private static String titleAt(NBTTagCompound lecternTag) {
-        ItemStack back = new ItemStack(lecternTag.getCompoundTag("Book"));
-        assertTrue(!back.isEmpty(), "the merged lectern carries a decodable Book");
+        ItemStack back = ItemStack.loadItemStackFromNBT(lecternTag.getCompoundTag("Book"));
+        assertNotNull(back, "the merged lectern carries a decodable Book");
         return back.getTagCompound().getString("title");
     }
 

@@ -16,7 +16,6 @@ import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.util.NonNullList;
 import net.minecraft.world.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -111,8 +110,8 @@ class RiddenMountContentsFoldTest {
     }
 
     private NBTTagCompound capturedItems(ItemStack stack) {
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(0, stack);
+        ItemStack[] items = new ItemStack[27];
+        items[0] = stack;
         return sink.captureItems(items);
     }
 

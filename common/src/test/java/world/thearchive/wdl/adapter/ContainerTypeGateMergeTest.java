@@ -15,7 +15,6 @@ import java.util.Map;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
@@ -42,8 +41,8 @@ class ContainerTypeGateMergeTest {
 
     /** A 27-slot {@code "Items"} holder carrying {@code stack} at {@code slot}, tagged with the recorded type. */
     private NBTTagCompound holder(String recordedTypeId, int slot, ItemStack stack) {
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(slot, stack);
+        ItemStack[] items = new ItemStack[27];
+        items[slot] = stack;
         NBTTagCompound holder = sink.captureItems(items);
         if (recordedTypeId != null) {
             holder.setString("wdl_block_entity_id", recordedTypeId);
@@ -52,7 +51,7 @@ class ContainerTypeGateMergeTest {
     }
 
     @Test
-    void aStaleBarrelHolderDoesNotOverlayTheReplacementChest() {
+    void aStaleFurnaceHolderDoesNotOverlayTheReplacementChest() {
         BlockPos pos = new BlockPos(10, 70, 20);
         NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
 

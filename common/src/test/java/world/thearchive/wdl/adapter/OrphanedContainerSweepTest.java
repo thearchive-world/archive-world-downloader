@@ -6,6 +6,7 @@ package world.thearchive.wdl.adapter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.BlockEntityFixtures.blockEntity;
 
@@ -22,11 +23,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.DimensionType;
@@ -36,6 +35,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
+import world.thearchive.wdl.adapter.impl.ItemListNbt;
 import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
@@ -89,15 +89,15 @@ class OrphanedContainerSweepTest {
     }
 
     /** Read chunk {@code chunk} back from disk and decode the 27-slot container contents of the block entity there. */
-    private NonNullList<ItemStack> itemsOnDisk(Path region, ChunkPos chunk, int x, int y, int z)
+    private ItemStack[] itemsOnDisk(Path region, ChunkPos chunk, int x, int y, int z)
             throws IOException {
         try (WdlRegionStorage in = storage(region)) {
             NBTTagCompound back = Optional.ofNullable(in.read(chunk))
                     .orElseThrow(() -> new AssertionError("chunk missing on disk"));
             NBTTagCompound blockEntity = blockEntityAt(back, x, y, z);
             assertNotNull(blockEntity, "block entity present on disk at " + x + "," + y + "," + z);
-            NonNullList<ItemStack> decoded = NonNullList.withSize(27, ItemStack.EMPTY);
-            ItemStackHelper.loadAllItems(blockEntity, decoded);
+            ItemStack[] decoded = new ItemStack[27];
+            ItemListNbt.loadAllItems(blockEntity, decoded);
             return decoded;
         }
     }
@@ -130,8 +130,8 @@ class OrphanedContainerSweepTest {
 
         // The container is opened after its chunk was flushed, so the captured Items holder is orphaned; the fix
         // folds it onto the on-disk chest through the writer-thread rewrite.
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(0, new ItemStack(Items.DIAMOND, 5));
+        ItemStack[] items = new ItemStack[27];
+        items[0] = new ItemStack(Items.DIAMOND, 5);
         Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(chestPos, sink.captureItems(items));
 
@@ -140,10 +140,10 @@ class OrphanedContainerSweepTest {
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, chunk, holders).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
-        NonNullList<ItemStack> onDisk = itemsOnDisk(region, chunk, 2, 64, 2);
-        assertEquals(Items.DIAMOND, onDisk.get(0).getItem(), "the orphaned contents reached the on-disk chest");
-        assertEquals(5, onDisk.get(0).getCount(), "with the right count");
-        assertTrue(onDisk.get(1).isEmpty(), "the fold set only the captured slot, leaving the rest of the chest empty");
+        ItemStack[] onDisk = itemsOnDisk(region, chunk, 2, 64, 2);
+        assertEquals(Items.DIAMOND, onDisk[0].getItem(), "the orphaned contents reached the on-disk chest");
+        assertEquals(5, onDisk[0].stackSize, "with the right count");
+        assertNull(onDisk[1], "the fold set only the captured slot, leaving the rest of the chest empty");
     }
 
     @Test
@@ -193,10 +193,10 @@ class OrphanedContainerSweepTest {
         flushEmptyChunk(region, rightChunk, ImmutableList.of(blockEntity("minecraft:chest", 15, 64, 4)));
         flushEmptyChunk(region, leftChunk, ImmutableList.of(blockEntity("minecraft:chest", 16, 64, 4)));
 
-        NonNullList<ItemStack> rightItems = NonNullList.withSize(27, ItemStack.EMPTY);
-        rightItems.set(0, new ItemStack(Items.EMERALD, 3));
-        NonNullList<ItemStack> leftItems = NonNullList.withSize(27, ItemStack.EMPTY);
-        leftItems.set(0, new ItemStack(Items.GOLD_INGOT, 9));
+        ItemStack[] rightItems = new ItemStack[27];
+        rightItems[0] = new ItemStack(Items.EMERALD, 3);
+        ItemStack[] leftItems = new ItemStack[27];
+        leftItems[0] = new ItemStack(Items.GOLD_INGOT, 9);
         Map<BlockPos, NBTTagCompound> rightHolder = holder(rightHalf, sink.captureItems(rightItems));
         Map<BlockPos, NBTTagCompound> leftHolder = holder(leftHalf, sink.captureItems(leftItems));
 
@@ -207,9 +207,9 @@ class OrphanedContainerSweepTest {
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, leftChunk, leftHolder).merged());
         assertFalse(sweep.finish().get(30, TimeUnit.SECONDS).failed(), "the orphan sweep completed");
 
-        assertEquals(Items.EMERALD, itemsOnDisk(region, rightChunk, 15, 64, 4).get(0).getItem(),
+        assertEquals(Items.EMERALD, itemsOnDisk(region, rightChunk, 15, 64, 4)[0].getItem(),
                 "the right half's orphaned contents reached its on-disk chest");
-        assertEquals(Items.GOLD_INGOT, itemsOnDisk(region, leftChunk, 16, 64, 4).get(0).getItem(),
+        assertEquals(Items.GOLD_INGOT, itemsOnDisk(region, leftChunk, 16, 64, 4)[0].getItem(),
                 "the left half's orphaned contents reached its on-disk chest (no split loss)");
     }
 
@@ -223,7 +223,7 @@ class OrphanedContainerSweepTest {
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos missing = new ChunkPos(5, 5);
         Map<BlockPos, NBTTagCompound> holders = holder(new BlockPos(82, 64, 82),
-                sink.captureItems(NonNullList.withSize(27, ItemStack.EMPTY)));
+                sink.captureItems(new ItemStack[27]));
 
         AsyncSaveWriter sweep = regionWriter(region);
         sweep.submitChunkRewrite(DimensionType.OVERWORLD, missing,
@@ -248,8 +248,8 @@ class OrphanedContainerSweepTest {
         Path region = Files.createDirectories(save.resolve("region"));
         ContainerSink sink = new ContainerSinkImpl();
         ChunkPos chunk = new ChunkPos(0, 0);
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(0, new ItemStack(Items.DIAMOND, 5));
+        ItemStack[] items = new ItemStack[27];
+        items[0] = new ItemStack(Items.DIAMOND, 5);
         Map<BlockPos, NBTTagCompound> holders = holder(new BlockPos(2, 64, 2), sink.captureItems(items));
 
         AsyncSaveWriter writer = regionWriter(region);
@@ -263,7 +263,7 @@ class OrphanedContainerSweepTest {
 
         assertFalse(result.failed(), "the single-writer write-then-rewrite completed");
         assertEquals(1, result.mergedContainers(), "the orphaned container merge is counted, not silently zero");
-        assertEquals(Items.DIAMOND, itemsOnDisk(region, chunk, 2, 64, 2).get(0).getItem(),
+        assertEquals(Items.DIAMOND, itemsOnDisk(region, chunk, 2, 64, 2)[0].getItem(),
                 "the rewrite folded onto the same-session write it read back from the writer's pending storage");
     }
 

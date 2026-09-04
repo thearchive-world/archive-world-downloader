@@ -7,7 +7,6 @@ import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.NonNullList;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
@@ -43,9 +42,9 @@ public final class MapHolderFixtures {
 
     /** The captured {@code Items} holder tag for {@code stacks}, serialized through {@code sink}. */
     public static NBTTagCompound holderOf(ContainerSink sink, ItemStack... stacks) {
-        NonNullList<ItemStack> items = NonNullList.withSize(stacks.length, ItemStack.EMPTY);
+        ItemStack[] items = new ItemStack[stacks.length];
         for (int i = 0; i < stacks.length; i++) {
-            items.set(i, stacks[i]);
+            items[i] = stacks[i];
         }
         return sink.captureItems(items);
     }

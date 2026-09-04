@@ -10,27 +10,28 @@ import java.util.Map;
 import net.minecraft.block.Block;
 import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import org.jspecify.annotations.Nullable;
+
+import world.thearchive.wdl.adapter.impl.ItemListNbt;
 
 /**
  * The fixture-fidelity gate: proves a fixture tag carries the shape the vanilla producer that would have written it
  * actually emits.
  *
- * <p>The property gated is a fixed point of vanilla's own decode then encode. A block-entity tag is fed to
+ * <p>The property gated is a fixed point of the producer's own decode then encode. A block-entity tag is fed to
  * {@link TileEntity#create} and saved back through {@link TileEntity#writeToNBT}; an {@code "Items"} holder is fed to
- * {@link ItemStackHelper#loadAllItems} and saved back through {@link ItemStackHelper#saveAllItems}. A fixture built
- * from a mental model rather than from the producer differs from its own round trip, because vanilla writes keys
- * unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "Count"} on every item entry, and each block
- * entity's own always-written state). Such a fixture collapses the cases a test means to distinguish, so the test
- * passes for a reason unrelated to the behavior it names.
+ * {@link ItemListNbt#loadAllItems} and saved back through {@link ItemListNbt#saveAllItems}, this band declaring no
+ * {@code ItemStackHelper} members of those names and {@link ItemListNbt} transcribing what a vanilla container writes
+ * inline here. A fixture built from a mental model rather than from the producer differs from its own round trip,
+ * because the producer writes keys unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "Count"} on
+ * every item entry, and each block entity's own always-written state). Such a fixture collapses the cases a test means
+ * to distinguish, so the test passes for a reason unrelated to the behavior it names.
  *
  * <p>Nothing here is a key list to maintain. The producer is called, so the expected shape follows the band the tests
  * compile against.
@@ -100,9 +101,9 @@ public final class FixtureFidelity {
     }
 
     /**
-     * Fail unless {@code holderTag}'s {@code "Items"} list is exactly what {@link ItemStackHelper#saveAllItems} emits
-     * for the stacks it decodes to. Catches an entry missing {@code "Slot"}, whose load silently lands every such entry
-     * on slot 0.
+     * Fail unless {@code holderTag}'s {@code "Items"} list is exactly what {@link ItemListNbt#saveAllItems} emits for
+     * the stacks it decodes to. Catches an entry missing {@code "Slot"}, whose load silently lands every such entry on
+     * slot 0.
      */
     public static void assertItemsHolderShape(NBTTagCompound holderTag) {
         NBTBase rawItems = holderTag.getTag("Items");
@@ -112,10 +113,11 @@ public final class FixtureFidelity {
         }
         NBTTagList items = holderTag.getTagList("Items", 10);
 
-        NonNullList<ItemStack> stacks = NonNullList.withSize(containerSize(items), ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(holderTag, stacks);
+        ItemStack[] stacks = new ItemStack[containerSize(items)];
+        ItemListNbt.loadAllItems(holderTag, stacks);
 
-        NBTTagCompound output = ItemStackHelper.saveAllItems(new NBTTagCompound(), stacks);
+        NBTTagCompound output = new NBTTagCompound();
+        ItemListNbt.saveAllItems(output, stacks);
 
         List<String> divergences = new ArrayList<>();
         diff("Items", output.getTagList("Items", 10), items, divergences);

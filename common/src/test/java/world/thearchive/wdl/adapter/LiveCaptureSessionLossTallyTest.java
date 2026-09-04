@@ -34,7 +34,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.network.play.server.SPacketSpawnObject;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.village.MerchantRecipe;
@@ -269,7 +268,7 @@ class LiveCaptureSessionLossTallyTest {
             private final ContainerSink real = new ContainerSinkImpl();
 
             @Override
-            public NBTTagCompound captureItems(NonNullList<ItemStack> items) {
+            public NBTTagCompound captureItems(ItemStack[] items) {
                 return real.captureItems(items);
             }
 
@@ -433,8 +432,8 @@ class LiveCaptureSessionLossTallyTest {
 
     /** A captured 27-slot container holder carrying one stack, the open-time bundle a fold merges. */
     private NBTTagCompound capturedItems(ItemStack stack) {
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(0, stack);
+        ItemStack[] items = new ItemStack[27];
+        items[0] = stack;
         return sink.captureItems(items);
     }
 

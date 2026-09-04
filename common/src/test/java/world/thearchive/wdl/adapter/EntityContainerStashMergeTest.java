@@ -13,17 +13,16 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.adapter.impl.EntitySinkImpl;
+import world.thearchive.wdl.adapter.impl.ItemListNbt;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
@@ -49,7 +48,7 @@ class EntityContainerStashMergeTest {
     /** A band sink whose merge blows up, for the isolation cases; its capture side is never reached. */
     private static final ContainerSink THROWING_SINK = new ContainerSink() {
         @Override
-        public NBTTagCompound captureItems(NonNullList<ItemStack> items) {
+        public NBTTagCompound captureItems(ItemStack[] items) {
             throw new AssertionError("the failure path never serializes items");
         }
 
@@ -87,8 +86,8 @@ class EntityContainerStashMergeTest {
     }
 
     private NBTTagCompound holderWith(int slot, ItemStack stack) {
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(slot, stack);
+        ItemStack[] items = new ItemStack[27];
+        items[slot] = stack;
         return containerSink.captureItems(items);
     }
 
@@ -112,10 +111,10 @@ class EntityContainerStashMergeTest {
         NBTTagCompound mergedEntity = findByUuid(entities, UUID_A);
         assertEquals("minecraft:chest_minecart", mergedEntity.getString("id"),
                 "the id is preserved (no clobber)");
-        NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(mergedEntity, back);
-        assertEquals(Items.EMERALD, back.get(2).getItem(), "the chest minecart gains exactly the captured stack");
-        assertEquals(7, back.get(2).getCount());
+        ItemStack[] back = new ItemStack[27];
+        ItemListNbt.loadAllItems(mergedEntity, back);
+        assertEquals(Items.EMERALD, back[2].getItem(), "the chest minecart gains exactly the captured stack");
+        assertEquals(7, back[2].stackSize);
 
         assertFalse(findByUuid(entities, UUID_B).hasKey("Items"), "the neighbor vehicle is untouched");
     }
@@ -140,10 +139,10 @@ class EntityContainerStashMergeTest {
         NBTTagCompound minecart = findByUuid(entities, UUID_A);
         assertFalse(minecart.hasKey("Items"), "the plain minecart it was pushed under carries no contents");
         NBTTagCompound nestedMule = minecart.getTagList("Passengers", 10).getCompoundTagAt(0);
-        NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(nestedMule, back);
-        assertEquals(Items.EMERALD, back.get(2).getItem(), "the nested mule carries exactly the captured stack");
-        assertEquals(7, back.get(2).getCount());
+        ItemStack[] back = new ItemStack[27];
+        ItemListNbt.loadAllItems(nestedMule, back);
+        assertEquals(Items.EMERALD, back[2].getItem(), "the nested mule carries exactly the captured stack");
+        assertEquals(7, back[2].stackSize);
     }
 
     @Test
@@ -229,9 +228,9 @@ class EntityContainerStashMergeTest {
         assertTrue(folded.containsKey(UUID_B));
 
         NBTTagList entities = chunkTag.getTagList("Entities", 10);
-        NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(findByUuid(entities, UUID_A), back);
-        assertEquals(Items.EMERALD, back.get(2).getItem(), "this copy carries the loot rather than being empty");
+        ItemStack[] back = new ItemStack[27];
+        ItemListNbt.loadAllItems(findByUuid(entities, UUID_A), back);
+        assertEquals(Items.EMERALD, back[2].getItem(), "this copy carries the loot rather than being empty");
         assertFalse(findByUuid(entities, UUID_C).hasKey("Items"), "the unfolded neighbor is untouched");
     }
 

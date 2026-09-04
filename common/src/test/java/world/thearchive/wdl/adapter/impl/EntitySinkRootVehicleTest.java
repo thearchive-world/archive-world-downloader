@@ -16,10 +16,8 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.passive.EntityPig;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.ChunkPos;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -100,13 +98,13 @@ class EntitySinkRootVehicleTest {
         assertEquals(0, tag.getTagList("Items", 10).tagCount(),
                 "the captured mount serializes no Items of its own, so the fold is required");
 
-        NonNullList<ItemStack> contents = NonNullList.withSize(27, ItemStack.EMPTY);
-        contents.set(3, new ItemStack(Items.DIAMOND, 9));
+        ItemStack[] contents = new ItemStack[27];
+        contents[3] = new ItemStack(Items.DIAMOND, 9);
         NBTTagCompound holder = containerSink.captureItems(contents);
 
         NBTTagCompound folded = containerSink.merge(tag, holder);
 
-        NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
+        ItemStack[] back = new ItemStack[27];
         NBTTagCompound probe = new NBTTagCompound();
         probe.setTag("Items", folded.getTagList("Items", 10));
         ItemStackHelper.loadAllItems(probe, back);

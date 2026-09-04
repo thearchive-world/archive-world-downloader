@@ -4,25 +4,26 @@
 package world.thearchive.wdl.testsupport;
 
 import net.minecraft.init.Items;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 
+import world.thearchive.wdl.adapter.impl.ItemListNbt;
+
 /**
- * Item NBT built by the vanilla writers rather than by hand: {@link ItemStackHelper#saveAllItems} for an
- * {@code "Items"} list and {@code ItemStack#writeToNBT} for a single stored stack (a lectern's {@code "Book"}, a
- * jukebox's {@code "RecordItem"}).
+ * Item NBT built by the writers rather than by hand: {@link ItemListNbt#saveAllItems} for an {@code "Items"} list (this
+ * band declaring no {@code ItemStackHelper} member of that name, so the write is the band's own transcription of what a
+ * vanilla container writes inline) and {@code ItemStack#writeToNBT} for a single stored stack (a lectern's
+ * {@code "Book"}, a jukebox's {@code "RecordItem"}).
  *
- * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: vanilla always writes {@code "Slot"}
- * and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under test sees
- * every entry collapsed onto one slot.
+ * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: the writer always emits
+ * {@code "Slot"} and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under
+ * test sees every entry collapsed onto one slot.
  */
 public final class ItemFixtures {
     private ItemFixtures() {}
@@ -160,10 +161,12 @@ public final class ItemFixtures {
         for (int slot : slots) {
             size = Math.max(size, slot + 1);
         }
-        NonNullList<ItemStack> stacks = NonNullList.withSize(size, ItemStack.EMPTY);
+        ItemStack[] stacks = new ItemStack[size];
         for (int i = 0; i < slots.length; i++) {
-            stacks.set(slots[i], contents[i]);
+            stacks[slots[i]] = contents[i];
         }
-        return ItemStackHelper.saveAllItems(new NBTTagCompound(), stacks);
+        NBTTagCompound holder = new NBTTagCompound();
+        ItemListNbt.saveAllItems(holder, stacks);
+        return holder;
     }
 }
