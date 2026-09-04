@@ -1,3 +1,4 @@
+import java.util.Locale
 import java.util.Properties
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
@@ -246,14 +247,20 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 // --- Lang catalog conversion (JSON -> .lang) ---
-// MC 1.12.2 loads .lang (key=value), the format Mojang replaced at 1.13. The JSON catalog under
+// MC 1.10.2 loads .lang (key=value), the format Mojang replaced at 1.13. The JSON catalog under
 // common/src/main/resources/assets/wdl/lang stays the source of truth (LangFidelityTest/LangKeyCoverageTest/etc.
 // keep reading it, unaffected by this task); this task converts a copy to .lang at package time so the shipped
-// jar carries the format 1.12.2 expects. Uses Gradle's bundled groovy.json.JsonSlurper, no new buildscript
+// jar carries the format 1.10.2 expects. Uses Gradle's bundled groovy.json.JsonSlurper, no new buildscript
 // dependency; keys are sorted for byte-reproducibility.
 abstract class ConvertLangToProperties : DefaultTask() {
     @get:InputDirectory abstract val jsonDir: DirectoryProperty
     @get:OutputDirectory abstract val outDir: DirectoryProperty
+
+    // Simplifying this away to the source basename ships raw keys, silently: nothing fails to build, nothing
+    // throws, and checkShippedLangNames is the only gate that reads the name the jar actually carries.
+    private fun shippedBaseName(code: String): String =
+        if (!code.contains('_')) code
+        else code.substringBefore('_') + "_" + code.substringAfter('_').uppercase(Locale.ROOT)
 
     @TaskAction fun convert() {
         val out = outDir.get().asFile
@@ -261,7 +268,7 @@ abstract class ConvertLangToProperties : DefaultTask() {
         jsonDir.get().asFile.listFiles { f -> f.extension == "json" }?.sortedBy { it.name }?.forEach { json ->
             @Suppress("UNCHECKED_CAST")
             val map = groovy.json.JsonSlurper().parse(json) as Map<String, Any?>
-            val lang = out.resolve(json.nameWithoutExtension + ".lang")
+            val lang = out.resolve(shippedBaseName(json.nameWithoutExtension) + ".lang")
             lang.bufferedWriter(Charsets.UTF_8).use { w ->
                 map.toSortedMap().forEach { (k, v) ->
                     w.write("$k=${v.toString().replace("\n", " ")}"); w.write("\n")
@@ -273,7 +280,7 @@ abstract class ConvertLangToProperties : DefaultTask() {
 
 val convertLang = tasks.register<ConvertLangToProperties>("convertLang") {
     group = "build"
-    description = "Converts the JSON lang catalog to 1.12.2 .lang (key=value) for the ship jar."
+    description = "Converts the JSON lang catalog to 1.10.2 .lang (key=value, uppercase region) for the ship jar."
     jsonDir.set(layout.projectDirectory.dir("../common/src/main/resources/assets/wdl/lang"))
     outDir.set(layout.buildDirectory.dir("generated-lang/assets/wdl/lang"))
 }
@@ -479,7 +486,7 @@ val bundleFastutil = tasks.register<FastutilClosure>("bundleFastutil") {
 // which already carries the token-expanded resources (mcmod.info, accesstransformer.cfg, pack.mcmeta, common
 // assets) since remapJar repackages the "jar" task's own sourceSet output; a direct from(processResources) would
 // only re-add the identical bytes a second time. The one resource this island packages differently from
-// processResources' own output is the lang directory: MC 1.12.2 loads .lang, not the JSON Mojang adopted at
+// processResources' own output is the lang directory: MC 1.10.2 loads .lang, not the JSON Mojang adopted at
 // 1.13, so the source lang JSON is excluded here and convertLang's converted .lang output takes its place.
 // Ship the license inside the jar: GPL-3.0 section 4, which LGPL-3.0 section 0 incorporates, asks that every
 // recipient get a copy of the License with the Program, and a mod jar travels on its own far from any listing page
@@ -997,9 +1004,87 @@ val checkFastutilBundle = tasks.register<CheckFastutilBundle>("checkFastutilBund
     shippedJar.from(fastutilShipped)
 }
 
+// The basenames the ship jar must carry under assets/wdl/lang, pinned as literals in the seargeOracleClasses idiom.
+// Vanilla is uppercase-region at this band: the client jar carries assets/minecraft/lang/en_US.lang, and 92 of the
+// 93 lang entries in asset index 1.10 are uppercase-region, the one exception being Mojang's own swg_de.
+val shippedLangNames = listOf(
+    "cs_CZ.lang", "da_DK.lang", "de_DE.lang", "en_PT.lang", "en_US.lang", "es_AR.lang", "es_CL.lang",
+    "es_EC.lang", "es_ES.lang", "es_MX.lang", "es_UY.lang", "es_VE.lang", "esan.lang", "fi_FI.lang",
+    "fr_CA.lang", "fr_FR.lang", "it_IT.lang", "ja_JP.lang", "ko_KR.lang", "nl_BE.lang", "nl_NL.lang",
+    "nn_NO.lang", "no_NO.lang", "pl_PL.lang", "pt_BR.lang", "pt_PT.lang", "qcb_ES.lang", "ru_RU.lang",
+    "sv_SE.lang", "tr_TR.lang", "uk_UA.lang", "zh_CN.lang", "zh_TW.lang",
+)
+
+// Reads the finished ship jar, the only place the shipped catalog name exists. A mis-cased region never crashes.
+// One mis-cased non-English name drops that locale to the English fallback. A mis-cased en_US is the fallback
+// itself going missing, so English users see raw keys. The inherited all-lowercase form is every name at once.
+abstract class CheckShippedLangNames : DefaultTask() {
+    @get:InputFile
+    abstract val jarToScan: RegularFileProperty
+
+    @get:Input
+    abstract val expectedNames: SetProperty<String>
+
+    @TaskAction
+    fun check() {
+        val jar = jarToScan.get().asFile
+        val dir = "assets/wdl/lang/"
+        val shippedLang = sortedSetOf<String>()
+        val shippedJson = sortedSetOf<String>()
+        ZipInputStream(jar.inputStream().buffered()).use { zin ->
+            var entry = zin.nextEntry
+            while (entry != null) {
+                if (!entry.isDirectory && entry.name.startsWith(dir)) {
+                    val base = entry.name.substring(dir.length)
+                    if (base.endsWith(".lang")) shippedLang.add(base)
+                    if (base.endsWith(".json")) shippedJson.add(base)
+                }
+                entry = zin.nextEntry
+            }
+        }
+        val scanned = jar.name
+        val expected = expectedNames.get().toSortedSet()
+        val failures = ArrayList<String>()
+
+        (expected - shippedLang).forEach { want ->
+            val misCased = shippedLang.firstOrNull { it.equals(want, ignoreCase = true) }
+            failures.add(
+                if (misCased == null) "missing from $scanned: $dir$want"
+                else "missing from $scanned: $dir$want ($scanned carries $misCased, which the game never asks for)"
+            )
+        }
+
+        // The JSON is the format Mojang adopted at 1.13, so a survivor is dead weight this band cannot read.
+        shippedJson.forEach {
+            failures.add("$scanned carries the unreadable JSON source $dir$it; modJar's exclude is what drops it")
+        }
+
+        // Counted as well as matched: the missing check above is blind to a catalog the pinned list does not name.
+        if (shippedLang.size != expected.size) {
+            failures.add(
+                "$scanned carries ${shippedLang.size} entries under $dir, expected ${expected.size}: "
+                    + shippedLang.joinToString(", ")
+            )
+        }
+
+        if (failures.isNotEmpty()) {
+            throw GradleException("$name: ${failures.size} problem(s):\n" + failures.joinToString("\n"))
+        }
+        logger.lifecycle("$name: $scanned carries all ${expected.size} expected catalogs under $dir and no JSON")
+    }
+}
+
+val checkShippedLangNames = tasks.register<CheckShippedLangNames>("checkShippedLangNames") {
+    group = "verification"
+    description = "Fails if the ship jar's lang catalog is not the expected uppercase-region .lang set."
+    dependsOn(modJar)
+    jarToScan.set(modJar.flatMap { it.archiveFile })
+    expectedNames.set(shippedLangNames)
+}
+
 tasks.named("check") {
     dependsOn("checkReobf", checkShipJar, checkReobfNegative, checkForgeFloor, checkAcceptedMinecraftVersions,
-        checkFastutilBundle)
+        checkFastutilBundle, checkShippedLangNames)
 }
 
 // Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge

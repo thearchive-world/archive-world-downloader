@@ -810,8 +810,8 @@ forge/src/main/java/world/thearchive/wdl/forge/ForgeConfigGuiFactory.java
 # the mods list a screen instance directly and need no class with that constructor shape.
 forge/src/main/java/world/thearchive/wdl/forge/ForgeConfigGuiTrampoline.java
 
-# The resource pack_format tracks this band's Minecraft version: 4 for 1.13.2 (PackCompatibility.forFormat
-# accepts only 4 at this band, treating 3 and below as too old and 5 and above as too new).
+# The resource pack_format tracks this band's Minecraft version: 2 for 1.10.2, where ResourcePackListEntry accepts
+# only 2, painting anything below it as too old and anything above it as too new.
 forge/src/main/resources/pack.mcmeta
 
 # The reobf pass/negative fixtures: a band-local build-support source set that compiles a small MCP-named
