@@ -26,10 +26,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The headless guard for the id remap: {@link MapIdRemap} mirrors {@link MapIdCollector} (collect becomes set),
- * rewriting every referenced {@code minecraft:map_id} to a resolver-supplied archive id across the same surfaces
- * (top-level, a container item's {@code minecraft:container}, a bundle's {@code minecraft:bundle_contents}). Collecting
- * after the remap is the oracle: the remapped set must equal the resolver applied to the original set, proving the walk
- * touches exactly the ids the collector reads.
+ * rewriting every referenced map id, the item-level {@code Damage} short at this band, to a resolver-supplied archive
+ * id across the same surfaces (top-level, a container item's {@code tag.BlockEntityTag.Items}, a bundle's
+ * {@code tag.Items}). Collecting after the remap is the oracle: the remapped set must equal the resolver applied to the
+ * original set, proving the walk touches exactly the ids the collector reads.
  */
 class MapIdRemapTest {
     private final ContainerSink sink = new ContainerSinkImpl();

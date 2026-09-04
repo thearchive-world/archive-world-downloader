@@ -147,8 +147,8 @@ class ContainerStashMergeTest {
     void whitelistedStateKeysReachTheMergedBlockEntity() {
         // Gate 1 (recordedTypeMatches) runs before the merge and drops the entry when the holder's
         // wdl_block_entity_id does not equal the block entity's saved id, so the block entity id here MUST be
-        // minecraft:brewing_stand to match the holder's claim, or all four state-key assertions would fail on correct
-        // code.
+        // Cauldron, the name this band registers the brewing stand under, to match the holder's claim, or all four
+        // state-key assertions would fail on correct code.
         BlockPos pos = new BlockPos(10, 70, 20);
         NBTTagCompound chunkTag = chunkTagWith(blockEntity("Cauldron", 10, 70, 20));
 

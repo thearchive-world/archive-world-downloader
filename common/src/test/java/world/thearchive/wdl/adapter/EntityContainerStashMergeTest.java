@@ -95,7 +95,7 @@ class EntityContainerStashMergeTest {
     void mergeEntityStashFillsTheMatchingEntityAndDrainsOnlyThatEntry() {
         NBTTagCompound chunkTag = entitiesChunkTag(
                 entityTag("MinecartChest", UUID_A),
-                entityTag("MinecartChest", UUID_B)); // a neighbor vehicle that must stay untouched
+                entityTag("MinecartHopper", UUID_B)); // a neighbor vehicle of another type that must stay untouched
 
         Map<UUID, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(UUID_A, holderWith(2, new ItemStack(Items.EMERALD, 7)));

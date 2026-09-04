@@ -43,8 +43,9 @@ class ChunkMergeTest {
 
     /**
      * A second container type distinct from chest, so a same-position type change can be shown; furnace here. Not
-     * trapped chest: at 1.12.2 the trapped chest hosts the same {@code TileEntityChest} class as a regular chest, so
-     * its saved {@code "id"} is the identical {@code minecraft:chest}, not a distinct type a merge could tell apart.
+     * trapped chest: {@code BlockChest.createNewTileEntity} answers both chest types with the same
+     * {@code TileEntityChest} at this band, so a trapped chest's saved {@code "id"} is the identical {@code Chest}, not
+     * a distinct type a merge could tell apart.
      */
     private static NBTTagCompound furnace(int x, int y, int z, String... itemIds) {
         return container("Furnace", x, y, z, itemIds);
