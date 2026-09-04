@@ -5,7 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.NonNullList;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Per-band container-capture axis: serialize an open container's items into the vanilla block-entity {@code "Items"}
@@ -13,7 +13,7 @@ import net.minecraft.util.NonNullList;
  * the player has the container open (via {@code ClientboundContainerSetContentPacket}), never in the chunk packet, so a
  * captured chunk's chest is structurally present but empty until this axis fills it in.
  *
- * <p>The live step ({@link #captureItems(NonNullList)}) serializes the items lifted from the open menu's container
+ * <p>The live step ({@link #captureItems(ItemStack[])}) serializes the items lifted from the open menu's container
  * slots. The pure step ({@link #merge(NBTTagCompound, NBTTagCompound)}) sets {@code "Items"} on a copy of an
  * already-captured block-entity tag.
  *
@@ -22,11 +22,11 @@ import net.minecraft.util.NonNullList;
  */
 public interface ContainerSink {
     /**
-     * Serialize {@code items} (a container-sized list with each captured stack at its container-slot index, empty slots
-     * are {@code ItemStack.EMPTY}) into a holder {@link NBTTagCompound} carrying the vanilla {@code "Items"} list (slot
-     * byte + stack), exactly as a block entity would save it. Server-free.
+     * Serialize {@code items} (a container-sized array with each captured stack at its container-slot index, empty
+     * slots are null) into a holder {@link NBTTagCompound} carrying the vanilla {@code "Items"} list (slot byte +
+     * stack), exactly as a block entity would save it. Server-free.
      */
-    NBTTagCompound captureItems(NonNullList<ItemStack> items);
+    NBTTagCompound captureItems(@Nullable ItemStack[] items);
 
     /**
      * Set {@code "Items"} on a copy of {@code blockEntityTag} from {@code capturedItemsHolder}, leaving every other

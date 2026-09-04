@@ -211,6 +211,7 @@ public final class EntitySinkImpl implements EntitySink {
     /** The single-key patch a live mount's saved tag owes. */
     private static @Nullable NBTTagCompound wornMountArmor(Entity entity) {
         String key;
+        @Nullable
         ItemStack stack;
         if (entity instanceof EntityHorse) {
             key = "ArmorItem";
@@ -225,7 +226,7 @@ public final class EntitySinkImpl implements EntitySink {
         } else {
             return null;
         }
-        if (stack.isEmpty()) {
+        if (stack == null) {
             return null;
         }
         NBTTagCompound worn = new NBTTagCompound();
@@ -239,12 +240,12 @@ public final class EntitySinkImpl implements EntitySink {
      * rather than reading as NONE; catching it costs one horse's armor where letting it out would cost the whole
      * chunk's entities.
      */
-    private static ItemStack horseArmor(EntityHorse horse) {
+    private static @Nullable ItemStack horseArmor(EntityHorse horse) {
         HorseArmorType tier;
         try {
             tier = horse.getHorseArmorType();
         } catch (ArrayIndexOutOfBoundsException e) {
-            return ItemStack.EMPTY;
+            return null;
         }
         switch (tier) {
             case IRON:
@@ -254,7 +255,7 @@ public final class EntitySinkImpl implements EntitySink {
             case DIAMOND:
                 return new ItemStack(Items.DIAMOND_HORSE_ARMOR);
             default:
-                return ItemStack.EMPTY;
+                return null;
         }
     }
 

@@ -3,16 +3,16 @@
 
 package world.thearchive.wdl.adapter.impl;
 
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.NonNullList;
+import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
 /**
- * 1.11.2 container sink: serializes an open container's items via vanilla's own {@code ItemStackHelper.saveAllItems}
- * and merges them into a captured block-entity tag.
+ * 1.10.2 container sink: serializes an open container's items into the vanilla {@code "Items"} shape and merges them
+ * into a captured block-entity tag. {@code ItemStackHelper} declares no {@code saveAllItems} below 1.11, so the write
+ * is this band's own {@link ItemListNbt#saveAllItems}, transcribed from what a vanilla container writes inline here.
  *
  * <p>Two steps (see {@link ContainerSink}): {@link #captureItems} serializes the live menu's container slots and
  * {@link #merge} sets {@code "Items"} on a copy of an already-captured block-entity tag (pure, so the headless
@@ -25,10 +25,10 @@ public final class ContainerSinkImpl implements ContainerSink {
      * map-id remap, the coordinate scrub or the save writer could reach.
      */
     @Override
-    public NBTTagCompound captureItems(NonNullList<ItemStack> items) {
+    public NBTTagCompound captureItems(@Nullable ItemStack[] items) {
         // saveAllItems writes the non-empty stacks under "Items", each a compound carrying its slot index.
         NBTTagCompound tag = new NBTTagCompound();
-        ItemStackHelper.saveAllItems(tag, items);
+        ItemListNbt.saveAllItems(tag, items);
         return tag.copy();
     }
 

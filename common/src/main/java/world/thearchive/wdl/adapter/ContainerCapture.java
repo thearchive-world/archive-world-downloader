@@ -21,7 +21,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityChest;
 import net.minecraft.tileentity.TileEntityEnderChest;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
@@ -313,16 +312,17 @@ final class ContainerCapture {
             return null; // bound but no block slots this tick; nothing to capture
         }
         int size = blockContainer.getSizeInventory();
-        NonNullList<ItemStack> items = NonNullList.withSize(size, ItemStack.EMPTY);
-        // 1.12.2 Slot has no container-slot accessor, so the container index is the menu order of the non-player
-        // slots: a client block container adds its slots consecutively in container-index order.
+        @Nullable
+        ItemStack[] items = new ItemStack[size];
+        // The container index is the menu order of the non-player slots: a client block container adds its
+        // slots consecutively in container-index order.
         int index = 0;
         for (Slot slot : menu.inventorySlots) {
             if (slot.inventory == playerInventory) {
                 continue;
             }
             if (index < size) {
-                items.set(index, slot.getStack());
+                items[index] = slot.getStack();
             }
             index++;
         }
@@ -349,7 +349,7 @@ final class ContainerCapture {
     @Nullable
     NBTTagCompound captureChestSlots(Container menu, EntityPlayerSP player) {
         IInventory playerInventory = player.inventory;
-        List<ItemStack> chest = new ArrayList<>();
+        List<@Nullable ItemStack> chest = new ArrayList<>();
         for (int i = SLOT_INVENTORY_START; i < menu.inventorySlots.size(); i++) {
             Slot slot = menu.inventorySlots.get(i);
             if (slot.inventory != playerInventory) {
@@ -361,9 +361,10 @@ final class ContainerCapture {
         if (chest.isEmpty()) {
             return null; // bound but no chest slots this tick; nothing to capture
         }
-        NonNullList<ItemStack> items = NonNullList.withSize(chest.size(), ItemStack.EMPTY);
+        @Nullable
+        ItemStack[] items = new ItemStack[chest.size()];
         for (int i = 0; i < chest.size(); i++) {
-            items.set(i, chest.get(i));
+            items[i] = chest.get(i);
         }
         return adapter.containerSink().captureItems(items);
     }
@@ -379,18 +380,18 @@ final class ContainerCapture {
     @Nullable
     NBTTagCompound captureHalfSlots(Container menu, EntityPlayerSP player, int low, int high) {
         IInventory playerInventory = player.inventory;
-        NonNullList<ItemStack> items = NonNullList.withSize(high - low, ItemStack.EMPTY);
+        @Nullable
+        ItemStack[] items = new ItemStack[high - low];
         boolean any = false;
-        // 1.12.2 Slot has no container-slot accessor, so the container index is the menu order of the non-player
-        // slots. The client double-chest menu is one InventoryLargeChest(54) with contiguous indices 0..53, so menu
-        // order equals the container index.
+        // The container index is the menu order of the non-player slots. The client double-chest menu is one
+        // InventoryLargeChest(54) with contiguous indices 0..53, so menu order equals the container index.
         int index = 0;
         for (Slot slot : menu.inventorySlots) {
             if (slot.inventory == playerInventory) {
                 continue;
             }
             if (index >= low && index < high) {
-                items.set(index - low, slot.getStack());
+                items[index - low] = slot.getStack();
                 any = true;
             }
             index++;

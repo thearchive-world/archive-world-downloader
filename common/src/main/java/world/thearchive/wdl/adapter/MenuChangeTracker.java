@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 final class MenuChangeTracker {
     static final int[] NO_DATA = new int[0];
 
-    private ItemStack @Nullable [] lastStacks;
+    private @Nullable ItemStack @Nullable [] lastStacks;
     private int @Nullable [] lastCounts;
     private int @Nullable [] lastData;
     private int lastPage;
@@ -33,6 +33,7 @@ final class MenuChangeTracker {
      * nothing to compare against, and the stash must run at least once).
      */
     boolean changedSince(List<Slot> slots, int page, int[] data) {
+        @Nullable
         ItemStack[] stacks = lastStacks;
         int[] counts = lastCounts;
         if (stacks == null || counts == null || stacks.length != slots.size()
@@ -41,8 +42,9 @@ final class MenuChangeTracker {
             return true;
         }
         for (int i = 0; i < stacks.length; i++) {
+            @Nullable
             ItemStack current = slots.get(i).getStack();
-            if (current != stacks[i] || current.getCount() != counts[i]) {
+            if (current != stacks[i] || countOf(current) != counts[i]) {
                 snapshot(slots, page, data);
                 return true;
             }
@@ -59,6 +61,7 @@ final class MenuChangeTracker {
     }
 
     private void snapshot(List<Slot> slots, int page, int[] data) {
+        @Nullable
         ItemStack[] stacks = lastStacks;
         int[] counts = lastCounts;
         if (stacks == null || counts == null || stacks.length != slots.size()) {
@@ -68,11 +71,17 @@ final class MenuChangeTracker {
             lastCounts = counts;
         }
         for (int i = 0; i < stacks.length; i++) {
+            @Nullable
             ItemStack current = slots.get(i).getStack();
             stacks[i] = current;
-            counts[i] = current.getCount();
+            counts[i] = countOf(current);
         }
         lastData = data.clone();
         lastPage = page;
+    }
+
+    /** An empty slot is a null stack at this band, and counts zero. */
+    private static int countOf(@Nullable ItemStack stack) {
+        return stack == null ? 0 : stack.stackSize;
     }
 }

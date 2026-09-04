@@ -95,8 +95,8 @@ public final class OpenClickTracker {
      * state owes no open and must not be latched.
      */
     private static boolean suppressesBlockUse(EntityPlayer player) {
-        boolean haveSomethingInOurHands = !player.getHeldItemMainhand().isEmpty()
-                || !player.getHeldItemOffhand().isEmpty();
+        boolean haveSomethingInOurHands = player.getHeldItemMainhand() != null
+                || player.getHeldItemOffhand() != null;
         return player.isSneaking() && haveSomethingInOurHands;
     }
 

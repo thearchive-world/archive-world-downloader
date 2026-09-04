@@ -47,6 +47,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 # offset cell, gated by EntityPlayer.canPlayerEdit and World.mayPlace), and there is no BlockEntityType registry,
 # so the placed shulker's block-entity id is TileEntity.getKey(TileEntityShulkerBox.class). The NBT and item/block
 # API is classic MCP (getSubCompound, ItemStack.writeToNBT, Block.getBlockFromItem, ExtendedBlockStorage.get).
+# Below 1.11 the held stack is null for an empty hand, so the jukebox insert and the placement each test for null ahead
+# of their first read of it rather than asking the stack whether it is empty.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
 # Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
@@ -530,6 +532,8 @@ common/src/main/java/world/thearchive/wdl/adapter/MapSink.java
 # the change signal snapshots a value copy of that tag rather than reference-comparing the (immutable,
 # always-swapped) component.
 # Below 1.13 the slot stack is read through the classic Slot.getStack and ItemStack is net.minecraft.item.
+# Below 1.11 that read answers null for an empty slot and a stack's count is the public stackSize field rather than
+# getCount, so the per-slot count the change signal compares reads zero for a null slot.
 common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
 
 # Below 1.20.5 MerchantOffers has no CODEC, so the offers holder is written via the vanilla
@@ -650,6 +654,8 @@ common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
 # identical TileEntityChest kinds (doubleChestPartner). The open menu is the classic Container/ContainerChest over
 # IInventory-backed slots (menu.inventorySlots, slot.inventory, getSizeInventory, Slot.getStack), and the
 # RayTraceResult and item/block API are classic MCP.
+# Below 1.11 the empty stack is null rather than a sentinel and there is no NonNullList, so each of the three slot
+# lifts fills a plain ItemStack[] sized to its own range and leaves an empty slot null.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so the compressed write takes a File
@@ -795,6 +801,8 @@ forge/src/reobftest/**
 # this band's Forge publishes no ENTITIES registry to read a domain from, so the vanilla-namespace test becomes
 # membership in EntityList's own registered name set, less the modid-qualified names Forge adds to it for mod
 # entities.
+# Below 1.11 getHeldItemMainhand and getHeldItemOffhand answer null for an empty hand, so the sneak-suppression gate's
+# non-empty-hand test is a null test.
 common/src/main/java/world/thearchive/wdl/adapter/OpenClickTracker.java
 
 # Below the 1.19 registry-sync rework the client receives the dimension type inline (a keyless Holder.Direct), so
@@ -1084,9 +1092,10 @@ common/src/main/java/world/thearchive/wdl/adapter/SectionKey.java
 # getChunkDataOutputStream and CompressedStreamTools, the pre-NbtIo name. Below 1.11 ChunkPos names its coordinate fields chunkXPos and chunkZPos rather than x and z.
 common/src/main/java/world/thearchive/wdl/adapter/WdlRegionStorage.java
 
-# Below 1.13 there is no Mojang mapping, so this container-capture seam names classic MCP NBTTagCompound/ItemStack and
-# NonNullList (net.minecraft.util) rather than CompoundTag/ItemStack and NonNullList (net.minecraft.core); the on-disk
-# Items shape underneath is unchanged.
+# Below 1.13 there is no Mojang mapping, so this container-capture seam names classic MCP NBTTagCompound/ItemStack
+# rather than CompoundTag/ItemStack; the on-disk Items shape underneath is unchanged.
+# Below 1.11 there is no NonNullList and no empty-stack sentinel, so the captured slots travel as a plain ItemStack[]
+# whose empty slots are null, the array form the two ItemStackHelper members this band does declare already take.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerSink.java
 
 # Below 1.13 there is no Mojang mapping, so this entity-capture seam names classic MCP Entity/NBTTagCompound and ChunkPos

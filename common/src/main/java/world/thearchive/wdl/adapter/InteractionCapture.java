@@ -293,6 +293,7 @@ public final class InteractionCapture {
     }
 
     private void recognize(EntityPlayer player, World level, EnumHand hand, RayTraceResult hit) {
+        @Nullable
         ItemStack stack = player.getHeldItem(hand);
         // getBlockPos may return a MutableBlockPos; the stash key must be immutable, like every stash.
         BlockPos clicked = hit.getBlockPos().toImmutable();
@@ -309,8 +310,8 @@ public final class InteractionCapture {
         }
     }
 
-    boolean recordJukeboxInsert(IBlockState state, BlockPos pos, ItemStack stack) {
-        if (state.getValue(BlockJukebox.HAS_RECORD) || !(stack.getItem() instanceof ItemRecord)
+    boolean recordJukeboxInsert(IBlockState state, BlockPos pos, @Nullable ItemStack stack) {
+        if (stack == null || state.getValue(BlockJukebox.HAS_RECORD) || !(stack.getItem() instanceof ItemRecord)
                 || !isCapturable(pos)) {
             return false; // an occupied jukebox ejects; only a playable disc inserts, and only where it can confirm
         }
@@ -318,8 +319,10 @@ public final class InteractionCapture {
         return true;
     }
 
-    private void recordPlace(EntityPlayer player, RayTraceResult hit, ItemStack stack) {
-        if (!(stack.getItem() instanceof ItemBlock)) {
+    private void recordPlace(EntityPlayer player, RayTraceResult hit, @Nullable ItemStack stack) {
+        // An empty hand is a null stack at this band, so the emptiness test has to precede the first read of the
+        // stack rather than sit in the placement gate below.
+        if (stack == null || !(stack.getItem() instanceof ItemBlock)) {
             return;
         }
         // The same question vanilla's own ItemBlock.onItemUse asks before it places, one step earlier on the same
@@ -334,7 +337,7 @@ public final class InteractionCapture {
         EnumFacing facing = hit.sideHit;
         IBlockState clickedState = level.getBlockState(clicked);
         BlockPos placedPos = clickedState.getBlock().isReplaceable(level, clicked) ? clicked : clicked.offset(facing);
-        if (stack.isEmpty() || !player.canPlayerEdit(placedPos, facing, stack)
+        if (!player.canPlayerEdit(placedPos, facing, stack)
                 || !level.mayPlace(placeBlock, placedPos, false, facing, player)) {
             return;
         }
