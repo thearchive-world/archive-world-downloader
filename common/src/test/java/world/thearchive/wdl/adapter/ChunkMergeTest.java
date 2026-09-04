@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.BlockPos;
@@ -359,8 +358,9 @@ class ChunkMergeTest {
         assertFalse(fresh.getBoolean("isLightOn"),
                 "on-disk isLightOn must not carry onto a gate-false fresh chunk");
         boolean anyLightCarried = false;
-        for (NBTBase sectionTag : fresh.getTagList("sections", 10)) {
-            NBTTagCompound section = (NBTTagCompound) sectionTag;
+        NBTTagList sections = fresh.getTagList("sections", 10);
+        for (int i = 0; i < sections.tagCount(); i++) {
+            NBTTagCompound section = (NBTTagCompound) sections.get(i);
             if (section.hasKey("BlockLight", 7) || section.hasKey("SkyLight", 7)) {
                 anyLightCarried = true;
             }
@@ -457,8 +457,8 @@ class ChunkMergeTest {
                         + "overwrite the fresher one, since vanilla's load is a last-write-wins set");
         NBTTagList merged = (NBTTagList) findByPos(fresh, 4, 64, 9).getTag("Items");
         boolean slot1IsFresherBook = false;
-        for (NBTBase entryTag : merged) {
-            NBTTagCompound entry = (NBTTagCompound) entryTag;
+        for (int i = 0; i < merged.tagCount(); i++) {
+            NBTTagCompound entry = (NBTTagCompound) merged.get(i);
             if ((entry.hasKey("Slot") ? entry.getByte("Slot") : (byte) -1) == 1
                     && "minecraft:enchanted_book".equals(entry.getString("id"))) {
                 slot1IsFresherBook = true;
