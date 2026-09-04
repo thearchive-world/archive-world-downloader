@@ -42,8 +42,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 # writes none of those keys (they are 1.19 additions), so at this band they are a benign rename-only carry, harmless
 # on read. Below 1.20.5 there are no item components, so the RecordItem write is ItemStack#save rather than
 # ItemStack.CODEC.
-# This band's java_version is 16, where sealed interfaces are only a preview feature, so the Candidate type is a plain
-# interface and confirm() is an if/instanceof chain rather than a pattern-matching switch.
+# This band compiles on Java 8, which has neither sealed types nor a pattern-matching switch, so the Candidate type
+# is a plain interface and confirm() is an if/instanceof chain.
 # Below 1.13 there is no unified UseOnContext/BlockPlaceContext: the placement gate reproduces vanilla
 # ItemBlock.onItemUse positional math directly (the clicked cell when the clicked block is replaceable, else the
 # offset cell, gated by EntityPlayer.canPlayerEdit and World.canBlockBePlaced, which is handed the held stack
@@ -178,6 +178,13 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
 # The snapshot fixture carries the band's ChunkSnapshotSource.SectionData rather than the vanilla
 # SerializableChunkData.SectionData that exists only at 1.21.2 and above.
 common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkCodecImplTest.java
+
+# The pre-Flattening chunk key gate, which the bands above the Flattening have no subject for: it pins the classic
+# Anvil root DataVersion and the flat numeric section (Blocks, Data, the int[256] HeightMap, the byte[256] Biomes)
+# together with the explicit absence of the McRegion V byte, the post-Flattening Heightmaps and Status keys and the
+# section Palette/BlockStates pair. A wrong-but-self-consistent encode passes a symmetric round trip, so this is the
+# only gate that sees it.
+common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkVanillaKeyShapeTest.java
 
 # The sky-light content gate, new at this band. Below 1.11 WorldProvider has no hasSkyLight, so the capture reads the
 # inverse of hasNoSky; the gate drives capture through the real per-dimension provider in all three dimensions and
@@ -817,9 +824,9 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.j
 # connection tee and mount reader. forge/build.gradle.kts is excluded from the diff as a *.gradle.kts.
 forge/src/main/resources/mcmod.info
 
-# The other half of the same manifest split: the parent bands ship only mods.toml, which the loader at this band
-# cannot read, so this band ships only the mcmod.info above and mods.toml is absent. Listed so the propagation diff
-# reads its absence as the intended band shape rather than as a dropped file.
+# The other half of the same manifest split: the 1.13.2-and-above Forge bands ship only mods.toml, which the loader
+# at this band cannot read, so this band ships only the mcmod.info above and mods.toml is absent. Listed so the
+# propagation diff reads its absence as the intended band shape rather than as a dropped file.
 forge/src/main/resources/META-INF/mods.toml
 
 # The access transformer is re-pinned per band. This band keeps the classic SRG field_NNNNN_ member scheme (the
