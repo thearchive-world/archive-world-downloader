@@ -57,8 +57,7 @@ final class EntityMerge {
         NBTTagList freshEntities = (NBTTagList) fresh.getTag("Entities");
         NBTTagList diskEntities = (NBTTagList) onDisk.getTag("Entities");
         Map<UUID, NBTTagCompound> diskNodes = new LinkedHashMap<>();
-        for (int i = 0; i < diskEntities.tagCount(); i++) {
-            NBTBase element = diskEntities.get(i);
+        for (NBTBase element : NbtElements.of(diskEntities)) {
             if (element instanceof NBTTagCompound) {
                 NBTTagCompound diskEntity = (NBTTagCompound) element;
                 diskNodes.putAll(EntityTreeWalk.byUuid(diskEntity));
@@ -66,8 +65,7 @@ final class EntityMerge {
         }
         Set<UUID> freshUuids = new HashSet<>();
         int merged = 0;
-        for (int i = 0; i < freshEntities.tagCount(); i++) {
-            NBTBase element = freshEntities.get(i);
+        for (NBTBase element : NbtElements.of(freshEntities)) {
             if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
@@ -97,8 +95,7 @@ final class EntityMerge {
         // unconditionally rather than dropped: the contract is over-capture over under-capture, and dropping it
         // would silently lose existing world data. A keyed one is carried only when the fresh set lacks it, matched
         // against the whole fresh tree so an entity that moved into or out of a vehicle is deduped, not duplicated.
-        for (int i = 0; i < diskEntities.tagCount(); i++) {
-            NBTBase element = diskEntities.get(i);
+        for (NBTBase element : NbtElements.of(diskEntities)) {
             if (!(element instanceof NBTTagCompound)) {
                 continue;
             }

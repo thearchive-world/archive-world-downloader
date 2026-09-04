@@ -84,8 +84,7 @@ final class RecoveredScan {
         Long2IntOpenHashMap bookshelves = bookshelfSlotsByDimension.computeIfAbsent(dimension,
                 key -> new Long2IntOpenHashMap());
         boolean grew = false;
-        for (int i = 0; i < blockEntities.tagCount(); i++) {
-            NBTBase element = blockEntities.get(i);
+        for (NBTBase element : NbtElements.of(blockEntities)) {
             NBTTagCompound blockEntity = element instanceof NBTTagCompound ? (NBTTagCompound) element : null;
             if (blockEntity == null || !hasCoordinates(blockEntity)) {
                 continue;
@@ -118,8 +117,7 @@ final class RecoveredScan {
         }
         NBTTagList entities = (NBTTagList) onDiskChunkTag.getCompoundTag("Level").getTag("Entities");
         boolean grew = false;
-        for (int i = 0; i < entities.tagCount(); i++) {
-            NBTBase element = entities.get(i);
+        for (NBTBase element : NbtElements.of(entities)) {
             if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
@@ -153,8 +151,7 @@ final class RecoveredScan {
         }
         NBTTagList items = (NBTTagList) blockEntity.getTag("Items");
         int mask = 0;
-        for (int i = 0; i < items.tagCount(); i++) {
-            NBTBase element = items.get(i);
+        for (NBTBase element : NbtElements.of(items)) {
             if (element instanceof NBTTagCompound) {
                 NBTTagCompound entry = (NBTTagCompound) element;
                 // 0xFF default, not 0: a malformed entry with no Slot must drop on the range check below, not

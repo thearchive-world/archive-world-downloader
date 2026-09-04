@@ -108,8 +108,7 @@ final class ChunkMerge {
             return 0;
         }
         int merged = 0;
-        for (int i = 0; i < freshBlockEntities.tagCount(); i++) {
-            NBTBase element = freshBlockEntities.get(i);
+        for (NBTBase element : NbtElements.of(freshBlockEntities)) {
             if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
@@ -215,8 +214,7 @@ final class ChunkMerge {
         if (!(x instanceof NBTTagInt) || !(y instanceof NBTTagInt) || !(z instanceof NBTTagInt) || id == null) {
             return null;
         }
-        for (int i = 0; i < diskBlockEntities.tagCount(); i++) {
-            NBTBase element = diskBlockEntities.get(i);
+        for (NBTBase element : NbtElements.of(diskBlockEntities)) {
             NBTTagCompound diskBlockEntity = element instanceof NBTTagCompound ? (NBTTagCompound) element : null;
             if (diskBlockEntity != null && id.equals(diskBlockEntity.getTag("id"))
                     && x.equals(diskBlockEntity.getTag("x")) && y.equals(diskBlockEntity.getTag("y"))

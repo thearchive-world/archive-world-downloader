@@ -29,8 +29,7 @@ final class ItemTreeWalk {
      * without a leading {@code "Slot"}); a non-compound element is skipped.
      */
     static void forEachItem(NBTTagList items, Consumer<NBTTagCompound> onItem) {
-        for (int i = 0; i < items.tagCount(); i++) {
-            NBTBase element = items.get(i);
+        for (NBTBase element : NbtElements.of(items)) {
             if (element instanceof NBTTagCompound) {
                 forEachItem((NBTTagCompound) element, onItem);
             }

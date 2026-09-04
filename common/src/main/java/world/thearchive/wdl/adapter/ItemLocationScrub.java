@@ -106,8 +106,7 @@ final class ItemLocationScrub {
         }
         if (entity.getTag(PASSENGERS) instanceof NBTTagList) {
             NBTTagList passengers = (NBTTagList) entity.getTag(PASSENGERS);
-            for (int i = 0; i < passengers.tagCount(); i++) {
-                NBTBase element = passengers.get(i);
+            for (NBTBase element : NbtElements.of(passengers)) {
                 if (element instanceof NBTTagCompound) {
                     NBTTagCompound passenger = (NBTTagCompound) element;
                     scrubEntity(passenger);
@@ -134,8 +133,7 @@ final class ItemLocationScrub {
             blockEntityTag.removeTag(FLOWER_POS);
             if (blockEntityTag.getTag(BEES) instanceof NBTTagList) {
                 NBTTagList bees = (NBTTagList) blockEntityTag.getTag(BEES);
-                for (int i = 0; i < bees.tagCount(); i++) {
-                    NBTBase element = bees.get(i);
+                for (NBTBase element : NbtElements.of(bees)) {
                     NBTTagCompound occupant = element instanceof NBTTagCompound ? (NBTTagCompound) element : null;
                     if (occupant != null && occupant.getTag(ENTITY_DATA) instanceof NBTTagCompound) {
                         NBTTagCompound entityData = (NBTTagCompound) occupant.getTag(ENTITY_DATA);

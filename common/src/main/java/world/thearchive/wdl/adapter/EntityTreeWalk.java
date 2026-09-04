@@ -43,8 +43,7 @@ final class EntityTreeWalk {
         }
         if (node.getTag("Passengers") instanceof NBTTagList) {
             NBTTagList passengers = (NBTTagList) node.getTag("Passengers");
-            for (int i = 0; i < passengers.tagCount(); i++) {
-                NBTBase element = passengers.get(i);
+            for (NBTBase element : NbtElements.of(passengers)) {
                 if (element instanceof NBTTagCompound) {
                     NBTTagCompound passenger = (NBTTagCompound) element;
                     index(passenger, nodes);

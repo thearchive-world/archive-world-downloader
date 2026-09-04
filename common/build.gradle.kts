@@ -176,6 +176,7 @@ pitest {
         "world.thearchive.wdl.adapter.ItemLocationScrub",
         "world.thearchive.wdl.adapter.MerchantOfferCapture",
         "world.thearchive.wdl.adapter.ItemTreeWalk",
+        "world.thearchive.wdl.adapter.NbtElements",
         "world.thearchive.wdl.adapter.NbtMerge",
         "world.thearchive.wdl.adapter.PlayerProgressSerializer",
         "world.thearchive.wdl.adapter.PlayerTag",
