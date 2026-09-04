@@ -24,11 +24,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * Pins the 1.10.2 natural-spawn equipment table: an item outside a type's pool in a pickup-fillable slot is a proven
  * loot pickup (persistence restored), an item inside the pool is ambiguous (left alone), the offhand is never inferred,
- * and unknown types are never inferred. There is no {@code EntityType} type-object before 1.13, so a mob is
- * discriminated by its classic {@link net.minecraft.entity.EntityList} registry name, a bare unnamespaced
- * {@code String}; the drowned and its trident, the 1.14 raid ominous banner, and the 1.11 vindicator and vex are all
- * absent at this band and are dropped from the table this pins. The wither skeleton is not a registration here either,
- * so its key is the variant name {@code profileKey} splits back out of the one {@code Skeleton} registration.
+ * and unknown types are never inferred. A mob is discriminated by its classic {@link net.minecraft.entity.EntityList}
+ * registry name; the wither skeleton is not a registration here, so its key is the variant name {@code profileKey}
+ * splits back out of the one {@code Skeleton} registration.
  */
 class NaturalEquipmentTest {
     private static final String ZOMBIE = "Zombie";

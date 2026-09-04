@@ -400,8 +400,8 @@ final class ContainerCapture {
         @Nullable
         ItemStack[] items = new ItemStack[high - low];
         boolean any = false;
-        // The container index is the menu order of the non-player slots. The client double-chest menu is one
-        // InventoryLargeChest(54) with contiguous indices 0..53, so menu order equals the container index.
+        // The container index is the menu order of the non-player slots: a client block container adds its
+        // slots consecutively in container-index order.
         int index = 0;
         for (Slot slot : menu.inventorySlots) {
             if (slot.inventory == playerInventory) {

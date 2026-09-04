@@ -447,12 +447,12 @@ final class EntityPacketCapture
      * resolution; the minecart id defers its subtype to the packet data, so the caller resolves that ahead of this
      * default resolution.
      *
-     * <p>These are this band's own unnamespaced CamelCase registration names, taken from the {@code EntityList} mapping
-     * table rather than re-cased from the namespaced ids the bands above name: several differ by more than case
-     * ({@code PrimedTnt}, {@code FallingSand}, {@code ThrownEnderpearl}, {@code FireworksRocketEntity}), so a
-     * mechanical transform is wrong on them. A name this band does not register costs more than a lost entity:
-     * {@code createEntityByIDFromName} builds {@code createEntityByName("Pig", level)} whenever the name it is handed
-     * resolves to no class, so a stale row would archive a pig at the object's position.
+     * <p>These are this band's own unnamespaced CamelCase registration names, and several differ from the namespaced
+     * spelling by more than case ({@code PrimedTnt}, {@code FallingSand}, {@code ThrownEnderpearl},
+     * {@code FireworksRocketEntity}), so re-casing the ids the bands above name is wrong on them. A name this band does
+     * not register costs more than a lost entity: {@code createEntityByIDFromName} falls back to
+     * {@code createEntityByName("Pig", level)} whenever the name it is handed resolves to no class, so a stale row
+     * would archive a pig at the object's position.
      */
     static @Nullable String objectEntityName(int spawnObjectType) {
         switch (spawnObjectType) {

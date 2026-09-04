@@ -432,10 +432,8 @@ class ContainerAssociationTest {
     // --- openChestedAnimal: the chested-animal sibling. A donkey or mule is recognized by the player looking at
     // (or riding) a chested mount whose own chest size matches the menu's CHEST-slot count. Like the entity
     // sibling there is no block pos: the bind target (the entity UUID) lives in the adapter, so this returns a
-    // plain bound/dropped flag and boundPos() carries only the "a menu is bound" signal. It earns its own kind
-    // (not ENTITY) because the chest-only lift differs from captureBlockSlots and the stash dispatches by kind.
-    // The chest size is the mount's own live size rather than a constant, so any chest a band gives a mount
-    // binds; the slot-count match is the mis-bind guard.
+    // plain bound/dropped flag and boundPos() carries only the "a menu is bound" signal. The chest size is read
+    // off the mount rather than being a constant, and the slot-count match is the mis-bind guard.
     private static final int DONKEY_CHEST = 15; // 5 columns * 3 rows, the chest a donkey or mule carries
 
     /** A normal chested-animal open: at a chested animal whose chest size matches the menu's chest slots -> BIND. */
@@ -451,7 +449,9 @@ class ContainerAssociationTest {
                 "the bind kind is CHESTED_ANIMAL");
     }
 
-    /** Binding reads the size off the mount rather than knowing one, so a chest of any size binds to its match. */
+    /**
+     * Binding reads the size off the mount rather than knowing one, so a smaller chest binds when the menu matches it.
+     */
     @Test
     void chestedAnimalBindsForSmallerChestSizes() {
         ContainerAssociation assoc = new ContainerAssociation();

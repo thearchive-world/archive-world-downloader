@@ -18,10 +18,8 @@ import org.jspecify.annotations.Nullable;
  * be built against a null one; this supplies a real {@code WorldProvider} and a fresh profiler through the 1.10.2
  * {@code World} constructor, with a null save handler and inert stubs for its two abstract members.
  *
- * <p>The provider is the dimension's own, built by {@link DimensionType#createDimension()} and bound with
- * {@code registerWorld}, which is what runs {@code createBiomeProvider} and therefore what sets {@code hasNoSky} on the
- * Nether and the End. A test that reads a per-dimension provider flag must go through {@link #get(DimensionType)} and
- * must not stub the provider, or it asserts the mod's own reading of that flag against itself.
+ * <p>A test that reads a per-dimension provider flag must go through {@link #get(DimensionType)} and must not stub the
+ * provider, or it asserts the mod's own reading of that flag against itself.
  */
 public final class HeadlessLevel extends World {
     private HeadlessLevel(DimensionType dimension) {

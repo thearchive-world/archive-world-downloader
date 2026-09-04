@@ -175,13 +175,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** The wdl-private subfolder under the save root (mirrors the download report's location). */
     private static final String WDL_SUBFOLDER = "wdl";
 
-    // One block-entity type id per class, probed once and kept for the run. This band publishes no class-to-id
-    // accessor and keeps vanilla's own class-to-id map private, so the id is read back off the serializer that
-    // writes it, which serializes the whole block entity (a chest's 27 slots included) to read one string. The
-    // outline rescan asks for an id per container per rescan on the tick thread, so the answer is cached against
-    // the class vanilla itself keys the id by, and one probe per block-entity type covers every instance of it.
-    // A class vanilla maps no id for makes that serializer throw rather than return nothing, so the empty string
-    // is cached for it too; without that the throw would repeat on every rescan the block entity stays in.
+    // Vanilla publishes no class-to-id accessor here, so reading one id means serializing the whole block entity (a
+    // chest's 27 slots included), and the outline rescan asks per container per rescan on the tick thread. The empty
+    // string is cached for a class vanilla maps no id for, since the probe throws for those and the throw would
+    // otherwise repeat on every rescan the block entity stays in.
     private static final Map<Class<?>, String> blockEntityTypeIds = new ConcurrentHashMap<>();
 
     private final VersionAdapter adapter;
@@ -2157,8 +2154,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * The block-entity registry id string for {@code blockEntity}, the key the chunk tag writes as {@code "id"} and the
-     * same one a recorded capture type holds, or null for a class vanilla registers no id for. Kept as a String, never
-     * the band-renamed id type (ResourceLocation vs Identifier), so its callers stay band-portable.
+     * same one a recorded capture type holds, or null for a class vanilla registers no id for.
      */
     static @Nullable String blockEntityTypeId(TileEntity blockEntity) {
         Class<?> type = blockEntity.getClass();
@@ -2167,9 +2163,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             cached = probeBlockEntityTypeId(blockEntity);
             blockEntityTypeIds.put(type, cached);
             if (cached.isEmpty()) {
-                // Once per class, since the sentinel is cached: a serializer that raised for a reason of its own
-                // rather than a missing mapping would otherwise disable both staleness gates for that class in
-                // silence for the rest of the run.
+                // Once per class, since the sentinel is cached: a serializer raising for a reason of its own would
+                // otherwise disable both staleness gates for that class in silence for the rest of the run.
                 LOGGER.debug("no block-entity id read for {}; both staleness gates fall back for every instance of it",
                         type.getName());
             }

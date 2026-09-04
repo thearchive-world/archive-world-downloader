@@ -9,15 +9,9 @@ import net.minecraft.nbt.NBTTagList;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The two {@code ItemStackHelper} members this band does not declare. {@code saveAllItems} and {@code loadAllItems}
- * arrive with the 1.11 empty-stack refactor; the class itself is here, and the two members it does declare
- * ({@code getAndSplit}, {@code getAndRemove}) take the slot array these take, an empty slot being null rather than a
- * sentinel stack.
- *
- * <p>The byte shape is the one every vanilla container writes and reads inline at this band, transcribed from
- * {@code TileEntityChest}: an empty slot contributes no entry, the slot index is a byte, {@code "Items"} is set even
- * when every slot was empty, and the read takes the slot byte unsigned and drops an out-of-range one in silence. A
- * captured container therefore loads as a vanilla-written one.
+ * The {@code saveAllItems} and {@code loadAllItems} this band's {@code ItemStackHelper} does not declare, transcribed
+ * from {@code TileEntityChest}. A departure from that byte shape is a container vanilla reads back differently from the
+ * one that was captured, with nothing to say so.
  */
 public final class ItemListNbt {
     private ItemListNbt() {}

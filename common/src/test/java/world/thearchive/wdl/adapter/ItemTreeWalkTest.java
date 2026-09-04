@@ -14,9 +14,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins ItemTreeWalk's nesting contract: below 1.20.5 an item is {@code {id, Count, tag}}, and the walk applies the leaf
- * action to the item's own {@code tag} compound, then recurses into the items nested in a container item
- * ({@code tag.BlockEntityTag.Items}) and a bundle ({@code tag.Items}). It drives the walk over hand-built NBT keyed by
- * those pre-component keys. The visited compounds are matched by identity, so the assertions stay clear of the
+ * action to the item's own {@code tag} compound, then recurses into the items nested under a container item's
+ * {@code tag.BlockEntityTag.Items} and under an item's own {@code tag.Items}. It drives the walk over hand-built NBT
+ * keyed by those pre-component keys. The visited compounds are matched by identity, so the assertions stay clear of the
  * band-varying NBTTagCompound accessors.
  */
 class ItemTreeWalkTest {

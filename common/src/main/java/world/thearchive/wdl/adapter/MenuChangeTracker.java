@@ -77,7 +77,6 @@ final class MenuChangeTracker {
         lastPage = page;
     }
 
-    /** An empty slot is a null stack at this band, and counts zero. */
     private static int countOf(@Nullable ItemStack stack) {
         return stack == null ? 0 : stack.stackSize;
     }

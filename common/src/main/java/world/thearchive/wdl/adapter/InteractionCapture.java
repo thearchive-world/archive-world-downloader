@@ -317,10 +317,9 @@ public final class InteractionCapture {
         if (stack == null || !(stack.getItem() instanceof ItemBlock)) {
             return;
         }
-        // The placement cell has to be derived rather than read: this band has no unified (player, hand, hit)
-        // placement context to ask, so the stash key is only right while this stays in step with vanilla's own
-        // ItemBlock.onItemUse, which places into the clicked cell when the clicked block is replaceable (grass,
-        // water) and into the cell against the clicked face otherwise.
+        // The stash key is only right while this stays in step with vanilla's own ItemBlock.onItemUse, which places
+        // into the clicked cell when the clicked block is replaceable and into the cell against the clicked face
+        // otherwise.
         World level = player.world;
         Block placeBlock = Block.getBlockFromItem(stack.getItem());
         BlockPos clicked = hit.getBlockPos();
@@ -443,11 +442,6 @@ public final class InteractionCapture {
      * {@code authoritative} confirms it, otherwise drop it (a placement the server refused or the player reverted
      * reduces to the same negative gate). Pure, so it is exercised headless against hand-built block-states. The
      * candidates stand or fall whole.
-     *
-     * <p>The whole-confirm kinds gate on block type alone, since the synced block-state carries no occupant or contents
-     * dimension: a server that strips a placed container's contents still confirms on type and persists the predicted
-     * content. That is an accepted inherent ceiling of optimistic prediction, not a fixable case: there is no
-     * client-side signal that distinguishes it from a confirmed placement.
      */
     static Optional<NBTTagCompound> confirm(IBlockState authoritative, Candidate candidate) {
         if (candidate instanceof HolderCandidate) {

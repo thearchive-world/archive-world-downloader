@@ -26,12 +26,11 @@ import world.thearchive.wdl.adapter.impl.ItemListNbt;
  *
  * <p>The property gated is a fixed point of the producer's own decode then encode. A block-entity tag is fed to
  * {@link TileEntity#create} and saved back through {@link TileEntity#writeToNBT}; an {@code "Items"} holder is fed to
- * {@link ItemListNbt#loadAllItems} and saved back through {@link ItemListNbt#saveAllItems}, this band declaring no
- * {@code ItemStackHelper} members of those names and {@link ItemListNbt} transcribing what a vanilla container writes
- * inline here. A fixture built from a mental model rather than from the producer differs from its own round trip,
- * because the producer writes keys unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "Count"} on
- * every item entry, and each block entity's own always-written state). Such a fixture collapses the cases a test means
- * to distinguish, so the test passes for a reason unrelated to the behavior it names.
+ * {@link ItemListNbt#loadAllItems} and saved back through {@link ItemListNbt#saveAllItems}. A fixture built from a
+ * mental model rather than from the producer differs from its own round trip, because the producer writes keys
+ * unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "Count"} on every item entry, and each block
+ * entity's own always-written state). Such a fixture collapses the cases a test means to distinguish, so the test
+ * passes for a reason unrelated to the behavior it names.
  *
  * <p>Nothing here is a key list to maintain. The producer is called, so the expected shape follows the band the tests
  * compile against.
@@ -164,12 +163,9 @@ public final class FixtureFidelity {
             if (blockEntity == null) {
                 continue;
             }
-            // This band publishes no class-to-id accessor, so the id is read off the save vanilla itself writes,
-            // which throws for a class it maps no id for rather than returning nothing. That throw is unreachable
-            // over this registry: its 31 provider blocks yield 22 block-entity classes, every one among vanilla's
-            // 23 registrations, and the moving piston, the one provider that creates no block entity, is dropped
-            // above. Skipping rather than propagating keeps one unmappable class from failing every fixture check
-            // instead of only the fixtures that name it.
+            // The id is read off the save vanilla itself writes, which throws for a class it maps no id for rather
+            // than returning nothing. Skipping rather than propagating keeps one unmappable class from failing every
+            // fixture check instead of only the fixtures that name it.
             String key;
             try {
                 key = save(blockEntity).getString("id");

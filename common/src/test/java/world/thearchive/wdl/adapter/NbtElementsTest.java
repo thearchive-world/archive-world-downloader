@@ -18,11 +18,9 @@ import net.minecraft.nbt.NBTTagString;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the iterable view every adapter tag-list walk now goes through. Two of its guarantees are load-bearing beyond
- * the obvious yield-every-element one: the view is repeatable, since a walk site builds it inline and a second walk
- * over the same list must start again from the front; and the cursor refuses to run past the end, since
- * {@code NBTTagList.get} answers an out of range index with a fresh NBTTagEnd rather than throwing, so an off-by-one in
- * the cursor would otherwise pass a phantom element to every walk in silence.
+ * Pins the iterable view every adapter tag-list walk goes through, including the two guarantees a walk site relies on
+ * without saying so: the view is repeatable, and the cursor throws past the end instead of handing on the fresh
+ * NBTTagEnd that {@code NBTTagList.get} answers an out of range index with.
  */
 class NbtElementsTest {
     private static NBTTagList listOf(String... values) {

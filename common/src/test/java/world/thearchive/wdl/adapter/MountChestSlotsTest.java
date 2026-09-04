@@ -22,8 +22,7 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 /**
  * The gate on the chest size a mount menu binds by. The bind matches that size against the open menu's chest-slot count
  * by exact equality and, on a mismatch, drops the open with no log line and no loss-report row, so a size wrong at all
- * discards every donkey and mule chest without a trace. Every case here therefore derives the size from a live chested
- * animal rather than asserting one literal against another.
+ * discards every donkey and mule chest without a trace.
  */
 class MountChestSlotsTest {
     // Vanilla's replaceItemInInventory addressing for a mount: 499 puts the chest on, 400 and 401 are the worn

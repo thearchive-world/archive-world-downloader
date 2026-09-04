@@ -16,10 +16,9 @@ import net.minecraft.util.text.TextComponentString;
 import world.thearchive.wdl.adapter.impl.ItemListNbt;
 
 /**
- * Item NBT built by the writers rather than by hand: {@link ItemListNbt#saveAllItems} for an {@code "Items"} list (this
- * band declaring no {@code ItemStackHelper} member of that name, so the write is the band's own transcription of what a
- * vanilla container writes inline) and {@code ItemStack#writeToNBT} for a single stored stack (a lectern's
- * {@code "Book"}, a jukebox's {@code "RecordItem"}).
+ * Item NBT built by the writers rather than by hand: {@link ItemListNbt#saveAllItems} for an {@code "Items"} list and
+ * {@code ItemStack#writeToNBT} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
+ * {@code "RecordItem"}).
  *
  * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: the writer always emits
  * {@code "Slot"} and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under

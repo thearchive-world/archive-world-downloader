@@ -20,13 +20,7 @@ import net.minecraft.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The 1.10.2 natural-spawn equipment table, reduced to the mobs this band can spawn (the drowned and its trident, the
- * 1.14 raid ominous banner, and the 1.11 vindicator and vex are all dropped) and split back out again where one
- * registration covers several of them, and the pure "was this equipped by a loot pickup" inference.
- *
- * <p>There is no {@code EntityType} type-object before 1.13, so a mob is discriminated by its classic
- * {@code EntityList} registry name ({@link EntityList#getEntityString}) rather than {@code mob.getType()}; that name is
- * a bare unnamespaced {@code String} at this band, so the profile table is keyed by one.
+ * The 1.10.2 natural-spawn equipment table and the pure "was this equipped by a loot pickup" inference.
  *
  * <p>Vanilla sets the server-only {@code PersistenceRequired} flag when a mob equips a picked-up item
  * ({@code EntityLiving.setItemStackToSlot} plus the drop-chance flag); the client never receives that flag. An equipped
@@ -82,12 +76,8 @@ final class NaturalEquipment {
             EntityEquipmentSlot.FEET, ImmutableSet.<Item>of(Items.LEATHER_BOOTS, Items.GOLDEN_BOOTS,
                     Items.CHAINMAIL_BOOTS, Items.IRON_BOOTS, Items.DIAMOND_BOOTS));
 
-    /**
-     * The five profile keys. {@code Zombie}, {@code Skeleton} and {@code PigZombie} are what {@code EntityList}
-     * registers those classes under here; {@code WitherSkeleton} and {@code Stray} are not registrations at this band
-     * at all, but the two {@code SkeletonType} variants {@link #profileKey} splits back out of {@code Skeleton}, and no
-     * registration spells either, so neither can collide with a real name.
-     */
+    // WitherSkeleton and Stray are not EntityList registrations at this band, so neither synthetic key can collide
+    // with a registered name.
     private static final String ZOMBIE = "Zombie";
     private static final String SKELETON = "Skeleton";
     private static final String WITHER_SKELETON = "WitherSkeleton";
@@ -95,11 +85,9 @@ final class NaturalEquipment {
     private static final String PIG_ZOMBIE = "PigZombie";
 
     /**
-     * Keyed by {@link #profileKey}, not by registry name alone. The husk and the zombie villager are one {@code Zombie}
-     * registration at this band and share the zombie's profile, so that collapse is lossless and needs no
-     * discriminator. The wither skeleton and the stray are one {@code Skeleton} registration, and that collapse is not:
-     * the wither skeleton differs from the other two in both the mainhand pool and the armor family, so its variant is
-     * split back out under the name the band above gives it.
+     * Keyed by {@link #profileKey}, not by registry name alone: the wither skeleton shares the {@code Skeleton}
+     * registration but differs in both the mainhand pool and the armor family, so keying on the bare name would judge
+     * it against the skeleton's bow profile.
      */
     private static final Map<String, Profile> PROFILES = ImmutableMap.<String, Profile>builder()
             .put(ZOMBIE, new Profile(ImmutableSet.of(Items.IRON_SWORD, Items.IRON_SHOVEL), ArmorKind.BASE))
@@ -138,17 +126,12 @@ final class NaturalEquipment {
     }
 
     /**
-     * The profile key for a live mob: the name {@code EntityList} registers its class under, except for the skeleton,
-     * whose three 1.11 ids are the single {@code Skeleton} registration here discriminated by {@code SkeletonType}. The
-     * two split-out variants are keyed under the names {@code SkeletonType} itself carries, which are also the names
-     * {@code EntityList} registers them under at the band above. Null for a class {@code EntityList} maps no name for,
-     * which for an {@code EntityLiving} is a test double subclassing a registered type.
+     * The profile key for a live mob: the name {@code EntityList} registers its class under, with {@code Skeleton}
+     * split by {@code SkeletonType} into the three keys the band above registers separately. Null when
+     * {@code EntityList} maps no name for the class.
      *
-     * <p>The discriminator hangs off the resolved name rather than off {@code instanceof}, because the name is an
-     * exact-runtime-class lookup and a modded subclass of the skeleton therefore resolves to its own name or to none.
-     * Reading it as a skeleton would judge it against vanilla's bow profile, which is the widening the bands above
-     * cannot make. That exactness is also what makes the cast safe: {@code addMapping} refuses a duplicate name, so
-     * {@code Skeleton} maps to {@code EntitySkeleton} and to nothing else.
+     * <p>The {@code EntitySkeleton} cast is safe because {@code getEntityString} resolves by exact runtime class and
+     * {@code addMapping} refuses a duplicate name, so {@code Skeleton} maps to {@code EntitySkeleton} and nothing else.
      */
     private static @Nullable String profileKey(EntityLiving mob) {
         String name = EntityList.getEntityString(mob);
@@ -173,8 +156,6 @@ final class NaturalEquipment {
             return false;
         }
         for (EntityEquipmentSlot slot : PICKUP_SLOTS) {
-            // An unequipped slot is null at this band, ItemStack.isEmpty and the EMPTY singleton both arriving at
-            // 1.11, so the emptiness test is the null test vanilla's own equipment walks make here.
             ItemStack item = mob.getItemStackFromSlot(slot);
             if (item != null && !isNaturalFor(type, slot, item)) {
                 return true;

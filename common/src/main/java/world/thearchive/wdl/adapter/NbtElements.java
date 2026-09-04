@@ -9,11 +9,11 @@ import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagList;
 
 /**
- * The elements of an {@link NBTTagList} as an {@link Iterable}, since NBTTagList implements neither Iterable nor
- * Iterator at this band. The view {@link #of} returns reads the list live rather than copying it, may be iterated any
- * number of times, and yields the list's own {@link NBTBase} elements, so writing through an element writes into the
- * list; growing or shrinking the list during a walk is undefined. {@link #next()} throws {@link NoSuchElementException}
- * once the list is exhausted, and removal is unsupported.
+ * The elements of an {@link NBTTagList} as an {@link Iterable}, which NBTTagList is not at this band. The view
+ * {@link #of} returns is live rather than a copy and may be walked any number of times. It yields the list's own
+ * {@link NBTBase} elements, so writing through an element writes into the list, and growing or shrinking the list
+ * during a walk is undefined. {@link #next()} throws {@link NoSuchElementException} past the end, and removal is
+ * unsupported.
  */
 final class NbtElements implements Iterator<NBTBase> {
     private final NBTTagList list;

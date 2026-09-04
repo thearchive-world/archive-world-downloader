@@ -28,20 +28,9 @@ public final class EntityFixtures {
     private EntityFixtures() {}
 
     /**
-     * Stamp the {@code id} a serialized entity tag carries, refusing a name this band does not register.
-     *
-     * <p>This is the one thing about an entity fixture that no producer checks. Vanilla writes the key from
-     * {@code EntityList.getEntityString} on the way out and reads it back through {@code NAME_TO_CLASS}, so a fixture
-     * naming anything outside that set describes an archive this band never writes, and the test built on it then
-     * passes for a reason unrelated to what it names. At 1.10.2 the registered names are unnamespaced CamelCase, so
-     * every namespaced literal is stale by construction, and several of them differ from the namespaced spelling by
-     * more than case. A stale name is not inert either: a load resolves the saved id through
-     * {@code EntityList.createEntityFromNBT}, which finds no class for it, warns that it is skipping an entity with
-     * that id, and returns null, and {@code AnvilChunkLoader.readChunkEntity} returns on that null before it recurses,
-     * so the entity's passengers go with it.
-     *
-     * <p>{@code getEntityNameList} is the membership source because it is built from {@code NAME_TO_CLASS}, the map a
-     * load resolves the saved id against.
+     * Stamp the {@code id} a serialized entity tag carries, refusing a name this band does not register. A fixture
+     * naming an id outside the registry describes an archive this band never writes, and on a real load that id takes
+     * the entity and every passenger under it.
      */
     private static void stampId(NBTTagCompound tag, String id) {
         TestRegistries.bootstrap();
