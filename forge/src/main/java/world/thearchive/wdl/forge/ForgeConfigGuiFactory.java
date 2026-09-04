@@ -10,36 +10,21 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraftforge.fml.client.IModGuiFactory;
 import org.jspecify.annotations.Nullable;
 
-import world.thearchive.wdl.Wdl;
-
 /**
  * The mods-list config-screen hook at this band, the analog of the {@code ExtensionPoint.CONFIGGUIFACTORY}
  * registration the 1.14.4-and-above bands make. FML resolves this class by name from the {@code guiFactory}
- * attribute on {@link WdlForge}'s {@code @Mod} annotation and instantiates it reflectively, so it stays public with
- * a no-arg constructor; the mods list greys its config button out unless {@link #hasConfigGui} returns true.
- *
- * <p>The interface carries two more members at this band that the 1.12.x line dropped, both deprecated there and
- * both nullable, and they are the older mechanism the config button superseded: a screen class FML would have
- * instantiated itself, and a handler for in-game runtime option categories. Neither is wanted when
- * {@link #hasConfigGui} answers true, so both return null, which is what FML's own no-config factories return.
+ * attribute on {@link WdlForge}'s {@code @Mod} annotation and instantiates it reflectively, so it stays public with a
+ * no-arg constructor. The mods list greys its config button out unless {@link #mainConfigGuiClass} answers non-null,
+ * and opens the class it answers by calling a public {@code (GuiScreen)} constructor on it, which is why that answer
+ * is {@link ForgeConfigGuiTrampoline} rather than the settings screen itself.
  */
 public final class ForgeConfigGuiFactory implements IModGuiFactory {
     @Override
     public void initialize(Minecraft minecraftInstance) {}
 
     @Override
-    public boolean hasConfigGui() {
-        return true;
-    }
-
-    @Override
-    public GuiScreen createConfigGui(GuiScreen parentScreen) {
-        return Wdl.createSettingsScreen(parentScreen);
-    }
-
-    @Override
-    public @Nullable Class<? extends GuiScreen> mainConfigGuiClass() {
-        return null;
+    public Class<? extends GuiScreen> mainConfigGuiClass() {
+        return ForgeConfigGuiTrampoline.class;
     }
 
     @Override

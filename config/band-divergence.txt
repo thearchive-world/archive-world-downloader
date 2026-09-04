@@ -778,7 +778,7 @@ forge/src/main/resources/META-INF/mods.toml
 # The access transformer is re-pinned per band. This band keeps the classic SRG field_NNNNN_ member scheme (the
 # 1.17-and-above bands use TSRGv2 f_NNNNN_), and it carries no NetworkManager channel widening, since NetworkManager
 # exposes a public channel() getter here that the connection tee reads directly; the SPacketEntity entity id and the
-# ContainerHorseInventory horse are the only widened members left. Legacy FML also does not auto-discover the file
+# ContainerHorseInventory mount are the only widened members left. Legacy FML also does not auto-discover the file
 # from its META-INF path the way the ModLauncher-era loaders do, so the shipped jar's manifest carries an
 # FMLAT attribute naming it, which the file's own header records.
 forge/src/main/resources/META-INF/accesstransformer.cfg
@@ -790,15 +790,25 @@ forge/src/main/resources/META-INF/accesstransformer.cfg
 # sign-extended short off the wire, so the narrowing is exact. New at this band.
 forge/src/main/java/world/thearchive/wdl/forge/ForgeConnectionTee.java
 
-# The Forge mount-menu read names the non-public ContainerHorseInventory.horse the Forge access transformer widens,
-# the one member MountMenuReader needs that this band exposes no getter for. New at this band.
+# The Forge mount-menu read names the non-public ContainerHorseInventory.theHorse the Forge access transformer
+# widens, the one member MountMenuReader needs that this band exposes no getter for. At this band the MCP dev name of
+# that field is theHorse rather than the parent band's horse, and the reflective read resolves the dev name ahead of
+# the searge one, so the literal is band-local. New at this band.
 forge/src/main/java/world/thearchive/wdl/forge/ForgeMountMenuReader.java
 
 # The mods-list config-screen hook below the 1.13 ExtensionPoint floor. Legacy FML instantiates an IModGuiFactory
-# named by the @Mod(guiFactory = ...) attribute and GuiModList enables its config button only for a factory whose
-# hasConfigGui answers true, where the parent bands register ExtensionPoint.CONFIGGUIFACTORY from WdlForge itself and
-# need no class of their own. New at this band.
+# named by the @Mod(guiFactory = ...) attribute, where the parent bands register ExtensionPoint.CONFIGGUIFACTORY from
+# WdlForge itself and need no class of their own. New at this band.
+# At this band the interface carries four members rather than the parent band's six: hasConfigGui and createConfigGui
+# do not exist here, and GuiModList drives the config button off mainConfigGuiClass instead, so that member answers a
+# real class rather than the null the parent band's factory returns.
 forge/src/main/java/world/thearchive/wdl/forge/ForgeConfigGuiFactory.java
+
+# The screen class the config-gui factory answers with. GuiModList opens the answer through a public (GuiScreen)
+# constructor and the shared WdlSettingsScreen is final with a five-argument one, so the class named there is this
+# band-local screen, which hands over to the real settings screen in initGui. New at this band; the parent bands hand
+# the mods list a screen instance directly and need no class with that constructor shape.
+forge/src/main/java/world/thearchive/wdl/forge/ForgeConfigGuiTrampoline.java
 
 # The resource pack_format tracks this band's Minecraft version: 4 for 1.13.2 (PackCompatibility.forFormat
 # accepts only 4 at this band, treating 3 and below as too old and 5 and above as too new).

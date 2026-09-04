@@ -13,8 +13,6 @@ import net.minecraft.network.INetHandler;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.IThreadListener;
-import net.minecraft.util.datafix.DataFixesManager;
-import net.minecraftforge.common.util.CompoundDataFixer;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.IFMLSidedHandler;
 import net.minecraftforge.fml.common.ModContainer;
@@ -25,23 +23,21 @@ import net.minecraftforge.fml.relauncher.Side;
 /**
  * Headless vanilla registry bootstrap for plain JUnit tests.
  *
- * <p>There is no game running here. At 1.12.2 the registries the chunk codec and level.dat writer read are the static
- * built-in {@code net.minecraft.util.registry.RegistryNamespaced} tables (blocks, items, biomes), each populated by its
- * own class's static initializer; there is no composite registry-access object at this band. So this only runs the
- * vanilla bootstrap, and a test that needs a block or item reads the static {@code Block.REGISTRY}/{@code
+ * <p>There is no game running here. At this band the registries the chunk codec and level.dat writer read are the
+ * static built-in {@code net.minecraft.util.registry.RegistryNamespaced} tables (blocks, items, biomes), each populated
+ * by its own class's static initializer; there is no composite registry-access object at this band. So this only runs
+ * the vanilla bootstrap, and a test that needs a block or item reads the static {@code Block.REGISTRY}/{@code
  * Item.REGISTRY} tables directly.
  *
  * <p>{@link Bootstrap#register()} is idempotent (guarded by its own {@code alreadyRegistered} flag) but expensive, so
  * it is run once per JVM.
  *
  * <p>{@link FMLCommonHandler#instance()}'s {@code sidedDelegate} is never set outside FML's own client/server
- * lifecycle, so {@link FMLCommonHandler#getDataFixer()} null-dereferences it until this loads one. Vanilla reaches that
- * method unconditionally from {@code WorldInfo.updateTagCompound} and {@code EntityPlayer.writeEntityToNBT}, so every
- * level.dat and player-entity write needs it. {@link FMLCommonHandler#instance()}'s two real sided delegates
- * ({@code FMLClientHandler}/{@code FMLServerHandler}) both source it from a live {@code Minecraft}/{@code
- * MinecraftServer}, which a headless test has neither, so this loads a minimal delegate instead: only
- * {@code getDataFixer()} does real work (the same {@link DataFixesManager#createFixer()} vanilla itself wraps), and
- * every other member is unreached by this suite, so a call into one is a genuine surprise, not a silent stub.
+ * lifecycle, and most of {@link FMLCommonHandler}'s members dereference it with no null guard, so this loads a minimal
+ * delegate to stand in for the two real ones ({@code FMLClientHandler}/{@code FMLServerHandler}), which both need a
+ * live {@code Minecraft}/{@code MinecraftServer} a headless test has neither of. Its members throw rather than
+ * returning a default, the branding list aside, so anything this suite does reach surfaces as a named failure instead
+ * of being silently stubbed out.
  */
 public final class TestRegistries {
     private static boolean bootstrapped;
@@ -60,11 +56,8 @@ public final class TestRegistries {
 
     /**
      * Sets {@link FMLCommonHandler}'s {@code sidedDelegate} directly, not through
-     * {@link FMLCommonHandler#beginLoading}: that method also calls {@code MinecraftForge.initialize()}, which reaches
-     * {@code ForgeHooks.initTools()}'s SRG-obfuscated reflection lookup ({@code ObfuscationReflectionHelper}), a lookup
-     * only FML's own launch classloader resolves to the deobfuscated field. A bare JUnit JVM has no such classloader,
-     * so that call throws {@code NoSuchFieldException}; going around {@code beginLoading} avoids it entirely, since
-     * only {@code getDataFixer()} is reached from this suite.
+     * {@link FMLCommonHandler#beginLoading}: that method also runs {@code MinecraftForge.initialize()}, Forge's own
+     * loader-lifecycle step, and the field assignment is the only part of {@code beginLoading} wanted here.
      */
     private static void loadSidedHandler() {
         try {
@@ -77,13 +70,6 @@ public final class TestRegistries {
     }
 
     private static final class HeadlessSidedHandler implements IFMLSidedHandler {
-        private final CompoundDataFixer dataFixer = new CompoundDataFixer(DataFixesManager.createFixer());
-
-        @Override
-        public CompoundDataFixer getDataFixer() {
-            return dataFixer;
-        }
-
         @Override
         public List<String> getAdditionalBrandingInformation() {
             return Collections.emptyList();
@@ -127,11 +113,6 @@ public final class TestRegistries {
         @Override
         public MinecraftServer getServer() {
             throw new UnsupportedOperationException("headless test sided handler: getServer unreached");
-        }
-
-        @Override
-        public boolean isDisplayCloseRequested() {
-            throw new UnsupportedOperationException("headless test sided handler: isDisplayCloseRequested unreached");
         }
 
         @Override

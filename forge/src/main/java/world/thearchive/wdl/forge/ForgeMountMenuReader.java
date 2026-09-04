@@ -20,7 +20,7 @@ import world.thearchive.wdl.adapter.MountMenuReader;
  */
 final class ForgeMountMenuReader extends MountMenuReader {
     private static final Field HORSE_FIELD =
-            ReflectionHelper.findField(ContainerHorseInventory.class, "horse", "field_111242_f");
+            ReflectionHelper.findField(ContainerHorseInventory.class, "theHorse", "field_111242_f");
 
     @Override
     protected @Nullable Entity mount(Container menu) {
