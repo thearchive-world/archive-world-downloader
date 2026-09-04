@@ -5,9 +5,9 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static world.thearchive.wdl.testsupport.MapHolderFixtures.containerHolding;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.filledMap;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderOf;
-import static world.thearchive.wdl.testsupport.MapHolderFixtures.containerHolding;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;

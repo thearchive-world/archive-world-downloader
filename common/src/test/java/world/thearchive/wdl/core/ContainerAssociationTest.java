@@ -453,7 +453,7 @@ class ContainerAssociationTest {
 
     /** Binding reads the size off the mount rather than knowing one, so a chest of any size binds to its match. */
     @Test
-    void chestedAnimalBindsForAChestSmallerThanTheDonkeys() {
+    void chestedAnimalBindsForSmallerChestSizes() {
         ContainerAssociation assoc = new ContainerAssociation();
 
         assertTrue(assoc.openChestedAnimal(true, true, 3, 3),

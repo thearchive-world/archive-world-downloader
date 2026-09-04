@@ -286,7 +286,7 @@ class ItemLocationScrubTest {
     }
 
     @Test
-    void scrubReachesLodestonesNestedInAContainerItem() {
+    void scrubReachesLodestonesNestedInContainerItems() {
         NBTTagCompound holder = holderOf(containerHoldingLodestone());
 
         ItemLocationScrub.scrub(holder, "Items");
@@ -345,7 +345,7 @@ class ItemLocationScrubTest {
     }
 
     @Test
-    void scrubBlockEntityReachesLodestonesNestedInAContainerItem() {
+    void scrubBlockEntityReachesLodestonesNestedInContainerItems() {
         NBTTagCompound displayed = blockEntityWithItem(containerHoldingLodestone());
         ItemLocationScrub.scrubBlockEntity(displayed);
         NBTTagList nestedItems = containerItemsOf(itemOf(displayed));
@@ -393,7 +393,7 @@ class ItemLocationScrubTest {
     }
 
     @Test
-    void scrubReachesBeeFlowerPosNestedInAContainerItem() {
+    void scrubReachesBeeFlowerPosNestedInContainerItems() {
         ItemStack carrier = new ItemStack(Blocks.CHEST);
         NBTTagCompound blockEntityTag = new NBTTagCompound();
         blockEntityTag.setTag("Items", ItemFixtures.items(beehiveWithBeeFlowerPos()));

@@ -42,7 +42,7 @@ class EntityIdRegistryTest {
     }
 
     @Test
-    void theChokePointsStampANameThisBandRegisters() {
+    void theChokePointsStampNamesThisBandRegisters() {
         assertEquals(LIVE, EntityFixtures.entityTag(LIVE).getString("id"));
         assertEquals("Boat", EntityFixtures.entityWithoutUuid("Boat").getString("id"));
     }
