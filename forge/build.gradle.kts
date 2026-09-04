@@ -847,33 +847,103 @@ val checkReobfNegative = tasks.register<CheckSeargeSurface>("checkReobfNegative"
     expectClean.set(false)
 }
 
-// The Forge runtime floor is written twice and no compiler sees both: forge_version_min in ../gradle.properties is
-// the band coordinate, and WdlForge's @Mod(dependencies = ...) is the string legacy FML actually enforces
-// (FMLModContainer.bindMetadata takes dependencies off the annotation descriptor unless mcmod.info opts into
-// useDependencyInformation, which this mod does not). An annotation value must be a compile-time constant, so the
-// literal cannot read the property and the duplication is structural. Without this gate a bumped property changes
-// nothing the loader sees, silently.
+// The Forge runtime floor and the mod id it hangs off are both written into WdlForge's @Mod(dependencies = ...)
+// string, which is the one legacy FML actually enforces (FMLModContainer.bindMetadata takes dependencies off the
+// annotation descriptor unless mcmod.info opts into useDependencyInformation, which this mod does not). An
+// annotation value must be a compile-time constant, so neither half can read its counterpart and the duplication
+// is structural: arm 1 compares the floor against forge_version_min in ../gradle.properties, arm 2 the id against
+// Forge's own bytecode.
+//
+// The id Forge registers for itself is Forge with a capital F, and FMLModContainer.sanityCheckModId warns that a
+// modid should equal its lowercase form, which makes the capital look like the defect. That warning is about the
+// id a mod declares for itself and never about a dependency label, so lowercasing this one is not a tidy but a
+// total load failure: Loader.sortModList set-differences the declared names against the registered ids by String
+// equality, so a mis-cased name resolves to nothing and the client aborts on MissingModsException before any mod
+// runs, with nothing anywhere in the build to show for it.
+//
+// Arm 2 reads the id off ForgeModContainer rather than pinning it, so it follows a forge_version bump, and unlike
+// the searge oracle above it needs no configuration of its own: Unimined's minecraft configuration already
+// resolves to the single provisioned Minecraft-plus-Forge artifact this island compiles against, and asking
+// Gradle for a configuration depends on nothing about the cache layout underneath it.
 val checkForgeFloor = tasks.register("checkForgeFloor") {
     group = "verification"
-    description = "Fails if WdlForge's @Mod dependencies floor does not match forge_version_min"
+    description = "Fails if WdlForge's @Mod dependencies misses forge_version_min or names a mod id Forge does not register"
     // Captured by value at configuration time, like checkPlugBand's own locals, so no Project reference survives
     // into task execution.
     val forgeVersionMin = band("forge_version_min")
     val entrypointSource = layout.projectDirectory
         .file("src/main/java/world/thearchive/wdl/forge/WdlForge.java")
+    val provisionedForge = objects.fileCollection().from(configurations.named("minecraft"))
     inputs.property("forgeVersionMin", forgeVersionMin)
     inputs.file(entrypointSource)
+    inputs.files(provisionedForge).withPropertyName("provisionedForge")
     doLast {
-        val declared = Regex("""required-after:forge@\[([^,\]]+),""")
-            .find(entrypointSource.asFile.readText())?.groupValues?.get(1)
+        val declared = Regex("""required-after:([^@\s;]+)@\[([^,\]]+),""")
+            .find(entrypointSource.asFile.readText())
             ?: throw GradleException(
-                "WdlForge declares no required-after:forge floor in its @Mod dependencies; legacy FML then "
+                "WdlForge declares no required-after Forge floor in its @Mod dependencies; legacy FML then "
                     + "enforces no Forge version at all"
             )
-        if (declared != forgeVersionMin) {
+        val declaredId = declared.groupValues[1]
+        val declaredFloor = declared.groupValues[2]
+        if (declaredFloor != forgeVersionMin) {
             throw GradleException(
                 "Forge floor mismatch: forge_version_min is $forgeVersionMin but WdlForge's @Mod dependencies "
-                    + "declares $declared. The annotation is the one legacy FML enforces, so change both."
+                    + "declares $declaredFloor. The annotation is the one legacy FML enforces, so change both."
+            )
+        }
+        val containerEntry = "net/minecraftforge/common/ForgeModContainer.class"
+        val containerBytes = provisionedForge.files.asSequence()
+            .filter { it.isFile && it.name.endsWith(".jar") }
+            .mapNotNull { jar ->
+                ZipFile(jar).use { zip ->
+                    zip.getEntry(containerEntry)?.let { zip.getInputStream(it).use { input -> input.readBytes() } }
+                }
+            }
+            .firstOrNull()
+            ?: throw GradleException(
+                "No $containerEntry in the provisioned Forge artifact, so the mod id Forge registers for itself "
+                    + "cannot be read and the declared dependency cannot be checked against it"
+            )
+        var registeredId: String? = null
+        ClassReader(containerBytes).accept(
+            object : ClassVisitor(Opcodes.ASM9) {
+                override fun visitMethod(
+                    access: Int,
+                    name: String,
+                    descriptor: String,
+                    signature: String?,
+                    exceptions: Array<String>?,
+                ): MethodVisitor = object : MethodVisitor(Opcodes.ASM9) {
+                    private var pending: String? = null
+
+                    override fun visitLdcInsn(value: Any?) {
+                        pending = value as? String
+                    }
+
+                    override fun visitFieldInsn(opcode: Int, owner: String, fieldName: String, fieldDesc: String) {
+                        if (opcode == Opcodes.PUTFIELD
+                            && owner == "net/minecraftforge/fml/common/ModMetadata"
+                            && fieldName == "modId"
+                        ) {
+                            registeredId = pending
+                        }
+                        pending = null
+                    }
+                }
+            },
+            0,
+        )
+        val registered = registeredId
+            ?: throw GradleException(
+                "$containerEntry assigns ModMetadata.modId from something other than a string constant, so the "
+                    + "mod id Forge registers for itself can no longer be read out of it"
+            )
+        if (declaredId != registered) {
+            throw GradleException(
+                "Forge mod id mismatch: WdlForge's @Mod dependencies names \"$declaredId\" but ForgeModContainer "
+                    + "registers \"$registered\". Loader.sortModList matches declared names against registered ids "
+                    + "by String equality, so the mod does not load at all."
             )
         }
     }
