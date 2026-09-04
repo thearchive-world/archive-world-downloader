@@ -1201,6 +1201,19 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityTreeWalk.java
 # rather than the list itself.
 common/src/main/java/world/thearchive/wdl/adapter/NbtMerge.java
 
+# New at this band, and the only band that needs it. NBTTagList implements Iterable from 1.11 up, so the bands above
+# walk a tag list with a plain enhanced for; here it extends NBTBase and implements nothing, and an index loop over
+# tagCount and get carries a boundary mutant at every walk site that no caller can distinguish from correct code.
+# This is that missing Iterable, and the nineteen walk sites across nine adapter files go through it. It is
+# top-level rather than nested so that every mutable byte belongs to a class the mutation allowlist enrolls: a
+# nested or anonymous cursor would match no glob and would never be mutated at all.
+common/src/main/java/world/thearchive/wdl/adapter/NbtElements.java
+
+# New at this band with the view it covers. Pins the two guarantees the walk sites rely on without stating them:
+# the view is repeatable, and the cursor throws past the end rather than handing on the fresh NBTTagEnd that
+# NBTTagList.get answers an out-of-range index with. No band above needs either, NBTTagList being Iterable there.
+common/src/test/java/world/thearchive/wdl/adapter/NbtElementsTest.java
+
 # Below 1.13 Minecraft ships no Mojang mapping, so this interface names classic MCP NBTTagCompound/Chunk rather than
 # CompoundTag/LevelChunk; the encode contract stays the shared seam even though the section shape underneath is the
 # pre-Flattening numeric form (see ChunkCodecImpl).
