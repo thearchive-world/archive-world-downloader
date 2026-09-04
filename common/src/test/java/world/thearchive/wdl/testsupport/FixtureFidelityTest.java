@@ -4,7 +4,6 @@
 package world.thearchive.wdl.testsupport;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -152,18 +151,6 @@ class FixtureFidelityTest {
                 holderOf(handBuiltEntry("minecraft:diamond", false, true)).getTagList("Items", 10));
 
         reject(() -> EntityFixtures.entityChunkTagWith(vehicle));
-    }
-
-    @Test
-    void theChunkChokePointStampsTheKeyThatOnlyTheChunkLayerWrites() {
-        // The block entity's own save never writes keepPacked, so it is exempt from the round trip yet still part
-        // of what lands on disk beside every saved block entity.
-        NBTTagCompound chunkTag = BlockEntityFixtures
-                .chunkTagWith(BlockEntityFixtures.blockEntity("Chest", 1, 64, 1));
-        NBTTagCompound blockEntity = BlockEntityFixtures.findByPos(chunkTag, 1, 64, 1);
-        assertEquals(false,
-                blockEntity.hasKey(FixtureFidelity.KEEP_PACKED) ? blockEntity.getBoolean(FixtureFidelity.KEEP_PACKED)
-                        : true);
     }
 
     @Test

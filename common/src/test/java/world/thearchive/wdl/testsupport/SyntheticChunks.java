@@ -88,22 +88,20 @@ public final class SyntheticChunks {
 
     /**
      * Every block entity as the chunk layer hands it over, which is where a snapshot's list comes from in production
-     * ({@code Chunk.getTileEntityMap}): checked against its producer's shape, then stamped with the {@code keepPacked}
-     * only that layer writes. This is the choke point for the snapshot axis, the way {@code chunkTagWith} is for a
-     * serialized chunk tag; without it a snapshot is a third way a hand-built block entity reaches production code
-     * unchecked.
+     * ({@code Chunk.getTileEntityMap}): checked against its producer's shape. This is the choke point for the snapshot
+     * axis, the way {@code chunkTagWith} is for a serialized chunk tag; without it a snapshot is a third way a
+     * hand-built block entity reaches production code unchecked.
      */
     private static List<NBTTagCompound> saved(List<NBTTagCompound> blockEntities, boolean checkShape) {
-        List<NBTTagCompound> stamped = new ArrayList<>();
+        List<NBTTagCompound> checked = new ArrayList<>();
         for (NBTTagCompound blockEntity : blockEntities) {
             NBTTagCompound copy = blockEntity.copy();
             if (checkShape) {
                 FixtureFidelity.assertBlockEntityShape(copy);
             }
-            copy.setBoolean(FixtureFidelity.KEEP_PACKED, false);
-            stamped.add(copy);
+            checked.add(copy);
         }
-        return ImmutableList.copyOf(stamped);
+        return ImmutableList.copyOf(checked);
     }
 
     /** The flat {@code int[256]} heightmap this band carries, one entry marked with the sentinel. */

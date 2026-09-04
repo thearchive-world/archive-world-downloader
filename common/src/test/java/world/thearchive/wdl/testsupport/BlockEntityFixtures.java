@@ -118,8 +118,8 @@ public final class BlockEntityFixtures {
     }
 
     /**
-     * A chunk tag whose {@code Level.TileEntities} list holds {@code blockEntities}, each carrying the
-     * {@code keepPacked} the chunk layer writes around a live block entity.
+     * A chunk tag whose {@code Level.TileEntities} list holds {@code blockEntities} exactly as this band's chunk layer
+     * would, which is the block entity's own save and nothing around it.
      *
      * <p>Every tag is checked against its producer's shape first. This is the choke point: a fixture assembled anywhere
      * and handed to a chunk merge passes through here, so an omitted key fails the build at the test that would
@@ -147,9 +147,7 @@ public final class BlockEntityFixtures {
         NBTTagCompound chunkTag = new NBTTagCompound();
         NBTTagList list = new NBTTagList();
         for (NBTTagCompound blockEntity : blockEntities) {
-            NBTTagCompound saved = blockEntity.copy();
-            saved.setBoolean(FixtureFidelity.KEEP_PACKED, false);
-            list.appendTag(saved);
+            list.appendTag(blockEntity.copy());
         }
         NBTTagCompound level = new NBTTagCompound();
         level.setTag("TileEntities", list);
@@ -158,15 +156,13 @@ public final class BlockEntityFixtures {
     }
 
     /**
-     * One block entity as the chunk layer hands it to the region writer: checked against its producer's shape, then
-     * carrying the {@code keepPacked} that layer stamps beside every live block entity it saves. Use this where a
-     * fixture reaches a chunk without going through {@link #chunkTagWith}.
+     * One block entity as the chunk layer hands it to the region writer, checked against its producer's shape. Below
+     * 1.13 that layer appends the block entity's own save and stamps nothing beside it, so this adds no key. Use it
+     * where a fixture reaches a chunk without going through {@link #chunkTagWith}.
      */
     public static NBTTagCompound savedBlockEntity(NBTTagCompound blockEntityTag) {
         FixtureFidelity.assertBlockEntityShape(blockEntityTag);
-        NBTTagCompound saved = blockEntityTag.copy();
-        saved.setBoolean(FixtureFidelity.KEEP_PACKED, false);
-        return saved;
+        return blockEntityTag.copy();
     }
 
     /** The block-entity tag in {@code list} at {@code x/y/z}, or an {@link AssertionError} when none matches. */

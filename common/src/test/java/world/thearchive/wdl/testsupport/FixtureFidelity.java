@@ -36,12 +36,6 @@ import world.thearchive.wdl.adapter.impl.ItemListNbt;
  * compile against.
  */
 public final class FixtureFidelity {
-    /**
-     * Written by the chunk layer around a saved block entity, not by the block entity itself, so it is invisible to the
-     * block-entity round trip and is set aside before it and restored after.
-     */
-    public static final String KEEP_PACKED = "keepPacked";
-
     private static @Nullable Map<String, IBlockState> representativeStates;
 
     private FixtureFidelity() {}
@@ -74,12 +68,11 @@ public final class FixtureFidelity {
     }
 
     /**
-     * Fail unless {@code blockEntityTag} is exactly what vanilla would write for the state it describes.
-     * {@link #KEEP_PACKED} is exempt, being written outside the block entity's own save.
+     * Fail unless {@code blockEntityTag} is exactly what vanilla would write for the state it describes. Nothing is
+     * exempt: this band's chunk layer appends the block entity's own save and adds no key of its own around it.
      */
     public static void assertBlockEntityShape(NBTTagCompound blockEntityTag) {
         NBTTagCompound subject = blockEntityTag.copy();
-        subject.removeTag(KEEP_PACKED);
 
         String id = subject.getString("id");
         BlockPos pos = new BlockPos(subject.getInteger("x"), subject.getInteger("y"), subject.getInteger("z"));
