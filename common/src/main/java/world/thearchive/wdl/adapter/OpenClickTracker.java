@@ -7,7 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.item.EntityMinecartContainer;
-import net.minecraft.entity.passive.AbstractHorse;
+import net.minecraft.entity.passive.EntityHorse;
 import net.minecraft.entity.passive.EntityVillager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntityEnderChest;
@@ -178,7 +178,7 @@ public final class OpenClickTracker {
         // tradeless state the newer bands read off VillagerProfession.NITWIT.
         boolean nitwit = villager && ((EntityVillager) entity).getProfession() == 5;
         return EntityMenuCapability.isMenuIncapable(vanilla, entity instanceof EntityMinecartContainer,
-                entity instanceof AbstractHorse, entity instanceof EntityVillager,
+                entity instanceof EntityHorse, entity instanceof EntityVillager,
                 villager, baby, nitwit);
     }
 
@@ -208,15 +208,13 @@ public final class OpenClickTracker {
      * client sends exactly one per open it asks for.
      *
      * <p>The signal is drained whether or not it is latched, so a request sent while riding something with no container
-     * cannot sit and seed a later open. The eligible set is deliberately narrower than vanilla's own gate for this
-     * request. Vanilla sends it for anything implementing AbstractHorse, which is three families on this band (the
-     * chest boats, the horses, and the nautiluses); only the container vehicles are latched here, because a chested
-     * mount's menu names its own animal and is recognized without click provenance at all, and a nautilus carries no
-     * chest, so neither has a container this latch could claim. Eligibility deliberately ignores the entity-capture
-     * toggle: the latch is what tells the vehicle's own click-less open apart from an open with no provenance at all,
-     * whatever the toggle. The vehicle is read on the tick the request is OBSERVED, which is not always the tick it was
-     * sent: the send hops to the connection's event loop, so the signal can surface a tick late. The intent carries the
-     * vehicle's network id so the bind can require the same vehicle to still be the one ridden.
+     * cannot sit and seed a later open. At this band vanilla sends the request only while riding an EntityHorse, whose
+     * menu names its own animal and is recognized without click provenance at all; the container-vehicle arm is kept as
+     * the band-shared wiring. Eligibility deliberately ignores the entity-capture toggle: the latch is what tells the
+     * vehicle's own click-less open apart from an open with no provenance at all, whatever the toggle. The vehicle is
+     * read on the tick the request is OBSERVED, which is not always the tick it was sent: the send hops to the
+     * connection's event loop, so the signal can surface a tick late. The intent carries the vehicle's network id so
+     * the bind can require the same vehicle to still be the one ridden.
      */
     void claimOpenInventoryRequest(@Nullable Entity vehicle) {
         if (!openInventoryRequested) {

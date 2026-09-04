@@ -11,7 +11,7 @@ import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.EntityMinecartContainer;
-import net.minecraft.entity.passive.AbstractChestHorse;
+import net.minecraft.entity.passive.EntityHorse;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.ContainerChest;
 import net.minecraft.inventory.IInventory;
@@ -47,9 +47,13 @@ import world.thearchive.wdl.platform.PlatformBridge;
 final class ContainerCapture {
     private static final Logger LOGGER = LogManager.getLogger(ContainerCapture.class);
 
-    // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the
-    // body-armor. Vanilla names the same 2 as the mount inventory start index.
+    // The chest starts at this index in both the horse menu and the mount's own inventory: slot 0 is the saddle
+    // and slot 1 is the armor.
     private static final int SLOT_INVENTORY_START = 2;
+
+    // Vanilla's whole mount inventory once a chest is on, the saddle and armor slots included; its chest portion is
+    // this less SLOT_INVENTORY_START.
+    private static final int CHESTED_INVENTORY_SIZE = 17;
 
     // A lectern block entity does not exist at this band (lecterns are a 1.14 block), so the lectern capture path is
     // inert here; the constant is kept for the shared, band-stable bind wiring the deep-band guard-out leaves in place.
@@ -249,17 +253,16 @@ final class ContainerCapture {
     }
 
     /**
-     * The chested animal {@code menu} is the inventory of, or {@code null} when it is not one. The menu names its own
-     * mount ({@link MountMenuReader}), so this is both the bind target and the dispatch gate: neither depends on the
-     * open target or the ridden vehicle, so a menu opened for one chested animal can never be bound to another the
-     * crosshair happens to rest on. Non-null only for a chested animal, so a mount menu for a chestless mount, and
-     * every other menu, falls through to the axes below it, and the horse menu never reaches the menu-type-blind
-     * vehicle branch.
+     * The chest-capable animal {@code menu} is the inventory of, or {@code null} when it is not one. The menu names its
+     * own mount ({@link MountMenuReader}), so a menu opened for one animal can never be bound to another the crosshair
+     * happens to rest on; every other menu, and a mount that can carry no chest at all, answers null and falls through
+     * to the axes below.
      */
     @Nullable
-    AbstractChestHorse chestedAnimal(Container menu) {
-        return MountMenuReader.mountOf(menu) instanceof AbstractChestHorse
-                ? (AbstractChestHorse) MountMenuReader.mountOf(menu)
+    EntityHorse chestedAnimal(Container menu) {
+        Entity mount = MountMenuReader.mountOf(menu);
+        return mount instanceof EntityHorse && ((EntityHorse) mount).getType().canBeChested()
+                ? (EntityHorse) mount
                 : null;
     }
 
@@ -291,6 +294,20 @@ final class ContainerCapture {
             }
         }
         return count;
+    }
+
+    /**
+     * A mount's own chest size, the entity-side half of the match {@link #countChestSlots} counts on the menu side, or
+     * 0 when the mount carries no chest.
+     */
+    static int mountChestSize(EntityHorse animal) {
+        // Never size this off the mount's own inventory or its item-handler capability: the client builds every mount
+        // with the two-slot chest and never resizes it when the synced flag arrives, so an inventory read answers zero
+        // here and the bind drops every donkey and mule chest with no log line and no loss-report row.
+        if (!animal.isChested()) {
+            return 0;
+        }
+        return CHESTED_INVENTORY_SIZE - SLOT_INVENTORY_START;
     }
 
     /**

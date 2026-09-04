@@ -38,8 +38,8 @@ import org.jspecify.annotations.Nullable;
  * The UUID-keyed sibling of {@link ChunkMerge}. The tack a mount wears needs no carry-forward key on either side of the
  * cuts that turn it into synced equipment (1.20.5 for the body, 1.21.5 for the saddle): above them it rides in the
  * equipment every capture re-reads, and below them capture re-derives {@code "SaddleItem"} from the synced saddled flag
- * and slot 1's {@code "ArmorItem"} or {@code "DecorItem"} from the horse's synced armor or the llama's synced dye
- * color, on every pass, so only {@code "Items"} carries forward.
+ * and slot 1's {@code "ArmorItem"} from the horse's synced armor tier, on every pass, so only {@code "Items"} carries
+ * forward.
  */
 final class EntityMerge {
     private EntityMerge() {}
@@ -114,8 +114,8 @@ final class EntityMerge {
      * villager's non-empty trade {@code "Offers"}. The single definition of prior-captured entity content, shared with
      * {@link RecoveredScan} so the outline's recovered-entity set tracks exactly what the carry-forward preserves, the
      * UUID-keyed sibling of {@link ChunkMerge#hasCapturedContent}. A mount's tack is deliberately not one of them:
-     * capture re-derives the saddle, a horse's armor and a llama's carpet from synced state on every pass, so none of
-     * them needs this or the carry-forward.
+     * capture re-derives the saddle and a horse's armor from synced state on every pass, so neither needs this or the
+     * carry-forward.
      */
     static boolean hasCapturedContent(NBTTagCompound entity) {
         return NbtMerge.isNonEmptyList(entity, "Items") || hasCapturedOffers(entity);

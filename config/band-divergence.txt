@@ -116,6 +116,9 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # class makes that serializer throw rather than answer nothing, so the empty string is cached for it and the probe
 # reports null. The ids it yields are unnamespaced CamelCase (Chest, Cauldron, Airportal) rather than the namespaced
 # snake_case of the bands above.
+# Below 1.11 the horse family is one EntityHorse discriminated by a HorseType enum, there being no AbstractHorse,
+# AbstractChestHorse or EntityLlama split yet, so the chested-animal bind names EntityHorse and takes the animal's
+# chest size from ContainerCapture.mountChestSize rather than the 1.11 getInventoryColumns.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
@@ -426,6 +429,9 @@ common/src/test/java/world/thearchive/wdl/testsupport/RegionRoundTrip.java
 # outline reflects exactly what an open would capture rather than vanilla's render-shape pairing. The client level
 # is WorldClient with a ChunkProviderClient (getLoadedChunk), the container base is TileEntityLockable, and the
 # seal test is IBlockState.isFullBlock.
+# Below 1.11 the horse family is one EntityHorse discriminated by a HorseType enum, so the container-entity test and
+# the rim box name EntityHorse and read isChested rather than AbstractChestHorse and hasChest, and the rim-height
+# reason cites only the two chested equines this band has.
 common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
 
 # The fastutil Minecraft bundles at this band has no static Long2ObjectMaps.fastIterator, so the draw-set walks its
@@ -476,6 +482,14 @@ common/src/test/java/world/thearchive/wdl/testsupport/EntityFixtures.java
 # names are unnamespaced CamelCase, and a saved id outside that set is skipped on load rather than read as something
 # else. No band above needs it, the namespaced ids there being what the fixtures already carry.
 common/src/test/java/world/thearchive/wdl/testsupport/EntityIdRegistryTest.java
+
+# New at this band. Pins the chest size a mount menu binds by, and the band fact behind it: below 1.11 there is no
+# getInventoryColumns and no public reader for the mount's own inventory, so the size comes from Forge's item-handler
+# capability over that inventory less the two worn slots. The bind matches it by exact equality and drops with no log
+# line and no loss-report row, so a wrong size loses every donkey and mule chest silently. No band above needs it,
+# getInventoryColumns being directly readable there, and the shared association test cannot host it, being
+# Minecraft-free by construction and driving the same entry point with literals.
+common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
 
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
 common/src/test/java/world/thearchive/wdl/adapter/PriorPlayerReadRoundTripTest.java
@@ -656,6 +670,12 @@ common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
 # RayTraceResult and item/block API are classic MCP.
 # Below 1.11 the empty stack is null rather than a sentinel and there is no NonNullList, so each of the three slot
 # lifts fills a plain ItemStack[] sized to its own range and leaves an empty slot null.
+# Below 1.11 the horse family is one EntityHorse discriminated by a HorseType enum, so the mount-menu read answers an
+# EntityHorse whose type can be chested rather than an AbstractChestHorse. There is no getInventoryColumns, and no
+# per-entity chest size is synced at all: vanilla's getChestSize is private, is a flat seventeen-or-two rather than a
+# column count, and runs only when the mount's inventory is built, which on a client is before the chested flag
+# arrives. So the entity-side chest size gates on the synced isChested and answers that seventeen less the two worn
+# slots, the same fifteen ContainerHorseInventory builds its chest rows from under the same flag.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so the compressed write takes a File
@@ -733,6 +753,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 
 # Below 1.13 there is no Mojang mapping, so the shared mount-menu read names the classic MCP net.minecraft.entity.Entity
 # and net.minecraft.inventory.Container rather than the Mojmap world.entity.Entity and world.inventory.AbstractContainerMenu.
+# Below 1.11 there are no llamas, so the uninstalled-reader hazard note drops the llama slot-count coincidence it
+# argued from and keeps only the warning itself.
 common/src/main/java/world/thearchive/wdl/adapter/MountMenuReader.java
 
 # Below 1.20.2 there is no AdvancementRequirements, so the fixture drives the two-argument
@@ -803,6 +825,9 @@ forge/src/reobftest/**
 # entities.
 # Below 1.11 getHeldItemMainhand and getHeldItemOffhand answer null for an empty hand, so the sneak-suppression gate's
 # non-empty-hand test is a null test.
+# Below 1.11 the horse family is one EntityHorse discriminated by a HorseType enum, so the custom-inventory-screen
+# test names EntityHorse. Vanilla sends the open-inventory request only while riding one at this band, so the
+# container-vehicle latch that request feeds cannot fire here.
 common/src/main/java/world/thearchive/wdl/adapter/OpenClickTracker.java
 
 # Below the 1.19 registry-sync rework the client receives the dimension type inline (a keyless Holder.Direct), so
@@ -829,6 +854,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
 # Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList/NBTBase, getTag/setTag/appendTag), the
 # captured-entity UUID is the pre-1.16 UUIDMost/UUIDLeast long pair read through hasUniqueId/getUniqueId, and the
 # Xp default carry is a NBTTagInt.
+# Below 1.11 there are no llamas, so the mount-tack notes name only the saddle and the horse's armor as the state
+# capture re-derives on every pass, the DecorItem carpet half having no producer at this band.
 common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
 
 # XaeroPlus publishes no 1.18.x build for either loader, so the coverage overlay's XaeroPlus binding is dropped as a

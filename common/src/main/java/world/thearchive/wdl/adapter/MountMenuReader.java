@@ -33,12 +33,8 @@ public abstract class MountMenuReader {
      * The mount {@code menu} names, or {@code null} when it is not a mount-inventory menu.
      *
      * <p>Null is also what an uninstalled reader returns, and that case does not drop the open: it demotes the mount
-     * menu to the block axis, where the slot-count match is the only thing left between it and a block bind, and a
-     * strength-one chested llama's menu is five non-player slots, exactly a hopper's and a brewing stand's. No vanilla
-     * action reaches that coincidence today, because opening a llama's inventory begins with a click on the llama that
-     * records an entity intent, and the click-less routes are limited to donkeys and mules at seventeen slots. Treat
-     * the uninstalled state as a real hazard rather than a safe no-op if anything ever makes a block target and a
-     * click-less mount open coexist.
+     * menu to the block axis, where the slot-count match is the only thing left between it and a block bind. Treat the
+     * uninstalled state as a real hazard rather than a safe no-op.
      */
     static @Nullable Entity mountOf(Container menu) {
         MountMenuReader reader = installed;

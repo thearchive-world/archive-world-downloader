@@ -12,14 +12,10 @@ import java.util.Set;
 import java.util.UUID;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
-import net.minecraft.entity.passive.AbstractHorse;
 import net.minecraft.entity.passive.EntityHorse;
-import net.minecraft.entity.passive.EntityLlama;
 import net.minecraft.entity.passive.HorseArmorType;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
-import net.minecraft.item.EnumDyeColor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -138,7 +134,7 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     private static @Nullable Set<UUID> collectSaddled(Entity entity, @Nullable Set<UUID> saddled) {
-        if (entity instanceof AbstractHorse && ((AbstractHorse) entity).isHorseSaddled()) {
+        if (entity instanceof EntityHorse && ((EntityHorse) entity).isHorseSaddled()) {
             Set<UUID> set = saddled != null ? saddled : new HashSet<>();
             set.add(entity.getUniqueID());
             return set;
@@ -163,15 +159,11 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     /**
-     * Write what a mount wears in its own inventory slot 1, which vanilla's own writer cannot see. Below the 1.20.5
-     * body-armor cut a horse's armor and a llama's carpet are both real stacks in that slot, a container the server
-     * never sends to the client, so vanilla finds the slot empty and emits neither {@code ArmorItem} nor
-     * {@code DecorItem}, the two keys it saves that one slot under.
-     *
-     * <p>This band mirrors neither into an equipment slot, so both are rebuilt from a synced proxy: the horse's
-     * four-value armor tier and the llama's dye color. Neither proxy carries the stack it stands for, so both are
-     * written plain. An existing key is left alone rather than overwritten, and the write is re-derived from synced
-     * state on every capture, so {@code EntityMerge} needs no carry-forward key.
+     * Write what a mount wears in its own inventory slot 1, which vanilla's own writer cannot see: a horse's armor is a
+     * real stack in a container the server never sends to the client, so vanilla finds the slot empty and emits no
+     * {@code ArmorItem}. It is rebuilt from the one synced proxy for it, the four-value armor tier, which carries no
+     * stack of its own, so the armor is written plain. An existing key is left alone rather than overwritten, and the
+     * write is re-derived from synced state on every capture, so {@code EntityMerge} needs no carry-forward key.
      */
     static void applyMountArmor(NBTTagCompound entityTag, NBTTagCompound worn) {
         for (String key : worn.getKeySet()) {
@@ -182,8 +174,8 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     /**
-     * Stamp each horse's armor and each llama's carpet in a saved group, by UUID rather than by position: the descent
-     * {@link #applySaddleItem(NBTTagCompound, Entity)} makes, and for the same reason.
+     * Stamp each horse's armor in a saved group, by UUID rather than by position: the descent and the reason are
+     * {@link #applySaddleItem(NBTTagCompound, Entity)}'s.
      */
     static void applyMountArmor(NBTTagCompound entityTag, Entity entity) {
         Map<UUID, NBTTagCompound> worn = collectMountArmor(entity, null);
@@ -210,27 +202,15 @@ public final class EntitySinkImpl implements EntitySink {
 
     /** The single-key patch a live mount's saved tag owes. */
     private static @Nullable NBTTagCompound wornMountArmor(Entity entity) {
-        String key;
-        @Nullable
-        ItemStack stack;
-        if (entity instanceof EntityHorse) {
-            key = "ArmorItem";
-            stack = horseArmor((EntityHorse) entity);
-        } else if (entity instanceof EntityLlama) {
-            EnumDyeColor color = ((EntityLlama) entity).getColor();
-            if (color == null) {
-                return null;
-            }
-            key = "DecorItem";
-            stack = new ItemStack(Blocks.CARPET, 1, color.getMetadata());
-        } else {
+        if (!(entity instanceof EntityHorse)) {
             return null;
         }
+        ItemStack stack = horseArmor((EntityHorse) entity);
         if (stack == null) {
             return null;
         }
         NBTTagCompound worn = new NBTTagCompound();
-        worn.setTag(key, stack.writeToNBT(new NBTTagCompound()));
+        worn.setTag("ArmorItem", stack.writeToNBT(new NBTTagCompound()));
         return worn;
     }
 

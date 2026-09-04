@@ -52,7 +52,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityMinecartContainer;
-import net.minecraft.entity.passive.AbstractChestHorse;
+import net.minecraft.entity.passive.EntityHorse;
 import net.minecraft.entity.passive.EntityVillager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
@@ -1873,14 +1873,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
             Entity entity = target.entity();
             boolean vehicleClaimsOpen = config.captureEntities()
                     && containerCapture.shouldClaimVehicleOpen(player, entity, target.vehicleIntent());
-            AbstractChestHorse chestedAnimal = config.captureEntities()
+            EntityHorse chestedAnimal = config.captureEntities()
                     ? containerCapture.chestedAnimal(menu)
                     : null;
-            // Branch order is load-bearing: the chested-animal branch precedes the entity-vehicle branch.
-            // shouldClaimVehicleOpen is menu-type-blind, so a strength-1 llama's horse menu (5
-            // non-player slots) ridden alongside a hopper minecart (size 5) would otherwise be claimed by the
-            // vehicle branch and mis-merge the chest into the minecart. Only a mount menu names a chested
-            // animal (no vehicle opens one), so peeling it off first cannot starve a vehicle capture.
+            // Branch order is load-bearing: the chested-animal branch precedes the entity-vehicle branch, because
+            // shouldClaimVehicleOpen reads no menu at all and so cannot tell a mount menu from a vehicle's. Only a
+            // mount menu names a chested animal (no vehicle opens one), so peeling it off first cannot starve a
+            // vehicle capture.
             // The lectern (LecternMenu / LecternBlockEntity) is a 1.14 addition absent at this band, so its bind arm
             // is dropped; a book-in-lectern cannot exist here to lose.
             if (menu instanceof ContainerMerchant) {
@@ -2102,17 +2101,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Translate the chested-animal open signals into primitives for {@link ContainerAssociation#openChestedAnimal} and,
-     * on a confident bind, store the entity UUID the finish merge keys on. The chested-animal analog of
-     * {@link #bindOpenedEntityContainer}, with one difference that is the whole point of it: the animal is the one the
-     * MENU names, so nothing about the crosshair or the ridden vehicle can put another animal's chest on this open. The
-     * chest size is the live size ({@code getInventoryColumns() * 3}; llama strength is synced), and the menu
-     * chest-slot count is read the same tick, so the slot-count match still drops a stale or mismatched open. The UUID
-     * is read once here; a chested animal that wanders while the menu stays open still merges into whatever chunk it
-     * ends in.
+     * on a confident bind, store the entity UUID the finish merge keys on. The animal is the one the MENU names, so
+     * nothing about the crosshair or the ridden vehicle can put another animal's chest on this open. Both counts are
+     * read the same tick, so the slot-count match still drops a stale or mismatched open, and the UUID is read once
+     * here, so an animal that wanders while the menu stays open still merges into whatever chunk it ends in.
      */
-    private void bindOpenedChestedAnimal(Container menu, EntityPlayerSP player,
-            AbstractChestHorse animal) {
-        int entityChestSize = animal.getInventoryColumns() * 3; // live size; llama strength is synced
+    private void bindOpenedChestedAnimal(Container menu, EntityPlayerSP player, EntityHorse animal) {
+        int entityChestSize = ContainerCapture.mountChestSize(animal);
         int menuChestSlotCount = ContainerCapture.countChestSlots(menu, player);
         if (association.openChestedAnimal(true, true, menuChestSlotCount, entityChestSize)) {
             UUID uuid = animal.getUniqueID();
