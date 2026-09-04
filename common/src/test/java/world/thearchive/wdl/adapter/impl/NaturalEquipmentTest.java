@@ -6,7 +6,9 @@ package world.thearchive.wdl.adapter.impl;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import net.minecraft.entity.monster.EntitySkeleton;
 import net.minecraft.entity.monster.EntityZombie;
+import net.minecraft.entity.monster.SkeletonType;
 import net.minecraft.entity.passive.EntityPig;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
@@ -130,10 +132,33 @@ class NaturalEquipmentTest {
         assertFalse(NaturalEquipment.wasLootEquipped(pig), "a type with no spawn-gear profile is never inferred");
     }
 
+    @Test
+    void eachSkeletonVariantIsScannedAgainstItsOwnPool() {
+        assertTrue(NaturalEquipment.wasLootEquipped(skeleton(SkeletonType.NORMAL, Items.DIAMOND_SWORD)),
+                "a diamond sword is outside the skeleton's bow pool");
+        assertFalse(NaturalEquipment.wasLootEquipped(skeleton(SkeletonType.NORMAL, Items.BOW)),
+                "the bow is the skeleton's own spawn weapon");
+        assertTrue(NaturalEquipment.wasLootEquipped(skeleton(SkeletonType.STRAY, Items.DIAMOND_SWORD)),
+                "a diamond sword is outside the stray's bow pool");
+        assertFalse(NaturalEquipment.wasLootEquipped(skeleton(SkeletonType.STRAY, Items.BOW)),
+                "the stray carries the same bow the skeleton does");
+        assertTrue(NaturalEquipment.wasLootEquipped(skeleton(SkeletonType.WITHER, Items.BOW)),
+                "the bow is outside the wither skeleton's stone-sword pool, so the variant reaches its own profile");
+        assertFalse(NaturalEquipment.wasLootEquipped(skeleton(SkeletonType.WITHER, Items.STONE_SWORD)),
+                "the stone sword is the wither skeleton's own spawn weapon");
+    }
+
     // EntityList.getEntityString (which NaturalEquipment.wasLootEquipped resolves a mob's type through) reads
     // CLASS_TO_NAME by exact runtime class, so a subclassed test double never resolves to a real name; gear is set
     // through the real EntityLivingBase.setItemStackToSlot instead of a subclass override.
     private static EntityZombie zombie() {
         return new EntityZombie(HeadlessLevel.get());
+    }
+
+    private static EntitySkeleton skeleton(SkeletonType type, Item mainhand) {
+        EntitySkeleton skeleton = new EntitySkeleton(HeadlessLevel.get());
+        skeleton.setSkeletonType(type);
+        skeleton.setItemStackToSlot(EntityEquipmentSlot.MAINHAND, of(mainhand));
+        return skeleton;
     }
 }
