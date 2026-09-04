@@ -111,19 +111,17 @@ public final class OpenClickTracker {
      * a redstone conductor opens for nobody.
      *
      * <p>Not a complete test of "this click opens a menu", and must not be extended into one. Provider presence is
-     * necessary and not sufficient: a shulker box with no room to open reports a provider and opens nothing for an
-     * ordinary player, while a spectator bypasses that check, so its eligibility differs by gamemode in the opposite
-     * direction to the ender chest's. A block latched without ever receiving its open leaves an intent the next
-     * unattributed open consumes.
+     * necessary and not sufficient: a container whose own use handler refuses to open still reports a provider. A block
+     * latched without ever receiving its open leaves an intent the next unattributed open consumes.
      */
     static boolean opensMenuFor(World level, BlockPos pos, boolean spectator) {
         // This band has no unified MenuProvider (a 1.14 abstraction); the container block entities that open a menu
         // are exactly the lockable-container ones (ILockableContainer, implemented by TileEntityLockable), which is
-        // what this recognizes. That covers both the loot containers (chest, hopper, dispenser, dropper, shulker,
-        // through TileEntityLockableLoot) and the non-loot menu containers (furnace, brewing stand, beacon), where
-        // the narrower ILootContainer would have missed the latter and dropped their contents. A provider-less
-        // workstation menu (crafting table, enchanting table, anvil) has no block entity to test here, so it is not
-        // latched and falls into the documented FRESH_WINDOW_TICKS leak class rather than the intent chain.
+        // what this recognizes. That covers both the loot containers (chest, hopper, dispenser, dropper, through
+        // TileEntityLockableLoot) and the non-loot menu containers (furnace, brewing stand, beacon), where the
+        // narrower ILootContainer would have missed the latter and dropped their contents. A provider-less workstation
+        // menu (crafting table, enchanting table, anvil) has no block entity to test here, so it is not latched and
+        // falls into the documented FRESH_WINDOW_TICKS leak class rather than the intent chain.
         if (level.getTileEntity(pos) instanceof ILockableContainer) {
             return true;
         }

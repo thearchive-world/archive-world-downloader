@@ -36,19 +36,19 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 # jukebox_playable item component (a playable disc is a RecordItem instance), and a captured jukebox carries the
 # playing state (IsPlaying, RecordStartTick, TickCount) our capture always writes; below 1.19 a vanilla jukebox
 # writes none of those keys (they are 1.19 additions), so at this band they are a benign rename-only carry, harmless
-# on read. Below 1.20.5 there are no item
-# components: the RecordItem write is ItemStack#save rather than ItemStack.CODEC, a placed shulker's contents are
-# read via BlockItem.getBlockEntityData plus ContainerHelper.loadAllItems rather than DataComponents.CONTAINER,
-# and a placed beehive's occupants are its BlockEntityTag.Bees list rather than DataComponents.BEES. This band's
-# java_version is 16, where sealed interfaces are only a preview feature, so the Candidate type is a plain interface
-# and confirm() is an if/instanceof chain rather than a pattern-matching switch.
+# on read. Below 1.20.5 there are no item components, so the RecordItem write is ItemStack#save rather than
+# ItemStack.CODEC.
+# This band's java_version is 16, where sealed interfaces are only a preview feature, so the Candidate type is a plain
+# interface and confirm() is an if/instanceof chain rather than a pattern-matching switch.
 # Below 1.13 there is no unified UseOnContext/BlockPlaceContext: the placement gate reproduces vanilla
 # ItemBlock.onItemUse positional math directly (the clicked cell when the clicked block is replaceable, else the
-# offset cell, gated by EntityPlayer.canPlayerEdit and World.mayPlace), and there is no BlockEntityType registry,
-# so the placed shulker's block-entity id is TileEntity.getKey(TileEntityShulkerBox.class). The NBT and item/block
-# API is classic MCP (getSubCompound, ItemStack.writeToNBT, Block.getBlockFromItem, ExtendedBlockStorage.get).
-# Below 1.11 the held stack is null for an empty hand, so the jukebox insert and the placement each test for null ahead
-# of their first read of it rather than asking the stack whether it is empty.
+# offset cell, gated by EntityPlayer.canPlayerEdit and World.mayPlace). The NBT and item/block API is classic MCP
+# (ItemStack.writeToNBT, Block.getBlockFromItem, ExtendedBlockStorage.get).
+# Below 1.11 there is no shulker box, so the recognizer keeps only the jukebox producer while the placed-container
+# path (placeStash, the ContainerSink and PlacedContainerSink wiring, the items-bundle flag, route's Items branch and
+# the placed stack recordPlaceAt no longer reads) stays with no InteractionKind constant left to drive it. The held
+# stack is also null for an empty hand, so the jukebox insert and the placement each test for null ahead of their
+# first read of it rather than asking the stack whether it is empty.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
 # Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
@@ -507,9 +507,10 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 # rather than a four-int array.
 common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
 
-# Below 1.20.5 an item is {id, Count, tag}; the walk recurses into a shulker's nested items via
-# tag.BlockEntityTag.Items and a bundle's via tag.Items, rather than the minecraft:container/minecraft:bundle_contents
-# components.
+# Below 1.20.5 an item is {id, Count, tag}; the walk recurses into an item's own tag.BlockEntityTag.Items and
+# tag.Items lists rather than the minecraft:container/minecraft:bundle_contents components. ItemBlock.setTileEntityNBT
+# copies BlockEntityTag onto any placed tile entity at this band, so that arm serves command-given container items
+# generally rather than one block's item form.
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
 # tag-list walks here iterate the list instead of indexing it.
 # Below 1.13 the NBT API is classic MCP (NBTTagCompound/NBTTagList/NBTBase, getTag rather than get; NBTTagList is

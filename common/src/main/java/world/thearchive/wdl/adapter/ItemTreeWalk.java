@@ -9,13 +9,13 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 
 /**
- * The classic-MCP walk over a serialized item tree, recursing into the items nested inside a shulker box (the
- * {@code tag.BlockEntityTag.Items} list) and a bundle (the {@code tag.Items} list). Operates only on already-serialized
- * NBT, never a live ItemStack. Two views share the one recursion: {@link #walkList}/{@link #walkItem} hand the leaf
- * each item's {@code tag} compound (the item-borne coordinate scrub reaches its keys there), and {@link #forEachItem}
- * hands the leaf each item compound itself. At this band the filled-map id is the item-level {@code Damage}, not the
- * inner {@code tag}, so the map-id pass takes the item view; a filled map carries no {@code tag} at all and the tag
- * view would never see it. Each caller supplies its own per-item leaf action.
+ * The classic-MCP walk over a serialized item tree, recursing into an item's nested item lists (the
+ * {@code tag.BlockEntityTag.Items} list and the {@code tag.Items} list). Operates only on already-serialized NBT, never
+ * a live ItemStack. Two views share the one recursion: {@link #walkList}/{@link #walkItem} hand the leaf each item's
+ * {@code tag} compound (the item-borne coordinate scrub reaches its keys there), and {@link #forEachItem} hands the
+ * leaf each item compound itself. At this band the filled-map id is the item-level {@code Damage}, not the inner
+ * {@code tag}, so the map-id pass takes the item view; a filled map carries no {@code tag} at all and the tag view
+ * would never see it. Each caller supplies its own per-item leaf action.
  */
 final class ItemTreeWalk {
     private static final String TAG = "tag";
@@ -37,9 +37,9 @@ final class ItemTreeWalk {
     }
 
     /**
-     * Apply {@code onItem} to {@code item} and every item nested inside it (a shulker box's
-     * {@code tag.BlockEntityTag.Items}, a bundle's {@code tag.Items}). The leaf sees the item compound itself, so a
-     * caller keying off the item-level {@code id} and {@code Damage} reaches them here.
+     * Apply {@code onItem} to {@code item} and every item nested inside it ({@code tag.BlockEntityTag.Items} and
+     * {@code tag.Items}). The leaf sees the item compound itself, so a caller keying off the item-level {@code id} and
+     * {@code Damage} reaches them here.
      */
     static void forEachItem(NBTTagCompound item, Consumer<NBTTagCompound> onItem) {
         onItem.accept(item);
@@ -47,6 +47,9 @@ final class ItemTreeWalk {
             return;
         }
         NBTTagCompound tag = (NBTTagCompound) item.getTag(TAG);
+        // ItemBlock copies BlockEntityTag onto the placed block entity at this band, so a command-given chest or
+        // hopper item carries its contents here, and dropping this arm leaves a map nested in one uncollected and
+        // unremapped, rendering the wrong picture in the download.
         if (tag.getTag(BLOCK_ENTITY_TAG) instanceof NBTTagCompound) {
             NBTTagCompound blockEntityTag = (NBTTagCompound) tag.getTag(BLOCK_ENTITY_TAG);
             if (blockEntityTag.getTag(ITEMS) instanceof NBTTagList) {

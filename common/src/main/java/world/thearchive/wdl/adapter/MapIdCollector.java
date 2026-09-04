@@ -9,10 +9,10 @@ import net.minecraft.nbt.NBTTagList;
 
 /**
  * Reusable, band-agnostic collection of the map ids a serialized item list references, over the shared
- * {@link ItemTreeWalk} that recurses into a shulker box (the {@code BlockEntityTag.Items} list) and a bundle (the
- * {@code Items} list). At this band a filled map's id is the item-level {@code Damage} short (the map's ItemStack
- * metadata) behind the {@code id == "minecraft:filled_map"} identity gate, not the inner {@code tag."map"} the higher
- * bands carry; the pure, headless-tested half of the filled-map enumeration.
+ * {@link ItemTreeWalk} that recurses into an item's nested {@code BlockEntityTag.Items} and {@code Items} lists. At
+ * this band a filled map's id is the item-level {@code Damage} short (the map's ItemStack metadata) behind the
+ * {@code id == "minecraft:filled_map"} identity gate, not the inner {@code tag."map"} the higher bands carry; the pure,
+ * headless-tested half of the filled-map enumeration.
  *
  * <p>Operates only on already-serialized NBT (our own captured copies of the open-time container / vehicle / ender
  * stashes), never on a live {@code ItemStack}. Used both at finish (the stashes) and as the enumeration's automated

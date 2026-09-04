@@ -9,10 +9,10 @@ import net.minecraft.nbt.NBTTagList;
 
 /**
  * The write half of {@link MapIdCollector}: rewrites every referenced map id in a serialized item list to a
- * resolver-supplied archive id, recursing into a shulker box (the {@code BlockEntityTag.Items} list) and a bundle (the
- * {@code Items} list) over the shared {@link ItemTreeWalk}. The session-local id a renumbering server assigns is
- * replaced by the content-stable archive id ({@link world.thearchive.wdl.core.MapManifest}) so the item renders the
- * right picture in the download.
+ * resolver-supplied archive id, recursing into an item's nested {@code BlockEntityTag.Items} and {@code Items} lists
+ * over the shared {@link ItemTreeWalk}. The session-local id a renumbering server assigns is replaced by the
+ * content-stable archive id ({@link world.thearchive.wdl.core.MapManifest}) so the item renders the right picture in
+ * the download.
  *
  * <p>Operates only on already-serialized NBT (our own captured copies of the open-time stashes), never on a live
  * {@code ItemStack}. At this band the id is the item-level {@code Damage} short (the map's ItemStack metadata) behind

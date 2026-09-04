@@ -124,8 +124,8 @@ final class MapArchive {
 
     /**
      * Rewrite every map id referenced by {@code holder}'s {@code listKey} list to its archive id, recursing into nested
-     * shulkers and bundles, and stream each first-imaged map's data on the way (the on-sight stream). Single-pass: call
-     * exactly once per captured holder.
+     * item lists, and stream each first-imaged map's data on the way (the on-sight stream). Single-pass: call exactly
+     * once per captured holder.
      */
     public void remap(NBTTagCompound holder, String listKey) {
         MapIdRemap.remapFromItemList(holder, listKey, this::archiveIdFor);

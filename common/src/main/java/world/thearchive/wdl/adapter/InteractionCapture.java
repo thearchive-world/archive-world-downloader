@@ -15,20 +15,15 @@ import java.util.Set;
 import java.util.function.Predicate;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockJukebox;
-import net.minecraft.block.BlockShulkerBox;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.ItemStackHelper;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemRecord;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.tileentity.TileEntityShulkerBox;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
-import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.RayTraceResult;
@@ -40,9 +35,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The MC-typed, loader-agnostic recognizer for interaction-prediction capture: content the chunk packet and an opened
- * menu never carry to the client (jukebox discs, placed shulker contents) is predicted from the local player's own
- * right-click and reconciled against the authoritative synced block-state before it is persisted, so a prediction the
- * server never confirmed is never written.
+ * menu never carry to the client (a jukebox disc) is predicted from the local player's own right-click and reconciled
+ * against the authoritative synced block-state before it is persisted, so a prediction the server never confirmed is
+ * never written.
  *
  * <p>Mirrors {@link EntityPacketCapture}: a connection-scoped {@code static volatile} publication point the per-loader
  * use-block hook resolves (the hook has no session reference), {@code null} when no download is running so the hook
@@ -51,9 +46,6 @@ import org.jspecify.annotations.Nullable;
  * ({@link #drainChunk}), reconciling each candidate against the captured snapshot's block-state ({@link #confirm},
  * {@link #blockStateAt}) and routing the confirmed holders to their merge ({@link ContainerMerge}). At most one capture
  * runs at a time, so a process singleton is correct.
- *
- * <p>One of the two writes reuses the open-time {@code "Items"} path (shulker, via {@link ContainerSink}); the other
- * writes the item's pre-component block-entity form directly ({@code ItemStack.writeToNBT} under {@code "RecordItem"}).
  */
 public final class InteractionCapture {
     private static final Logger LOGGER = LogManager.getLogger(InteractionCapture.class);
@@ -81,7 +73,7 @@ public final class InteractionCapture {
     /** Insert-time candidates (jukebox), keyed by the looked-at block pos. Main-thread only. */
     private final Map<BlockPos, Candidate> insertStash = new LinkedHashMap<>();
 
-    /** Place-time candidates (shulker), keyed by the derived placed pos. Main-thread only. */
+    /** Place-time candidates, keyed by the derived placed pos. Main-thread only. */
     private final Map<BlockPos, Candidate> placeStash = new LinkedHashMap<>();
 
     /** Notified the instant a bookshelf book insert is recorded, so the outline marks that slot captured. */
@@ -107,10 +99,10 @@ public final class InteractionCapture {
 
     /**
      * The optimistic-mark callback for a placed container, the whole-block sibling of {@link BookshelfSlotSink}:
-     * invoked the instant a content-bearing block (a shulker) is placed, so the session marks its pos captured this
-     * session before the flush confirms it, the way the open-time stash marks a chest on open. Carries the placed
-     * block-entity type id so the session records it alongside the mark, the way the open-time stashes do, letting Gate
-     * 2 re-rim the position if a different container later replaces the shulker.
+     * invoked the instant a content-bearing block is placed, so the session marks its pos captured this session before
+     * the flush confirms it, the way the open-time stash marks a chest on open. Carries the placed block-entity type id
+     * so the session records it alongside the mark, the way the open-time stashes do, letting Gate 2 re-rim the
+     * position if a different container later replaces it.
      */
     @FunctionalInterface
     interface PlacedContainerSink {
@@ -192,14 +184,13 @@ public final class InteractionCapture {
     /**
      * The kind of a {@link HolderCandidate}, and the one descriptor per holder content type. Each constant carries the
      * reconcile predicate that confirms its content against the authoritative block-state, and whether its confirmed
-     * holder folds into the open-time {@code "Items"} container bundle (a placed shulker, which opening supersedes) or
-     * the generic holder merge ({@link ContainerMerge#mergeHolderChunkStash}: a jukebox disc). Adding a content type is
-     * one constant that drives the gate, {@link #route}, and the merge together, so a half-wired type cannot compile
+     * holder folds into the open-time {@code "Items"} container bundle (a placed container, which opening supersedes)
+     * or the generic holder merge ({@link ContainerMerge#mergeHolderChunkStash}: a jukebox disc). Adding a content type
+     * is one constant that drives the gate, {@link #route}, and the merge together, so a half-wired type cannot compile
      * rather than silently capturing but never writing.
      */
     enum InteractionKind {
-        JUKEBOX(false, state -> state.getBlock() instanceof BlockJukebox && state.getValue(BlockJukebox.HAS_RECORD)),
-        SHULKER(true, state -> state.getBlock() instanceof BlockShulkerBox);
+        JUKEBOX(false, state -> state.getBlock() instanceof BlockJukebox && state.getValue(BlockJukebox.HAS_RECORD));
 
         private final boolean itemsBundle;
         private final Predicate<IBlockState> confirm;
@@ -209,7 +200,7 @@ public final class InteractionCapture {
             this.confirm = confirm;
         }
 
-        /** Whether a confirmed holder of this kind folds into the open-time {@code "Items"} bundle (a shulker). */
+        /** Whether a confirmed holder of this kind folds into the open-time {@code "Items"} bundle. */
         boolean itemsBundle() {
             return itemsBundle;
         }
@@ -224,9 +215,9 @@ public final class InteractionCapture {
     interface Candidate {}
 
     /**
-     * A jukebox disc or placed shulker: one merge-ready single-key holder ({@code "RecordItem"}/{@code "Items"}). The
-     * gate keeps it whole only when the authoritative block-state confirms the content is present (HAS_RECORD, or the
-     * expected placed block type).
+     * A jukebox disc or a placed container: one merge-ready single-key holder ({@code "RecordItem"}/{@code "Items"}).
+     * The gate keeps it whole only when the authoritative block-state confirms the content is present (HAS_RECORD, or
+     * the expected placed block type).
      */
     static final class HolderCandidate implements Candidate {
         private final InteractionKind kind;
@@ -248,8 +239,8 @@ public final class InteractionCapture {
 
     /**
      * A chunk's confirmed holders, split by merge path: {@code items} folds through the open-time container
-     * {@code "Items"} merge (placed shulker) under the open-time-wins precedence; {@code holders} takes the generic
-     * field-copy merge (jukebox disc under {@code "RecordItem"}), each holder already carrying exactly the key its
+     * {@code "Items"} merge (a placed container) under the open-time-wins precedence; {@code holders} takes the generic
+     * field-copy merge (a jukebox disc under {@code "RecordItem"}), each holder already carrying exactly the key its
      * block entity reads. One bundle drains per chunk.
      */
     static final class ChunkBundles {
@@ -271,9 +262,10 @@ public final class InteractionCapture {
     }
 
     /**
-     * Observe one local-player right-click (client main thread). Recognize an insert into an existing jukebox or a
-     * place of a content-bearing block-item, snapshot the hand content to immutable NBT at once, and stash it; the
-     * reconcile gate at flush decides whether it survives. Never mutates the interaction or the live stack.
+     * Observe one local-player right-click (client main thread). Recognize an insert into an existing jukebox, snapshot
+     * the hand content to immutable NBT at once, and stash it; the reconcile gate at flush decides whether it survives.
+     * A block placement is recognized too, superseding whatever was captured at the cell it lands in. Never mutates the
+     * interaction or the live stack.
      */
     private void onUseBlock(EntityPlayer player, World level, EnumHand hand, RayTraceResult hit) {
         recordFailSoft(hit.getBlockPos(), () -> recognize(player, level, hand, hit));
@@ -363,24 +355,6 @@ public final class InteractionCapture {
             return;
         }
         placementSink.blockPlacedAt(placedPos.toLong());
-        Block block = Block.getBlockFromItem(stack.getItem());
-        // Keyed by the (block-entity-NBT key, block) pairing: key presence alone does not imply this block saves
-        // under the mapped key, and an unrecognized pairing has no general block-to-key mapping, so it drops.
-        if (block instanceof BlockShulkerBox) {
-            NBTTagCompound blockEntityTag = stack.getSubCompound("BlockEntityTag");
-            if (blockEntityTag != null && blockEntityTag.hasKey("Items", 9)) {
-                NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-                ItemStackHelper.loadAllItems(blockEntityTag, items);
-                NBTTagCompound holder = containerSink.captureItems(items);
-                placeStash.put(placedPos, new HolderCandidate(InteractionKind.SHULKER, holder));
-                placedContainerSink.containerCaptured(placedPos.toLong(), shulkerBlockEntityId());
-            }
-        }
-    }
-
-    @SuppressWarnings("NullAway") // getKey is non-null for the registered vanilla shulker box block entity
-    private static String shulkerBlockEntityId() {
-        return TileEntity.getKey(TileEntityShulkerBox.class).toString();
     }
 
     /** The chunks holding a pending candidate, so the session can re-encode the loaded ones before the gate. */
@@ -457,8 +431,8 @@ public final class InteractionCapture {
 
     private static void route(BlockPos pos, Candidate candidate, NBTTagCompound holder, ChunkBundles bundles) {
         // The descriptor decides the merge path, so a new content type adds an InteractionKind constant, never a
-        // case here: a holder kind not bound to the "Items" bundle takes the generic field-copy merge, while a
-        // shulker confirms to an open-time "Items" holder.
+        // case here: a holder kind not bound to the "Items" bundle takes the generic field-copy merge, and a kind
+        // bound to it folds into an open-time "Items" holder.
         if (candidate instanceof HolderCandidate && !((HolderCandidate) candidate).kind().itemsBundle()) {
             bundles.holders().put(pos, holder);
         } else {

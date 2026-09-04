@@ -9,11 +9,11 @@ import net.minecraft.nbt.NBTTagList;
 
 /**
  * Reusable privacy scrub for item-borne location data: blanks the lodestone-compass target and the flower position
- * carried by a silk-touched beehive item on every item it reaches, recursing into shulker boxes (the item's
- * {@code BlockEntityTag.Items}) and bundles (the item's {@code Items}) over the shared {@link ItemTreeWalk}. Below the
- * 1.20.5 component update an item's data lives in its {@code tag} compound, so the scrub removes the coordinate keys
- * there: the lodestone target ({@code LodestonePos} plus {@code LodestoneDimension}, leaving {@code LodestoneTracked})
- * and, on a beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and each occupant's
+ * carried by a silk-touched beehive item on every item it reaches, recursing into each item's nested
+ * {@code BlockEntityTag.Items} and {@code Items} lists over the shared {@link ItemTreeWalk}. Below the 1.20.5 component
+ * update an item's data lives in its {@code tag} compound, so the scrub removes the coordinate keys there: the
+ * lodestone target ({@code LodestonePos} plus {@code LodestoneDimension}, leaving {@code LodestoneTracked}) and, on a
+ * beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and each occupant's
  * {@code BlockEntityTag.Bees[].EntityData.FlowerPos} (leaving each a valid bee). The pre-component item copies the
  * hive's whole block-entity NBT, so it carries the hive's own top-level flower position too, which the component era
  * drops; both are stripped here.

@@ -743,9 +743,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int villagerTradesLost;
 
     /**
-     * Predicted interactions (a bookshelf book, a jukebox disc, a placed shulker or beehive) that no chunk flush ever
-     * reached, so nothing of them was written (main thread). Counted at the two whole-buffer drains, the dimension
-     * rebind and the finish, since only what neither reached is unrecoverable.
+     * Predicted interactions (a bookshelf book, a jukebox disc, a placed container) that no chunk flush ever reached,
+     * so nothing of them was written (main thread). Counted at the two whole-buffer drains, the dimension rebind and
+     * the finish, since only what neither reached is unrecoverable.
      */
     private int interactionCapturesLost;
 
@@ -3749,25 +3749,23 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // so only immutable, detached data crosses to the writer (the thread-handoff boundary rule).
             Map<BlockPos, NBTTagCompound> containers = drainChunkHolders(containerStash, pos);
             Map<BlockPos, NBTTagCompound> lecterns = drainChunkHolders(lecternStash, pos);
-            // Scrub and on-sight map remap each drained holder exactly once, here at drain time and
-            // never as a whole-stash pass: the stash holds every not-yet-flushed container, which a dense storage
-            // room keeps hot for a whole session, so a per-tick pass over it scales with everything opened (with
-            // hundreds of shulker-filled chests, one pass made the client tick take tens of milliseconds), while
-            // the drain-time prepare costs only the holders actually flushing and still precedes everything
-            // writer-bound. A map in a chest whose chunk flushes mid-roam is thereby captured before it leaves
-            // memory.
+            // Scrub and on-sight map remap each drained holder exactly once, here at drain time and never as a
+            // whole-stash pass: the stash holds every not-yet-flushed container, which a dense storage room keeps hot
+            // for a whole session, so a per-tick pass over it scales with everything opened, while the drain-time
+            // prepare costs only the holders actually flushing and still precedes everything writer-bound. A map in a
+            // chest whose chunk flushes mid-roam is thereby captured before it leaves memory.
             prepareDrainedItems(containers);
             // Drain and reconcile this chunk's interaction-predicted candidates against the captured snapshot's
-            // block-state. The confirmed "Items" (placed shulker, bookshelf books) are scrubbed and map
-            // remapped like the open-time path, then folded into the container bundle behind the open-time-wins
-            // precedence (an opened container at the same pos supersedes a possibly-stale place snapshot). The
-            // jukebox/beehive holders carry to the writer thunk for their own field-copy merge.
+            // block-state. The confirmed "Items" are scrubbed and map remapped like the open-time path, then folded
+            // into the container bundle behind the open-time-wins precedence (an opened container at the same pos
+            // supersedes a possibly-stale place snapshot). The jukebox holders carry to the writer thunk for their
+            // own field-copy merge.
             final Map<BlockPos, NBTTagCompound> holders;
             if (interactionCapture != null) {
-                // Placed-shulker durability: drainChunk reconciles each candidate against this snapshot, the very
-                // one the writer thunk below encodes and merges against, so a jukebox-then-shulker replacement at
-                // one pos is dropped by the confirm predicate before it can merge. Keep the reconcile on the same
-                // snapshot as the position merge; a live read or a different snapshot here reopens that hole.
+                // drainChunk reconciles each candidate against this snapshot, the very one the writer thunk below
+                // encodes and merges against, so a replacement at one pos is dropped by the confirm predicate before
+                // it can merge. Keep the reconcile on the same snapshot as the position merge; a live read or a
+                // different snapshot here reopens that hole.
                 InteractionCapture.ChunkBundles confirmed = interactionCapture.drainChunk(pos, snapshot);
                 // Drop the open-time-wins losers before the remap, since prepareDrainedItems allocates a map id
                 // and writes map_<id>.dat per holder: remapping a same-pos loser would orphan that file.
@@ -3908,7 +3906,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * dimension, so a residual holder never crosses a portal into another dimension's {@link ChunkPos} space. The
      * interaction-prediction candidates are deliberately not swept: their reconcile gate confirms a candidate against
      * the live captured snapshot's block-state, which an orphaned chunk no longer holds, so a candidate cannot be
-     * confirmed off the on-disk chunk (and a placed shulker or beehive is not even present there).
+     * confirmed off the on-disk chunk (and a placed container is not even present there).
      */
     private void sweepOrphanedHolders(AsyncSaveWriter activeWriter) {
         if (containerStash.isEmpty() && lecternStash.isEmpty()) {
@@ -4479,10 +4477,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Tally each confirmed interaction-prediction merge to the dedup-correct report counter, the way open-time merges
-     * tally, keyed by pos so each container counts once. A placed shulker, a jukebox disc, and a beehive count here at
-     * confirm (flush) time, so their live count lags until the chunk roams out of the hot window. A bookshelf is the
-     * exception: it is counted live at full-cycle ({@link #onBookshelfSlotCaptured}) and skipped here, so a
-     * partly-cycled shelf never counts.
+     * tally, keyed by pos so each container counts once. Every confirmed merge counts here at confirm (flush) time, so
+     * its live count lags until the chunk roams out of the hot window. A bookshelf is the exception: it is counted live
+     * at full-cycle ({@link #onBookshelfSlotCaptured}) and skipped here, so a partly-cycled shelf never counts.
      */
     private void tallyInteractionMerges(Set<BlockPos> items, Set<BlockPos> holders) {
         tallyInteractionPositions(items);

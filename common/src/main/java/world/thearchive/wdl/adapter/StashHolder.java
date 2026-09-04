@@ -12,10 +12,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * One stashed open-time holder, either the live tag (fresh, still last-seen-wins overwritable) or its gzip-packed NBT
- * bytes once compacted. The stash retains every holder until its chunk flushes, and a shulker-filled container's tag is
- * hundreds of kilobytes of scattered tag objects, so a dense storage room session holds hundreds of megabytes as trees;
- * packed to one byte array each, the same session holds a few tens of kilobytes per container and the object count
- * collapses with it. Main-thread only, like the stashes themselves.
+ * bytes once compacted. The stash retains every holder until its chunk flushes, so a dense storage room session holds
+ * every opened container as a tree of scattered tag objects; packed to one byte array each, the same session holds a
+ * fraction of that and the object count collapses with it. Main-thread only, like the stashes themselves.
  */
 final class StashHolder {
     private @Nullable NBTTagCompound tag;
