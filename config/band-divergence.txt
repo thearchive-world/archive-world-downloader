@@ -192,6 +192,10 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityRoundTripTest.java
 # constructor is 1.21.2 and above). Below 1.20.5 RegistryAccess has no createSerializationContext, so the ops are
 # built via RegistryOps.create(NbtOps.INSTANCE, registries); its DataResult.getOrThrow also takes (boolean,
 # Consumer<String>), not the no-argument form.
+# Below 1.11 there is no doWeatherCycle rule, so the curated-set assertions ask GameRules.hasRule whether the rule
+# exists rather than reading it with getBoolean, which answers false for an undefined rule and so would pass whether
+# or not the download froze weather. The arbitrary uncurated rule the override test writes is reducedDebugInfo, whose
+# vanilla default is false, because an override equal to a rule's own default would pass unwritten.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
 
 # The headless entity double overrides hurt(DamageSource, float), the pre-1.21.2 damage entry point (the
@@ -917,9 +921,11 @@ common/src/test/java/world/thearchive/wdl/adapter/BookshelfSlotsTest.java
 # ten-argument form.
 common/src/test/java/world/thearchive/wdl/adapter/EntityPacketCaptureTest.java
 
-# Two of the nine band-neutral curated game-rule specs have no rule at 1.18.2 (doVinesSpread and doWardenSpawning are
-# 1.19 additions), so the runtime filter surfaces seven and the layout skips their order slots alongside the
-# band-neutral fire-spread row.
+# Five of the nine band-neutral curated game-rule specs have no rule at 1.10.2: doVinesSpread and doWardenSpawning
+# (1.19 additions) and doTraderSpawning and doPatrolSpawning (1.14) as on every band below those, plus doWeatherCycle,
+# which arrives at 1.11. So the runtime filter surfaces four and the layout skips their order slots alongside the
+# band-neutral fire-spread row. The expected count is derived from the curated superset filtered through
+# GameRules.hasRule rather than pinned to a number, so it needs no re-pinning one band down.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.java
 
 # Below the 1.19 registry-sync rework forType classifies a dimension type by its effects id (the keyless client holder

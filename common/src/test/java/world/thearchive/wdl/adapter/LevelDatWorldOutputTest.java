@@ -107,7 +107,10 @@ class LevelDatWorldOutputTest {
         assertTrue(rules.getBoolean("keepInventory"), "keep inventory");
         assertFalse(rules.getBoolean("mobGriefing"), "no mob griefing");
         assertFalse(rules.getBoolean("doDaylightCycle"), "day frozen");
-        assertFalse(rules.getBoolean("doWeatherCycle"), "weather frozen");
+        // hasRule, not getBoolean: getBoolean answers false for an undefined rule, so a getBoolean assertion here
+        // would pass whether or not the band freezes weather, and would pass hardest when it does not.
+        assertFalse(rules.hasRule("doWeatherCycle"),
+                "this band has no weather rule, so none is frozen and none is written");
     }
 
     @Test
@@ -133,7 +136,7 @@ class LevelDatWorldOutputTest {
         assertFalse((data.hasKey("raining") ? data.getBoolean("raining") : true), "not raining");
         assertFalse((data.hasKey("thundering") ? data.getBoolean("thundering") : true), "not thundering");
         assertEquals(0, (data.hasKey("clearWeatherTime") ? data.getInteger("clearWeatherTime") : -1),
-                "weather opens clear, not force-held; the curated advance_weather=false is what holds it");
+                "weather opens clear, not force-held");
     }
 
     @Test
@@ -188,11 +191,10 @@ class LevelDatWorldOutputTest {
 
     @Test
     void aValidOverrideIsWritten() {
-        // doFireTick is not in the curated set; a valid override of it passes through. The rule this named before the
-        // port, doLimitedCrafting, arrives at 1.12 and so is rejected here as an unknown id, which would have made
-        // this test assert the opposite of what it is for.
-        GameRules rules = gameRules(build(with("gamerule.doFireTick", "true")));
+        // reducedDebugInfo is not in the curated set, and its vanilla default is false: an override equal to a rule's
+        // own default would pass whether or not it was written.
+        GameRules rules = gameRules(build(with("gamerule.reducedDebugInfo", "true")));
 
-        assertTrue(rules.getBoolean("doFireTick"), "an arbitrary valid rule passes through");
+        assertTrue(rules.getBoolean("reducedDebugInfo"), "an arbitrary valid rule passes through");
     }
 }
