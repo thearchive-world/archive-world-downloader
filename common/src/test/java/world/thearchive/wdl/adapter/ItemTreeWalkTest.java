@@ -33,7 +33,7 @@ class ItemTreeWalkTest {
     }
 
     @Test
-    void walkVisitsAnItemsOwnComponents() {
+    void walkVisitsAnItemsOwnTag() {
         NBTTagCompound tag = new NBTTagCompound();
         assertTrue(visitedTags(itemWithTag(tag)).contains(tag),
                 "the walk applies the leaf action to the item's own tag");
@@ -53,13 +53,13 @@ class ItemTreeWalkTest {
     }
 
     @Test
-    void walkRecursesIntoBundle() {
+    void walkRecursesIntoAnItemsOwnItemsList() {
         NBTTagCompound nestedTag = new NBTTagCompound();
-        NBTTagList bundleItems = new NBTTagList();
-        bundleItems.appendTag(itemWithTag(nestedTag));
+        NBTTagList nestedItems = new NBTTagList();
+        nestedItems.appendTag(itemWithTag(nestedTag));
         NBTTagCompound tag = new NBTTagCompound();
-        tag.setTag("Items", bundleItems);
+        tag.setTag("Items", nestedItems);
         assertTrue(visitedTags(itemWithTag(tag)).contains(nestedTag),
-                "an item nested in a bundle is visited");
+                "an item nested under an item's own tag.Items is visited");
     }
 }

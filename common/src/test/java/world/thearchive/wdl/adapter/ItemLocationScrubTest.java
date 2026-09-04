@@ -47,8 +47,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The automated guard for the item-coordinate privacy scrub: {@link ItemLocationScrub} blanks the lodestone target and
  * the beehive bee flower positions on every item it reaches, over a serialized item list (the inventory or the ender
  * items), a block entity's own NBT (a chest, a jukebox), and a serialized entity (an item frame, mob equipment, an
- * inventory list, passengers), reaching items nested inside a container item ({@code tag.BlockEntityTag}) and inside a
- * bundle ({@code tag.Items}), while leaving the scrubbed item valid and every other item untouched. Real
+ * inventory list, passengers), reaching items nested inside a container item ({@code tag.BlockEntityTag}) and under an
+ * item's own {@code tag.Items}, while leaving the scrubbed item valid and every other item untouched. Real
  * {@link ItemStack}s serialized via the production {@link ContainerSink#captureItems} drive the round-trip, so neither
  * a live menu nor a {@code World} is needed; the scrub key strings are pinned by the assertions (a wrong key leaves the
  * coordinate and fails). Neither the lodestone nor the beehive exists at this band; the scrub is generic, name-driven

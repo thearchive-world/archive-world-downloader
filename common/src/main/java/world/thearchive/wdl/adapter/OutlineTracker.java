@@ -405,15 +405,15 @@ public final class OutlineTracker {
     }
 
     /**
-     * Whether {@code entity} is a merchant worth rimming: an adult villager whose synced profession is a real trading
-     * one. A nitwit or baby villager has no trades, so its rim could never clear. The profession and baby state ride
-     * the synced data, so this is client-derivable. The wandering trader is a 1.14 addition absent at this band, so it
-     * is not a case here; villagers are the only merchants.
+     * Whether {@code entity} is a merchant worth rimming: an adult villager. A baby villager has no trades, so its rim
+     * could never clear. The baby state rides the synced data, so this is client-derivable. The wandering trader is a
+     * 1.14 addition absent at this band, so it is not a case here; villagers are the only merchants.
      */
     private static boolean isTradeableMerchant(Entity entity) {
         if (entity instanceof EntityVillager && !((EntityVillager) entity).isChild()) {
-            // Profession is an int on the synced data (getProfession) at this band; every profession trades except
-            // nitwit (id 5), and there is no unemployed state below 1.14.
+            // getProfession here is Math.max(profession % 5, 0), so it answers 0..4 and this test is a constant
+            // true: every profession below 1.14 trades, there being no nitwit and no unemployed state. It is kept
+            // rather than dropped because the bands above share the line and read a real nitwit through it.
             return ((EntityVillager) entity).getProfession() != 5;
         }
         return false;

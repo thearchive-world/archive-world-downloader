@@ -16,8 +16,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Band-stable primitives over already-serialized chunk and entity NBT: locate a block entity by its saved position, and
  * carry a captured list, compound or scalar forward from an on-disk tag into a freshly captured one. Each is a plain
- * tag operation over the post-1.18 serialized form with no per-band codec, so one definition stays byte-identical
- * across the region layouts the read-merges span.
+ * tag operation with no per-band codec, so one definition stays byte-identical across the region layouts the
+ * read-merges span.
  */
 final class NbtMerge {
     private NbtMerge() {}

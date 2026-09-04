@@ -34,9 +34,9 @@ public final class BlockEntityFixtures {
 
     /**
      * As {@link #blockEntity} for a block entity the player renamed, so a merge can be shown to leave a real sibling
-     * field alone. At 1.10.2 only a {@link net.minecraft.tileentity.TileEntityLockableLoot} (a chest and the like)
-     * carries an arbitrary name; the raw {@code "CustomName"} JSON key written here is exactly what its
-     * {@code setCustomName} would write, so the fidelity round trip still passes for one.
+     * field alone. Vanilla's own {@code setCustomName} takes a plain String and writes it raw, where this writes a
+     * serialized component, so the value is band-foreign even though the tag type is the same and the fidelity round
+     * trip, which compares shape rather than content, still passes.
      */
     public static NBTTagCompound namedBlockEntity(String id, int x, int y, int z, String customName) {
         NBTTagCompound tag = blockEntity(id, x, y, z);

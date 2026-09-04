@@ -277,10 +277,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private LongOpenHashSet allCaptured = new LongOpenHashSet();
 
     /**
-     * Positions a block-STATE change marked unsaved since the last re-encode, pushed here by the
-     * {@link Chunk.UnsavedListener} installed at first capture (change-driven, low-latency rung). A bounded slice is
-     * drained and re-encoded each tick. Nulled at {@link #finish()} teardown so the listeners still attached to loaded
-     * chunks become no-ops and stop pinning the finished session's set.
+     * Positions a block-STATE change marked unsaved since the last re-encode, found by {@link #pollDirtyChunks}'s
+     * per-tick walk of the keep-hot buffer (change-driven, low-latency rung). This band has no unsaved-listener push to
+     * be fed from, so the set is filled by pull and nothing outside this session ever writes it. A bounded slice is
+     * drained and re-encoded each tick. Nulled at {@link #finish()} teardown to release it.
      */
     private @Nullable LongOpenHashSet dirty = new LongOpenHashSet();
 
@@ -1628,11 +1628,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Populate the change-driven dirty set by polling {@code isUnsaved()} across the keep-hot buffer. Below the 1.21.2
-     * {@code setUnsavedListener} push there is no change callback, so this pull replaces it. The buffer is bounded to
-     * the keep-hot square around the player, so a full scan per tick stays cheap; it does no encoding, so it spends no
-     * encode budget. Only chunks a real block-state change re-flagged since their last re-encode are added, and each
-     * re-encode clears the flag again ({@link #reencode}), so a chunk re-enters only on a fresh change.
+     * Populate the change-driven dirty set by polling {@code needsSaving(false)} across the keep-hot buffer. Below the
+     * 1.21.2 {@code setUnsavedListener} push there is no change callback, so this pull replaces it. The buffer is
+     * bounded to the keep-hot square around the player, so a full scan per tick stays cheap; it does no encoding, so it
+     * spends no encode budget. Only chunks a real block-state change re-flagged since their last re-encode are added,
+     * and each re-encode clears the flag again ({@link #reencode}), so a chunk re-enters only on a fresh change.
      */
     private void pollDirtyChunks(ChunkProviderClient chunkSource, LongOpenHashSet dirtySet) {
         for (ChunkPos pos : captured.keySet()) {
@@ -1708,11 +1708,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Replace one still-hot chunk's buffered tag with a fresh encode of its current live state, then re-arm the dirty
-     * listener. Skips a chunk already re-encoded this tick or first-captured this tick, and a candidate that is no
-     * longer eligible (flushed, so never revived; or its live chunk has unloaded past the keep-hot margin, so the last
-     * buffered snapshot stands). A throwing capture is logged and the prior buffered snapshot is kept, isolating the
-     * failure to one chunk.
+     * Replace one still-hot chunk's buffered tag with a fresh encode of its current live state, then re-arm the chunk's
+     * unsaved flag so only a fresh change re-adds it. Skips a chunk already re-encoded this tick or first-captured this
+     * tick, and a candidate that is no longer eligible (flushed, so never revived; or its live chunk has unloaded past
+     * the keep-hot margin, so the last buffered snapshot stands). A throwing capture is logged and the prior buffered
+     * snapshot is kept, isolating the failure to one chunk.
      */
     private void reencode(ChunkPos pos, ChunkCodec codec, ChunkProviderClient chunkSource,
             LongOpenHashSet reencodedThisTick) {
@@ -1750,10 +1750,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Detach the re-capture change tracking at session teardown: drop the dirty set so the
-     * {@link Chunk.UnsavedListener}s still attached to loaded {@link WorldClient} chunks become inert (they guard on it
-     * being non-null) and stop pinning this finished session's set until those chunks unload. A later session
-     * re-installs its own listeners at its own first capture.
+     * Detach the re-capture change tracking at session teardown: drop the dirty set and the floor queue. Nothing is
+     * attached to a {@link WorldClient} chunk to detach, the rung being a poll this session drives rather than a
+     * callback installed on the chunk, so dropping the set is the whole teardown.
      */
     private void detachRecapture() {
         dirty = null;
@@ -2367,7 +2366,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // snapshot rather than a stale-present one and cannot persist content the player just reverted.
             reencodePendingInteractionChunks(level().getChunkProvider(), adapter.chunkCodec(), reencodedThisTick);
         }
-        detachRecapture(); // teardown: release the dirty set; loaded chunks' listeners become inert
+        detachRecapture(); // teardown: release the dirty set, which is all the poll-driven rung holds
         deactivateInteractionCapture(); // stop the use-block hook feeding this session; the drain reads the instance
         deactivateOpenClickTracker(); // stop the use hooks seeding this session's open bind
         if (totalCapturedChunks() == 0) {
@@ -4491,8 +4490,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Blank item-borne coordinates on every entity in an encoded entity-chunk tag (and their passengers), per the
-     * item-coordinate knob. Walks the post-1.17 {@code "Entities"} list; {@link ItemLocationScrub#scrubEntity} recurses
-     * each entity's own {@code "Passengers"}, so this stays a flat top-level loop. Runs inside the per-chunk try.
+     * item-coordinate knob. Walks the encoded chunk's {@code "Entities"} list; {@link ItemLocationScrub#scrubEntity}
+     * recurses each entity's own {@code "Passengers"}, so this stays a flat top-level loop. Runs inside the per-chunk
+     * try.
      */
     private void scrubEntityItems(NBTTagCompound entityChunkTag) {
         if (!(entityChunkTag.getTag("Entities") instanceof NBTTagList)) {
@@ -4509,7 +4509,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Remap (and on-sight serialize) the maps of each entity's displayed single {@code "Item"} in an encoded
-     * entity-chunk tag: an item frame's framed map and a dropped item entity's map. Walks the post-1.17
+     * entity-chunk tag: an item frame's framed map and a dropped item entity's map. Walks the encoded chunk's
      * {@code "Entities"} list; entities with no {@code "Item"} are skipped. Runs inside the per-chunk try.
      */
     private void remapEntityItems(NBTTagCompound entityChunkTag, MapArchive archive) {

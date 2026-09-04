@@ -72,13 +72,13 @@ public final class OpenClickTracker {
      * states what it does and does not settle. Every click that can open a menu must stay in the intent chain: an
      * unlatched menu open still consumes the next latch on resolve, stealing a following container's provenance (an
      * anvil open eating a furnace click binds the anvil's three slots onto the three-slot furnace, a mis-bind), and
-     * menu blocks like the crafting family carry no block entity, so menu-provider presence, not block-entity presence,
-     * is the load-bearing filter. A placement target, door, or lever reports no provider and stays unlatched; a latched
-     * click on one could only supersede real intents. The ender chest is the one vanilla menu-opening block with no
-     * provider (its menu is built in the block's use handler over the per-player ender container), so it is latched by
-     * its block entity; every other openMenu block either overrides {@code getMenuProvider} or has a
-     * {@code MenuProvider} block entity (verified across 1.21.11). A server GUI opened from a provider-less block falls
-     * into the documented {@link #FRESH_WINDOW_TICKS} leak class instead of the chain.
+     * this band has no unified menu provider to ask, so the filter is a lockable container block entity plus the ender
+     * chest and nothing else: an enchantment table carries a block entity and is not latched either. A placement
+     * target, door, or lever carries no lockable container and stays unlatched; a latched click on one could only
+     * supersede real intents. The crafting family carries no block entity either and is unlatched for the same reason,
+     * so a menu opened from one falls into the documented {@link #FRESH_WINDOW_TICKS} leak class instead of the chain.
+     * The ender chest is latched on its own block entity rather than the lockable-container test, its menu being built
+     * in the block's use handler over the per-player ender container.
      */
     public static void dispatchUseBlock(EntityPlayer player, World level, RayTraceResult hit) {
         OpenClickTracker tracker = active;
@@ -157,8 +157,8 @@ public final class OpenClickTracker {
 
     /**
      * Whether this entity provably opens no server-driven container menu in vanilla, so its superseded marker may be
-     * suppressed. Extraction only; the decision is {@link EntityMenuCapability}. Baby/nitwit are the sole tradeless
-     * villager states robust to profession-sync staleness; NONE is deliberately excluded.
+     * suppressed. Extraction only; the decision is {@link EntityMenuCapability}. A baby villager is the only tradeless
+     * villager state this band has; the nitwit arm is kept for the bands that share the line and never fires here.
      */
     private static boolean menuIncapable(Entity entity) {
         // There is no EntityType registry before 1.13, so the entity's vanilla-ness is read from its classic
@@ -170,8 +170,9 @@ public final class OpenClickTracker {
         boolean vanilla = key != null && key.indexOf('.') < 0 && EntityList.getEntityNameList().contains(key);
         boolean villager = entity instanceof EntityVillager;
         boolean baby = villager && ((EntityVillager) entity).isChild();
-        // At this band the villager profession is an int (getProfession); nitwit is profession id 5, the same
-        // tradeless state the newer bands read off VillagerProfession.NITWIT.
+        // getProfession here is Math.max(profession % 5, 0), so it answers 0..4 and this arm is a constant false:
+        // there is no nitwit below 1.14. It is kept rather than dropped because the bands above share the line and a
+        // band-local deletion would fork the file for no change in what is captured.
         boolean nitwit = villager && ((EntityVillager) entity).getProfession() == 5;
         return EntityMenuCapability.isMenuIncapable(vanilla, entity instanceof EntityMinecartContainer,
                 entity instanceof EntityHorse, entity instanceof EntityVillager,
