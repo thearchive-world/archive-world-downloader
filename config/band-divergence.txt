@@ -20,6 +20,10 @@
 # dimension types (via DimensionType.registerBuiltin) and the biomes and the rest of worldgen from code. There is no
 # layered registry loader or tag-load step (the RegistryDataLoader, LayeredRegistryAccess and PendingTags machinery
 # the deeper bands thread through is all post-1.19), and no kept test binds data-driven tags.
+# Below 1.11 the bootstrap installs no headless FML sided handler. The 1.11.2 and 1.12.2 bands install one for a
+# single member, FMLCommonHandler.getDataFixer, which null-dereferences sidedDelegate on a path vanilla's own chunk
+# read reaches, and both say in their own prose that it is the only member their suite reaches. This band's
+# FMLCommonHandler declares no getDataFixer at all, so the delegate stands in for a call that does not exist.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
 # Below the 1.21.2 chunk-serialization cut vanilla has no SerializableChunkData.SectionData record, so this
