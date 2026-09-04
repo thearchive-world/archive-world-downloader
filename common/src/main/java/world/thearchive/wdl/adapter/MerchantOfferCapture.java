@@ -59,7 +59,8 @@ final class MerchantOfferCapture {
         if (offers == null || recipes == null) {
             return;
         }
-        for (NBTBase element : recipes) {
+        for (int i = 0; i < recipes.tagCount(); i++) {
+            NBTBase element = recipes.get(i);
             NBTTagCompound recipe = element instanceof NBTTagCompound ? (NBTTagCompound) element : null;
             NBTTagCompound sell = recipe != null && recipe.getTag("sell") instanceof NBTTagCompound
                     ? (NBTTagCompound) recipe.getTag("sell")

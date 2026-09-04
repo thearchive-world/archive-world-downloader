@@ -55,14 +55,16 @@ final class NbtMerge {
         NBTTagList freshList = fresh.getTag(key) instanceof NBTTagList ? (NBTTagList) fresh.getTag(key)
                 : new NBTTagList();
         Set<Integer> slots = new HashSet<>();
-        for (NBTBase element : freshList) {
+        for (int i = 0; i < freshList.tagCount(); i++) {
+            NBTBase element = freshList.get(i);
             if (element instanceof NBTTagCompound) {
                 NBTTagCompound entry = (NBTTagCompound) element;
                 slots.add(slotOf(entry));
             }
         }
         boolean carried = false;
-        for (NBTBase element : diskList) {
+        for (int i = 0; i < diskList.tagCount(); i++) {
+            NBTBase element = diskList.get(i);
             if (!(element instanceof NBTTagCompound)) {
                 continue;
             }

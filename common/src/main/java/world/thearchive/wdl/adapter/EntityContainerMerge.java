@@ -66,7 +66,8 @@ final class EntityContainerMerge {
         }
         int merged = 0;
         int failed = 0;
-        for (NBTBase element : entities) {
+        for (int i = 0; i < entities.tagCount(); i++) {
+            NBTBase element = entities.get(i);
             if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
@@ -109,7 +110,8 @@ final class EntityContainerMerge {
         }
         int merged = 0;
         int failed = 0;
-        for (NBTBase element : entities) {
+        for (int i = 0; i < entities.tagCount(); i++) {
+            NBTBase element = entities.get(i);
             if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
@@ -152,7 +154,8 @@ final class EntityContainerMerge {
             return new MergeTally(0, 0);
         }
         int merged = 0;
-        for (NBTBase element : entities) {
+        for (int i = 0; i < entities.tagCount(); i++) {
+            NBTBase element = entities.get(i);
             if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
@@ -185,7 +188,8 @@ final class EntityContainerMerge {
             return new MergeTally(0, 0);
         }
         int merged = 0;
-        for (NBTBase element : entities) {
+        for (int i = 0; i < entities.tagCount(); i++) {
+            NBTBase element = entities.get(i);
             if (!(element instanceof NBTTagCompound)) {
                 continue;
             }
