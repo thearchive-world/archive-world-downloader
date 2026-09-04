@@ -36,40 +36,40 @@ public final class RimRendererImpl implements RimRenderer {
         Vec3d camera = context.cameraPos();
         // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, lifted
         // outward by the standoff, so a recessed model is framed while a flush one is drawn on its own surface.
-        float minX = (float) (cellBox.minX - camera.x);
-        float minY = (float) (cellBox.minY - camera.y);
-        float minZ = (float) (cellBox.minZ - camera.z);
-        float maxX = (float) (cellBox.maxX - camera.x);
-        float maxY = (float) (cellBox.maxY - camera.y);
-        float maxZ = (float) (cellBox.maxZ - camera.z);
+        float minX = (float) (cellBox.minX - camera.xCoord);
+        float minY = (float) (cellBox.minY - camera.yCoord);
+        float minZ = (float) (cellBox.minZ - camera.zCoord);
+        float maxX = (float) (cellBox.maxX - camera.xCoord);
+        float maxY = (float) (cellBox.maxY - camera.yCoord);
+        float maxZ = (float) (cellBox.maxZ - camera.zCoord);
         switch (face) {
             case TOP: {
-                float y = (float) (shapeBox.maxY + SURFACE_STANDOFF - camera.y);
+                float y = (float) (shapeBox.maxY + SURFACE_STANDOFF - camera.yCoord);
                 quad(lines, colorArgb, minX, y, minZ, maxX, y, minZ, maxX, y, maxZ, minX, y, maxZ);
                 break;
             }
             case BOTTOM: {
-                float y = (float) (shapeBox.minY - SURFACE_STANDOFF - camera.y);
+                float y = (float) (shapeBox.minY - SURFACE_STANDOFF - camera.yCoord);
                 quad(lines, colorArgb, minX, y, minZ, maxX, y, minZ, maxX, y, maxZ, minX, y, maxZ);
                 break;
             }
             case NORTH: {
-                float z = (float) (shapeBox.minZ - SURFACE_STANDOFF - camera.z);
+                float z = (float) (shapeBox.minZ - SURFACE_STANDOFF - camera.zCoord);
                 quad(lines, colorArgb, minX, minY, z, maxX, minY, z, maxX, maxY, z, minX, maxY, z);
                 break;
             }
             case SOUTH: {
-                float z = (float) (shapeBox.maxZ + SURFACE_STANDOFF - camera.z);
+                float z = (float) (shapeBox.maxZ + SURFACE_STANDOFF - camera.zCoord);
                 quad(lines, colorArgb, minX, minY, z, maxX, minY, z, maxX, maxY, z, minX, maxY, z);
                 break;
             }
             case WEST: {
-                float x = (float) (shapeBox.minX - SURFACE_STANDOFF - camera.x);
+                float x = (float) (shapeBox.minX - SURFACE_STANDOFF - camera.xCoord);
                 quad(lines, colorArgb, x, minY, minZ, x, minY, maxZ, x, maxY, maxZ, x, maxY, minZ);
                 break;
             }
             case EAST: {
-                float x = (float) (shapeBox.maxX + SURFACE_STANDOFF - camera.x);
+                float x = (float) (shapeBox.maxX + SURFACE_STANDOFF - camera.xCoord);
                 quad(lines, colorArgb, x, minY, minZ, x, minY, maxZ, x, maxY, maxZ, x, maxY, minZ);
                 break;
             }

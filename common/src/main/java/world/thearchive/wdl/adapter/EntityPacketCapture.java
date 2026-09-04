@@ -313,7 +313,7 @@ final class EntityPacketCapture
         }
         Vec3d base = new Vec3d(entity.posX, entity.posY, entity.posZ);
         int id = entity.getEntityId();
-        sampler.registerSeed(id, base.x, base.z);
+        sampler.registerSeed(id, base.xCoord, base.zCoord);
         int distanceBlocks = sampler.seedSample(id, playerX, playerZ);
         if (distanceBlocks != SendRangeSampler.NO_SAMPLE && distanceBlocks <= plausibleMaxBlocks) {
             sendRange.observe(dimensionId, distanceBlocks);

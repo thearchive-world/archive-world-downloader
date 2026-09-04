@@ -115,7 +115,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         LOGGER.info(rendered.getUnformattedText() + linkTargets);
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.player != null) {
-            mc.player.sendStatusMessage(rendered, false);
+            mc.player.sendStatusMessage(rendered);
         }
     }
 
@@ -247,14 +247,14 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (anchor == null) {
             return ImmutableList.of();
         }
-        int x = anchor.x;
-        int y = anchor.y;
+        int x = anchor.xPosition;
+        int y = anchor.yPosition;
         int width = anchor.width;
         // Bounded to the anchor's own column. Shifting everything lower drags a corner button off the screen edge;
         // shifting only what spans the center strands the half-width and non-button rows a mod appends below.
         for (GuiButton widget : widgets) {
             if (movesWithAnchor(widget, x, y, width)) {
-                widget.y = widget.y + ROW_PITCH;
+                widget.yPosition = widget.yPosition + ROW_PITCH;
             }
         }
         GuiButton primary = new WdlMenuButton(x, y, width - 24, 20, I18n.format(primaryLabelKey.get()), onPrimary);
@@ -266,8 +266,8 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     }
 
     static boolean movesWithAnchor(GuiButton widget, int anchorX, int anchorY, int anchorWidth) {
-        return widget.y >= anchorY && widget.x < anchorX + anchorWidth
-                && widget.x + widget.width > anchorX;
+        return widget.yPosition >= anchorY && widget.xPosition < anchorX + anchorWidth
+                && widget.xPosition + widget.width > anchorX;
     }
 
     /**
@@ -280,10 +280,11 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         int center = screenWidth / 2;
         GuiButton lowest = null;
         for (GuiButton widget : widgets) {
-            if (widget.width < MIN_ANCHOR_WIDTH || widget.x > center || widget.x + widget.width < center) {
+            if (widget.width < MIN_ANCHOR_WIDTH || widget.xPosition > center
+                    || widget.xPosition + widget.width < center) {
                 continue;
             }
-            if (lowest == null || widget.y > lowest.y) {
+            if (lowest == null || widget.yPosition > lowest.yPosition) {
                 lowest = widget;
             }
         }

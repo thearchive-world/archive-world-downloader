@@ -193,8 +193,8 @@ public final class OutlineTracker {
     private void buildBlockContainers(WorldClient level, Vec3d cameraPos, double clamp, OutlineConfig config,
             CaptureToggles toggles, CapturedContainers captured, RecoveredCoverage recovered) {
         int chunkRadius = MathHelper.ceil(clamp / 16.0);
-        int cameraChunkX = MathHelper.floor(cameraPos.x) >> 4;
-        int cameraChunkZ = MathHelper.floor(cameraPos.z) >> 4;
+        int cameraChunkX = MathHelper.floor(cameraPos.xCoord) >> 4;
+        int cameraChunkZ = MathHelper.floor(cameraPos.zCoord) >> 4;
         ChunkProviderClient chunkSource = level.getChunkProvider();
         int rescans = 0;
         for (int cx = cameraChunkX - chunkRadius; cx <= cameraChunkX + chunkRadius; cx++) {
@@ -308,7 +308,8 @@ public final class OutlineTracker {
             CaptureToggles toggles, CapturedContainers captured, RecoveredCoverage recovered) {
         for (int i = 0; i < entry.containers.size(); i++) {
             CachedContainer container = entry.containers.get(i);
-            if (!OutlineClamp.isWithin(cameraPos.x, cameraPos.y, cameraPos.z, container.centerX, container.centerY,
+            if (!OutlineClamp.isWithin(cameraPos.xCoord, cameraPos.yCoord, cameraPos.zCoord, container.centerX,
+                    container.centerY,
                     container.centerZ, clamp)) {
                 continue;
             }
@@ -333,16 +334,18 @@ public final class OutlineTracker {
 
     private void enumerateEntityContainers(WorldClient level, Vec3d cameraPos, double clamp, OutlineConfig config,
             CapturedContainers captured, RecoveredCoverage recovered) {
-        AxisAlignedBB clampBox = new AxisAlignedBB(cameraPos.x - clamp, cameraPos.y - clamp, cameraPos.z - clamp,
-                cameraPos.x + clamp,
-                cameraPos.y + clamp, cameraPos.z + clamp);
+        AxisAlignedBB clampBox = new AxisAlignedBB(cameraPos.xCoord - clamp, cameraPos.yCoord - clamp,
+                cameraPos.zCoord - clamp,
+                cameraPos.xCoord + clamp,
+                cameraPos.yCoord + clamp, cameraPos.zCoord + clamp);
         for (Entity entity : level.getEntitiesWithinAABB(Entity.class, clampBox,
                 candidate -> isContainerEntity(candidate) || isTradeableMerchant(candidate))) {
             if (entity.isInvisible()) {
                 continue; // an invisible mob's body does not render, so its rim would reveal it: a fairness leak
             }
             Vec3d center = new Vec3d(entity.posX, entity.posY, entity.posZ);
-            if (!OutlineClamp.isWithin(cameraPos.x, cameraPos.y, cameraPos.z, center.x, center.y, center.z, clamp)) {
+            if (!OutlineClamp.isWithin(cameraPos.xCoord, cameraPos.yCoord, cameraPos.zCoord, center.xCoord,
+                    center.yCoord, center.zCoord, clamp)) {
                 continue;
             }
             OutlineClass classification = OutlineClassifier.classify(NO_CELLS, null, entity.getUniqueID(), false,
@@ -350,8 +353,9 @@ public final class OutlineTracker {
             if (classification == OutlineClass.CAPTURED) {
                 continue;
             }
-            long sectionKey = SectionKey.asLong(MathHelper.floor(center.x) >> 4, MathHelper.floor(center.y) >> 4,
-                    MathHelper.floor(center.z) >> 4);
+            long sectionKey = SectionKey.asLong(MathHelper.floor(center.xCoord) >> 4,
+                    MathHelper.floor(center.yCoord) >> 4,
+                    MathHelper.floor(center.zCoord) >> 4);
             OutlineRim rim = new OutlineRim(OutlineClassifier.hueFor(classification, config), rimBox(entity),
                     NO_CELLS);
             rim.face(RimFace.TOP); // a vehicle in the open has no block neighbors to seal, so it rims its box top

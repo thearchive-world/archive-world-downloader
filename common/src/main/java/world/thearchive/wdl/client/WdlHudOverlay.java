@@ -137,7 +137,7 @@ public final class WdlHudOverlay {
                 return; // idle, or past the done linger: the overlay draws nothing
             }
             boolean detailed = config.detailed() || isPeeking(config);
-            draw(new RenderSurfaceImpl(), minecraft.fontRenderer, config, frame, detailed);
+            draw(new RenderSurfaceImpl(), minecraft.fontRendererObj, config, frame, detailed);
         } catch (RuntimeException e) {
             // A per-frame draw must never crash the HUD pass or spam the log; surface the first failure only.
             if (!errorLogged) {

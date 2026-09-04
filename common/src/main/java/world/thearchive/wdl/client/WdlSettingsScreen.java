@@ -296,7 +296,7 @@ public final class WdlSettingsScreen extends GuiScreen {
         for (Map.Entry<Gui, ITextComponent> tip : this.hoverTooltips) {
             if (isControlHovered(tip.getKey(), mouseX, mouseY)) {
                 this.drawHoveringText(
-                        this.fontRenderer.listFormattedStringToWidth(tip.getValue().getUnformattedText(), 200),
+                        this.fontRendererObj.listFormattedStringToWidth(tip.getValue().getUnformattedText(), 200),
                         mouseX, mouseY);
                 break;
             }
@@ -322,12 +322,12 @@ public final class WdlSettingsScreen extends GuiScreen {
     private static void setControlPosition(Gui control, int x, int y) {
         if (control instanceof GuiButton) {
             GuiButton button = (GuiButton) control;
-            button.x = x;
-            button.y = y;
+            button.xPosition = x;
+            button.yPosition = y;
         } else {
             GuiTextField box = (GuiTextField) control;
-            box.x = x;
-            box.y = y;
+            box.xPosition = x;
+            box.yPosition = y;
         }
     }
 
@@ -348,8 +348,8 @@ public final class WdlSettingsScreen extends GuiScreen {
             return ((GuiButton) control).isMouseOver();
         }
         GuiTextField box = (GuiTextField) control;
-        return mouseX >= box.x && mouseX < box.x + CONTROL_WIDTH
-                && mouseY >= box.y && mouseY < box.y + CONTROL_HEIGHT;
+        return mouseX >= box.xPosition && mouseX < box.xPosition + CONTROL_WIDTH
+                && mouseY >= box.yPosition && mouseY < box.yPosition + CONTROL_HEIGHT;
     }
 
     private void selectTab(int index) {
@@ -516,7 +516,7 @@ public final class WdlSettingsScreen extends GuiScreen {
     }
 
     private Control textControl(String key) {
-        GuiTextField box = new GuiTextField(0, this.fontRenderer, 0, 0, CONTROL_WIDTH, CONTROL_HEIGHT);
+        GuiTextField box = new GuiTextField(0, this.fontRendererObj, 0, 0, CONTROL_WIDTH, CONTROL_HEIGHT);
         box.setMaxStringLength(32);
         box.setText(currentText(key));
         box.setGuiResponder(new GuiPageButtonList.GuiResponder() {
@@ -751,8 +751,8 @@ public final class WdlSettingsScreen extends GuiScreen {
         @Override
         public void renderContent(int mouseX, int mouseY, boolean hovering) {
             RenderSurface surface = new RenderSurfaceImpl();
-            int textY = getContentY() + (ROW_HEIGHT - fontRenderer.FONT_HEIGHT) / 2 + 2;
-            surface.text(fontRenderer, this.label, getContentX(), textY, BrandColors.opaque(BrandColors.AMBER));
+            int textY = getContentY() + (ROW_HEIGHT - fontRendererObj.FONT_HEIGHT) / 2 + 2;
+            surface.text(fontRendererObj, this.label, getContentX(), textY, BrandColors.opaque(BrandColors.AMBER));
         }
     }
 
@@ -794,8 +794,8 @@ public final class WdlSettingsScreen extends GuiScreen {
             int revertX = rowX + getContentWidth() - REVERT_WIDTH;
             int controlX = revertX - GAP - controlWidth(control);
 
-            int textY = rowTop + (ROW_HEIGHT - fontRenderer.FONT_HEIGHT) / 2;
-            surface.text(fontRenderer, this.label, rowX, textY, BrandColors.opaque(enabled ? BrandColors.IVORY
+            int textY = rowTop + (ROW_HEIGHT - fontRendererObj.FONT_HEIGHT) / 2;
+            surface.text(fontRendererObj, this.label, rowX, textY, BrandColors.opaque(enabled ? BrandColors.IVORY
                     : BrandColors.GRAY));
 
             setControlActive(control, enabled);
@@ -805,9 +805,9 @@ public final class WdlSettingsScreen extends GuiScreen {
             // Passive indicator: an amber caution mark sits just left of an off core-capture toggle, a
             // defense-in-depth reminder that the download will be missing that data beyond the confirm-at-change.
             if (showsCaptureWarning()) {
-                int glyphY = controlY + (CONTROL_HEIGHT - fontRenderer.FONT_HEIGHT) / 2;
-                surface.text(fontRenderer, CAPTURE_WARNING_GLYPH,
-                        controlX - GAP - fontRenderer.getStringWidth(CAPTURE_WARNING_GLYPH), glyphY,
+                int glyphY = controlY + (CONTROL_HEIGHT - fontRendererObj.FONT_HEIGHT) / 2;
+                surface.text(fontRendererObj, CAPTURE_WARNING_GLYPH,
+                        controlX - GAP - fontRendererObj.getStringWidth(CAPTURE_WARNING_GLYPH), glyphY,
                         BrandColors.opaque(BrandColors.AMBER));
             }
 
@@ -816,8 +816,8 @@ public final class WdlSettingsScreen extends GuiScreen {
             boolean modified = isModified();
             this.revert.visible = modified;
             this.revert.enabled = enabled && modified;
-            this.revert.x = revertX;
-            this.revert.y = controlY;
+            this.revert.xPosition = revertX;
+            this.revert.yPosition = controlY;
             this.revert.drawButton(Minecraft.getMinecraft(), mouseX, mouseY);
 
             // The revert icon is a bundled sprite, not a font glyph: the revert codepoint resolves only through
@@ -1032,9 +1032,9 @@ public final class WdlSettingsScreen extends GuiScreen {
             }
             minecraft.getTextureManager().bindTexture(BUTTON_TEXTURES);
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-            int handleX = this.x + (int) (this.value * (this.width - 8));
-            this.drawTexturedModalRect(handleX, this.y, 0, 66, 4, 20);
-            this.drawTexturedModalRect(handleX + 4, this.y, 196, 66, 4, 20);
+            int handleX = this.xPosition + (int) (this.value * (this.width - 8));
+            this.drawTexturedModalRect(handleX, this.yPosition, 0, 66, 4, 20);
+            this.drawTexturedModalRect(handleX + 4, this.yPosition, 196, 66, 4, 20);
         }
 
         @Override
@@ -1053,7 +1053,7 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
 
         private void setValueFromMouse(double mouseX) {
-            this.value = MathHelper.clamp((mouseX - (this.x + 4)) / (this.width - 8), 0.0, 1.0);
+            this.value = MathHelper.clamp((mouseX - (this.xPosition + 4)) / (this.width - 8), 0.0, 1.0);
             updateMessage();
             applyValue();
         }

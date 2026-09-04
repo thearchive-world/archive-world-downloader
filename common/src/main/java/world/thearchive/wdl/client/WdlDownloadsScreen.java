@@ -324,8 +324,8 @@ public final class WdlDownloadsScreen extends GuiScreen {
             if (!this.visible) {
                 return;
             }
-            this.hovered = mouseX >= this.x && mouseY >= this.y && mouseX < this.x + this.width
-                    && mouseY < this.y + this.height;
+            this.hovered = mouseX >= this.xPosition && mouseY >= this.yPosition && mouseX < this.xPosition + this.width
+                    && mouseY < this.yPosition + this.height;
             draw(mouseX, mouseY);
         }
 
@@ -357,7 +357,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
 
         int fieldX = (this.width - NAME_WIDTH) / 2;
         int fieldY = TOP_Y + 4 + Math.round(0.05f * Math.max(0, this.height - TOP_Y - FIELD_HEIGHT - 8));
-        NameField field = new NameField(this.fontRenderer, fieldX, fieldY, NAME_WIDTH, FIELD_HEIGHT);
+        NameField field = new NameField(this.fontRendererObj, fieldX, fieldY, NAME_WIDTH, FIELD_HEIGHT);
         field.setMaxStringLength(NAME_MAX_LENGTH);
         field.setText(name);
         field.setGuiResponder(new GuiPageButtonList.GuiResponder() {
@@ -384,7 +384,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         int listX = (this.width - listWidth) / 2;
         int belowButtons = addCaptureWarning(buttonRowY + BUTTON_HEIGHT + 8);
         int headerY = Math.max(addUpdateBanner(belowButtons), TOP_Y + 50);
-        int linkWidth = this.fontRenderer.getStringWidth(openSavesText()) + 8;
+        int linkWidth = this.fontRendererObj.getStringWidth(openSavesText()) + 8;
         int disclosureWidth = Math.max(listWidth - linkWidth - 4, 80);
         if (!this.entries.isEmpty()) {
             addButton(new DisclosureWidget(listX, headerY, disclosureWidth));
@@ -422,12 +422,13 @@ public final class WdlDownloadsScreen extends GuiScreen {
         String name = this.activeDownloadName != null ? this.activeDownloadName : this.defaultName;
         ITextComponent labelText = amberComponent(
                 new TextComponentTranslation("wdl.screen.downloads.downloading", name));
-        StringLabel label = new StringLabel(labelText, this.fontRenderer.getStringWidth(labelText.getUnformattedText()),
+        StringLabel label = new StringLabel(labelText,
+                this.fontRendererObj.getStringWidth(labelText.getUnformattedText()),
                 FIELD_HEIGHT);
         centerTopWidget(label, FIELD_HEIGHT);
         addButton(label);
 
-        int buttonRowY = label.y + FIELD_HEIGHT + 6;
+        int buttonRowY = label.yPosition + FIELD_HEIGHT + 6;
         boolean recording = state == CaptureState.RECORDING;
         // a finishing save shows a disabled Saving label, not an actionable Stop
         addButtonRow(buttonRowY, recording ? stopLabel() : savingLabel(), this::stopCapture, recording);
@@ -448,20 +449,21 @@ public final class WdlDownloadsScreen extends GuiScreen {
         ITextComponent labelText = amberComponent(name != null
                 ? new TextComponentTranslation("wdl.screen.downloads.restoring", name)
                 : new TextComponentTranslation("wdl.screen.downloads.restoring_sweep"));
-        StringLabel label = new StringLabel(labelText, this.fontRenderer.getStringWidth(labelText.getUnformattedText()),
+        StringLabel label = new StringLabel(labelText,
+                this.fontRendererObj.getStringWidth(labelText.getUnformattedText()),
                 FIELD_HEIGHT);
         centerTopWidget(label, FIELD_HEIGHT);
         addButton(label);
 
-        int buttonRowY = label.y + FIELD_HEIGHT + 6;
+        int buttonRowY = label.yPosition + FIELD_HEIGHT + 6;
         addButton(new ActionButton((this.width - BUTTON_WIDTH) / 2, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
                 I18n.format("gui.done"), this::closeToParent));
         addUpdateBanner(buttonRowY + BUTTON_HEIGHT + 8);
     }
 
     private void centerTopWidget(GuiButton widget, int height) {
-        widget.x = (this.width - widget.getButtonWidth()) / 2;
-        widget.y = TOP_Y + 4 + Math.round(0.05f * Math.max(0, this.height - TOP_Y - height - 8));
+        widget.xPosition = (this.width - widget.getButtonWidth()) / 2;
+        widget.yPosition = TOP_Y + 4 + Math.round(0.05f * Math.max(0, this.height - TOP_Y - height - 8));
     }
 
     private GuiButton addButtonRow(int buttonRowY, ITextComponent primaryLabel, Runnable onPrimary,
@@ -505,11 +507,11 @@ public final class WdlDownloadsScreen extends GuiScreen {
         ITextComponent prose = new TextComponentTranslation("wdl.screen.downloads.update_available",
                 update.runningDisplay(), update.latestDisplay());
         int maxBandWidth = listBandWidth();
-        int modrinthWidth = this.fontRenderer.getStringWidth("Modrinth");
-        int curseforgeWidth = this.fontRenderer.getStringWidth("CurseForge");
-        int dismissWidth = this.fontRenderer.getStringWidth(DISMISS_GLYPH);
-        int leftWidth = this.fontRenderer.getStringWidth(WARNING_GLYPH)
-                + this.fontRenderer.getStringWidth(prose.getUnformattedText());
+        int modrinthWidth = this.fontRendererObj.getStringWidth("Modrinth");
+        int curseforgeWidth = this.fontRendererObj.getStringWidth("CurseForge");
+        int dismissWidth = this.fontRendererObj.getStringWidth(DISMISS_GLYPH);
+        int leftWidth = this.fontRendererObj.getStringWidth(WARNING_GLYPH)
+                + this.fontRendererObj.getStringWidth(prose.getUnformattedText());
         // A row too wide for the list band drops the lower-priority CurseForge label rather than
         // overflowing the box.
         boolean curseforgeFits = leftWidth + BANNER_GAP + modrinthWidth + BANNER_GAP + curseforgeWidth
@@ -544,8 +546,8 @@ public final class WdlDownloadsScreen extends GuiScreen {
             return y;
         }
         ITextComponent text = new TextComponentTranslation("wdl.screen.downloads.capture_disabled");
-        int width = this.fontRenderer.getStringWidth(WARNING_GLYPH)
-                + this.fontRenderer.getStringWidth(text.getUnformattedText());
+        int width = this.fontRendererObj.getStringWidth(WARNING_GLYPH)
+                + this.fontRendererObj.getStringWidth(text.getUnformattedText());
         addButton(new CaptureWarningWidget((this.width - width) / 2, y, width, text));
         return y + HEADER_ROW_HEIGHT + 6;
     }
@@ -840,8 +842,8 @@ public final class WdlDownloadsScreen extends GuiScreen {
 
         @Override
         void draw(int mouseX, int mouseY) {
-            new RenderSurfaceImpl().text(fontRenderer, this.text, this.x,
-                    this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2, NAME_ARGB);
+            new RenderSurfaceImpl().text(fontRendererObj, this.text, this.xPosition,
+                    this.yPosition + (this.height - fontRendererObj.FONT_HEIGHT) / 2, NAME_ARGB);
         }
     }
 
@@ -857,8 +859,8 @@ public final class WdlDownloadsScreen extends GuiScreen {
             String triangle = listCollapsed ? TRIANGLE_COLLAPSED : TRIANGLE_EXPANDED;
             ITextComponent header = new TextComponentString(triangle)
                     .appendSibling(new TextComponentTranslation("wdl.screen.downloads.existing", entries.size()));
-            surface.text(fontRenderer, header, this.x + 4,
-                    this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2, HEADER_ARGB);
+            surface.text(fontRendererObj, header, this.xPosition + 4,
+                    this.yPosition + (this.height - fontRendererObj.FONT_HEIGHT) / 2, HEADER_ARGB);
         }
 
         @Override
@@ -878,8 +880,8 @@ public final class WdlDownloadsScreen extends GuiScreen {
         void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
             int color = hovered ? LINK_HOVER_ARGB : LINK_REST_ARGB;
-            surface.text(fontRenderer, openSavesText(), this.x + 4,
-                    this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2, color);
+            surface.text(fontRendererObj, openSavesText(), this.xPosition + 4,
+                    this.yPosition + (this.height - fontRendererObj.FONT_HEIGHT) / 2, color);
         }
 
         @Override
@@ -901,12 +903,13 @@ public final class WdlDownloadsScreen extends GuiScreen {
         @Override
         void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
-            surface.fill(this.x, this.y, this.x + getButtonWidth(),
-                    this.y + this.height, BANNER_FILL_ARGB);
-            surface.outline(this.x, this.y, getButtonWidth(), this.height, BANNER_OUTLINE_ARGB);
-            int textY = this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2;
-            surface.text(fontRenderer, WARNING_GLYPH, this.x + BANNER_GAP, textY, BANNER_GLYPH_ARGB);
-            surface.text(fontRenderer, this.prose, this.x + BANNER_GAP + fontRenderer.getStringWidth(WARNING_GLYPH),
+            surface.fill(this.xPosition, this.yPosition, this.xPosition + getButtonWidth(),
+                    this.yPosition + this.height, BANNER_FILL_ARGB);
+            surface.outline(this.xPosition, this.yPosition, getButtonWidth(), this.height, BANNER_OUTLINE_ARGB);
+            int textY = this.yPosition + (this.height - fontRendererObj.FONT_HEIGHT) / 2;
+            surface.text(fontRendererObj, WARNING_GLYPH, this.xPosition + BANNER_GAP, textY, BANNER_GLYPH_ARGB);
+            surface.text(fontRendererObj, this.prose,
+                    this.xPosition + BANNER_GAP + fontRendererObj.getStringWidth(WARNING_GLYPH),
                     textY,
                     BANNER_TEXT_ARGB);
         }
@@ -927,10 +930,10 @@ public final class WdlDownloadsScreen extends GuiScreen {
         void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
             int color = hovered ? BANNER_LINK_HOVER_ARGB : BANNER_LINK_ARGB;
-            surface.text(fontRenderer, this.label, this.x,
-                    this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2, color);
+            surface.text(fontRendererObj, this.label, this.xPosition,
+                    this.yPosition + (this.height - fontRendererObj.FONT_HEIGHT) / 2, color);
             if (this.hovered) {
-                WdlDownloadsScreen.this.drawHoveringText(this.url, mouseX, mouseY);
+                WdlDownloadsScreen.this.drawCreativeTabHoveringText(this.url, mouseX, mouseY);
             }
         }
 
@@ -953,8 +956,8 @@ public final class WdlDownloadsScreen extends GuiScreen {
             int color = hovered ? LINK_HOVER_ARGB : LINK_REST_ARGB;
             // The glyph comes from the fallback font, whose ink sits high in its line box, so the shared
             // centering formula reads a pixel high without the nudge.
-            surface.text(fontRenderer, DISMISS_GLYPH, this.x,
-                    this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2 + 1, color);
+            surface.text(fontRendererObj, DISMISS_GLYPH, this.xPosition,
+                    this.yPosition + (this.height - fontRendererObj.FONT_HEIGHT) / 2 + 1, color);
         }
 
         @Override
@@ -977,12 +980,13 @@ public final class WdlDownloadsScreen extends GuiScreen {
         @Override
         void draw(int mouseX, int mouseY) {
             RenderSurface surface = new RenderSurfaceImpl();
-            int textY = this.y + (this.height - fontRenderer.FONT_HEIGHT) / 2;
-            surface.text(fontRenderer, WARNING_GLYPH, this.x, textY, BANNER_GLYPH_ARGB);
-            surface.text(fontRenderer, this.text, this.x + fontRenderer.getStringWidth(WARNING_GLYPH), textY,
+            int textY = this.yPosition + (this.height - fontRendererObj.FONT_HEIGHT) / 2;
+            surface.text(fontRendererObj, WARNING_GLYPH, this.xPosition, textY, BANNER_GLYPH_ARGB);
+            surface.text(fontRendererObj, this.text, this.xPosition + fontRendererObj.getStringWidth(WARNING_GLYPH),
+                    textY,
                     NAME_ARGB);
             if (this.hovered) {
-                WdlDownloadsScreen.this.drawHoveringText(fontRenderer.listFormattedStringToWidth(
+                WdlDownloadsScreen.this.drawHoveringText(fontRendererObj.listFormattedStringToWidth(
                         new TextComponentTranslation("wdl.screen.downloads.capture_disabled.tooltip")
                                 .getUnformattedText(),
                         200),
@@ -1343,10 +1347,10 @@ public final class WdlDownloadsScreen extends GuiScreen {
                     surface.blitFavicon(this.iconLocation, rowX + 2, rowY + 3, ICON_SIZE);
                 }
                 int textX = rowX + 4 + ICON_ADVANCE;
-                int dateX = rightEdge - fontRenderer.getStringWidth(this.lastPlayed);
-                surface.text(fontRenderer, this.lastPlayed, dateX, rowY + 4, GRAY_ARGB);
-                int labelMax = entryWidth - fontRenderer.getStringWidth(this.lastPlayed) - 12 - ICON_ADVANCE;
-                surface.text(fontRenderer, ClientText.ellipsize(fontRenderer, this.displayName, labelMax),
+                int dateX = rightEdge - fontRendererObj.getStringWidth(this.lastPlayed);
+                surface.text(fontRendererObj, this.lastPlayed, dateX, rowY + 4, GRAY_ARGB);
+                int labelMax = entryWidth - fontRendererObj.getStringWidth(this.lastPlayed) - 12 - ICON_ADVANCE;
+                surface.text(fontRendererObj, ClientText.ellipsize(fontRendererObj, this.displayName, labelMax),
                         textX, rowY + 4, NAME_ARGB);
 
                 this.line2Top = rowY + 14;
@@ -1396,28 +1400,28 @@ public final class WdlDownloadsScreen extends GuiScreen {
                     return rightLimit;
                 }
                 if (separator) {
-                    if (pairX + 6 + fontRenderer.getStringWidth(DOT) + 6 >= rightLimit) {
+                    if (pairX + 6 + fontRendererObj.getStringWidth(DOT) + 6 >= rightLimit) {
                         return rightLimit;
                     }
-                    surface.text(fontRenderer, DOT, pairX + 6, y, GRAY_ARGB);
-                    pairX += 6 + fontRenderer.getStringWidth(DOT) + 6;
+                    surface.text(fontRendererObj, DOT, pairX + 6, y, GRAY_ARGB);
+                    pairX += 6 + fontRendererObj.getStringWidth(DOT) + 6;
                 }
                 String label = new TextComponentTranslation(labelKey).getUnformattedText();
-                String clampedLabel = ClientText.ellipsize(fontRenderer, label, rightLimit - pairX);
-                surface.text(fontRenderer, clampedLabel, pairX, y, GRAY_ARGB);
+                String clampedLabel = ClientText.ellipsize(fontRendererObj, label, rightLimit - pairX);
+                surface.text(fontRendererObj, clampedLabel, pairX, y, GRAY_ARGB);
                 if (!clampedLabel.equals(label)) {
                     return rightLimit;
                 }
-                int valueX = pairX + fontRenderer.getStringWidth(label) + 4;
+                int valueX = pairX + fontRendererObj.getStringWidth(label) + 4;
                 if (valueX >= rightLimit) {
                     return rightLimit;
                 }
-                String clampedText = ClientText.ellipsize(fontRenderer, text, rightLimit - valueX);
-                surface.text(fontRenderer, clampedText, valueX, y, GRAY_ARGB);
+                String clampedText = ClientText.ellipsize(fontRendererObj, text, rightLimit - valueX);
+                surface.text(fontRendererObj, clampedText, valueX, y, GRAY_ARGB);
                 if (!clampedText.equals(text)) {
                     return rightLimit;
                 }
-                return valueX + fontRenderer.getStringWidth(text);
+                return valueX + fontRendererObj.getStringWidth(text);
             }
 
             /**
@@ -1426,14 +1430,14 @@ public final class WdlDownloadsScreen extends GuiScreen {
              */
             private int renderStatus(RenderSurface surface, int rightEdge, int y, int mouseX, int mouseY,
                     boolean hovering) {
-                this.arrowLeft = rightEdge - fontRenderer.getStringWidth(ARROW);
+                this.arrowLeft = rightEdge - fontRendererObj.getStringWidth(ARROW);
                 this.arrowRight = rightEdge;
                 this.recoverLeft = -1;
                 this.recoverRight = -1;
                 this.restoreLeft = -1;
                 this.restoreRight = -1;
                 boolean overArrow = hovering && inLine(mouseX, mouseY, this.arrowLeft, this.arrowRight, y);
-                surface.text(fontRenderer, ARROW, this.arrowLeft, y, overArrow ? LINK_HOVER_ARGB : LINK_REST_ARGB);
+                surface.text(fontRendererObj, ARROW, this.arrowLeft, y, overArrow ? LINK_HOVER_ARGB : LINK_REST_ARGB);
 
                 // The slot just left of the arrow holds the Singleplayer chip (joined by the Restore action
                 // chip when a clean source is cached and the row is not the loaded world), the Recover chip,
@@ -1448,45 +1452,45 @@ public final class WdlDownloadsScreen extends GuiScreen {
                         restorable = true;
                         String restoreChip = new TextComponentTranslation("wdl.screen.downloads.restore")
                                 .getUnformattedText();
-                        this.restoreLeft = slotRight - fontRenderer.getStringWidth(restoreChip);
+                        this.restoreLeft = slotRight - fontRendererObj.getStringWidth(restoreChip);
                         this.restoreRight = slotRight;
                         boolean overRestore = hovering
                                 && inLine(mouseX, mouseY, this.restoreLeft, this.restoreRight, y);
                         drawRestoreChip(surface, restoreChip, this.restoreLeft, y,
                                 overRestore ? LINK_HOVER_ARGB : RECOVER_ARGB);
                         if (overRestore) {
-                            pendingTooltip = () -> surface.tooltip(fontRenderer, restoreTooltip(source),
+                            pendingTooltip = () -> surface.tooltip(fontRendererObj, restoreTooltip(source),
                                     TOOLTIP_WRAP_WIDTH, mouseX, mouseY);
                         }
                         slotRight = this.restoreLeft - 4;
                     }
                     String chip = new TextComponentTranslation("wdl.screen.downloads.tainted").getUnformattedText();
-                    int chipLeft = slotRight - fontRenderer.getStringWidth(chip);
-                    surface.text(fontRenderer, chip, chipLeft, y, TAINTED_ARGB);
+                    int chipLeft = slotRight - fontRendererObj.getStringWidth(chip);
+                    surface.text(fontRendererObj, chip, chipLeft, y, TAINTED_ARGB);
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
                         // With the Restore chip present the tooltip drops the fresh-download advice: the
                         // chip beside it is the better way out.
                         ITextComponent taintedTip = new TextComponentTranslation(restorable
                                 ? "wdl.screen.downloads.tooltip.tainted_restorable"
                                 : "wdl.screen.downloads.tooltip.tainted");
-                        pendingTooltip = () -> surface.tooltip(fontRenderer, taintedTip, TOOLTIP_WRAP_WIDTH, mouseX,
+                        pendingTooltip = () -> surface.tooltip(fontRendererObj, taintedTip, TOOLTIP_WRAP_WIDTH, mouseX,
                                 mouseY);
                     }
                     slotLeft = chipLeft;
                 } else if (this.entry.health() == DownloadHealth.RECOVERABLE) {
                     String chip = new TextComponentTranslation("wdl.screen.downloads.recover").getUnformattedText();
-                    this.recoverLeft = slotRight - fontRenderer.getStringWidth(chip);
+                    this.recoverLeft = slotRight - fontRendererObj.getStringWidth(chip);
                     this.recoverRight = slotRight;
                     boolean overRecover = hovering && inLine(mouseX, mouseY, this.recoverLeft, this.recoverRight, y);
-                    surface.text(fontRenderer, chip, this.recoverLeft, y,
+                    surface.text(fontRendererObj, chip, this.recoverLeft, y,
                             overRecover ? LINK_HOVER_ARGB : RECOVER_ARGB);
                     slotLeft = this.recoverLeft;
                 } else if (this.entry.health() == DownloadHealth.PARTIAL) {
                     String chip = new TextComponentTranslation("wdl.screen.downloads.partial").getUnformattedText();
-                    int chipLeft = slotRight - fontRenderer.getStringWidth(chip);
-                    surface.text(fontRenderer, chip, chipLeft, y, PARTIAL_ARGB);
+                    int chipLeft = slotRight - fontRendererObj.getStringWidth(chip);
+                    surface.text(fontRendererObj, chip, chipLeft, y, PARTIAL_ARGB);
                     if (hovering && inLine(mouseX, mouseY, chipLeft, slotRight, y)) {
-                        pendingTooltip = () -> surface.tooltip(fontRenderer,
+                        pendingTooltip = () -> surface.tooltip(fontRendererObj,
                                 new TextComponentTranslation("wdl.toast.partial.title"), TOOLTIP_WRAP_WIDTH, mouseX,
                                 mouseY);
                     }
@@ -1496,14 +1500,14 @@ public final class WdlDownloadsScreen extends GuiScreen {
                     if (size.isPresent()) {
                         SizeFormatter.Size formatted = SizeFormatter.format(size.getAsLong());
                         ITextComponent text = new TextComponentTranslation(formatted.unitKey(), formatted.number());
-                        surface.text(fontRenderer, text,
-                                slotRight - fontRenderer.getStringWidth(text.getUnformattedText()), y, GRAY_ARGB);
-                        slotLeft = slotRight - fontRenderer.getStringWidth(text.getUnformattedText());
+                        surface.text(fontRendererObj, text,
+                                slotRight - fontRendererObj.getStringWidth(text.getUnformattedText()), y, GRAY_ARGB);
+                        slotLeft = slotRight - fontRendererObj.getStringWidth(text.getUnformattedText());
                     }
                 }
 
                 if (overArrow) {
-                    pendingTooltip = () -> surface.tooltip(fontRenderer, ImmutableList.of(
+                    pendingTooltip = () -> surface.tooltip(fontRendererObj, ImmutableList.of(
                             new TextComponentTranslation("wdl.screen.downloads.tooltip.folder", entry.folderName()),
                             new TextComponentTranslation("wdl.screen.downloads.tooltip.version", modVersion,
                                     mcVersion)),
@@ -1518,11 +1522,11 @@ public final class WdlDownloadsScreen extends GuiScreen {
              */
             private void drawRestoreChip(RenderSurface surface, String chip, int x, int y, int color) {
                 if (chip.startsWith(RESTORE_GLYPH)) {
-                    surface.text(fontRenderer, RESTORE_GLYPH, x, y + 1, color);
-                    surface.text(fontRenderer, chip.substring(RESTORE_GLYPH.length()),
-                            x + fontRenderer.getStringWidth(RESTORE_GLYPH), y, color);
+                    surface.text(fontRendererObj, RESTORE_GLYPH, x, y + 1, color);
+                    surface.text(fontRendererObj, chip.substring(RESTORE_GLYPH.length()),
+                            x + fontRendererObj.getStringWidth(RESTORE_GLYPH), y, color);
                 } else {
-                    surface.text(fontRenderer, chip, x, y, color);
+                    surface.text(fontRendererObj, chip, x, y, color);
                 }
             }
 
@@ -1547,7 +1551,8 @@ public final class WdlDownloadsScreen extends GuiScreen {
             }
 
             private boolean inLine(int mouseX, int mouseY, int left, int right, int top) {
-                return mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= top + fontRenderer.FONT_HEIGHT;
+                return mouseX >= left && mouseX <= right && mouseY >= top
+                        && mouseY <= top + fontRendererObj.FONT_HEIGHT;
             }
 
             boolean handleEdgeClick(int mouseX, int mouseY) {
@@ -1588,7 +1593,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
                     return null;
                 }
                 return new IntRect(this.restoreLeft, this.line2Top,
-                        this.restoreRight - this.restoreLeft + 1, fontRenderer.FONT_HEIGHT + 1);
+                        this.restoreRight - this.restoreLeft + 1, fontRendererObj.FONT_HEIGHT + 1);
             }
 
             void close() {

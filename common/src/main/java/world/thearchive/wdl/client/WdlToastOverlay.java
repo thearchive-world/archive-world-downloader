@@ -110,7 +110,7 @@ public final class WdlToastOverlay {
      */
     public static void render() {
         Minecraft minecraft = Minecraft.getMinecraft();
-        FontRenderer font = minecraft.fontRenderer;
+        FontRenderer font = minecraft.fontRendererObj;
         if (font == null) {
             return;
         }
