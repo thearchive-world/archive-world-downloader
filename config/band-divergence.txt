@@ -346,6 +346,12 @@ common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionReb
 # registries argument.
 common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 
+# Below 1.13 the NBT API is classic MCP, so the guard's own vocabulary is the classic setter spelling: every write
+# onto a compound here is set plus its type (setString, setByte, setInteger, setTag) and there is no untyped put to
+# tell apart from an ordinary Map call, so the two Mojmap-shaped patterns collapse to one set pattern. Left as it
+# came, the guard matched nothing on any classic-MCP band and would have gone on reading as compliance.
+common/src/test/java/world/thearchive/wdl/testsupport/HandBuiltFixtureGuardTest.java
+
 # Below 1.11 a block-entity id carries no namespace and there is no class-to-id accessor, so the representative-state
 # map is keyed by the raw id string with no ResourceLocation left in the file, and each provider block's id is read off
 # vanilla's own save, whose throw for a class it maps no id for stands in for the null return the bands above skip on.

@@ -17,14 +17,18 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagByteArray;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.core.MapManifest;
+import world.thearchive.wdl.testsupport.ItemFixtures;
+import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The container-map loss gate: a filled map nested in a chest and in a nested container item is collected and remapped
@@ -32,20 +36,22 @@ import world.thearchive.wdl.core.MapManifest;
  * At this band a filled map's id is the item-level {@code Damage} short behind the {@code id == "minecraft:filled_map"}
  * identity gate, not the inner {@code tag."map"} of the higher bands. Without the item-compound walk the maps are never
  * collected; without the identity gate the damaged pickaxe is rewritten as a map, corrupting its durability and
- * aliasing it to a captured map image. Hand-built classic-MCP item NBT drives it, no live ItemStack.
+ * aliasing it to a captured map image. Each item entry comes from vanilla's own {@code ItemStack} writer, so the
+ * item-level {@code Damage} short under test is the one a real stack serializes.
  */
 class ContainerMapCollectionTest {
     private static final String FILLED_MAP = "minecraft:filled_map";
     private static final int PICKAXE_DAMAGE = 800;
     private static final int CHEST_MAP_SESSION_ID = 40;
-    private static final int SHULKER_MAP_SESSION_ID = 41;
+    private static final int NESTED_MAP_SESSION_ID = 41;
+
+    @BeforeAll
+    static void bootstrapVanilla() {
+        TestRegistries.bootstrap();
+    }
 
     private static NBTTagCompound item(String id, int damage) {
-        NBTTagCompound item = new NBTTagCompound();
-        item.setString("id", id);
-        item.setByte("Count", (byte) 1);
-        item.setShort("Damage", (short) damage);
-        return item;
+        return ItemFixtures.itemTag(ItemFixtures.damagedStack(id, damage));
     }
 
     private static NBTTagCompound containerHolding(NBTTagCompound nested) {
@@ -55,9 +61,9 @@ class ContainerMapCollectionTest {
         blockEntityTag.setTag("Items", nestedItems);
         NBTTagCompound tag = new NBTTagCompound();
         tag.setTag("BlockEntityTag", blockEntityTag);
-        NBTTagCompound shulker = item("minecraft:shulker_box", 0);
-        shulker.setTag("tag", tag);
-        return shulker;
+        ItemStack container = ItemFixtures.stack("minecraft:chest");
+        container.setTagCompound(tag);
+        return ItemFixtures.itemTag(container);
     }
 
     /** A chest holder whose {@code Items} carry the chest map, the damaged pickaxe, and a container nesting a map. */

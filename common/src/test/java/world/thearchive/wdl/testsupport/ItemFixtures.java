@@ -53,6 +53,13 @@ public final class ItemFixtures {
         return stack;
     }
 
+    /** The stack for {@code itemId} carrying {@code damage} as its item-level metadata, count 1. */
+    public static ItemStack damagedStack(String itemId, int damage) {
+        ItemStack stack = stack(itemId);
+        stack.setItemDamage(damage);
+        return stack;
+    }
+
     /** The {@code "Items"} list vanilla writes for {@code itemIds} at ascending slots from 0. */
     public static NBTTagList items(String... itemIds) {
         return items(stacks(itemIds));
