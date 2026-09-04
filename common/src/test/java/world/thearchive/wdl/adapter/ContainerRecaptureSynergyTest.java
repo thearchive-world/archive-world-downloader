@@ -77,7 +77,7 @@ class ContainerRecaptureSynergyTest {
     void reCapturingThePlacedChestLetsTheStashMergeOntoIt() {
         // After re-capture the chunk's block entities include the placed chest, so the merge lands.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(false,
-                ImmutableList.of(blockEntity("minecraft:chest", CHEST_X, CHEST_Y, CHEST_Z)));
+                ImmutableList.of(blockEntity("Chest", CHEST_X, CHEST_Y, CHEST_Z)));
         NBTTagCompound recapturedTag = codec.encode(snapshot, false);
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
@@ -100,7 +100,7 @@ class ContainerRecaptureSynergyTest {
         NBTTagCompound latestRecapture = null;
         for (int reencode = 0; reencode < 3; reencode++) {
             ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(false,
-                    ImmutableList.of(blockEntity("minecraft:chest", CHEST_X, CHEST_Y, CHEST_Z)));
+                    ImmutableList.of(blockEntity("Chest", CHEST_X, CHEST_Y, CHEST_Z)));
             latestRecapture = codec.encode(snapshot, false);
         }
 

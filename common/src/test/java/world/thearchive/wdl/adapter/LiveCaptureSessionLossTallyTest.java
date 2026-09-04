@@ -416,8 +416,8 @@ class LiveCaptureSessionLossTallyTest {
      */
     private ChunkSnapshotSource chestChunk() {
         return SyntheticChunks.fullWithBlockEntities(true,
-                ImmutableList.of(blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()),
-                        blockEntity("minecraft:ender_chest", lectern.getX(), lectern.getY(), lectern.getZ())));
+                ImmutableList.of(blockEntity("Chest", chest.getX(), chest.getY(), chest.getZ()),
+                        blockEntity("EnderChest", lectern.getX(), lectern.getY(), lectern.getZ())));
     }
 
     /** The block entity of the given type in the chunk written to {@code paths}, or null when absent. */

@@ -124,8 +124,8 @@ class OrphanedContainerSweepTest {
 
         // The chunk is flushed carrying an empty chest, then leaves the keep-hot buffer: the client chunk packet
         // never carries container contents, so a not-yet-opened chest is on disk structurally present but empty.
-        flushEmptyChunk(region, chunk, ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
-        assertTrue(itemsOnDisk(region, chunk, 2, 64, 2).get(0).isEmpty(),
+        flushEmptyChunk(region, chunk, ImmutableList.of(blockEntity("Chest", 2, 64, 2)));
+        assertNull(itemsOnDisk(region, chunk, 2, 64, 2)[0],
                 "the flushed chunk's chest starts empty, before the container is opened");
 
         // The container is opened after its chunk was flushed, so the captured Items holder is orphaned; the fix
@@ -156,7 +156,7 @@ class OrphanedContainerSweepTest {
 
         // No vanilla lectern exists at this band, so a fieldless ender chest stands in as the carrier the orphan
         // sweep's LecternSink book fold writes "Book"/"Page" onto; the sweep-fold wiring is what is under test.
-        flushEmptyChunk(region, chunk, ImmutableList.of(blockEntity("minecraft:ender_chest", 3, 64, 3)));
+        flushEmptyChunk(region, chunk, ImmutableList.of(blockEntity("EnderChest", 3, 64, 3)));
 
         Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(lecternPos, sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 7));
@@ -190,8 +190,8 @@ class OrphanedContainerSweepTest {
         BlockPos rightHalf = new BlockPos(15, 64, 4); // last column of chunk (0,0)
         BlockPos leftHalf = new BlockPos(16, 64, 4);  // first column of chunk (1,0), the connected partner
 
-        flushEmptyChunk(region, rightChunk, ImmutableList.of(blockEntity("minecraft:chest", 15, 64, 4)));
-        flushEmptyChunk(region, leftChunk, ImmutableList.of(blockEntity("minecraft:chest", 16, 64, 4)));
+        flushEmptyChunk(region, rightChunk, ImmutableList.of(blockEntity("Chest", 15, 64, 4)));
+        flushEmptyChunk(region, leftChunk, ImmutableList.of(blockEntity("Chest", 16, 64, 4)));
 
         ItemStack[] rightItems = new ItemStack[27];
         rightItems[0] = new ItemStack(Items.EMERALD, 3);
@@ -255,7 +255,7 @@ class OrphanedContainerSweepTest {
         AsyncSaveWriter writer = regionWriter(region);
         writer.submitChunk(DimensionType.OVERWORLD, chunk, () -> codec.encode(
                 SyntheticChunks.fullWithBlockEntities(true,
-                        ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2))),
+                        ImmutableList.of(blockEntity("Chest", 2, 64, 2))),
                 false), ChunkMerge::merge);
         writer.submitChunkRewrite(DimensionType.OVERWORLD, chunk,
                 onDisk -> ContainerMerge.mergeChunkStash(sink, onDisk, chunk, holders).merged());

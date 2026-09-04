@@ -42,23 +42,23 @@ class EntityBufferTest {
         TestRegistries.bootstrap(); // ChunkPos static init needs the vanilla bootstrap (SharedConstants)
     }
 
-    private static NBTTagCompound tag(String marker) {
-        return EntityFixtures.entityTag(marker);
+    private static NBTTagCompound tag(String id) {
+        return EntityFixtures.entityTag(id);
     }
 
-    private static List<String> markersOf(List<NBTTagCompound> tags) {
-        List<String> markers = new ArrayList<>();
+    private static List<String> idsOf(List<NBTTagCompound> tags) {
+        List<String> ids = new ArrayList<>();
         for (NBTTagCompound tag : tags) {
-            markers.add(tag.getString("id"));
+            ids.add(tag.getString("id"));
         }
-        return markers;
+        return ids;
     }
 
     @Test
     void accumulatedEntitiesDrainByChunk() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
-        buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Pig"));
+        buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("Cow"));
 
         List<NBTTagCompound> drained = buffer.drainChunk(new ChunkPos(0, 0));
 
@@ -69,20 +69,20 @@ class EntityBufferTest {
     @Test
     void reSeeingAnEntityInNewChunkReHomesItAndDropsTheStaleCopy() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("old"));
-        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("new")); // it walked into a new chunk
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Squid"));
+        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("Ozelot")); // it walked into a new chunk
 
         assertTrue(buffer.drainChunk(new ChunkPos(0, 0)).isEmpty(), "the stale copy is gone from the old chunk");
         List<NBTTagCompound> current = buffer.drainChunk(new ChunkPos(5, 5));
         assertEquals(1, current.size(), "exactly one copy, in the newest chunk");
-        assertEquals("new", current.get(0).getString("id"));
+        assertEquals("Ozelot", current.get(0).getString("id"));
     }
 
     @Test
     void reHomingDropsTheEmptiedChunkFromBufferedChunks() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("old"));
-        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("new"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Squid"));
+        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("Ozelot"));
 
         assertEquals(ImmutableSet.of(new ChunkPos(5, 5)), buffer.bufferedChunks(),
                 "the chunk the entity left holds nothing, so it is not a buffered chunk");
@@ -91,8 +91,8 @@ class EntityBufferTest {
     @Test
     void reHomingLeavesChunkOfReportingTheNewChunk() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("old"));
-        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("new"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Squid"));
+        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("Ozelot"));
 
         assertEquals(new ChunkPos(5, 5), buffer.chunkOf(UUID_A));
     }
@@ -100,22 +100,22 @@ class EntityBufferTest {
     @Test
     void reHomingKeepsAnOldChunkThatStillHoldsAnotherEntity() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
-        buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
-        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("a-moved"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Pig"));
+        buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("Cow"));
+        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("Wolf"));
 
         assertEquals(ImmutableSet.of(new ChunkPos(0, 0), new ChunkPos(5, 5)), buffer.bufferedChunks());
-        assertEquals(ImmutableList.of("b"), markersOf(buffer.drainChunk(new ChunkPos(0, 0))),
+        assertEquals(ImmutableList.of("Cow"), idsOf(buffer.drainChunk(new ChunkPos(0, 0))),
                 "the entity that stayed behind is still buffered in the old chunk");
     }
 
     @Test
     void reSeeingAnEntityInTheSameChunkReplacesTheTag() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("old"));
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("new"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Squid"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Ozelot"));
 
-        assertEquals(ImmutableList.of("new"), markersOf(buffer.drainChunk(new ChunkPos(0, 0))));
+        assertEquals(ImmutableList.of("Ozelot"), idsOf(buffer.drainChunk(new ChunkPos(0, 0))));
         assertTrue(buffer.isEmpty(), "the replaced copy left no residue");
     }
 
@@ -123,14 +123,14 @@ class EntityBufferTest {
     void chunkOfReportsTheCurrentChunkForTheNewOrMovedCheck() {
         EntityBuffer buffer = new EntityBuffer();
         assertNull(buffer.chunkOf(UUID_A), "an unseen entity has no chunk");
-        buffer.accumulate(UUID_A, new ChunkPos(3, 4), tag("a"));
+        buffer.accumulate(UUID_A, new ChunkPos(3, 4), tag("Pig"));
         assertEquals(new ChunkPos(3, 4), buffer.chunkOf(UUID_A));
     }
 
     @Test
     void chunkOfForgetsAnEntityWhoseChunkDrained() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Pig"));
         buffer.drainChunk(new ChunkPos(0, 0));
 
         assertNull(buffer.chunkOf(UUID_A), "a flushed entity is unbuffered again, so the prime poll re-buffers it");
@@ -139,8 +139,8 @@ class EntityBufferTest {
     @Test
     void bufferedChunksListsEveryChunkHoldingEntities() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
-        buffer.accumulate(UUID_B, new ChunkPos(1, 1), tag("b"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Pig"));
+        buffer.accumulate(UUID_B, new ChunkPos(1, 1), tag("Cow"));
 
         assertEquals(ImmutableSet.of(new ChunkPos(0, 0), new ChunkPos(1, 1)), buffer.bufferedChunks());
     }
@@ -148,52 +148,52 @@ class EntityBufferTest {
     @Test
     void drainingOneChunkLeavesTheOtherChunkBuffered() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
-        buffer.accumulate(UUID_B, new ChunkPos(1, 1), tag("b"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Pig"));
+        buffer.accumulate(UUID_B, new ChunkPos(1, 1), tag("Cow"));
 
-        assertEquals(ImmutableList.of("a"), markersOf(buffer.drainChunk(new ChunkPos(0, 0))));
+        assertEquals(ImmutableList.of("Pig"), idsOf(buffer.drainChunk(new ChunkPos(0, 0))));
 
         assertEquals(ImmutableSet.of(new ChunkPos(1, 1)), buffer.bufferedChunks(),
                 "the undrained chunk is still reported");
         assertEquals(new ChunkPos(1, 1), buffer.chunkOf(UUID_B));
-        assertEquals(ImmutableList.of("b"), markersOf(buffer.drainChunk(new ChunkPos(1, 1))));
+        assertEquals(ImmutableList.of("Cow"), idsOf(buffer.drainChunk(new ChunkPos(1, 1))));
         assertTrue(buffer.isEmpty());
     }
 
     @Test
     void bufferedChunksSnapshotAllowsDrainingInsideTheLoop() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
-        buffer.accumulate(UUID_B, new ChunkPos(1, 1), tag("b"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Pig"));
+        buffer.accumulate(UUID_B, new ChunkPos(1, 1), tag("Cow"));
 
-        List<String> markers = new ArrayList<>();
+        List<String> ids = new ArrayList<>();
         for (ChunkPos pos : buffer.bufferedChunks()) {
-            markers.addAll(markersOf(buffer.drainChunk(pos))); // the flush loop drains inside the iteration
+            ids.addAll(idsOf(buffer.drainChunk(pos))); // the flush loop drains inside the iteration
         }
 
-        assertEquals(ImmutableSet.of("a", "b"), new HashSet<>(markers));
+        assertEquals(ImmutableSet.of("Pig", "Cow"), new HashSet<>(ids));
         assertTrue(buffer.isEmpty());
     }
 
     @Test
     void bufferedChunksPartitionEveryAccumulatedEntity() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
-        buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
-        buffer.accumulate(UUID_C, new ChunkPos(1, 1), tag("c"));
-        buffer.accumulate(UUID_A, new ChunkPos(1, 1), tag("a-moved")); // re-home into an occupied chunk
-        buffer.accumulate(UUID_B, new ChunkPos(2, 2), tag("b-moved")); // re-home, emptying (0, 0)
-        buffer.accumulate(UUID_D, new ChunkPos(2, 2), tag("d"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Pig"));
+        buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("Cow"));
+        buffer.accumulate(UUID_C, new ChunkPos(1, 1), tag("Sheep"));
+        buffer.accumulate(UUID_A, new ChunkPos(1, 1), tag("Wolf")); // re-home into an occupied chunk
+        buffer.accumulate(UUID_B, new ChunkPos(2, 2), tag("Bat")); // re-home, emptying (0, 0)
+        buffer.accumulate(UUID_D, new ChunkPos(2, 2), tag("Chicken"));
 
-        List<String> markers = new ArrayList<>();
+        List<String> ids = new ArrayList<>();
         for (ChunkPos pos : buffer.bufferedChunks()) {
             List<NBTTagCompound> drained = buffer.drainChunk(pos);
             assertFalse(drained.isEmpty(), "a reported chunk holds at least one entity: " + pos);
-            markers.addAll(markersOf(drained));
+            ids.addAll(idsOf(drained));
         }
 
-        assertEquals(ImmutableSet.of("a-moved", "b-moved", "c", "d"), new HashSet<>(markers));
-        assertEquals(4, markers.size(), "no entity drains twice");
+        assertEquals(ImmutableSet.of("Wolf", "Bat", "Sheep", "Chicken"), new HashSet<>(ids));
+        assertEquals(4, ids.size(), "no entity drains twice");
         assertTrue(buffer.isEmpty(), "every buffered entity was reachable through the reported chunks");
     }
 
@@ -206,7 +206,7 @@ class EntityBufferTest {
     @Test
     void drainingAnAlreadyDrainedChunkYieldsNothing() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Pig"));
         buffer.drainChunk(new ChunkPos(0, 0));
 
         assertTrue(buffer.drainChunk(new ChunkPos(0, 0)).isEmpty());
@@ -216,12 +216,12 @@ class EntityBufferTest {
     @Test
     void drainYieldsMutableTagsTheCallerCanFilter() {
         EntityBuffer buffer = new EntityBuffer();
-        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
-        buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
+        buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("Pig"));
+        buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("Cow"));
 
         List<NBTTagCompound> drained = buffer.drainChunk(new ChunkPos(0, 0));
-        drained.removeIf(tag -> "a".equals(tag.getString("id"))); // the caller filters the drain in place
+        drained.removeIf(tag -> "Pig".equals(tag.getString("id"))); // the caller filters the drain in place
 
-        assertEquals(ImmutableList.of("b"), markersOf(drained));
+        assertEquals(ImmutableList.of("Cow"), idsOf(drained));
     }
 }

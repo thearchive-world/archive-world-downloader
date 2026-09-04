@@ -13,7 +13,6 @@ import net.minecraft.init.Items;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.ResourceLocation;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -21,20 +20,20 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * Pins the 1.12.2 natural-spawn equipment table: an item outside a type's pool in a pickup-fillable slot is a proven
+ * Pins the 1.10.2 natural-spawn equipment table: an item outside a type's pool in a pickup-fillable slot is a proven
  * loot pickup (persistence restored), an item inside the pool is ambiguous (left alone), the offhand is never inferred,
  * and unknown types are never inferred. There is no {@code EntityType} type-object before 1.13, so a mob is
- * discriminated by its classic {@link net.minecraft.entity.EntityList} registry name, a {@link ResourceLocation}; the
- * drowned (its trident), the wandering trader, and the 1.14 raid-captain ominous-banner carve-out are all absent at
- * this band and are dropped from the table this pins.
+ * discriminated by its classic {@link net.minecraft.entity.EntityList} registry name, a bare unnamespaced
+ * {@code String}; the drowned and its trident, the 1.14 raid ominous banner, and the 1.11 vindicator and vex are all
+ * absent at this band and are dropped from the table this pins. The wither skeleton is not a registration here either,
+ * so its key is the variant name {@code profileKey} splits back out of the one {@code Skeleton} registration.
  */
 class NaturalEquipmentTest {
-    private static final ResourceLocation ZOMBIE = new ResourceLocation("zombie");
-    private static final ResourceLocation SKELETON = new ResourceLocation("skeleton");
-    private static final ResourceLocation WITHER_SKELETON = new ResourceLocation("wither_skeleton");
-    private static final ResourceLocation ZOMBIE_PIGMAN = new ResourceLocation("zombie_pigman");
-    private static final ResourceLocation CREEPER = new ResourceLocation("creeper");
-    private static final ResourceLocation PIG = new ResourceLocation("pig");
+    private static final String ZOMBIE = "Zombie";
+    private static final String SKELETON = "Skeleton";
+    private static final String WITHER_SKELETON = "WitherSkeleton";
+    private static final String PIG_ZOMBIE = "PigZombie";
+    private static final String CREEPER = "Creeper";
 
     @BeforeAll
     static void bootstrap() {
@@ -76,9 +75,9 @@ class NaturalEquipmentTest {
         assertFalse(NaturalEquipment.isNaturalFor(SKELETON, EntityEquipmentSlot.MAINHAND, of(Items.IRON_SWORD)));
         assertTrue(NaturalEquipment.isNaturalFor(WITHER_SKELETON, EntityEquipmentSlot.MAINHAND,
                 of(Items.STONE_SWORD)));
-        assertTrue(NaturalEquipment.isNaturalFor(ZOMBIE_PIGMAN, EntityEquipmentSlot.MAINHAND,
+        assertTrue(NaturalEquipment.isNaturalFor(PIG_ZOMBIE, EntityEquipmentSlot.MAINHAND,
                 of(Items.GOLDEN_SWORD)));
-        assertFalse(NaturalEquipment.isNaturalFor(ZOMBIE_PIGMAN, EntityEquipmentSlot.MAINHAND,
+        assertFalse(NaturalEquipment.isNaturalFor(PIG_ZOMBIE, EntityEquipmentSlot.MAINHAND,
                 of(Items.IRON_SWORD)));
     }
 
@@ -86,14 +85,14 @@ class NaturalEquipmentTest {
     void typeSpecificArmorPools() {
         // A base-armor spawn wears any armor tier naturally; a no-armor spawn never does.
         assertTrue(NaturalEquipment.isNaturalFor(ZOMBIE, EntityEquipmentSlot.CHEST, of(Items.GOLDEN_CHESTPLATE)));
-        assertFalse(NaturalEquipment.isNaturalFor(ZOMBIE_PIGMAN, EntityEquipmentSlot.CHEST,
+        assertFalse(NaturalEquipment.isNaturalFor(PIG_ZOMBIE, EntityEquipmentSlot.CHEST,
                 of(Items.LEATHER_CHESTPLATE)));
     }
 
     @Test
     void offhandIsNeverInferred() {
         // The offhand is outside the inference: a mob can hold an unpersisted item there.
-        assertTrue(NaturalEquipment.isNaturalFor(ZOMBIE_PIGMAN, EntityEquipmentSlot.OFFHAND, of(Items.GOLD_INGOT)));
+        assertTrue(NaturalEquipment.isNaturalFor(PIG_ZOMBIE, EntityEquipmentSlot.OFFHAND, of(Items.GOLD_INGOT)));
         assertFalse(NaturalEquipment.PICKUP_SLOTS.contains(EntityEquipmentSlot.OFFHAND));
     }
 
@@ -131,8 +130,8 @@ class NaturalEquipmentTest {
         assertFalse(NaturalEquipment.wasLootEquipped(pig), "a type with no spawn-gear profile is never inferred");
     }
 
-    // EntityList.getKey (which NaturalEquipment.wasLootEquipped resolves a mob's type through) matches by exact
-    // runtime class via Forge's EntityRegistry, so a subclassed test double never resolves to a real id; gear is set
+    // EntityList.getEntityString (which NaturalEquipment.wasLootEquipped resolves a mob's type through) reads
+    // CLASS_TO_NAME by exact runtime class, so a subclassed test double never resolves to a real name; gear is set
     // through the real EntityLivingBase.setItemStackToSlot instead of a subclass override.
     private static EntityZombie zombie() {
         return new EntityZombie(HeadlessLevel.get());

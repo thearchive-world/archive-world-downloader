@@ -224,7 +224,7 @@ class ItemLocationScrubTest {
      */
     private NBTTagCompound blockEntityWithItem(ItemStack item) {
         // A jukebox stands in for the higher-band single-item carriers (a decorated pot); no bell exists at this band.
-        NBTTagCompound blockEntity = BlockEntityFixtures.blockEntity("minecraft:jukebox", 0, 64, 0);
+        NBTTagCompound blockEntity = BlockEntityFixtures.blockEntity("RecordPlayer", 0, 64, 0);
         blockEntity.setTag("item", ItemFixtures.itemTag(item));
         return blockEntity;
     }
@@ -247,7 +247,7 @@ class ItemLocationScrubTest {
 
     private NBTTagCompound blockEntityWithItems(ItemStack... stacks) {
         // A chest stands in for the higher-band Items-list carriers (a campfire); no campfire exists at this band.
-        NBTTagCompound blockEntity = BlockEntityFixtures.blockEntity("minecraft:chest", 0, 64, 0);
+        NBTTagCompound blockEntity = BlockEntityFixtures.blockEntity("Chest", 0, 64, 0);
         blockEntity.setTag("Items", holderOf(stacks).getTagList("Items", 10));
         return blockEntity;
     }
@@ -354,7 +354,7 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubBlockEntityLeavesNonItemBlockEntityUnchanged() {
-        NBTTagCompound blockEntity = BlockEntityFixtures.blockEntityWithForeignKey("minecraft:sign", 1, 2, 3,
+        NBTTagCompound blockEntity = BlockEntityFixtures.blockEntityWithForeignKey("Sign", 1, 2, 3,
                 "wdl_test_marker", "urn");
         NBTTagList sherds = new NBTTagList();
         NBTTagCompound sherd = new NBTTagCompound();
@@ -417,9 +417,9 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubEntityBlanksItemFrameAndItemDisplay() {
-        NBTTagCompound frame = entity("minecraft:item_frame");
+        NBTTagCompound frame = entity("ItemFrame");
         frame.setTag("Item", itemNbt(lodestoneCompass()));
-        NBTTagCompound display = entity("minecraft:item_display");
+        NBTTagCompound display = entity("ArmorStand");
         display.setTag("item", itemNbt(lodestoneCompass())); // lowercase key: the case-agnostic walk must reach it
 
         ItemLocationScrub.scrubEntity(frame);
@@ -431,12 +431,12 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubEntityBlanksEquipmentAndInventory() {
-        NBTTagCompound zombie = entity("minecraft:zombie");
+        NBTTagCompound zombie = entity("Zombie");
         NBTTagCompound equipment = new NBTTagCompound();
         equipment.setTag("mainhand", itemNbt(lodestoneCompass()));
         zombie.setTag("equipment", equipment);
 
-        NBTTagCompound allay = entity("minecraft:allay");
+        NBTTagCompound allay = entity("Villager");
         NBTTagList inventory = new NBTTagList();
         inventory.appendTag(itemNbt(lodestoneCompass()));
         allay.setTag("Inventory", inventory);
@@ -455,7 +455,7 @@ class ItemLocationScrubTest {
         // A ListTag-shaped mob equipment: HandItems/ArmorItems lists of item NBT (empty slots are {}), a shape a
         // modded or foreign server can still hand a 1.12.2 client. The generic name-agnostic NBTTagList walk must
         // reach them, or a captured mob's held lodestone leaks its target.
-        NBTTagCompound zombie = entity("minecraft:zombie");
+        NBTTagCompound zombie = entity("Zombie");
         NBTTagList handItems = new NBTTagList();
         handItems.appendTag(itemNbt(lodestoneCompass())); // mainhand
         handItems.appendTag(itemNbt(shulkerHoldingLodestone())); // offhand: nested lodestone must also be reached
@@ -484,7 +484,7 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubEntityBlanksBeehiveHeldByAnEntity() {
-        NBTTagCompound frame = entity("minecraft:item_frame");
+        NBTTagCompound frame = entity("ItemFrame");
         frame.setTag("Item", itemNbt(beehiveWithBeeFlowerPos()));
 
         ItemLocationScrub.scrubEntity(frame);
@@ -496,8 +496,8 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubEntityRecursesIntoPassengers() {
-        NBTTagCompound boat = entity("minecraft:boat");
-        NBTTagCompound rider = entity("minecraft:zombie");
+        NBTTagCompound boat = entity("Boat");
+        NBTTagCompound rider = entity("Zombie");
         NBTTagCompound riderEquip = new NBTTagCompound();
         riderEquip.setTag("mainhand", itemNbt(lodestoneCompass()));
         rider.setTag("equipment", riderEquip);
@@ -516,7 +516,7 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubEntityWithoutCoordinateItemsIsNoop() {
-        NBTTagCompound zombie = entity("minecraft:zombie");
+        NBTTagCompound zombie = entity("Zombie");
         NBTTagCompound equipment = new NBTTagCompound();
         equipment.setTag("mainhand", itemNbt(new ItemStack(Items.DIAMOND_SWORD)));
         zombie.setTag("equipment", equipment);

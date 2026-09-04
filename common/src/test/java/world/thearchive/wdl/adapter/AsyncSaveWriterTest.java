@@ -569,9 +569,9 @@ class AsyncSaveWriterTest {
         // A captured chunk carrying an empty chest block entity, plus the open-time Items holder for that chest:
         // the fold runs inside the writer-thread thunk, on the freshly encoded tag.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(true,
-                ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(0, new ItemStack(Items.DIAMOND, 5));
+                ImmutableList.of(blockEntity("Chest", 2, 64, 2)));
+        ItemStack[] items = new ItemStack[27];
+        items[0] = new ItemStack(Items.DIAMOND, 5);
         Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(2, 64, 2), sink.captureItems(items));
 
@@ -610,7 +610,7 @@ class AsyncSaveWriterTest {
         // No vanilla lectern exists at this band, so a fieldless ender chest stands in as the carrier the
         // LecternSink book fold writes "Book"/"Page" onto; the writer-thread fold wiring is what is under test.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(true,
-                ImmutableList.of(blockEntity("minecraft:ender_chest", 3, 64, 3)));
+                ImmutableList.of(blockEntity("EnderChest", 3, 64, 3)));
         Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(3, 64, 3), sink.captureBook(new ItemStack(Items.WRITABLE_BOOK), 4));
 
@@ -793,9 +793,9 @@ class AsyncSaveWriterTest {
                 dimension -> storage(region, "chunk"),
                 () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(true,
-                ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
-        NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-        items.set(0, new ItemStack(Items.DIAMOND, 5));
+                ImmutableList.of(blockEntity("Chest", 2, 64, 2)));
+        ItemStack[] items = new ItemStack[27];
+        items[0] = new ItemStack(Items.DIAMOND, 5);
         Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(2, 64, 2), sink.captureItems(items));
         first.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
@@ -1030,11 +1030,11 @@ class AsyncSaveWriterTest {
     }
 
     private static NBTTagCompound filledVehicle(UUID uuid) {
-        return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid, "minecraft:diamond");
+        return EntityFixtures.containerVehicle("MinecartChest", uuid, "minecraft:diamond");
     }
 
     private static NBTTagCompound emptyVehicle(UUID uuid) {
-        return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid);
+        return EntityFixtures.containerVehicle("MinecartChest", uuid);
     }
 
     private static NBTTagList vehicleItems(WdlRegionStorage storage, ChunkPos pos, UUID uuid) throws IOException {
@@ -1217,7 +1217,7 @@ class AsyncSaveWriterTest {
     private static ChunkSnapshotSource chunkWithChests(List<BlockPos> chests) {
         List<NBTTagCompound> blockEntities = new ArrayList<>();
         for (BlockPos chest : chests) {
-            blockEntities.add(blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()));
+            blockEntities.add(blockEntity("Chest", chest.getX(), chest.getY(), chest.getZ()));
         }
         return SyntheticChunks.fullWithBlockEntities(true, blockEntities);
     }
@@ -1270,7 +1270,7 @@ class AsyncSaveWriterTest {
 
     /** A one-entity entity-chunk tag at {@code pos}, the smallest payload an entities write task can carry. */
     private static NBTTagCompound pigChunk(ChunkPos pos) {
-        return EntityFixtures.entityChunkTagAt(pos, EntityFixtures.entityTag("minecraft:pig"));
+        return EntityFixtures.entityChunkTagAt(pos, EntityFixtures.entityTag("Pig"));
     }
 
     private static NBTTagCompound entityChunk(NBTTagCompound... entities) {

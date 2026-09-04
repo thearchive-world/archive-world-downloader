@@ -97,7 +97,7 @@ class FixtureFidelityTest {
     @Test
     void aBlockEntityTagCarryingOnlyItsMetadataIsRejected() {
         NBTTagCompound handBuilt = new NBTTagCompound();
-        handBuilt.setString("id", "minecraft:chest");
+        handBuilt.setString("id", "Chest");
         handBuilt.setInteger("x", 10);
         handBuilt.setInteger("y", 70);
         handBuilt.setInteger("z", 20);
@@ -109,7 +109,7 @@ class FixtureFidelityTest {
 
     @Test
     void aBlockEntityTagMissingAnAlwaysWrittenStateKeyIsRejected() {
-        NBTTagCompound brewingStand = BlockEntityFixtures.blockEntity("minecraft:brewing_stand", 6, 64, 6);
+        NBTTagCompound brewingStand = BlockEntityFixtures.blockEntity("Cauldron", 6, 64, 6);
         brewingStand.removeTag("BrewTime");
 
         String message = reject(() -> FixtureFidelity.assertBlockEntityShape(brewingStand));
@@ -118,7 +118,7 @@ class FixtureFidelityTest {
 
     @Test
     void aBlockEntityTagCarryingAnInventedKeyIsRejected() {
-        NBTTagCompound jukebox = BlockEntityFixtures.blockEntity("minecraft:jukebox", 1, 64, 1);
+        NBTTagCompound jukebox = BlockEntityFixtures.blockEntity("RecordPlayer", 1, 64, 1);
         jukebox.setString("wdlProbeField", "keep-me");
 
         String message = reject(() -> FixtureFidelity.assertBlockEntityShape(jukebox));
@@ -128,15 +128,15 @@ class FixtureFidelityTest {
     @Test
     void aProducerBuiltBlockEntityIsAccepted() {
         assertDoesNotThrow(() -> FixtureFidelity
-                .assertBlockEntityShape(BlockEntityFixtures.blockEntity("minecraft:chest", 10, 70, 20)));
+                .assertBlockEntityShape(BlockEntityFixtures.blockEntity("Chest", 10, 70, 20)));
         assertDoesNotThrow(() -> FixtureFidelity
-                .assertBlockEntityShape(BlockEntityFixtures.namedBlockEntity("minecraft:chest", 1, 2, 3, "named")));
+                .assertBlockEntityShape(BlockEntityFixtures.namedBlockEntity("Chest", 1, 2, 3, "named")));
     }
 
     @Test
     void theChunkChokePointRejectsHandBuiltBlockEntities() {
         NBTTagCompound handBuilt = new NBTTagCompound();
-        handBuilt.setString("id", "minecraft:chest");
+        handBuilt.setString("id", "Chest");
         handBuilt.setInteger("x", 1);
         handBuilt.setInteger("y", 64);
         handBuilt.setInteger("z", 1);
@@ -147,7 +147,7 @@ class FixtureFidelityTest {
     @Test
     void theEntityChokePointRejectsHandBuiltItemsHolders() {
         NBTTagCompound vehicle = new NBTTagCompound();
-        vehicle.setString("id", "minecraft:chest_minecart");
+        vehicle.setString("id", "MinecartChest");
         vehicle.setTag("Items",
                 holderOf(handBuiltEntry("minecraft:diamond", false, true)).getTagList("Items", 10));
 
@@ -159,7 +159,7 @@ class FixtureFidelityTest {
         // The block entity's own save never writes keepPacked, so it is exempt from the round trip yet still part
         // of what lands on disk beside every saved block entity.
         NBTTagCompound chunkTag = BlockEntityFixtures
-                .chunkTagWith(BlockEntityFixtures.blockEntity("minecraft:chest", 1, 64, 1));
+                .chunkTagWith(BlockEntityFixtures.blockEntity("Chest", 1, 64, 1));
         NBTTagCompound blockEntity = BlockEntityFixtures.findByPos(chunkTag, 1, 64, 1);
         assertEquals(false,
                 blockEntity.hasKey(FixtureFidelity.KEEP_PACKED) ? blockEntity.getBoolean(FixtureFidelity.KEEP_PACKED)
@@ -169,6 +169,6 @@ class FixtureFidelityTest {
     @Test
     void aProducerBuiltContainerVehicleIsAccepted() {
         assertDoesNotThrow(() -> EntityFixtures.entityChunkTagWith(
-                EntityFixtures.containerVehicle("minecraft:chest_minecart", VEHICLE, "minecraft:diamond")));
+                EntityFixtures.containerVehicle("MinecartChest", VEHICLE, "minecraft:diamond")));
     }
 }

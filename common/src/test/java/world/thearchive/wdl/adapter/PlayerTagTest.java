@@ -171,7 +171,7 @@ class PlayerTagTest {
     void setRootVehicleWritesTheVanillaAttachAndEntityShape() {
         NBTTagCompound tag = playerTag();
         UUID directVehicle = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
-        NBTTagCompound vehicleTag = EntityFixtures.entityTag("minecraft:chest_boat");
+        NBTTagCompound vehicleTag = EntityFixtures.entityTag("MinecartChest");
 
         PlayerTag.setRootVehicle(tag, directVehicle, vehicleTag);
 
@@ -179,7 +179,7 @@ class PlayerTagTest {
         assertEquals(directVehicle,
                 rootVehicle.getUniqueId("Attach"),
                 "Attach is the direct vehicle UUID the pre-1.16 AttachMost/AttachLeast form serializes");
-        assertEquals("minecraft:chest_boat", rootVehicle.getCompoundTag("Entity").getString("id"),
+        assertEquals("MinecartChest", rootVehicle.getCompoundTag("Entity").getString("id"),
                 "the vehicle NBT nests under Entity, the shape loadAndSpawnParentVehicle spawns from");
         assertTrue(tag.hasKey("Air"), "the rest of the player tag is untouched");
     }
@@ -187,7 +187,7 @@ class PlayerTagTest {
     private static NBTTagCompound priorPlayerWithRootVehicle() {
         NBTTagCompound prior = new NBTTagCompound();
         NBTTagCompound rootVehicle = new NBTTagCompound();
-        rootVehicle.setTag("Entity", EntityFixtures.entityTag("minecraft:chest_boat"));
+        rootVehicle.setTag("Entity", EntityFixtures.entityTag("MinecartChest"));
         prior.setTag("RootVehicle", rootVehicle);
         return prior;
     }
@@ -222,13 +222,13 @@ class PlayerTagTest {
     void restorePriorMountContentsYieldsToTheFreshMount() {
         NBTTagCompound prior = priorPlayerWithRootVehicle();
         NBTTagCompound fresh = playerTag();
-        NBTTagCompound freshEntity = EntityFixtures.entityTag("minecraft:oak_boat");
+        NBTTagCompound freshEntity = EntityFixtures.entityTag("Boat");
         PlayerTag.setRootVehicle(fresh, UUID.fromString("11111111-2222-3333-4444-555555555555"), freshEntity);
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
         assertFalse(carried, "the fresh mount is authoritative, nothing carries back");
-        assertEquals("minecraft:oak_boat",
+        assertEquals("Boat",
                 fresh.getCompoundTag("RootVehicle").getCompoundTag("Entity").getString("id"),
                 "the fresh mount wins");
     }
@@ -245,7 +245,7 @@ class PlayerTagTest {
     /** A RootVehicle whose Entity carries the mount's own UUID and an Items list, the seated-mount capture shape. */
     private static NBTTagCompound mountRootVehicle(UUID mountUuid, NBTTagList items) {
         NBTTagCompound rootVehicle = new NBTTagCompound();
-        NBTTagCompound entity = EntityFixtures.entity("minecraft:chest_boat", mountUuid);
+        NBTTagCompound entity = EntityFixtures.entity("MinecartChest", mountUuid);
         entity.setTag("Items", items);
         rootVehicle.setTag("Entity", entity);
         return rootVehicle;
@@ -322,7 +322,7 @@ class PlayerTagTest {
         NBTTagCompound rootVehicle = new NBTTagCompound();
         NBTTagCompound mount = mountRootVehicle(mountUuid, items).getCompoundTag("Entity");
         rootVehicle.setTag("Entity",
-                EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:minecart", carrierUuid), mount));
+                EntityFixtures.entityCarrying(EntityFixtures.entity("MinecartRideable", carrierUuid), mount));
         return rootVehicle;
     }
 

@@ -81,12 +81,12 @@ class EntityRoundTripTest {
         ChunkPos pos = new ChunkPos(3, -7);
 
         NBTTagCompound tag = sink
-                .encodeChunk(ImmutableList.of(entityTag("minecraft:pig", 1), entityTag("minecraft:cow", 2)), pos);
+                .encodeChunk(ImmutableList.of(entityTag("Pig", 1), entityTag("Cow", 2)), pos);
 
         NBTTagList entities = tag.getTagList("Entities", 10);
         assertEquals(2, entities.tagCount(), "both entity tags must be retained in the Entities list");
-        assertEquals("minecraft:pig", entities.getCompoundTagAt(0).getString("id"));
-        assertEquals("minecraft:cow", entities.getCompoundTagAt(1).getString("id"));
+        assertEquals("Pig", entities.getCompoundTagAt(0).getString("id"));
+        assertEquals("Cow", entities.getCompoundTagAt(1).getString("id"));
     }
 
     @Test
@@ -110,7 +110,7 @@ class EntityRoundTripTest {
             for (int i = 0; i < positions.size(); i++) {
                 ChunkPos pos = positions.get(i);
                 out.write(pos, hostChunk()); // the host chunk the entities fold into
-                NBTTagCompound carrier = sink.encodeChunk(ImmutableList.of(entityTag("minecraft:item", i)), pos);
+                NBTTagCompound carrier = sink.encodeChunk(ImmutableList.of(entityTag("Item", i)), pos);
                 RegionChunkWriter.MergeWriteResult folded = RegionChunkWriter.foldEntitiesIntoRegion(out, pos, carrier);
                 assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_NEW, folded.outcome(),
                         "a first fold into a host chunk with no prior entities is a new write");
@@ -129,7 +129,7 @@ class EntityRoundTripTest {
                                 ? entities.getCompoundTagAt(0).getInteger("wdlMarker")
                                 : -1,
                         "the right entity must land in the chunk at " + positions.get(i));
-                assertEquals("minecraft:item", entities.getCompoundTagAt(0).getString("id"));
+                assertEquals("Item", entities.getCompoundTagAt(0).getString("id"));
             }
         }
 

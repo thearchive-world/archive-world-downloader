@@ -73,8 +73,8 @@ class ContainerStashMergeTest {
     void mergeChunkStashFillsTheMatchingBlockEntityAndDrainsOnlyThatChunksEntries() {
         BlockPos chestPos = new BlockPos(10, 70, 20);
         NBTTagCompound chunkTag = chunkTagWith(
-                blockEntity("minecraft:chest", 10, 70, 20),
-                blockEntity("minecraft:furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
+                blockEntity("Chest", 10, 70, 20),
+                blockEntity("Furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(chestPos, holderWith(2, new ItemStack(Items.EMERALD, 7)));
@@ -99,7 +99,7 @@ class ContainerStashMergeTest {
     @Test
     void mergeChunkStashDrainsButDoesNotMergeWhenNoBlockEntityAtThePos() {
         BlockPos pos = new BlockPos(1, 64, 1);
-        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 2, 64, 1)); // a chest, but elsewhere
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("Chest", 2, 64, 1)); // a chest, but elsewhere
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
@@ -132,7 +132,7 @@ class ContainerStashMergeTest {
             }
         };
         BlockPos chestPos = new BlockPos(10, 70, 20);
-        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("Chest", 10, 70, 20));
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(chestPos, new NBTTagCompound()); // an empty holder makes no type claim, so the merge is reached
 
@@ -150,7 +150,7 @@ class ContainerStashMergeTest {
         // minecraft:brewing_stand to match the holder's claim, or all four state-key assertions would fail on correct
         // code.
         BlockPos pos = new BlockPos(10, 70, 20);
-        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:brewing_stand", 10, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("Cauldron", 10, 70, 20));
 
         NBTTagCompound holder = new NBTTagCompound();
         holder.setTag("Items", new NBTTagList());
@@ -158,7 +158,7 @@ class ContainerStashMergeTest {
         holder.setInteger("triggered", 1);
         holder.setShort("BrewTime", (short) 123);
         holder.setByte("Fuel", (byte) 7);
-        holder.setString("wdl_block_entity_id", "minecraft:brewing_stand");
+        holder.setString("wdl_block_entity_id", "Cauldron");
         holder.setString("junk", "never");
         // The three captured content keys the sink does not own. They are what tells a whitelist keyed on
         // open-time state apart from one that copies whatever it recognizes: a key this mod captures is not
@@ -189,7 +189,7 @@ class ContainerStashMergeTest {
         BlockPos pos = new BlockPos(10, 70, 20);
         // The captured brewing stand carries NON-default state, so "the merge left it alone" is distinguishable from
         // "the merge rewrote it with defaults". At the producer defaults the two are the same tag.
-        NBTTagCompound brewingStand = blockEntity("minecraft:brewing_stand", 10, 70, 20);
+        NBTTagCompound brewingStand = blockEntity("Cauldron", 10, 70, 20);
         brewingStand.setShort("BrewTime", (short) 220);
         brewingStand.setByte("Fuel", (byte) 12);
         NBTTagCompound chunkTag = chunkTagWith(brewingStand);

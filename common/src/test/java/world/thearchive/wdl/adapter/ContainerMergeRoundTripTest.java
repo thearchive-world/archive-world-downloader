@@ -41,7 +41,7 @@ class ContainerMergeRoundTripTest {
 
     /** A captured client chest BE tag carrying a real non-Items field, to assert no clobber. */
     private static NBTTagCompound chestTag(int x, int y, int z) {
-        return namedBlockEntity("minecraft:chest", x, y, z, "keep-me");
+        return namedBlockEntity("Chest", x, y, z, "keep-me");
     }
 
     private static int countNonEmpty(ItemStack[] items) {
@@ -67,7 +67,7 @@ class ContainerMergeRoundTripTest {
         NBTTagCompound merged = sink.merge(chestTag(10, 64, -7), holder);
 
         // No field clobber: id / pos / unrelated fields survive.
-        assertEquals("minecraft:chest", merged.getString("id"));
+        assertEquals("Chest", merged.getString("id"));
         assertEquals(10, merged.getInteger("x"));
         assertEquals(64, merged.getInteger("y"));
         assertEquals(-7, merged.getInteger("z"));

@@ -32,7 +32,7 @@ class ChunkReencodeFidelityTest {
      * rebuilt every tag from vanilla's own load, so it could not prove the passthrough this names.
      */
     private static NBTTagCompound sign(int x, int y, int z, String text) {
-        return BlockEntityFixtures.blockEntityWithForeignKey("minecraft:sign", x, y, z, "wdl_test_text", text);
+        return BlockEntityFixtures.blockEntityWithForeignKey("Sign", x, y, z, "wdl_test_text", text);
     }
 
     @Test

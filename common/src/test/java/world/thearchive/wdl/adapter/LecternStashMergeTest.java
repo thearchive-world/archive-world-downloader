@@ -83,7 +83,7 @@ class LecternStashMergeTest {
         BlockPos lecternPos = new BlockPos(10, 70, 20);
         NBTTagCompound chunkTag = chunkTagWith(
                 blockEntity("minecraft:lectern", 10, 70, 20),
-                blockEntity("minecraft:chest", 11, 70, 20)); // a neighbor BE that must stay untouched
+                blockEntity("Chest", 11, 70, 20)); // a neighbor BE that must stay untouched
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(lecternPos, bookHolder("Bound Here", 2));

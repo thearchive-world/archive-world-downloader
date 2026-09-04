@@ -124,7 +124,7 @@ class CarryForwardWiringTest {
 
         writePrior(paths, pos, chestHolding("minecraft:diamond"));
         captureChunk(session, pos, snapshotWithEmptyChest());
-        stashContainer(session, chest, BlockEntityFixtures.emptyContainerHolder(27, "minecraft:chest"));
+        stashContainer(session, chest, BlockEntityFixtures.emptyContainerHolder(27, "Chest"));
 
         AsyncSaveWriter writer = saveWriter(paths);
         session.flushBuffer(writer, true, 0, 0, 0);
@@ -193,11 +193,11 @@ class CarryForwardWiringTest {
     /** A captured chunk holding one chest exactly as the client saves it, which is with no contents. */
     private ChunkSnapshotSource snapshotWithEmptyChest() {
         return SyntheticChunks.withBlockEntityAt(chest, Blocks.CHEST.getDefaultState(),
-                blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ()));
+                blockEntity("Chest", chest.getX(), chest.getY(), chest.getZ()));
     }
 
     private NBTTagCompound chestHolding(String... itemIds) {
-        NBTTagCompound tag = blockEntity("minecraft:chest", chest.getX(), chest.getY(), chest.getZ());
+        NBTTagCompound tag = blockEntity("Chest", chest.getX(), chest.getY(), chest.getZ());
         tag.setTag("Items", ItemFixtures.items(itemIds));
         return tag;
     }

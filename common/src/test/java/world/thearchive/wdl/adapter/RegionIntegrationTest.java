@@ -184,7 +184,7 @@ class RegionIntegrationTest {
 
             ChunkSnapshotSource emptied = chestSnapshot(chestPos);
             Map<BlockPos, NBTTagCompound> containers = new LinkedHashMap<>();
-            containers.put(chestPos, BlockEntityFixtures.emptyContainerHolder(27, "minecraft:chest"));
+            containers.put(chestPos, BlockEntityFixtures.emptyContainerHolder(27, "Chest"));
             List<BlockPos> landing = ChunkFlushPlan.landingHolderPositions(emptied, containers);
             NBTTagCompound fresh = codec.encode(emptied, false);
             MergeTally folded = ChunkFlushPlan.foldChunkStashes(fresh, pos, containerSink, lecternSink, containers,
@@ -213,7 +213,7 @@ class RegionIntegrationTest {
     /** A captured chunk snapshot whose one chest at {@code pos} holds each named item. */
     private static ChunkSnapshotSource chestSnapshot(BlockPos pos,
             String... itemIds) {
-        NBTTagCompound chest = blockEntity("minecraft:chest", pos.getX(), pos.getY(), pos.getZ());
+        NBTTagCompound chest = blockEntity("Chest", pos.getX(), pos.getY(), pos.getZ());
         chest.setTag("Items", ItemFixtures.items(itemIds));
         return SyntheticChunks.fullWithBlockEntities(true, ImmutableList.of(chest));
     }

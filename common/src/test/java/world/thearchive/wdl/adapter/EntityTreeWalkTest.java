@@ -27,8 +27,8 @@ class EntityTreeWalkTest {
 
     @Test
     void everyNodeOfTheTreeIsIndexedByItsOwnUuid() {
-        NBTTagCompound mount = EntityFixtures.entity("minecraft:mule", MOUNT);
-        NBTTagCompound tree = EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:minecart", CARRIER),
+        NBTTagCompound mount = EntityFixtures.entity("EntityHorse", MOUNT);
+        NBTTagCompound tree = EntityFixtures.entityCarrying(EntityFixtures.entity("MinecartRideable", CARRIER),
                 mount);
 
         Map<UUID, NBTTagCompound> nodes = EntityTreeWalk.byUuid(tree);
@@ -41,9 +41,9 @@ class EntityTreeWalkTest {
 
     @Test
     void aNodeWithNoReadableUuidIsNotIndexedAndDoesNotHideItsPassengers() {
-        NBTTagCompound mount = EntityFixtures.entity("minecraft:mule", MOUNT);
+        NBTTagCompound mount = EntityFixtures.entity("EntityHorse", MOUNT);
         NBTTagCompound tree = EntityFixtures.entityCarrying(
-                EntityFixtures.entityWithShortUuid("minecraft:minecart", 1, 2), mount);
+                EntityFixtures.entityWithShortUuid("MinecartRideable", 1, 2), mount);
 
         Map<UUID, NBTTagCompound> nodes = EntityTreeWalk.byUuid(tree);
 

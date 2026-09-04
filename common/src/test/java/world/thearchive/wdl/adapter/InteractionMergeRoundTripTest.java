@@ -64,8 +64,8 @@ class InteractionMergeRoundTripTest {
     void jukeboxDiscRoundTripsThroughCaptureMergeAndVanillaCodec() {
         BlockPos jukeboxPos = new BlockPos(10, 70, 20);
         NBTTagCompound chunkTag = chunkTagWith(
-                taggedBlockEntity("minecraft:jukebox", 10, 70, 20),
-                taggedBlockEntity("minecraft:furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
+                taggedBlockEntity("RecordPlayer", 10, 70, 20),
+                taggedBlockEntity("Furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
         markBlockEntity(chunkTag, 10, 70, 20, "keep-me");
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
@@ -81,7 +81,7 @@ class InteractionMergeRoundTripTest {
 
         NBTTagList blockEntities = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
         NBTTagCompound jukeboxBlockEntity = findByPos(blockEntities, 10, 70, 20);
-        assertEquals("minecraft:jukebox", jukeboxBlockEntity.getString("id"), "id survives");
+        assertEquals("RecordPlayer", jukeboxBlockEntity.getString("id"), "id survives");
         assertEquals("keep-me", markerOf(jukeboxBlockEntity), "an unrelated field is not clobbered");
         assertEquals(Items.RECORD_CAT, readRecordItem(jukeboxBlockEntity).getItem(),
                 "the jukebox gains exactly the disc");
@@ -92,7 +92,7 @@ class InteractionMergeRoundTripTest {
     @Test
     void jukeboxHolderCarriesPlayingStateSoItShowsNoteParticlesOnLoad() {
         BlockPos jukeboxPos = new BlockPos(10, 70, 20);
-        NBTTagCompound chunkTag = chunkTagWith(taggedBlockEntity("minecraft:jukebox", 10, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(taggedBlockEntity("RecordPlayer", 10, 70, 20));
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(jukeboxPos, InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_CAT)));
 
@@ -110,7 +110,7 @@ class InteractionMergeRoundTripTest {
     void mergeDrainsButDoesNotMergeWhenNoBlockEntityAtThePos() {
         BlockPos pos = new BlockPos(1, 64, 1);
         // A jukebox, but in a different cell than the stashed pos
-        NBTTagCompound chunkTag = chunkTagWith(taggedBlockEntity("minecraft:jukebox", 2, 64, 1));
+        NBTTagCompound chunkTag = chunkTagWith(taggedBlockEntity("RecordPlayer", 2, 64, 1));
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, InteractionCapture.captureRecordItem(new ItemStack(Items.RECORD_11)));

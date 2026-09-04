@@ -104,18 +104,18 @@ class LevelDatPlayerRoundTripTest {
     void savesCapturedPlayerRootVehicleInTheShapeLoadAndSpawnParentVehicleReads(@TempDir Path saves)
             throws IOException {
         NBTTagCompound playerTag = capturedPlayerTag();
-        UUID boat = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
-        NBTTagCompound boatTag = EntityFixtures.entityTag("minecraft:chest_boat"); // the id loadEntityRecursive reads
-        PlayerTag.setRootVehicle(playerTag, boat, boatTag);
+        UUID vehicle = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
+        NBTTagCompound vehicleTag = EntityFixtures.entityTag("MinecartChest"); // the id loadEntityRecursive reads
+        PlayerTag.setRootVehicle(playerTag, vehicle, vehicleTag);
         CapturedPlayer captured = new CapturedPlayer(playerTag, BlockPos.ORIGIN, 0.0F, 0.0F,
                 DimensionType.OVERWORLD, GameType.CREATIVE, EnumDifficulty.NORMAL);
 
         NBTTagCompound data = saveAndReadBack(saves, "rootvehicle", captured);
 
         NBTTagCompound rootVehicle = data.getCompoundTag("Player").getCompoundTag("RootVehicle");
-        assertEquals("minecraft:chest_boat", rootVehicle.getCompoundTag("Entity").getString("id"),
+        assertEquals("MinecartChest", rootVehicle.getCompoundTag("Entity").getString("id"),
                 "the Entity child keeps its id, or loadEntityRecursive silently skips it (no re-seat)");
-        assertEquals(boat,
+        assertEquals(vehicle,
                 rootVehicle.getUniqueId("Attach"),
                 "Attach round-trips through NBTTagCompound.getUniqueId as the direct vehicle UUID the re-seat matches");
     }

@@ -54,7 +54,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * gate, so its single copy is that session's level.dat RootVehicle. A resume that finishes un-seated rewrites the
  * level.dat with no RootVehicle, which destroys that copy, and the release is what puts the mount into the world as a
  * standalone entity before that happens. Everything it fails to write is gone for good, including whatever the previous
- * download archived inside a chest boat or a chested animal.
+ * download archived inside a chest minecart or a chested animal.
  *
  * <p>Three axes. ROUTING: the position and the dimension must come from the same tag, so the cross-dimension case
  * asserts both the arrival and the absence, since a write that reaches the right folder while also reaching the wrong
@@ -157,7 +157,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
         writePriorLevelDat(session, save, DimensionType.NETHER,
-                EntityFixtures.entityWithShortPos("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y));
+                EntityFixtures.entityWithShortPos("MinecartChest", MOUNT, MOUNT_X, MOUNT_Y));
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
 
@@ -251,8 +251,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD);
         writePriorLevelDat(session, save, DimensionType.NETHER, mount());
-        // Rode a donkey in the previous download, rode a boat in this one. The fresh record replaces the prior
-        // one in the Player slot, so the donkey is preserved by nothing unless it is released here, and being
+        // Rode one mount in the previous download, another in this one. The fresh record replaces the prior
+        // one in the Player slot, so the prior mount is preserved by nothing unless it is released here, and being
         // seated on SOMETHING is not the same question as being seated on THAT mount.
         seatedOn(session, otherMount(), OTHER_MOUNT);
         WorldPaths paths = paths(save);
@@ -273,9 +273,9 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
         writePriorLevelDat(session, save, DimensionType.NETHER, mount());
-        // The player is riding the prior mount, but that mount is itself in a boat, so the RootVehicle record
-        // holds the OUTER boat with the mount nested under it. The mount is still under the player and still
-        // saved by this finish, so releasing it would put a second copy of it in the world.
+        // The player is riding the prior mount, but that mount is itself in a second vehicle, so the RootVehicle
+        // record holds the OUTER vehicle with the mount nested under it. The mount is still under the player and
+        // still saved by this finish, so releasing it would put a second copy of it in the world.
         seatedOn(session, EntityFixtures.entityCarrying(otherMount(), mount()), OTHER_MOUNT, MOUNT);
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
@@ -331,7 +331,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
     /** The prior download's mount, carrying the loot whose survival is the whole point of releasing it. */
     private static NBTTagCompound mount() {
-        return EntityFixtures.containerVehicleAt("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z,
+        return EntityFixtures.containerVehicleAt("MinecartChest", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z,
                 MOUNT_LOOT);
     }
 
@@ -345,11 +345,11 @@ class LiveCaptureSessionResumedMountReleaseTest {
     }
 
     /**
-     * A second mount of the SAME entity type, so identity rests on the UUID alone. Two boats is also the realistic
-     * switch; a donkey against a boat would let a check comparing entity types pass by accident.
+     * A second mount of the SAME entity type, so identity rests on the UUID alone. Two of one type is also the
+     * realistic switch; two different types would let a check comparing entity types pass by accident.
      */
     private static NBTTagCompound otherMount() {
-        return EntityFixtures.entityAt("minecraft:chest_boat", OTHER_MOUNT, 8.5, 64.0, 8.5);
+        return EntityFixtures.entityAt("MinecartChest", OTHER_MOUNT, 8.5, 64.0, 8.5);
     }
 
     /** A prior level.dat player tag: the dimension it finished in, and the mount it was riding if any. */

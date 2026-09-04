@@ -144,7 +144,7 @@ class ChunkFlushPlanTest {
     @Test
     void theComposedReadMergeDerivesTheOpenTimePositionsFromTheLandingHolders() {
         BlockPos pos = new BlockPos(6, 64, 6);
-        ChunkSnapshotSource snapshot = snapshotOf(blockEntity("minecraft:brewing_stand", 6, 64, 6));
+        ChunkSnapshotSource snapshot = snapshotOf(blockEntity("Cauldron", 6, 64, 6));
         NBTTagCompound onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
         NBTTagCompound freshReopened = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
         NBTTagCompound freshRewalked = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
@@ -165,7 +165,7 @@ class ChunkFlushPlanTest {
     void landingHolderPositionsIsWhatTheComposedReadMergeShouldBeGiven() {
         // The list handed to the composed merge has to be the LANDING holders, not every drained one: a holder
         // the fold drops writes no state, and calling it captured would blank what an earlier visit saved.
-        NBTTagCompound brewingStandTag = blockEntity("minecraft:brewing_stand", 6, 64, 6);
+        NBTTagCompound brewingStandTag = blockEntity("Cauldron", 6, 64, 6);
         ChunkSnapshotSource snapshot = snapshotOf(brewingStandTag);
         Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(6, 64, 6), itemsHolder("minecraft:diamond"));
@@ -179,7 +179,7 @@ class ChunkFlushPlanTest {
 
     /** A brewing stand carrying the two state keys vanilla writes unconditionally, at the given values. */
     private static NBTTagCompound brewingStand(int x, int y, int z, short brewTime, byte fuel) {
-        NBTTagCompound tag = blockEntity("minecraft:brewing_stand", x, y, z);
+        NBTTagCompound tag = blockEntity("Cauldron", x, y, z);
         tag.setShort("BrewTime", brewTime);
         tag.setByte("Fuel", fuel);
         return tag;
@@ -191,9 +191,9 @@ class ChunkFlushPlanTest {
     @Test
     void foldChunkStashesMergesEveryStashOntoItsOwnBlockEntity() {
         NBTTagCompound chunkTag = chunkTagWith(
-                blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:ender_chest", 2, 64, 2),
-                blockEntity("minecraft:jukebox", 3, 64, 3));
+                blockEntity("Chest", 1, 64, 1),
+                blockEntity("EnderChest", 2, 64, 2),
+                blockEntity("RecordPlayer", 3, 64, 3));
 
         Map<BlockPos, NBTTagCompound> containers = stash(new BlockPos(1, 64, 1), itemsHolder("minecraft:diamond"));
         Map<BlockPos, NBTTagCompound> lecterns = stash(new BlockPos(2, 64, 2),
@@ -216,9 +216,9 @@ class ChunkFlushPlanTest {
     @Test
     void foldChunkStashesCountsEveryThrowingBandMergeAsFailed() {
         NBTTagCompound chunkTag = chunkTagWith(
-                blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:ender_chest", 2, 64, 2),
-                blockEntity("minecraft:jukebox", 3, 64, 3));
+                blockEntity("Chest", 1, 64, 1),
+                blockEntity("EnderChest", 2, 64, 2),
+                blockEntity("RecordPlayer", 3, 64, 3));
 
         MergeTally tally = ChunkFlushPlan.foldChunkStashes(chunkTag, origin(), THROWING_CONTAINER_SINK,
                 THROWING_LECTERN_SINK,
@@ -232,7 +232,7 @@ class ChunkFlushPlanTest {
 
     @Test
     void foldChunkStashesLeavesAnotherChunksEntriesForItsOwnFlush() {
-        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 1, 64, 1));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("Chest", 1, 64, 1));
         Map<BlockPos, NBTTagCompound> containers = stash(new BlockPos(100, 64, 100),
                 itemsHolder("minecraft:diamond"));
 
@@ -246,8 +246,8 @@ class ChunkFlushPlanTest {
     @Test
     void foldResidualHoldersSumsBothMergesOntoTheOnDiskChunk() {
         NBTTagCompound onDisk = chunkTagWith(
-                blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:ender_chest", 2, 64, 2));
+                blockEntity("Chest", 1, 64, 1),
+                blockEntity("EnderChest", 2, 64, 2));
 
         MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, origin(), containerSink, lecternSink,
                 stash(new BlockPos(1, 64, 1), itemsHolder("minecraft:diamond")),
@@ -263,8 +263,8 @@ class ChunkFlushPlanTest {
     @Test
     void foldResidualHoldersCountsEveryThrowingBandMergeAsFailed() {
         NBTTagCompound onDisk = chunkTagWith(
-                blockEntity("minecraft:chest", 1, 64, 1),
-                blockEntity("minecraft:ender_chest", 2, 64, 2));
+                blockEntity("Chest", 1, 64, 1),
+                blockEntity("EnderChest", 2, 64, 2));
 
         MergeTally tally = ChunkFlushPlan.foldResidualHolders(onDisk, origin(), THROWING_CONTAINER_SINK,
                 THROWING_LECTERN_SINK,
@@ -282,7 +282,7 @@ class ChunkFlushPlanTest {
         ChunkSnapshotSource snapshot = snapshotOf(chest, shulkerBox);
 
         NBTTagCompound matching = itemsHolder("minecraft:diamond");
-        matching.setString("wdl_block_entity_id", "minecraft:chest");
+        matching.setString("wdl_block_entity_id", "Chest");
         NBTTagCompound stale = itemsHolder("minecraft:emerald");
         stale.setString("wdl_block_entity_id", "minecraft:chest"); // the block at 2,64,2 is a shulker box now
         Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();

@@ -252,11 +252,11 @@ class RecoveredScanTest {
     }
 
     private static NBTTagCompound filledVehicle(UUID uuid) {
-        return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid, "minecraft:diamond");
+        return EntityFixtures.containerVehicle("MinecartChest", uuid, "minecraft:diamond");
     }
 
     private static NBTTagCompound emptyVehicle(UUID uuid) {
-        return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid);
+        return EntityFixtures.containerVehicle("MinecartChest", uuid);
     }
 
     private static NBTTagCompound entityChunkWith(NBTTagCompound... entities) {
@@ -283,20 +283,20 @@ class RecoveredScanTest {
     }
 
     private static NBTTagCompound filledChest(int x, int y, int z) {
-        NBTTagCompound blockEntity = blockEntity("minecraft:chest", x, y, z);
+        NBTTagCompound blockEntity = blockEntity("Chest", x, y, z);
         blockEntity.setTag("Items", ItemFixtures.items("minecraft:diamond"));
         return blockEntity;
     }
 
     private static NBTTagCompound emptyChest(int x, int y, int z) {
-        return blockEntity("minecraft:chest", x, y, z);
+        return blockEntity("Chest", x, y, z);
     }
 
     // No vanilla lectern exists at this band, but RecoveredScan still reads the field-based "Book" (CapturedBlockField
     // .BOOK) for foreign or modded block entities, so a fieldless ender chest stands in as the carrier. A synthetic
     // Book is no producer's output, so a chunk built from this must go through malformedChunkTagWith.
     private static NBTTagCompound lecternWithBook(int x, int y, int z) {
-        NBTTagCompound blockEntity = blockEntity("minecraft:ender_chest", x, y, z);
+        NBTTagCompound blockEntity = blockEntity("EnderChest", x, y, z);
         blockEntity.setTag("Book", ItemFixtures.itemTag(ItemFixtures.writtenBook(1)));
         blockEntity.setInteger("Page", 0);
         return blockEntity;
@@ -314,7 +314,7 @@ class RecoveredScanTest {
     }
 
     private static NBTTagCompound emptyJukebox(int x, int y, int z) {
-        return blockEntity("minecraft:jukebox", x, y, z);
+        return blockEntity("RecordPlayer", x, y, z);
     }
 
     /**
@@ -333,7 +333,7 @@ class RecoveredScanTest {
     // (CapturedBlockField.BEES) for foreign or modded block entities, so a fieldless ender chest stands in as the
     // carrier.
     private static NBTTagCompound emptyBeehive(int x, int y, int z) {
-        return blockEntity("minecraft:ender_chest", x, y, z);
+        return blockEntity("EnderChest", x, y, z);
     }
 
     private static NBTTagCompound chunkWith(NBTTagCompound... blockEntities) {

@@ -23,7 +23,7 @@ class StashHolderTest {
     private static NBTTagCompound nestedHolder() {
         NBTTagCompound holder = ItemFixtures
                 .itemsHolder(ItemFixtures.namedStack("minecraft:diamond_pickaxe", "Efficiency Pick"));
-        holder.setString("wdl_block_entity_id", "minecraft:chest");
+        holder.setString("wdl_block_entity_id", "Chest");
         return holder;
     }
 

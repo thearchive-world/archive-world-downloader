@@ -73,9 +73,9 @@ class RiddenMountContentsFoldTest {
         LiveCaptureSession session = session(temporary);
         stashEntityContainer(session, MOUNT, capturedItems(new ItemStack(Items.DIAMOND, 5)));
 
-        NBTTagCompound folded = session.foldRidingVehicleContents(EntityFixtures.entity("minecraft:mule", MOUNT));
+        NBTTagCompound folded = session.foldRidingVehicleContents(EntityFixtures.entity("EntityHorse", MOUNT));
 
-        NBTTagCompound expected = EntityFixtures.entity("minecraft:mule", MOUNT);
+        NBTTagCompound expected = EntityFixtures.entity("EntityHorse", MOUNT);
         expected.setTag("Items", capturedItems(new ItemStack(Items.DIAMOND, 5)).getTagList("Items", 10));
         assertEquals(expected, folded,
                 "a mount standing on its own folds to the tag it always did, key for key");
@@ -97,8 +97,8 @@ class RiddenMountContentsFoldTest {
 
     /** The scenario shape: a chested mount that a plain minecart pushed itself under, so the mount is the passenger. */
     private static NBTTagCompound mountUnderCarrier() {
-        return EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:minecart", CARRIER),
-                EntityFixtures.entity("minecraft:mule", MOUNT));
+        return EntityFixtures.entityCarrying(EntityFixtures.entity("MinecartRideable", CARRIER),
+                EntityFixtures.entity("EntityHorse", MOUNT));
     }
 
     private static NBTTagCompound passengerOf(NBTTagCompound entity) {

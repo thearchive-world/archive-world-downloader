@@ -94,8 +94,8 @@ class EntityContainerStashMergeTest {
     @Test
     void mergeEntityStashFillsTheMatchingEntityAndDrainsOnlyThatEntry() {
         NBTTagCompound chunkTag = entitiesChunkTag(
-                entityTag("minecraft:chest_minecart", UUID_A),
-                entityTag("minecraft:chest_boat", UUID_B)); // a neighbor vehicle that must stay untouched
+                entityTag("MinecartChest", UUID_A),
+                entityTag("MinecartChest", UUID_B)); // a neighbor vehicle that must stay untouched
 
         Map<UUID, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(UUID_A, holderWith(2, new ItemStack(Items.EMERALD, 7)));
@@ -109,7 +109,7 @@ class EntityContainerStashMergeTest {
 
         NBTTagList entities = chunkTag.getTagList("Entities", 10);
         NBTTagCompound mergedEntity = findByUuid(entities, UUID_A);
-        assertEquals("minecraft:chest_minecart", mergedEntity.getString("id"),
+        assertEquals("MinecartChest", mergedEntity.getString("id"),
                 "the id is preserved (no clobber)");
         ItemStack[] back = new ItemStack[27];
         ItemListNbt.loadAllItems(mergedEntity, back);
@@ -124,8 +124,8 @@ class EntityContainerStashMergeTest {
         // A chested mule pushed into a plain minecart saves nested under the minecart's Passengers, never as a
         // top-level entity, and the open-time fold must still reach it or the contents the player opened are lost.
         NBTTagCompound chunkTag = entitiesChunkTag(
-                EntityFixtures.entityCarrying(entityTag("minecraft:minecart", UUID_A),
-                        entityTag("minecraft:mule", UUID_B)));
+                EntityFixtures.entityCarrying(entityTag("MinecartRideable", UUID_A),
+                        entityTag("EntityHorse", UUID_B)));
 
         Map<UUID, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(UUID_B, holderWith(2, new ItemStack(Items.EMERALD, 7)));
@@ -147,7 +147,7 @@ class EntityContainerStashMergeTest {
 
     @Test
     void mergeEntityStashIsTotalOnMissingUuid() {
-        NBTTagCompound entity = EntityFixtures.entityWithoutUuid("minecraft:chest_minecart");
+        NBTTagCompound entity = EntityFixtures.entityWithoutUuid("MinecartChest");
         NBTTagCompound chunkTag = entitiesChunkTag(entity);
         Map<UUID, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(UUID_A, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
@@ -162,7 +162,7 @@ class EntityContainerStashMergeTest {
     @Test
     void mergeEntityStashIsTotalOnOddLengthUuid() {
         // 3 ints, not the 4 a UUID needs
-        NBTTagCompound entity = EntityFixtures.entityWithShortUuid("minecraft:chest_minecart", 1, 2, 3);
+        NBTTagCompound entity = EntityFixtures.entityWithShortUuid("MinecartChest", 1, 2, 3);
         NBTTagCompound chunkTag = entitiesChunkTag(entity);
         Map<UUID, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(UUID_A, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
@@ -177,7 +177,7 @@ class EntityContainerStashMergeTest {
     @Test
     void mergeEntityStashIsTotalOnWrongTypeUuid() {
         // a string where a 4-int array is expected
-        NBTTagCompound entity = EntityFixtures.entityWithWrongTypeUuid("minecraft:chest_minecart", "not-a-uuid");
+        NBTTagCompound entity = EntityFixtures.entityWithWrongTypeUuid("MinecartChest", "not-a-uuid");
         NBTTagCompound chunkTag = entitiesChunkTag(entity);
         Map<UUID, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(UUID_A, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
@@ -194,7 +194,7 @@ class EntityContainerStashMergeTest {
         // A band merge that throws between the chunk flush and finish() must be isolated: the vehicle's items are
         // lost, its stash entry is still drained, and the loss is counted so the caller reports a partial save
         // honestly instead of a clean one.
-        NBTTagCompound chunkTag = entitiesChunkTag(entityTag("minecraft:chest_minecart", UUID_A));
+        NBTTagCompound chunkTag = entitiesChunkTag(entityTag("MinecartChest", UUID_A));
         Map<UUID, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(UUID_A, new NBTTagCompound());
 
@@ -211,9 +211,9 @@ class EntityContainerStashMergeTest {
         // survive the call. Counting is what says the repeat happened at all: the contents it writes are the same
         // ones the first fold wrote, so a re-fold that silently did nothing looks identical on that chunk alone.
         NBTTagCompound chunkTag = entitiesChunkTag(
-                entityTag("minecraft:chest_minecart", UUID_A),
-                entityTag("minecraft:chest_boat", UUID_B),
-                entityTag("minecraft:chest_minecart", UUID_C)); // never folded, so nothing is written onto it
+                entityTag("MinecartChest", UUID_A),
+                entityTag("MinecartChest", UUID_B),
+                entityTag("MinecartChest", UUID_C)); // never folded, so nothing is written onto it
 
         Map<UUID, NBTTagCompound> folded = new LinkedHashMap<>();
         folded.put(UUID_A, holderWith(2, new ItemStack(Items.EMERALD, 7)));
@@ -238,7 +238,7 @@ class EntityContainerStashMergeTest {
     void refoldFlushedContainersCountsThrowingMergeAsFailed() {
         // A re-fold that throws leaves this copy of the vehicle empty beside a copy that has its contents, so it
         // is a partial loss the caller has to report rather than a clean save.
-        NBTTagCompound chunkTag = entitiesChunkTag(entityTag("minecraft:chest_minecart", UUID_A));
+        NBTTagCompound chunkTag = entitiesChunkTag(entityTag("MinecartChest", UUID_A));
         Map<UUID, NBTTagCompound> folded = new LinkedHashMap<>();
         folded.put(UUID_A, new NBTTagCompound());
 
@@ -252,7 +252,7 @@ class EntityContainerStashMergeTest {
 
     @Test
     void mergeEntityStashOnAnEmptyStashReturnsZeroTallyNotNull() {
-        NBTTagCompound chunkTag = entitiesChunkTag(entityTag("minecraft:chest_minecart", UUID_A));
+        NBTTagCompound chunkTag = entitiesChunkTag(entityTag("MinecartChest", UUID_A));
         MergeTally tally = EntityContainerMerge.mergeEntityStash(containerSink, chunkTag, new LinkedHashMap<>());
         assertEquals(0, tally.merged(), "an empty stash merges nothing");
         assertEquals(0, tally.failed(), "and loses nothing");

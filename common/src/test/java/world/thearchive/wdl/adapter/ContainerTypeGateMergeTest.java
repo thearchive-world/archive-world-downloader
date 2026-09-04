@@ -53,7 +53,7 @@ class ContainerTypeGateMergeTest {
     @Test
     void aStaleFurnaceHolderDoesNotOverlayTheReplacementChest() {
         BlockPos pos = new BlockPos(10, 70, 20);
-        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("Chest", 10, 70, 20));
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holder("minecraft:shulker_box", 2, new ItemStack(Items.EMERALD, 7)));
@@ -89,7 +89,7 @@ class ContainerTypeGateMergeTest {
     @Test
     void aHolderWithoutRecordedTypeOverlaysUnchanged() {
         BlockPos pos = new BlockPos(10, 70, 20);
-        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 10, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("Chest", 10, 70, 20));
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holder(null, 2, new ItemStack(Items.EMERALD, 7))); // the interaction path carries no type
@@ -105,7 +105,7 @@ class ContainerTypeGateMergeTest {
     void aMismatchedHolderBrokenToAirStillNoOpsAndDrains() {
         BlockPos pos = new BlockPos(10, 70, 20);
         // The block was broken to air: no block entity at pos, only an unrelated chest elsewhere in the chunk.
-        NBTTagCompound chunkTag = chunkTagWith(blockEntity("minecraft:chest", 11, 70, 20));
+        NBTTagCompound chunkTag = chunkTagWith(blockEntity("Chest", 11, 70, 20));
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();
         stash.put(pos, holder("minecraft:shulker_box", 0, new ItemStack(Items.DIAMOND, 1)));

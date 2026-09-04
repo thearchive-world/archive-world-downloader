@@ -38,7 +38,7 @@ class EntityMergeTest {
     }
 
     private static NBTTagCompound vehicle(UUID uuid, String... itemIds) {
-        return EntityFixtures.containerVehicle("minecraft:chest_minecart", uuid, itemIds);
+        return EntityFixtures.containerVehicle("MinecartChest", uuid, itemIds);
     }
 
     private static NBTTagCompound entities(NBTTagCompound... vehicles) {
@@ -85,7 +85,7 @@ class EntityMergeTest {
      * node carries the client zero here), and the offers holder only when {@code offers} is present.
      */
     private static NBTTagCompound villager(UUID uuid, @Nullable NBTTagCompound offers, int xp) {
-        NBTTagCompound tag = EntityFixtures.entity("minecraft:villager", uuid);
+        NBTTagCompound tag = EntityFixtures.entity("Villager", uuid);
         tag.setInteger("Xp", xp);
         if (offers != null) {
             tag.setTag("Offers", offers);
@@ -175,10 +175,10 @@ class EntityMergeTest {
         // A chested mule pushed into a minecart saves nested under the minecart's Passengers, and on a resume
         // the re-captured mule spawns with an empty chest, so its prior contents must carry from the nested node.
         NBTTagCompound onDisk = entities(EntityFixtures.entityCarrying(vehicle(UUID_A),
-                EntityFixtures.containerVehicle("minecraft:mule", UUID_B, "minecraft:diamond",
+                EntityFixtures.containerVehicle("EntityHorse", UUID_B, "minecraft:diamond",
                         "minecraft:gold_ingot")));
         NBTTagCompound fresh = entities(EntityFixtures.entityCarrying(vehicle(UUID_A),
-                EntityFixtures.containerVehicle("minecraft:mule", UUID_B)));
+                EntityFixtures.containerVehicle("EntityHorse", UUID_B)));
 
         int mergeBacks = EntityMerge.merge(onDisk, fresh);
 
@@ -252,7 +252,7 @@ class EntityMergeTest {
         // stated contract is to carry forward every on-disk entity the fresh capture lacks (over-capture beats
         // under-capture). We always write a valid UUID, so the trigger is corruption or a foreign-written save;
         // dropping it would silently lose the user's existing world data. Carry it forward, the same as a keyed one.
-        NBTTagCompound noUuid = EntityFixtures.entityWithoutUuid("minecraft:chest_minecart");
+        NBTTagCompound noUuid = EntityFixtures.entityWithoutUuid("MinecartChest");
         NBTTagCompound onDisk = entities(noUuid);
         NBTTagCompound fresh = entities(vehicle(UUID_A));
 

@@ -139,7 +139,7 @@ class LiveCaptureSessionLossLogWiringTest {
 
     /** An encoded entity-chunk tag holding one entity whose displayed {@code "Item"} is {@code stack}. */
     private NBTTagCompound entityChunkDisplaying(UUID uuid, ItemStack stack) {
-        NBTTagCompound entity = EntityFixtures.entity("minecraft:item_frame", uuid);
+        NBTTagCompound entity = EntityFixtures.entity("ItemFrame", uuid);
         entity.setTag("Item", itemTagOf(stack));
         return EntityFixtures.entityChunkTagWith(entity);
     }

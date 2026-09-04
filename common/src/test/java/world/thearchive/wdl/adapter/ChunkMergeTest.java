@@ -38,7 +38,7 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
  */
 class ChunkMergeTest {
     private static NBTTagCompound chest(int x, int y, int z, String... itemIds) {
-        return container("minecraft:chest", x, y, z, itemIds);
+        return container("Chest", x, y, z, itemIds);
     }
 
     /**
@@ -47,7 +47,7 @@ class ChunkMergeTest {
      * its saved {@code "id"} is the identical {@code minecraft:chest}, not a distinct type a merge could tell apart.
      */
     private static NBTTagCompound furnace(int x, int y, int z, String... itemIds) {
-        return container("minecraft:furnace", x, y, z, itemIds);
+        return container("Furnace", x, y, z, itemIds);
     }
 
     private static NBTTagCompound container(String id, int x, int y, int z, String... itemIds) {
@@ -61,7 +61,7 @@ class ChunkMergeTest {
     // the carrier. A synthetic Book is no producer's output, so a Book-bearing carrier goes through
     // malformedChunkTagWith, not the fidelity-checked chunkTagWith.
     private static NBTTagCompound lectern(int x, int y, int z, boolean withBook, int page) {
-        NBTTagCompound blockEntity = blockEntity("minecraft:ender_chest", x, y, z);
+        NBTTagCompound blockEntity = blockEntity("EnderChest", x, y, z);
         if (withBook) {
             blockEntity.setTag("Book", ItemFixtures.itemTag(ItemFixtures.writtenBook(page + 1)));
             blockEntity.setInteger("Page", page);
@@ -75,7 +75,7 @@ class ChunkMergeTest {
     }
 
     private static NBTTagCompound jukebox(int x, int y, int z) {
-        return blockEntity("minecraft:jukebox", x, y, z);
+        return blockEntity("RecordPlayer", x, y, z);
     }
 
     private static NBTTagCompound jukeboxWithDisc(int x, int y, int z, String discId) {
@@ -90,7 +90,7 @@ class ChunkMergeTest {
     // (CapturedBlockField.BEES) for foreign or modded block entities, so a fieldless ender chest stands in as the
     // carrier.
     private static NBTTagCompound beehive(int x, int y, int z) {
-        return blockEntity("minecraft:ender_chest", x, y, z);
+        return blockEntity("EnderChest", x, y, z);
     }
 
     /**
@@ -417,7 +417,7 @@ class ChunkMergeTest {
     }
 
     private static NBTTagCompound brewingStand(int x, int y, int z, short brewTime, byte fuel) {
-        NBTTagCompound blockEntity = blockEntity("minecraft:brewing_stand", x, y, z);
+        NBTTagCompound blockEntity = blockEntity("Cauldron", x, y, z);
         blockEntity.setShort("BrewTime", brewTime);
         blockEntity.setByte("Fuel", fuel);
         return blockEntity;
