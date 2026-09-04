@@ -427,7 +427,7 @@ public final class OutlineTracker {
         IBlockState state = level.getBlockState(pos);
         AxisAlignedBB box = state.getBoundingBox(level, pos).offset(pos);
         List<AxisAlignedBB> parts = new ArrayList<>(4);
-        state.addCollisionBoxToList(level, pos, new AxisAlignedBB(pos), parts, null, false);
+        state.addCollisionBoxToList(level, pos, new AxisAlignedBB(pos), parts, null);
         for (int i = 0; i < parts.size(); i++) {
             box = box.union(parts.get(i));
         }

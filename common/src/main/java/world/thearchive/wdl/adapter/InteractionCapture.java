@@ -317,12 +317,10 @@ public final class InteractionCapture {
         if (stack == null || !(stack.getItem() instanceof ItemBlock)) {
             return;
         }
-        // The same question vanilla's own ItemBlock.onItemUse asks before it places, one step earlier on the same
-        // client state. This band has no unified (player, hand, hit) UseOnContext / BlockPlaceContext; reproduce its
-        // positional math directly. The placement lands on the clicked cell when the clicked block is replaceable
-        // (grass, water), else the cell against the clicked face; the place is allowed only where the player may edit
-        // it and World.mayPlace accepts the block, exactly vanilla's own gate (the player is the mayPlace placer, so
-        // it is excluded from the placement collision check just as vanilla's ItemBlock.onItemUse does).
+        // The placement cell has to be derived rather than read: this band has no unified (player, hand, hit)
+        // placement context to ask, so the stash key is only right while this stays in step with vanilla's own
+        // ItemBlock.onItemUse, which places into the clicked cell when the clicked block is replaceable (grass,
+        // water) and into the cell against the clicked face otherwise.
         World level = player.world;
         Block placeBlock = Block.getBlockFromItem(stack.getItem());
         BlockPos clicked = hit.getBlockPos();
@@ -330,7 +328,7 @@ public final class InteractionCapture {
         IBlockState clickedState = level.getBlockState(clicked);
         BlockPos placedPos = clickedState.getBlock().isReplaceable(level, clicked) ? clicked : clicked.offset(facing);
         if (!player.canPlayerEdit(placedPos, facing, stack)
-                || !level.mayPlace(placeBlock, placedPos, false, facing, player)) {
+                || !level.canBlockBePlaced(placeBlock, placedPos, false, facing, player, stack)) {
             return;
         }
         // The stash key must be immutable, like every other stash.

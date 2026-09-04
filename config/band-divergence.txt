@@ -42,7 +42,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 # interface and confirm() is an if/instanceof chain rather than a pattern-matching switch.
 # Below 1.13 there is no unified UseOnContext/BlockPlaceContext: the placement gate reproduces vanilla
 # ItemBlock.onItemUse positional math directly (the clicked cell when the clicked block is replaceable, else the
-# offset cell, gated by EntityPlayer.canPlayerEdit and World.mayPlace). The NBT and item/block API is classic MCP
+# offset cell, gated by EntityPlayer.canPlayerEdit and World.canBlockBePlaced, which is handed the held stack
+# because the block's own canReplace consults it). The NBT and item/block API is classic MCP
 # (ItemStack.writeToNBT, Block.getBlockFromItem, ExtendedBlockStorage.get).
 # Below 1.11 there is no shulker box, so the recognizer keeps only the jukebox producer while the placed-container
 # path (placeStash, the ContainerSink and PlacedContainerSink wiring, the items-bundle flag, route's Items branch and
