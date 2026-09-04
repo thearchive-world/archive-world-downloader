@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.filledMap;
 import static world.thearchive.wdl.testsupport.MapHolderFixtures.holderOf;
-import static world.thearchive.wdl.testsupport.MapHolderFixtures.shulkerHolding;
+import static world.thearchive.wdl.testsupport.MapHolderFixtures.containerHolding;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -27,8 +27,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The headless guard for the id remap: {@link MapIdRemap} mirrors {@link MapIdCollector} (collect becomes set),
  * rewriting every referenced {@code minecraft:map_id} to a resolver-supplied archive id across the same surfaces
- * (top-level, a shulker's {@code minecraft:container}, a bundle's {@code minecraft:bundle_contents}). Collecting after
- * the remap is the oracle: the remapped set must equal the resolver applied to the original set, proving the walk
+ * (top-level, a container item's {@code minecraft:container}, a bundle's {@code minecraft:bundle_contents}). Collecting
+ * after the remap is the oracle: the remapped set must equal the resolver applied to the original set, proving the walk
  * touches exactly the ids the collector reads.
  */
 class MapIdRemapTest {
@@ -47,7 +47,7 @@ class MapIdRemapTest {
 
     @Test
     void remapsEveryReferencedIdAcrossAllSurfacesSkippingNonMaps() {
-        NBTTagCompound holder = holderOf(sink, filledMap(5), shulkerHolding(filledMap(7)),
+        NBTTagCompound holder = holderOf(sink, filledMap(5), containerHolding(filledMap(7)),
                 new ItemStack(Items.DIAMOND, 3));
 
         MapIdRemap.remapFromItemList(holder, "Items", id -> id + 100);
@@ -58,7 +58,7 @@ class MapIdRemapTest {
 
     @Test
     void remapTouchesExactlyTheIdsTheCollectorReads() {
-        NBTTagCompound holder = holderOf(sink, filledMap(5), shulkerHolding(filledMap(7)));
+        NBTTagCompound holder = holderOf(sink, filledMap(5), containerHolding(filledMap(7)));
         assertEquals(ImmutableSet.of(5, 7), collect(holder), "the pre-remap oracle");
 
         Map<Integer, Integer> table = ImmutableMap.of(5, 0, 7, 1);
@@ -69,7 +69,7 @@ class MapIdRemapTest {
 
     @Test
     void theSameIdInTwoPlacesRemapsConsistently() {
-        NBTTagCompound holder = holderOf(sink, filledMap(42), shulkerHolding(filledMap(42)));
+        NBTTagCompound holder = holderOf(sink, filledMap(42), containerHolding(filledMap(42)));
 
         MapIdRemap.remapFromItemList(holder, "Items", id -> id + 100);
 

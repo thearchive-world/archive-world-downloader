@@ -11,9 +11,9 @@ import net.minecraft.nbt.NBTTagCompound;
 import world.thearchive.wdl.adapter.ContainerSink;
 
 /**
- * Shared map-item-holder NBT fixtures for the map archive tests: a filled-map stack, a shulker nesting one, and the
- * captured {@code Items} holder they serialize into. Hoisted here so the id collector, remap, and archive tests share
- * one copy rather than each carrying its own.
+ * Shared map-item-holder NBT fixtures for the map archive tests: a filled-map stack, a container item nesting one, and
+ * the captured {@code Items} holder they serialize into. Hoisted here so the id collector, remap, and archive tests
+ * share one copy rather than each carrying its own.
  */
 public final class MapHolderFixtures {
     private MapHolderFixtures() {}
@@ -27,17 +27,18 @@ public final class MapHolderFixtures {
     }
 
     /**
-     * A shulker box whose {@code tag.BlockEntityTag.Items} nests {@code contents}. At this band shulker boxes are
-     * sixteen per-color blocks with no colorless variant; the color is incidental to the fixture.
+     * A container item whose {@code tag.BlockEntityTag.Items} nests {@code contents}. {@code ItemBlock} copies that
+     * compound onto the placed block entity at this band, so a command-given chest carrying it is a live shape rather
+     * than a synthetic one.
      */
-    public static ItemStack shulkerHolding(ItemStack... contents) {
-        ItemStack shulker = new ItemStack(Blocks.PURPLE_SHULKER_BOX);
+    public static ItemStack containerHolding(ItemStack... contents) {
+        ItemStack container = new ItemStack(Blocks.CHEST);
         NBTTagCompound blockEntityTag = new NBTTagCompound();
         blockEntityTag.setTag("Items", ItemFixtures.items(contents));
         NBTTagCompound tag = new NBTTagCompound();
         tag.setTag("BlockEntityTag", blockEntityTag);
-        shulker.setTagCompound(tag);
-        return shulker;
+        container.setTagCompound(tag);
+        return container;
     }
 
     /** The captured {@code Items} holder tag for {@code stacks}, serialized through {@code sink}. */

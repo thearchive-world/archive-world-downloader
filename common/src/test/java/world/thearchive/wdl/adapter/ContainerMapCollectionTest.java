@@ -27,9 +27,9 @@ import org.junit.jupiter.api.io.TempDir;
 import world.thearchive.wdl.core.MapManifest;
 
 /**
- * The container-map loss gate: a filled map nested in a chest and in a shulker box is collected and remapped through
- * the item-level {@code Damage} path, while a non-map item carrying its own {@code Damage} is left untouched. At this
- * band a filled map's id is the item-level {@code Damage} short behind the {@code id == "minecraft:filled_map"}
+ * The container-map loss gate: a filled map nested in a chest and in a nested container item is collected and remapped
+ * through the item-level {@code Damage} path, while a non-map item carrying its own {@code Damage} is left untouched.
+ * At this band a filled map's id is the item-level {@code Damage} short behind the {@code id == "minecraft:filled_map"}
  * identity gate, not the inner {@code tag."map"} of the higher bands. Without the item-compound walk the maps are never
  * collected; without the identity gate the damaged pickaxe is rewritten as a map, corrupting its durability and
  * aliasing it to a captured map image. Hand-built classic-MCP item NBT drives it, no live ItemStack.
@@ -48,7 +48,7 @@ class ContainerMapCollectionTest {
         return item;
     }
 
-    private static NBTTagCompound shulkerHolding(NBTTagCompound nested) {
+    private static NBTTagCompound containerHolding(NBTTagCompound nested) {
         NBTTagList nestedItems = new NBTTagList();
         nestedItems.appendTag(nested);
         NBTTagCompound blockEntityTag = new NBTTagCompound();
@@ -60,12 +60,12 @@ class ContainerMapCollectionTest {
         return shulker;
     }
 
-    /** A chest holder whose {@code Items} carry the chest map, the damaged pickaxe, and a shulker nesting a map. */
-    private static NBTTagCompound holder(NBTTagCompound chestMap, NBTTagCompound pickaxe, NBTTagCompound shulker) {
+    /** A chest holder whose {@code Items} carry the chest map, the damaged pickaxe, and a container nesting a map. */
+    private static NBTTagCompound holder(NBTTagCompound chestMap, NBTTagCompound pickaxe, NBTTagCompound nested) {
         NBTTagList items = new NBTTagList();
         items.appendTag(chestMap);
         items.appendTag(pickaxe);
-        items.appendTag(shulker);
+        items.appendTag(nested);
         NBTTagCompound holder = new NBTTagCompound();
         holder.setTag("Items", items);
         return holder;
@@ -83,15 +83,15 @@ class ContainerMapCollectionTest {
     }
 
     @Test
-    void collectsFilledMapIdsFromChestAndShulkerNotTheDamagedPickaxe() {
+    void collectsFilledMapIdsFromChestAndNestedContainerNotTheDamagedPickaxe() {
         NBTTagCompound holder = holder(item(FILLED_MAP, CHEST_MAP_SESSION_ID), item("minecraft:diamond_pickaxe",
-                PICKAXE_DAMAGE), shulkerHolding(item(FILLED_MAP, SHULKER_MAP_SESSION_ID)));
+                PICKAXE_DAMAGE), containerHolding(item(FILLED_MAP, NESTED_MAP_SESSION_ID)));
 
         Set<Integer> ids = new LinkedHashSet<>();
         MapIdCollector.collectFromItemList(holder, "Items", ids);
 
         assertTrue(ids.contains(CHEST_MAP_SESSION_ID), "the chest filled map's item-level Damage id is collected");
-        assertTrue(ids.contains(SHULKER_MAP_SESSION_ID), "the shulker-nested filled map's id is collected");
+        assertTrue(ids.contains(NESTED_MAP_SESSION_ID), "the container-nested filled map's id is collected");
         assertFalse(ids.contains(PICKAXE_DAMAGE),
                 "the damaged pickaxe's universal Damage field is not read as a map id");
     }
@@ -99,15 +99,15 @@ class ContainerMapCollectionTest {
     @Test
     void remapStreamsTheFilledMapsAndLeavesTheNonMapDamageUntouched(@TempDir Path directory) throws IOException {
         NBTTagCompound chestMap = item(FILLED_MAP, CHEST_MAP_SESSION_ID);
-        NBTTagCompound shulkerMap = item(FILLED_MAP, SHULKER_MAP_SESSION_ID);
+        NBTTagCompound nestedMap = item(FILLED_MAP, NESTED_MAP_SESSION_ID);
         NBTTagCompound pickaxe = item("minecraft:diamond_pickaxe", PICKAXE_DAMAGE);
-        NBTTagCompound holder = holder(chestMap, pickaxe, shulkerHolding(shulkerMap));
+        NBTTagCompound holder = holder(chestMap, pickaxe, containerHolding(nestedMap));
 
         Path dataDirectory = directory.resolve("data");
         Map<Integer, NBTBase> streamed = new LinkedHashMap<>();
         MapArchive archive = new MapArchive(MapManifest.empty(),
                 sessionId -> sessionId == CHEST_MAP_SESSION_ID ? picture(1)
-                        : sessionId == SHULKER_MAP_SESSION_ID ? picture(2) : null,
+                        : sessionId == NESTED_MAP_SESSION_ID ? picture(2) : null,
                 (archiveId, dataTag) -> {
                     streamed.put(archiveId, dataTag);
                     try {
@@ -120,16 +120,16 @@ class ContainerMapCollectionTest {
         archive.remap(holder, "Items");
 
         int chestArchiveId = chestMap.getShort("Damage");
-        int shulkerArchiveId = shulkerMap.getShort("Damage");
+        int nestedArchiveId = nestedMap.getShort("Damage");
         assertNotEquals(CHEST_MAP_SESSION_ID, chestArchiveId,
                 "the chest map's in-container reference is remapped off its session id to its archive id");
-        assertNotEquals(SHULKER_MAP_SESSION_ID, shulkerArchiveId,
-                "the shulker-nested map's reference is remapped to its archive id");
+        assertNotEquals(NESTED_MAP_SESSION_ID, nestedArchiveId,
+                "the container-nested map's reference is remapped to its archive id");
         assertTrue(streamed.containsKey(chestArchiveId), "the chest map is streamed to the sink under its archive id");
         assertTrue(Files.exists(dataDirectory.resolve("map_" + chestArchiveId + ".dat")),
                 "the chest map is streamed to data/map_<id>.dat");
-        assertTrue(Files.exists(dataDirectory.resolve("map_" + shulkerArchiveId + ".dat")),
-                "the shulker-nested map is streamed to data/map_<id>.dat");
+        assertTrue(Files.exists(dataDirectory.resolve("map_" + nestedArchiveId + ".dat")),
+                "the container-nested map is streamed to data/map_<id>.dat");
         assertEquals(PICKAXE_DAMAGE, pickaxe.getShort("Damage"),
                 "the damaged pickaxe's Damage is left untouched by the map-id remap");
     }

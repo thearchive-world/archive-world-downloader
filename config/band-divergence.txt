@@ -596,23 +596,33 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityContainerStashMergeTest.
 # no CODEC, so the offers holder is built via MerchantOffers.createTag rather than encoding through RegistryOps.
 common/src/test/java/world/thearchive/wdl/adapter/EntityMergeTest.java
 
-# Below 1.20.5 there are no item components: a placed shulker's contents and a placed beehive's occupants live
-# under the item's tag.BlockEntityTag (Items / Bees) rather than DataComponents.CONTAINER/BEES, and
+# Below 1.20.5 there are no item components: a placed container item's contents and a placed beehive's occupants
+# live under the item's tag.BlockEntityTag (Items / Bees) rather than DataComponents.CONTAINER/BEES, and
 # InteractionCapture.captureRecordItem/captureBees take no registries argument. The three bookshelf-insert tests do
 # not run on this band: the chiseled bookshelf is UPDATE_1_20-experimental at 1.19.4, so its bookshelf_books item tag
 # ships only in the built-in experimental datapack the standard-only TestRegistries omits, leaving the insert gate
 # empty headless.
+# Below 1.11 there is no shulker box, so the recognizer has only the jukebox producer and the placed-container path
+# is wired with nothing to drive it. Five methods are deliberately dropped here rather than repointed, their subject
+# being that producer itself and not a behavior this band still has: shulkerWithBlockPresentKeepsTheItemsHolder,
+# shulkerDiscardedWhenBlockAbsent and reconcileRoutesConfirmedShulkerToItemsBundle need an items-bundle
+# InteractionKind, which no constant declares here, and placedShulkerNotifiesThePlacedContainerSink and
+# aPlacedShulkerInAnUncapturableChunkIsNeitherStashedNorMarked assert a placed-container notification that
+# recordPlaceAt no longer makes. Four more that named the shulker only in passing are repointed onto the jukebox or
+# onto a chest and stay, and both blockStateAt cases (the negative-Y section read-back, which is band-general) read a
+# placed chest instead. Twenty-three methods at the parent, eighteen here.
 common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
 
 # Below 1.20.5 there are no item components: the lodestone target is the raw LodestonePos/LodestoneDimension/
 # LodestoneTracked keys vanilla's CompassItem.addLodestoneTags writes, a beehive item's occupants and the hive's
 # own flower position are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and tag.BlockEntityTag.FlowerPos,
-# shulker and bundle contents live under tag.BlockEntityTag.Items and tag.Items, ContainerHelper.loadAllItems
+# container-item and bundle contents live under tag.BlockEntityTag.Items and tag.Items, ContainerHelper.loadAllItems
 # takes no registries argument, and DataResult.getOrThrow takes (boolean, Consumer<String>).
 common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk drives hand-built NBT keyed by tag.BlockEntityTag.Items (a
-# shulker) and tag.Items (a bundle) rather than the component keys, and there is no sulfur cube to recurse into.
+# container item) and tag.Items (a bundle) rather than the component keys, and there is no sulfur cube to recurse
+# into.
 common/src/test/java/world/thearchive/wdl/adapter/ItemTreeWalkTest.java
 
 # Below 1.20.5 there is no WrittenBookContent component; a written book's title/author/generation/resolved and its
@@ -665,10 +675,13 @@ common/src/test/java/world/thearchive/wdl/testsupport/BlockEntityFixtures.java
 # The gate therefore names the omitted key instead of a lost element, which is the assertion that changes here.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelityTest.java
 
-# Below 1.20.5 there are no item components: a filled map's id is the raw int tag."map", and a shulker's/bundle's
-# nested contents live under tag.BlockEntityTag.Items and tag.Items.
+# Below 1.20.5 there are no item components: a filled map's id is the raw int tag."map", and a container item's or
+# bundle's nested contents live under tag.BlockEntityTag.Items and tag.Items.
 # Below 1.13 a filled map's id is the item-level Damage short behind the id == minecraft:filled_map identity gate, not
 # the inner tag."map" (the fixture reads getShort("Damage") and builds new ItemStack(Items.FILLED_MAP, 1, id)).
+# Below 1.11 there is no shulker box, so the nesting fixture is a chest item: ItemBlock still copies BlockEntityTag
+# onto the block entity it places here, so a command-given chest carrying one is a live shape and not a synthetic
+# stand-in.
 common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
 
 # Below 1.20.3 there is no Crafter block, block entity or menu (the Bats and Pots update added them, experimental),
@@ -735,8 +748,10 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 common/src/test/java/world/thearchive/wdl/adapter/MapIdCountsShapeTest.java
 
 # New at this band: the container-map loss gate. Below 1.13 a filled map's id is the item-level Damage short behind the
-# id == "minecraft:filled_map" gate, so this test drives hand-built classic-MCP item NBT to prove the chest- and
-# shulker-nested maps collect and remap while a damaged non-map item's universal Damage field is left untouched.
+# id == "minecraft:filled_map" gate, so this test drives classic-MCP item NBT to prove the chest-nested and
+# container-item-nested maps collect and remap while a damaged non-map item's universal Damage field is left
+# untouched. Below 1.11 the nesting carrier is a chest item rather than a shulker box, and every entry is built
+# through ItemStack.writeToNBT rather than by hand so the hand-built-fixture guard has nothing to catch here.
 common/src/test/java/world/thearchive/wdl/adapter/ContainerMapCollectionTest.java
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.

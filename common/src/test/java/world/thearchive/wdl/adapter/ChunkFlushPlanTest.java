@@ -277,14 +277,14 @@ class ChunkFlushPlanTest {
 
     @Test
     void landingHolderPositionsNamesOnlyTheHoldersThatWillActuallyLand() {
-        NBTTagCompound chest = blockEntity("minecraft:chest", 1, 64, 1);
-        NBTTagCompound shulkerBox = blockEntity("minecraft:shulker_box", 2, 64, 2);
-        ChunkSnapshotSource snapshot = snapshotOf(chest, shulkerBox);
+        NBTTagCompound chest = blockEntity("Chest", 1, 64, 1);
+        NBTTagCompound furnace = blockEntity("Furnace", 2, 64, 2);
+        ChunkSnapshotSource snapshot = snapshotOf(chest, furnace);
 
         NBTTagCompound matching = itemsHolder("minecraft:diamond");
         matching.setString("wdl_block_entity_id", "Chest");
         NBTTagCompound stale = itemsHolder("minecraft:emerald");
-        stale.setString("wdl_block_entity_id", "minecraft:chest"); // the block at 2,64,2 is a shulker box now
+        stale.setString("wdl_block_entity_id", "Chest"); // the block at 2,64,2 is a furnace now
         Map<BlockPos, NBTTagCompound> holders = new LinkedHashMap<>();
         holders.put(new BlockPos(1, 64, 1), matching);
         holders.put(new BlockPos(2, 64, 2), stale);

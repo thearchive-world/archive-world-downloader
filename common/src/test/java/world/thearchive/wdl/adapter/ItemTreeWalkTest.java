@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins ItemTreeWalk's nesting contract: below 1.20.5 an item is {@code {id, Count, tag}}, and the walk applies the leaf
- * action to the item's own {@code tag} compound, then recurses into the items nested in a shulker box
+ * action to the item's own {@code tag} compound, then recurses into the items nested in a container item
  * ({@code tag.BlockEntityTag.Items}) and a bundle ({@code tag.Items}). It drives the walk over hand-built NBT keyed by
  * those pre-component keys. The visited compounds are matched by identity, so the assertions stay clear of the
  * band-varying NBTTagCompound accessors.
@@ -42,14 +42,14 @@ class ItemTreeWalkTest {
     @Test
     void walkRecursesIntoContainer() {
         NBTTagCompound nestedTag = new NBTTagCompound();
-        NBTTagList shulkerItems = new NBTTagList();
-        shulkerItems.appendTag(itemWithTag(nestedTag));
+        NBTTagList containerItems = new NBTTagList();
+        containerItems.appendTag(itemWithTag(nestedTag));
         NBTTagCompound blockEntityTag = new NBTTagCompound();
-        blockEntityTag.setTag("Items", shulkerItems);
+        blockEntityTag.setTag("Items", containerItems);
         NBTTagCompound tag = new NBTTagCompound();
         tag.setTag("BlockEntityTag", blockEntityTag);
         assertTrue(visitedTags(itemWithTag(tag)).contains(nestedTag),
-                "an item nested in a shulker box container is visited");
+                "an item nested in a container item is visited");
     }
 
     @Test
