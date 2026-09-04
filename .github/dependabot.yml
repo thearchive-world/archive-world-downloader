@@ -38,7 +38,7 @@ updates:
         patterns:
           - "*"
     ignore:
-      # JUnit stays on the 5.x line: 6.x raises the baseline to Java 17, which the 1.12.2 band (Java 8)
+      # JUnit stays on the 5.x line: 6.x raises the baseline to Java 17, which the 1.10.2 band (Java 8)
       # cannot meet. Allow 5.x minor+patch (incl. security) and suppress only the 6.x major.
       - dependency-name: "org.junit:junit-bom"
         update-types: ["version-update:semver-major"]

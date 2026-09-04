@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The read-merge for a chunk's captured entities, UUID-keyed (the pre-1.16 {@code UUIDMost}/{@code UUIDLeast} long
- * pair). At 1.15.2 the entities live inside the {@code region/} chunk under {@code Level.Entities} (there is no
+ * pair). At 1.10.2 the entities live inside the {@code region/} chunk under {@code Level.Entities} (there is no
  * separate {@code entities/} region until 1.17), and the writer folds the fresh capture in through this merge. Two
  * carry-forwards, both so a re-write of an entity-chunk adds to, never overwrites, what is already on disk:
  *

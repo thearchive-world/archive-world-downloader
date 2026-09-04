@@ -1339,7 +1339,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private @Nullable Chunk liveChunkAt(ChunkProviderClient chunkSource, ChunkPos pos) {
         // This band's client chunk source has no status-taking getChunk; getLoadedChunk returns the live loaded
-        // chunk or null. A 1.12.2 client chunk is always full (there is no ProtoChunk or ChunkStatus concept before
+        // chunk or null. A 1.10.2 client chunk is always full (there is no ProtoChunk or ChunkStatus concept before
         // 1.13), so no status promotion is needed: the saved chunk's TerrainPopulated and LightPopulated flags carry
         // the completeness the higher bands' Status string does.
         Chunk chunk = chunkSource.getLoadedChunk(pos.chunkXPos, pos.chunkZPos);
@@ -1926,8 +1926,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // The lectern page (a LecternMenu concept) does not exist at this band, so the page dimension of the
             // change key is always the fixed 0.
             int page = 0;
-            // No menu's ContainerData is readable at this band (the brewing stand's brew time and fuel have no
-            // public accessor), so the change gate keys on the slots alone.
+            // Nothing this band's stash serializes is taken from menu progress data, so the change gate keys on
+            // the slots alone.
             int[] data = MenuChangeTracker.NO_DATA;
             if (!stashChangeTracker.changedSince(menu.inventorySlots, page, data)) {
                 return; // unchanged since the last stash: last-seen-wins needs no re-serialize this tick
@@ -2199,10 +2199,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void stashContainerItems(Container menu, EntityPlayerSP player, long posKey) {
         NBTTagCompound holder = containerCapture.captureBlockSlots(menu, player);
         if (holder != null) {
-            // The brewing stand's brew-time and fuel are menu-only ContainerData held in private fields with no
-            // public reader at this band (getBrewingTicks / getFuel are later accessors), so they are not captured
-            // here; the potions, ingredient, and fuel item are captured as ordinary Items, and the timer resumes on
-            // load. Losing the in-progress timer is the accepted band limit.
+            // The brewing stand's in-progress brew time and fuel level are not captured; the potions, ingredient
+            // and fuel item are captured as ordinary Items, and the timer resumes on load. Losing the in-progress
+            // timer is the accepted band limit.
             stashBlockHolder(containerStash, BlockPos.fromLong(posKey), holder);
         }
     }
@@ -2982,7 +2981,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             gameType = gameMode != null ? gameMode.getCurrentGameType() : GameType.SURVIVAL;
             if (gameType == GameType.SPECTATOR) {
                 // Vanilla applies the saved game type to every opener, so a spectator stamp opens the world in
-                // spectator, and on a world shipped without cheats there is no way back out. At 1.15.2 the client
+                // spectator, and on a world shipped without cheats there is no way back out. At 1.10.2 the client
                 // tracks no mode held before spectating, so fall back to survival.
                 gameType = GameType.SURVIVAL;
             }
@@ -3192,7 +3191,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (file == null || !Files.exists(file)) {
             return null;
         }
-        // 1.15.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
+        // 1.10.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(file)) {
             NBTTagCompound root = CompressedStreamTools.readCompressed(input);
             return root.getTag("Data") instanceof NBTTagCompound ? (NBTTagCompound) root.getTag("Data") : null;
@@ -3288,7 +3287,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null; // colors never received (imageless): skipped, never fabricated
         }
         NBTBase mapTag = adapter.mapSink().serializeMap(saved);
-        // 1.16.5 MapData has no locked() copy method, and mutating the live client map's locked flag would
+        // 1.10.2 MapData has no locked() copy method, and mutating the live client map's locked flag would
         // freeze its tracking, so the archived lock is set on the serialized tag instead, leaving the live map alone.
         if (config.lockDownloadedMaps() && mapTag instanceof NBTTagCompound) {
             ((NBTTagCompound) mapTag).setBoolean("locked", true);
@@ -3296,7 +3295,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return mapTag;
     }
 
-    // 1.16.5 has no Entity.shouldBeSaved(); reproduce its predicate: a removed, riding, or single-player-vehicle
+    // 1.10.2 has no Entity.shouldBeSaved(); reproduce its predicate: a removed, riding, or single-player-vehicle
     // entity is not written standalone.
     private static boolean shouldSaveEntity(Entity entity) {
         return !entity.isDead && !entity.isRiding()
@@ -3569,7 +3568,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // level.dat: a superflat VOID world. The version-coupled saveLevelData call lives behind
             // LevelDataWriter.save() (its vanilla signature drifts across bands), so this shared session stays
             // cherry-pickable. Built here on the main thread; the writer thread only writes the finished data.
-            // At 1.15.2 the level directory is the ISaveFormat folder, which roots WorldPaths, the map manifest and
+            // At 1.10.2 the level directory is the ISaveFormat folder, which roots WorldPaths, the map manifest and
             // the export zip.
             Path saveRoot = storage.getWorldDirectory().toPath();
             WorldPaths paths = adapter.worldPaths(saveRoot);
@@ -4633,7 +4632,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (player != null && player.getServerBrand() != null) {
             brand = player.getServerBrand();
         }
-        // 1.16.5 has no server simulation distance (a 1.18 addition), so render distance stands in for the report.
+        // 1.10.2 has no server simulation distance (a 1.18 addition), so render distance stands in for the report.
         return new ReportEnvironment(brand, minecraft.gameSettings.renderDistanceChunks,
                 targetDimension.getName().toString(), Wdl.mcVersion(), bridge.modVersion());
     }

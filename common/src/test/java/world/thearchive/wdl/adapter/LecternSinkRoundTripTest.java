@@ -36,14 +36,14 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * neither a live menu nor a {@code World} is needed. The one client-coupled step (lifting the book from the live open
  * menu's slot 0) is not exercised headless, exactly as for containers.
  *
- * <p>At 1.12.2 the merge cases are disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag
+ * <p>At 1.10.2 the merge cases are disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag
  * can be built from a real producer here, and lectern-book capture is a documented limit at this band. The pure
  * {@link LecternSink#merge} keeps coverage through the re-pointed {@code ChunkFlushPlanTest} and
  * {@code AsyncSaveWriterTest} fold-wiring tests, which drive it against a stand-in carrier. {@code captureBook} needs
  * only a book item, so it still runs.
  */
 class LecternSinkRoundTripTest {
-    private static final String LECTERN_ABSENT = "lecterns absent at 1.12.2 (1.14 block entity, documented limit)";
+    private static final String LECTERN_ABSENT = "lecterns absent at 1.10.2 (1.14 block entity, documented limit)";
 
     private final LecternSink sink = new LecternSinkImpl();
 

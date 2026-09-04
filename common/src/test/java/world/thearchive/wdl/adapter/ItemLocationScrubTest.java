@@ -455,7 +455,7 @@ class ItemLocationScrubTest {
     @Test
     void scrubEntityBlanksPre1215HandAndArmorItems() {
         // A ListTag-shaped mob equipment: HandItems/ArmorItems lists of item NBT (empty slots are {}), a shape a
-        // modded or foreign server can still hand a 1.12.2 client. The generic name-agnostic NBTTagList walk must
+        // modded or foreign server can still hand a 1.10.2 client. The generic name-agnostic NBTTagList walk must
         // reach them, or a captured mob's held lodestone leaks its target.
         NBTTagCompound zombie = entity("Zombie");
         NBTTagList handItems = new NBTTagList();

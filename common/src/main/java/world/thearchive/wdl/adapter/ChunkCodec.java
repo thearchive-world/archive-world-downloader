@@ -13,7 +13,7 @@ import net.minecraft.world.chunk.Chunk;
  *
  * <p>The split is what lets the heavy serialize run off the render thread: {@link #capture} runs on the client main
  * thread (the live read must), and {@link #encode} runs later on the save writer thread over the detached snapshot. At
- * 1.15.2 the chunk biomes come from the static biome registry (pre-1.16 serialize needs no client registries), so
+ * 1.10.2 the chunk biomes come from the static biome registry (pre-1.16 serialize needs no client registries), so
  * neither step carries one. The capture step is client/level-coupled (it reads the light engine); the encode step is
  * pure and is what the headless round-trip exercises.
  */

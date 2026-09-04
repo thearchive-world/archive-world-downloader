@@ -17,7 +17,7 @@ import world.thearchive.wdl.core.WorldType;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The captured dimension is routed to a vanilla single-player folder by its TYPE. At 1.15.2 the dimension key IS the
+ * The captured dimension is routed to a vanilla single-player folder by its TYPE. At 1.10.2 the dimension key IS the
  * {@link DimensionType}, so a server whose level keys are non-standard (e.g. Multiverse's
  * {@code minecraft:worlds/2b2t/2b2t_1}) still lands in {@code ./region} / {@code DIM-1} / {@code DIM1} by the vanilla
  * type it carries rather than a nested folder.

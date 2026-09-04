@@ -25,7 +25,7 @@ buildscript {
 }
 
 // The non-Fabric jar for this deep band, a separate Gradle build beside the 8.14.5 root. This band
-// predates the Mojmap floor (no Mojang mappings exist for 1.12.2), so the toolchain reaches for classic MCP
+// predates the Mojmap floor (no Mojang mappings exist for 1.10.2), so the toolchain reaches for classic MCP
 // (searge intermediary plus the MCP project's community names) instead, exactly as common/build.gradle.kts does.
 // Unimined provisions the MCP-named Minecraft jar and the real Forge API natively, through its minecraftForge
 // loader block, and reobfuscates the shipped jar MCP -> searge natively (defaultRemapJar), so this island carries

@@ -356,7 +356,7 @@ final class EntityPacketCapture
 
     private void onSetEquipment(SPacketEntityEquipment packet) {
         if (tracks(packet.getEntityID())) {
-            // 1.12.2 sends one slot per packet, not the 1.16 slot/stack list.
+            // 1.10.2 sends one slot per packet, not the 1.16 slot/stack list.
             EntityEquipmentSlot slot = packet.getEquipmentSlot();
             recordEquipment(packet.getEntityID(), slot.ordinal(), new EquipmentEntry(slot, packet.getItemStack()));
         }

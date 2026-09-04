@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * Maps a captured dimension to the vanilla single-player dimension it is written under. At 1.12.2 the dimension key is
+ * Maps a captured dimension to the vanilla single-player dimension it is written under. At 1.10.2 the dimension key is
  * the {@link DimensionType} itself (the pre-1.16 model, before the level-key rework), so both the captured dimension
  * and the routed target are {@code DimensionType}s and every dimension a capture records is one of the three static
  * vanilla types.

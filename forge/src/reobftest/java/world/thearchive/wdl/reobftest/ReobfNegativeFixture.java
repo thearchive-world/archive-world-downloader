@@ -3,7 +3,7 @@
 
 package world.thearchive.wdl.reobftest;
 
-// Negative reobf fixture. Its literal is SRG-shaped but names no real 1.12.2 member; checkReobfNegative scans
+// Negative reobf fixture. Its literal is SRG-shaped but names no real 1.10.2 member; checkReobfNegative scans
 // this fixture's own class output for it and must fail the build when the pinned oracle rejects it. A gate
 // never seen to fire is not trusted.
 public final class ReobfNegativeFixture {

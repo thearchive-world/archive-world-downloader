@@ -17,7 +17,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Proves the Unimined-provisioned MCP 1.12.2 jar actually runs under the Java 8 target: the jar loads, its static
+ * Proves the Unimined-provisioned MCP 1.10.2 jar actually runs under the Java 8 target: the jar loads, its static
  * initializers run, and its classes bind the descriptors the compiled bytecode expects. A {@link NoClassDefFoundError}
  * or {@link NoSuchMethodError} here means the provision is wrong.
  */

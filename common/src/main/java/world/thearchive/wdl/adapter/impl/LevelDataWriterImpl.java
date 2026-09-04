@@ -35,7 +35,7 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.11.2 {@code level.dat} writer for the selected generator: the default superflat VOID (a single air layer over the
+ * 1.10.2 {@code level.dat} writer for the selected generator: the default superflat VOID (a single air layer over the
  * void biome), or the vanilla DEFAULT/FLAT presets. Pre-1.13 {@code level.dat} records only the generator name and its
  * options string, so no worldgen registries are reconstructed here. The captured chunks always supply the real terrain;
  * the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the server's
@@ -202,7 +202,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are the band-neutral curated keys; each maps to its 1.11.2 vanilla rule id here. A curated name
+    // The WDL names are the band-neutral curated keys; each maps to its 1.10.2 vanilla rule id here. A curated name
     // with no rule at this band (the wandering-trader, patrol, warden and vine-spread rules are all 1.14 and above) is
     // dropped at runtime, so this list is the superset.
     private static List<CuratedSpec> buildCuratedGameRules() {
@@ -227,7 +227,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         }
         WorldInfo worldInfo = data.worldData();
         worldInfo.setGameType(player.gameType());
-        // 1.12.2 setSpawn takes only a position; the spawn yaw has no level.dat field at this band.
+        // 1.10.2 setSpawn takes only a position; the spawn yaw has no level.dat field at this band.
         worldInfo.setSpawn(player.spawnPos());
         worldInfo.setDifficulty(player.difficulty());
         storage.saveWorldInfoWithPlayer(worldInfo, player.playerTag());
@@ -238,7 +238,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         if (!Files.exists(levelDatFile)) {
             return null;
         }
-        // 1.12.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
+        // 1.10.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(levelDatFile)) {
             NBTTagCompound root = CompressedStreamTools.readCompressed(input);
             if (!root.hasKey("Data", 10)) {

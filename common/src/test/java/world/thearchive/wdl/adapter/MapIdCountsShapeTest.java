@@ -33,12 +33,12 @@ class MapIdCountsShapeTest {
         byte[] raw = Files.readAllBytes(idcountsDat);
         // (a) uncompressed: not a gzip stream (gzip magic is 0x1f 0x8b)
         assertFalse(raw.length >= 2 && (raw[0] & 0xff) == 0x1f && (raw[1] & 0xff) == 0x8b,
-                "1.12.2 idcounts.dat must be uncompressed, not gzip");
+                "1.10.2 idcounts.dat must be uncompressed, not gzip");
         NBTTagCompound root = CompressedStreamTools.read(
                 new DataInputStream(new ByteArrayInputStream(raw)));
         // (b) root {map: short}, no data wrapper, no DataVersion
         assertEquals(2 /* TAG_Short */, root.getTagId("map"), "map must be a short at the root");
-        assertFalse(root.hasKey("data"), "1.12.2 idcounts has no data wrapper");
-        assertFalse(root.hasKey("DataVersion"), "1.12.2 idcounts has no DataVersion");
+        assertFalse(root.hasKey("data"), "1.10.2 idcounts has no data wrapper");
+        assertFalse(root.hasKey("DataVersion"), "1.10.2 idcounts has no DataVersion");
     }
 }

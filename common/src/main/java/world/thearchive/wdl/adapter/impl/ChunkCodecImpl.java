@@ -41,7 +41,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
     private static final int BLOCKS_BYTES = 4096;
     private static final int SECTION_LAYER_BYTES = 2048;
 
-    // The 1.11.2 block-section column is 0..15. A client only ever holds sections in that range, so a section index
+    // The 1.10.2 block-section column is 0..15. A client only ever holds sections in that range, so a section index
     // outside it cannot occur; the encode bound is a defensive guard on the pure surface.
     private static final int MIN_BLOCK_SECTION = 0;
     private static final int MAX_BLOCK_SECTION = 15;
@@ -163,9 +163,9 @@ public final class ChunkCodecImpl implements ChunkCodec {
     }
 
     /**
-     * The per-chunk biome ids for the 1.12.2 column: {@code chunk.getBiomeArray()} widened to {@code int}, matching
+     * The per-chunk biome ids for the 1.10.2 column: {@code chunk.getBiomeArray()} widened to {@code int}, matching
      * vanilla {@code AnvilChunkLoader}, which stores the same {@code byte[256]} verbatim under the {@code "Biomes"} key
-     * a 1.12.2 client reads back. Widened (rather than narrowed) here so the shared {@link ChunkSnapshotSource} keeps
+     * a 1.10.2 client reads back. Widened (rather than narrowed) here so the shared {@link ChunkSnapshotSource} keeps
      * one {@code int[]} biome shape across bands; {@link #encode} narrows it back down for the on-disk key.
      */
     private static int[] columnBiomes(Chunk chunk) {

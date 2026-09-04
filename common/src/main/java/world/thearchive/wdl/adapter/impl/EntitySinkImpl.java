@@ -25,7 +25,7 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.EntitySink;
 
 /**
- * 1.11.2 entity sink: a client-safe per-entity serialize ({@code Entity.writeToNBTOptional}), the write half of what
+ * 1.10.2 entity sink: a client-safe per-entity serialize ({@code Entity.writeToNBTOptional}), the write half of what
  * vanilla's {@code AnvilChunkLoader} folds into a chunk's {@code Level.Entities}. There is no separate
  * {@code entities/} region at this band (that is 1.17 and above), so the writer folds this sink's carrier into the
  * region chunk.
@@ -36,7 +36,7 @@ import world.thearchive.wdl.adapter.EntitySink;
  * gate-bypassing vehicle serialize.
  */
 public final class EntitySinkImpl implements EntitySink {
-    // 1.12.2 has no Entity.shouldBeSaved(); reproduce its predicate from the primitives it composes: a dead,
+    // 1.10.2 has no Entity.shouldBeSaved(); reproduce its predicate from the primitives it composes: a dead,
     // riding, or single-player-vehicle entity is not written standalone. writeToNBTOptional then repeats the
     // dead/riding half and additionally refuses an entity with no id string (a player), the encode-id gate.
     private static boolean shouldSaveEntity(Entity entity) {

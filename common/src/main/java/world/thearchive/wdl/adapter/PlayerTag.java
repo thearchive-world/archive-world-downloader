@@ -34,7 +34,7 @@ final class PlayerTag {
 
     /**
      * Apply the strip opt-out to {@code raw}: when {@code saveInventory} is false, drop {@code "Inventory"} and
-     * {@code "SelectedItemSlot"}. At 1.12.2 the 36-slot main inventory, the 4-slot armor and the offhand slot are all
+     * {@code "SelectedItemSlot"}. At 1.10.2 the 36-slot main inventory, the 4-slot armor and the offhand slot are all
      * written into the single {@code "Inventory"} list (there is no separate equipment compound), so dropping that one
      * key already strips armor and offhand too; when {@code saveEnderChest} is false, drop {@code "EnderItems"}. Each
      * removal leaves a tag vanilla loads (every dropped key is optional).
@@ -51,7 +51,7 @@ final class PlayerTag {
 
     /**
      * Unconditional privacy strip: remove both coordinate-bearing real-world location fields. Neither key exists in a
-     * 1.12.2 player tag (the last death location is a 1.19 addition and the explosion-impact position a 1.21 addition),
+     * 1.10.2 player tag (the last death location is a 1.19 addition and the explosion-impact position a 1.21 addition),
      * so this is a harmless no-op kept for signature parity with the shared caller.
      */
     static void stripDeathLocation(NBTTagCompound raw) {

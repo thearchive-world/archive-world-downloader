@@ -34,7 +34,7 @@ public final class BlockEntityFixtures {
 
     /**
      * As {@link #blockEntity} for a block entity the player renamed, so a merge can be shown to leave a real sibling
-     * field alone. At 1.12.2 only a {@link net.minecraft.tileentity.TileEntityLockableLoot} (a chest and the like)
+     * field alone. At 1.10.2 only a {@link net.minecraft.tileentity.TileEntityLockableLoot} (a chest and the like)
      * carries an arbitrary name; the raw {@code "CustomName"} JSON key written here is exactly what its
      * {@code setCustomName} would write, so the fidelity round trip still passes for one.
      */

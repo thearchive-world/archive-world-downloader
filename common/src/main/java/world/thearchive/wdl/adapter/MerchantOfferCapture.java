@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@link #serialize} builds the {@code {Offers:{Recipes:[...]}}} holder from the trade list's own NBT write. The
  * {@code "Xp"} trade-experience tag a newer band writes is omitted here: trade experience is a 1.14 addition absent at
- * 1.13.2, and this band's villager save carries no such tag. {@link #scrubAndRemapOffers} walks each offer's
+ * 1.10.2, and this band's villager save carries no such tag. {@link #scrubAndRemapOffers} walks each offer's
  * {@code sell} item, the only full item stack an offer carries, through the item-location scrub and the map-id remap
  * every captured item takes; the {@code buy}/{@code buyB} costs are match predicates, not instance data, so they carry
  * no coordinate or map id and are left alone.

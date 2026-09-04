@@ -17,7 +17,7 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The 1.15.2 world-output writes: the curated safe game rules and the world-open state land in the level.dat Data tag.
+ * The 1.10.2 world-output writes: the curated safe game rules and the world-open state land in the level.dat Data tag.
  * Noon and clear weather are fixed invariants applied regardless of the world-defaults master, the game-rule master
  * gates the curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it
  * against the real {@code GameRules}.
@@ -53,7 +53,7 @@ class LevelDatWorldOutputTest {
         return WorldOutputConfig.parse(properties);
     }
 
-    // At 1.15.2 the generator seed and structure toggle live directly in the Data tag (RandomSeed, MapFeatures),
+    // At 1.10.2 the generator seed and structure toggle live directly in the Data tag (RandomSeed, MapFeatures),
     // not in a WorldGenSettings compound (that is 1.16 and later).
     private NBTTagCompound worldGenTag(LevelDataWriter.LevelData built) {
         return dataTag(built);

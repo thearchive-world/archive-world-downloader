@@ -80,7 +80,7 @@ class ChunkMergeTest {
     }
 
     private static NBTTagCompound jukeboxWithDisc(int x, int y, int z, String discId) {
-        // At 1.18.2 JukeboxBlockEntity.saveAdditional writes only RecordItem, and only when a disc is present; the
+        // At 1.10.2 TileEntityJukebox.writeToNBT writes only RecordItem, and only when a disc is present; the
         // IsPlaying and tick sidecars are 1.19 additions.
         NBTTagCompound blockEntity = jukebox(x, y, z);
         blockEntity.setTag("RecordItem", ItemFixtures.itemTag(discId));

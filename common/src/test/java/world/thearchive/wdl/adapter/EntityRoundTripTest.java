@@ -32,7 +32,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * ({@link EntitySink#encodeChunk(List, ChunkPos)} over already-serialized entity tags) folded into a {@code region/}
  * chunk under {@code Level.Entities} through {@link RegionChunkWriter#foldEntitiesIntoRegion} is a self-consistent,
  * vanilla-valid Anvil round-trip: the {@code Entities} list survives inside the host chunk with each entity's
- * {@code id}. At 1.16.5 there is no separate {@code entities/} region (that is 1.17 and above); entities live in the
+ * {@code id}. At 1.10.2 there is no separate {@code entities/} region (that is 1.17 and above); entities live in the
  * chunk itself.
  *
  * <p>Server-free by construction: hand-built entity tags drive the carrier, so neither a live {@code Entity} nor a
@@ -137,6 +137,6 @@ class EntityRoundTripTest {
         assertTrue(Files.exists(regionDirectory.resolve("r.1.0.mca")), "(32,0) -> region 1,0");
         assertTrue(Files.exists(regionDirectory.resolve("r.0.1.mca")), "(0,32) -> region 0,1");
         assertTrue(Files.exists(regionDirectory.resolve("r.-1.-1.mca")), "(-1,-1) -> region -1,-1");
-        assertFalse(Files.isDirectory(save.resolve("entities")), "no separate entities/ region is written at 1.16.5");
+        assertFalse(Files.isDirectory(save.resolve("entities")), "no separate entities/ region is written at 1.10.2");
     }
 }

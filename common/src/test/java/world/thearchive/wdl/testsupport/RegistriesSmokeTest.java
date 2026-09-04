@@ -56,7 +56,7 @@ class RegistriesSmokeTest {
         assertSame(Blocks.STONE, Block.REGISTRY.getObject(stoneId));
         assertEquals(stoneId, Block.REGISTRY.getNameForObject(Blocks.STONE));
 
-        // Pin the Block class mapping on a block that is a plain Block at 1.12.2. minecraft:stone is not (BlockStone,
+        // Pin the Block class mapping on a block that is a plain Block at 1.10.2. minecraft:stone is not (BlockStone,
         // pre-Flattening host of the granite/diorite metadata variants), so minecraft:cobblestone carries the
         // exact-class check: it is registered as a bare new Block(Material.ROCK).
         assertSame(Block.class, Block.REGISTRY.getObject(new ResourceLocation("minecraft", "cobblestone")).getClass());

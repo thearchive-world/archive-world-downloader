@@ -27,7 +27,7 @@ import world.thearchive.wdl.core.AtomicFileWrite;
  * {@code DataVersion}, the exact bytes vanilla's {@code MapStorage.getUniqueDataId}/{@code loadIdCounts} write and
  * read. The write ({@link #writeIdCounts}), the read ({@link #readIdCounts}) and the serialize
  * ({@link #serializeIdCounts}) are branched together: a write-only branch would leave {@code readIdCounts} expecting
- * the parent band's gzip {@code {data:{map:int}}} envelope, throwing on the 1.12.2 file, restarting the id floor and
+ * the 1.13-and-above gzip {@code {data:{map:int}}} envelope, throwing on the 1.10.2 file, restarting the id floor and
  * overwriting archived map data.
  */
 final class MapDataWriter {
@@ -82,7 +82,7 @@ final class MapDataWriter {
      * has no manifest to persist the id floor across a resume, so it reconstructs the floor from this file (the only
      * durable record of an imageless id that sits above the highest imaged {@code map_<n>.dat}). Reads the same
      * UNCOMPRESSED root {@code {map: short}} {@link #writeIdCounts} writes, branched in lockstep with the write so the
-     * resume read never faults on the 1.12.2 file.
+     * resume read never faults on the 1.10.2 file.
      */
     public static int readIdCounts(Path dataDirectory) throws IOException {
         Path file = dataDirectory.resolve(ID_COUNTS_KEY + ".dat");

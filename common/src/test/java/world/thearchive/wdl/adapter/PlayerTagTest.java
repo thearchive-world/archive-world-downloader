@@ -27,7 +27,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for the band-agnostic {@link PlayerTag} operations on an already-serialized player tag: the strip
  * knob (drop {@code Inventory}/{@code SelectedItemSlot}, which at this band also carries the armor and offhand slots),
- * the death-location strip (a harmless no-op here; neither key exists in a 1.12.2 player tag), the {@code Dimension}
+ * the death-location strip (a harmless no-op here; neither key exists in a 1.10.2 player tag), the {@code Dimension}
  * write and the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure
  * NBT, so it round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
  */
@@ -79,7 +79,7 @@ class PlayerTagTest {
 
     @Test
     void stripDeathLocationIsNoOpAtThisBand() {
-        // Neither key exists in a 1.12.2 player tag (LastDeathLocation is 1.19, current_explosion_impact_pos is
+        // Neither key exists in a 1.10.2 player tag (LastDeathLocation is 1.19, current_explosion_impact_pos is
         // 1.21), so the strip has nothing to remove and the rest of the tag is untouched either way.
         NBTTagCompound tag = playerTag();
 

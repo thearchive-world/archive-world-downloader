@@ -92,7 +92,7 @@ class LecternRecaptureSynergyTest {
     }
 
     @Test
-    @Disabled("lecterns are a 1.14 block entity, absent at 1.12.2; a re-captured lectern block entity cannot be built "
+    @Disabled("lecterns are a 1.14 block entity, absent at 1.10.2; a re-captured lectern block entity cannot be built "
             + "here, so this synergy is a documented limit at this band")
     void reCapturingThePlacedLecternLetsTheStashMergeOntoIt() {
         // After re-capture the chunk's block entities include the placed lectern, so the merge lands.
@@ -111,7 +111,7 @@ class LecternRecaptureSynergyTest {
     }
 
     @Test
-    @Disabled("lecterns are a 1.14 block entity, absent at 1.12.2; a re-captured lectern block entity cannot be built "
+    @Disabled("lecterns are a 1.14 block entity, absent at 1.10.2; a re-captured lectern block entity cannot be built "
             + "here, so this synergy is a documented limit at this band")
     void repeatedRecaptureBeforeFlushMergesContentsExactlyOnce() {
         // Re-capture re-encodes the chunk many times while it is hot; each fresh tag carries the (book-less)

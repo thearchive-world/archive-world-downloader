@@ -37,12 +37,12 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * the wrong block's book corrupts the archive), so it is proven headless with hand-built chunk tags (no live client, no
  * {@code Level}).
  *
- * <p>Disabled at 1.13.2: lecterns are a 1.14 block entity, so no captured lectern block-entity tag can be built here,
+ * <p>Disabled at 1.10.2: lecterns are a 1.14 block entity, so no captured lectern block-entity tag can be built here,
  * and lectern-book capture is a documented limit at this band. {@link ContainerMerge#mergeLecternChunkStash} keeps
  * coverage through the re-pointed {@code ChunkFlushPlanTest} and {@code OrphanedContainerSweepTest}, which drive it
  * against a stand-in carrier.
  */
-@Disabled("lecterns are a 1.14 block entity, absent at 1.13.2; the save-time lectern-book injection is a documented "
+@Disabled("lecterns are a 1.14 block entity, absent at 1.10.2; the save-time lectern-book injection is a documented "
         + "limit with no valid fixture here")
 class LecternStashMergeTest {
     private final LecternSink sink = new LecternSinkImpl();

@@ -58,7 +58,7 @@ class MapArchiveTest {
         NBTTagCompound data = new NBTTagCompound();
         data.setTag("colors", new NBTTagByteArray(colors));
         data.setByte("scale", (byte) scale);
-        data.setInteger("dimension", dimension.getId()); // at 1.15.2 vanilla writes the map dimension as an int id
+        data.setInteger("dimension", dimension.getId()); // at 1.10.2 vanilla writes the map dimension as an int id
         data.setBoolean("locked", locked);
         data.setInteger("xCenter", 0);
         data.setInteger("zCenter", 0);
