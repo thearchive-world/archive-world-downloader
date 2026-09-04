@@ -12,7 +12,6 @@ import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.EntityMinecartEmpty;
-import net.minecraft.entity.passive.AbstractHorse;
 import net.minecraft.entity.passive.EntityHorse;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.IInventory;
@@ -158,9 +157,9 @@ class SaddleCaptureTest {
      * private field is reached directly; the assertion it backs is what stops the fixture from letting vanilla's own
      * writer emit the key.
      */
-    private static boolean saddleSlotIsEmpty(AbstractHorse horse) {
+    private static boolean saddleSlotIsEmpty(EntityHorse horse) {
         try {
-            Field field = AbstractHorse.class.getDeclaredField("horseChest");
+            Field field = EntityHorse.class.getDeclaredField("horseChest");
             field.setAccessible(true);
             return ((IInventory) field.get(horse)).getStackInSlot(0) == null;
         } catch (ReflectiveOperationException e) {

@@ -429,14 +429,14 @@ class ContainerAssociationTest {
                 "a vehicle intent with no container vehicle anywhere -> NO CLAIM");
     }
 
-    // --- openChestedAnimal: the chested-animal sibling. A donkey/mule/llama is recognized by the player
-    // looking at (or riding) an AbstractChestedHorse whose own chest size matches the menu's CHEST-slot count.
-    // Like the entity sibling there is no block pos: the bind target (the entity UUID) lives in the adapter, so
-    // this returns a plain bound/dropped flag and boundPos() carries only the "a menu is bound" signal. It earns
-    // its own kind (not ENTITY) because the chest-only lift differs from captureBlockSlots and the stash
-    // dispatches by kind. The chest size is the live size (getInventoryColumns()*3), so a 15-slot donkey and a
-    // 3-slot strength-1 llama both bind; the slot-count match is the mis-bind guard.
-    private static final int DONKEY_CHEST = 15; // 5 columns * 3 rows: a donkey/mule, and a max-strength llama
+    // --- openChestedAnimal: the chested-animal sibling. A donkey or mule is recognized by the player looking at
+    // (or riding) a chested mount whose own chest size matches the menu's CHEST-slot count. Like the entity
+    // sibling there is no block pos: the bind target (the entity UUID) lives in the adapter, so this returns a
+    // plain bound/dropped flag and boundPos() carries only the "a menu is bound" signal. It earns its own kind
+    // (not ENTITY) because the chest-only lift differs from captureBlockSlots and the stash dispatches by kind.
+    // The chest size is the mount's own live size rather than a constant, so any chest a band gives a mount
+    // binds; the slot-count match is the mis-bind guard.
+    private static final int DONKEY_CHEST = 15; // 5 columns * 3 rows, the chest a donkey or mule carries
 
     /** A normal chested-animal open: at a chested animal whose chest size matches the menu's chest slots -> BIND. */
     @Test
@@ -451,13 +451,13 @@ class ContainerAssociationTest {
                 "the bind kind is CHESTED_ANIMAL");
     }
 
-    /** Binding is size-agnostic across the llama strengths: a strength-1 llama has a 3-slot chest. */
+    /** Binding reads the size off the mount rather than knowing one, so a chest of any size binds to its match. */
     @Test
-    void chestedAnimalBindsForWeakLlamaSize() {
+    void chestedAnimalBindsForAChestSmallerThanTheDonkeys() {
         ContainerAssociation assoc = new ContainerAssociation();
 
         assertTrue(assoc.openChestedAnimal(true, true, 3, 3),
-                "a strength-1 llama (3 chest slots) binds when the menu has 3 chest slots");
+                "a three-slot mount chest binds when the menu has three chest slots");
         assertEquals(ContainerAssociation.BindKind.CHESTED_ANIMAL, assoc.boundKind());
     }
 
@@ -477,7 +477,7 @@ class ContainerAssociationTest {
         ContainerAssociation assoc = new ContainerAssociation();
 
         assertFalse(assoc.openChestedAnimal(true, false, DONKEY_CHEST, DONKEY_CHEST),
-                "an entity that is not an AbstractChestedHorse must not bind -> DROP");
+                "an entity that is not a chested mount must not bind -> DROP");
         assertFalse(assoc.boundPos().isPresent());
     }
 

@@ -12,17 +12,14 @@ import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Field;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.EntityMinecartEmpty;
-import net.minecraft.entity.passive.AbstractHorse;
 import net.minecraft.entity.passive.EntityHorse;
 import net.minecraft.entity.passive.HorseArmorType;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.IInventory;
-import net.minecraft.item.EnumDyeColor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.network.datasync.DataParameter;
 import net.minecraft.util.math.ChunkPos;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -33,15 +30,13 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the mount slot-1 write: a horse's armor and a llama's carpet. Both are real stacks in the
- * mount's own inventory slot 1, a container the server never sends, so vanilla's writer finds the slot empty and both
- * mounts archive bare.
+ * The automated guard for the mount slot-1 write: a horse's armor. It is a real stack in the mount's own inventory slot
+ * 1, a container the server never sends, so vanilla's writer finds the slot empty and an armored mount archives bare.
  *
  * <p>Every fixture leaves that slot EMPTY and reaches the synced source instead, and that is the whole point: a mount
- * armored or carpeted the ordinary way carries the key from vanilla's own writer, so a slot-1 fixture would pass with
- * this class's production code deleted. Live-entity tests drive {@code encodeChunk} and {@code captureRootVehicle}, so
- * removing either call site in {@link EntitySinkImpl} reddens one of them; the tag-level tests pin the on-disk
- * contract.
+ * armored the ordinary way carries the key from vanilla's own writer, so a slot-1 fixture would pass with this class's
+ * production code deleted. Live-entity tests drive {@code encodeChunk} and {@code captureRootVehicle}, so removing
+ * either call site in {@link EntitySinkImpl} reddens one of them; the tag-level tests pin the on-disk contract.
  */
 class MountArmorCaptureTest {
     private final EntitySink sink = new EntitySinkImpl();
@@ -83,54 +78,6 @@ class MountArmorCaptureTest {
         assertFalse(saved.hasKey("ArmorItem"), "a bare horse must not be given armor it never wore");
     }
 
-    @Test
-    void aCarpetedLlamaIsWrittenWithThePlainCarpetOfItsSyncedColor() {
-        EntityLlama llama = carpetedLlama(EnumDyeColor.RED);
-
-        NBTTagCompound saved = onlyEntityOf(
-                sink.encodeChunk(ImmutableList.<Entity>of(llama), new ChunkPos(0, 0), false));
-
-        assertTrue(saved.hasKey("DecorItem", 10),
-                "a llama the client sees carpeted must reach disk carrying the key vanilla reads its carpet from");
-        NBTTagCompound decor = saved.getCompoundTag("DecorItem");
-        assertEquals("minecraft:carpet", decor.getString("id"),
-                "this band has one carpet item, the color riding in its damage value");
-        assertEquals(EnumDyeColor.RED.getMetadata(), decor.getShort("Damage"),
-                "the color is the one thing the client is told, so it must be right");
-        ItemStack loaded = new ItemStack(decor);
-        assertEquals(1, loaded.getCount(), "one carpet, the stack a llama wears");
-        assertFalse(loaded.hasTagCompound(),
-                "a plain carpet: the synced color is all the write has, so nothing more may be invented");
-    }
-
-    @Test
-    void aBareLlamaIsWrittenWithoutAnyCarpet() {
-        EntityLlama llama = new EntityLlama(HeadlessLevel.get());
-        assertTrue(llama.getColor() == null, "precondition: the client sees this llama wearing nothing");
-
-        NBTTagCompound saved = onlyEntityOf(
-                sink.encodeChunk(ImmutableList.<Entity>of(llama), new ChunkPos(0, 0), false));
-
-        assertFalse(saved.hasKey("DecorItem"), "a bare llama must not be given a carpet it never wore");
-    }
-
-    /**
-     * This band needs no reverse table, the synced value being the carpet's own damage value, so what is checked here
-     * is that all sixteen colors round-trip to sixteen distinct damage values rather than collapsing.
-     */
-    @Test
-    void everyDyeColorWritesTheCarpetOfItsOwnDamageValue() {
-        for (EnumDyeColor color : EnumDyeColor.values()) {
-            NBTTagCompound saved = onlyEntityOf(
-                    sink.encodeChunk(ImmutableList.<Entity>of(carpetedLlama(color)), new ChunkPos(0, 0), false));
-
-            NBTTagCompound decor = saved.getCompoundTag("DecorItem");
-            assertEquals("minecraft:carpet", decor.getString("id"), "every color writes the one carpet item");
-            assertEquals(color.getMetadata(), decor.getShort("Damage"),
-                    "the carpet written for " + color.getName() + " must carry that color's own damage value");
-        }
-    }
-
     /**
      * A mount riding something else reaches disk only as a nested compound, because the entities path refuses a
      * passenger its own entry. A plain minecart picks up a parked mount with no size gate, which is the ordinary way
@@ -157,11 +104,11 @@ class MountArmorCaptureTest {
      * serialize, so the write has to be on both paths or the most ordinary case of all archives bare.
      */
     @Test
-    void aCarpetedMountIsWrittenCarpetedOnTheRootVehiclePath() {
-        NBTTagCompound saved = sink.captureRootVehicle(carpetedLlama(EnumDyeColor.PURPLE), false);
+    void anArmoredMountIsWrittenArmoredOnTheRootVehiclePath() {
+        NBTTagCompound saved = sink.captureRootVehicle(armoredHorse(new ItemStack(Items.IRON_HORSE_ARMOR)), false);
 
         assertNotNull(saved, "precondition: the mount is serialized at all");
-        assertTrue(saved.hasKey("DecorItem", 10),
+        assertTrue(saved.hasKey("ArmorItem", 10),
                 "the ridden-mount path must write slot 1 too, not only the entities path");
     }
 
@@ -233,44 +180,18 @@ class MountArmorCaptureTest {
         return horse;
     }
 
-    /** A real llama in the exact state a client holds: the synced dye color set, inventory slot 1 still empty. */
-    private static EntityLlama carpetedLlama(EnumDyeColor color) {
-        EntityLlama llama = new EntityLlama(HeadlessLevel.get());
-        llama.getDataManager().set(colorId(), color.getMetadata());
-        assertEquals(color, llama.getColor(), "fixture: the client must see this llama wearing that color");
-        assertTrue(mountSlotOneIsEmpty(llama),
-                "fixture: slot 1 must stay empty, or vanilla writes the key itself and the test proves nothing");
-        return llama;
-    }
-
     /**
      * Whether the mount's own inventory slot 1 is empty. This band exposes no public reader for that container, so the
      * private field is reached directly; the assertion it backs is what stops the fixture from letting vanilla's own
      * writer emit the key.
      */
-    private static boolean mountSlotOneIsEmpty(AbstractHorse mount) {
+    private static boolean mountSlotOneIsEmpty(EntityHorse mount) {
         try {
-            Field field = AbstractHorse.class.getDeclaredField("horseChest");
+            Field field = EntityHorse.class.getDeclaredField("horseChest");
             field.setAccessible(true);
             return ((IInventory) field.get(mount)).getStackInSlot(1) == null;
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("could not reach the mount inventory", e);
-        }
-    }
-
-    /**
-     * The synced carpet-color accessor, reached by reflection because it is private and every public route to it runs
-     * through inventory slot 1. The same shape {@code SaddleCaptureTest} uses to reach the mount inventory.
-     */
-    private static DataParameter<Integer> colorId() {
-        try {
-            Field field = EntityLlama.class.getDeclaredField("DATA_COLOR_ID");
-            field.setAccessible(true);
-            @SuppressWarnings("unchecked")
-            DataParameter<Integer> color = (DataParameter<Integer>) field.get(null);
-            return color;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("could not reach the synced carpet color", e);
         }
     }
 }

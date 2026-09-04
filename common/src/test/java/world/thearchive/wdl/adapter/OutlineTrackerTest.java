@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test;
 class OutlineTrackerTest {
     @Test
     void chestedRimBoxCapsTopToChestHeightKeepingFootprint() {
-        AxisAlignedBB llamaBox = new AxisAlignedBB(10.0, 64.0, -5.0, 10.9, 65.87, -4.1);
+        AxisAlignedBB mountBox = new AxisAlignedBB(10.0, 64.0, -5.0, 10.9, 65.87, -4.1);
 
-        AxisAlignedBB rim = OutlineTracker.chestedRimBox(llamaBox);
+        AxisAlignedBB rim = OutlineTracker.chestedRimBox(mountBox);
 
         assertEquals(10.0, rim.minX, 1.0e-9);
         assertEquals(10.9, rim.maxX, 1.0e-9);

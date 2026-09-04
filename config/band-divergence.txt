@@ -227,6 +227,19 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest
 # describes is EntityList.getEntityString reading CLASS_TO_NAME by exact runtime class.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 
+# Below 1.11 the horse family is one EntityHorse with no AbstractHorse supertype, so the mount inventory is reached
+# off EntityHorse's own private horseChest field, and there is no llama: the three carpet cases
+# (aCarpetedLlamaIsWrittenWithThePlainCarpetOfItsSyncedColor, aBareLlamaIsWrittenWithoutAnyCarpet and
+# everyDyeColorWritesTheCarpetOfItsOwnDamageValue) are deliberately dropped rather than repointed, their subject
+# being the DecorItem carpet write, which has no producer at this band. The root-vehicle case is band-general and is
+# repointed onto an armored horse rather than dropped with them. Ten methods at the parent, seven here.
+common/src/test/java/world/thearchive/wdl/adapter/impl/MountArmorCaptureTest.java
+
+# Below 1.11 there is no AbstractHorse supertype, so the saddle-slot probe reaches EntityHorse's own private
+# horseChest field, and the read-back of the written SaddleItem is ItemStack.loadItemStackFromNBT rather than the
+# 1.11 NBT constructor.
+common/src/test/java/world/thearchive/wdl/adapter/impl/SaddleCaptureTest.java
+
 # Below the 1.21 update the HUD render callback carries a float partial-tick rather than a DeltaTracker, so the
 # shared overlay's render entry point takes a float on this band.
 # Below 1.13 there is no Mojang mapping, so the overlay names the classic client types: FontRenderer, KeyBinding,
