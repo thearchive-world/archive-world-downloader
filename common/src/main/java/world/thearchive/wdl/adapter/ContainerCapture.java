@@ -343,8 +343,9 @@ final class ContainerCapture {
      * Serialize only the chest slots of an open chested-animal menu (the non-player slots from
      * {@link #SLOT_INVENTORY_START}) into an {@code "Items"} holder via the per-band {@link ContainerSink}, or
      * {@code null} when the menu exposes no chest slots this tick (a chestless animal). Distinct from
-     * {@link #captureBlockSlots}: the chest is numbered 0-based in MENU ORDER, which is what makes the lift
-     * band-agnostic. Kept separate on purpose.
+     * {@link #captureBlockSlots}: a mount has no chest inventory of its own at this band, so the slots are numbered
+     * into the whole mount inventory from {@link #SLOT_INVENTORY_START} rather than from zero. Kept separate on
+     * purpose.
      */
     @Nullable
     NBTTagCompound captureChestSlots(Container menu, EntityPlayerSP player) {
@@ -353,17 +354,18 @@ final class ContainerCapture {
         for (int i = SLOT_INVENTORY_START; i < menu.inventorySlots.size(); i++) {
             Slot slot = menu.inventorySlots.get(i);
             if (slot.inventory != playerInventory) {
-                // The 0-based menu-order index here is the chest-relative Items slot; it absorbs the leading
-                // saddle/body slots and keeps the chest from shifting. Do not fold this into captureBlockSlots.
                 chest.add(slot.getStack());
             }
         }
         if (chest.isEmpty()) {
             return null; // bound but no chest slots this tick; nothing to capture
         }
-        NonNullList<ItemStack> items = NonNullList.withSize(chest.size(), ItemStack.EMPTY);
+        // Offset into vanilla's own numbering: a mount's chest shares one inventory with the saddle and armor
+        // slots, and its read drops any saved entry below SLOT_INVENTORY_START. A zero-based holder therefore loses
+        // its first two stacks and shifts the rest, with no log line and no loss-report row.
+        NonNullList<ItemStack> items = NonNullList.withSize(SLOT_INVENTORY_START + chest.size(), ItemStack.EMPTY);
         for (int i = 0; i < chest.size(); i++) {
-            items.set(i, chest.get(i));
+            items.set(SLOT_INVENTORY_START + i, chest.get(i));
         }
         return adapter.containerSink().captureItems(items);
     }
