@@ -844,17 +844,52 @@ val checkReobfNegative = tasks.register<CheckSeargeSurface>("checkReobfNegative"
 // useDependencyInformation, which this mod does not). An annotation value must be a compile-time constant, so the
 // literal cannot read the property and the duplication is structural. Without this gate a bumped property changes
 // nothing the loader sees, silently.
+//
+// A floor off another band's Forge line agrees with forge_version_min and still loads for nobody, so the floor is
+// also ordered against forge_version, the build this island provisions, and pinned to its leading component.
+// Forge's leading component tracks the Minecraft band, 13 here against 12 at 1.10.2 and 14 at 1.12.2, and nothing
+// else in the build relates the two coordinates.
 val checkForgeFloor = tasks.register("checkForgeFloor") {
     group = "verification"
-    description = "Fails if WdlForge's @Mod dependencies floor does not match forge_version_min"
+    description = "Fails if WdlForge's @Mod dependencies floor does not match forge_version_min or outruns forge_version"
     // Captured by value at configuration time, like checkPlugBand's own locals, so no Project reference survives
     // into task execution.
     val forgeVersionMin = band("forge_version_min")
+    val forgeVersion = band("forge_version")
     val entrypointSource = layout.projectDirectory
         .file("src/main/java/world/thearchive/wdl/forge/WdlForge.java")
     inputs.property("forgeVersionMin", forgeVersionMin)
+    inputs.property("forgeVersion", forgeVersion)
     inputs.file(entrypointSource)
     doLast {
+        fun numericParts(key: String, value: String): List<Int> =
+            value.split('.').map { part ->
+                part.toIntOrNull()
+                    ?: throw GradleException(
+                        "$key is \"$value\", which is not a dotted numeric Forge version, so the declared floor "
+                            + "cannot be ordered against the build this island provisions"
+                    )
+            }
+        val minParts = numericParts("forge_version_min", forgeVersionMin)
+        val provisionedParts = numericParts("forge_version", forgeVersion)
+        if (minParts.first() != provisionedParts.first()) {
+            throw GradleException(
+                "Forge line mismatch: forge_version_min is $forgeVersionMin but this island provisions Forge "
+                    + "$forgeVersion. Forge's leading component tracks the Minecraft band, so a floor off another "
+                    + "band's line is one no build of this band's line satisfies, and every user gets "
+                    + "MissingModsException."
+            )
+        }
+        val floorOrdering = (0 until maxOf(minParts.size, provisionedParts.size))
+            .map { i -> minParts.getOrElse(i) { 0 }.compareTo(provisionedParts.getOrElse(i) { 0 }) }
+            .firstOrNull { it != 0 } ?: 0
+        if (floorOrdering > 0) {
+            throw GradleException(
+                "Forge floor above the provisioned build: forge_version_min is $forgeVersionMin but this island "
+                    + "provisions and ships against Forge $forgeVersion, so the jar demands a build newer than the "
+                    + "one it was compiled against, and every user gets MissingModsException."
+            )
+        }
         val declared = Regex("""required-after:forge@\[([^,\]]+),""")
             .find(entrypointSource.asFile.readText())?.groupValues?.get(1)
             ?: throw GradleException(
