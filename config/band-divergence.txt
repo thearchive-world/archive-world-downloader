@@ -88,6 +88,11 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # id would otherwise misplace the export zip). Below 1.20.2 ClientPacketListener has no serverBrand, so the
 # report environment reads the server brand through LocalPlayer.getServerBrand(). Below 1.20 Entity.level is a
 # public field rather than the level() accessor, so the camera-anchor level guard reads camera.level directly.
+# Below 1.14 LevelChunk exposes no isUnsaved reader, so the dirty poll stands in the should-save query
+# method_3893(false) and the re-arm stamps the chunk's last save time alongside setUnsaved(false). That query's
+# entity arm compares the world's game time against a last save time nothing writes on a client, so without the
+# stamp it is permanently satisfied and the poll re-flags every entity-bearing chunk on every tick; the stamp bounds
+# the residual to one re-encode per entity-bearing chunk per 600 ticks.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # New here and on every other band below 1.14, on none above: from 1.14 up the chunk exposes an isUnsaved reader, so
