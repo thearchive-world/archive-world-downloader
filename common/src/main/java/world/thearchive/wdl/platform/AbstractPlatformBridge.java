@@ -31,6 +31,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
 
+import world.thearchive.wdl.adapter.impl.RenderSurfaceImpl;
 import world.thearchive.wdl.compat.flashback.FlashbackReplayProbe;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
@@ -278,8 +279,8 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         }
         GuiButton primary = new WdlMenuButton(x, y, width - 24, 20, I18n.format(primaryLabelKey.get()), onPrimary);
         primary.enabled = primaryEnabled.getAsBoolean();
-        // This band's button carries no hover-tooltip parameter, so the settings button has no hover label.
-        GuiButton config = new WdlMenuButton(x + width - 20, y, 20, 20, "...", onConfig);
+        GuiButton config = new WdlMenuButton(x + width - 20, y, 20, 20, "...", onConfig,
+                "wdl.pause.settings.tooltip");
         lastPrimary = primary;
         return ImmutableList.of(primary, config);
     }
@@ -319,10 +320,27 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         // switch never claims a click on this row; the press is dispatched by the loader's action-performed hook.
         private static final int ID = 0x77646C01;
         private final Runnable action;
+        private final @Nullable String tooltipKey;
 
         public WdlMenuButton(int x, int y, int width, int height, String label, Runnable action) {
+            this(x, y, width, height, label, action, null);
+        }
+
+        public WdlMenuButton(int x, int y, int width, int height, String label, Runnable action,
+                @Nullable String tooltipKey) {
             super(ID, x, y, width, height, label);
             this.action = action;
+            this.tooltipKey = tooltipKey;
+        }
+
+        @Override
+        public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTick) {
+            super.drawButton(minecraft, mouseX, mouseY, partialTick);
+            GuiScreen current = minecraft.currentScreen;
+            if (this.tooltipKey != null && this.visible && this.hovered && current != null) {
+                new RenderSurfaceImpl(current).tooltip(minecraft.fontRenderer,
+                        ImmutableList.of(new TextComponentTranslation(this.tooltipKey)), mouseX, mouseY);
+            }
         }
 
         /** Run the button's action; called by the loader's action-performed hook when this button is clicked. */
