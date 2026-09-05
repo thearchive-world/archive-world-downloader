@@ -36,6 +36,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
 
+import world.thearchive.wdl.adapter.impl.RenderSurfaceImpl;
 import world.thearchive.wdl.compat.flashback.FlashbackReplayProbe;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
@@ -264,8 +265,18 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         Button primary = new Button(x, y, width - 24, 20, I18n.get(primaryLabelKey.get()),
                 button -> onPrimary.run());
         primary.active = primaryEnabled.getAsBoolean();
-        // 1.15.2 Button carries no hover-tooltip parameter, so the settings button has no hover label.
-        Button config = new Button(x + width - 20, y, 20, 20, "...", button -> onConfig.run());
+        Button config = new Button(x + width - 20, y, 20, 20, "...", button -> onConfig.run()) {
+            @Override
+            public void renderButton(int mouseX, int mouseY, float partialTick) {
+                super.renderButton(mouseX, mouseY, partialTick);
+                Screen current = Minecraft.getInstance().screen;
+                if (this.isHovered() && current != null) {
+                    new RenderSurfaceImpl(current).tooltip(Minecraft.getInstance().font,
+                            ImmutableList.of(new TranslatableComponent("wdl.pause.settings.tooltip")),
+                            mouseX, mouseY);
+                }
+            }
+        };
         lastPrimary = primary;
         return ImmutableList.of(primary, config);
     }
