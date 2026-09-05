@@ -315,8 +315,9 @@ final class ContainerCapture {
      * Serialize only the chest slots of an open chested-animal menu (the non-player slots from
      * {@link #SLOT_INVENTORY_START}) into an {@code "Items"} holder via the per-band {@link ContainerSink}, or
      * {@code null} when the menu exposes no chest slots this tick (a chestless animal). Distinct from
-     * {@link #captureBlockSlots}: the chest is numbered 0-based in MENU ORDER, not by {@code Slot.getContainerSlot()},
-     * which is what makes the lift band-agnostic. Kept separate on purpose.
+     * {@link #captureBlockSlots}: a mount has no chest inventory of its own at this band, so the slots are numbered
+     * into the whole mount inventory from {@link #SLOT_INVENTORY_START} rather than from zero. Kept separate on
+     * purpose.
      */
     @Nullable
     CompoundTag captureChestSlots(AbstractContainerMenu menu, LocalPlayer player) {
@@ -325,20 +326,18 @@ final class ContainerCapture {
         for (int i = SLOT_INVENTORY_START; i < menu.slots.size(); i++) {
             Slot slot = menu.slots.get(i);
             if (slot.container != playerInventory) {
-                // The 0-based menu-order index here, not getContainerSlot(), is the chest-relative Items slot:
-                // getContainerSlot() is 0-based on 1.21.11 but 1-based on 1.21.4 (the saddle is container index
-                // 0 there), so the menu-order count is what absorbs the per-band saddle offset and keeps the
-                // chest from shifting by one on 1.21.4. Do not reindex by getContainerSlot() or fold this into
-                // captureBlockSlots.
                 chest.add(slot.getItem());
             }
         }
         if (chest.isEmpty()) {
             return null; // bound but no chest slots this tick; nothing to capture
         }
-        NonNullList<ItemStack> items = NonNullList.withSize(chest.size(), ItemStack.EMPTY);
+        // Offset into vanilla's own numbering: a mount's chest shares one inventory with the saddle and armor
+        // slots, and its read drops any saved entry below SLOT_INVENTORY_START. A zero-based holder therefore loses
+        // its first two stacks and shifts the rest, with no log line and no loss-report row.
+        NonNullList<ItemStack> items = NonNullList.withSize(SLOT_INVENTORY_START + chest.size(), ItemStack.EMPTY);
         for (int i = 0; i < chest.size(); i++) {
-            items.set(i, chest.get(i));
+            items.set(SLOT_INVENTORY_START + i, chest.get(i));
         }
         return adapter.containerSink().captureItems(items, registries);
     }
@@ -359,11 +358,10 @@ final class ContainerCapture {
             if (slot.container == playerInventory) {
                 continue;
             }
-            // getContainerSlot() is safe here, unlike in captureChestSlots: the client double-chest menu is one
-            // SimpleContainer(54) with no offset, so getContainerSlot() equals menu order on every band (verified
-            // 1.21.11 and 1.21.4). Do not unify this lift with captureChestSlots, whose 0-based menu-order
-            // numbering absorbs the 1.21.4 saddle offset (container index 0); merging them would shift the 1.21.4
-            // chest by one.
+            // The client double-chest menu is one SimpleContainer(54) with no offset, so getContainerSlot()
+            // equals menu order here. Do not unify this lift with captureChestSlots, which numbers its holder from
+            // SLOT_INVENTORY_START into a mount's whole inventory; this holder stays 0-based, a chest block entity
+            // reading its Items from slot zero, so merging them would push every double-chest stack two slots up.
             int index = slot.getContainerSlot();
             if (index >= low && index < high) {
                 items.set(index - low, slot.getItem());
