@@ -104,6 +104,11 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # id would otherwise misplace the export zip). Below 1.20.2 ClientPacketListener has no serverBrand, so the
 # report environment reads the server brand through LocalPlayer.getServerBrand(). Below 1.20 Entity.level is a
 # public field rather than the level() accessor, so the camera-anchor level guard reads camera.level directly.
+# Below 1.14 Chunk exposes no isUnsaved reader, so the dirty poll stands in the should-save query needsSaving(false)
+# and the re-arm stamps the chunk's last save time alongside setModified(false). That query's entity arm compares the
+# world's total time against a last save time nothing writes on a client, so without the stamp it is permanently
+# satisfied and the poll re-flags every entity-bearing chunk on every tick; the stamp bounds the residual to one
+# re-encode per entity-bearing chunk per 600 ticks.
 # Below 1.13 there is no EntityType or unified Registry, so a captured block entity's type id is a plain String; the
 # client chunk is fetched through ChunkProviderClient.getLoadedChunk with no
 # ChunkStatus promotion (a classic client chunk is always full); the double chest is recognized by the
