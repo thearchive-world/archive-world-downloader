@@ -35,6 +35,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
 
+import world.thearchive.wdl.adapter.impl.RenderSurfaceImpl;
 import world.thearchive.wdl.compat.flashback.FlashbackReplayProbe;
 import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
@@ -269,11 +270,21 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             }
         };
         primary.field_1055 = primaryEnabled.getAsBoolean();
-        // This band's button carries no hover-tooltip parameter, so the settings button has no hover label.
         class_356 config = new class_356(0, x + width - 20, y, 20, 20, "...") {
             @Override
             public void method_18374(double mouseX, double mouseY) {
                 onConfig.run();
+            }
+
+            @Override
+            public void renderButton(int mouseX, int mouseY, float partialTick) {
+                super.renderButton(mouseX, mouseY, partialTick);
+                Screen current = Minecraft.getInstance().screen;
+                if (this.field_5056 && current != null) {
+                    new RenderSurfaceImpl(current).tooltip(Minecraft.getInstance().font,
+                            ImmutableList.of(new TranslatableComponent("wdl.pause.settings.tooltip")),
+                            mouseX, mouseY);
+                }
             }
         };
         lastPrimary = primary;

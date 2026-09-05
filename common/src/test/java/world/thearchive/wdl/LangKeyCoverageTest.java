@@ -83,14 +83,11 @@ class LangKeyCoverageTest {
 
     private static final Set<String> NOT_TRANSLATION_KEYS = ImmutableSet.of("wdl.properties");
 
-    // Narration and title strings the higher bands set through Component parameters this band's pre-1.14 widget and
-    // screen APIs do not carry: a Button hover-tooltip (the 1.15.2 Button widget has no tooltip parameter), a Screen
-    // title (the 1.13.2 GuiScreen predates the 1.14 title Component, so super(title) is dropped), and a text field's
-    // narration message (the 1.13.2 text field widget takes no message). See WdlDownloadsScreen, WdlSettingsScreen and
-    // AbstractPlatformBridge. Their en_us strings stay so the catalog matches the higher bands, but no consumer reaches
-    // them on this band.
+    // Strings the higher bands show that this band does not: a button hover-tooltip these screens do not draw, a
+    // screen title (the 1.13.2 GuiScreen predates the 1.14 title Component, so super(title) is dropped), and a
+    // text field's narration message (the 1.13.2 text field widget takes no message). Their en_us strings stay so
+    // the catalog matches the higher bands, but no consumer reaches them on this band.
     private static final Set<String> BAND_DROPPED_KEYS = ImmutableSet.of(
-            "wdl.pause.settings.tooltip",
             "wdl.screen.downloads.download.tooltip",
             "wdl.screen.downloads.name",
             "wdl.screen.downloads.title",
@@ -144,6 +141,13 @@ class LangKeyCoverageTest {
                 "An enrolled literal is no longer named in the production tree. Drop it from\n"
                         + "COMPLETED_STEMS, DELEGATED_STEMS or NOT_TRANSLATION_KEYS; a stale entry is an\n"
                         + "exemption nothing is checking.");
+
+        Set<String> noLongerDropped = new TreeSet<>(BAND_DROPPED_KEYS);
+        noLongerDropped.retainAll(literals);
+        assertEquals(ImmutableSet.of(), noLongerDropped,
+                "A band-dropped key is named in the production tree, so this band no longer drops\n"
+                        + "it. Remove it from BAND_DROPPED_KEYS; an entry there is an exemption nothing\n"
+                        + "is checking.");
     }
 
     @Test
