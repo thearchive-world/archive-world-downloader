@@ -851,33 +851,68 @@ val checkReobfNegative = tasks.register<CheckSeargeSurface>("checkReobfNegative"
 // string, which is the one legacy FML actually enforces (FMLModContainer.bindMetadata takes dependencies off the
 // annotation descriptor unless mcmod.info opts into useDependencyInformation, which this mod does not). An
 // annotation value must be a compile-time constant, so neither half can read its counterpart and the duplication
-// is structural: arm 1 compares the floor against forge_version_min in ../gradle.properties, arm 2 the id against
-// Forge's own bytecode.
+// is structural. The floor is checked twice, against forge_version_min in ../gradle.properties and against
+// forge_version, the build this island actually provisions; the id is checked against Forge's own bytecode.
 //
-// The id Forge registers for itself is Forge with a capital F, and FMLModContainer.sanityCheckModId warns that a
-// modid should equal its lowercase form, which makes the capital look like the defect. That warning is about the
-// id a mod declares for itself and never about a dependency label, so lowercasing this one is not a tidy but a
-// total load failure: Loader.sortModList set-differences the declared names against the registered ids by String
-// equality, so a mis-cased name resolves to nothing and the client aborts on MissingModsException before any mod
-// runs, with nothing anywhere in the build to show for it.
+// A floor off another band's Forge line agrees with forge_version_min and still loads for nobody, so the floor is
+// also ordered against forge_version and pinned to its leading component. Forge's leading component tracks the
+// Minecraft band, 12 here against 13 at 1.11.2 and 14 at 1.12.2, and nothing else in the build relates the two
+// coordinates.
 //
-// Arm 2 reads the id off ForgeModContainer rather than pinning it, so it follows a forge_version bump, and unlike
+// The id Forge registers for itself at this band is Forge with a capital F, and FMLModContainer.sanityCheckModId
+// warns that a modid should equal its lowercase form, which makes the capital look like the defect. That warning
+// is about the id a mod declares for itself and never about a dependency label, so lowercasing this one is not a
+// tidy but a total load failure: Loader.sortModList set-differences the declared names against the registered ids
+// by String equality, so a mis-cased name resolves to nothing and the client aborts on MissingModsException
+// before any mod runs, with nothing anywhere in the build to show for it.
+//
+// The id check reads ForgeModContainer rather than pinning the id, so it follows a forge_version bump, and unlike
 // the searge oracle above it needs no configuration of its own: Unimined's minecraft configuration already
 // resolves to the single provisioned Minecraft-plus-Forge artifact this island compiles against, and asking
 // Gradle for a configuration depends on nothing about the cache layout underneath it.
 val checkForgeFloor = tasks.register("checkForgeFloor") {
     group = "verification"
-    description = "Fails if WdlForge's @Mod dependencies misses forge_version_min or names a mod id Forge does not register"
+    description = "Fails if WdlForge's @Mod dependencies misses forge_version_min, outruns forge_version, or names a mod id Forge does not register"
     // Captured by value at configuration time, like checkPlugBand's own locals, so no Project reference survives
     // into task execution.
     val forgeVersionMin = band("forge_version_min")
+    val forgeVersion = band("forge_version")
     val entrypointSource = layout.projectDirectory
         .file("src/main/java/world/thearchive/wdl/forge/WdlForge.java")
     val provisionedForge = objects.fileCollection().from(configurations.named("minecraft"))
     inputs.property("forgeVersionMin", forgeVersionMin)
+    inputs.property("forgeVersion", forgeVersion)
     inputs.file(entrypointSource)
     inputs.files(provisionedForge).withPropertyName("provisionedForge")
     doLast {
+        fun numericParts(key: String, value: String): List<Int> =
+            value.split('.').map { part ->
+                part.toIntOrNull()
+                    ?: throw GradleException(
+                        "$key is \"$value\", which is not a dotted numeric Forge version, so the declared floor "
+                            + "cannot be ordered against the build this island provisions"
+                    )
+            }
+        val minParts = numericParts("forge_version_min", forgeVersionMin)
+        val provisionedParts = numericParts("forge_version", forgeVersion)
+        if (minParts.first() != provisionedParts.first()) {
+            throw GradleException(
+                "Forge line mismatch: forge_version_min is $forgeVersionMin but this island provisions Forge "
+                    + "$forgeVersion. Forge's leading component tracks the Minecraft band, so a floor off another "
+                    + "band's line is one no build of this band's line satisfies, and every user gets "
+                    + "MissingModsException."
+            )
+        }
+        val floorOrdering = (0 until maxOf(minParts.size, provisionedParts.size))
+            .map { i -> minParts.getOrElse(i) { 0 }.compareTo(provisionedParts.getOrElse(i) { 0 }) }
+            .firstOrNull { it != 0 } ?: 0
+        if (floorOrdering > 0) {
+            throw GradleException(
+                "Forge floor above the provisioned build: forge_version_min is $forgeVersionMin but this island "
+                    + "provisions and ships against Forge $forgeVersion, so the jar demands a build newer than the "
+                    + "one it was compiled against, and every user gets MissingModsException."
+            )
+        }
         val declared = Regex("""required-after:([^@\s;]+)@\[([^,\]]+),""")
             .find(entrypointSource.asFile.readText())
             ?: throw GradleException(
