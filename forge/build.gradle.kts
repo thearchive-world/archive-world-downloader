@@ -913,12 +913,26 @@ val checkForgeFloor = tasks.register("checkForgeFloor") {
                     + "one it was compiled against, and every user gets MissingModsException."
             )
         }
-        val declared = Regex("""required-after:([^@\s;]+)@\[([^,\]]+),""")
-            .find(entrypointSource.asFile.readText())
-            ?: throw GradleException(
+        // Raw file text, not the parsed annotation: a required-after entry inside a comment counts, and a second
+        // Forge entry anywhere in this file reds the build rather than going unread.
+        val forgeEntries = Regex("""required-after:([^@\s;]+)@\[([^,\]]+),""")
+            .findAll(entrypointSource.asFile.readText())
+            .filter { it.groupValues[1].equals("forge", ignoreCase = true) }
+            .toList()
+        if (forgeEntries.isEmpty()) {
+            throw GradleException(
                 "WdlForge declares no required-after Forge floor in its @Mod dependencies; legacy FML then "
                     + "enforces no Forge version at all"
             )
+        }
+        if (forgeEntries.size > 1) {
+            throw GradleException(
+                "WdlForge declares ${forgeEntries.size} required-after Forge floors in its @Mod dependencies "
+                    + "(${forgeEntries.joinToString { it.value }}). Legacy FML enforces every entry it parses, so "
+                    + "one this gate did not read can still stop the mod loading; declare exactly one."
+            )
+        }
+        val declared = forgeEntries.single()
         val declaredId = declared.groupValues[1]
         val declaredFloor = declared.groupValues[2]
         if (declaredFloor != forgeVersionMin) {
