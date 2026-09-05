@@ -82,6 +82,12 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # opens the vanilla IOWorker through WorldPaths (openRegionStorage) rather than constructing one directly. Below 1.17
 # (era E3) entities live inside the region/ chunk, so the writer is built with the region opener alone (the
 # openEntitiesStorage argument is dropped) and the entity flush folds into the host chunk's Level.Entities.
+# Below 1.17 LevelChunk.isUnsaved is not the unsaved flag alone: it also returns true while the chunk's last save
+# held entities and the game time differs from its last-save time, which nothing writes on a client, so clearing
+# the unsaved flag could never quiet it and the dirty poll re-flagged every entity-bearing chunk on every tick.
+# The re-arm therefore clears the last-save entity flag alongside the unsaved flag, which states what the
+# re-encode wrote (the codec serializes blocks and block entities, never an entity), and leaves the query reading
+# the unsaved flag until an entity enters the chunk again.
 # Below 1.20.3 there is no Crafter menu or block entity, so the crafter open-bind and stash legs are
 # dropped; NbtIo.readCompressed takes a File with no NbtAccounter; and the world save root is read via
 # getLevelPath(LevelResource.ROOT).normalize(), the pre-getLevelDirectory form (normalized because ROOT's bare-dot
