@@ -488,6 +488,23 @@ neoforge/src/test/java/world/thearchive/wdl/neoforge/NeoForgeServiceResolutionTe
 # is a public field rather than the level() accessor, so the spectator-reach guard reads player.level directly.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 
+# New at this band, as on every band up to 1.20.4 and none above it. Pins the numbering a captured mount chest has to
+# carry and the band fact behind it: a mount has no chest inventory of its own, the saddle slot, the armor slot and
+# the chest being one SimpleContainer, and vanilla addresses that one inventory absolutely. Its write walks from index
+# two to the inventory's own size and stamps the loop index itself as Slot, and its read masks the saved byte back and
+# refuses anything below two, or at or past that size, so a zero-based holder loses its two lowest stacks and lands
+# every survivor two positions early with no log line and no loss-report row. The lift therefore offsets into
+# vanilla's own numbering, and this gate reloads through vanilla's entity reader rather than counting what came back:
+# a count assertion passes on shifted contents, which is why the size gate already in the suite saw none of this. This
+# band does not derive a chested donkey's or mule's size from its columns at all, AbstractChestedHorse fixing it at
+# seventeen, which its five columns happen to reproduce as two tack slots and three rows of five; a llama overrides
+# that with two plus three times its own strength, which vanilla clamps between one and five, so its inventory runs
+# from five slots to seventeen and its chest from three to fifteen. The player under the lift is allocated without
+# running a constructor, this band's LocalPlayer reaching the client singleton for a sound manager and wanting a
+# level built around a renderer, so it is given nothing but the inventory backing the menu's own player slots. From
+# 1.20.5 up vanilla numbers a saved chest stack chest-relative instead, which is why no band there carries the file.
+common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
+
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so the compressed write takes a File
 # (NbtIo.writeCompressed(CompoundTag, File)) and the read a File with no accounter; the OutputStream write
 # overload the id-counts staging uses is unchanged.
