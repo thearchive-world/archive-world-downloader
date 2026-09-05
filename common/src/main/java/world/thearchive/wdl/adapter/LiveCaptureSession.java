@@ -37,6 +37,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.client.Minecraft;
@@ -3547,7 +3548,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null; // a prior open attempt failed; the failure is reported at finish()
         }
         Minecraft minecraft = Minecraft.getInstance();
-        LevelStorageSource source = minecraft.getLevelSource();
+        return openWorld(minecraft.getLevelSource(), minecraft.gameDirectory.toPath().resolve("saves"),
+                saveRoot -> beginReport(minecraft, saveRoot));
+    }
+
+    /**
+     * The world-open proper, with the client singleton resolved by the caller, and the saves root with it, this band's
+     * save format carrying no accessor for it. The report stamp arrives as a thunk so that gathering its MC-side facts
+     * cannot abort the open, and package-private so that guarantee is headless-testable.
+     */
+    @Nullable
+    AsyncSaveWriter openWorld(LevelStorageSource source, Path savesDirectory, Consumer<Path> reportStep) {
         LevelStorage storage;
         try {
             // Path containment: assert the resolved level root stays under the saves base before selectLevel, which
@@ -3555,7 +3566,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // disk. toRealPath canonicalizes the base so a symlinked saves directory cannot defeat the lexical check.
             // This band's LevelStorageSource has no getBaseDir; the saves base is the game directory's saves folder,
             // the same root it constructs the level source over.
-            Path savesBase = minecraft.gameDirectory.toPath().resolve("saves").toRealPath();
+            Path savesBase = savesDirectory.toRealPath();
             Path resolved = savesBase.resolve(saveName).normalize();
             // A download folder is a single component directly under saves; requiring the parent to be exactly
             // the saves base rejects both a parent-escape and any multi-component name (whose first segment could
@@ -3599,7 +3610,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (target.mode() == DownloadMode.NEW) {
                 saveMapManifest();
             }
-            beginReport(minecraft, saveRoot);
+            // A throw here would otherwise record a start error, which short-circuits every later write and
+            // costs every captured chunk, for metadata the save itself does not need.
+            try {
+                reportStep.accept(saveRoot);
+            } catch (RuntimeException e) {
+                LOGGER.warn("the download report could not be stamped at world-open; the save continues", e);
+            }
             LevelDataWriter levelDataWriter = adapter.levelDataWriter();
             LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(config.worldOutput(),
                     resolveWorldName());
@@ -4623,12 +4640,52 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * session's download.md. The store is fail-soft, so a report write failure never blocks the save.
      */
     private void beginReport(Minecraft minecraft, Path saveRoot) {
-        DownloadIdentity identity = buildReportIdentity(minecraft);
-        ReportEnvironment environment = buildReportEnvironment(minecraft);
+        stampReport(saveRoot, () -> buildReportIdentity(minecraft), () -> buildReportEnvironment(minecraft));
+    }
+
+    /**
+     * Stamp the report from the supplied facts, degrading either read that throws rather than propagating. Never
+     * throwing is the contract: the stamp writes the sentinel that marks a folder a wdl download, so a propagated read
+     * failure leaves a fully written save neither listed nor resumable. Package-private so that guarantee is
+     * headless-testable.
+     */
+    void stampReport(Path saveRoot, Supplier<DownloadIdentity> readIdentity,
+            Supplier<ReportEnvironment> readEnvironment) {
+        DownloadIdentity identity;
+        try {
+            identity = readIdentity.get();
+        } catch (RuntimeException e) {
+            LOGGER.warn("the download report could not read its source; recording an unidentified one", e);
+            identity = unidentifiedIdentity();
+        }
+        ReportEnvironment environment;
+        try {
+            environment = readEnvironment.get();
+        } catch (RuntimeException e) {
+            LOGGER.warn("the download report could not read its world facts; recording them absent", e);
+            environment = unidentifiedEnvironment();
+        }
         this.reportRoot = saveRoot;
         this.reportIdentity = identity;
         this.reportEnvironment = environment;
         report.begin(saveRoot, identity, environment, config.nonDefaultSettings());
+    }
+
+    /**
+     * The report identity for a download whose MC-side facts could not be read. Package-private so the fields that must
+     * stay real, rather than degrade, are headless-testable.
+     */
+    DownloadIdentity unidentifiedIdentity() {
+        String worldName = target.worldName();
+        return new DownloadIdentity(UUID.randomUUID().toString(), Instant.now().truncatedTo(ChronoUnit.SECONDS),
+                "", "", "", "", "", bridge.loaderName(), bridge.loaderVersion(),
+                worldName != null ? worldName : "", "unidentified");
+    }
+
+    /** The report environment for a download whose MC-side facts could not be read. */
+    private ReportEnvironment unidentifiedEnvironment() {
+        return new ReportEnvironment("", 0, DimensionType.getName(targetDimension).toString(), Wdl.mcVersion(),
+                bridge.modVersion());
     }
 
     /** Read the MC-side environment facts (server brand, simulation distance, dimension, MC + mod version). */
