@@ -665,3 +665,18 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkSectionClampTest.java
 # Below 1.18 a chunk's block entities nest under Level.TileEntities, not the flat root block_entities added at 1.18,
 # so the in-session stash merge locates a block entity by x/y/z through the Level compound.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+
+# New at this band relative to dev, and carried by every band from 1.11.2 to 1.20.4 rather than by this one alone.
+# Below 1.20.5 a chested mount has no chest inventory of its own: the saddle slot, the armor slot and the chest are
+# one SimpleContainer, AbstractChestedHorse writes each stack under its own index in it walking from two, and its
+# read refuses any saved Slot below two or at or past that inventory's size. At 1.20.5 the write starts at one and
+# stamps the index less one and the read adds it back, turning the saved number chest-relative, which is why no band
+# from there up carries this file. So the lift has to offset its menu-order count into the absolute numbering, and
+# this gate reloads through vanilla's own entity reader rather than counting what survives, a count assertion passing
+# unchanged on shifted contents. The widths it drives are this band's: getInventorySize returns a flat seventeen for
+# a donkey or mule, which its five columns reproduce as two tack slots and fifteen chest slots, and Llama overrides
+# that with two plus three times its own strength, clamped between one and five, so a llama chest runs from three
+# slots to fifteen. SlotAccess arrives at 1.17, so the fixture puts the chest on through the mount's own getSlot at
+# vanilla's address 499 rather than the setSlot the bands below use, and pins the inventory's end through that same
+# numbered access, one assertion requiring SlotAccess.NULL a slot past the size it fills.
+common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
