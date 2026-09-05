@@ -437,6 +437,19 @@ common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
 # no CODEC, so the offers holder is built via MerchantOffers.createTag rather than encoding through RegistryOps.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantStashMergeTest.java
 
+# New at this band, and on every band below 1.20.5. Pins the slot numbering a captured mount chest has to carry and
+# the band fact behind it: AbstractChestedHorse writes each chest stack under its index in the mount's whole
+# inventory, counting up from 2, and its read refuses any saved entry numbered below 2, so a 0-based holder loses
+# its two lowest stacks and lands every survivor two slots early with no log line and no loss-report row. The gate
+# reloads the captured holder through vanilla's own readAdditionalSaveData rather than counting what came back,
+# because a count is exactly what a whole-chest shift leaves untouched. Its two cases are the two chest widths this
+# band has: getInventorySize is a flat 17 for a chested donkey or mule rather than anything read off
+# getInventoryColumns, while Llama overrides it with 2 + 3 * getInventoryColumns and answers getInventoryColumns
+# with its own strength, so the llama case runs all five strengths vanilla's own setter clamps to. No band at or
+# above 1.20.5 carries the file: the write there is Slot = i - 1 counting up from 1 and the read puts j back at
+# j + 1, which makes the 0-based holder dev captures the correct one there.
+common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
+
 # Below 1.20.5 a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and
 # vanilla's JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount alongside a present
 # RecordItem, so the fixtures carry those too and the beehive fixture goes through the unchecked
