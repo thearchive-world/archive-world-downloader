@@ -109,6 +109,8 @@ common/src/test/java/world/thearchive/wdl/adapter/RecaptureRearmTest.java
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
 # SystemToast has no custom-id class, so the two toast streams reuse two distinct vanilla SystemToastIds enum
 # categories, and MutableComponent has no withColor(int), so toast text colors go through withStyle.
+# The pause row is built from this band's own widget forms, and its settings button subclasses Button to draw
+# its hover label from renderButton, the vanilla button gaining a tooltip parameter only at 1.16.5.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
 # The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
