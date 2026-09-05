@@ -496,6 +496,21 @@ neoforge/src/test/java/world/thearchive/wdl/neoforge/NeoForgeServiceResolutionTe
 # is a public field rather than the level() accessor, so the spectator-reach guard reads player.level directly.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 
+# New at this band, as on every band up to 1.20.4 and none above it. Pins the numbering a captured mount chest has to
+# carry and the band fact behind it: a mount has no chest inventory of its own, the saddle slot, the armor slot and
+# the chest sharing one container, and vanilla addresses that one container absolutely. Its write runs from index two
+# and stamps the index itself as Slot, and its read masks the saved byte back and refuses anything below two, or at or
+# past the container's own size, so a zero-based holder loses its two lowest stacks and lands every survivor two
+# positions early with no log line and no loss-report row. The lift therefore offsets into vanilla's own numbering,
+# and this gate reloads through vanilla's entity reader rather than counting what came back: a count assertion passes
+# on shifted contents, which is why the size gate already in the suite saw none of this. A chested donkey or mule
+# sizes that container to a flat seventeen, five columns over three rows behind the two worn ones, while a llama sizes
+# it to two plus three times its own strength, so its chest runs from three slots to fifteen as the strength runs one
+# through five, and each case checks the width it fills against the container vanilla itself sized. The fixture is
+# band-shaped twice over: the bridge mapping leaves the donkey class unnamed, so the donkey comes from
+# EntityType.DONKEY, and there is no Entity.getSlot here, so that container is reached by reflection.
+common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
+
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so the compressed write takes a File
 # (NbtIo.writeCompressed(CompoundTag, File)) and the read a File with no accounter; the OutputStream write
 # overload the id-counts staging uses is unchanged.
