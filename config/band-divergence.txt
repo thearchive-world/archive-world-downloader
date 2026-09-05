@@ -293,6 +293,14 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 # redundant instanceof-Tag pattern.
 common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
 
+# Below 1.20.5 a mount has no chest inventory of its own: the saddle slot, the armor slot and the chest are one
+# container AbstractChestedHorse writes from index 2 up, stamping each stack's own index as its Slot, and whose
+# read refuses any saved entry numbered below 2. So the chest lift numbers its holder from index 2 into that whole
+# inventory rather than from zero; the 0-based holder dev captures is the right one at 1.20.5 and above, where the
+# write is Slot = i - 1 counting up from 1 and the read puts j back at j + 1. Below 1.21.11 AbstractChestedHorse
+# sits in net.minecraft.world.entity.animal.horse rather than the .equine package that rename moved it to.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
+
 # Below 1.20.5 an item is {id, Count, tag}; the walk recurses into a shulker's nested items via
 # tag.BlockEntityTag.Items and a bundle's via tag.Items, rather than the minecraft:container/minecraft:bundle_contents
 # components.
@@ -384,6 +392,21 @@ common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
 # Below 1.20.5 there is no ItemCost, so a merchant offer's buy cost is a plain ItemStack, and MerchantOffers has
 # no CODEC, so the offers holder is built via MerchantOffers.createTag rather than encoding through RegistryOps.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantStashMergeTest.java
+
+# New at this band, and on every band below 1.20.5. Pins the slot numbering a captured mount chest has to carry and
+# the band fact behind it: AbstractChestedHorse writes each chest stack under its index in the mount's whole
+# inventory, counting up from 2, and its read refuses any saved entry numbered below 2, so a 0-based holder loses
+# its two lowest stacks and lands every survivor two slots early with no log line and no loss-report row. The gate
+# reloads the captured holder through vanilla's own readAdditionalSaveData rather than counting what came back,
+# because a count is exactly what a whole-chest shift leaves untouched. Its two cases are the two chest widths this
+# band has: getInventorySize is a flat 17 for a chested donkey or mule rather than anything read off
+# getInventoryColumns, while Llama overrides it with 2 + 3 * getInventoryColumns and answers getInventoryColumns
+# with its own strength, so the llama case runs all five strengths vanilla's own setter clamps to. Each case reads
+# that width back off AbstractHorse.getSlot, whose 498 + m addressing answers SlotAccess.NULL one slot past the
+# end, rather than trusting the formula the fixture just sized itself by. No band at or above 1.20.5 carries the
+# file: the write there is Slot = i - 1 counting up from 1 and the read puts j back at j + 1, which makes the
+# 0-based holder dev captures the correct one there.
+common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
 
 # Below 1.20.5 a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and
 # vanilla's JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount alongside a present
