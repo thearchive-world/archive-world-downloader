@@ -90,6 +90,18 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # public field rather than the level() accessor, so the camera-anchor level guard reads camera.level directly.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
+# New here and on every band below 1.17, on none above: from 1.17 up LevelChunk.isUnsaved is the unsaved flag
+# alone, so the re-arm has nothing else to quiet and this gate has nothing to stand in for. Here the query also
+# returns true while the chunk's last save held entities and the game time differs from its last-save time, which
+# nothing but the server's own chunk map ever writes, so the re-arm clears the last-save entity flag alongside the
+# unsaved flag and this gate holds it to that: the unsaved clear alone leaves the query true, the re-arm leaves it
+# reading the unsaved flag, and an entity entering the chunk re-flags it, the residual the poll's contract states.
+# The fixture builds the chunk from a registry-taking ChunkBiomeContainer, moves the world clock through the
+# headless level's own client level data (Level having lost setGameTime at 1.16), and runs the vanilla bootstrap
+# ahead of that level, since reaching the registries through Level's own initializer here leaves GlobalPos.CODEC
+# reading a resource-key codec Level has not assigned yet.
+common/src/test/java/world/thearchive/wdl/adapter/RecaptureRearmTest.java
+
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
 # SystemToast has no custom-id class, so the two toast streams reuse two distinct vanilla SystemToastIds enum
 # categories, and MutableComponent has no withColor(int), so toast text colors go through withStyle.
