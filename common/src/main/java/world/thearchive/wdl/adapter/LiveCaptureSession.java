@@ -4601,6 +4601,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
         report.begin(saveRoot, identity, environment, config.nonDefaultSettings());
     }
 
+    /**
+     * The source server's MOTD, empty when the client never learned one. The field is filled by the server-list ping or
+     * by the server's own status packet at join, so a direct connect to a server that sends neither leaves it unset.
+     * Pure and package-private so the fallback is headless-testable.
+     */
+    static String sourceMotd(ServerData server) {
+        return server.motd != null ? server.motd.getString() : "";
+    }
+
     /** Read the MC-side environment facts (server brand, simulation distance, dimension, MC + mod version). */
     private ReportEnvironment buildReportEnvironment(Minecraft minecraft) {
         String brand = "";
@@ -4630,7 +4639,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (server != null) {
             address = server.ip;
             sourceName = server.name;
-            motd = server.motd.getString();
+            motd = sourceMotd(server);
             sourceKind = "";
         }
         String worldName = target.worldName();
