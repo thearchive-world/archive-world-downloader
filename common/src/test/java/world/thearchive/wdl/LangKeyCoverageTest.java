@@ -85,17 +85,15 @@ class LangKeyCoverageTest {
 
     private static final Set<String> NOT_TRANSLATION_KEYS = ImmutableSet.of("wdl.properties");
 
-    // Narration and title strings the higher bands set through Component parameters this band's pre-1.14 widget and
-    // screen APIs do not carry: a button hover-tooltip (GuiButton takes no tooltip parameter), a screen title
-    // (GuiScreen predates the 1.14 title Component, so super(title) is dropped), and a text field's narration message
-    // (GuiTextField takes no message). Their en_us strings stay so the catalog matches the higher bands, but no
-    // consumer reaches them on this band.
+    // Strings the higher bands show that this band does not: a button hover-tooltip these screens do not draw, a
+    // screen title (GuiScreen predates the 1.14 title Component, so super(title) is dropped), and a text field's
+    // narration message (GuiTextField takes no message). Their en_us strings stay so the catalog matches the
+    // higher bands, but no consumer reaches them on this band.
     private static final Set<String> BAND_DROPPED_KEYS = ImmutableSet.of(
             // No narrator exists below 1.12: neither NarratorChatListener nor ChatType is in this band's Minecraft,
             // and the text-to-speech library they drive is not in its library set, so the downloads list is not
             // narrated here and the key it would have spoken reaches nothing.
             "wdl.screen.downloads.narration",
-            "wdl.pause.settings.tooltip",
             "wdl.screen.downloads.download.tooltip",
             "wdl.screen.downloads.name",
             "wdl.screen.downloads.title",
@@ -149,6 +147,13 @@ class LangKeyCoverageTest {
                 "An enrolled literal is no longer named in the production tree. Drop it from\n"
                         + "COMPLETED_STEMS, DELEGATED_STEMS or NOT_TRANSLATION_KEYS; a stale entry is an\n"
                         + "exemption nothing is checking.");
+
+        Set<String> noLongerDropped = new TreeSet<>(BAND_DROPPED_KEYS);
+        noLongerDropped.retainAll(literals);
+        assertEquals(ImmutableSet.of(), noLongerDropped,
+                "A band-dropped key is named in the production tree, so this band no longer drops\n"
+                        + "it. Remove it from BAND_DROPPED_KEYS; an entry there is an exemption nothing\n"
+                        + "is checking.");
     }
 
     @Test
