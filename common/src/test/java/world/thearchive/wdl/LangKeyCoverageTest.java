@@ -83,11 +83,9 @@ class LangKeyCoverageTest {
 
     private static final Set<String> NOT_TRANSLATION_KEYS = ImmutableSet.of("wdl.properties");
 
-    // Button hover-tooltips the higher bands show but this band drops, since the 1.15.2 Button widget carries no
-    // hover-tooltip parameter (see WdlDownloadsScreen, WdlSettingsScreen and AbstractPlatformBridge). Their en_us
-    // strings stay so the catalog matches the higher bands, but no consumer reaches them on this band.
+    // Button hover-tooltips the higher bands show and this band does not draw. Their en_us strings stay so the
+    // catalog matches the higher bands, but no consumer reaches them on this band.
     private static final Set<String> BAND_DROPPED_KEYS = ImmutableSet.of(
-            "wdl.pause.settings.tooltip",
             "wdl.screen.downloads.download.tooltip",
             "wdl.settings.defaults.tooltip");
 
@@ -138,6 +136,13 @@ class LangKeyCoverageTest {
                 "An enrolled literal is no longer named in the production tree. Drop it from\n"
                         + "COMPLETED_STEMS, DELEGATED_STEMS or NOT_TRANSLATION_KEYS; a stale entry is an\n"
                         + "exemption nothing is checking.");
+
+        Set<String> noLongerDropped = new TreeSet<>(BAND_DROPPED_KEYS);
+        noLongerDropped.retainAll(literals);
+        assertEquals(ImmutableSet.of(), noLongerDropped,
+                "A band-dropped key is named in the production tree, so this band no longer drops\n"
+                        + "it. Remove it from BAND_DROPPED_KEYS; an entry there is an exemption nothing\n"
+                        + "is checking.");
     }
 
     @Test
