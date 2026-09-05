@@ -1,0 +1,197 @@
+// Copyright (C) Archive World Downloader contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+package world.thearchive.wdl.adapter;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.mojang.authlib.GameProfile;
+import java.lang.reflect.Field;
+import java.nio.file.Paths;
+import java.util.UUID;
+import net.minecraft.client.ClientRecipeBook;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.stats.StatsCounter;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
+import net.minecraft.world.entity.animal.horse.Llama;
+import net.minecraft.world.inventory.HorseInventoryMenu;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.level.block.Blocks;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
+import world.thearchive.wdl.testsupport.HeadlessLevel;
+import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
+import world.thearchive.wdl.testsupport.TestRegistries;
+
+/**
+ * The reload gate on a captured mount chest. Every chest slot is filled with a stack sized to that slot's own absolute
+ * index and read back through vanilla's own entity reader, because a stack count assertion passes on shifted contents,
+ * which is how a two-slot shift shipped past every gate the suite already had.
+ */
+class MountChestSlotsTest {
+    // Vanilla's setSlot addressing for a mount: 499 puts the chest on.
+    private static final int CHEST_ITEM_SLOT = 499;
+    // The saddle slot and the armor slot lead the mount's one container, so the chest starts at two whether or not
+    // the mount can fill either.
+    private static final int WORN_SLOTS = 2;
+    private static final int CHEST_ROWS = 3;
+    private static final int DONKEY_CHEST_COLUMNS = 5;
+    // The strengths vanilla's own setter clamps a llama to.
+    private static final int LOWEST_LLAMA_STRENGTH = 1;
+    private static final int HIGHEST_LLAMA_STRENGTH = 5;
+
+    @BeforeAll
+    static void bootstrapVanilla() {
+        TestRegistries.bootstrap();
+    }
+
+    @Test
+    void aCapturedDonkeyChestReloadsIntoTheSlotsItWasCapturedFrom() {
+        AbstractChestedHorse donkey = chested(donkey());
+        assertEquals(DONKEY_CHEST_COLUMNS, donkey.getInventoryColumns(),
+                "fixture: a donkey's chest is five fixed columns, the fifteen slots a mule shares");
+
+        assertTheChestReloadsWhereItWasCapturedFrom(donkey, donkey());
+    }
+
+    @Test
+    void aCapturedLlamaChestReloadsIntoTheSlotsItWasCapturedFromAtEveryStrength() {
+        for (int strength = LOWEST_LLAMA_STRENGTH; strength <= HIGHEST_LLAMA_STRENGTH; strength++) {
+            AbstractChestedHorse llama = chested(llamaOfStrength(strength));
+            assertEquals(strength, llama.getInventoryColumns(),
+                    "fixture: a llama's chest is as wide as its own strength, not a fixed count");
+
+            assertTheChestReloadsWhereItWasCapturedFrom(llama, new Llama(HeadlessLevel.get()));
+        }
+    }
+
+    private static void assertTheChestReloadsWhereItWasCapturedFrom(AbstractChestedHorse mount,
+            AbstractChestedHorse reloaded) {
+        int inventorySize = WORN_SLOTS + CHEST_ROWS * mount.getInventoryColumns();
+        Container chest = inventoryOf(mount);
+        assertEquals(inventorySize, chest.getContainerSize(),
+                "fixture: vanilla must have sized the whole mount inventory around the chest it was given");
+        // One stack per chest slot, sized to its own absolute index, so a shift or a drop is identifiable per slot.
+        for (int i = WORN_SLOTS; i < inventorySize; i++) {
+            chest.setItem(i, new ItemStack(Items.APPLE, i));
+        }
+        LocalPlayer player = headlessPlayer();
+        HorseInventoryMenu menu = new HorseInventoryMenu(player.inventory, chest, mount, player);
+
+        CompoundTag holder = new ContainerCapture(new VersionAdapterImpl(),
+                new HeadlessPlatformBridge(Paths.get(".")), null).captureChestSlots(menu, player);
+        assertNotNull(holder, "fixture: a chested mount menu must yield a holder");
+
+        // What the flush does: the mount's own saved tag, with only "Items" replaced by the captured holder.
+        CompoundTag saved = mount.saveWithoutId(new CompoundTag());
+        saved.put("Items", holder.getList("Items", 10));
+        reloaded.load(saved);
+        assertTrue(reloaded.hasChest(), "fixture: the reloaded mount must read as chested, or nothing is read");
+
+        int chestSlots = inventorySize - WORN_SLOTS;
+        ListTag reread = reloaded.saveWithoutId(new CompoundTag()).getList("Items", 10);
+        for (int i = 0; i < reread.size(); i++) {
+            CompoundTag entry = reread.getCompound(i);
+            int slot = entry.getByte("Slot") & 255;
+            assertEquals(slot, entry.getByte("Count") & 255,
+                    "in a " + chestSlots + "-slot chest the stack reloaded at slot " + slot
+                            + " must be the one captured from that slot");
+        }
+        assertEquals(chestSlots, reread.size(),
+                "every captured chest stack must survive the reload, none dropped by vanilla's slot gate");
+    }
+
+    /** A mount put through vanilla's own chest placement, which is what sizes its inventory around the chest. */
+    private static AbstractChestedHorse chested(AbstractChestedHorse mount) {
+        assertTrue(mount.setSlot(CHEST_ITEM_SLOT, new ItemStack(Blocks.CHEST)),
+                "fixture: the mount must take the chest");
+        assertTrue(mount.hasChest(), "fixture: the mount now reads as chested");
+        return mount;
+    }
+
+    /** Built through the entity type, this band's bridge mapping leaving the donkey class itself unnamed. */
+    private static AbstractChestedHorse donkey() {
+        return EntityType.DONKEY.create(HeadlessLevel.get());
+    }
+
+    /** The strength has to be set before the chest goes on: the container is sized once, at that moment. */
+    private static Llama llamaOfStrength(int strength) {
+        Llama llama = new Llama(HeadlessLevel.get());
+        llama.getEntityData().set(strengthId(), strength);
+        return llama;
+    }
+
+    /** Reached by reflection because vanilla's own strength setter is private. */
+    private static EntityDataAccessor<Integer> strengthId() {
+        try {
+            Field field = Llama.class.getDeclaredField("DATA_STRENGTH_ID");
+            field.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            EntityDataAccessor<Integer> strength = (EntityDataAccessor<Integer>) field.get(null);
+            return strength;
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("could not reach the synced llama strength", e);
+        }
+    }
+
+    /** Reached by reflection: there is no {@code Entity.getSlot} at this band and the field is protected. */
+    private static Container inventoryOf(AbstractHorse mount) {
+        try {
+            Field field = AbstractHorse.class.getDeclaredField("inventory");
+            field.setAccessible(true);
+            return (Container) field.get(mount);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("could not reach the mount inventory", e);
+        }
+    }
+
+    /** A headless {@code LocalPlayer}, guarded against the two abstract members that reach the client singleton. */
+    private static LocalPlayer headlessPlayer() {
+        Minecraft client = headlessClient();
+        ClientPacketListener connection = new ClientPacketListener(client, null, null,
+                new GameProfile(UUID.randomUUID(), "wdl-test"));
+        return new LocalPlayer(client, HeadlessLevel.get(), connection, new StatsCounter(),
+                new ClientRecipeBook(new RecipeManager())) {
+            @Override
+            public boolean isSpectator() {
+                return false;
+            }
+
+            @Override
+            public boolean isCreative() {
+                return false;
+            }
+        };
+    }
+
+    /**
+     * Allocated without a constructor, {@code Minecraft}'s only constructor opening a window while
+     * {@code LocalPlayer}'s reaches the client for a sound manager. Named through {@code Class.forName} because
+     * {@code sun} is an illegal import.
+     */
+    private static Minecraft headlessClient() {
+        try {
+            Class<?> unsafe = Class.forName("sun.misc.Unsafe");
+            Field theUnsafe = unsafe.getDeclaredField("theUnsafe");
+            theUnsafe.setAccessible(true);
+            return (Minecraft) unsafe.getMethod("allocateInstance", Class.class)
+                    .invoke(theUnsafe.get(null), Minecraft.class);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("could not allocate a headless client", e);
+        }
+    }
+}
