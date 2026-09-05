@@ -631,6 +631,23 @@ common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
 # RayTraceResult and item/block API are classic MCP.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 
+# New at this band, as on every band up to 1.20.4 and none above it. Pins the numbering a captured mount chest has to
+# carry and the band fact behind it: a mount has no chest inventory of its own, the saddle slot, the armor slot and
+# the chest sharing one ContainerHorseChest, and vanilla addresses that one inventory absolutely. Its write walks from
+# index two to the inventory's own size and stamps the loop index itself as Slot, and its read masks the saved byte
+# back and refuses anything below two, or at or past that size, so a zero-based holder loses its two lowest stacks and
+# lands every survivor two positions early with no log line and no loss-report row. The lift therefore offsets into
+# vanilla's own numbering, and this gate reloads through vanilla's entity reader rather than counting what came back:
+# a count assertion passes on shifted contents, which is why the size gate already in the suite saw none of this. The
+# chest is three rows of the mount's own getInventoryColumns behind the two worn slots, so a donkey or mule is a fixed
+# five columns and seventeen slots while a llama is as wide as its own strength, which vanilla clamps between one and
+# five, so its inventory runs from five slots to seventeen and its chest from three to fifteen; the llama case is
+# driven at every one of those strengths, the narrow chest being where a two-slot shift shows soonest. The recipe book
+# arrives at this band, so the headless EntityPlayerSP the lift reads takes five constructor arguments rather than the
+# four of the band below. From 1.20.5 up vanilla numbers a saved chest stack chest-relative instead, which is why no
+# band there carries the file.
+common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
+
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so the compressed write takes a File
 # (NbtIo.writeCompressed(CompoundTag, File)) and the read a File with no accounter; the OutputStream write
 # overload the id-counts staging uses is unchanged.
