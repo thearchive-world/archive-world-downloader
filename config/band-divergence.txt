@@ -128,10 +128,12 @@ common/src/test/java/world/thearchive/wdl/adapter/RecaptureRearmTest.java
 # leaves the cherry-pick line: the /wdl command is a net.minecraft.command.CommandBase (execute and
 # getTabCompletions over an ICommandSender) the loader registers through Forge's ClientCommandHandler rather than
 # a LiteralArgumentBuilder tree; the pause-menu row is GuiButton subclasses dispatched through the loader's
-# action-performed hook rather than an onPress callback; the chat and toast text is classic ITextComponent built
-# from TextComponentString/TextComponentTranslation with Style.setColor(TextFormatting); the toast host is
-# Minecraft.getToastGui with the two streams reusing SystemToast.Type categories; and the nearest-named-color
-# quantizer recomputes each color's RGB from its color index, since TextFormatting exposes no RGB accessor.
+# action-performed hook rather than an onPress callback, and that row's settings button draws its own hover
+# label from drawButton, GuiButton taking no tooltip parameter; the chat and toast text is classic
+# ITextComponent built from TextComponentString/TextComponentTranslation with Style.setColor(TextFormatting);
+# the toast host is Minecraft.getToastGui with the two streams reusing SystemToast.Type categories; and the
+# nearest-named-color quantizer recomputes each color's RGB from its color index, since TextFormatting exposes
+# no RGB accessor.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
 # The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
