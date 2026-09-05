@@ -1406,10 +1406,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (!hasEncodeBudget()) {
                 break; // out of budget: the rest of the square (still uncaptured) spills to a later tick
             }
-            // Safety canary: capture only ever touches Minecraft.level (ClientLevel)
-            // chunks, which are never persisted, so arming their unsaved flag cannot suppress a real singleplayer
-            // save. The chunk comes from the bound level's own source, so this holds for a first capture and a
-            // revisit re-buffer alike.
+            // Safety canary: capture only ever touches Minecraft.level (ClientLevel) chunks, which are never
+            // persisted, so arming their save state cannot silently suppress a real singleplayer save.
             assert chunk.getLevel() == level : "capture touched a chunk outside the bound ClientLevel";
             // The snapshot stands alone in its own try because it is the only statement here whose failure
             // loses the chunk: past the buffer insert the terrain is already committed to flush, so a throw
@@ -1594,13 +1592,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Clear the chunk's construction-time {@code unsaved=true} so the first post-capture poll does not flag every
-     * freshly captured chunk dirty. Below the 1.21.2 unsaved-listener there is no change callback, so a real
-     * post-capture block-STATE change re-sets the flag and {@link #pollDirtyChunks} picks it up on the next tick.
+     * Re-arm a freshly captured chunk ({@link #rearmUnsaved}) so the first post-capture poll does not flag it dirty.
+     * Below the 1.21.2 unsaved-listener there is no change callback, so a real post-capture block-STATE change re-sets
+     * the flag and {@link #pollDirtyChunks} picks it up on the next tick.
      */
     private void attachRecapture(LevelChunk chunk, ChunkPos pos) {
         capturedThisTick.add(pos.toLong());
-        chunk.setUnsaved(false);
+        rearmUnsaved(chunk);
     }
 
     /**
@@ -1633,8 +1631,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Populate the change-driven dirty set by polling {@code isUnsaved()} across the keep-hot buffer. Below the 1.21.2
      * {@code setUnsavedListener} push there is no change callback, so this pull replaces it. The buffer is bounded to
      * the keep-hot square around the player, so a full scan per tick stays cheap; it does no encoding, so it spends no
-     * encode budget. Only chunks a real block-state change re-flagged since their last re-encode are added, and each
-     * re-encode clears the flag again ({@link #reencode}), so a chunk re-enters only on a fresh change.
+     * encode budget. Chunks a real block-state change re-flagged since their last re-encode are added, and each
+     * re-encode re-arms the chunk ({@link #rearmUnsaved}); a chunk an entity has entered since its last re-encode also
+     * re-enters once, the query reporting a last save that held entities, and the re-encode that follows re-arms it.
      */
     private void pollDirtyChunks(ClientChunkCache chunkSource, LongOpenHashSet dirtySet) {
         for (ChunkPos pos : captured.keySet()) {
@@ -1707,11 +1706,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Replace one still-hot chunk's buffered tag with a fresh encode of its current live state, then re-arm the dirty
-     * listener. Skips a chunk already re-encoded this tick or first-captured this tick, and a candidate that is no
-     * longer eligible (flushed, so never revived; or its live chunk has unloaded past the keep-hot margin, so the last
-     * buffered snapshot stands). A throwing capture is logged and the prior buffered snapshot is kept, isolating the
-     * failure to one chunk.
+     * Replace one still-hot chunk's buffered tag with a fresh encode of its current live state, then re-arm the chunk
+     * ({@link #rearmUnsaved}) so only a fresh change re-adds it. Skips a chunk already re-encoded this tick or
+     * first-captured this tick, and a candidate that is no longer eligible (flushed, so never revived; or its live
+     * chunk has unloaded past the keep-hot margin, so the last buffered snapshot stands). A throwing capture is logged
+     * and the prior buffered snapshot is kept, isolating the failure to one chunk.
      */
     private void reencode(ChunkPos pos, ChunkCodec codec, ClientChunkCache chunkSource,
             LongOpenHashSet reencodedThisTick) {
@@ -1727,18 +1726,32 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (chunk == null) {
             return; // unreachable given shouldRecapture above; the explicit check narrows nullness
         }
-        // Safety canary: re-capture must only ever touch Minecraft.level
-        // (ClientLevel) chunks, which are never persisted, so clearing their unsaved flag cannot suppress a
-        // real singleplayer save. The chunk is fetched from the bound level's own source, so this holds.
+        // Safety canary: re-capture must only ever touch Minecraft.level (ClientLevel) chunks, which are never
+        // persisted, so re-arming their save state cannot silently suppress a real singleplayer save.
         assert chunk.getLevel() == level : "re-capture touched a chunk outside the bound ClientLevel";
         try {
             captured.put(pos, codec.capture(chunk, registries));
             reencodedThisTick.add(key);
             dirtyRemove(key);
-            chunk.setUnsaved(false); // re-arm the unsaved flag so the next block-state change re-flags this chunk
+            rearmUnsaved(chunk);
         } catch (RuntimeException e) {
             LOGGER.warn("failed to re-capture chunk {}", pos, e);
         }
+    }
+
+    /**
+     * Re-arm a client chunk after this session serialized it: clear its unsaved flag, and clear its last-save entity
+     * flag to state what the re-encode wrote, which is the chunk's blocks and block entities and never an entity. The
+     * {@code isUnsaved()} query that {@link #pollDirtyChunks} polls then reduces to the unsaved flag, so only a fresh
+     * block-state change flags the chunk again until an entity next enters it. Package-private so a test can drive the
+     * re-arm against a real chunk.
+     */
+    static void rearmUnsaved(LevelChunk chunk) {
+        chunk.setUnsaved(false);
+        // The entity clear is load-bearing, not bookkeeping. isUnsaved also returns true while the last save held
+        // entities and the game time differs from the chunk's last-save time, which nothing writes on a client, so
+        // without the clear the poll re-flags every entity-bearing chunk on every tick and spends the encode budget.
+        chunk.setLastSaveHadEntities(false);
     }
 
     private void dirtyRemove(long key) {
