@@ -851,7 +851,7 @@ val checkReobfNegative = tasks.register<CheckSeargeSurface>("checkReobfNegative"
 // else in the build relates the two coordinates.
 val checkForgeFloor = tasks.register("checkForgeFloor") {
     group = "verification"
-    description = "Fails if WdlForge's @Mod dependencies floor does not match forge_version_min or outruns forge_version"
+    description = "Fails if WdlForge's @Mod dependencies floor does not match forge_version_min, outruns forge_version, or names a mod id Forge does not register"
     // Captured by value at configuration time, like checkPlugBand's own locals, so no Project reference survives
     // into task execution.
     val forgeVersionMin = band("forge_version_min")
@@ -890,16 +890,41 @@ val checkForgeFloor = tasks.register("checkForgeFloor") {
                     + "one it was compiled against, and every user gets MissingModsException."
             )
         }
-        val declared = Regex("""required-after:forge@\[([^,\]]+),""")
-            .find(entrypointSource.asFile.readText())?.groupValues?.get(1)
-            ?: throw GradleException(
-                "WdlForge declares no required-after:forge floor in its @Mod dependencies; legacy FML then "
+        // Raw file text, not the parsed annotation: a required-after entry inside a comment counts, and a second
+        // Forge entry anywhere in this file reds the build rather than going unread.
+        val forgeEntries = Regex("""required-after:([^@\s;]+)@\[([^,\]]+),""")
+            .findAll(entrypointSource.asFile.readText())
+            .filter { it.groupValues[1].equals("forge", ignoreCase = true) }
+            .toList()
+        if (forgeEntries.isEmpty()) {
+            throw GradleException(
+                "WdlForge declares no required-after Forge floor in its @Mod dependencies; legacy FML then "
                     + "enforces no Forge version at all"
             )
+        }
+        if (forgeEntries.size > 1) {
+            throw GradleException(
+                "WdlForge declares ${forgeEntries.size} required-after Forge floors in its @Mod dependencies "
+                    + "(${forgeEntries.joinToString { it.value }}). Legacy FML enforces every entry it parses, so "
+                    + "one this gate did not read can still stop the mod loading; declare exactly one."
+            )
+        }
+        val entry = forgeEntries.single()
+        val declaredId = entry.groupValues[1]
+        val declared = entry.groupValues[2]
         if (declared != forgeVersionMin) {
             throw GradleException(
                 "Forge floor mismatch: forge_version_min is $forgeVersionMin but WdlForge's @Mod dependencies "
                     + "declares $declared. The annotation is the one legacy FML enforces, so change both."
+            )
+        }
+        // Pinned rather than read off the provisioned jar as 1.10.2 does: ForgeModContainer registers the literal
+        // "forge" at this band and the literal "Forge" at 1.10.2, so this string is band-local, not a tidy.
+        if (declaredId != "forge") {
+            throw GradleException(
+                "Forge mod id mismatch: WdlForge's @Mod dependencies names \"$declaredId\" but ForgeModContainer "
+                    + "registers \"forge\" at this band. Loader.sortModList matches declared names against "
+                    + "registered ids by String equality, so the mod does not load at all."
             )
         }
     }
