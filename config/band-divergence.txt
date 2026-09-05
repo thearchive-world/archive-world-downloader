@@ -126,6 +126,16 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # chest size from ContainerCapture.mountChestSize rather than the 1.11 getInventoryColumns.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
+# New here and on every other band below 1.14, on none above: from 1.14 up the chunk exposes an isUnsaved reader, so
+# the dirty poll reads that flag directly and this gate has nothing to stand in for. Here the poll has to use the
+# should-save query instead, whose entity arm is permanently satisfied on a client chunk, nothing but the server's
+# own chunk provider ever writing the last save time it compares against. Clearing the unsaved flag cannot quiet
+# that arm, so the re-arm stamps the last save time too, and this gate holds it to that: the clear alone leaves the
+# query true, the re-arm leaves it reading the flag alone, and the arm returns once at 600 ticks, the bounded
+# residual the poll's contract states. The names are classic MCP throughout (Chunk, needsSaving, setHasEntities,
+# and the world clock pushed through WorldInfo.setWorldTotalTime).
+common/src/test/java/world/thearchive/wdl/adapter/RecaptureRearmTest.java
+
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
 # SystemToast has no custom-id class, so the two toast streams reuse two distinct vanilla SystemToastIds enum
 # categories, and MutableComponent has no withColor(int), so toast text colors go through withStyle.
