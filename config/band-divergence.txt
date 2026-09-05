@@ -532,8 +532,9 @@ common/src/test/java/world/thearchive/wdl/testsupport/EntityIdRegistryTest.java
 # split by entity shape: a fixture built through replaceItemInInventory is server-shaped, because that path re-runs
 # initHorseChest, and no fixture of that shape can hold a chested flag over a two-slot inventory, which is the client
 # state the field defect arrived in. The case that sets the flag on its own is the one that sees it. No band above
-# needs the test, getInventoryColumns being directly readable there, and the shared association test cannot host it,
-# being Minecraft-free by construction and driving the same entry point with literals.
+# needs this size gate, getInventoryColumns being directly readable there, though the bands above up to 1.20.4 now
+# carry the file for the slot-numbering gate instead, and the shared association test cannot host it, being
+# Minecraft-free by construction and driving the same entry point with literals.
 common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
 
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
