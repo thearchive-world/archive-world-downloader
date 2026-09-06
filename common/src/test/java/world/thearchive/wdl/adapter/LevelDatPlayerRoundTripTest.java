@@ -101,6 +101,20 @@ class LevelDatPlayerRoundTripTest {
     }
 
     @Test
+    void aNullCapturedPlayerLeavesAnExistingLevelDatAlone(@TempDir Path saves) throws IOException {
+        CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(), new BlockPos(120, 72, -340), 90.0F, 12.0F,
+                DimensionType.NETHER, GameType.CREATIVE, EnumDifficulty.HARD);
+        saveAndReadBack(saves, "resumed", captured);
+
+        NBTTagCompound data = saveAndReadBack(saves, "resumed", null);
+
+        assertEquals("captured-player", data.getCompoundTag("Player").getString("wdlMarker"),
+                "a finish with no player of its own must not overwrite the player record already in the folder");
+        assertEquals(GameType.CREATIVE.getID(), (data.hasKey("GameType") ? data.getInteger("GameType") : -99),
+                "nor the rest of the prior level.dat it has nothing better to replace");
+    }
+
+    @Test
     void savesCapturedPlayerRootVehicleInTheShapeLoadAndSpawnParentVehicleReads(@TempDir Path saves)
             throws IOException {
         NBTTagCompound playerTag = capturedPlayerTag();
