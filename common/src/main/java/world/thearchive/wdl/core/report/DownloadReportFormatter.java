@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.StringJoiner;
 
 import world.thearchive.wdl.core.ElapsedTime;
 
@@ -84,6 +85,23 @@ final class DownloadReportFormatter {
             out.append("- **Duration**: Unknown\n");
         }
         out.append("- **Status**: ").append(statusText(session)).append('\n');
+        appendLosses(out, session.losses());
+    }
+
+    /**
+     * What the download lost, by axis, under the status it explains. Absent for a partial record written before the
+     * counts were kept, which is why the status line stands on its own above. The count reads after the axis name
+     * rather than before it, so a single loss does not render as a plural.
+     */
+    private static void appendLosses(StringBuilder out, Map<String, Integer> losses) {
+        if (losses.isEmpty()) {
+            return;
+        }
+        StringJoiner axes = new StringJoiner(", ");
+        for (Map.Entry<String, Integer> loss : losses.entrySet()) {
+            axes.add(loss.getKey().replace('_', ' ') + " " + loss.getValue());
+        }
+        out.append("- **Lost**: ").append(axes).append('\n');
     }
 
     private static void appendServer(StringBuilder out, DownloadSession session) {
