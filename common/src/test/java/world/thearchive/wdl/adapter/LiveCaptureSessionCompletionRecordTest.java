@@ -11,6 +11,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import net.minecraft.world.level.dimension.DimensionType;
@@ -130,9 +131,26 @@ class LiveCaptureSessionCompletionRecordTest {
 
         freezeAndReport(session, cleanWrite());
 
-        assertFalse(recordedSession(saveRoot).isClean(),
+        DownloadSession recorded = recordedSession(saveRoot);
+        assertFalse(recorded.isClean(),
                 "and the record carries that verdict, which is what shows the user a resumable partial download "
                         + "instead of telling them a save missing its player is finished");
+        assertEquals(Collections.singletonMap("player_records", 1), recorded.losses(),
+                "naming the axis it lost on, and only that one, so the report tells the user what to go back for "
+                        + "rather than only that something went wrong");
+    }
+
+    @Test
+    void aCleanDownloadRecordsNoLossAtAll(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(temporary);
+        Path saveRoot = temporary.resolve("save");
+        beginReport(session, saveRoot);
+
+        freezeAndReport(session, cleanWrite());
+
+        assertEquals(Collections.<String, Integer>emptyMap(), recordedSession(saveRoot).losses(),
+                "a download that lost nothing names no axis: the breakdown is the losses that moved, so a reader "
+                        + "seeing an axis knows it is real rather than a zero row");
     }
 
     /**
