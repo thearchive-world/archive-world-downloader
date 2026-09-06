@@ -47,6 +47,7 @@ public final class DownloadReportLog {
     private static final String SETTING_PREFIX = "s.";
     private static final String DIMENSION_PREFIX = "d.";
     private static final String SAVE_DIMENSION_PREFIX = "sd.";
+    private static final String LOSS_PREFIX = "l.";
 
     private DownloadReportLog() {}
 
@@ -58,14 +59,16 @@ public final class DownloadReportLog {
 
     /**
      * One completed download: the begin-time record plus the frozen session counts, the frozen in-save chunk totals
-     * ({@code saveChunks} with the {@code sd.} per-dimension breakdown), and the clean-finish status.
+     * ({@code saveChunks} with the {@code sd.} per-dimension breakdown), and what it lost, as the {@code l.} per-axis
+     * counts plus the status they decide. The status is derived here rather than passed alongside them, so a record
+     * cannot claim a clean finish while listing a loss.
      */
     public static String completedLine(DownloadIdentity identity, @Nullable ReportEnvironment environment,
             Map<String, String> settings, Instant finishedAt, DownloadCounts counts, SaveChunks saveChunks,
-            boolean clean) {
+            Map<String, Integer> losses) {
         Map<String, @Nullable Object> fields = beginFields(identity, environment, settings);
         fields.put("finishedAt", DateTimeFormatter.ISO_INSTANT.format(finishedAt));
-        fields.put("status", clean ? STATUS_COMPLETE : STATUS_PARTIAL);
+        fields.put("status", losses.isEmpty() ? STATUS_COMPLETE : STATUS_PARTIAL);
         fields.put("chunks", counts.chunks());
         fields.put("entities", counts.entities());
         fields.put("containers", counts.containers());
@@ -75,6 +78,9 @@ public final class DownloadReportLog {
         }
         for (DimensionChunks dimension : saveChunks.dimensions()) {
             fields.put(SAVE_DIMENSION_PREFIX + dimension.dimensionName(), dimension.chunks());
+        }
+        for (Map.Entry<String, Integer> loss : losses.entrySet()) {
+            fields.put(LOSS_PREFIX + loss.getKey(), loss.getValue());
         }
         return Json.writeObject(fields);
     }
@@ -185,7 +191,7 @@ public final class DownloadReportLog {
             SaveChunks saveChunks = new SaveChunks(intValue(object, "saveChunks"),
                     readDimensions(object, SAVE_DIMENSION_PREFIX));
             return new DownloadSession(identity, settings, environment, true, clean,
-                    instantValue(object, "finishedAt"), counts, saveChunks);
+                    instantValue(object, "finishedAt"), counts, saveChunks, readLosses(object));
         }
         return new DownloadSession(identity, settings, environment, false, false, null, null, null);
     }
@@ -206,6 +212,17 @@ public final class DownloadReportLog {
                 stringValue(object, "sourceMotd"), stringValue(object, "loaderName"),
                 stringValue(object, "loaderVersion"), stringValue(object, "downloadName"),
                 stringValue(object, "sourceKind"));
+    }
+
+    /** The per-axis loss counts, empty for a record written before they were kept. */
+    private static Map<String, Integer> readLosses(Map<String, @Nullable Object> object) {
+        Map<String, Integer> losses = new LinkedHashMap<>();
+        for (Map.Entry<String, @Nullable Object> entry : object.entrySet()) {
+            if (entry.getKey().startsWith(LOSS_PREFIX) && entry.getValue() instanceof Number) {
+                losses.put(entry.getKey().substring(LOSS_PREFIX.length()), ((Number) entry.getValue()).intValue());
+            }
+        }
+        return losses;
     }
 
     private static Map<String, String> readSettings(Map<String, @Nullable Object> object) {
