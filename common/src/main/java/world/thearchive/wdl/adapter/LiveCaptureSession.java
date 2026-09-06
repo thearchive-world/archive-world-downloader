@@ -751,6 +751,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private int resumedMountsLost;
 
+
     /**
      * Chunks whose terrain snapshot threw, so the position reached neither the buffer nor the captured set and the
      * reopened world has none of that chunk's terrain, falling back to its own generator there (main thread). Deduped
@@ -2330,6 +2331,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      *
      */
     private void finishCapture() {
+        // Stamped here rather than at the drain, because the save-time burst below is itself a live-state read
+        // racing the same teardown: a window measured from the drain would leave it out and read low.
+        long finishStartNanos = System.nanoTime();
         // The finish drain must encode everything still loaded, so the per-tick encode budget does not apply
         // here (the burst below and the entity refresh run unbounded).
         encodeDeadlineNanos = Long.MAX_VALUE;
@@ -2372,7 +2376,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             completeWithoutWriter();
             return;
         }
-        drainToWriter(activeWriter, minecraft, player);
+        drainToWriter(activeWriter, minecraft, player, finishStartNanos);
     }
 
     /**
@@ -2421,7 +2425,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
-    private void drainToWriter(AsyncSaveWriter activeWriter, Minecraft minecraft, @Nullable EntityPlayerSP player) {
+    private void drainToWriter(AsyncSaveWriter activeWriter, Minecraft minecraft, @Nullable EntityPlayerSP player,
+            long finishStartNanos) {
         // From here every newly imaged map batches instead of streaming alone, so the writer can report the map
         // phase over a known total. Armed before the first finish-time remap below and handed over after the last
         // one; the local spares that handover a null check on the field.
@@ -2434,12 +2439,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // Stop the inbound tee before the finish drain so no spawn arrives mid-drain to be left unwritten and
         // uncounted; the drain and the reconciliation then see a settled accumulator.
         deactivatePacketCapture();
-        // Snapshot a ridden vehicle into the player's RootVehicle before the drain, so its UUID is held from the
-        // standalone write below and its stashed contents drain before the not-saved check. The mount is
-        // player-state, so this is not gated on captureEntities.
-        if (player != null && minecraft.world == level()) {
-            prepareRootVehicleCapture(player);
-        }
+        captureLiveClientState(minecraft, player);
+        long liveStateNanos = System.nanoTime();
         retryRefusedPrimes();
         // Drain the held packet accumulator: every non-player entity in a captured chunk, including the fly-past
         // tail that unloaded long ago and even after a disconnect-flush, at its last
@@ -2468,11 +2469,35 @@ public final class LiveCaptureSession implements CaptureController.Session {
         countDroppedInteractionCaptures(); // likewise: only what the whole-buffer drain could not reach
         countOrphanedContainerVehicles();
         countOrphanedMerchantTrades();
-        // Snapshot and assemble the local player for the save (skipped on a disconnect-flush). Fail-soft:
-        // a serialize or scrub throw here, after chunks have committed, must not abort before
-        // activeWriter.finish() and leave a chunks-without-level.dat unopenable world plus a leaked lock, so
-        // any throw degrades to a null capturedPlayer (the openable void-world level.dat) and the save runs on.
+        long drainDoneNanos = System.nanoTime();
+        releaseResumedDismountedMount(activeWriter);
+        prepareReportCompletion(); // freeze the end-of-capture counts before the writer finalizes
+        // After every remap site above, so the batch is complete and queues behind the last chunk and entity
+        // write: the bar then finishes the chunk phase, advances through the map phase, and only then compresses.
+        activeWriter.submitMapBatch(mapWrites);
+        this.finishMapWrites = null; // the writer holds its own copy; dropping ours frees the batched map tags
+        this.finishBatchClosed = true;
+        // INFO because a field report of a missing player record is undiagnosable without it, and never has debug.log.
+        LOGGER.info("finish: the live client state was read {} ms in, the entity drain and flush finished {} ms "
+                + "in; the first figure is the window a concurrent client teardown has to beat",
+                (liveStateNanos - finishStartNanos) / 1_000_000L, (drainDoneNanos - finishStartNanos) / 1_000_000L);
+    }
+
+    /**
+     * Everything this finish must read from the live client, taken before the entity drain rather than after it.
+     *
+     * <p>Do not move any of it back behind the drain. A disconnect the player did not initiate delivers this finish on
+     * the network IO thread while the client main thread is inside {@code Minecraft.disconnect}, so the two run
+     * concurrently and every read here is void once the field it needs is nulled. Being early shortens that window
+     * without closing it: a client already torn down when the finish is entered still loses the player record.
+     */
+    private void captureLiveClientState(Minecraft minecraft, @Nullable EntityPlayerSP player) {
         if (player != null && minecraft.world == level()) {
+            // The mount is player-state, so this is not gated on captureEntities.
+            prepareRootVehicleCapture(player);
+            // Fail-soft: a serialize or scrub throw here, after chunks have committed, must not abort before
+            // activeWriter.finish() and leave a chunks-without-level.dat unopenable world plus a leaked lock, so
+            // any throw degrades to a null capturedPlayer (the openable void-world level.dat) and the save runs on.
             this.capturedPlayer = failSoft("player", () -> assembleCapturedPlayer(player, minecraft));
             this.capturedProgress = failSoft("progress", () -> assembleCapturedProgress(player, minecraft));
             UUID salvageAttach = rootVehicleAttach;
@@ -2487,19 +2512,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         () -> assembleSalvageMountPlayer(player, minecraft, salvageAttach, salvageMount));
             }
         }
-        releaseResumedDismountedMount(activeWriter);
-        // Snapshot the source server's icon on the main thread (getCurrentServer is live only while connected);
-        // the writer thread reads the frozen bytes. Reading at finish, not begin, also catches an icon pushed
-        // mid-session after join. Null in singleplayer or with no cached icon, so no icon file is written.
+        // Snapshot the source server's icon on the main thread; the writer thread reads the frozen bytes. Reading
+        // at finish, not begin, also catches an icon pushed mid-session after join. Deliberately outside the guard
+        // above, so an icon can still survive a finish already too late for the player record.
         ServerData iconServer = minecraft.getCurrentServerData();
         String iconB64 = iconServer != null ? iconServer.getBase64EncodedIconData() : null;
         this.reportIconBytes = iconB64 != null ? Base64.getDecoder().decode(iconB64) : null;
-        prepareReportCompletion(); // freeze the end-of-capture counts before the writer finalizes
-        // After every remap site above, so the batch is complete and queues behind the last chunk and entity
-        // write: the bar then finishes the chunk phase, advances through the map phase, and only then compresses.
-        activeWriter.submitMapBatch(mapWrites);
-        this.finishMapWrites = null; // the writer holds its own copy; dropping ours frees the batched map tags
-        this.finishBatchClosed = true;
     }
 
     /**
@@ -4786,7 +4804,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * session's own fail-soft tallies (throwing chunk snapshots, map writes and remaps, the finalize-time idcounts
      * write, the map-id manifest, block and vehicle container merges, unrecovered opened vehicles, unwritten
      * interaction predictions, structural entity drops, an unplaceable resumed mount, and the degraded finish-time
-     * steps). Heterogeneous units, honest only as a rough magnitude; the log carries the breakdown.
+     * steps). Heterogeneous units, honest only as a rough magnitude; the
+     * log carries the breakdown.
      *
      * <p>A zero is not proof a download lost nothing. Losses reach this sum only where a term was added for them, so
      * read a zero as "no counted term moved" and never as "nothing was lost", and do not add a caller that treats it as
