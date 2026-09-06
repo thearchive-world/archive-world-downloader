@@ -3001,9 +3001,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // assembly stays the backstop for the shared step, the uuid.
             advancements = failSoft("advancements", () -> {
                 NetHandlerPlayClient connection = minecraft.getConnection();
-                Map<String, AdvancementProgress> byId = connection != null
-                        ? AdvancementSnapshot.byId(connection.getAdvancementManager())
-                        : ImmutableMap.of();
+                if (connection == null) {
+                    // Null, not an empty blob: the writer skips a null surface and writes an empty one, so
+                    // serializing nothing here would overwrite a resume's prior advancements.
+                    return null;
+                }
+                Map<String, AdvancementProgress> byId = AdvancementSnapshot.byId(connection.getAdvancementManager());
                 return PlayerProgressSerializer.advancementsJson(byId);
             });
         }
