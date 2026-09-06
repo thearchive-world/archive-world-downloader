@@ -208,6 +208,33 @@ final class CaptureDriver {
         tick((int) ticks);
     }
 
+    /**
+     * Wire this driver's controller to the loader's disconnect event, the one line production runs at startup. Without
+     * it a disconnect leaves the driver recording, because the driver deliberately runs its own controller.
+     */
+    void armDisconnectAutoStop() {
+        bridge.onDisconnect(controller::onDisconnect);
+    }
+
+    /** Pump without stopping first, the disconnect auto-stop having already run; returns the save root on disk. */
+    Path awaitSaveAfterDisconnect() {
+        boolean saved = false;
+        for (int tick = 0; tick < SAVE_TIMEOUT_TICKS && !saved; tick++) {
+            saved = context.computeOnClient(client -> {
+                controller.tick();
+                return controller.state() == CaptureState.IDLE;
+            });
+            if (!saved) {
+                context.waitTick();
+            }
+        }
+        if (!saved) {
+            throw new AssertionError("capture '" + target.folderName() + "' did not finish saving after the "
+                    + "disconnect within " + SAVE_TIMEOUT_TICKS + " ticks");
+        }
+        return context.computeOnClient(client -> client.getLevelSource().getBaseDir().resolve(target.folderName()));
+    }
+
     /** Stop recording and pump until the background writer reports done; returns the save root on disk. */
     Path stopAndAwaitSave() {
         return stopAndAwaitSave(true, "did not finish saving");
