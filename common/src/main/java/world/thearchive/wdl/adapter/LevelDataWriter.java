@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.util.List;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.WorldData;
 import org.jspecify.annotations.Nullable;
@@ -92,8 +94,14 @@ public interface LevelDataWriter {
     List<CuratedGameRule> curatedGameRules();
 
     /**
-     * A built {@code WorldData} paired with the registries needed to serialize it, plus the game-rule resolution (the
-     * effective rules were already applied to the world data; the diagnostics are for the caller to log and surface).
+     * A built {@code WorldData} paired with the registries needed to serialize it, the game-rule resolution (the
+     * effective rules were already applied to the world data; the diagnostics are for the caller to log and surface),
+     * and the two values {@link #save} writes to the save-side SavedData files that this band's {@code WorldData} no
+     * longer carries.
+     *
+     * <p>Do not move those last two onto the writer: it is one shared instance, so two downloads whose open and
+     * finalize interleave would overwrite each other's values and the loser's save would abort before level.dat exists.
      */
-    record LevelData(WorldData worldData, RegistryAccess registries, GameRuleResolution gameRules) {}
+    record LevelData(WorldData worldData, RegistryAccess registries, GameRuleResolution gameRuleResolution,
+            WorldGenSettings worldGenSettings, GameRules gameRules) {}
 }
