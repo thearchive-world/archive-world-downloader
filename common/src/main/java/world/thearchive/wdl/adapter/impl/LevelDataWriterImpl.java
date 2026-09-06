@@ -256,7 +256,10 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // so any IO failure aborts before level.dat exists: an aborted save with no level.dat is invisible in
         // vanilla's world list, whereas a level.dat with a missing world_gen_settings.dat opens as a random-seed
         // world around the captured chunks, claiming success.
-        UUID singleplayerUuid = null;
+        // Carried from the folder's existing level.dat when this finish has no player of its own: readPriorPlayer
+        // resolves the player file through this stamp and through nothing else, so dropping it silently strands a
+        // player record this save still holds.
+        UUID singleplayerUuid = player == null ? priorSingleplayerUuid(saveRoot) : null;
         if (player != null) {
             // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
             PrimaryLevelData levelData = (PrimaryLevelData) worldData;
@@ -267,6 +270,29 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         }
         writeMetadata(saveRoot, registries, worldData, data.worldGenSettings(), data.gameRules());
         access.saveDataTag(worldData, singleplayerUuid);
+    }
+
+    /**
+     * The {@code singleplayer_uuid} already stamped in this folder's level.dat, or null when the folder is fresh or
+     * carries no stamp. Fail-soft on every read failure: the stamp is a carry-forward handle, and losing it costs a
+     * later resume its prior contents, which is strictly better than failing a save that is otherwise written.
+     */
+    private static @Nullable UUID priorSingleplayerUuid(Path saveRoot) {
+        Path levelDatFile = saveRoot.resolve("level.dat");
+        if (!Files.exists(levelDatFile)) {
+            return null;
+        }
+        try {
+            CompoundTag root = NbtIo.readCompressed(levelDatFile, NbtAccounter.uncompressedQuota());
+            return root.get("Data") instanceof CompoundTag data
+                    ? data.read("singleplayer_uuid", UUIDUtil.CODEC).orElse(null)
+                    : null;
+        } catch (IOException | RuntimeException e) {
+            LOGGER.warn("could not read the prior singleplayer uuid from {}; a later resume will not find this "
+                    + "folder's player record and will not carry its ender chest or parked mount forward",
+                    levelDatFile, e);
+            return null;
+        }
     }
 
     /**
