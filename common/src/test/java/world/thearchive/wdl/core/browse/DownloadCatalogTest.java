@@ -223,7 +223,8 @@ class DownloadCatalogTest {
                         "", "Resumed World"), ReportFixtures.environment("1.0.0-SNAPSHOT"),
                         ReportFixtures.settings(), Instant.parse("2026-07-24T00:00:00Z"),
                         new DownloadCounts(10, 5, 2),
-                        new SaveChunks(1000, Collections.<DimensionChunks>emptyList()), false));
+                        new SaveChunks(1000, Collections.<DimensionChunks>emptyList()),
+                        Collections.singletonMap("chunks", 1)));
 
         List<DownloadEntry> entries = DownloadCatalog.list(savesDirectory, null);
 
@@ -247,14 +248,14 @@ class DownloadCatalogTest {
                         "", "Scanless World"), ReportFixtures.environment("1.0.0-SNAPSHOT"),
                         ReportFixtures.settings(), Instant.parse("2026-07-24T00:00:00Z"),
                         new DownloadCounts(10, 5, 2),
-                        new SaveChunks(0, Collections.<DimensionChunks>emptyList()), true));
+                        new SaveChunks(0, Collections.<DimensionChunks>emptyList()), Collections.emptyMap()));
         Path undercountFolder = savesDirectory.resolve("undercount-world");
         DownloadReportLog.append(DownloadReportStore.machineFile(undercountFolder),
                 DownloadReportLog.completedLine(ReportFixtures.identity("b", "survival.thearchive.world",
                         "", "Undercount World"), ReportFixtures.environment("1.0.0-SNAPSHOT"),
                         ReportFixtures.settings(), Instant.parse("2026-07-24T00:00:00Z"),
                         new DownloadCounts(10, 5, 2),
-                        new SaveChunks(4, Collections.<DimensionChunks>emptyList()), true));
+                        new SaveChunks(4, Collections.<DimensionChunks>emptyList()), Collections.emptyMap()));
 
         List<DownloadEntry> entries = DownloadCatalog.list(savesDirectory, null);
 
@@ -279,7 +280,7 @@ class DownloadCatalogTest {
                         "", "Equal World"), ReportFixtures.environment("1.0.0-SNAPSHOT"),
                         ReportFixtures.settings(), Instant.parse("2026-07-24T00:00:00Z"),
                         new DownloadCounts(10, 5, 2),
-                        new SaveChunks(10, Collections.<DimensionChunks>emptyList()), true));
+                        new SaveChunks(10, Collections.<DimensionChunks>emptyList()), Collections.emptyMap()));
 
         List<DownloadEntry> entries = DownloadCatalog.list(savesDirectory, null);
 
@@ -309,14 +310,14 @@ class DownloadCatalogTest {
             DownloadCounts counts) throws IOException {
         DownloadReportLog.append(DownloadReportStore.machineFile(folder), DownloadReportLog.completedLine(
                 identity(id, name), environment(), Collections.<String, String>emptyMap(), finished, counts,
-                new SaveChunks(0, ImmutableList.of()), true));
+                new SaveChunks(0, ImmutableList.of()), Collections.emptyMap()));
     }
 
     private static void writePartial(Path folder, String id, String name, Instant finished,
             DownloadCounts counts) throws IOException {
         DownloadReportLog.append(DownloadReportStore.machineFile(folder), DownloadReportLog.completedLine(
                 identity(id, name), environment(), Collections.<String, String>emptyMap(), finished, counts,
-                new SaveChunks(0, ImmutableList.of()), false));
+                new SaveChunks(0, ImmutableList.of()), Collections.singletonMap("chunks", 1)));
     }
 
     private static void writePending(Path folder, String id, String name) throws IOException {
