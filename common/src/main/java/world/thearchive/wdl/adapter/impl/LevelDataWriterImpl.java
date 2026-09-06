@@ -103,12 +103,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /** One curated rule: its stable WDL name, the running band's id for it, and the curated raw value. */
     private record CuratedSpec(String wdlId, String bandId, String curatedValue) {}
 
-    // buildLevelData -> save bridge: the worldgen and game-rule values the save-side SavedData writes need, which the
-    // 26.x WorldData no longer carries (worldGenOptions() and getGameRules() are both gone). Set by buildLevelData,
-    // consumed and cleared by the paired save; never spans two downloads.
-    private @Nullable WorldGenSettings pendingWorldGenSettings;
-    private @Nullable GameRules pendingGameRules;
-
     // SpecialWorldProperty is vanilla-deprecated, but the only public PrimaryLevelData ctor still
     // requires it; we take it from the baked dimensions (FLAT, for this superflat void world).
     @SuppressWarnings("deprecation")
@@ -146,9 +140,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // write; noon is world_clocks.dat written by save(), not a setDayTime call, since that method is gone at 26.x.
         PrimaryLevelData worldData = new PrimaryLevelData(
                 settings, dimensions.specialWorldProperty(), dimensions.lifecycle());
-        this.pendingWorldGenSettings = worldGenSettings;
-        this.pendingGameRules = gameRules;
-        return new LevelData(worldData, registries, gameRuleResolution);
+        return new LevelData(worldData, registries, gameRuleResolution, worldGenSettings, gameRules);
     }
 
     @Override
@@ -273,7 +265,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
             levelData.setDifficulty(player.difficulty());
             singleplayerUuid = writePlayerData(saveRoot, player.playerTag());
         }
-        writeMetadata(saveRoot, registries, worldData);
+        writeMetadata(saveRoot, registries, worldData, data.worldGenSettings(), data.gameRules());
         access.saveDataTag(worldData, singleplayerUuid);
     }
 
@@ -301,14 +293,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
      * world clocks. Any {@code IOException} aborts the save unchecked rather than catch-and-degrade: a swallowed
      * worldgen write regenerates a random-seed world, and a missing clocks file freezes the world at tick 0.
      */
-    private void writeMetadata(Path saveRoot, RegistryAccess registries, WorldData worldData) {
-        WorldGenSettings worldGenSettings = this.pendingWorldGenSettings;
-        GameRules gameRules = this.pendingGameRules;
-        if (worldGenSettings == null || gameRules == null) {
-            throw new IllegalStateException("save() called before buildLevelData");
-        }
-        this.pendingWorldGenSettings = null;
-        this.pendingGameRules = null;
+    private void writeMetadata(Path saveRoot, RegistryAccess registries, WorldData worldData,
+            WorldGenSettings worldGenSettings, GameRules gameRules) {
         try {
             LevelStorageSource.writeWorldGenSettings(registries, saveRoot, worldGenSettings);
             LevelStorageSource.writeGameRules(worldData, saveRoot, gameRules);

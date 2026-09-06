@@ -238,7 +238,7 @@ class LevelDatWorldOutputTest {
     void anInvalidOverrideValueIsDroppedAndTheCuratedValueStands() throws IOException {
         Saved saved = save(with("gamerule.keep_inventory", "banana"));
 
-        assertTrue(saved.built().gameRules().droppedInvalidValues().contains("keep_inventory"),
+        assertTrue(saved.built().gameRuleResolution().droppedInvalidValues().contains("keep_inventory"),
                 "the typo is surfaced");
         assertTrue(gameRules(saved).get(GameRules.KEEP_INVENTORY),
                 "the curated value stands; the typo is not written");
@@ -248,7 +248,7 @@ class LevelDatWorldOutputTest {
     void anUnknownOverrideIdIsSurfacedNotWritten() throws IOException {
         Saved saved = save(with("gamerule.doMobSpawning", "false")); // a 1.21.4 id
 
-        assertTrue(saved.built().gameRules().unknownIds().contains("doMobSpawning"),
+        assertTrue(saved.built().gameRuleResolution().unknownIds().contains("doMobSpawning"),
                 "the cross-band loss is surfaced");
         assertFalse(gameRules(saved).get(GameRules.SPAWN_MOBS), "the curated safe set still applies");
     }

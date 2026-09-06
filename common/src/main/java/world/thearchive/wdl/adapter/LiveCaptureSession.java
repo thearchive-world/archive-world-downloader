@@ -3709,7 +3709,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             LevelDataWriter levelDataWriter = adapter.levelDataWriter();
             LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(registries, config.worldOutput(),
                     resolveWorldName());
-            surfaceGameRuleOverrideLoss(levelData.gameRules());
+            surfaceGameRuleOverrideLoss(levelData.gameRuleResolution());
             writer = new AsyncSaveWriter(
                     dimension -> new SimpleRegionStorage(paths.regionStorageInfo(dimension),
                             paths.regionDirectory(dimension), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK),
