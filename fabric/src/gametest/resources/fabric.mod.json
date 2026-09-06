@@ -28,6 +28,7 @@
       "world.thearchive.wdl.fabric.gametest.WdlMapStreamCrashStateTest",
       "world.thearchive.wdl.fabric.gametest.WdlOffModeMapIdCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlOutlineRenderSmokeTest",
+      "world.thearchive.wdl.fabric.gametest.WdlDisconnectFlushTest",
       "world.thearchive.wdl.fabric.gametest.WdlPlayerDataCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlPreexistingEntityCaptureTest",
       "world.thearchive.wdl.fabric.gametest.WdlPlayerMapFinishStreamTest",
