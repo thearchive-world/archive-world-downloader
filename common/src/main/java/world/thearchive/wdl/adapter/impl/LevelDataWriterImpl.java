@@ -51,6 +51,7 @@ import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.storage.LevelData.RespawnData;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.jspecify.annotations.Nullable;
@@ -270,7 +271,11 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // Do not port to 26.x by picking the nearest saveDataTag overload: no overload there carries a player
         // compound, so that band must write players/data/<uuid>.dat itself.
         if (player == null) {
-            access.saveDataTag(data.registries(), data.worldData());
+            // level.dat's "Player" is the only copy of the player record at this band and this write carries
+            // none, so writing unconditionally destroys a prior download's record, silently.
+            if (!Files.exists(access.getLevelPath(LevelResource.LEVEL_DATA_FILE))) {
+                access.saveDataTag(data.registries(), data.worldData());
+            }
             return;
         }
         // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
