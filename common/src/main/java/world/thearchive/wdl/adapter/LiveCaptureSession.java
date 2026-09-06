@@ -3121,10 +3121,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 ClientPacketListener connection = minecraft.getConnection();
                 if (connection == null) {
                     noteLivePlayerStateLost("advancements");
+                    // Null, not an empty blob: the writer skips a null surface and writes an empty one, so
+                    // serializing nothing here would overwrite a resume's prior advancements.
+                    return null;
                 }
-                Map<String, AdvancementProgress> byId = connection != null
-                        ? AdvancementSnapshot.byId(connection.getAdvancements())
-                        : Map.of();
+                Map<String, AdvancementProgress> byId = AdvancementSnapshot.byId(connection.getAdvancements());
                 return PlayerProgressSerializer.advancementsJson(byId, dataVersion);
             });
         }
