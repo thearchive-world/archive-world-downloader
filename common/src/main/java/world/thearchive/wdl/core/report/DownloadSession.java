@@ -4,6 +4,7 @@
 package world.thearchive.wdl.core.report;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
@@ -22,10 +23,21 @@ public final class DownloadSession {
     private final @Nullable Instant finishedAt;
     private final @Nullable DownloadCounts counts;
     private final @Nullable SaveChunks saveChunks;
+    private final Map<String, Integer> losses;
 
+    /** A session with no per-loss breakdown: an interrupted download, or a record written before losses were kept. */
     public DownloadSession(DownloadIdentity identity, Map<String, String> settings,
             @Nullable ReportEnvironment environment, boolean complete, boolean clean,
             @Nullable Instant finishedAt, @Nullable DownloadCounts counts, @Nullable SaveChunks saveChunks) {
+        this(identity, settings, environment, complete, clean, finishedAt, counts, saveChunks,
+                Collections.emptyMap());
+    }
+
+    public DownloadSession(DownloadIdentity identity, Map<String, String> settings,
+            @Nullable ReportEnvironment environment, boolean complete, boolean clean,
+            @Nullable Instant finishedAt, @Nullable DownloadCounts counts, @Nullable SaveChunks saveChunks,
+            Map<String, Integer> losses) {
+        this.losses = losses;
         this.identity = identity;
         this.settings = settings;
         this.environment = environment;
@@ -48,6 +60,14 @@ public final class DownloadSession {
     /** The server/software context captured at begin; null when read from a pre-bump v1 record. */
     public @Nullable ReportEnvironment environment() {
         return environment;
+    }
+
+    /**
+     * What this download lost, by axis, counts only, empty when it lost nothing a tally counts. An absent axis is the
+     * absence of a counted loss, never an assertion that nothing was lost.
+     */
+    public Map<String, Integer> losses() {
+        return losses;
     }
 
     /** Whether this download wrote a completion record; absence reads as interrupted. */

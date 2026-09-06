@@ -121,7 +121,7 @@ class DownloadReportStoreTest {
         DownloadReportStore store = new DownloadReportStore();
         store.begin(directory, identity(), environment(), settings());
         store.complete(directory, identity(), environment(), settings(), FINISHED, new DownloadCounts(421, 367, 0),
-                () -> new SaveChunks(0, Collections.<DimensionChunks>emptyList()), true);
+                () -> new SaveChunks(0, Collections.<DimensionChunks>emptyList()), Collections.emptyMap());
 
         assertTrue(Files.exists(wdl(directory, "download.jsonl")));
         assertFalse(Files.exists(wdl(directory, "download.pending")), "the sentinel is deleted on a clean finish");
@@ -136,9 +136,9 @@ class DownloadReportStoreTest {
         DownloadReportStore store = new DownloadReportStore();
         store.begin(directory, identity(), environment(), settings());
         store.complete(directory, identity(), environment(), settings(), FINISHED, new DownloadCounts(1, 1, 0),
-                () -> new SaveChunks(0, Collections.<DimensionChunks>emptyList()), true);
+                () -> new SaveChunks(0, Collections.<DimensionChunks>emptyList()), Collections.emptyMap());
         store.complete(directory, identity(), environment(), settings(), FINISHED, new DownloadCounts(1, 1, 0),
-                () -> new SaveChunks(0, Collections.<DimensionChunks>emptyList()), true);
+                () -> new SaveChunks(0, Collections.<DimensionChunks>emptyList()), Collections.emptyMap());
 
         assertEquals(1, Files.readAllLines(wdl(directory, "download.jsonl")).size(), "exactly one completed line");
     }
@@ -163,7 +163,7 @@ class DownloadReportStoreTest {
         assertDoesNotThrow(() -> store.begin(blocker, identity(), environment(), settings()));
         assertDoesNotThrow(() -> store.complete(blocker, identity(), environment(), settings(), FINISHED,
                 new DownloadCounts(1, 1, 0), () -> new SaveChunks(0, Collections.<DimensionChunks>emptyList()),
-                true));
+                Collections.emptyMap()));
         assertFalse(warnings.isEmpty(), "a failed report write is caught and surfaced, never thrown");
     }
 
@@ -176,9 +176,9 @@ class DownloadReportStoreTest {
             return new SaveChunks(1, Collections.<DimensionChunks>emptyList());
         };
         store.complete(saveRoot, identity(), environment(), settings(), FINISHED,
-                new DownloadCounts(1, 0, 0), scan, true);
+                new DownloadCounts(1, 0, 0), scan, Collections.emptyMap());
         store.complete(saveRoot, identity(), environment(), settings(), FINISHED,
-                new DownloadCounts(1, 0, 0), scan, true);
+                new DownloadCounts(1, 0, 0), scan, Collections.emptyMap());
         assertEquals(1, scans.get(), "the latch must swallow the second scan, not only the second line");
     }
 }
