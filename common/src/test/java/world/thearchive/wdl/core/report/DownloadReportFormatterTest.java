@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -156,6 +157,40 @@ class DownloadReportFormatterTest {
                 Collections.singletonList(session), false, UTC, Locale.ROOT);
 
         assertTrue(md.contains("- **Status**: Completed with errors (partial)"));
+    }
+
+    @Test
+    void namesWhatAnIncompleteDownloadLost() {
+        DownloadIdentity identity = ReportFixtures.identity("p", "survival.thearchive.world", "", "");
+        Map<String, Integer> losses = new LinkedHashMap<>();
+        losses.put("player_records", 1);
+        losses.put("chunk_captures", 3);
+        DownloadSession session = new DownloadSession(identity, Collections.<String, String>emptyMap(),
+                environment(), true, false, STARTED.plusSeconds(4),
+                new DownloadCounts(10, 1, 0, List.of(new DimensionChunks("overworld", 10))), null, losses);
+
+        String md = DownloadReportFormatter.render(
+                Collections.singletonList(session), false, UTC, Locale.ROOT);
+
+        assertTrue(md.contains("- **Lost**: player records 1, chunk captures 3"),
+                "a partial status the user cannot act on is only an alarm; the axes are what say whether to go "
+                        + "back for it, and the wire keys read as words: " + md);
+    }
+
+    @Test
+    void aPartialRecordFromBeforeLossesWereKeptNamesNone() {
+        DownloadIdentity identity = ReportFixtures.identity("p", "survival.thearchive.world", "", "");
+        DownloadSession session = new DownloadSession(identity, Collections.<String, String>emptyMap(),
+                environment(), true, false, STARTED.plusSeconds(4),
+                new DownloadCounts(10, 1, 0, List.of(new DimensionChunks("overworld", 10))), null);
+
+        String md = DownloadReportFormatter.render(
+                Collections.singletonList(session), false, UTC, Locale.ROOT);
+
+        assertTrue(md.contains("- **Status**: Completed with errors (partial)"), "the status still stands alone");
+        assertFalse(md.contains("- **Lost**:"),
+                "and an older record renders no breakdown rather than an empty or invented one, since it never "
+                        + "carried the counts: " + md);
     }
 
     @Test
