@@ -4863,11 +4863,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return; // nothing began, or finish() returned early before freezing the counts
         }
         WorldIconWriter.write(pending.saveRoot(), reportIconBytes); // bytes were snapshotted on the main thread
-        boolean clean = !isPartialSave(chunksFailed, entityChunksFailed);
         report.complete(pending.saveRoot(), pending.identity(), pending.environment(), pending.settings(),
                 pending.finishedAt(), new DownloadCounts(pending.chunks(), pending.entities(),
                         pending.containers(), pending.dimensions()),
-                this::scanSaveChunks, clean);
+                this::scanSaveChunks, countedLosses(chunksFailed, entityChunksFailed));
     }
 
     /**
@@ -4917,10 +4916,43 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     private int failedWriteCount(int chunksFailed, int entityChunksFailed) {
-        return chunksFailed + entityChunksFailed + chunksCaptureFailed + mapsFailed.get() + mapsRemapFailed
-                + idCountsFailed + mapManifestLosses() + blockContainersFailed + entityContainersFailed
-                + containerVehiclesLost + villagerTradesLost + interactionCapturesLost + structuralEntitiesLost
-                + resumedMountsLost + playerRecordsLost + finishStepsFailed;
+        int total = 0;
+        for (int axis : countedLosses(chunksFailed, entityChunksFailed).values()) {
+            total += axis;
+        }
+        return total;
+    }
+
+    /**
+     * Every counted loss that actually moved, by axis, in the order the finish's own breakdown line names them. Empty
+     * means no counted term moved, never that nothing was lost. The keys reach the completion record verbatim, so they
+     * are as durable as it is.
+     */
+    private Map<String, Integer> countedLosses(int chunksFailed, int entityChunksFailed) {
+        Map<String, Integer> losses = new LinkedHashMap<>();
+        putLoss(losses, "chunks", chunksFailed);
+        putLoss(losses, "entity_chunks", entityChunksFailed);
+        putLoss(losses, "chunk_captures", chunksCaptureFailed);
+        putLoss(losses, "maps", mapsFailed.get());
+        putLoss(losses, "map_remaps", mapsRemapFailed);
+        putLoss(losses, "idcounts", idCountsFailed);
+        putLoss(losses, "map_manifest", mapManifestLosses());
+        putLoss(losses, "block_containers", blockContainersFailed);
+        putLoss(losses, "entity_containers", entityContainersFailed);
+        putLoss(losses, "container_vehicles", containerVehiclesLost);
+        putLoss(losses, "villager_trades", villagerTradesLost);
+        putLoss(losses, "predicted_interactions", interactionCapturesLost);
+        putLoss(losses, "structural_entities", structuralEntitiesLost);
+        putLoss(losses, "resumed_mounts", resumedMountsLost);
+        putLoss(losses, "player_records", playerRecordsLost);
+        putLoss(losses, "finish_steps", finishStepsFailed);
+        return losses;
+    }
+
+    private static void putLoss(Map<String, Integer> losses, String axis, int count) {
+        if (count > 0) {
+            losses.put(axis, count);
+        }
     }
 
     /** The completion inputs frozen at end-of-capture, immutable so they cross to the writer thread safely. */
