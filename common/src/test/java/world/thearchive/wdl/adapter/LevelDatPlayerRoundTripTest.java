@@ -5,6 +5,7 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -114,6 +115,25 @@ class LevelDatPlayerRoundTripTest {
         assertEquals(GameType.SURVIVAL.getId(), data.getIntOr("GameType", -99),
                 "the void world stays the default survival");
         assertTrue(data.contains("spawn"), "the default spawn is still written");
+    }
+
+    @Test
+    void aNullCapturedPlayerKeepsTheExistingSingleplayerStamp(@TempDir Path saves) throws IOException {
+        CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(), new BlockPos(120, 72, -340), 90.0F, 12.0F,
+                Level.OVERWORLD, GameType.CREATIVE, Difficulty.HARD);
+        CompoundTag first = saveAndReadBack(saves, "resumed", captured);
+        assertTrue(first.contains("singleplayer_uuid"), "the captured finish stamps the folder");
+
+        // A disconnect-flushed finish over the same folder: no live player to read, everything else unchanged.
+        CompoundTag second = saveAndReadBack(saves, "resumed", null);
+
+        assertEquals(first.read("singleplayer_uuid", UUIDUtil.CODEC).orElse(null),
+                second.read("singleplayer_uuid", UUIDUtil.CODEC).orElse(null),
+                "a finish with no player of its own must carry the stamp already in the folder: it is the only "
+                        + "handle on the player file still sitting there, so dropping it strands that record and "
+                        + "every later resume silently stops carrying its ender chest and parked mount forward");
+        assertNotNull(writer.readPriorPlayer(saves.resolve("resumed").resolve("level.dat")),
+                "and the prior player still resolves through it, which is what the carry-forwards read");
     }
 
     @Test
