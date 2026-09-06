@@ -763,6 +763,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private int resumedMountsLost;
 
+    /**
+     * A player record this finish did not get intact from the live client (main thread). At most one per download, and
+     * two shapes: no record at all, the finish having arrived after the teardown, and a record assembled while the
+     * teardown ran under it, whose game mode or advancements then silently took a fallback.
+     */
+    private int playerRecordsLost;
 
     /**
      * Chunks whose terrain snapshot threw, so the position reached neither the buffer nor the captured set and the
@@ -2474,6 +2480,28 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
     }
 
+    // Package-private for the reason the orphan counts above are: the loss sits in the Minecraft-coupled finish
+    // drain, which no headless test can reach.
+    void countMissingPlayerRecord() {
+        playerRecordsLost = 1;
+        LOGGER.warn("no player record reached the save: the finish found no live player to read, so this download "
+                + "contributed no inventory, ender chest, advancements, statistics or game mode, and a folder it "
+                + "opened fresh opens at its default spawn rather than where the download was taken; the download "
+                + "reports partial, and resuming it while connected captures the player");
+    }
+
+    /**
+     * Count one surface of the player record that fell back to a default because the client tore that state down before
+     * the finish read it. Call it only from a read whose field stays non-null for a whole live session, so that a null
+     * there is the teardown and never an ordinary state.
+     */
+    private void noteLivePlayerStateLost(String surface) {
+        playerRecordsLost = 1;
+        LOGGER.warn("the player record lost its {}: the client tore that state down before the finish could read "
+                + "it, so the save carries a default in its place; the download reports partial, and resuming it "
+                + "while connected captures the player again", surface);
+    }
+
     private void drainToWriter(AsyncSaveWriter activeWriter, Minecraft minecraft, @Nullable LocalPlayer player,
             long finishStartNanos) {
         // From here every newly imaged map batches instead of streaming alone, so the writer can report the map
@@ -2560,6 +2588,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 this.capturedPlayer = failSoft("salvaged mount",
                         () -> assembleSalvageMountPlayer(player, minecraft, salvageAttach, salvageMount));
             }
+        } else {
+            // Always a loss, never a download that simply had no player: a session that captured nothing returns
+            // before the drain is entered, so anything reaching here captured chunks around a live player.
+            countMissingPlayerRecord();
         }
         // Snapshot the source server's icon on the main thread; the writer thread reads the frozen bytes. Reading
         // at finish, not begin, also catches an icon pushed mid-session after join. Deliberately outside the guard
@@ -3014,11 +3046,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         // Creative only when the world-defaults master imposes it (with its openInCreative knob on); with the
         // master off the world opens in the player's real game mode, matching cheats and time/weather falling
-        // back. gameMode is non-null here (a player is present), but the field is @Nullable, so guard and fall
-        // back to the survival default.
+        // back. Holding a player local does not keep gameMode alive: the teardown nulls it before the level field
+        // this assembly was admitted by, so the survival fallback here is reachable rather than defensive.
         GameType gameType = GameType.CREATIVE;
         if (!config.worldOutput().overrideWorldDefaults() || !config.worldOutput().openInCreative()) {
             MultiPlayerGameMode gameMode = minecraft.gameMode;
+            if (gameMode == null) {
+                noteLivePlayerStateLost("game mode");
+            }
             gameType = gameMode != null ? gameMode.getPlayerMode() : GameType.SURVIVAL;
             if (gameType == GameType.SPECTATOR) {
                 // Vanilla applies the saved game type to every opener, so a spectator stamp opens the world in
@@ -3068,6 +3103,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             advancements = failSoft("advancements", () -> {
                 ClientPacketListener connection = minecraft.getConnection();
                 if (connection == null) {
+                    noteLivePlayerStateLost("advancements");
                     // Null, not an empty blob: the writer skips a null surface and writes an empty one, so
                     // serializing nothing here would overwrite a resume's prior advancements.
                     return null;
@@ -4648,11 +4684,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
         LOGGER.info("counted capture losses for {}: {} chunk captures, {} maps, {} map remaps, {} idcounts, "
                 + "{} map manifest, {} block containers, {} entity containers, {} container vehicles, "
                 + "{} villager trades, {} predicted interactions, {} structural entities, {} resumed mounts, "
-                + "{} finish steps",
+                + "{} player records, {} finish steps",
                 saveName, chunksCaptureFailed, mapsFailed.get(), mapsRemapFailed, idCountsFailed,
                 mapManifestLosses(), blockContainersFailed, entityContainersFailed, containerVehiclesLost,
                 villagerTradesLost, interactionCapturesLost, structuralEntitiesLost, resumedMountsLost,
-                finishStepsFailed);
+                playerRecordsLost, finishStepsFailed);
         // The destination the toast names is the export zip when one was actually written (the shareable copy),
         // else the openable folder; zipFileName is null on a zip failure, so the toast never names a missing zip.
         String zipFileName = result.zipFileName();
@@ -4846,8 +4882,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * writer's chunk and entity-chunk tally (from the finalize step or {@link AsyncSaveWriter.SaveResult}) and the
      * session's own fail-soft tallies (throwing chunk snapshots, map writes and remaps, the finalize-time idcounts
      * write, the map-id manifest, block and vehicle container merges, unrecovered opened vehicles, unwritten
-     * interaction predictions, structural entity drops, an unplaceable resumed mount, and the degraded finish-time
-     * steps). Heterogeneous units, honest only as a rough magnitude; the
+     * interaction predictions, structural entity drops, an unplaceable resumed mount, a player record no live client
+     * was left to read, and the degraded finish-time steps). Heterogeneous units, honest only as a rough magnitude; the
      * log carries the breakdown.
      *
      * <p>A zero is not proof a download lost nothing. Losses reach this sum only where a term was added for them, so
@@ -4873,7 +4909,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return chunksFailed + entityChunksFailed + chunksCaptureFailed + mapsFailed.get() + mapsRemapFailed
                 + idCountsFailed + mapManifestLosses() + blockContainersFailed + entityContainersFailed
                 + containerVehiclesLost + villagerTradesLost + interactionCapturesLost + structuralEntitiesLost
-                + resumedMountsLost + finishStepsFailed;
+                + resumedMountsLost + playerRecordsLost + finishStepsFailed;
     }
 
     /** The completion inputs frozen at end-of-capture, immutable so they cross to the writer thread safely. */
