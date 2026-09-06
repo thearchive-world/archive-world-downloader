@@ -29,8 +29,8 @@ import world.thearchive.wdl.testsupport.LogCapture;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The finish line naming what a download lost, term by term. Its thirteen counts arrive as thirteen consecutive
- * arguments against thirteen labels the compiler never compares them to, so two of them swapped still compiles,
+ * The finish line naming what a download lost, term by term. Its fourteen counts arrive as fourteen consecutive
+ * arguments against fourteen labels the compiler never compares them to, so two of them swapped still compiles,
  * renders, and still reads as a plausible report while attributing a loss to the wrong axis. Only the rendered text
  * tells the pairing apart, so every counter is given a distinct value and the whole line is asserted. It is the line a
  * user is asked for when a download reports partial, and the tally it explains is the same one the completion record
@@ -45,7 +45,7 @@ class LiveCaptureSessionFinishLossLineTest {
     private static final String SESSION_LOGGER = LiveCaptureSession.class.getName();
 
     /**
-     * One distinct value per counter, so any two of the thirteen exchanged renders a line that differs from this one;
+     * One distinct value per counter, so any two of the fourteen exchanged renders a line that differs from this one;
      * equal values would let the swap they are meant to catch pass.
      */
     private static final int CHUNKS = 1;
@@ -61,6 +61,7 @@ class LiveCaptureSessionFinishLossLineTest {
     private static final int RESUMED_MOUNTS = 11;
     private static final int FINISH_STEPS = 12;
     private static final int VILLAGER_TRADES = 13;
+    private static final int PLAYER_RECORDS = 14;
 
     @BeforeAll
     static void bootstrapVanilla() {
@@ -108,14 +109,14 @@ class LiveCaptureSessionFinishLossLineTest {
             assertEquals("counted capture losses for headless: 1 chunk captures, 2 maps, 3 map remaps, 4 idcounts, "
                     + "5 map manifest, 6 block containers, 7 entity containers, 8 container vehicles, "
                     + "13 villager trades, 9 predicted interactions, 10 structural entities, 11 resumed mounts, "
-                    + "12 finish steps",
+                    + "14 player records, 12 finish steps",
                     captured.rendered(1),
                     "each count reads against the axis it was counted on, so a reader sent to this line by a "
                             + "partial finish looks for the right thing");
         }
     }
 
-    /** Give each of the thirteen tallies its own value; production accrues them across two threads and a session. */
+    /** Give each of the fourteen tallies its own value; production accrues them across two threads and a session. */
     private static void recordLosses(LiveCaptureSession session) {
         setCount(session, "chunksCaptureFailed", CHUNKS);
         counter(session, "mapsFailed").set(MAPS);
@@ -131,6 +132,7 @@ class LiveCaptureSessionFinishLossLineTest {
         setCount(session, "interactionCapturesLost", INTERACTION_CAPTURES);
         setCount(session, "structuralEntitiesLost", STRUCTURAL_ENTITIES);
         setCount(session, "resumedMountsLost", RESUMED_MOUNTS);
+        setCount(session, "playerRecordsLost", PLAYER_RECORDS);
         setCount(session, "finishStepsFailed", FINISH_STEPS);
     }
 
