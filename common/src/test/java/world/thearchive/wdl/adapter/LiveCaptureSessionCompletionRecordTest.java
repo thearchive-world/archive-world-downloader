@@ -114,6 +114,27 @@ class LiveCaptureSessionCompletionRecordTest {
                         + "the tally and the durable artifact");
     }
 
+    @Test
+    void aFinishThatFoundNoLivePlayerRecordsAsPartial(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(temporary);
+        Path saveRoot = temporary.resolve("save");
+        beginReport(session, saveRoot);
+        assertFalse(session.isPartialSave(0, 0), "the predicate reads clean until the missing record is counted");
+
+        session.countMissingPlayerRecord();
+
+        assertTrue(session.isPartialSave(0, 0),
+                "a save carrying no player record is partial: it opens at the default spawn rather than where the "
+                        + "download was taken, and carries none of the inventory, ender chest, advancements, "
+                        + "statistics or game mode");
+
+        freezeAndReport(session, cleanWrite());
+
+        assertFalse(recordedSession(saveRoot).isClean(),
+                "and the record carries that verdict, which is what shows the user a resumable partial download "
+                        + "instead of telling them a save missing its player is finished");
+    }
+
     /**
      * The one completion record written under {@code saveRoot}. Read through the production reader, so a flag written
      * under the wrong key or in the wrong sense fails here rather than passing a raw-text match.
