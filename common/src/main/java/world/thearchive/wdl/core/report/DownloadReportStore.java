@@ -76,7 +76,7 @@ public final class DownloadReportStore {
      */
     public synchronized void complete(Path saveRoot, DownloadIdentity identity, ReportEnvironment environment,
             Map<String, String> settings, Instant finishedAt, DownloadCounts counts,
-            Supplier<SaveChunks> saveChunks, boolean clean) {
+            Supplier<SaveChunks> saveChunks, Map<String, Integer> losses) {
         if (completed.contains(identity.id())) {
             return;
         }
@@ -84,7 +84,7 @@ public final class DownloadReportStore {
             // Append the durable completed line first, latch the id, then drop the sentinel: a delete
             // failure cannot let a second append through, and a stale sentinel is reconciled by id on read.
             DownloadReportLog.append(reportFile(saveRoot, MACHINE_FILE), DownloadReportLog.completedLine(
-                    identity, environment, settings, finishedAt, counts, saveChunks.get(), clean));
+                    identity, environment, settings, finishedAt, counts, saveChunks.get(), losses));
             completed.add(identity.id());
             Files.deleteIfExists(reportFile(saveRoot, PENDING_FILE));
             regenerateHumanRendering(saveRoot);
