@@ -239,7 +239,11 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     @Override
     public void save(LevelStorage storage, LevelDataWriter.LevelData data, @Nullable CapturedPlayer player) {
         if (player == null) {
-            storage.saveLevelData(data.worldData(), null);
+            // level.dat's "Player" is the only copy of the player record at this band and this write carries
+            // none, so writing unconditionally destroys a prior download's record, silently.
+            if (!Files.exists(storage.getFolder().toPath().resolve("level.dat"))) {
+                storage.saveLevelData(data.worldData(), null);
+            }
             return;
         }
         net.minecraft.world.level.storage.LevelData levelData = data.worldData();
