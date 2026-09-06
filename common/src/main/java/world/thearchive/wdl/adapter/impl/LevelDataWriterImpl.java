@@ -222,7 +222,11 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     @Override
     public void save(ISaveHandler storage, LevelDataWriter.LevelData data, @Nullable CapturedPlayer player) {
         if (player == null) {
-            storage.saveWorldInfo(data.worldData());
+            // level.dat's "Player" is the only copy of the player record at this band and this write carries
+            // none, so writing unconditionally destroys a prior download's record, silently.
+            if (!Files.exists(storage.getWorldDirectory().toPath().resolve("level.dat"))) {
+                storage.saveWorldInfo(data.worldData());
+            }
             return;
         }
         WorldInfo worldInfo = data.worldData();
