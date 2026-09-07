@@ -10,7 +10,7 @@
 
 [versions]
 loom = "1.17.19"
-moddev = "2.0.144"
+moddev = "2.0.146"
 spotless = "8.10.1"
 errorprone-plugin = "5.1.0"
 mod-publish-plugin = "2.2.0"
