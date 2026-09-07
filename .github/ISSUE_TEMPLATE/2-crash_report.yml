@@ -41,6 +41,7 @@ body:
       label: Mod loader
       options:
         - Fabric
+        - Forge
         - NeoForge
     validations:
       required: true
