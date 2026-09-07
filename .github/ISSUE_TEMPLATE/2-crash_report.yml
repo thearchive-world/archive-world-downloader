@@ -14,8 +14,6 @@ body:
       options:
         - label: 'This crash mentions Archive World Downloader (or "wdl") in the log, or removing the mod stops it.'
           required: true
-        - label: I have searched open and closed issues for this crash.
-          required: true
 
   - type: input
     id: wdl_version
