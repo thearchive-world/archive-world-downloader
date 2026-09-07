@@ -298,6 +298,10 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.
 # RegionChunkWriter.foldEntitiesIntoRegion rather than draining a second entities/ storage: the entities opener
 # and Storages are dropped, the resume scan reads the same region/ chunk, and a fold with no host chunk is a
 # counted loss.
+# The pauseEncoding Javadoc names rebuilds this band has, the server's ids written in on the way in on both loaders
+# and Fabric's registry-sync unmap when the level closes: Forge here reverts nothing when a level closes, its
+# client-side revert having lost its caller in the 1.13 port, so the trunk's wording names the wrong loader for that
+# edge.
 common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the merge-write reads and writes through the vanilla
@@ -317,6 +321,7 @@ common/src/main/java/world/thearchive/wdl/adapter/WorldPaths.java
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the drain is proven against the vanilla IOWorker (a
 # test-local subclass reaches its protected constructor) rather than constructing one via
 # RegionStorageInfo/DataFixers. Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
+# Its encode-pause Javadoc names the same rebuilds, for the reason on AsyncSaveWriter.java above.
 common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
 
 # Deleted on this band: the whole test exercises chiseled-bookshelf occupancy flush, and ChiseledBookShelfBlock does
