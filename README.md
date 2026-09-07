@@ -23,11 +23,17 @@ One download covers the overworld, the Nether, and the End. Downloads are named 
 
 ## Supported versions
 
-Version 1.0 ships builds for Fabric and NeoForge on Minecraft 1.21.4, 1.21.11, 26.1.2, and 26.2. These are the exact versions built, not a continuous range; the CurseForge listing is the live source of truth for what is published.
+Archive World Downloader ships builds for these exact Minecraft versions, not a continuous range:
+
+- **Forge:** 1.10.2, 1.11.2, 1.12.2, 1.13.2
+- **Fabric and Forge:** 1.14.4, 1.15.2, 1.16.5, 1.17.1, 1.18.2, 1.19.4, 1.20.1, 1.20.2
+- **Fabric and NeoForge:** 1.20.4, 1.20.6, 1.21.1, 1.21.3, 1.21.4, 1.21.5, 1.21.8, 1.21.10, 1.21.11, 26.1.2, 26.2
+
+The [GitHub releases](https://github.com/thearchive-world/archive-world-downloader/releases) and the CurseForge listing are the live source of truth for what is published.
 
 ## Installation
 
-Archive World Downloader is client-side only; install it on your own client, not the server. Use a launcher's mod browser (Prism Launcher, the CurseForge App), or drop the matching `archive-wdl-<loader>-*.jar` into your `mods` folder: Fabric and Quilt also need [Fabric API](https://modrinth.com/mod/fabric-api), while NeoForge needs nothing extra. The mod needs Java 21 or newer. The [install guide](https://wdl.docs.thearchive.world/get-started/install/) has the full walkthrough.
+Archive World Downloader is client-side only; install it on your own client, not the server. Use a launcher's mod browser (Prism Launcher, the CurseForge App), or drop the matching `archive-wdl-<loader>-*.jar` into your `mods` folder: Fabric and Quilt also need [Fabric API](https://modrinth.com/mod/fabric-api), while Forge and NeoForge need nothing extra. Each build runs on the Java version its Minecraft version already needs. The [install guide](https://wdl.docs.thearchive.world/get-started/install/) has the full walkthrough.
 
 ## Usage
 
