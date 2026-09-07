@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -1416,6 +1417,109 @@ class AsyncSaveWriterTest {
         second.finish().get(30, TimeUnit.SECONDS);
 
         assertEquals(1, applied[0], "the second write reads the prior and applies the merge THIS submit supplied");
+    }
+
+    /**
+     * Forge rebuilds the client's block registry in place when a level closes, so a block is unresolvable for as long
+     * as the rebuild runs; an encode that reads it meanwhile writes air instead of the real block, and on the bands
+     * that encode by name the download still reports complete. The writer must resolve no encode across that window.
+     */
+    @Test
+    void resolvesNoEncodeWhileEncodingIsPaused(@TempDir Path save) throws Exception {
+        RegistryAccess registries = TestRegistries.frozen();
+        Path region = Files.createDirectories(save.resolve("region"));
+        AtomicBoolean loaderStateAvailable = new AtomicBoolean(true);
+        AtomicInteger encodesDuringRebuild = new AtomicInteger();
+        AtomicInteger encodes = new AtomicInteger();
+
+        AsyncSaveWriter writer = newWriter(region);
+        CountDownLatch firstEncoded = new CountDownLatch(1);
+
+        // Encode one chunk unpaused first. Without it the later absence proves nothing: a writer that never picked
+        // anything up would satisfy it just as well as a writer that is correctly held.
+        writer.submitChunk(Level.OVERWORLD, new ChunkPos(5, 5), () -> {
+            encodes.incrementAndGet();
+            firstEncoded.countDown();
+            return codec.encode(SyntheticChunks.full(registries, true), registries, false);
+        }, ChunkMerge::merge);
+        assertTrue(firstEncoded.await(30, TimeUnit.SECONDS), "the writer is live and consuming the queue");
+
+        writer.pauseEncoding();
+        loaderStateAvailable.set(false);
+
+        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+            encodes.incrementAndGet();
+            if (!loaderStateAvailable.get()) {
+                encodesDuringRebuild.incrementAndGet();
+            }
+            return codec.encode(SyntheticChunks.full(registries, true), registries, false);
+        }, ChunkMerge::merge);
+
+        for (int i = 0; i < 50 && encodes.get() == 1; i++) {
+            Thread.sleep(10);
+        }
+        assertEquals(1, encodes.get(), "the same writer resolves nothing more once it is held");
+
+        loaderStateAvailable.set(true);
+        writer.resumeEncoding();
+
+        AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
+
+        assertFalse(result.failed(), "the drain succeeded");
+        assertEquals(2, result.chunksWritten(), "both chunks reach disk, the held one after the rebuild");
+        assertEquals(0, encodesDuringRebuild.get(), "no encode ran while the loader state was unavailable");
+    }
+
+    /**
+     * The pause alone would leave whichever chunk is already mid-encode racing the rebuild, so the call the client
+     * thread makes has to be a handshake: it returns only once the writer is idle, which is the point at which the
+     * caller may let the loader mutate what the encode reads.
+     */
+    @Test
+    void pauseWaitsForAnEncodeAlreadyInFlight(@TempDir Path save) throws Exception {
+        RegistryAccess registries = TestRegistries.frozen();
+        Path region = Files.createDirectories(save.resolve("region"));
+        CountDownLatch encodeStarted = new CountDownLatch(1);
+        CountDownLatch releaseEncode = new CountDownLatch(1);
+        AtomicBoolean encodeFinished = new AtomicBoolean(false);
+
+        AsyncSaveWriter writer = newWriter(region);
+
+        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+            encodeStarted.countDown();
+            try {
+                releaseEncode.await(30, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
+            encodeFinished.set(true);
+            return tag;
+        }, ChunkMerge::merge);
+
+        assertTrue(encodeStarted.await(30, TimeUnit.SECONDS), "the writer picked the chunk up");
+
+        AtomicBoolean pauseReturned = new AtomicBoolean(false);
+        Thread client = new Thread(() -> {
+            writer.pauseEncoding();
+            pauseReturned.set(true);
+        }, "test-client-thread");
+        client.start();
+
+        // Well inside the handshake's own abandon timeout, so this observes the wait rather than racing it.
+        for (int i = 0; i < 10 && !pauseReturned.get(); i++) {
+            Thread.sleep(5);
+        }
+        assertFalse(pauseReturned.get(), "pause must not return while an encode is still in flight");
+
+        releaseEncode.countDown();
+        client.join(30_000);
+
+        assertTrue(pauseReturned.get(), "pause returns once the in-flight encode finishes");
+        assertTrue(encodeFinished.get(), "the in-flight encode was allowed to complete rather than being abandoned");
+
+        writer.resumeEncoding();
+        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the drain succeeded");
     }
 
     /** A writer over one region directory, for the cases that only need chunks to reach disk. */
