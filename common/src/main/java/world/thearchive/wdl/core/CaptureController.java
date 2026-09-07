@@ -66,6 +66,17 @@ public final class CaptureController {
          */
         boolean isSaveComplete();
 
+        /**
+         * Hold the background writer off the loader's registries, and wait for any read already under way to finish.
+         * The client rebuilds those registries in place on both edges of a connection, and a write encoded across a
+         * rebuild loses its blocks, so this is taken before the client is allowed to start one. Default no-op, because
+         * a session with no background write of its own has nothing to hold.
+         */
+        default void holdWriterEncoding() {}
+
+        /** Let the background writer read the loader's registries again, once the rebuild is over. */
+        default void releaseWriterEncoding() {}
+
         /** Live progress so far, as MC-free counts (read for the status command and HUD). */
         CaptureCounts counts();
 
@@ -105,6 +116,15 @@ public final class CaptureController {
     // already drawing; a stale IDLE would hide the overlay for a whole download with nothing to correct it.
     private volatile CaptureState state = CaptureState.IDLE;
     private @Nullable Session session;
+
+    /**
+     * The session whose writer is held off the loader's registries, released by the first tick that is not the finish's
+     * own re-entrant one.
+     */
+    private volatile @Nullable Session encodeHeld;
+
+    /** Set while {@link #stop()} is inside {@link Session#finish()}; that call's own poll must not release the hold. */
+    private volatile boolean finishing;
 
     // The running session's latched capture toggles, republished here because the session reference itself is
     // client-thread-only while the overlay reads run off-thread. Null exactly when no session is set.
@@ -313,6 +333,15 @@ public final class CaptureController {
      * {@link #stop()}; the null-session and state guards keep it idempotent.
      */
     public void tick() {
+        // Ahead of every guard below, including the null-session one: the session that was held may already have been
+        // dropped, and the writer it owns still has to be let go. A tick cannot begin until the client's own teardown
+        // has returned, which is what makes this the safe side of the rebuild; a re-entrant tick from inside the
+        // finish is not, so it is excluded rather than allowed to release early.
+        Session held = encodeHeld;
+        if (held != null && !finishing) {
+            encodeHeld = null;
+            held.releaseWriterEncoding();
+        }
         if (session == null) {
             return;
         }
@@ -349,19 +378,43 @@ public final class CaptureController {
      */
     public void stop() {
         if (state == CaptureState.RECORDING) {
+            finishing = true;
             Session active = Objects.requireNonNull(session, "session is set whenever state is RECORDING");
             // Snapshot the counts and elapsed time before finish() tears the live session down, so the HUD
             // keeps showing the stop-time figures through the save and the done linger.
             frozenCounts = active.counts();
             frozenElapsedMillis = Math.max(0L, clockMillis.getAsLong() - startMillis);
             state = CaptureState.SAVING;
-            active.finish(); // returns at once, but may already have re-entered tick() and reached IDLE
+            try {
+                active.finish(); // returns at once, but may already have re-entered tick() and reached IDLE
+            } finally {
+                finishing = false;
+            }
         }
     }
 
-    /** Auto-flush when the player disconnects mid-recording. */
+    /**
+     * Hold the writer, then flush. The hold comes first and is taken whatever the state, because the save the
+     * disconnect has to protect is often one already running: stopping a download and then leaving the server is a
+     * routine order, and a stop that already moved the state out of recording makes the flush below a no-op while
+     * leaving a full drain to encode straight through the client's registry rebuild.
+     */
     public void onDisconnect() {
+        holdWriterEncoding();
         stop();
+    }
+
+    /** The join edge rebuilds the registries too, so a save still draining from the last server is held across it. */
+    public void onServerJoin() {
+        holdWriterEncoding();
+    }
+
+    private void holdWriterEncoding() {
+        Session active = session;
+        if (active != null && encodeHeld == null) {
+            encodeHeld = active;
+            active.holdWriterEncoding();
+        }
     }
 
     /**
