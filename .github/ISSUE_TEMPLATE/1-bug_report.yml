@@ -44,6 +44,7 @@ body:
       description: Which loader did you install the mod with?
       options:
         - Fabric
+        - Forge
         - NeoForge
     validations:
       required: true
