@@ -11,8 +11,8 @@ is agreed before effort goes in.
 ## Prerequisites
 
 Install a **Temurin** JDK (Eclipse Adoptium's OpenJDK distribution) matching this branch's target
-Minecraft version. The required major version is the `java_version` property in `gradle.properties`
-(JDK 21 on this branch). Automatic toolchain provisioning is deliberately off
+Minecraft version. The required major version is the `java_version` property in `gradle.properties`.
+Automatic toolchain provisioning is deliberately off
 (`org.gradle.java.installations.auto-download=false`, and no download repository is configured), so
 the build always compiles with a JDK you installed and trust rather than silently fetching one. It
 uses a JDK it detects locally; if no matching Temurin JDK is on your machine, the build stops with a
@@ -32,9 +32,10 @@ recorded in that release's GitHub notes.
 ./gradlew build
 ```
 
-This compiles the three subprojects (`common`, `fabric`, `neoforge`), runs the checks (Checkstyle,
-Spotless, NullAway, the license-header check, and the `core` invariants), and produces the loader
-jars under `fabric/build/libs` and `neoforge/build/libs`.
+This compiles `common` and whichever root loader modules the branch ships, runs the checks
+(Checkstyle, Spotless, NullAway, the license-header check, and the `core` invariants), and produces
+those loaders' jars under `<loader>/build/libs`. A branch that ships Forge builds it separately with
+`forge/gradlew build`, which puts its jar under `forge/build/libs`.
 
 ## Running a development client
 
@@ -46,22 +47,29 @@ testing:
 ./gradlew :neoforge:runClient
 ```
 
+Run the task for a loader the branch ships. On a branch with Forge the equivalent lives in the
+island, as `forge/gradlew runClient`.
+
 ## Developer setup
 
 Any editor works; the build is driven by Gradle, not an IDE. IntelliJ IDEA is the reference setup.
 
-**IntelliJ IDEA:** open the repository folder and trust the Gradle project; it imports `common`,
-`fabric`, and `neoforge`. Use a recent version, since older IntelliJ may fail to sync Gradle 9.6 or
-not honor its configuration cache. Point the Gradle JVM at the Temurin JDK this branch targets (the
-`java_version` in `gradle.properties`, as the Prerequisites section covers). Under Settings, Build,
-Execution, Deployment, Build Tools, Gradle, set both "Build and run using" and "Run tests using" to
-Gradle, so the configuration cache and the loader classpath are honored; the "Run tests using"
-choice matters for the NeoForge unit-test run, which boots the mod loader and behaves differently
-under IntelliJ's own test runner. After sync, the dev-client runs for each loader and the Fabric
-`clientGameTest` run appear. Run `./gradlew genSources` once for readable Fabric Minecraft sources
-(ModDevGradle attaches NeoForge's on import). EditorConfig is bundled and on, so IntelliJ takes
-indentation and import layout from `.editorconfig`; the full formatter is Spotless, so run
-`./gradlew spotlessApply` to match the style gate.
+**IntelliJ IDEA:** open the repository folder and trust the Gradle project; it imports `common`
+together with the root loader modules this branch ships, `fabric` and `neoforge` where it has them.
+A branch that ships Forge keeps it in `forge/`, a separate Gradle build with its own wrapper, so
+open that folder as its own project rather than expecting the root sync to find it. Use a recent
+version, since older IntelliJ may fail to sync the Gradle version your branch pins or to honor its
+configuration cache. Point the Gradle JVM at the Temurin JDK this branch targets (the `java_version`
+in `gradle.properties`, as the Prerequisites section covers). Under Settings, Build, Execution,
+Deployment, Build Tools, Gradle, set both "Build and run using" and "Run tests using" to Gradle, so
+the configuration cache and the loader classpath are honored; the "Run tests using" choice matters
+on a branch with a `neoforge` module, whose unit-test run boots the mod loader and behaves
+differently under IntelliJ's own test runner. After sync, a dev-client run appears for each loader
+module the branch has, with the `clientGameTest` run where the branch carries that tier. On a Fabric
+branch, run `./gradlew genSources` once for readable Minecraft sources; ModDevGradle attaches
+NeoForge's on import. EditorConfig is bundled and on, so IntelliJ takes indentation and import
+layout from `.editorconfig`; the full formatter is Spotless, so run `./gradlew spotlessApply` to
+match the style gate.
 
 **Recommended plugins (optional):** CheckStyle-IDEA, pointed at `config/checkstyle/checkstyle.xml`,
 shows the Checkstyle rules live; the rules are enforced in CI regardless. Minecraft Development adds
@@ -70,18 +78,20 @@ and unused key checks, which pairs with the `en_us.json` key parity the build en
 features are unused here.
 
 **Other IDEs:** Eclipse and Visual Studio Code import the same Gradle build and get their run
-configurations from Loom and ModDevGradle (ModDevGradle attaches NeoForge sources on import). Style
-and lint are enforced by `./gradlew build` in any editor; to match the formatter locally run
-`./gradlew spotlessApply`. Visual Studio Code needs Microsoft's Extension Pack for Java. The license
-header is the same two lines in every editor, and `./gradlew build` fails if a Java file is missing
-it.
+configurations from the loader plugin each module uses (ModDevGradle attaches NeoForge sources on
+import). Style and lint are enforced by `./gradlew build` in any editor; to match the formatter
+locally run `./gradlew spotlessApply`. Visual Studio Code needs Microsoft's Extension Pack for Java.
+The license header is the same two lines in every editor, and `./gradlew build` fails if a Java file
+is missing it.
 
 ## Project layout
 
-The mod is three Gradle subprojects:
+The mod is `common` plus a thin module per loader:
 
 - `common` holds the shared, loader-independent code, which is most of the mod.
-- `fabric` and `neoforge` are the thin per-loader entry points.
+- `fabric` and `neoforge` are the thin per-loader entry points, on the branches that ship them.
+- `forge` is the same thing for Forge, but a separate Gradle build with its own wrapper rather
+  than a subproject.
 
 Inside `common`, one internal boundary is load-bearing and enforced by the build:
 
@@ -95,9 +105,9 @@ part up a layer.
 
 The mod avoids Mixins. The small amount of extra access it needs comes from a read-only access
 widener (`fabric/src/main/resources/wdl.accesswidener`) on Fabric and an access transformer
-(`neoforge/src/main/resources/META-INF/accesstransformer.cfg`) on NeoForge, not from bytecode
-patching. Adding a Mixin has a high bar: prefer widening access or an existing seam, and raise the
-case in an issue first.
+(`META-INF/accesstransformer.cfg` under that loader module's resources) on NeoForge and on Forge,
+not from bytecode patching. Adding a Mixin has a high bar: prefer widening access or an existing
+seam, and raise the case in an issue first.
 
 ## Code style
 
@@ -146,9 +156,9 @@ The simplest way to add or update a locale is a pull request that edits the matc
 `<locale>.json` (copy `en_us.json` to start a new one). Keep every key that `en_us.json` has, in the
 same order, and keep the format placeholders intact: the `%s`, `%1$s`, and `\n` in a string must
 survive translation, only the surrounding words change. The test suite checks this parity and
-placeholder fidelity, so a submission that drops a key or breaks a placeholder fails the build. Leave
-a key untranslated (equal to the English) rather than deleting it; Minecraft falls back to English
-for any missing key.
+placeholder fidelity, so a submission that drops a key or breaks a placeholder fails the build.
+Leave a key untranslated (equal to the English) rather than deleting it; Minecraft falls back to
+English for any missing key.
 
 That is what the build can check. What it cannot check is whether the words read like Minecraft,
 which is what the review turns on: your language's own Minecraft wording, casing, register, and form
@@ -181,9 +191,9 @@ applied with the merge.
 ## Reporting issues
 
 Open an issue from the [issue templates](https://github.com/thearchive-world/archive-world-downloader/issues/new/choose)
-and fill in the form. The bug and crash forms ask for your Minecraft version, the loader (Fabric or
-NeoForge) and its version, the mod version, and steps to reproduce, so the report arrives actionable.
-For a crash, attach the crash report or the relevant part of `logs/latest.log`.
+and fill in the form. The bug and crash forms ask for your Minecraft version, the loader (Fabric,
+Forge, or NeoForge) and its version, the mod version, and steps to reproduce, so the report arrives
+actionable. For a crash, attach the crash report or the relevant part of `logs/latest.log`.
 
 Do not open a public issue for a security vulnerability. Report it privately instead, following the
 [security policy](SECURITY.md).
