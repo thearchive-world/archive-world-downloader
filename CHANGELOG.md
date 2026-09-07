@@ -6,6 +6,26 @@ The release pipeline ships the section whose heading matches the release version
 `<version>` is the mod_version core) as the notes on CurseForge, Modrinth, and the GitHub release. Write each
 version's notes here before tagging; a release with no matching section fails rather than shipping empty notes.
 
+## 1.3.0
+
+### Added
+
+- Support for Minecraft 1.10.2, on Forge.
+- The download report names what a partial download lost, not just that it lost something.
+- Minecraft 1.11.2-1.15.2: the "..." button beside Download This World shows its "Settings" label on hover.
+
+### Fixed
+
+- A download ended by an unexpected disconnect is far less likely to lose your inventory, game mode, advancements, and spawn point.
+- A download that could not save your character reports as partial instead of completed.
+- A failure while recording the server's details no longer costs you the whole download.
+- Minecraft 1.11.2-1.21.11: a download that ends before it can save your character no longer erases the one an earlier download saved.
+- Minecraft 1.12.2 and above: a download that ends before it can save your advancements no longer erases the ones an earlier download saved.
+- Minecraft 1.16.5 and above: downloads from a server joined by direct connect no longer come out empty.
+- Minecraft 1.11.2-1.20.4: a saved donkey, mule, or llama chest no longer loses the items in its first two slots and shifts the rest two slots out of place.
+- Minecraft 26.1.2 and 26.2: a download interrupted by a disconnect no longer loses track of its character, so resuming it keeps your ender chest and your mount.
+- Minecraft 26.1.2 and 26.2: starting a second download while the first is still finishing no longer leaves the first missing from the world list.
+
 ## 1.2.0
 
 ### Added
