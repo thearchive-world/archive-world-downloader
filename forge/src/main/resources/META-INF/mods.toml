@@ -1,14 +1,14 @@
 modLoader = "javafml"
 loaderVersion = "[45,)"
 license = "LGPL-3.0-or-later"
-issueTrackerURL = "https://github.com/thearchive-world/archive-world-downloader/issues"
+issueTrackerURL = "https://github.com/thearchive-world/archive-world-downloader/issues/new/choose"
 
 [[mods]]
 modId = "wdl"
 version = "${version}"
 displayName = "Archive World Downloader"
 authors = "terbin"
-displayURL = "https://modrinth.com/mod/${mod_id}"
+displayURL = "https://wdl.docs.thearchive.world/"
 description = "Keep the multiplayer worlds you visit. As you explore, the mod saves the terrain, mobs, and maps around you into a singleplayer world you can open offline, and containers save their contents when you open them. Everything comes from your own game, so nothing runs on the server."
 logoFile = "icon.png"
 logoBlur = false
