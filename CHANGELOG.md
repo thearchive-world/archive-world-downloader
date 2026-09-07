@@ -24,7 +24,7 @@ version's notes here before tagging; a release with no matching section fails ra
 - Minecraft 1.16.5 and above: downloads from a server joined by direct connect no longer come out empty.
 - Minecraft 1.11.2-1.20.4: a saved donkey, mule, or llama chest no longer loses the items in its first two slots and shifts the rest two slots out of place.
 - Minecraft 26.1.2 and 26.2: a download interrupted by a disconnect no longer loses track of its character, so resuming it keeps your ender chest and your mount.
-- Minecraft 26.1.2 and 26.2: starting a second download while the first is still finishing no longer leaves the first missing from the world list.
+- Minecraft 26.1.2 and 26.2: downloading two worlds around the same time no longer leaves one of them incomplete (missing level.dat) and absent from your singleplayer world list.
 
 ## 1.2.0
 
