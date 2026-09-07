@@ -34,7 +34,7 @@ fix is available.
 ## Supported versions
 
 Security fixes are made against the most recent release for each Minecraft version the
-project currently ships. The compatibility matrix in the README lists those versions,
+project currently ships. The supported-versions list in the README names those versions,
 and the Modrinth and CurseForge listings are the live source of truth for exactly which
 builds are published. Older builds and pre-release snapshots are not supported: update
 to the latest release before reporting.
