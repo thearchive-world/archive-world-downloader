@@ -21,7 +21,7 @@ That opens a private advisory visible only to you and the maintainer.
 Where you can, include:
 
 - the mod version and the Minecraft version (the `+` tag in the jar file name), and
-  the loader (Fabric or NeoForge),
+  the loader (Fabric, Forge, or NeoForge),
 - what the problem is and what an attacker could achieve with it,
 - steps or a small proof of concept to reproduce it,
 - any relevant excerpt from `logs/latest.log`.
