@@ -9,9 +9,9 @@
     "terbin"
   ],
   "contact": {
-    "homepage": "https://modrinth.com/mod/${mod_id}",
+    "homepage": "https://wdl.docs.thearchive.world/",
     "sources": "https://github.com/thearchive-world/archive-world-downloader",
-    "issues": "https://github.com/thearchive-world/archive-world-downloader/issues"
+    "issues": "https://github.com/thearchive-world/archive-world-downloader/issues/new/choose"
   },
   "license": "LGPL-3.0-or-later",
   "environment": "client",
