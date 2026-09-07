@@ -48,9 +48,22 @@ class CaptureControllerTest {
         SaveStage saveStage = SaveStage.NONE;
         float saveProgress;
 
+        int holds;
+        int releases;
+
         @Override
         public void captureTick() {
             captures++;
+        }
+
+        @Override
+        public void holdWriterEncoding() {
+            holds++;
+        }
+
+        @Override
+        public void releaseWriterEncoding() {
+            releases++;
         }
 
         @Override
@@ -758,10 +771,64 @@ class CaptureControllerTest {
         FakeSession session = new FakeSession();
         controller.start(() -> session);
 
-        controller.onDisconnect();
+        controller.stop();
         controller.tick();
-        controller.onDisconnect();
+        controller.stop();
 
         assertEquals(1, session.finishes, "the finish the first disconnect ran is the only one");
+    }
+
+    /**
+     * Stopping a download and then leaving the server is a routine order, and it is the order the first version of this
+     * guard missed: by the time the disconnect arrives the state has already left recording, so the flush is a no-op,
+     * while a full drain is still encoding against registries the client is about to rebuild. The hold has to be taken
+     * on the disconnect whatever the state.
+     */
+    @Test
+    void disconnectHoldsTheWriterEvenWhenTheSaveIsAlreadyRunning() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+        controller.stop(); // the player stopped the download first; the state is now SAVING
+        assertEquals(CaptureState.SAVING, controller.state());
+        assertEquals(0, session.holds, "stopping alone rebuilds nothing, so nothing is held");
+
+        controller.onDisconnect();
+
+        assertEquals(1, session.holds, "the disconnect holds the writer even though the flush it also runs is a no-op");
+        assertEquals(0, session.releases, "and nothing releases it before the client has torn the level down");
+    }
+
+    /** The hold is released by a later tick, never by the re-entrant poll the finish itself makes. */
+    @Test
+    void theHoldOutlivesTheFinishAndIsReleasedByTheNextTick() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+
+        controller.onDisconnect();
+
+        assertEquals(1, session.holds, "the disconnect holds first");
+        assertEquals(0, session.releases, "the finish it runs must not release its own hold");
+
+        controller.tick();
+
+        assertEquals(1, session.releases, "the first tick after the finish releases it");
+    }
+
+    /**
+     * The join edge takes the hold too. On this band it arrives only once the loader has already rebuilt, so what this
+     * pins is that the wiring reaches a session the state has left recording, not any coverage it buys here.
+     */
+    @Test
+    void joiningHoldsTheWriterStillDrainingFromTheLastServer() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+        controller.stop();
+
+        controller.onServerJoin();
+
+        assertEquals(1, session.holds, "the join edge holds the still-draining writer");
     }
 }

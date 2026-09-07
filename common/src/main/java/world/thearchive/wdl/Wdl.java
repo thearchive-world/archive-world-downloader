@@ -231,11 +231,14 @@ public final class Wdl {
         bridge.addPauseMenuButtons(Wdl::pausePrimaryLabelKey, Wdl::isPausePrimaryEnabled, Wdl::onPausePrimary,
                 Wdl::openSettingsScreen);
         bridge.onClientTickEnd(Wdl::onClientTick);
-        bridge.onDisconnect(controller::onDisconnect);
+        // Both disconnect routes flush without the writer hold onDisconnect takes: Forge on this band reverts no
+        // registry on a disconnect, so there is nothing to hold the writer off.
+        bridge.onDisconnect(controller::stop);
         bridge.onLevelTeardown(() -> onLevelTeardown(controller, bridge.isConnectionClosed()));
         // A backend transfer (play-to-configuration re-entry) fires no disconnect hook on either loader, so the
         // tee raises its own signal and the controller polls it each tick, stopping the download the same way.
         controller.setTransferStopPoll(ConnectionTee::consumeTransferSignal);
+        bridge.onServerJoin(controller::onServerJoin);
         bridge.onServerJoin(Wdl::onServerJoin);
         bridge.onServerJoin(Wdl::onUpdateAvailableJoin);
         bridge.registerCommands(new WdlCommands(Wdl::onStart, Wdl::onStartNamed, Wdl::onStop, Wdl::onStatus,
@@ -336,7 +339,7 @@ public final class Wdl {
      */
     static void onLevelTeardown(CaptureController controller, boolean connectionClosed) {
         if (connectionClosed) {
-            controller.onDisconnect();
+            controller.stop();
         }
     }
 

@@ -93,6 +93,8 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # entity arm compares the world's game time against a last save time nothing writes on a client, so without the
 # stamp it is permanently satisfied and the poll re-flags every entity-bearing chunk on every tick; the stamp bounds
 # the residual to one re-encode per entity-bearing chunk per 600 ticks.
+# The encodeQuiesced field is plain rather than volatile here and its Javadoc drops the network-thread wording: this
+# band ships no Fabric tree, so every path that takes or reads the hold is the client thread.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # New here and on every other band below 1.14, on none above: from 1.14 up the chunk exposes an isUnsaved reader, so
@@ -307,6 +309,9 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.
 # RegionChunkWriter.foldEntitiesIntoRegion rather than draining a second entities/ storage: the entities opener
 # and Storages are dropped, the resume scan reads the same region/ chunk, and a fold with no host chunk is a
 # counted loss.
+# The pauseEncoding Javadoc names a rebuild this band has, the login handshake's snapshot injection, rather than the
+# level-close one it lacks: Forge here reverts nothing when a level closes, its client-side revert having lost its
+# caller in the 1.13 port.
 common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the merge-write reads and writes through the vanilla
@@ -326,6 +331,7 @@ common/src/main/java/world/thearchive/wdl/adapter/WorldPaths.java
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the drain is proven against the vanilla IOWorker (a
 # test-local subclass reaches its protected constructor) rather than constructing one via
 # RegionStorageInfo/DataFixers. Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
+# Its encode-pause Javadoc names the join-side rebuild, for the reason on AsyncSaveWriter.java above.
 common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
 
 # Deleted on this band: the whole test exercises chiseled-bookshelf occupancy flush, and ChiseledBookShelfBlock does
@@ -648,7 +654,8 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
 # time and translates the loader's signal into the controller's own calls, the disconnect flush when the connection is
 # gone and nothing on a dimension change, so the controller stays the same on every version and free of the loader's
 # edge. The higher bands need no equivalent because their disconnect hook already runs ahead of the client's nulling
-# of the player.
+# of the player. Both disconnect routes flush through stop rather than onDisconnect, taking no writer hold: Forge here
+# reverts no registry on a disconnect.
 common/src/main/java/world/thearchive/wdl/Wdl.java
 
 # Deleted on this band with the rest of the XaeroPlus binding (XaeroPlus ships no 1.18.x build for either loader): the
@@ -776,14 +783,14 @@ common/src/test/java/world/thearchive/wdl/adapter/ContainerTypeGateMergeTest.jav
 
 # This band's fastutil 8.2.1 has no LongSet.of() factory, so the test builds sets via LongSets and LongOpenHashSet;
 # the Java 8 floor also has no Set.of collection factory (Java 9), so the entity sets are Guava ImmutableSet.of.
-# It also pins that a second disconnect after the first one finished finishes nothing further, which is the order this
-# band's tick-edge disconnect arrives in behind the flush the wiring runs at the level-teardown edge.
+# It also pins that a second stop after the first one finished finishes nothing further, which is the order this band's
+# tick-edge disconnect arrives in behind the flush the wiring runs at the level-teardown edge.
 common/src/test/java/world/thearchive/wdl/core/CaptureControllerTest.java
 
 # Pins the band's own level-teardown edge through the wiring that translates it: a teardown with the connection still
 # open ends no download, one with it already closed finishes the download instead, and the loader's own disconnect
-# callback a tick later finishes nothing further. Absent on the bands whose disconnect hook runs ahead of the client's
-# nulling of the player, which carry no such edge.
+# callback afterwards finishes nothing further, and neither edge holds the writer. Absent on the bands whose
+# disconnect hook runs ahead of the client's nulling of the player, which carry no such edge.
 common/src/test/java/world/thearchive/wdl/WdlLevelTeardownTest.java
 
 # Implements the band's own PlatformBridge.onLevelTeardown, as the same no-op registration every other arm of this

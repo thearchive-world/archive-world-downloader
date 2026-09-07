@@ -26,9 +26,15 @@ class WdlLevelTeardownTest {
     /** A session that only counts what the controller asks of it; the save never completes on its own. */
     private static final class CountingSession implements CaptureController.Session {
         int finishes;
+        int holds;
 
         @Override
         public void captureTick() {}
+
+        @Override
+        public void holdWriterEncoding() {
+            holds++;
+        }
 
         @Override
         public void finish() {
@@ -84,6 +90,7 @@ class WdlLevelTeardownTest {
         Wdl.onLevelTeardown(controller, false);
 
         assertEquals(0, session.finishes, "a dimension change flushes nothing");
+        assertEquals(0, session.holds, "and holds nothing, this loader reverting no registry there");
         assertEquals(CaptureState.RECORDING, controller.state(), "the download is still running");
     }
 
@@ -99,6 +106,7 @@ class WdlLevelTeardownTest {
         Wdl.onLevelTeardown(controller, true);
 
         assertEquals(1, session.finishes, "the download flushes here, while the player is still live");
+        assertEquals(0, session.holds, "without a writer hold, this loader reverting no registry on a disconnect");
         assertEquals(CaptureState.SAVING, controller.state(), "the download is draining");
     }
 
@@ -114,7 +122,7 @@ class WdlLevelTeardownTest {
 
         Wdl.onLevelTeardown(controller, true);
         controller.tick();
-        controller.onDisconnect();
+        controller.stop();
 
         assertEquals(1, session.finishes, "the finish the teardown edge ran is the only one");
     }
