@@ -8,7 +8,6 @@ body:
       value: |
         Thanks for reporting a bug. Before you start:
 
-        - Please search [open issues](https://github.com/thearchive-world/archive-world-downloader/issues?q=is%3Aissue) and [closed issues](https://github.com/thearchive-world/archive-world-downloader/issues?q=is%3Aissue+is%3Aclosed) in case this is already reported.
         - For questions or general chat, open a [Discussion](https://github.com/thearchive-world/archive-world-downloader/discussions) instead.
         - For crashes, freezes, or saves that won't load, use the **Crash report** template.
 
