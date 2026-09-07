@@ -48,6 +48,13 @@ import world.thearchive.wdl.core.SaveProgress;
 final class AsyncSaveWriter {
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    // Comfortably over a measured chunk encode (single-digit milliseconds), since overrunning it costs the very chunk
+    // the pause exists to protect, while the client thread waits.
+    private static final long PAUSE_HANDSHAKE_TIMEOUT_MILLIS = 250L;
+
+    // Only a stuck-save backstop, so it sits far above the registry rebuild it waits out (tens of milliseconds).
+    private static final long PAUSE_SELF_RELEASE_TIMEOUT_MILLIS = 10_000L;
+
     /**
      * Lazily opens a region storage on the writer thread; called once per (target, dimension) on its first tag. The
      * dimension lets one writer follow the player across a portal, opening each dimension's storage on demand, so two
@@ -138,6 +145,10 @@ final class AsyncSaveWriter {
     private final SaveProgress progress;
     private final BlockingQueue<Task> queue = new LinkedBlockingQueue<>();
     private final CompletableFuture<SaveResult> result = new CompletableFuture<>();
+    private final Object encodeLock = new Object();
+    private boolean encodingPaused;
+    private boolean encodeInFlight;
+    private int guardLapses;
     private final Thread thread;
 
     // Total write tasks handed over so far, the denominator of the HUD's chunk-drain bar. Incremented on the
@@ -291,6 +302,98 @@ final class AsyncSaveWriter {
         return result;
     }
 
+    /**
+     * Stop the writer resolving any further encode thunk, and wait for one already in flight to finish (main thread).
+     * Forge rebuilds the client's block registry in place when a level closes, and an encode reading it meanwhile
+     * resolves blocks to nothing, which some bands write as air rather than reporting. Returning from this call is the
+     * guarantee the caller needs: no encode is running, and none will start until {@link #resumeEncoding}, so the
+     * rebuild cannot overlap one.
+     *
+     * <p>The wait is bounded because it runs on the thread the player is waiting on: an encode that overruns it is let
+     * go rather than freezing the client, which costs at most the one chunk this was protecting.
+     */
+    public void pauseEncoding() {
+        synchronized (encodeLock) {
+            encodingPaused = true;
+            long deadline = System.nanoTime() + PAUSE_HANDSHAKE_TIMEOUT_MILLIS * 1_000_000L;
+            while (encodeInFlight) {
+                long remainingMillis = (deadline - System.nanoTime()) / 1_000_000L;
+                if (remainingMillis <= 0) {
+                    // Counted, not just logged: the chunk this abandons is written either way, and a save that may
+                    // hold air where terrain was has to reach the player as partial rather than as clean.
+                    guardLapses++;
+                    LOGGER.warn("an encode was still running after {} ms; letting the loader proceed anyway, so this "
+                            + "chunk may lose blocks", PAUSE_HANDSHAKE_TIMEOUT_MILLIS);
+                    return;
+                }
+                try {
+                    encodeLock.wait(remainingMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
+
+    /** Whether encoding is currently held off, so the session wiring around the pause is testable. */
+    boolean isEncodingPaused() {
+        synchronized (encodeLock) {
+            return encodingPaused;
+        }
+    }
+
+    /** Let the writer resolve encode thunks again, once the loader has finished rebuilding (main thread). */
+    public void resumeEncoding() {
+        synchronized (encodeLock) {
+            encodingPaused = false;
+            encodeLock.notifyAll();
+        }
+    }
+
+    /**
+     * Bounded because a resume that never arrives must not strand the save: the drain would never reach the finalize
+     * and the download would sit in saving forever, which is worse than the race the wait avoids.
+     */
+    private void acquireEncodePermit() {
+        synchronized (encodeLock) {
+            long deadline = System.nanoTime() + PAUSE_SELF_RELEASE_TIMEOUT_MILLIS * 1_000_000L;
+            while (encodingPaused) {
+                long remainingMillis = (deadline - System.nanoTime()) / 1_000_000L;
+                if (remainingMillis <= 0) {
+                    // Counted for the same reason as the handshake lapse: what follows is an encode taken with no
+                    // guarantee about the loader's registries, so the save reports partial rather than clean.
+                    guardLapses++;
+                    LOGGER.warn("no resume arrived within {} ms; encoding again so the save can finalize",
+                            PAUSE_SELF_RELEASE_TIMEOUT_MILLIS);
+                    encodingPaused = false;
+                    break;
+                }
+                try {
+                    encodeLock.wait(remainingMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            encodeInFlight = true;
+        }
+    }
+
+    /** How many times a bounded wait gave up and let an encode run unguarded, each one a chunk that may hold air. */
+    private int guardLapses() {
+        synchronized (encodeLock) {
+            return guardLapses;
+        }
+    }
+
+    private void releaseEncodePermit() {
+        synchronized (encodeLock) {
+            encodeInFlight = false;
+            encodeLock.notifyAll();
+        }
+    }
+
     private void run() {
         // One storage per dimension, opened on demand: a session that follows the player across a portal writes
         // each dimension's chunks/entities to its own vanilla folder (overworld region/, nether DIM-1/, ...).
@@ -342,6 +445,7 @@ final class AsyncSaveWriter {
                 WriteTask task = (WriteTask) next;
                 progress.chunks(++drained, submitted); // both REGION and ENTITIES drain under the one chunks phase
                 CompoundTag tag;
+                acquireEncodePermit();
                 try {
                     tag = task.encode().get(); // encode + stage-(a) fold on this thread (a no-op for entities)
                 } catch (RuntimeException e) {
@@ -354,6 +458,8 @@ final class AsyncSaveWriter {
                         entityChunksFailed++;
                     }
                     continue;
+                } finally {
+                    releaseEncodePermit();
                 }
                 if (task.target() == Target.REGION) {
                     SimpleRegionStorage region = regions.storageFor(task.dimension());
@@ -406,7 +512,8 @@ final class AsyncSaveWriter {
             }
             regions.synchronizeAll();
             entities.synchronizeAll();
-            finalizer.run(chunksFailed, entityChunksFailed); // level.dat, idcounts, and the completion record
+            // level.dat, idcounts, and the completion record
+            finalizer.run(chunksFailed + guardLapses(), entityChunksFailed);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             error = e;
@@ -424,7 +531,10 @@ final class AsyncSaveWriter {
         if (error == null) {
             zipFileName = bestEffortOutput(outputs, "the export zip");
         }
-        result.complete(new SaveResult(chunksNew, chunksRecaptured, mergedContainers, chunksFailed,
+        // A lapsed guard means a chunk was encoded while the loader may have been rebuilding what the encode reads,
+        // which is the silent half of the defect the guard exists for. It reaches the tally so the download reports
+        // partial and names the log, rather than reporting clean over blocks that may have become air.
+        result.complete(new SaveResult(chunksNew, chunksRecaptured, mergedContainers, chunksFailed + guardLapses(),
                 entityChunksWritten, entityChunksFailed, entitiesCarriedForward, zipFileName, error));
     }
 
