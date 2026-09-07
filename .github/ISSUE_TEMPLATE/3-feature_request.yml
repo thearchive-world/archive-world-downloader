@@ -13,15 +13,6 @@ body:
         - Bug reports go in the **Bug report** template, not here.
 
   - type: textarea
-    id: search_terms
-    attributes:
-      label: What did you search for?
-      description: Listing the keywords you tried helps the next person find this idea, and helps us spot duplicates.
-      placeholder: e.g. "save chest contents on disconnect"
-    validations:
-      required: true
-
-  - type: textarea
     id: summary
     attributes:
       label: What would you like to see?
