@@ -48,9 +48,22 @@ class CaptureControllerTest {
         SaveStage saveStage = SaveStage.NONE;
         float saveProgress;
 
+        int holds;
+        int releases;
+
         @Override
         public void captureTick() {
             captures++;
+        }
+
+        @Override
+        public void holdWriterEncoding() {
+            holds++;
+        }
+
+        @Override
+        public void releaseWriterEncoding() {
+            releases++;
         }
 
         @Override
@@ -745,5 +758,91 @@ class CaptureControllerTest {
 
         now[0] = 60_001L;
         assertFalse(controller.doneElapsedMillis().isPresent(), "and is gone one millisecond past it");
+    }
+
+    /**
+     * Stopping a download and then leaving the server is a routine order, and it is the order the first version of this
+     * guard missed: by the time the disconnect arrives the state has already left recording, so the flush is a no-op,
+     * while a full drain is still encoding against registries the client is about to rebuild. The hold has to be taken
+     * on the disconnect whatever the state.
+     */
+    @Test
+    void disconnectHoldsTheWriterEvenWhenTheSaveIsAlreadyRunning() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+        controller.stop(); // the player stopped the download first; the state is now SAVING
+        assertEquals(CaptureState.SAVING, controller.state());
+        assertEquals(0, session.holds, "stopping alone rebuilds nothing, so nothing is held");
+
+        controller.onDisconnect();
+
+        assertEquals(1, session.holds, "the disconnect holds the writer even though the flush it also runs is a no-op");
+        assertEquals(0, session.releases, "and nothing releases it before the client has torn the level down");
+    }
+
+    /** The hold is released by a later tick, never by the re-entrant poll the finish itself makes. */
+    @Test
+    void theHoldOutlivesTheFinishAndIsReleasedByTheNextTick() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+
+        controller.onDisconnect();
+
+        assertEquals(1, session.holds, "the disconnect holds first");
+        assertEquals(0, session.releases, "the finish it runs must not release its own hold");
+
+        controller.tick();
+
+        assertEquals(1, session.releases, "the first tick after the finish releases it");
+    }
+
+    /** Joining rebuilds the registries too, so a save still draining from the previous server is held across it. */
+    @Test
+    void joiningHoldsTheWriterStillDrainingFromTheLastServer() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+        controller.stop();
+
+        controller.onServerJoin();
+
+        assertEquals(1, session.holds, "the join edge holds the still-draining writer");
+    }
+
+    /**
+     * Where the loader detects a disconnect only on a client-tick edge, that edge is already past the registry rebuild,
+     * so the hold rides the level-teardown signal instead. That signal also fires where nothing is being rebuilt and
+     * the download must keep running, a dimension change among them, so it may only take the hold: a flush here would
+     * end a download the player never stopped.
+     */
+    @Test
+    void levelTeardownHoldsTheWriterWithoutEndingTheDownload() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+
+        controller.onLevelTeardown();
+
+        assertEquals(1, session.holds, "the teardown edge holds the writer ahead of the rebuild");
+        assertEquals(0, session.finishes, "and flushes nothing, because this edge is not the disconnect");
+        assertEquals(CaptureState.RECORDING, controller.state(), "the download is still running");
+    }
+
+    /** The teardown runs inside the client's own world load, so only a tick after it may hand the writer back. */
+    @Test
+    void theLevelTeardownHoldIsReleasedByTheNextTick() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+
+        controller.onLevelTeardown();
+
+        assertEquals(0, session.releases, "nothing releases it while the client is still loading");
+
+        controller.tick();
+
+        assertEquals(1, session.releases, "the first tick after the load hands the writer back");
     }
 }
