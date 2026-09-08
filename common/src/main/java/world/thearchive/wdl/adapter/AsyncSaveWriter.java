@@ -96,12 +96,14 @@ final class AsyncSaveWriter {
      * into those new to the archive (no prior on disk) and those re-captured (merged with a prior copy on a resume),
      * with {@code mergedContainers} the count of on-disk block containers whose contents carried forward;
      * {@code entitiesCarriedForward} is the entity analog (a re-flushed entity-chunk's contents and unioned-in
-     * entities), a diagnostic that flags chunks re-flushed with partial sets. {@link #chunksWritten()} is the total the
+     * entities), a diagnostic that flags chunks re-flushed with partial sets; {@code entitiesRecovered} counts only
+     * those whose content came from a prior download's record in a different chunk file, so it is the one term that
+     * says an interaction-captured entity moved between downloads. {@link #chunksWritten()} is the total the
      * saved-world message reports. {@code zipFileName} is the export zip actually written on a clean save, or null
      * (knob off, zip failed, or the save failed), so a completion surface never names a zip that is not on disk.
      */
     record SaveResult(int chunksNew, int chunksRecaptured, int mergedContainers, int chunksFailed,
-            int entityChunksWritten, int entityChunksFailed, int entitiesCarriedForward,
+            int entityChunksWritten, int entityChunksFailed, int entitiesCarriedForward, int entitiesRecovered,
             @Nullable String zipFileName, @Nullable Throwable error) {
         public boolean failed() {
             return error != null;
@@ -164,6 +166,10 @@ final class AsyncSaveWriter {
     // entity chunk by an entities-targeted resume scan, off the chunk write path. Same threading discipline.
     private volatile @Nullable BiConsumer<ResourceKey<Level>, CompoundTag> resumeEntityReadObserver;
 
+    // The interaction-captured content prior downloads already saved, or null on a fresh download. Same threading
+    // discipline as the observers above.
+    private volatile @Nullable RecoveredEntityContent recoveredEntityContent;
+
     /**
      * The three writer-thread steps run around the drain, in lifecycle order: {@code preflight} before any chunk is
      * written into the folder (the pre-merge resume backup), {@code finalizer} after the drain while the folder is open
@@ -201,6 +207,11 @@ final class AsyncSaveWriter {
      */
     public void observeEntityResumeReads(BiConsumer<ResourceKey<Level>, CompoundTag> observer) {
         this.resumeEntityReadObserver = observer;
+    }
+
+    /** Set the bank this writer carries onto a moved entity, after each entity chunk's own read-merge. */
+    public void carryRecoveredEntityContent(RecoveredEntityContent content) {
+        this.recoveredEntityContent = content;
     }
 
     /**
@@ -406,6 +417,7 @@ final class AsyncSaveWriter {
         int entityChunksWritten = 0;
         int entityChunksFailed = 0;
         int entitiesCarriedForward = 0;
+        int entitiesRecovered = 0;
         @Nullable
         Throwable error = null;
         try {
@@ -498,12 +510,17 @@ final class AsyncSaveWriter {
                     // vehicle's contents AND every on-disk entity the fresh capture lacks (EntityMerge unions, so
                     // a partial re-flush adds to rather than overwrites the prior set). Counted separately from
                     // block containers: a non-zero tally means chunks were re-flushed with partial sets.
+                    // The after-merge step is what reaches an entity that changed entity-chunk between downloads:
+                    // its prior record is in another chunk file, so this chunk's own read-merge has nothing to
+                    // carry, and only content banked from the resume scan can fill it.
+                    RecoveredEntityContent recovered = this.recoveredEntityContent;
                     RegionChunkWriter.MergeWriteResult merged = RegionChunkWriter.writeMerging(entityStore,
-                            task.pos(), tag, task.merge());
+                            task.pos(), tag, task.merge(), recovered == null ? null : recovered::applyTo);
                     switch (merged.outcome()) {
                         case WRITTEN_NEW, WRITTEN_RECAPTURED -> {
                             entityChunksWritten++;
                             entitiesCarriedForward += merged.mergeBacks();
+                            entitiesRecovered += merged.recoveredCarries();
                         }
                         case FAILED, PRESERVED -> entityChunksFailed++; // as above
                         case NOTHING_TO_WRITE -> {}
@@ -535,7 +552,8 @@ final class AsyncSaveWriter {
         // which is the silent half of the defect the guard exists for. It reaches the tally so the download reports
         // partial and names the log, rather than reporting clean over blocks that may have become air.
         result.complete(new SaveResult(chunksNew, chunksRecaptured, mergedContainers, chunksFailed + guardLapses(),
-                entityChunksWritten, entityChunksFailed, entitiesCarriedForward, zipFileName, error));
+                entityChunksWritten, entityChunksFailed, entitiesCarriedForward, entitiesRecovered, zipFileName,
+                error));
     }
 
     /**
