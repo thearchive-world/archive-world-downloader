@@ -111,7 +111,8 @@ class EntityRoundTripTest {
                 ChunkPos pos = positions.get(i);
                 out.write(pos, hostChunk()); // the host chunk the entities fold into
                 NBTTagCompound carrier = sink.encodeChunk(ImmutableList.of(entityTag("Item", i)), pos);
-                RegionChunkWriter.MergeWriteResult folded = RegionChunkWriter.foldEntitiesIntoRegion(out, pos, carrier);
+                RegionChunkWriter.MergeWriteResult folded = RegionChunkWriter.foldEntitiesIntoRegion(out, pos, carrier,
+                        null);
                 assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_NEW, folded.outcome(),
                         "a first fold into a host chunk with no prior entities is a new write");
             }
