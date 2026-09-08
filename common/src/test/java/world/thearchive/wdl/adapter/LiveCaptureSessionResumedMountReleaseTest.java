@@ -350,6 +350,71 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return new ChunkPos(-71, 30);
     }
 
+    @Test
+    void thePriorPlayerRecordBeatsTheEntityChunksWhenBothHoldTheMount(@TempDir Path saves,
+            @TempDir Path configDirectory) throws Exception {
+        Path save = saves.resolve("world");
+        LiveCaptureSession session = session(new VersionAdapterImpl(), configDirectory, Level.NETHER,
+                DownloadMode.RESUME);
+        // A mount ridden at a finish is refused every standalone write, so its entity-chunk copy is frozen at the
+        // last flush it was dismounted for, while the player record holds what the player saw from horseback.
+        writePriorLevelDat(session, save, Level.NETHER,
+                EntityFixtures.containerVehicleAt("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z,
+                        "minecraft:diamond", "minecraft:emerald"));
+        bankRecoveredContents(session, MOUNT, "minecraft:diamond");
+
+        CompoundTag raw = seatedRawWithEmptyMount();
+        session.restoreSeatedMountContents(raw);
+
+        assertEquals(2, mountItems(raw).size(),
+                "the player record is the fresher source for a ridden mount, so filling from the entity chunks "
+                        + "ahead of it would destroy what it alone still holds");
+    }
+
+    @Test
+    void theEntityChunksFillWhatThePriorRecordCannotReach(@TempDir Path saves, @TempDir Path configDirectory)
+            throws Exception {
+        Path save = saves.resolve("world");
+        LiveCaptureSession session = session(new VersionAdapterImpl(), configDirectory, Level.NETHER,
+                DownloadMode.RESUME);
+        // The earlier download finished on foot, so it wrote no RootVehicle at all and the prior-record restore
+        // has nothing to match against.
+        writePriorLevelDat(session, save, Level.NETHER, null);
+        bankRecoveredContents(session, MOUNT, "minecraft:diamond");
+
+        CompoundTag raw = seatedRawWithEmptyMount();
+        session.restoreSeatedMountContents(raw);
+
+        assertEquals(1, mountItems(raw).size(),
+                "and where that record holds nothing, the entity chunks are the only source there is");
+    }
+
+    /** The fresh seated record as a live client serializes it: the mount is there, its container reads empty. */
+    private static CompoundTag seatedRawWithEmptyMount() {
+        CompoundTag raw = new CompoundTag();
+        PlayerTag.setRootVehicle(raw, MOUNT,
+                EntityFixtures.entityAt("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z));
+        return raw;
+    }
+
+    private static ListTag mountItems(CompoundTag raw) {
+        return raw.getCompound("RootVehicle").getCompound("Entity").getList("Items", 10);
+    }
+
+    /** Seed the bank the resume scan fills, standing in for a prior download's entity-chunk record. */
+    private static void bankRecoveredContents(LiveCaptureSession session, UUID uuid, String... itemIds)
+            throws Exception {
+        RecoveredEntityContent bank = state(session, "recoveredEntityContent");
+        CompoundTag flat = EntityFixtures.entityChunkTagWith(
+                EntityFixtures.containerVehicleAt("minecraft:chest_boat", uuid, MOUNT_X, MOUNT_Y, MOUNT_Z, itemIds));
+        // The scan hands the bank the region chunk, whose entities sit under Level.Entities at this band.
+        CompoundTag level = new CompoundTag();
+        level.put("Entities", flat.getList("Entities", 10));
+        CompoundTag chunk = new CompoundTag();
+        chunk.put("Level", level);
+        bank.record(chunk);
+    }
+
     /**
      * A second mount of the SAME entity type, so identity rests on the UUID alone. Two boats is also the realistic
      * switch; a donkey against a boat would let a check comparing entity types pass by accident.
