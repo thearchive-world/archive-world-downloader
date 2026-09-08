@@ -161,3 +161,17 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
 # Below the 1.21 update a captured jukebox is marked playing via IsPlaying rather than the ticks_since_song_started
 # sidecar, so this round-trip asserts the playing flag.
 common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
+
+# The pre-1.21.5 CompoundTag and ListTag accessors (getCompound, getList, getString) replace the Optional-returning
+# getCompoundOrEmpty, getListOrEmpty and getStringOr family, and getIntOr becomes a local helper because getInt
+# reads an absent key back as a real zero while the assertions rely on -1.
+common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
+
+# The pre-1.21.5 accessors and the local getIntOr helper, as above.
+common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
+
+# The pre-1.21.5 accessors, as above.
+common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
+
+# The pre-1.21.5 accessors, as above.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
