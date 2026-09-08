@@ -30,10 +30,13 @@ final class RegionChunkWriter {
         int merge(CompoundTag onDisk, CompoundTag fresh);
     }
 
-    /** Fold detached open-time holders into an on-disk chunk tag in place; returns how many block entities got them. */
+    /**
+     * Mutate a chunk tag in place, returning how many nodes changed. May throw, and a throw abandons the write exactly
+     * as a throwing merge does.
+     */
     @FunctionalInterface
     public interface ChunkRewrite {
-        int apply(CompoundTag onDisk);
+        int apply(CompoundTag tag);
     }
 
     /**
@@ -49,8 +52,12 @@ final class RegionChunkWriter {
         FAILED
     }
 
-    /** A read-merge write's outcome, plus the merge-back count the merge reported (zero unless re-captured). */
-    record MergeWriteResult(MergeOutcome outcome, int mergeBacks) {}
+    /**
+     * A read-merge write's outcome, the merge-back count the merge reported (zero unless re-captured), and separately
+     * the count an after-merge step carried in. The two are not summed: a merge-back came from this chunk's own prior
+     * copy, an after-merge carry came from somewhere else, and only the second says a record moved between downloads.
+     */
+    record MergeWriteResult(MergeOutcome outcome, int mergeBacks, int recoveredCarries) {}
 
     /**
      * Runs on the writer thread, which solely owns {@code storage}. The prior may be a resumed download's or this
@@ -61,8 +68,20 @@ final class RegionChunkWriter {
      */
     public static MergeWriteResult writeMerging(IOWorker storage, ChunkPos pos,
             @Nullable CompoundTag tag, ChunkReadMerge merge) {
+        return writeMerging(storage, pos, tag, merge, null);
+    }
+
+    /**
+     * As above, plus {@code afterMerge}, run on the merged tag once the prior copy of this same chunk has had its say
+     * and before anything is written. Ordering is the contract: a step run here can only see what the chunk's own prior
+     * did not supply, so a carry sourced from another chunk can never displace this one's. A throw from it is the same
+     * loss as a throwing merge and is preserved the same way, which is why it sits inside that try rather than beside
+     * the write.
+     */
+    public static MergeWriteResult writeMerging(IOWorker storage, ChunkPos pos,
+            @Nullable CompoundTag tag, ChunkReadMerge merge, @Nullable ChunkRewrite afterMerge) {
         if (tag == null) {
-            return new MergeWriteResult(MergeOutcome.NOTHING_TO_WRITE, 0);
+            return new MergeWriteResult(MergeOutcome.NOTHING_TO_WRITE, 0, 0);
         }
         @Nullable
         CompoundTag onDisk;
@@ -70,28 +89,32 @@ final class RegionChunkWriter {
             onDisk = storage.load(pos);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("preserving chunk {}: on-disk read failed", pos, e);
-            return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
+            return new MergeWriteResult(MergeOutcome.PRESERVED, 0, 0);
         }
         int mergeBacks = 0;
+        int recoveredCarries = 0;
         boolean recaptured = onDisk != null;
-        if (onDisk != null) {
-            try {
+        try {
+            if (onDisk != null) {
                 mergeBacks = merge.merge(onDisk, tag);
-            } catch (RuntimeException e) {
-                LOGGER.warn("preserving chunk {}: carry-forward merge failed", pos, e);
-                // Falling through to the write here lands a tag whose carry-forward stopped at an unknown
-                // point and reports it a clean re-captured write, which is a loss no term counts.
-                return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
             }
+            if (afterMerge != null) {
+                recoveredCarries = afterMerge.apply(tag);
+            }
+        } catch (RuntimeException e) {
+            LOGGER.warn("preserving chunk {}: carry-forward merge failed", pos, e);
+            // Falling through to the write here lands a tag whose carry-forward stopped at an unknown
+            // point and reports it a clean re-captured write, which is a loss no term counts.
+            return new MergeWriteResult(MergeOutcome.PRESERVED, 0, 0);
         }
         try {
             storage.store(pos, tag).join();
         } catch (RuntimeException e) {
             LOGGER.warn("skipping chunk {}: write failed", pos, e);
-            return new MergeWriteResult(MergeOutcome.FAILED, 0);
+            return new MergeWriteResult(MergeOutcome.FAILED, 0, 0);
         }
         return new MergeWriteResult(recaptured ? MergeOutcome.WRITTEN_RECAPTURED : MergeOutcome.WRITTEN_NEW,
-                mergeBacks);
+                mergeBacks, recoveredCarries);
     }
 
     /**

@@ -274,7 +274,8 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityVehicleRelocationTest.ja
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the entity read-back open the vanilla
 # IOWorker through WorldPaths. Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the
-# no-argument form.
+# no-argument form. And the pre-1.21.5 accessors (getCompound, getList) replace the Optional-returning
+# getCompoundOrEmpty and getListOrEmpty family.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the sweep is proven against the vanilla IOWorker (a
@@ -608,3 +609,23 @@ common/src/test/java/world/thearchive/wdl/WorldgenWarmupTest.java
 # the inventory's end back through that same numbered access, requiring a real slot at the last index it fills and
 # SlotAccess.NULL at the next, so the size it drives is the one AbstractChestedHorse creates.
 common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
+
+# The pre-1.21.5 CompoundTag and ListTag accessors (getCompound, getList, getString) replace the Optional-returning
+# getCompoundOrEmpty, getListOrEmpty and getStringOr family, and getIntOr becomes a local helper because getInt
+# reads an absent key back as a real zero while the assertions rely on -1.
+# Below 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain
+# ItemStack buy cost and serializes through vanilla's own MerchantOffers.createTag.
+common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
+
+# The pre-1.21.5 accessors and the local getIntOr helper, as above; and this band's plain-ItemStack merchant
+# fixture serialized through MerchantOffers.createTag.
+common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
+
+# The pre-1.21.5 accessors and this band's plain-ItemStack merchant fixture, as above; and the on-disk oracle
+# opens the entities store as a vanilla IOWorker through WorldPaths.openEntitiesStorage, there being no
+# SimpleRegionStorage below 1.20.6 and no entitiesStorageInfo on this band's WorldPaths.
+common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
+
+# Below 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain
+# ItemStack buy cost and serializes through vanilla's own MerchantOffers.createTag.
+common/src/test/java/world/thearchive/wdl/adapter/RiddenMountContentsFoldTest.java
