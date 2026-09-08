@@ -30,10 +30,13 @@ final class RegionChunkWriter {
         int merge(CompoundTag onDisk, CompoundTag fresh);
     }
 
-    /** Fold detached open-time holders into an on-disk chunk tag in place; returns how many block entities got them. */
+    /**
+     * Mutate a chunk tag in place, returning how many nodes changed. May throw, and a throw abandons the write exactly
+     * as a throwing merge does.
+     */
     @FunctionalInterface
     public interface ChunkRewrite {
-        int apply(CompoundTag onDisk);
+        int apply(CompoundTag tag);
     }
 
     /**
@@ -49,14 +52,20 @@ final class RegionChunkWriter {
         FAILED
     }
 
-    /** A read-merge write's outcome, plus the merge-back count the merge reported (zero unless re-captured). */
+    /**
+     * A read-merge write's outcome, the merge-back count the merge reported (zero unless re-captured), and separately
+     * the count an after-merge step carried in. The two are not summed: a merge-back came from this chunk's own prior
+     * copy, an after-merge carry came from somewhere else, and only the second says a record moved between downloads.
+     */
     static final class MergeWriteResult {
         private final MergeOutcome outcome;
         private final int mergeBacks;
+        private final int recoveredCarries;
 
-        MergeWriteResult(MergeOutcome outcome, int mergeBacks) {
+        MergeWriteResult(MergeOutcome outcome, int mergeBacks, int recoveredCarries) {
             this.outcome = outcome;
             this.mergeBacks = mergeBacks;
+            this.recoveredCarries = recoveredCarries;
         }
 
         MergeOutcome outcome() {
@@ -65,6 +74,10 @@ final class RegionChunkWriter {
 
         int mergeBacks() {
             return mergeBacks;
+        }
+
+        int recoveredCarries() {
+            return recoveredCarries;
         }
     }
 
@@ -84,7 +97,7 @@ final class RegionChunkWriter {
     public static MergeWriteResult writeMerging(WdlRegionStorage storage, ChunkPos pos,
             @Nullable CompoundTag tag, ChunkReadMerge merge) {
         if (tag == null) {
-            return new MergeWriteResult(MergeOutcome.NOTHING_TO_WRITE, 0);
+            return new MergeWriteResult(MergeOutcome.NOTHING_TO_WRITE, 0, 0);
         }
         @Nullable
         CompoundTag onDisk;
@@ -92,7 +105,7 @@ final class RegionChunkWriter {
             onDisk = storage.read(pos);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("preserving chunk {}: on-disk read failed", pos, e);
-            return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
+            return new MergeWriteResult(MergeOutcome.PRESERVED, 0, 0);
         }
         int mergeBacks = 0;
         boolean recaptured = onDisk != null;
@@ -103,7 +116,7 @@ final class RegionChunkWriter {
                 LOGGER.warn("preserving chunk {}: carry-forward merge failed", pos, e);
                 // Falling through to the write here lands a tag whose carry-forward stopped at an unknown
                 // point and reports it a clean re-captured write, which is a loss no term counts.
-                return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
+                return new MergeWriteResult(MergeOutcome.PRESERVED, 0, 0);
             }
             preserveEntities(onDisk, tag);
         }
@@ -111,10 +124,10 @@ final class RegionChunkWriter {
             storage.write(pos, tag);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("skipping chunk {}: write failed", pos, e);
-            return new MergeWriteResult(MergeOutcome.FAILED, 0);
+            return new MergeWriteResult(MergeOutcome.FAILED, 0, 0);
         }
         return new MergeWriteResult(recaptured ? MergeOutcome.WRITTEN_RECAPTURED : MergeOutcome.WRITTEN_NEW,
-                mergeBacks);
+                mergeBacks, 0);
     }
 
     /**
@@ -182,23 +195,23 @@ final class RegionChunkWriter {
      * per-chunk discipline, never aborting the drain.
      */
     public static MergeWriteResult foldEntitiesIntoRegion(WdlRegionStorage regionStorage, ChunkPos pos,
-            CompoundTag freshEnvelope) {
+            CompoundTag freshEnvelope, @Nullable ChunkRewrite afterMerge) {
         CompoundTag onDisk;
         try {
             onDisk = regionStorage.read(pos);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("preserving chunk {}: on-disk read failed before the entity fold", pos, e);
-            return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
+            return new MergeWriteResult(MergeOutcome.PRESERVED, 0, 0);
         }
         if (onDisk == null) {
             LOGGER.warn("chunk {}: no host chunk on disk; its captured entities are lost", pos);
-            return new MergeWriteResult(MergeOutcome.FAILED, 0);
+            return new MergeWriteResult(MergeOutcome.FAILED, 0, 0);
         }
         if (!(onDisk.get("Level") instanceof CompoundTag)) {
             // A malformed host with no Level compound cannot hold the fold; count it lost rather than storing the
             // host unchanged and reporting a clean write, the way the null-host branch above does.
             LOGGER.warn("chunk {}: on-disk chunk has no Level compound; its captured entities are lost", pos);
-            return new MergeWriteResult(MergeOutcome.FAILED, 0);
+            return new MergeWriteResult(MergeOutcome.FAILED, 0, 0);
         }
         CompoundTag level = onDisk.getCompound("Level");
         ListTag diskEntities = level.get("Entities") instanceof ListTag
@@ -206,13 +219,17 @@ final class RegionChunkWriter {
                 : new ListTag();
         boolean recaptured = !diskEntities.isEmpty();
         int mergeBacks;
+        int recoveredCarries = 0;
         try {
             CompoundTag onDiskEnvelope = new CompoundTag();
             onDiskEnvelope.put("Entities", diskEntities);
             mergeBacks = EntityMerge.merge(onDiskEnvelope, freshEnvelope);
+            if (afterMerge != null) {
+                recoveredCarries = afterMerge.apply(freshEnvelope);
+            }
         } catch (RuntimeException e) {
             LOGGER.warn("preserving chunk {}: entity fold failed", pos, e);
-            return new MergeWriteResult(MergeOutcome.PRESERVED, 0);
+            return new MergeWriteResult(MergeOutcome.PRESERVED, 0, 0);
         }
         if (freshEnvelope.get("Entities") instanceof ListTag) {
             level.put("Entities", freshEnvelope.get("Entities"));
@@ -221,9 +238,9 @@ final class RegionChunkWriter {
             regionStorage.write(pos, onDisk);
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("skipping chunk {}: entity write-back failed", pos, e);
-            return new MergeWriteResult(MergeOutcome.FAILED, 0);
+            return new MergeWriteResult(MergeOutcome.FAILED, 0, 0);
         }
         return new MergeWriteResult(recaptured ? MergeOutcome.WRITTEN_RECAPTURED : MergeOutcome.WRITTEN_NEW,
-                mergeBacks);
+                mergeBacks, recoveredCarries);
     }
 }

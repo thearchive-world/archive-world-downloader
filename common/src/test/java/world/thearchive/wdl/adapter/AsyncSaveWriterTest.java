@@ -928,7 +928,7 @@ class AsyncSaveWriterTest {
         try (WdlRegionStorage io = storage(region, "chunk")) {
             // Terrain flushes, then a captured chest minecart folds into the chunk's Level.Entities.
             io.write(pos, codec.encode(SyntheticChunks.full(true), false));
-            RegionChunkWriter.foldEntitiesIntoRegion(io, pos, entityChunk(filledVehicle(cart)));
+            RegionChunkWriter.foldEntitiesIntoRegion(io, pos, entityChunk(filledVehicle(cart)), null);
             assertFalse(vehicleItems(io, pos, cart).isEmpty(), "the fold placed the vehicle in Level.Entities");
 
             // A revisit re-flushes fresh terrain over the same chunk; the terrain tag carries no Entities of its own.
@@ -1310,7 +1310,6 @@ class AsyncSaveWriterTest {
      */
     @Test
     void resolvesNoEncodeWhileEncodingIsPaused(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean loaderStateAvailable = new AtomicBoolean(true);
         AtomicInteger encodesDuringRebuild = new AtomicInteger();
@@ -1321,22 +1320,22 @@ class AsyncSaveWriterTest {
 
         // Encode one chunk unpaused first. Without it the later absence proves nothing: a writer that never picked
         // anything up would satisfy it just as well as a writer that is correctly held.
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(5, 5), () -> {
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(5, 5), () -> {
             encodes.incrementAndGet();
             firstEncoded.countDown();
-            return codec.encode(SyntheticChunks.full(registries, true), registries, false);
+            return codec.encode(SyntheticChunks.full(true), false);
         }, ChunkMerge::merge);
         assertTrue(firstEncoded.await(30, TimeUnit.SECONDS), "the writer is live and consuming the queue");
 
         writer.pauseEncoding();
         loaderStateAvailable.set(false);
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
             encodes.incrementAndGet();
             if (!loaderStateAvailable.get()) {
                 encodesDuringRebuild.incrementAndGet();
             }
-            return codec.encode(SyntheticChunks.full(registries, true), registries, false);
+            return codec.encode(SyntheticChunks.full(true), false);
         }, ChunkMerge::merge);
 
         for (int i = 0; i < 50 && encodes.get() == 1; i++) {
@@ -1361,7 +1360,6 @@ class AsyncSaveWriterTest {
      */
     @Test
     void pauseWaitsForAnEncodeAlreadyInFlight(@TempDir Path save) throws Exception {
-        RegistryAccess registries = TestRegistries.frozen();
         Path region = Files.createDirectories(save.resolve("region"));
         CountDownLatch encodeStarted = new CountDownLatch(1);
         CountDownLatch releaseEncode = new CountDownLatch(1);
@@ -1369,14 +1367,14 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = newWriter(region);
 
-        writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0), () -> {
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
             encodeStarted.countDown();
             try {
                 releaseEncode.await(30, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            CompoundTag tag = codec.encode(SyntheticChunks.full(registries, true), registries, false);
+            CompoundTag tag = codec.encode(SyntheticChunks.full(true), false);
             encodeFinished.set(true);
             return tag;
         }, ChunkMerge::merge);

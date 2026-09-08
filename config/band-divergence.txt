@@ -339,7 +339,8 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityVehicleRelocationTest.ja
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the writer and the entity read-back open the vanilla
 # IOWorker through WorldPaths. Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the
-# no-argument form.
+# no-argument form. The scan hands the bank a region chunk, whose entities sit under Level.Entities below
+# 1.17, so the fixture that stands in for a prior download's record builds that shape.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the sweep is proven against the vanilla IOWorker (a
@@ -807,3 +808,29 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkSectionClampTest.java
 # Below 1.18 a chunk's block entities nest under Level.TileEntities, not the flat root block_entities added at 1.18,
 # so the in-session stash merge locates a block entity by x/y/z through the Level compound.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+
+# This band's java_version is 8, where a type test cannot bind a pattern variable, so each instanceof over an NBT
+# read is a local, an unbound instanceof and a cast rather than the pattern form the higher bands use.
+common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferScrub.java
+
+# The Java 8 pattern-variable rewrite above; and below 1.17 (era E3) entities live inside the region chunk, so the
+# resume scan hands the bank that whole chunk and the record side reads Level.Entities where the higher bands read a
+# top-level Entities. The apply side is not rewritten with it, taking the flat envelope the entity fold passes.
+common/src/main/java/world/thearchive/wdl/adapter/RecoveredEntityContent.java
+
+# The Java 8 pattern-variable rewrite; and the merchant fixture builds its offer with a plain ItemStack buy cost and
+# serializes through MerchantOffers.createTag, there being no ItemCost or offers codec below 1.20.5.
+common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
+
+# Below 1.17 (era E3) entities live inside the region chunk, so the scanned-chunk fixture wraps its entities under
+# Level.Entities while the fresh-chunk fixture keeps the flat envelope, the two shapes the bank's two sides take; and
+# the merchant fixture uses this band's plain-ItemStack offer and createTag. The later getIntOr, getListOrEmpty,
+# getCompoundOrEmpty and getStringOr accessors are spelled in this band's forms, getIntOr as a local helper because
+# getInt reads an absent key back as a real zero.
+common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
+
+# Below 1.17 (era E3) entities live inside the region chunk, so the on-disk oracle reads the host chunk's
+# Level.Entities through the band's WdlRegionStorage rather than a separate entities/ store (no IOWorker below 1.15,
+# no SimpleRegionStorage below 1.20.6), and the fixture seeds a host chunk before each download because a fold with
+# no host on disk is a counted loss. The merchant fixture and the later NBT accessors are this band's, as above.
+common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
