@@ -17,6 +17,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -94,6 +96,29 @@ class RiddenMountContentsFoldTest {
         assertFalse(passengerOf(folded).contains("Items"), "on neither node of it");
         assertTrue(stash(session).containsKey(UUID.fromString("11111111-2222-3333-4444-555555555555")),
                 "and its stash entry is left for the chunk write that owns it");
+    }
+
+    @Test
+    void aMerchantRidingWithThePlayerLosesTheTradesItsClientMadeUp(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(temporary);
+        CompoundTag villager = EntityFixtures.entity("minecraft:villager", MOUNT);
+        villager.put("Offers", invented());
+        villager.putInt("Career", 4);
+
+        CompoundTag folded = session.foldRidingVehicleContents(
+                EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:boat", CARRIER), villager));
+
+        assertFalse(passengerOf(folded).contains("Offers"),
+                "the entity write never sees this tree, so a merchant riding with the player is the one copy that "
+                        + "would reach the archive still selling what its client invented");
+        assertFalse(passengerOf(folded).contains("Career"));
+    }
+
+    /** The trade list a client merchant builds for itself, in the shape {@code MerchantOffers.createTag} writes. */
+    private static CompoundTag invented() {
+        MerchantOffers offers = new MerchantOffers();
+        offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), new ItemStack(Items.DIAMOND), 1, 0, 0.0f));
+        return offers.createTag();
     }
 
     /** The scenario shape: a chested mount that a plain minecart pushed itself under, so the mount is the passenger. */

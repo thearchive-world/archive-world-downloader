@@ -112,7 +112,8 @@ class EntityRoundTripTest {
                 ChunkPos pos = positions.get(i);
                 out.store(pos, hostChunk()).join(); // the host chunk the entities fold into
                 CompoundTag carrier = sink.encodeChunk(ImmutableList.of(entityTag("minecraft:item", i)), pos);
-                RegionChunkWriter.MergeWriteResult folded = RegionChunkWriter.foldEntitiesIntoRegion(out, pos, carrier);
+                RegionChunkWriter.MergeWriteResult folded = RegionChunkWriter.foldEntitiesIntoRegion(out, pos, carrier,
+                        null);
                 assertEquals(RegionChunkWriter.MergeOutcome.WRITTEN_NEW, folded.outcome(),
                         "a first fold into a host chunk with no prior entities is a new write");
             }
