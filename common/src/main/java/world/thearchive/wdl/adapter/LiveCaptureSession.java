@@ -303,6 +303,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private long encodeDeadlineNanos = Long.MAX_VALUE;
 
+    /**
+     * Whether the writer is held off the loader's registries. Volatile because a disconnect the player did not initiate
+     * delivers the hold on the network IO thread while the client main thread runs its own teardown, so the two ends of
+     * this flag are not always the same thread.
+     */
+    private volatile boolean encodeQuiesced;
+
     /** Cached nearest-first capture offsets, rebuilt only when the render distance changes (a per-tick array). */
     private int @Nullable [] ringOffsetsCache;
     private int ringOffsetsRadius = -1;
@@ -2330,6 +2337,26 @@ public final class LiveCaptureSession implements CaptureController.Session {
         completeThroughWriter(runnable -> Minecraft.getMinecraft().addScheduledTask(runnable), this::finishCapture);
     }
 
+    @Override
+    public void holdWriterEncoding() {
+        // Set for as long as the hold lasts, so a writer opened after it (a download whose chunks all still sit in
+        // the buffer opens one inside the drain) is born held rather than free-running into the rebuild.
+        encodeQuiesced = true;
+        AsyncSaveWriter activeWriter = writer;
+        if (activeWriter != null) {
+            activeWriter.pauseEncoding();
+        }
+    }
+
+    @Override
+    public void releaseWriterEncoding() {
+        encodeQuiesced = false;
+        AsyncSaveWriter activeWriter = writer;
+        if (activeWriter != null) {
+            activeWriter.resumeEncoding();
+        }
+    }
+
     /**
      * The finish proper: the save-time re-capture burst, the capture teardown, the exits that write nothing, and the
      * drain that hands the writer everything it still needs. Leaves the end-of-stream signal to
@@ -3586,8 +3613,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null; // a prior open attempt failed; the failure is reported at finish()
         }
         Minecraft minecraft = Minecraft.getMinecraft();
-        return openWorld(minecraft.getSaveLoader(), minecraft.gameDir.toPath().resolve("saves"),
+        AsyncSaveWriter opened = openWorld(minecraft.getSaveLoader(), minecraft.gameDir.toPath().resolve("saves"),
                 saveRoot -> beginReport(minecraft, saveRoot));
+        if (opened != null && encodeQuiesced) {
+            opened.pauseEncoding();
+        }
+        return opened;
     }
 
     /**

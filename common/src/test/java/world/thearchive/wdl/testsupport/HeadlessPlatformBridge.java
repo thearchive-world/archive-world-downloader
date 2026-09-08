@@ -48,6 +48,9 @@ public class HeadlessPlatformBridge implements PlatformBridge {
     public void onServerJoin(Runnable callback) {}
 
     @Override
+    public void onLevelTeardown(Runnable callback) {}
+
+    @Override
     public Path configDirectory() {
         return configDirectory;
     }

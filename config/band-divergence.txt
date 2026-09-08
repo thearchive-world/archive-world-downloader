@@ -356,6 +356,10 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.
 # counted loss.
 # Below 1.13 DimensionType is the classic enum with an instance getName() rather than a static
 # DimensionType.getName(DimensionType) accessor, and chunk tags are the classic MCP NBTTagCompound.
+# It also carries a self-release backstop of 60 seconds against the higher bands' 10, which follows from the
+# teardown edge this band and its two pre-Flattening siblings hold on: the hold brackets the client's whole
+# pre-revert teardown here, so that backstop has to outlast other mods' unload listeners and a synchronous
+# resource reload rather than a rebuild.
 common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the merge-write reads and writes through the band's
@@ -837,6 +841,8 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
 # getCurrentServerData, addScheduledTask for the restore-completion marshal, displayGuiScreen for the screen opens,
 # ServerData.serverName for the source name, and the saves directory resolved as the game directory's saves child (the
 # save format exposes no saves-root accessor), with the loaded-world path taken as the integrated server's folder under it.
+# It also wires the band's own level-teardown edge to the capture controller, which the higher bands need no equivalent
+# of because their disconnect hook already runs ahead of the loader's registry rebuild.
 common/src/main/java/world/thearchive/wdl/Wdl.java
 
 # Below 1.13 there is no Mojang mapping, so the resume/confirm flow names the classic MCP Minecraft API:
@@ -985,6 +991,8 @@ common/src/test/java/world/thearchive/wdl/adapter/ContainerTypeGateMergeTest.jav
 
 # This band's fastutil 8.2.1 has no LongSet.of() factory, so the test builds sets via LongSets and LongOpenHashSet;
 # the Java 8 floor also has no Set.of collection factory (Java 9), so the entity sets are Guava ImmutableSet.of.
+# It also carries the two cases pinning the band's level-teardown edge: the teardown holds the writer without ending
+# the download, and the tick after it hands the writer back.
 common/src/test/java/world/thearchive/wdl/core/CaptureControllerTest.java
 
 # This band's fastutil 8.2.1 has no LongSet.of() factory, so the test builds sets via LongSets and LongOpenHashSet;
@@ -1228,3 +1236,24 @@ common/src/test/java/world/thearchive/wdl/core/OpenClickIntentTest.java
 # translation (en_us "Proceed") since the higher bands resolve the vanilla key directly and never gained an
 # equivalent wdl key.
 common/src/main/resources/assets/wdl/lang/*.json
+
+# On this band the loader detects a disconnect on a client-tick edge, which is one tick past the registry rebuild that
+# Minecraft.loadWorld runs, so the bridge SPI carries a second edge the higher bands need no equivalent of:
+# onLevelTeardown, fired from the loader's own world-unload signal while the block-state ids a chunk encode reads are
+# still the ones the capture took them against.
+common/src/main/java/world/thearchive/wdl/platform/PlatformBridge.java
+
+# The teardown edge above needs a hold-only entry, because the same signal also carries a dimension change, which
+# rebuilds nothing: flushing there would end a download the player never stopped. onDisconnect stays the flush and
+# onLevelTeardown is the hold, where the higher bands wire onDisconnect and onServerJoin and need no third edge.
+# onServerJoin's own note is narrowed here for the same reason the third edge exists: this band signals a join
+# through the player's own connection, which the loader creates after it has rebuilt the registries, so that hold
+# lands too late to cover the join-side rebuild.
+common/src/main/java/world/thearchive/wdl/core/CaptureController.java
+
+# Implements the band's own PlatformBridge.onLevelTeardown, as the same no-op registration every other arm of this
+# fake bridge is.
+common/src/test/java/world/thearchive/wdl/testsupport/HeadlessPlatformBridge.java
+
+# Its own fake bridge implements the band's PlatformBridge.onLevelTeardown, as a no-op like its neighbors.
+common/src/test/java/world/thearchive/wdl/ResumeFlowTest.java

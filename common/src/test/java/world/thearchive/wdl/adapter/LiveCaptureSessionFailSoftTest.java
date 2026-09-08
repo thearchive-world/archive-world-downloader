@@ -251,6 +251,25 @@ class LiveCaptureSessionFailSoftTest {
     }
 
     /**
+     * The controller takes the hold on the connection edge and hands it back a tick later, so what this pins is the
+     * session's half of that seam: the hold reaches the writer it owns, and the release lets it go again.
+     */
+    @Test
+    void holdAndReleaseReachTheWriterTheSessionOwns(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(temporary);
+        AsyncSaveWriter writer = bindWriter(session, temporary, (chunksFailed, entityChunksFailed) -> {});
+
+        session.holdWriterEncoding();
+        assertTrue(writer.isEncodingPaused(), "the hold reaches the writer");
+
+        session.releaseWriterEncoding();
+        assertFalse(writer.isEncodingPaused(), "and the release lets it go");
+
+        session.finish();
+        assertNotNull(writer.result().get(30, TimeUnit.SECONDS), "the writer still reaches its terminal state");
+    }
+
+    /**
      * The one link no unit above pins: that {@link LiveCaptureSession#finish} routes through the guard at all.
      * Headless, {@code Minecraft.getInstance()} is null, so the finish body throws on its first client read, which is
      * the same shape as any other throw on the way to the marker and exercises the whole route. What this cannot pin is

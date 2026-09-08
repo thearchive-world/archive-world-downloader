@@ -15,6 +15,7 @@ import net.minecraft.client.settings.KeyBinding;
 import net.minecraftforge.client.ClientCommandHandler;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.common.ModContainer;
@@ -43,6 +44,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     private final List<Runnable> tickEndCallbacks = new ArrayList<>();
     private final List<Runnable> disconnectCallbacks = new ArrayList<>();
     private final List<Runnable> serverJoinCallbacks = new ArrayList<>();
+    private final List<Runnable> levelTeardownCallbacks = new ArrayList<>();
     private boolean connected;
     private @Nullable Supplier<String> primaryLabelKey;
     private @Nullable BooleanSupplier primaryEnabled;
@@ -103,6 +105,32 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     @Override
     public void onServerJoin(Runnable callback) {
         serverJoinCallbacks.add(callback);
+    }
+
+    @Override
+    public void onLevelTeardown(Runnable callback) {
+        levelTeardownCallbacks.add(callback);
+    }
+
+    /**
+     * The one edge ahead of the loader's registry revert. Minecraft.loadWorld posts WorldEvent.Unload at its head and
+     * calls FMLClientHandler.handleClientWorldClosing, which reverts the registries on any non-local connection, later
+     * in that same method on that same thread, and nothing between the two runs a client tick. So the disconnect
+     * callbacks above, which ride the tick edge, cannot reach a subscriber until the revert is over, and this can.
+     *
+     * <p>Gated on the client's own world: with an integrated server running, the server thread posts this event for
+     * its worlds too, and a callback taken there would reach the capture off the client thread it belongs to. Firing
+     * on a dimension change as well is deliberate and harmless, the teardown being real either way and the hold
+     * released by the next tick.
+     */
+    @SubscribeEvent
+    public void onWorldUnload(WorldEvent.Unload event) {
+        if (!event.getWorld().isRemote) {
+            return;
+        }
+        for (Runnable callback : levelTeardownCallbacks) {
+            callback.run();
+        }
     }
 
     /**
