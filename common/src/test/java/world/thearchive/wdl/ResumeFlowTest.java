@@ -80,6 +80,9 @@ class ResumeFlowTest {
         public void onServerJoin(Runnable callback) {}
 
         @Override
+        public void onLevelTeardown(Runnable callback) {}
+
+        @Override
         public Path configDirectory() {
             return Paths.get(".");
         }

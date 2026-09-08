@@ -45,6 +45,14 @@ public interface PlatformBridge {
     /** Run {@code callback} when the client finishes joining a world/server (the mirror of onDisconnect). */
     void onServerJoin(Runnable callback);
 
+    /**
+     * Run {@code callback} as the client starts tearing its level down, which is where the loader rebuilds the
+     * registries a background write reads. Separate from onDisconnect, which a loader may detect on a client-tick edge
+     * that is already past that rebuild and so too late to hold anything off it. Fires on every teardown, a dimension
+     * change included, so a subscriber may only arm itself here, never end a download.
+     */
+    void onLevelTeardown(Runnable callback);
+
     /** The loader's config directory. */
     Path configDirectory();
 
