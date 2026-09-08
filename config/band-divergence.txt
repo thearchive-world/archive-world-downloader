@@ -356,10 +356,11 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.
 # counted loss.
 # Below 1.13 DimensionType is the classic enum with an instance getName() rather than a static
 # DimensionType.getName(DimensionType) accessor, and chunk tags are the classic MCP NBTTagCompound.
-# It also carries a self-release backstop of 60 seconds against the higher bands' 10, which follows from the
-# teardown edge this band and its two pre-Flattening siblings hold on: the hold brackets the client's whole
-# pre-revert teardown here, so that backstop has to outlast other mods' unload listeners and a synchronous
-# resource reload rather than a rebuild.
+# It also carries an INFO line reporting how long the writer hold blocked its caller, and a self-release backstop of
+# 60 seconds against the higher bands' 10. Both follow from the teardown edge this band and its two pre-Flattening
+# siblings hold on, which the higher bands need no equivalent of: the hold brackets the client's whole pre-revert
+# teardown here, so the mod's own share of a stall is otherwise indistinguishable from every other mod's, and the
+# backstop has to outlast other mods' unload listeners and a synchronous resource reload rather than a rebuild.
 common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the merge-write reads and writes through the band's

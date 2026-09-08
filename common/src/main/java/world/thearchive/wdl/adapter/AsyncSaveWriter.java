@@ -478,26 +478,36 @@ final class AsyncSaveWriter {
      * go rather than freezing the client, which costs at most the one chunk this was protecting.
      */
     public void pauseEncoding() {
-        synchronized (encodeLock) {
-            encodingPaused = true;
-            long deadline = System.nanoTime() + PAUSE_HANDSHAKE_TIMEOUT_MILLIS * 1_000_000L;
-            while (encodeInFlight) {
-                long remainingMillis = (deadline - System.nanoTime()) / 1_000_000L;
-                if (remainingMillis <= 0) {
-                    // Counted, not just logged: the chunk this abandons is written either way, and a save that may
-                    // hold air where terrain was has to reach the player as partial rather than as clean.
-                    guardLapses++;
-                    LOGGER.warn("an encode was still running after {} ms; letting the loader proceed anyway, so this "
-                            + "chunk may lose blocks", PAUSE_HANDSHAKE_TIMEOUT_MILLIS);
-                    return;
-                }
-                try {
-                    encodeLock.wait(remainingMillis);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
+        long startNanos = System.nanoTime();
+        try {
+            synchronized (encodeLock) {
+                encodingPaused = true;
+                long deadline = System.nanoTime() + PAUSE_HANDSHAKE_TIMEOUT_MILLIS * 1_000_000L;
+                while (encodeInFlight) {
+                    long remainingMillis = (deadline - System.nanoTime()) / 1_000_000L;
+                    if (remainingMillis <= 0) {
+                        // Counted, not just logged: the chunk this abandons is written either way, and a save that may
+                        // hold air where terrain was has to reach the player as partial rather than as clean.
+                        guardLapses++;
+                        LOGGER.warn("an encode was still running after {} ms; letting the loader proceed anyway, so "
+                                + "this chunk may lose blocks", PAUSE_HANDSHAKE_TIMEOUT_MILLIS);
+                        return;
+                    }
+                    try {
+                        encodeLock.wait(remainingMillis);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
                 }
             }
+        } finally {
+            // INFO rather than DEBUG, and not behind a toggle, because a report of a stalled teardown arrives
+            // with the game log and nothing else, and this is the only number in it that separates this mod's share
+            // of that stall from every other mod's. Bounded without a toggle: nothing reaches this call unless a
+            // download is running.
+            LOGGER.info("held the save writer off the registry: the calling thread blocked for {} ms",
+                    (System.nanoTime() - startNanos) / 1_000_000L);
         }
     }
 
