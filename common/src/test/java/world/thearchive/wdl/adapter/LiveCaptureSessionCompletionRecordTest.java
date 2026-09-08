@@ -83,7 +83,7 @@ class LiveCaptureSessionCompletionRecordTest {
 
     /** A save that wrote everything it was given, so the whole verdict is the session's own tallies. */
     private static AsyncSaveWriter.SaveResult cleanWrite() {
-        return new AsyncSaveWriter.SaveResult(0, 0, 0, 0, 0, 0, 0, null, null);
+        return new AsyncSaveWriter.SaveResult(0, 0, 0, 0, 0, 0, 0, 0, null, null);
     }
 
     @Test
