@@ -26,7 +26,7 @@ Where you can, include:
 - steps or a small proof of concept to reproduce it,
 - any relevant excerpt from `logs/latest.log`.
 
-You will get an acknowledgement as soon as the maintainer can review the report. This
+You will get an acknowledgment as soon as the maintainer can review the report. This
 is a solo-maintained project, so please allow reasonable time for a fix before any
 public disclosure. Fixes ship in a new release, and the advisory is published once a
 fix is available.
