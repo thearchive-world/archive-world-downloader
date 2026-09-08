@@ -938,7 +938,7 @@ class AsyncSaveWriterTest {
         try (WdlRegionStorage io = storage(region, "chunk")) {
             // Terrain flushes, then a captured chest minecart folds into the chunk's Level.Entities.
             io.write(pos, codec.encode(SyntheticChunks.full(true), false));
-            RegionChunkWriter.foldEntitiesIntoRegion(io, pos, entityChunk(filledVehicle(cart)));
+            RegionChunkWriter.foldEntitiesIntoRegion(io, pos, entityChunk(filledVehicle(cart)), null);
             assertFalse(vehicleItems(io, pos, cart).isEmpty(), "the fold placed the vehicle in Level.Entities");
 
             // A revisit re-flushes fresh terrain over the same chunk; the terrain tag carries no Entities of its own.
