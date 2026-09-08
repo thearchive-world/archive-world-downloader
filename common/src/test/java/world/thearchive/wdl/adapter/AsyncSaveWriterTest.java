@@ -28,6 +28,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -45,6 +47,7 @@ import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.testsupport.EntityFixtures;
+import world.thearchive.wdl.testsupport.LogCapture;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
@@ -55,6 +58,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * no-render-freeze contract; the live freeze itself is not exercised headless.
  */
 class AsyncSaveWriterTest {
+    private static final String WRITER_LOGGER = "world.thearchive.wdl.adapter.AsyncSaveWriter";
+
     private final ChunkCodec codec = new ChunkCodecImpl();
 
     private static WdlRegionStorage storage(Path directory, String type) {
@@ -1402,6 +1407,56 @@ class AsyncSaveWriterTest {
 
         assertTrue(pauseReturned.get(), "pause returns once the in-flight encode finishes");
         assertTrue(encodeFinished.get(), "the in-flight encode was allowed to complete rather than being abandoned");
+
+        writer.resumeEncoding();
+        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the drain succeeded");
+    }
+
+    /**
+     * A teardown stall is visible to the player and sits among other mods doing their own teardown work, so nothing in
+     * a field log says how much of one was this. The line is that number, and this pins that it reports the wait rather
+     * than a constant.
+     */
+    @Test
+    void reportsHowLongTheHoldBlockedTheClientThread(@TempDir Path save) throws Exception {
+        Path region = Files.createDirectories(save.resolve("region"));
+        CountDownLatch encodeStarted = new CountDownLatch(1);
+        CountDownLatch releaseEncode = new CountDownLatch(1);
+
+        AsyncSaveWriter writer = newWriter(region);
+        writer.submitChunk(DimensionType.OVERWORLD, new ChunkPos(0, 0), () -> {
+            encodeStarted.countDown();
+            try {
+                releaseEncode.await(30, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return codec.encode(SyntheticChunks.full(true), false);
+        }, ChunkMerge::merge);
+        assertTrue(encodeStarted.await(30, TimeUnit.SECONDS), "the writer picked the chunk up");
+
+        try (LogCapture captured = LogCapture.attach(WRITER_LOGGER)) {
+            CountDownLatch reachedTheHold = new CountDownLatch(1);
+            Thread client = new Thread(() -> {
+                reachedTheHold.countDown();
+                writer.pauseEncoding();
+            }, "test-client-thread");
+            client.start();
+            assertTrue(reachedTheHold.await(30, TimeUnit.SECONDS), "the client thread reached the hold");
+            Thread.sleep(80); // the wait the line then has to report, held open by this test rather than by chance
+            releaseEncode.countDown();
+            client.join(30_000);
+
+            int last = captured.count() - 1;
+            assertTrue(last >= 0, "the hold said what it cost");
+            assertEquals("INFO", captured.level(last),
+                    "at INFO, because the field report this exists for carries no debug log");
+            String line = captured.rendered(last);
+            Matcher waited = Pattern.compile("blocked for (\\d+) ms").matcher(line);
+            assertTrue(waited.find(), "the line names the wait in milliseconds: " + line);
+            assertTrue(Long.parseLong(waited.group(1)) >= 50,
+                    "the line reports the wait it actually took rather than zero: " + line);
+        }
 
         writer.resumeEncoding();
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the drain succeeded");
