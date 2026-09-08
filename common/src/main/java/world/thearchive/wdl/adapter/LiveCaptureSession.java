@@ -427,6 +427,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private final RecoveredScan recoveredScan = new RecoveredScan();
 
+    /**
+     * The interaction-captured content prior downloads already saved, banked by the same resume scan that feeds
+     * {@link #recoveredScan} and carried onto an entity that changed entity-chunk since. Empty on a fresh download.
+     */
+    private final RecoveredEntityContent recoveredEntityContent = new RecoveredEntityContent();
+
+    // Merchant nodes whose client-invented trade data was dropped before the folds. A diagnostic: on a band whose
+    // vanilla guards the client-side write this stays zero, and a non-zero count is the band handing us trades no
+    // player ever saw.
+    private int inventedMerchantOffersDropped;
+
     // Which chunks have had a recovered-coverage scan requested this dimension, so each on-disk prior is read
     // once; cleared on a portal so the new dimension re-scans its own chunks (coverage is per dimension).
     private final LongOpenHashSet recoveryScanned = new LongOpenHashSet();
@@ -3001,6 +3012,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // Into a copy, because a node below the root is folded in place: the tag handed in stays exactly what
         // the entity serialize produced, the no-mutate discipline the container sink itself keeps.
         CompoundTag result = vehicleTag.copy();
+        // The entity write never sees this tree, dropExcludedRootVehicles having removed it, so the scrub the flush
+        // applies to every other merchant has to be repeated here or a merchant riding with the player is the one
+        // that reaches the archive still carrying what the client made up for it.
+        inventedMerchantOffersDropped += MerchantOfferScrub.stripInventedOffersFromRecord(result);
         for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(result).entrySet()) {
             foldEntityContents(node.getKey(), node.getValue());
         }
@@ -3101,7 +3116,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             PlayerTag.setRootVehicle(raw, rootVehicleAttach, rootVehicleTag);
         }
         if (target.mode() == DownloadMode.RESUME) {
-            restorePriorMountContents(raw); // restore a prior download's mount contents on a same-mount seated resume
+            restoreSeatedMountContents(raw);
         }
         // Creative only when the world-defaults master imposes it (with its openInCreative knob on); with the
         // master off the world opens in the player's real game mode, matching cheats and time/weather falling
@@ -3232,6 +3247,45 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
+     * Restore a seated resume's mount contents from both prior sources, in the one order that cannot lose data. The
+     * prior player record goes first because for a ridden mount it is the fresher of the two, and the entity chunks
+     * fill only what it leaves empty. Swapping them destroys whatever the record would have restored, since each
+     * carries only into a node that is still empty. Package-private so that order is testable, which is the whole
+     * reason the two calls sit in one method rather than side by side at the call site.
+     */
+    void restoreSeatedMountContents(CompoundTag raw) {
+        restorePriorMountContents(raw);
+        restoreRecoveredMountContents(raw);
+    }
+
+    /**
+     * Fill a seated resume's mount contents from the entity chunks an earlier download wrote, for the nodes
+     * {@link #restorePriorMountContents} cannot reach: that record is absent entirely when the earlier download
+     * finished on foot, and it matches per node, so a mount first ridden this session finds nothing there. Ordering
+     * against it is the whole safety property and not a preference: it runs first and this carries only into a node
+     * still empty, because for a ridden mount its record is the fresher source (a riding entity is refused every
+     * standalone write, so the entity-chunk copy is frozen at the last dismounted flush). Filling ahead of it destroyed
+     * what it would have restored. Scrubbed like the sibling and not re-remapped, the banked copy having come off disk
+     * already remapped.
+     */
+    private void restoreRecoveredMountContents(CompoundTag raw) {
+        if (!(raw.get("RootVehicle") instanceof CompoundTag rootVehicle)
+                || !(rootVehicle.get("Entity") instanceof CompoundTag entity)) {
+            return;
+        }
+        boolean restored = false;
+        for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entity).entrySet()) {
+            CompoundTag recovered = recoveredEntityContent.holderFor(node.getKey());
+            if (recovered != null) {
+                restored |= NbtMerge.carryList(recovered, node.getValue(), "Items");
+            }
+        }
+        if (restored && !config.saveItemCoordinates()) {
+            ItemLocationScrub.scrubEntity(entity);
+        }
+    }
+
+    /**
      * Release a prior download's parked mount as a standalone entity on a resume, so a mount the player rode in an
      * earlier download and has since left is preserved as a world entity rather than lost. A mount ridden at a finish
      * is a one-player vehicle the entity capture refuses, so that finish saved it only as the RootVehicle in its saved
@@ -3289,6 +3343,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 recordResumedMountLoss("the entity sink refused its tag");
                 return;
             }
+            inventedMerchantOffersDropped += MerchantOfferScrub.stripInventedOffers(envelope);
             activeWriter.submitEntity(priorDimension, pos, envelope);
         } catch (RuntimeException e) {
             resumedMountsLost++;
@@ -3795,7 +3850,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // download and runs only on a resume, reusing the writer's own read rather than a second region store.
             // The entities-store sibling marks a prior-captured container entity recovered by its UUID the same way.
             writer.observeResumeReads(recoveredScan::record);
-            writer.observeEntityResumeReads(recoveredScan::recordEntities);
+            // One read, two consumers. The entity read is the only source for a prior record in a chunk file this
+            // write is not touching, so it is not gated on the outline the way the block read is.
+            writer.observeEntityResumeReads((dimension, onDisk) -> {
+                recoveredScan.recordEntities(dimension, onDisk);
+                recoveredEntityContent.record(onDisk);
+            });
+            writer.carryRecoveredEntityContent(recoveredEntityContent);
             // The shared ender inventory is global, not per-chunk, so it is read once here at resume init rather
             // than through the chunk scan: mark it recovered when the prior download already holds it.
             markPriorEnderRecovered();
@@ -3877,15 +3938,18 @@ public final class LiveCaptureSession implements CaptureController.Session {
         while (entries.hasNext()) {
             Map.Entry<ChunkPos, ChunkSnapshotSource> entry = entries.next();
             ChunkPos pos = entry.getKey();
-            // On a resume, read this chunk's on-disk prior for recovered coverage while it is still in view, once
-            // per chunk, rather than waiting for the flush (by when it has left the outline clamp). The
-            // recovered set feeds only the outline, so the read is skipped whole when the outline is off, and each
-            // axis is gated on its own capture switch (an off axis draws no rim, so its prior is never consulted).
-            if (resumeDownload && config.outline().renderUnsavedOutline() && recoveryScanned.add(pos.toLong())) {
-                if (config.captureContainers()) {
+            // On a resume, read this chunk's on-disk prior while it is still in view, once per chunk, rather than
+            // waiting for the flush (by when it has left the outline clamp). The block read feeds only the outline
+            // and is skipped when that is off; the entity read is not, because it also banks the contents an entity
+            // that changed chunk can no longer serialize, and losing those to a render toggle would make a
+            // cosmetic setting decide whether a villager keeps its trades.
+            boolean scanPriorBlocks = config.captureContainers() && config.outline().renderUnsavedOutline();
+            boolean scanPriorEntities = config.captureEntities();
+            if (resumeDownload && (scanPriorBlocks || scanPriorEntities) && recoveryScanned.add(pos.toLong())) {
+                if (scanPriorBlocks) {
                     activeWriter.submitResumeScan(targetDimension, pos);
                 }
-                if (config.captureEntities()) {
+                if (scanPriorEntities) {
                     activeWriter.submitEntityResumeScan(targetDimension, pos);
                 }
             }
@@ -4173,6 +4237,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 countEntityFlushDrop(tags);
                 return;
             }
+            // Before any fold: an invented list fills the slot both carry-forwards need empty, for the reason
+            // MerchantOfferScrub states in full.
+            inventedMerchantOffersDropped += MerchantOfferScrub.stripInventedOffers(envelope);
             entityContainersFailed += EntityContainerMerge.refoldFlushedContainers(adapter.containerSink(),
                     envelope, foldedContainerVehicles, entityContainerStash).failed();
             recordStandaloneFoldedContainers(tags);
@@ -4700,10 +4767,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
             bridge.sendChat(ChatCopy.savedTo(saveName, saveFolder.toString()));
         }
         LOGGER.info("saved {} chunks ({} new, {} re-captured, {} failed), {} entity-chunks ({} failed, "
-                + "{} carried forward on re-flush), {} containers, {} lecterns, {} villager trades to {}",
+                + "{} carried forward on re-flush, {} recovered from an earlier download), {} containers, "
+                + "{} lecterns, {} villager trades ({} client-invented trade lists dropped) to {}",
                 result.chunksWritten(), result.chunksNew(), result.chunksRecaptured(), result.chunksFailed(),
                 result.entityChunksWritten(), result.entityChunksFailed(), result.entitiesCarriedForward(),
-                containers, mergedLecterns, mergedVillagerTrades, saveName);
+                result.entitiesRecovered(), containers, mergedLecterns, mergedVillagerTrades,
+                inventedMerchantOffersDropped, saveName);
         // The terms of the partial-finish sum the line above does not name, so that adding the two it does name
         // reproduces the count the chat reports. Logged even when every term is zero: a reader who cannot tell
         // "nothing else was lost" from "this build had no such line" cannot check the clean verdict at all.
