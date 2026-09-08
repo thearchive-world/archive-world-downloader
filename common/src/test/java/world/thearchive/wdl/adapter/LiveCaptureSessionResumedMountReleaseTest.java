@@ -344,6 +344,71 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return new ChunkPos(-71, 30);
     }
 
+    @Test
+    void thePriorPlayerRecordBeatsTheEntityChunksWhenBothHoldTheMount(@TempDir Path saves,
+            @TempDir Path configDirectory) throws Exception {
+        Path save = saves.resolve("world");
+        LiveCaptureSession session = session(new VersionAdapterImpl(), configDirectory, DimensionType.NETHER,
+                DownloadMode.RESUME);
+        // A mount ridden at a finish is refused every standalone write, so its entity-chunk copy is frozen at the
+        // last flush it was dismounted for, while the player record holds what the player saw from horseback.
+        writePriorLevelDat(session, save, DimensionType.NETHER,
+                EntityFixtures.containerVehicleAt("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z,
+                        "minecraft:diamond", "minecraft:emerald"));
+        bankRecoveredContents(session, MOUNT, "minecraft:diamond");
+
+        NBTTagCompound raw = seatedRawWithEmptyMount();
+        session.restoreSeatedMountContents(raw);
+
+        assertEquals(2, mountItems(raw).tagCount(),
+                "the player record is the fresher source for a ridden mount, so filling from the entity chunks "
+                        + "ahead of it would destroy what it alone still holds");
+    }
+
+    @Test
+    void theEntityChunksFillWhatThePriorRecordCannotReach(@TempDir Path saves, @TempDir Path configDirectory)
+            throws Exception {
+        Path save = saves.resolve("world");
+        LiveCaptureSession session = session(new VersionAdapterImpl(), configDirectory, DimensionType.NETHER,
+                DownloadMode.RESUME);
+        // The earlier download finished on foot, so it wrote no RootVehicle at all and the prior-record restore
+        // has nothing to match against.
+        writePriorLevelDat(session, save, DimensionType.NETHER, null);
+        bankRecoveredContents(session, MOUNT, "minecraft:diamond");
+
+        NBTTagCompound raw = seatedRawWithEmptyMount();
+        session.restoreSeatedMountContents(raw);
+
+        assertEquals(1, mountItems(raw).tagCount(),
+                "and where that record holds nothing, the entity chunks are the only source there is");
+    }
+
+    /** The fresh seated record as a live client serializes it: the mount is there, its container reads empty. */
+    private static NBTTagCompound seatedRawWithEmptyMount() {
+        NBTTagCompound raw = new NBTTagCompound();
+        PlayerTag.setRootVehicle(raw, MOUNT,
+                EntityFixtures.entityAt("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z));
+        return raw;
+    }
+
+    private static NBTTagList mountItems(NBTTagCompound raw) {
+        return raw.getCompoundTag("RootVehicle").getCompoundTag("Entity").getTagList("Items", 10);
+    }
+
+    /** Seed the bank the resume scan fills, standing in for a prior download's entity-chunk record. */
+    private static void bankRecoveredContents(LiveCaptureSession session, UUID uuid, String... itemIds)
+            throws Exception {
+        RecoveredEntityContent bank = state(session, "recoveredEntityContent");
+        NBTTagCompound chunk = EntityFixtures.entityChunkTagWith(
+                EntityFixtures.containerVehicleAt("minecraft:chest_boat", uuid, MOUNT_X, MOUNT_Y, MOUNT_Z, itemIds));
+        // The scan hands the bank the region chunk, whose entities sit under Level.Entities at this band.
+        NBTTagCompound level = new NBTTagCompound();
+        level.setTag("Entities", chunk.getTagList("Entities", 10));
+        NBTTagCompound host = new NBTTagCompound();
+        host.setTag("Level", level);
+        bank.record(host);
+    }
+
     /**
      * A second mount of the SAME entity type, so identity rests on the UUID alone. Two boats is also the realistic
      * switch; a donkey against a boat would let a check comparing entity types pass by accident.
@@ -384,7 +449,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         LevelDataWriter.LevelData built = writer.buildLevelData(WorldOutputConfig.DEFAULTS, null);
         CapturedPlayer captured = new CapturedPlayer(player, BlockPos.ORIGIN, 0.0F, 0.0F, DimensionType.OVERWORLD,
                 GameType.SURVIVAL, EnumDifficulty.NORMAL);
-        // This band's LevelStorageSource is abstract and needs a live MinecraftServer to select a level; construct the
+        // This band's AnvilSaveConverter is abstract and needs a live MinecraftServer to select a level; construct the
         // concrete save handler directly against the saves directory instead, which roots the level folder at save.
         ISaveHandler storage = new AnvilSaveConverter(save.getParent().toFile(), null)
                 .getSaveLoader(save.getFileName().toString(), true);

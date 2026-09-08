@@ -92,9 +92,28 @@ class LiveCaptureSessionFinishLossLineTest {
                 () -> {});
     }
 
-    /** A save that wrote everything it was given, so the whole failure count on the line is the session's own. */
+    /**
+     * A save that wrote everything it was given, so the whole failure count on the line is the session's own. Every
+     * component is distinct, because the saved-world line renders them positionally and two zeros cannot tell a swapped
+     * pair apart.
+     */
     private static AsyncSaveWriter.SaveResult cleanWrite() {
-        return new AsyncSaveWriter.SaveResult(0, 0, 0, 0, 0, 0, 0, null, null);
+        return new AsyncSaveWriter.SaveResult(11, 12, 13, 0, 15, 0, 17, 18, null, null);
+    }
+
+    @Test
+    void theSavedWorldLineRendersEachWriterTallyInItsOwnPlace(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(temporary);
+        try (LogCapture captured = LogCapture.attach(SESSION_LOGGER)) {
+            report(session, cleanWrite());
+
+            assertEquals("saved 23 chunks (11 new, 12 re-captured, 0 failed), 15 entity-chunks (0 failed, "
+                    + "17 carried forward on re-flush, 18 recovered from an earlier download), 13 containers, "
+                    + "0 lecterns, 0 villager trades (0 client-invented trade lists dropped) to headless",
+                    captured.rendered(0),
+                    "thirteen positional arguments, two of them added after this line was written; a swapped pair "
+                            + "renders a plausible sentence and nothing else here reads it");
+        }
     }
 
     @Test
