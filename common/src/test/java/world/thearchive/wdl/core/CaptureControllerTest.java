@@ -798,7 +798,10 @@ class CaptureControllerTest {
         assertEquals(1, session.releases, "the first tick after the finish releases it");
     }
 
-    /** Joining rebuilds the registries too, so a save still draining from the previous server is held across it. */
+    /**
+     * The join edge takes the hold too. On this band it arrives only once the loader has already rebuilt, so what this
+     * pins is that the wiring reaches a session the state has left recording, not any coverage it buys here.
+     */
     @Test
     void joiningHoldsTheWriterStillDrainingFromTheLastServer() {
         CaptureController controller = controller();
