@@ -15,6 +15,8 @@ import java.util.UUID;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.village.class_1144;
+import net.minecraft.village.class_1145;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.dimension.DimensionType;
@@ -94,6 +96,29 @@ class RiddenMountContentsFoldTest {
         assertFalse(passengerOf(folded).contains("Items"), "on neither node of it");
         assertTrue(stash(session).containsKey(UUID.fromString("11111111-2222-3333-4444-555555555555")),
                 "and its stash entry is left for the chunk write that owns it");
+    }
+
+    @Test
+    void aMerchantRidingWithThePlayerLosesTheTradesItsClientMadeUp(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(temporary);
+        CompoundTag villager = EntityFixtures.entity("minecraft:villager", MOUNT);
+        villager.put("Offers", invented());
+        villager.putInt("Career", 4);
+
+        CompoundTag folded = session.foldRidingVehicleContents(
+                EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:boat", CARRIER), villager));
+
+        assertFalse(passengerOf(folded).contains("Offers"),
+                "the entity write never sees this tree, so a merchant riding with the player is the one copy that "
+                        + "would reach the archive still selling what its client invented");
+        assertFalse(passengerOf(folded).contains("Career"));
+    }
+
+    /** The trade list a client merchant builds for itself, in the shape vanilla's own trade-list NBT write produces. */
+    private static CompoundTag invented() {
+        class_1145 offers = new class_1145();
+        offers.add(new class_1144(new ItemStack(Items.EMERALD, 1), new ItemStack(Items.DIAMOND)));
+        return offers.method_3557();
     }
 
     /** The scenario shape: a chested mount that a plain minecart pushed itself under, so the mount is the passenger. */
