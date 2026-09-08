@@ -40,3 +40,17 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
 # The headless Level is band-local: every band declares a different abstract Level surface, so the stub is
 # written against this one. New at this band.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
+
+# The pre-1.21.5 CompoundTag and ListTag accessors (getCompound, getList, getString) replace the Optional-returning
+# getCompoundOrEmpty, getListOrEmpty and getStringOr family, and getIntOr becomes a local helper because getInt
+# reads an absent key back as a real zero while the assertions rely on -1.
+common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
+
+# The pre-1.21.5 accessors and the local getIntOr helper, as above.
+common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
+
+# The pre-1.21.5 accessors, as above.
+common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
+
+# The pre-1.21.5 accessors, as above.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
