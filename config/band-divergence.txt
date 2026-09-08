@@ -109,6 +109,11 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # NetHandlerPlayClient.getAdvancementManager (ClientAdvancementManager) rather than getAdvancements; the player's stat
 # holder is EntityPlayerSP.getStatFileWriter (StatisticsManager) rather than getStats; and neither progress surface
 # carries a DataVersion stamp, so the assembly step drops the shared data-version local entirely.
+# The encodeQuiesced field is plain rather than volatile here, and the finish's live-read warning and log line drop
+# their concurrent-teardown wording: this band ships no Fabric tree, so every path that takes the hold and every
+# caller of the finish is the client thread, which makes the higher bands' network-thread justification false on it.
+# What the finish races here is its own lateness rather than a concurrent teardown, the disconnect reaching it only
+# once the player is already gone.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # New here and on every other band below 1.14, on none above: from 1.14 up the chunk exposes an isUnsaved reader, so
