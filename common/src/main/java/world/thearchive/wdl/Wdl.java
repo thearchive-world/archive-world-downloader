@@ -232,7 +232,7 @@ public final class Wdl {
                 Wdl::openSettingsScreen);
         bridge.onClientTickEnd(Wdl::onClientTick);
         bridge.onDisconnect(controller::onDisconnect);
-        bridge.onLevelTeardown(controller::onLevelTeardown);
+        bridge.onLevelTeardown(() -> onLevelTeardown(controller, bridge.isConnectionClosed()));
         // A backend transfer (play-to-configuration re-entry) fires no disconnect hook on either loader, so the
         // tee raises its own signal and the controller polls it each tick, stopping the download the same way.
         controller.setTransferStopPoll(ConnectionTee::consumeTransferSignal);
@@ -323,6 +323,23 @@ public final class Wdl {
             return;
         }
         resumeFlow.begin(defaultBaseName(), false);
+    }
+
+    /**
+     * The client's level teardown, which on this loader is where the registry revert happens and the last edge with a
+     * live player: the disconnect hook rides a client tick that cannot come round until the client has both reverted
+     * the registries and nulled the player the finish reads the inventory, ender chest, advancements, statistics and
+     * game mode from. With the connection still open the teardown is a dimension change, which reverts nothing and must
+     * not end a download the player never stopped, so nothing happens. With it already closed the teardown is the
+     * disconnect itself: the writer is held off the revert and the flush runs here while the player is still there, and
+     * the loader's own disconnect callback still arrives and flushes nothing further.
+     *
+     * <p>Package-private and handed the controller so the translation stays testable without the loader wiring.
+     */
+    static void onLevelTeardown(CaptureController controller, boolean connectionClosed) {
+        if (connectionClosed) {
+            controller.onDisconnect();
+        }
     }
 
     /**

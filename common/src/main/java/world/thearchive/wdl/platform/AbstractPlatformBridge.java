@@ -15,6 +15,7 @@ import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.gui.toasts.SystemToast;
+import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommand;
@@ -95,6 +96,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             return false;
         }
         return !mc.isSingleplayer() || isReplayPlayback();
+    }
+
+    @Override
+    public boolean isConnectionClosed() {
+        NetHandlerPlayClient connection = Minecraft.getMinecraft().getConnection();
+        return connection == null || !connection.getNetworkManager().isChannelOpen();
     }
 
     // Kept private so nothing invites an off-main-thread read from the coverage overlay, which would break the
