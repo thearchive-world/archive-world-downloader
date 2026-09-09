@@ -404,21 +404,8 @@ public final class CaptureController {
         stop();
     }
 
-    /**
-     * The join edge rebuilds the registries too. Where the loader signals a join through the player's own connection,
-     * this fires after that rebuild rather than before it, so the hold does not cover it.
-     */
+    /** The join edge rebuilds the registries too, so a save still draining from the last server is held across it. */
     public void onServerJoin() {
-        holdWriterEncoding();
-    }
-
-    /**
-     * The client's level teardown is where the rebuild happens, and on a loader whose disconnect hook cannot fire until
-     * that teardown has returned it is the only edge early enough to be ahead of it. It holds and nothing else: the
-     * same signal carries a dimension change, which rebuilds nothing, and flushing there would end a download the
-     * player never stopped.
-     */
-    public void onLevelTeardown() {
         holdWriterEncoding();
     }
 

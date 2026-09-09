@@ -51,6 +51,11 @@ public class HeadlessPlatformBridge implements PlatformBridge {
     public void onLevelTeardown(Runnable callback) {}
 
     @Override
+    public boolean isConnectionClosed() {
+        return false;
+    }
+
+    @Override
     public Path configDirectory() {
         return configDirectory;
     }
