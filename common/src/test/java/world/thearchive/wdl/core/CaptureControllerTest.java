@@ -746,4 +746,22 @@ class CaptureControllerTest {
         now[0] = 60_001L;
         assertFalse(controller.doneElapsedMillis().isPresent(), "and is gone one millisecond past it");
     }
+
+    /**
+     * On this band the loader's own disconnect callback arrives after the wiring has already flushed the download at
+     * the level-teardown edge. A second disconnect must find the download already finished rather than starting a
+     * second one.
+     */
+    @Test
+    void aSecondDisconnectAfterTheFirstFinishedFinishesNothingFurther() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession();
+        controller.start(() -> session);
+
+        controller.onDisconnect();
+        controller.tick();
+        controller.onDisconnect();
+
+        assertEquals(1, session.finishes, "the finish the first disconnect ran is the only one");
+    }
 }

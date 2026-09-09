@@ -45,6 +45,24 @@ public interface PlatformBridge {
     /** Run {@code callback} when the client finishes joining a world/server (the mirror of onDisconnect). */
     void onServerJoin(Runnable callback);
 
+    /**
+     * Run {@code callback} as the client starts tearing its level down, which is the last moment the local player is
+     * still live. Separate from onDisconnect, which a loader may detect on a client-tick edge that is already past it
+     * and so too late to read anything off the player. Fires on every teardown, a dimension change included, so a
+     * subscriber that means to end a download here must first ask {@link #isConnectionClosed()} which kind of teardown
+     * this is.
+     */
+    void onLevelTeardown(Runnable callback);
+
+    /**
+     * Whether the play connection to the server is gone: its channel closed, or no connection at all. Vanilla decides
+     * between processing packets and running its own disconnect teardown on exactly this, so at the
+     * {@link #onLevelTeardown} edge it separates a real disconnect, where the channel is already closed on every route
+     * including the player's own Disconnect button, from a dimension change, which is only reached by processing a
+     * packet and so only with the channel open.
+     */
+    boolean isConnectionClosed();
+
     /** The loader's config directory. */
     Path configDirectory();
 

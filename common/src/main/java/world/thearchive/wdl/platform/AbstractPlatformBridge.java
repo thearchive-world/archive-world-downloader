@@ -23,6 +23,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.ClickEvent;
@@ -99,6 +100,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             return false;
         }
         return !mc.isLocalServer() || isReplayPlayback();
+    }
+
+    @Override
+    public boolean isConnectionClosed() {
+        ClientPacketListener connection = Minecraft.getInstance().getConnection();
+        return connection == null || !connection.getConnection().isConnected();
     }
 
     // Kept private so nothing invites an off-main-thread read from the coverage overlay, which would break the

@@ -14,6 +14,7 @@ import net.minecraft.client.gui.screens.class_385;
 import net.minecraft.realms.class_356;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.DeferredWorkQueue;
 import net.minecraftforge.fml.ModList;
@@ -92,6 +93,26 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     @Override
     public void onServerJoin(Runnable callback) {
         onConnectionEdge(true, callback);
+    }
+
+    /**
+     * The one edge ahead of the client's own nulling of the player. Minecraft posts WorldEvent.Unload at the head of
+     * the method that installs or clears the level, so a subscriber here still sees the level, the player, the game
+     * mode and the server data the finish reads, where the connection-edge probe below cannot fire until the clearing
+     * arm has nulled the player it watches.
+     *
+     * <p>Gated on the client's own level: with an integrated server running, the server thread posts this event for its
+     * worlds too, and a callback taken there would reach the capture off the client thread it belongs to. Firing on a
+     * dimension change as well is deliberate, the teardown being real either way; telling the two apart is
+     * {@link #isConnectionClosed()}'s job, not this gate's.
+     */
+    @Override
+    public void onLevelTeardown(Runnable callback) {
+        MinecraftForge.EVENT_BUS.addListener((WorldEvent.Unload event) -> {
+            if (event.getWorld() == Minecraft.getInstance().level) {
+                callback.run();
+            }
+        });
     }
 
     /**

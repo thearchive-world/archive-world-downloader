@@ -110,7 +110,17 @@ common/src/test/java/world/thearchive/wdl/adapter/RecaptureRearmTest.java
 # categories, and MutableComponent has no withColor(int), so toast text colors go through withStyle.
 # The pause row is built from this band's own widget forms, and its settings button subclasses class_356 to draw
 # its hover label from renderButton, the vanilla button gaining a tooltip parameter only at 1.16.5.
+# It also implements the band's own PlatformBridge.isConnectionClosed, which is pure vanilla and so belongs here beside
+# isRemoteWorld: the play connection's channel, or its absence, read the way vanilla's own MultiPlayerGameMode reads it
+# to choose between processing packets and running the disconnect teardown. Below 1.14 the accessor is
+# Connection.isConnected rather than the isChannelOpen of the pre-Flattening bands.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
+
+# On this band the loader detects a disconnect on a client-tick edge, which is one tick past the player that
+# Minecraft.loadWorld nulls, so the bridge SPI carries a second edge and one predicate the higher bands need no
+# equivalent of: onLevelTeardown, fired from the loader's own world-unload signal while the local player is still live,
+# and isConnectionClosed, which tells a subscriber there which kind of teardown it is being called for.
+common/src/main/java/world/thearchive/wdl/platform/PlatformBridge.java
 
 # The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
 # below the cut) and read the biome registry via registryOrThrow and the section floor via getMinSection. Below
@@ -634,6 +644,11 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
 # XaeroPlus publishes no 1.18.x build for either loader, so the coverage overlay's XaeroPlus binding is dropped as a
 # disclosed limit on this band: Wdl.initialize no longer constructs the XaeroPlus integration, and the compat/xaeroplus
 # package is deleted. The JourneyMap overlay covers the same role where its API resolves.
+# It also carries the band's own level-teardown edge: onLevelTeardown reads the bridge's isConnectionClosed at fire
+# time and translates the loader's signal into the controller's own calls, the disconnect flush when the connection is
+# gone and nothing on a dimension change, so the controller stays the same on every version and free of the loader's
+# edge. The higher bands need no equivalent because their disconnect hook already runs ahead of the client's nulling
+# of the player.
 common/src/main/java/world/thearchive/wdl/Wdl.java
 
 # Deleted on this band with the rest of the XaeroPlus binding (XaeroPlus ships no 1.18.x build for either loader): the
@@ -689,6 +704,9 @@ forge/src/main/java/world/thearchive/wdl/forge/WdlForge.java
 # GuiScreenEvent.InitGuiEvent.Post (getGui/addWidget) rather than the 1.18.2 ScreenEvent.InitScreenEvent.Post, the
 # login and logout events are ClientPlayerNetworkEvent.LoggedInEvent and LoggedOutEvent, and the /wdl client command
 # is a no-op because Forge 37 has no client-command event (RegisterClientCommandsEvent is a 1.18.2 addition).
+# It also implements the band's own PlatformBridge.onLevelTeardown, from Forge's WorldEvent.Unload, which Minecraft
+# posts at the head of the method that installs or clears the level and so ahead of the player it nulls there. Gated on
+# the client's own level, an integrated server posting the same event for its worlds off the client thread.
 forge/src/main/java/world/thearchive/wdl/forge/ForgePlatformBridge.java
 
 # Below 1.19 the void generator reconstructs the vanilla worldgen registries too (its biome needs a Forge registry name
@@ -758,7 +776,24 @@ common/src/test/java/world/thearchive/wdl/adapter/ContainerTypeGateMergeTest.jav
 
 # This band's fastutil 8.2.1 has no LongSet.of() factory, so the test builds sets via LongSets and LongOpenHashSet;
 # the Java 8 floor also has no Set.of collection factory (Java 9), so the entity sets are Guava ImmutableSet.of.
+# It also pins that a second disconnect after the first one finished finishes nothing further, which is the order this
+# band's tick-edge disconnect arrives in behind the flush the wiring runs at the level-teardown edge.
 common/src/test/java/world/thearchive/wdl/core/CaptureControllerTest.java
+
+# Pins the band's own level-teardown edge through the wiring that translates it: a teardown with the connection still
+# open ends no download, one with it already closed finishes the download instead, and the loader's own disconnect
+# callback a tick later finishes nothing further. Absent on the bands whose disconnect hook runs ahead of the client's
+# nulling of the player, which carry no such edge.
+common/src/test/java/world/thearchive/wdl/WdlLevelTeardownTest.java
+
+# Implements the band's own PlatformBridge.onLevelTeardown, as the same no-op registration every other arm of this
+# fake bridge is, and answers its isConnectionClosed false: no headless test drives a teardown through the bridge, the
+# wiring's own cases calling Wdl.onLevelTeardown directly.
+common/src/test/java/world/thearchive/wdl/testsupport/HeadlessPlatformBridge.java
+
+# Its own fake bridge implements the band's PlatformBridge.onLevelTeardown as a no-op like its neighbors, and answers
+# isConnectionClosed false for the reason the headless bridge does.
+common/src/test/java/world/thearchive/wdl/ResumeFlowTest.java
 
 # This band's fastutil 8.2.1 has no LongSet.of() factory, so the test builds sets via LongSets and LongOpenHashSet;
 # the Java 8 floor also has no Set.of collection factory (Java 9), so the entity sets are Guava ImmutableSet.of.

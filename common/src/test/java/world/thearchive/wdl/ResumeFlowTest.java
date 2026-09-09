@@ -80,6 +80,14 @@ class ResumeFlowTest {
         public void onServerJoin(Runnable callback) {}
 
         @Override
+        public void onLevelTeardown(Runnable callback) {}
+
+        @Override
+        public boolean isConnectionClosed() {
+            return false;
+        }
+
+        @Override
         public Path configDirectory() {
             return Paths.get(".");
         }
