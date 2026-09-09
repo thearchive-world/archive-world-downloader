@@ -120,8 +120,8 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
      *
      * <p>Gated on the client's own world: with an integrated server running, the server thread posts this event for
      * its worlds too, and a callback taken there would reach the capture off the client thread it belongs to. Firing
-     * on a dimension change as well is deliberate and harmless, the teardown being real either way and the hold
-     * released by the next tick.
+     * on a dimension change as well is deliberate and harmless: a subscriber reads the connection state and does
+     * nothing there, a dimension change reverting nothing.
      */
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {

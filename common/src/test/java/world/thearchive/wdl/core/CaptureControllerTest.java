@@ -815,37 +815,20 @@ class CaptureControllerTest {
     }
 
     /**
-     * Where the loader detects a disconnect only on a client-tick edge, that edge is already past the registry rebuild,
-     * so the hold rides the level-teardown signal instead. That signal also fires where nothing is being rebuilt and
-     * the download must keep running, a dimension change among them, so it may only take the hold: a flush here would
-     * end a download the player never stopped.
+     * On this band the loader's own disconnect callback arrives after the wiring has already flushed the download at
+     * the level-teardown edge. A second disconnect must find the download already finished rather than starting a
+     * second one.
      */
     @Test
-    void levelTeardownHoldsTheWriterWithoutEndingTheDownload() {
+    void aSecondDisconnectAfterTheFirstFinishedFinishesNothingFurther() {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
         controller.start(() -> session);
 
-        controller.onLevelTeardown();
-
-        assertEquals(1, session.holds, "the teardown edge holds the writer ahead of the rebuild");
-        assertEquals(0, session.finishes, "and flushes nothing, because this edge is not the disconnect");
-        assertEquals(CaptureState.RECORDING, controller.state(), "the download is still running");
-    }
-
-    /** The teardown runs inside the client's own world load, so only a tick after it may hand the writer back. */
-    @Test
-    void theLevelTeardownHoldIsReleasedByTheNextTick() {
-        CaptureController controller = controller();
-        FakeSession session = new FakeSession();
-        controller.start(() -> session);
-
-        controller.onLevelTeardown();
-
-        assertEquals(0, session.releases, "nothing releases it while the client is still loading");
-
+        controller.onDisconnect();
         controller.tick();
+        controller.onDisconnect();
 
-        assertEquals(1, session.releases, "the first tick after the load hands the writer back");
+        assertEquals(1, session.finishes, "the finish the first disconnect ran is the only one");
     }
 }
