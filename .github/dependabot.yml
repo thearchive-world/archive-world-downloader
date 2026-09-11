@@ -4,7 +4,8 @@
 # per-band snapshot value that Dependabot would resolve to the wrong band, or sit under a strict constraint
 # from the Minecraft platform that it cannot see, so they stay human-curated. This file is read only from the
 # repository's default branch, which is dev, and it deliberately sets no target-branch: that key opts the
-# ecosystem it sits on out of security updates.
+# ecosystem it sits on out of security updates. The copy a version branch carries is therefore inert; a band
+# takes dev's bumps when dev's commits are propagated to it.
 version: 2
 updates:
   # Workflow actions: checkout / setup-java / gradle-actions. Grouped into one PR per run so a routine bump of
@@ -21,11 +22,10 @@ updates:
         patterns:
           - "*"
 
-  # Gradle build plugins (fabric-loom, spotless, gradle-errorprone-plugin) plus the
-  # nullness/test tool libraries (Error Prone core, NullAway, the JUnit BOM), all covered because
-  # they live in gradle/libs.versions.toml; Dependabot does not read the build-logic convention plugins that
-  # consume them. The Minecraft runtime + mod coordinates are ignored below because each is band-coupled and
-  # must be bumped by hand against the target band, re-verifying it resolves.
+  # The Gradle build plugins plus the nullness/test tool libraries (Error Prone core, NullAway, the JUnit
+  # BOM), all covered because they live in gradle/libs.versions.toml; Dependabot does not read the build-logic
+  # convention plugins that consume them. The Minecraft runtime + mod coordinates are ignored below because
+  # each is band-coupled and must be bumped by hand against the target band, re-verifying it resolves.
   - package-ecosystem: gradle
     directory: "/"
     schedule:
@@ -38,8 +38,8 @@ updates:
         patterns:
           - "*"
     ignore:
-      # JUnit stays on the 5.x line: 6.x raises the baseline to Java 17, which the 1.12.2 band (Java 8)
-      # cannot meet. Allow 5.x minor+patch (incl. security) and suppress only the 6.x major.
+      # JUnit stays on the 5.x line: 6.x raises the baseline to Java 17, which the Java 8 bands cannot
+      # meet. Allow 5.x minor+patch (incl. security) and suppress only the 6.x major.
       - dependency-name: "org.junit:junit-bom"
         update-types: ["version-update:semver-major"]
       # Modrinth-hosted soft-dependencies (XaeroPlus, ModMenu): XaeroPlus tags each band with a
