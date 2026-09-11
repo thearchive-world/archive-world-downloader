@@ -704,5 +704,6 @@ settings.gradle.kts
 build.gradle.kts
 
 # The catalog carries only the plugins some build on this band applies, so it has no moddev
-# entry (dev's carries all three for its three loaders); the tool-library entries match dev's.
+# entry (dev's carries loom, moddev and mod-publish-plugin for its fabric and neoforge subprojects); the
+# tool-library entries match dev's.
 gradle/libs.versions.toml
