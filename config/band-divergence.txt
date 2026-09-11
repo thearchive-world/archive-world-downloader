@@ -100,7 +100,7 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
 # Game-rule typed-leg test revert: nine curated rules (no integer fire), band camelCase vanilla override ids.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.java
 
-# RespawnData.of self-wraps a yaw from 1.21.11 on; below that the codec alone bounds it to [-180,180) (from
+# RespawnData.of self-wraps a yaw from 1.21.11 on; below that the codec alone bounds it to [-180,180] (from
 # 1.21.9 onward), so at 1.21.10 the plug wraps the captured yaw before writing it and this test pins the wrap.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
 
@@ -119,7 +119,7 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 # ResourceKey.location rename revert: .identifier() -> .location().
 common/src/test/java/world/thearchive/wdl/adapter/VanillaDimensionsTest.java
 
-# EntityType.PARCHED does not exist at 1.21.10 (added at 1.21.11 with the spears), so its three natural-gear
+# EntityType.PARCHED does not exist at 1.21.10 (added at 1.21.11), so its three natural-gear
 # assertions are absent along with the plug's table entry, and the header stamp reads "Verified against
 # decompiled 1.21.10" rather than 1.21.11.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
