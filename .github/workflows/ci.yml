@@ -58,6 +58,15 @@ jobs:
           # could read it; nothing in this workflow pushes back to the repo.
           persist-credentials: false
 
+      - name: Fetch the propagation baselines
+        # checkBandDivergence diffs a band against the branch it was minted from and against dev, and the
+        # single-branch checkout above carries neither. A tree diff needs the two tips, not their history, so
+        # depth 1 is enough. dev and a PR into it declare no mint_parent and fetch nothing.
+        run: |
+          parent="$(sed -n 's/^mint_parent=//p' gradle.properties | tail -n1 | tr -d '[:space:]')"
+          [ -n "$parent" ] || { echo "no mint_parent in gradle.properties: this is the propagation root"; exit 0; }
+          git fetch --no-tags --depth=1 origin "+refs/heads/dev:refs/remotes/origin/dev" "+refs/heads/$parent:refs/remotes/origin/$parent"
+
       - name: Resolve the build JDK
         # setup-java cannot read a .properties file, so this branch's own coordinate is lifted here. The major
         # (the same digit-prefix checkJavaVersion compares java_version against) also names the
