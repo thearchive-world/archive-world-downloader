@@ -549,3 +549,16 @@ common/src/test/java/world/thearchive/wdl/UiLiteralEnrollmentTest.java
 # than dev's hard assertTrue, since this band ships only some of the loader trees; common's own root stays required
 # and scanned.
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
+
+# Below Java 21 the pinned Error Prone release, a Java 21 build, cannot load inside the compile toolchain, so this
+# band gates NullAway behind errorProneUsable and runs annotations-only, where dev runs the checker unconditionally
+# and carries no such gate.
+build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
+
+# The JUnit note names no loader subproject, this band including no :neoforge (dev's names common and neoforge);
+# the code is dev's.
+build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
+
+# The consumer comment names :fabric alone as the remapping loader, this band including no :neoforge; the code
+# is dev's.
+build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
