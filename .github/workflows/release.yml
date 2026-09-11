@@ -131,9 +131,9 @@ jobs:
           fi
 
       - name: Build
-        # -Pmint_parent= blanks the band's mint parent so checkBandDivergence runs only its reason rule here.
-        # The propagation diff gated this band before it was tagged and again when it was pushed; a tag build
-        # must not go red because dev moved after the walk, since the tag cannot change.
+        # -Pmint_parent= blanks the band's mint parent so checkBandDivergence runs only its reason rule here: a
+        # tag build must not go red because dev or the parent moved after the band was gated, since the tag
+        # cannot change.
         run: ./gradlew build -Pmint_parent= --stacktrace
 
       # The forge/ island is a separate Gradle build the root build above does not reach. Build it only on the
