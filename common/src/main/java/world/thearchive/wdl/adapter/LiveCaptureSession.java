@@ -4875,7 +4875,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (server != null) {
             address = server.ip;
             sourceName = server.name;
-            motd = server.motd;
+            motd = server.motd != null ? server.motd : "";
             sourceKind = "";
         }
         String worldName = target.worldName();
