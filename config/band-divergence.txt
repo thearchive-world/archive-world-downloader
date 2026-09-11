@@ -94,6 +94,9 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # id would otherwise misplace the export zip). Below 1.20.2 ClientPacketListener has no serverBrand, so the
 # report environment reads the server brand through LocalPlayer.getServerBrand(). Below 1.20 Entity.level is a
 # public field rather than the level() accessor, so the camera-anchor level guard reads camera.level directly.
+# Below 1.16.5 ServerData.motd is a plain String rather than a Component, left null until a ping fills it, so the
+# report identity reads it through an inline null guard rather than the sourceMotd helper that dereferences a
+# Component.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # New here and on every band below 1.17, on none above: from 1.17 up LevelChunk.isUnsaved is the unsaved flag
@@ -810,3 +813,20 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # than dev's hard assertTrue, since this band ships only some of the loader trees; common's own root stays required
 # and scanned.
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
+
+# Below Java 21 the pinned Error Prone release, a Java 21 build, cannot load inside the compile toolchain, so this
+# band gates NullAway behind errorProneUsable and runs annotations-only, where dev runs the checker unconditionally
+# and carries no such gate.
+# The floor comment also drops the clause comparing the band to the deep Java 8 bands, which here would compare
+# the band to itself.
+build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
+
+# Below Java 11 Checkstyle cannot run on the band's own toolchain, so this file points the Checkstyle tasks at a
+# modern launcher, and PITest at the band's own Java 8 toolchain where mcp_mappings_version marks a classic-MCP
+# band (legacy FML cannot static-initialize above Java 8) or at the modern launcher otherwise; dev, a Java 25
+# band, carries no launcher block. The JUnit note names no loader subproject.
+build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
+
+# The consumer comment names :fabric alone as the remapping loader, this band including no :neoforge; the code
+# is dev's.
+build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
