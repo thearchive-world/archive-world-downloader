@@ -870,6 +870,9 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # than dev's hard assertTrue, since this band ships neither root loader tree; common's own root stays required and
 # scanned. key.wdl.peek_hud is enrolled as an external consumer, since the island's WdlForge constructs it outside the
 # scanned roots.
+# Keys this band's screens never reach (two button tooltips, two screen titles, a text field's narration
+# message) sit in BAND_DROPPED_KEYS, their en_us strings kept so the catalog matches the higher bands.
+# The file also carries the Java 8 forms the band's test tree uses throughout (Guava immutable collections, Paths.get).
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
 
 # Below Java 21 the pinned Error Prone release, a Java 21 build, cannot load inside the compile toolchain, so this
@@ -898,5 +901,11 @@ settings.gradle.kts
 build.gradle.kts
 
 # The catalog carries only the plugins some build on this band applies, so it has no moddev, mod-publish-plugin
-# entry (dev's carries all three for its three loaders); the tool-library entries match dev's.
+# entry (dev's carries loom, moddev and mod-publish-plugin for its fabric and neoforge subprojects); the
+# tool-library entries match dev's.
 gradle/libs.versions.toml
+
+# The source-merge consumer plugin does not exist on this band (deleted, not merely divergent): its only appliers
+# were the fabric and neoforge subprojects, neither of which this Forge-only root includes, and the island merges
+# common by direct path.
+build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
