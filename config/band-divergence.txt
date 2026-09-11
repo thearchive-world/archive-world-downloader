@@ -510,6 +510,6 @@ build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
 # paragraph above include(...) names why NeoForge is absent; dev includes common, fabric and neoforge.
 settings.gradle.kts
 
-# The apply-false plugin block declares only the catalog-pinned plugins a subproject on this band applies, and
-# its notes name that band's appliers, where dev declares the set for common, fabric and neoforge.
+# The mod-publish-plugin note names :fabric as the sole applier, this band including no :neoforge; the plugin
+# block is dev's.
 build.gradle.kts
