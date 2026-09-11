@@ -1317,3 +1317,15 @@ build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 # band (legacy FML cannot static-initialize above Java 8) or at the modern launcher otherwise; dev, a Java 25
 # band, carries no launcher block. The JUnit note names no loader subproject.
 build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
+
+# This root includes only common: the band is Forge-only, its jar built by the island under forge/, and the
+# paragraph above include(...) names why NeoForge is absent; dev includes common, fabric and neoforge.
+settings.gradle.kts
+
+# The apply-false plugin block declares only the catalog-pinned plugins a subproject on this band applies, and
+# its notes name that band's appliers, where dev declares the set for common, fabric and neoforge.
+build.gradle.kts
+
+# The catalog carries only the plugins some build on this band applies, so it has no loom, moddev, mod-publish-plugin
+# entry (dev's carries all three for its three loaders); the tool-library entries match dev's.
+gradle/libs.versions.toml
