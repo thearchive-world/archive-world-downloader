@@ -15,15 +15,8 @@
 # reads as stale.
 #
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
-# Every pattern carries a # reason directly above it, naming why the file diverges per band and to what;
-# checkBandDivergence fails the build on a pattern with no reason. Keep each pattern narrow: a directory-wide
-# glob would mask an unintended divergence, which is the drift this register exists to catch.
-#
-# This is the seed of the known, stable members. Each port adds its own per-file band-local divergences as it
-# creates them (the way the 26.x port records the players/ progress path), rather than pre-listing the bulk
-# renames whose files no branch has diverged yet: the Identifier and ResourceKey.identifier() rename set, the
-# band-fragile test assertions, and the keybind lang key. A broad glob for those would mask real drift or
-# guess divergences that do not exist yet.
+# Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
+# a shared reason across several files is repeated per line rather than written once over a group.
 
 # Below 1.21.2 the registry-load path has no PendingTags step (TagLoader.loadTagsForExistingRegistries and
 # Registry.PendingTags are 1.21.2 and above), so this shared test bootstrap loads the WORLDGEN registries from the
@@ -31,18 +24,22 @@
 # pre-1.21.2 forms.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
-# ClientCommandManager) is Fabric-API-coupled and moves across bands.
+# Fabric API 0.114.0 for 1.21.1 draws the HUD overlay through HudRenderCallback, unconditionally after the
+# whole vanilla HUD; fabric-api 0.119.4 for 1.21.4 moves to HudLayerRegistrationCallback with an
+# IdentifiedLayer, and 0.141.4 for 1.21.11 to HudElementRegistry.addLast on an Identifier.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
+# fabric-api 0.114.0 for 1.21.1 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
+# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api 0.155.2 for 26.1
+# renamed them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
-# The villager-trade capture gametest carries the deep-band client forms: villager types are the flat npc package,
-# EntityType is not yet EntityTypes, Minecraft.setScreen is not relocated into Minecraft.gui, the crosshair pick is
-# GameRenderer.pick rather than LocalPlayer.raycastHitResult, an entity is resolved by UUID over entitiesForRendering
-# rather than Level.getEntity(UUID), and the pre-1.21.5 CompoundTag/ListTag accessors (getCompound/getInt/getList)
-# replace the Optional-returning family.
+# Below 1.21.11 Villager sits in the flat npc package (npc.villager at 1.21.11) and LocalPlayer.raycastHitResult is
+# absent (added at 1.21.11), so the crosshair is refreshed through GameRenderer.pick; below 1.21.5 there is no
+# Level.getEntity(UUID), so an entity is resolved by UUID over entitiesForRendering; 26.2 moved the EntityType constants
+# to EntityTypes and setScreen into Minecraft.gui. Below 1.21.5 CompoundTag.getList takes a type id and getCompound,
+# getInt, getFloat, getString and ListTag.getCompound return the value itself (Optional at 1.21.5, with the
+# getCompoundOrEmpty, getListOrEmpty, getIntOr, getFloatOr and getStringOr defaults).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
 # The shared capture driver reads the camera through GameRenderer.getMainCamera().getPosition(), the pre-26.2,
 # pre-1.21.11 forms.
@@ -52,34 +49,37 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
 # chunk-snapshot seam defines its own band-stable SectionData carrier for the static-write codec.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 
-# Reads the captured section through the band's own ChunkSnapshotSource.SectionData rather than the vanilla
-# SerializableChunkData.SectionData that exists only at 1.21.2 and above.
+# Below 1.21.2 there is no SerializableChunkData.SectionData, so the captured section is read through
+# ChunkSnapshotSource.SectionData.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
-# Below 1.21.2 the entity position wire differs: the absolute-only ClientboundTeleportEntityPacket replaces the
-# newer teleport plus ClientboundEntityPositionSyncPacket and PositionMoveRotation, the byte-encoded packet
-# rotations are decoded here, and the single BOAT and CHEST_BOAT types replace the per-wood split.
+# Below 1.21.2 the entity position wire differs: the absolute-only ClientboundTeleportEntityPacket replaces the newer
+# teleport plus ClientboundEntityPositionSyncPacket and PositionMoveRotation, the byte-encoded packet rotations are
+# decoded here, and the single BOAT and CHEST_BOAT types replace the per-wood split. EntityType.create takes the Level
+# alone below 1.21.2; 1.21.2 added the EntitySpawnReason parameter.
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 
-# Below 1.21.2 there is no chunk unsaved-listener, so re-capture polls isUnsaved over the keep-hot buffer here;
-# it also reads the band's ChunkSnapshotSource.SectionData and reconstructs entities via the pre-spawn-reason
-# EntityType.create(Level).
+# Below 1.21.2 LevelChunk has no setUnsavedListener, so re-capture polls isUnsaved over the keep-hot buffer and re-arms
+# the flag with setUnsaved(false) (tryMarkSaved at 1.21.2), and there is no SerializableChunkData.SectionData, so the
+# captured section is ChunkSnapshotSource.SectionData.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
-# The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
-# below the cut) and read the biome registry via registryOrThrow and the section floor via getMinSection.
+# Below 1.21.2 there is no SerializableChunkData.SectionData, so the chunk fixtures build
+# ChunkSnapshotSource.SectionData; the biome registry is read through RegistryAccess.registryOrThrow (renamed
+# lookupOrThrow at 1.21.2) and the section floor through LevelHeightAccessor.getMinSection (renamed getMinSectionY at
+# 1.21.2).
 common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
 
 # Below 1.21.2 the Mob constructor reads level.getProfilerSupplier(), so a mob cannot be built against a null level;
-# this headless Level supplies the overworld dimension type, the vanilla registries, and an inactive profiler. New at
-# this band.
+# this headless Level supplies the overworld dimension type, the vanilla registries, and an inactive profiler. Below
+# 1.21.2 the Level constructor also takes that profiler supplier as a parameter, which 1.21.2 and above drop.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
 
-# Builds the section's biome registry via registryOrThrow, the pre-1.21.2 form (lookupOrThrow returns a
-# RegistryLookup, not a Registry, below the cut).
+# Builds the section's biome registry via registryOrThrow, the pre-1.21.2 form (lookupOrThrow returns a RegistryLookup,
+# not a Registry, below 1.21.2).
 common/src/test/java/world/thearchive/wdl/testsupport/RegistriesSmokeTest.java
 
 # Resolves an item by id via Registry.get, the pre-1.21.2 accessor (renamed getValue at 1.21.2).
@@ -89,12 +89,13 @@ common/src/test/java/world/thearchive/wdl/testsupport/ItemFixtures.java
 # self-consistency by decoding each section's block-state and biome container directly.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
 
-# The snapshot fixture carries the band's ChunkSnapshotSource.SectionData rather than the vanilla
-# SerializableChunkData.SectionData that exists only at 1.21.2 and above.
+# Below 1.21.2 there is no SerializableChunkData.SectionData, so the snapshot fixture carries
+# ChunkSnapshotSource.SectionData.
 common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkCodecImplTest.java
 
-# Below 1.21.2 there is no ChunkPos.CODEC, so the entities-region Position is read back as its {x, z} int array, the
-# pre-1.21.2 EntityStorage form the sink writes.
+# Below 1.21.2 there is no ChunkPos.CODEC, so the test reads the entities-region Position back as its {x, z} int array;
+# the 1.21.3 test parses it through ChunkPos.CODEC and dev's through CompoundTag.read(String, Codec), added at 1.21.5.
+# EntityStorage writes that int array through 1.21.4 and stores it through ChunkPos.CODEC from 1.21.5.
 common/src/test/java/world/thearchive/wdl/adapter/EntityRoundTripTest.java
 
 # Constructs GameRules from a Dynamic via the pre-1.21.2 single-argument constructor (the feature-flag-filtered
@@ -121,16 +122,45 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest
 # level.getProfilerSupplier() and cannot take a null level.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 
-# The pre-1.21.5 CompoundTag and ListTag accessors (getCompound, getList, getString) replace the Optional-returning
-# getCompoundOrEmpty, getListOrEmpty and getStringOr family, and getIntOr becomes a local helper because getInt
-# reads an absent key back as a real zero while the assertions rely on -1.
+# Below 1.21.2 ItemEnchantments.LEVEL_CODEC is intRange(0, 255) rather than the intRange(1, 255) that begins at 1.21.2,
+# so a level-0 enchantment round-trips through the disk codec below 1.21.2 and the wire-codec enchantments builder
+# 1.21.3's BadStacks carries to force one through is absent.
+common/src/test/java/world/thearchive/wdl/testsupport/BadStacks.java
+
+# Below 1.21.2 the Mob constructor needs a non-null level and hurtServer(ServerLevel, ...) is 1.21.2 and above, so the
+# headless mob double is built against HeadlessLevel and overrides hurt(DamageSource, float); a level-0 enchantment
+# saves fine too, so DataComponents.DAMAGE set to -1, which NON_NEGATIVE_INT rejects, is the unsavable fixture.
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkItemDegradationTest.java
+
+# Below 1.21.2 ItemEnchantments.LEVEL_CODEC is intRange(0, 255), so a level-0 enchantment saves without error and the
+# unsavable fixture is DataComponents.DAMAGE set to -1, which NON_NEGATIVE_INT rejects, rather than a level-0 enchant.
+common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
+
+# Below 1.21.2 ItemEnchantments.LEVEL_CODEC is intRange(0, 255), so a level-0 enchantment saves without error,
+# ItemStackSanitizer.repairEnchantments has no fixture reachable at 1.21.1 and the remaining tests use
+# DataComponents.DAMAGE set to -1, which NON_NEGATIVE_INT rejects, instead.
+common/src/test/java/world/thearchive/wdl/adapter/impl/ItemStackSanitizerTest.java
+
+# Below 1.21.2 ItemEnchantments.LEVEL_CODEC is intRange(0, 255), so a level-0 enchantment saves without error and
+# DataComponents.DAMAGE set to -1, which NON_NEGATIVE_INT rejects, is the unsavable fixture at 1.21.1.
+common/src/test/java/world/thearchive/wdl/adapter/impl/PlayerSinkItemDegradationTest.java
+
+# Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
+# 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr,
+# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero while the
+# assertions rely on -1.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
 
-# The pre-1.21.5 accessors and the local getIntOr helper, as above.
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt and ListTag.getCompound return the value itself (Optional
+# at 1.21.5, with the getListOrEmpty, getIntOr and getCompoundOrEmpty defaults). The test's intOr helper stands in for
+# getIntOr because getInt reads an absent key back as a real zero.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
 
-# The pre-1.21.5 accessors, as above.
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getString and ListTag.getCompound return the value
+# itself (Optional at 1.21.5, with the getCompoundOrEmpty, getListOrEmpty and getStringOr defaults).
 common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
 
-# The pre-1.21.5 accessors, as above.
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getString and ListTag.getCompound return the value
+# itself (Optional at 1.21.5, with the getCompoundOrEmpty, getListOrEmpty and getStringOr defaults). Below 1.21.5
+# CompoundTag has no store with a Codec, so the UUID is encoded through NbtOps directly.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
