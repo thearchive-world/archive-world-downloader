@@ -554,7 +554,6 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.j
 # (Forge 1.13.2-25.0.223, the 25.x line for 1.13.2). The forge/ tree diverges per band across its shim, platform
 # bridge, connection tee and mount reader; the access transformer is re-pinned for this band to the classic SRG
 # field_NNNNN_ member scheme (the 1.17-and-above bands use TSRGv2 f_NNNNN_) with the xa/ya/za move-delta widenings.
-# forge/build.gradle.kts is excluded from the diff as a *.gradle.kts.
 forge/src/main/resources/META-INF/mods.toml
 
 # The Forge connection tee names two members the Forge access transformer widens (net.minecraft.network.Connection
@@ -653,20 +652,23 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.j
 # registries rather than the *_LOCATION keys, and the caves variant routes to the overworld by its overworld effects.
 common/src/test/java/world/thearchive/wdl/adapter/VanillaDimensionsTest.java
 
-# Below 1.19 the Forge client-registration APIs differ: the config screen is ConfigGuiHandler.ConfigGuiFactory (in the
-# fmlclient package at Forge 37) rather than the ConfigScreenHandler added at 1.19, keys register through
-# ClientRegistry.registerKeyBinding (fmlclient.registry at Forge 37) during FMLClientSetupEvent rather than the
-# RegisterKeyMappingsEvent added at 1.19, the HUD registers through OverlayRegistry.registerOverlayTop with a
-# PoseStack draw callback rather than RegisterGuiOverlaysEvent, the login event is
-# ClientPlayerNetworkEvent.LoggedInEvent (getNetworkManager) rather than LoggingIn, and PlayerInteractEvent exposes
-# getPlayer/getWorld rather than getEntity/getLevel.
+# Below 1.19 the Forge client-registration APIs differ: the config screen registers through
+# ExtensionPoint.CONFIGGUIFACTORY as a BiFunction rather than the ConfigGuiHandler.ConfigGuiFactory wrapper the
+# 1.17-and-above bands register, keys register through ClientRegistry.registerKeyBinding (fml.client.registry at
+# Forge 25) during FMLClientSetupEvent rather than the RegisterKeyMappingsEvent added at 1.19, the HUD registers
+# through OverlayRegistry.registerOverlayTop with a PoseStack draw callback rather than RegisterGuiOverlaysEvent, the
+# connection tee installs on the client-tick edge where Minecraft.getConnection() turns non-null rather than a login
+# event (ClientPlayerNetworkEvent does not exist at this band), and PlayerInteractEvent exposes getPlayer/getWorld
+# rather than getEntity/getLevel.
 forge/src/main/java/world/thearchive/wdl/forge/WdlForge.java
 
-# Below 1.19 keys register through ClientRegistry.registerKeyBinding (fmlclient.registry at Forge 37) during
+# Below 1.19 keys register through ClientRegistry.registerKeyBinding (fml.client.registry at Forge 25) during
 # FMLClientSetupEvent rather than the RegisterKeyMappingsEvent added at 1.19, the screen-init event is
-# GuiScreenEvent.InitGuiEvent.Post (getGui/addWidget) rather than the 1.18.2 ScreenEvent.InitScreenEvent.Post, the
-# login and logout events are ClientPlayerNetworkEvent.LoggedInEvent and LoggedOutEvent, and the /wdl client command
-# is a no-op because Forge 37 has no client-command event (RegisterClientCommandsEvent is a 1.18.2 addition).
+# GuiScreenEvent.InitGuiEvent.Post (getGui/addWidget) rather than the 1.18.2 ScreenEvent.InitScreenEvent.Post,
+# ClientPlayerNetworkEvent (the login/logout event the higher bands listen on) does not exist at this band, so the
+# connection edge is read off Minecraft.getConnection() turning non-null or null on the client tick instead, and the
+# /wdl client command is a no-op because Forge 25 has no client-command event (RegisterClientCommandsEvent is a
+# 1.18.2 addition).
 # It also implements the band's own PlatformBridge.onLevelTeardown, from Forge's WorldEvent.Unload, which Minecraft
 # posts at the head of the method that installs or clears the level and so ahead of the player it nulls there. Gated on
 # the client's own level, an integrated server posting the same event for its worlds off the client thread.
