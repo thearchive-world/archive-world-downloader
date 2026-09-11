@@ -11,7 +11,7 @@ plugins {
 }
 
 base {
-    // -> archive-wdl-fabric  (the NeoForge subproject will set archive-wdl-neoforge)
+    // -> archive-wdl-fabric
     archivesName.set("${property("mod_archives_base")}-fabric")
 }
 
@@ -159,7 +159,7 @@ tasks.named<ProcessResources>("processResources") {
     filesMatching("wdl-publishing.properties") { expand(tokens) }
 }
 
-// Loom's remapJar is the producing task; the guard is shared with the NeoForge sibling (see build-logic).
+// Loom's remapJar is the producing task; the guard comes from build-logic.
 registerVerifyProductionJar("remapJar")
 
 // Prints this subproject's resolved version (mod_version + the MC build-metadata, set by wdl.java-conventions)
