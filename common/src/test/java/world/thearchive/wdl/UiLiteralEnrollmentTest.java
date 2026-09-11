@@ -55,8 +55,7 @@ class UiLiteralEnrollmentTest {
         Map<String, Integer> found = new TreeMap<>();
         for (Path root : VIEW_ROOTS) {
             if (root.startsWith("..")) {
-                // fabric/neoforge are stripped on this Forge-only band (0 tracked files); a present loader root
-                // (the inert neoforge/ dir the middle bands still carry) is still required and scanned.
+                // A band ships only some loaders, so a loader root may be absent; only common's own root must exist.
                 if (!Files.isDirectory(root)) {
                     continue;
                 }
