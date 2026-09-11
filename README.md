@@ -6,7 +6,7 @@
 [![CurseForge](https://img.shields.io/curseforge/dt/1554389?label=CurseForge)](https://www.curseforge.com/minecraft/mc-mods/wdl)
 [![License: LGPL-3.0-or-later](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue.svg)](LICENSE)
 
-> Get it on **[CurseForge](https://www.curseforge.com/minecraft/mc-mods/wdl)**. A Modrinth release is in review and is not available there yet. Full documentation is at **[wdl.docs.thearchive.world](https://wdl.docs.thearchive.world/)**.
+> Get it on **[Modrinth](https://modrinth.com/mod/wdl)** or **[CurseForge](https://www.curseforge.com/minecraft/mc-mods/wdl)**. Full documentation is at **[wdl.docs.thearchive.world](https://wdl.docs.thearchive.world/)**.
 
 ## What it does
 
