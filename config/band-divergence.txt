@@ -114,6 +114,9 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # caller of the finish is the client thread, which makes the higher bands' network-thread justification false on it.
 # What the finish races here is its own lateness rather than a concurrent teardown, the disconnect reaching it only
 # once the player is already gone.
+# Below 1.16.5 ServerData.serverMOTD is a plain String rather than a Component, left null until a ping fills it, so the
+# report identity reads it through an inline null guard rather than the sourceMotd helper that dereferences a
+# Component.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # New here and on every other band below 1.14, on none above: from 1.14 up the chunk exposes an isUnsaved reader, so
@@ -1166,8 +1169,8 @@ common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
 
 # fabric/ and neoforge/ are stripped on this Forge-only band (0 tracked files), so the PRODUCTION_ROOTS loop's
 # loader-root checks are skip-if-absent (if (!Files.isDirectory(root)) { continue; }) rather than the mint
-# parent's hard assertTrue; common's own root stays required and scanned. forge/src carries zero wdl. translation
-# keys (verified on this band and on the ported 1.13.2 glue), so scanning common alone is complete.
+# parent's hard assertTrue; common's own root stays required and scanned. forge/src constructs key.wdl.peek_hud
+# outside the scanned roots, so that key is enrolled as an external consumer.
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
 
 # New at this band: the Unimined MCP-provision boot smoke test. It loads the provisioned MCP-named Minecraft jar and
@@ -1354,3 +1357,16 @@ common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.jav
 # fold with no host on disk is a counted
 # loss. The merchant fixture and the later NBT accessors are this band's, as above.
 common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
+
+# Below Java 21 the pinned Error Prone release, a Java 21 build, cannot load inside the compile toolchain, so this
+# band gates NullAway behind errorProneUsable and runs annotations-only, where dev runs the checker unconditionally
+# and carries no such gate.
+# The floor comment also drops the clause comparing the band to the deep Java 8 bands, which here would compare
+# the band to itself.
+build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
+
+# Below Java 11 Checkstyle cannot run on the band's own toolchain, so this file points the Checkstyle tasks at a
+# modern launcher, and PITest at the band's own Java 8 toolchain where mcp_mappings_version marks a classic-MCP
+# band (legacy FML cannot static-initialize above Java 8) or at the modern launcher otherwise; dev, a Java 25
+# band, carries no launcher block. The JUnit note names no loader subproject.
+build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
