@@ -37,9 +37,9 @@ tasks.named<ProcessResources>("processResources") {
 
 // Ship the license inside the artifact. GPL-3.0 section 4, which LGPL-3.0 section 0 incorporates, asks that
 // every recipient be given a copy of the License along with the Program, and a mod jar travels on its own
-// far from any listing page: modpacks, mirrors, a copied mods/ folder. This plugin is applied by exactly the
-// two loader subprojects that produce shipped jars, and Fabric's remapJar derives from jar, so configuring
-// jar here reaches both artifacts. Captured into a val so no Project reference survives into task execution
+// far from any listing page: modpacks, mirrors, a copied mods/ folder. This plugin is applied by every loader
+// subproject that produces a shipped jar, and Fabric's remapJar derives from jar, so configuring jar here
+// reaches each of those artifacts. Captured into a val so no Project reference survives into task execution
 // (configuration cache).
 val licenseTexts = listOf(rootProject.file("LICENSE"), rootProject.file("GPL-3.0.txt"))
 tasks.named<Jar>("jar") {
