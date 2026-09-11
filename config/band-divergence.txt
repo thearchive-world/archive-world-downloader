@@ -1541,8 +1541,9 @@ build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
 
 # This root includes only common: the band is Forge-only, its jar built by the island under forge/, and the
 # paragraph above include(...) names why NeoForge is absent; dev includes common, fabric and neoforge. The
-# pluginManagement block also differs: this root resolves the Unimined plugin from the MinecraftForge and
-# WagYourTail mavens in place of the fabricmc, neoforged and parchment ones, and excludes log4j from the portal.
+# pluginManagement block also differs: this root resolves the Unimined plugin from WagYourTail's mavens and the
+# loader and universal jars from MinecraftForge's, in place of the fabricmc, neoforged and parchment ones, and
+# excludes log4j from the portal.
 settings.gradle.kts
 
 # The apply-false plugin block declares only the catalog-pinned plugins a subproject on this band applies, and
