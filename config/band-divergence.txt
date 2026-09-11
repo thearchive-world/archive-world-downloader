@@ -812,6 +812,9 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # band, so the external-consumer set names that key. The loader-root loop is skip-if-absent for a loader root rather
 # than dev's hard assertTrue, since this band ships only some of the loader trees; common's own root stays required
 # and scanned.
+# Two button tooltips this band does not draw sit in BAND_DROPPED_KEYS, their en_us strings kept so the catalog
+# matches the higher bands.
+# The file also carries the Java 8 forms the band's test tree uses throughout (Guava immutable collections, Paths.get).
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
 
 # Below Java 21 the pinned Error Prone release, a Java 21 build, cannot load inside the compile toolchain, so this
@@ -840,5 +843,6 @@ settings.gradle.kts
 build.gradle.kts
 
 # The catalog carries only the plugins some build on this band applies, so it has no moddev
-# entry (dev's carries all three for its three loaders); the tool-library entries match dev's.
+# entry (dev's carries loom, moddev and mod-publish-plugin for its fabric and neoforge subprojects); the
+# tool-library entries match dev's.
 gradle/libs.versions.toml
