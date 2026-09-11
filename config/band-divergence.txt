@@ -518,6 +518,10 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 # the map keys).
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
+# Below 1.20.2 ServerData has no Type: the fixture builds it with the (name, ip, isLan) constructor rather than
+# ServerData.Type.OTHER.
+common/src/test/java/world/thearchive/wdl/adapter/ReportSourceMotdTest.java
+
 # The Forge island's manifest carries loaderVersion [47,) at this band (Forge 47.x for 1.20.1) versus the [48,)
 # of the 1.20.2 mint parent. The rest of the forge/ tree does not diverge from the parent: forge/build.gradle.kts
 # is excluded from the diff as a *.gradle.kts, and the shim, wrapper and access transformer are byte-identical.
