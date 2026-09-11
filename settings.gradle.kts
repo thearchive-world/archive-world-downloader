@@ -11,9 +11,8 @@ pluginManagement {
 
 rootProject.name = "wdl"
 
-// NeoForge is dropped on this band: NeoForge 20.2.x publishes no Gradle module metadata, so ModDevGradle
-// cannot resolve the neoforge-moddev-bundle variant it requires. The second, non-Fabric loader is Forge, built
-// through ForgeGradle 6 on its own Gradle-8 island under forge/ (a separate Gradle build, since FG6 is
-// Gradle-8-only and one build carries one wrapper). This root stays Gradle 9 and builds only common + fabric;
-// the Forge jar is produced by forge/gradlew, not from here.
+// NeoForge is dropped on this band: its only 1.20.1 line is the transitional 47.1.x fork, published as
+// net.neoforged:forge and by NeoForged's own account still compatible with existing Forge mods, so the Forge jar
+// built here covers it. The second, non-Fabric loader is Forge, built by the Forge island under forge/ (a separate
+// Gradle build with its own wrapper). This root builds only common + fabric; the Forge jar comes from forge/gradlew.
 include("common", "fabric")
