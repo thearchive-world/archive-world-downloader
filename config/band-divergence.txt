@@ -78,6 +78,9 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # the residual to one re-encode per entity-bearing chunk per 600 ticks.
 # The encodeQuiesced field is plain rather than volatile here and its Javadoc drops the network-thread wording: this
 # band ships no Fabric tree, so every path that takes or reads the hold is the client thread.
+# Below 1.16.5 ServerData.motd is a plain String rather than a Component, left null until a ping fills it, so the
+# report identity reads it through an inline null guard rather than the sourceMotd helper that dereferences a
+# Component.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # New here and on every other band below 1.14, on none above: from 1.14 up the chunk exposes an isUnsaved reader, so
@@ -868,3 +871,18 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # scanned. key.wdl.peek_hud is enrolled as an external consumer, since the island's WdlForge constructs it outside the
 # scanned roots.
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
+
+# Below Java 21 the pinned Error Prone release, a Java 21 build, cannot load inside the compile toolchain, so this
+# band gates NullAway behind errorProneUsable and runs annotations-only, where dev runs the checker unconditionally
+# and carries no such gate.
+# The floor comment also drops the clause comparing the band to the deep Java 8 bands, which here would compare
+# the band to itself.
+# The loader-merge sentence takes the deep bands' form, this band having no loader subproject and no
+# wdl.common-merge plugin.
+build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
+
+# Below Java 11 Checkstyle cannot run on the band's own toolchain, so this file points the Checkstyle tasks at a
+# modern launcher, and PITest at the band's own Java 8 toolchain where mcp_mappings_version marks a classic-MCP
+# band (legacy FML cannot static-initialize above Java 8) or at the modern launcher otherwise; dev, a Java 25
+# band, carries no launcher block. The JUnit note names no loader subproject.
+build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
