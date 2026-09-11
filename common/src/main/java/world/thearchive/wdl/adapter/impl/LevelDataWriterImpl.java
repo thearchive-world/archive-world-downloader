@@ -281,7 +281,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
         PrimaryLevelData levelData = (PrimaryLevelData) data.worldData();
         levelData.setGameType(player.gameType());
-        // Keep this wrap: 1.21.10's RespawnData.of stores the raw yaw, rejected by the codec's [-180,180) bound.
+        // Keep this wrap: 1.21.10's RespawnData.of stores the raw yaw, rejected by the codec's [-180,180] bound.
         float yaw = Mth.wrapDegrees(player.yaw());
         float pitch = Mth.clamp(player.pitch(), -90.0F, 90.0F);
         levelData.setSpawn(RespawnData.of(player.dimension(), player.spawnPos(), yaw, pitch));
