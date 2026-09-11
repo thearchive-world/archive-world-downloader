@@ -885,8 +885,8 @@ common/src/main/java/world/thearchive/wdl/adapter/BookshelfSlots.java
 # user-facing strings through the classic new TextComponentString(...) constructor rather than Component.literal,
 # and the acknowledged-literals map (including the empty no-phase HUD placeholder in WdlHudOverlay) reflects this
 # band's set. fabric/ and neoforge/ are stripped on this Forge-only band (0 tracked files), so the VIEW_ROOTS loop's
-# loader-root checks are skip-if-absent rather than the mint parent's hard assertTrue; common's own root stays
-# required and scanned.
+# loader-root checks are skip-if-absent rather than dev's hard assertTrue; common's own root stays required and
+# scanned.
 common/src/test/java/world/thearchive/wdl/UiLiteralEnrollmentTest.java
 
 # Deleted on this band: the chiseled-bookshelf slot-mask helper it tests (BookshelfSlots) is dropped because
@@ -1171,9 +1171,12 @@ common/src/main/java/world/thearchive/wdl/client/WdlCaptureDisableConfirmScreen.
 common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
 
 # fabric/ and neoforge/ are stripped on this Forge-only band (0 tracked files), so the PRODUCTION_ROOTS loop's
-# loader-root checks are skip-if-absent (if (!Files.isDirectory(root)) { continue; }) rather than the mint
-# parent's hard assertTrue; common's own root stays required and scanned. forge/src constructs key.wdl.peek_hud
+# loader-root checks are skip-if-absent (if (!Files.isDirectory(root)) { continue; }) rather than dev's hard
+# assertTrue; common's own root stays required and scanned. forge/src constructs key.wdl.peek_hud
 # outside the scanned roots, so that key is enrolled as an external consumer.
+# Keys this band's screens never reach (two button tooltips, two screen titles, a text field's narration
+# message) sit in BAND_DROPPED_KEYS, their en_us strings kept so the catalog matches the higher bands.
+# The file also carries the Java 8 forms the band's test tree uses throughout (Guava immutable collections, Paths.get).
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
 
 # New at this band: the Unimined MCP-provision boot smoke test. It loads the provisioned MCP-named Minecraft jar and
@@ -1309,7 +1312,8 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # band gates NullAway behind errorProneUsable and runs annotations-only, where dev runs the checker unconditionally
 # and carries no such gate.
 # The floor comment also drops the clause comparing the band to the deep Java 8 bands, which here would compare
-# the band to itself.
+# the band to itself. The loader-merge sentence takes the deep bands' form, this band having no loader subproject
+# and no wdl.common-merge plugin.
 build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 
 # Below Java 11 Checkstyle cannot run on the band's own toolchain, so this file points the Checkstyle tasks at a
@@ -1319,7 +1323,9 @@ build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
 
 # This root includes only common: the band is Forge-only, its jar built by the island under forge/, and the
-# paragraph above include(...) names why NeoForge is absent; dev includes common, fabric and neoforge.
+# paragraph above include(...) names why NeoForge is absent; dev includes common, fabric and neoforge. The
+# pluginManagement block also differs: this root resolves the Unimined plugin from the MinecraftForge and
+# WagYourTail mavens in place of the fabricmc, neoforged and parchment ones, and excludes log4j from the portal.
 settings.gradle.kts
 
 # The apply-false plugin block declares only the catalog-pinned plugins a subproject on this band applies, and
@@ -1327,5 +1333,11 @@ settings.gradle.kts
 build.gradle.kts
 
 # The catalog carries only the plugins some build on this band applies, so it has no loom, moddev, mod-publish-plugin
-# entry (dev's carries all three for its three loaders); the tool-library entries match dev's.
+# entry (dev's carries loom, moddev and mod-publish-plugin for its fabric and neoforge subprojects); the
+# tool-library entries match dev's.
 gradle/libs.versions.toml
+
+# The source-merge consumer plugin does not exist on this band (deleted, not merely divergent): its only appliers
+# were the fabric and neoforge subprojects, neither of which this Forge-only root includes, and the island merges
+# common by direct path.
+build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
