@@ -89,7 +89,7 @@ public final class Wdl {
     @SuppressWarnings("NullAway.Init")
     private static PlatformBridge bridge;
 
-    private static final ReadyLatch READY = new ReadyLatch();
+    private static final ReadyLatch readyLatch = new ReadyLatch();
 
     private static final CaptureController controller = new CaptureController();
 
@@ -160,7 +160,7 @@ public final class Wdl {
      * {@code journeymap.*} type, so an optional integration can wire itself order-independently.
      */
     public static void runWhenReady(Runnable runnable) {
-        READY.runWhenReady(runnable);
+        readyLatch.runWhenReady(runnable);
     }
 
     /** The loader platform bridge, for an optional integration that must reach it (no journeymap.* type here). */
@@ -211,7 +211,7 @@ public final class Wdl {
         // the vanilla client shutdown hook gives the integrated server.
         Runtime.getRuntime().addShutdownHook(new Thread(Wdl::abortRestoreOnShutdown, "wdl-restore-shutdown"));
         XaeroPlusIntegration.initialize(bridge);
-        READY.markReadyAndDrain();
+        readyLatch.markReadyAndDrain();
     }
 
     /**
