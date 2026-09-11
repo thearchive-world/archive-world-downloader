@@ -15,51 +15,72 @@
 # reads as stale.
 #
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
-# Every pattern carries a # reason directly above it, naming why the file diverges per band and to what;
-# checkBandDivergence fails the build on a pattern with no reason. Keep each pattern narrow: a directory-wide
-# glob would mask an unintended divergence, which is the drift this register exists to catch.
-#
-# This is the seed of the known, stable members. Each port adds its own per-file band-local divergences as it
-# creates them (the way the 26.x port records the players/ progress path), rather than pre-listing the bulk
-# renames whose files no branch has diverged yet: the Identifier and ResourceKey.identifier() rename set, the
-# band-fragile test assertions, and the keybind lang key. A broad glob for those would mask real drift or
-# guess divergences that do not exist yet.
+# Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
+# a shared reason across several files is repeated per line rather than written once over a group.
 
-# 26.x: RegistryDataLoader.load returns CompletableFuture<RegistryAccess.Frozen>, not the frozen access, so
-# this shared test bootstrap unwraps it there.
+# Below 26.1 RegistryDataLoader.load returns the frozen access and DataComponentInitializers does not exist; 26.1 made
+# load take an Executor and return a CompletableFuture, which the 26.x bootstrap joins, and binds the data components in
+# the resource reload, so the 26.x bootstrap also runs the DataComponentInitializers.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
-# ClientCommandManager) is Fabric-API-coupled and moves across bands.
+# Below 1.21.4 the Fabric client game test API is unavailable, so client_gametest is false in gradle.properties
+# and this build script gates the automated capture-verification tier behind that flag.
+fabric/build.gradle.kts
+
+# Fabric API 0.114.1 for 1.21.3 draws the HUD overlay through HudRenderCallback, unconditionally after the whole
+# vanilla HUD; fabric-api 0.119.4 for 1.21.4 moves to HudLayerRegistrationCallback with an IdentifiedLayer, and
+# 0.141.4 for 1.21.11 to HudElementRegistry.addLast on an Identifier.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
+# fabric-api 0.114.1 for 1.21.3 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
+# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api 0.155.2 for 26.1
+# renamed them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
-# The villager-trade capture gametest carries the deep-band client forms: villager types are the flat npc package,
-# EntityType is not yet EntityTypes, Minecraft.setScreen is not relocated into Minecraft.gui, the crosshair pick is
-# GameRenderer.pick rather than LocalPlayer.raycastHitResult, an entity is resolved by UUID over entitiesForRendering
-# rather than Level.getEntity(UUID), and the pre-1.21.5 CompoundTag/ListTag accessors (getCompound/getInt/getList)
-# replace the Optional-returning family.
+# Below 1.21.11 Villager sits in the flat npc package (npc.villager at 1.21.11) and LocalPlayer.raycastHitResult is
+# absent (added at 1.21.11), so the crosshair is refreshed through GameRenderer.pick; below 1.21.5 there is no
+# Level.getEntity(UUID), so an entity is resolved by UUID over entitiesForRendering; 26.2 moved the EntityType constants
+# to EntityTypes and setScreen into Minecraft.gui. Below 1.21.5 CompoundTag.getList takes a type id and getCompound,
+# getInt, getFloat, getString and ListTag.getCompound return the value itself (Optional at 1.21.5, with the
+# getCompoundOrEmpty, getListOrEmpty, getIntOr, getFloatOr and getStringOr defaults).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
 # The shared capture driver reads the camera through GameRenderer.getMainCamera().getPosition(), the pre-26.2,
 # pre-1.21.11 forms.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
 
-# The headless Level is band-local: every band declares a different abstract Level surface, so the stub is
-# written against this one. New at this band.
+# Below 1.21.4 the abstract Level declares no dragonParts(), which 1.21.4 added; the stub otherwise carries the 1.21.4
+# surface (the overworld dimension type passed where 1.21.11's constructor takes null, setMapData and getFreeMapId until
+# 1.21.5, no RespawnData accessors until 1.21.9, no environmentAttributes until 1.21.11), so the stubbed overrides
+# differ.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
+# Below 1.21.5 ItemEnchantments.STREAM_CODEC carries a trailing showInTooltip boolean after the level map, which
+# 1.21.5 dropped, so the hand-written wire form appends it.
+common/src/test/java/world/thearchive/wdl/testsupport/BadStacks.java
 
-# The pre-1.21.5 CompoundTag and ListTag accessors (getCompound, getList, getString) replace the Optional-returning
-# getCompoundOrEmpty, getListOrEmpty and getStringOr family, and getIntOr becomes a local helper because getInt
-# reads an absent key back as a real zero while the assertions rely on -1.
+# Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
+# 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr,
+# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero while the
+# assertions rely on -1.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
 
-# The pre-1.21.5 accessors and the local getIntOr helper, as above.
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt and ListTag.getCompound return the value itself (Optional
+# at 1.21.5, with the getListOrEmpty, getIntOr and getCompoundOrEmpty defaults). The test's intOr helper stands in for
+# getIntOr because getInt reads an absent key back as a real zero.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
 
-# The pre-1.21.5 accessors, as above.
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getString and ListTag.getCompound return the value
+# itself (Optional at 1.21.5, with the getCompoundOrEmpty, getListOrEmpty and getStringOr defaults).
 common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
 
-# The pre-1.21.5 accessors, as above.
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getString and ListTag.getCompound return the value
+# itself (Optional at 1.21.5, with the getCompoundOrEmpty, getListOrEmpty and getStringOr defaults). Below 1.21.5
+# CompoundTag has no store with a Codec, so the UUID is encoded through NbtOps directly.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
+
+# Below 1.21.4 Leashable.readLeashData returns the parsed LeashData rather than assigning it internally as the
+# void form does, so the test assigns it explicitly with setLeashData.
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkLeashDegradationTest.java
+
+# Items.COPPER_HELMET arrives at 1.21.9 and EntityType.PARCHED at 1.21.11, so their assertions are absent and the
+# header stamp names 1.21.3.
+common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
