@@ -177,7 +177,14 @@ class LangKeyCoverageTest {
     private static Set<String> productionKeyLiterals() {
         Set<String> literals = new TreeSet<>();
         for (Path root : PRODUCTION_ROOTS) {
-            assertTrue(Files.isDirectory(root), "production source root not found: " + root.toAbsolutePath());
+            if (root.startsWith("..")) {
+                // A band ships only some loaders, so a loader root may be absent; only common's own root must exist.
+                if (!Files.isDirectory(root)) {
+                    continue;
+                }
+            } else {
+                assertTrue(Files.isDirectory(root), "production source root not found: " + root.toAbsolutePath());
+            }
             for (Path file : javaFiles(root)) {
                 Matcher matcher = keyLiteral.matcher(readString(file));
                 while (matcher.find()) {
