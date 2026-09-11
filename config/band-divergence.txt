@@ -893,7 +893,9 @@ build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
 # This root includes only common: the band is Forge-only, its jar built by the island under forge/, and the
 # paragraph above include(...) names why NeoForge is absent; dev includes common, fabric and neoforge.
 # It also includes the tools/mojmap-bridge build, which composes the intermediary-to-Mojmap mapping jar
-# common's Loom toolchain consumes on this band.
+# common's Loom toolchain consumes on this band, and a value source that generates that jar through the bridge
+# build's own wrapper at settings evaluation, since Loom reads it while configuring common and no task edge can
+# produce it in time.
 settings.gradle.kts
 
 # The apply-false plugin block declares only the catalog-pinned plugins a subproject on this band applies, and
