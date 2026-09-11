@@ -327,17 +327,9 @@ val checkJavaVersion = tasks.register("checkJavaVersion") {
     }
 }
 
-// The band-divergence register names the shared files that legitimately carry band-local code, each with a
-// reason. Two halves. The reason half holds on every branch: a pattern with no # reason directly above it is
-// an error, the one rule a path-pattern file cannot enforce itself. The diff half runs on a band that names
-// the branch it was minted from (mint_parent in gradle.properties; dev names none and is the root): the
-// working tree is diffed against that parent and against dev, a shared path that differs from both must be
-// registered, a pattern that matches no path differing from dev is stale, and core/ main sources may differ
-// from neither. A path equal to the parent's is inherited and a path equal to dev's is the parent's lag or a
-// workaround this band does not need, so neither is this band's drift. Git does the diffing and the pattern
-// matching (check-ignore with the register as the only excludes source), so a pattern means exactly what
-// gitignore(5) says: the last match wins and a directory pattern covers its subtree. No fetch: the two refs
-// must already be present, a local branch first and origin/<name> second; the workflows fetch the tips.
+// The working tree is diffed against the mint parent and against dev. A path equal to the parent's is inherited
+// and a path equal to dev's is not this band's divergence, so neither is drift; only a path differing from both
+// must be registered.
 val checkBandDivergence = tasks.register("checkBandDivergence") {
     group = "verification"
     description = "Fails if config/band-divergence.txt disagrees with the tree: a pattern without a reason, " +
@@ -346,7 +338,7 @@ val checkBandDivergence = tasks.register("checkBandDivergence") {
     // project accessor the configuration cache would reject.
     val registryFile = rootProject.file("config/band-divergence.txt")
     val repoDir = rootProject.layout.projectDirectory.asFile
-    // Blank on the command line (-Pmint_parent=) reads as absent, which is how the release build opts out.
+    // Blank on the command line (-Pmint_parent=) reads as absent.
     val mintParent = providers.gradleProperty("mint_parent").orNull?.trim().orEmpty()
     inputs.file(registryFile)
     inputs.property("mintParent", mintParent)
@@ -369,8 +361,8 @@ val checkBandDivergence = tasks.register("checkBandDivergence") {
         }
         if (mintParent.isEmpty()) {
             logger.lifecycle(
-                "checkBandDivergence: no mint_parent declared, so only the reason rule ran (dev is the propagation " +
-                    "root; a band names the branch it was minted from in gradle.properties)"
+                "checkBandDivergence: no mint_parent declared, so only the reason rule ran (a band names the branch " +
+                    "it was minted from in gradle.properties; dev names none)"
             )
             return@doLast
         }
@@ -399,8 +391,7 @@ val checkBandDivergence = tasks.register("checkBandDivergence") {
         val plugPrefix = "common/src/main/java/world/thearchive/wdl/adapter/impl/"
         val corePrefix = "common/src/main/java/world/thearchive/wdl/core/"
         fun isShared(path: String) = path !in excludedPaths && !path.startsWith(plugPrefix)
-        // The working tree against a ref, as status letter per shared path (A, M or D; renames are split so
-        // each side registers on its own).
+        // Renames are split (--no-renames) so each side registers on its own and the two-field parse holds.
         fun diffAgainst(sha: String): Map<String, String> {
             val (code, out) = git(null, "diff", "--no-renames", "--name-status", "-z", sha)
             if (code != 0) throw GradleException("checkBandDivergence: git diff against $sha exited $code")
@@ -415,8 +406,9 @@ val checkBandDivergence = tasks.register("checkBandDivergence") {
         val allPaths = (parentDiff.keys + devDiff.keys).sorted()
 
         // check-ignore -v -z prints source, line, pattern and path per input path, the first three empty for a
-        // path nothing matches; only a match sourced from the register counts (a .gitignore hit is not a
-        // registration).
+        // path nothing matches. Only a non-negated match sourced from the register counts; a .gitignore or
+        // info/exclude match on the same path outranks the register and hides it, so such a path reads as drift
+        // and its pattern as stale.
         val credit = mutableMapOf<String, Int>()
         if (allPaths.isNotEmpty()) {
             val pathList = File(temporaryDir, "paths").apply { writeText(allPaths.joinToString("\u0000")) }
