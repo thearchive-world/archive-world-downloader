@@ -13,10 +13,9 @@ plugins {
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 // The Error Prone javac plugin runs inside the compile toolchain, and the pinned release (2.50) is a
-// Java 21 build that a lower toolchain cannot load. A band below that floor (this one targets Java 17)
-// therefore runs annotations-only, the same posture the deep Java 8 bands take. The nullness verdict is
-// not lost: the shared core and adapter are byte-identical to the Java 21 bands that do run NullAway, so
-// the only checked surface this band forgoes is its own plug.
+// Java 21 build that a lower toolchain cannot load. A band below that floor therefore runs
+// annotations-only. The nullness verdict is not wholly lost: core is byte-identical to the bands that
+// do run NullAway, so it carries their verdict; everything else in this band's tree goes unchecked.
 val errorProneUsable = providers.gradleProperty("java_version").get().toInt() >= 21
 
 dependencies {
