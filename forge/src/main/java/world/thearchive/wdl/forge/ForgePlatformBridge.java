@@ -160,7 +160,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     }
 
     /**
-     * The /wdl client command is unavailable on this band's Forge jar: Forge 37 has no client-command event
+     * The /wdl client command is unavailable on this band's Forge jar: Forge 36 has no client-command event
      * (RegisterClientCommandsEvent is a 1.18.2 addition), and the server-side RegisterCommandsEvent cannot register a
      * command against a remote server. The command's actions are reached through the peek keybind and the pause-menu
      * buttons instead.
