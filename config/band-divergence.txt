@@ -560,14 +560,13 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 # the map keys).
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
-# The Forge island's manifest carries loaderVersion [36,) at this band (Forge 36.x for 1.16.5). The forge/ tree
+# The Forge island's manifest carries loaderVersion [28,) at this band (Forge 28.x at 1.14.4). The forge/ tree
 # diverges per band across its shim, platform bridge, connection tee and mount reader; the access transformer is
 # re-pinned for this band to the classic SRG field_NNNNN_ member scheme (the 1.17-and-above bands use TSRGv2
-# f_NNNNN_) with the xa/ya/za move-delta widenings. forge/build.gradle.kts is excluded from the diff as a
-# *.gradle.kts.
+# f_NNNNN_) with the xa/ya/za move-delta widenings.
 forge/src/main/resources/META-INF/mods.toml
 
-# The resource pack_format tracks this band's Minecraft version, 6 for 1.16.5 versus 7 for 1.17.1.
+# The resource pack_format tracks this band's Minecraft version, 4 for 1.14.4 versus 5 for 1.15.2.
 forge/src/main/resources/pack.mcmeta
 
 # Below the 1.19 registry split the code-defined registries are static fields on Registry (Registry.ENTITY_TYPE),
@@ -637,20 +636,20 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.j
 # registries rather than the *_LOCATION keys, and the caves variant routes to the overworld by its overworld effects.
 common/src/test/java/world/thearchive/wdl/adapter/VanillaDimensionsTest.java
 
-# Below 1.19 the Forge client-registration APIs differ: the config screen is ConfigGuiHandler.ConfigGuiFactory (in the
-# fmlclient package at Forge 37) rather than the ConfigScreenHandler added at 1.19, keys register through
-# ClientRegistry.registerKeyBinding (fmlclient.registry at Forge 37) during FMLClientSetupEvent rather than the
-# RegisterKeyMappingsEvent added at 1.19, the HUD registers through OverlayRegistry.registerOverlayTop with a
-# PoseStack draw callback rather than RegisterGuiOverlaysEvent, the login event is
+# Below 1.19 the Forge client-registration APIs differ: the config screen registers through
+# ExtensionPoint.CONFIGGUIFACTORY with a BiFunction at Forge 28 rather than the ConfigScreenHandler added at 1.19,
+# keys register through ClientRegistry.registerKeyBinding (fml.client.registry at Forge 28) during
+# FMLClientSetupEvent rather than the RegisterKeyMappingsEvent added at 1.19, the HUD registers through
+# RenderGameOverlayEvent.Post on the game bus rather than RegisterGuiOverlaysEvent, the login event is
 # ClientPlayerNetworkEvent.LoggedInEvent (getNetworkManager) rather than LoggingIn, and PlayerInteractEvent exposes
 # getPlayer/getWorld rather than getEntity/getLevel.
 forge/src/main/java/world/thearchive/wdl/forge/WdlForge.java
 
-# Below 1.19 keys register through ClientRegistry.registerKeyBinding (fmlclient.registry at Forge 37) during
+# Below 1.19 keys register through ClientRegistry.registerKeyBinding (fml.client.registry at Forge 28) during
 # FMLClientSetupEvent rather than the RegisterKeyMappingsEvent added at 1.19, the screen-init event is
 # GuiScreenEvent.InitGuiEvent.Post (getGui/addWidget) rather than the 1.18.2 ScreenEvent.InitScreenEvent.Post, the
 # login and logout events are ClientPlayerNetworkEvent.LoggedInEvent and LoggedOutEvent, and the /wdl client command
-# is a no-op because Forge 37 has no client-command event (RegisterClientCommandsEvent is a 1.18.2 addition).
+# is a no-op because Forge 28 has no client-command event (RegisterClientCommandsEvent is a 1.18.2 addition).
 forge/src/main/java/world/thearchive/wdl/forge/ForgePlatformBridge.java
 
 # Below 1.19 the void generator reconstructs the vanilla worldgen registries too (its biome needs a Forge registry name
