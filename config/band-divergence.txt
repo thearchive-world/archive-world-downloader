@@ -15,41 +15,38 @@
 # reads as stale.
 #
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
-# Every pattern carries a # reason directly above it, naming why the file diverges per band and to what;
-# checkBandDivergence fails the build on a pattern with no reason. Keep each pattern narrow: a directory-wide
-# glob would mask an unintended divergence, which is the drift this register exists to catch.
-#
-# This is the seed of the known, stable members. Each port adds its own per-file band-local divergences as it
-# creates them (the way the 26.x port records the players/ progress path), rather than pre-listing the bulk
-# renames whose files no branch has diverged yet: the Identifier and ResourceKey.identifier() rename set, the
-# band-fragile test assertions, and the keybind lang key. A broad glob for those would mask real drift or
-# guess divergences that do not exist yet.
+# Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
+# a shared reason across several files is repeated per line rather than written once over a group.
 
-# 26.x: RegistryDataLoader.load returns CompletableFuture<RegistryAccess.Frozen>, not the frozen access, so
-# this shared test bootstrap unwraps it there.
+# Below 26.1 RegistryDataLoader.load returns the frozen access and DataComponentInitializers does not exist; 26.1 made
+# load take an Executor and return a CompletableFuture, which the 26.x bootstrap joins, and binds the data components in
+# the resource reload, so the 26.x bootstrap also runs the DataComponentInitializers.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
-# ClientCommandManager) is Fabric-API-coupled and moves across bands.
-# On the down-ported bands the file also carries a 1.21.11-baseline revert: the Identifier rename back to ResourceLocation.
+# fabric-api 0.136.1 for 1.21.8 registers the key through KeyBindingHelper.registerKeyBinding and the HUD element
+# through HudElementRegistry.addLast on a ResourceLocation (Identifier from 1.21.11); fabric-api 0.155.2 for 26.1
+# names the helper KeyMappingHelper.registerKeyMapping.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
+# fabric-api 0.136.1 for 1.21.8 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
+# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api 0.155.2 for 26.1
+# names them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # The villager-trade capture gametest carries the pre-26.2 client forms: EntityType constants are not yet under
 # EntityTypes, and Minecraft.setScreen is not yet relocated into Minecraft.gui, so the screen dismissals and the
 # villager-type reads spell those the 1.21.x way.
-# On the down-ported bands the file also carries 1.21.11-baseline reverts: the npc.villager package to flat npc, and LocalPlayer.raycastHitResult to GameRenderer.pick.
+# Below 1.21.11 Villager sits in the flat npc package (npc.villager at 1.21.11) and LocalPlayer.raycastHitResult is
+# absent (added at 1.21.11), so the crosshair is refreshed through the public GameRenderer.pick.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
 # The shared capture driver's new entity-rim readback reads the camera through GameRenderer.getMainCamera, not the
 # 26.2 mainCamera rename.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
 
 # ---------------------------------------------------------------------------
-# 1.21.10 band: down-port reverts from the 1.21.11 mint parent. Each shared file below carries a band-local revert
-# of a 1.21.11 rename or removal. The plug (adapter/impl/**) and the coordinate files are excluded by the gate, not
-# listed here.
+# 1.21.10 band: down-port reverts from the 1.21.11 mint parent. Each shared file in the 1.21.10 set carries a band-local
+# revert of a 1.21.11 rename or removal. The plug (adapter/impl/**) and the coordinate files are excluded by the gate
+# and carry no entry.
 # ---------------------------------------------------------------------------
 
 # Entity-package regroup revert: animal.equine.AbstractChestedHorse -> animal.horse.
@@ -64,7 +61,8 @@ common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
 # Entity-package regroup + ResourceKey.location + NbtAccounter unlimitedHeap reverts.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
-# ResourceKey.location rename revert plus 1.21.11-only entity-type removal (CAMEL_HUSK, NAUTILUS, ZOMBIE_NAUTILUS).
+# Below 1.21.11 ResourceKey exposes its id as location() (identifier() at 1.21.11), and EntityType.CAMEL_HUSK, NAUTILUS
+# and ZOMBIE_NAUTILUS arrive at 1.21.11.
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 
 # ResourceKey.location rename revert: dimension key .identifier() -> .location().
@@ -89,7 +87,7 @@ common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
 # (key.categories.wdl.downloader), not the KeyMapping.Category record built from a ResourceLocation.
 common/src/main/java/world/thearchive/wdl/client/WdlKeyBinds.java
 
-# Util rename revert: net.minecraft.util.Util -> top-level net.minecraft.Util at this band.
+# Util rename revert: net.minecraft.util.Util -> top-level net.minecraft.Util pre-1.21.11.
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 
 # Per-vertex line-width revert: drops Window.getAppropriateLineWidth (absent pre-1.21.11); width carried, unapplied.
@@ -101,7 +99,8 @@ common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 # Game-rule typed-leg test revert: gamerules.GameRules -> flat GameRules, RULE_* names, getBoolean, fire rule dropped.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
 
-# Game-rule typed-leg test revert: nine curated rules (no integer fire), band camelCase vanilla override ids.
+# fire_spread_radius_around_player exists only from 1.21.11, so below it the curated set is nine rules, the layout's
+# fire row binds no rule and the integer fire-rule test is absent.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.java
 
 # NbtAccounter unlimitedHeap test revert: drops the 1.21.11-only UNCOMPRESSED_NBT_QUOTA oversized-read test.
@@ -188,8 +187,9 @@ fabric/src/main/resources/wdl.accesswidener
 # Mount-menu revert: AbstractMountInventoryMenu.mount -> HorseInventoryMenu.horse.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeMountMenuReader.java
 
-# Rendertype revert (renderer.rendertype.RenderTypes -> renderer.RenderType) plus, at 1.21.8, an outline-event
-# revert: the frustum is read off RenderLevelStageEvent.AfterTranslucentBlocks directly, since ExtractLevelRenderStateEvent (its 1.21.9+ source) is absent at this band.
+# Rendertype revert (renderer.rendertype.RenderTypes -> renderer.RenderType) plus, at 1.21.8, an outline-event revert:
+# the frustum is read off RenderLevelStageEvent.AfterTranslucentBlocks directly, since ExtractLevelRenderStateEvent (its
+# 1.21.9+ source) is absent at 1.21.8.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeOutlineRegistrar.java
 
 # Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation for the HUD element id.
@@ -198,16 +198,17 @@ neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
 # Mount-menu revert: opens HorseInventoryMenu.horse (was AbstractMountInventoryMenu.mount).
 neoforge/src/main/resources/META-INF/accesstransformer.cfg
 
-# Game-rule test revert: reads the curated rules from level.dat's GameRules compound, the 1.21.10 key (1.21.11 writes game_rules).
+# Game-rule test revert: reads the curated rules from level.dat's GameRules compound, the 1.21.10 key (1.21.11 writes
+# game_rules).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlWorldOutputConfigTest.java
 
 # ---------------------------------------------------------------------------
-# 1.21.8 band: two further down-port reverts beyond the 1.21.10 set above -- the 1.21.9 chunk-ctor cut and the
-# 1.21.9->1.21.10 keybind-category cut. The chunk-ctor cut is mostly plug-local (adapter/impl/**, excluded by the
-# gate), but its SerializableChunkData/LevelChunkSection shape also reaches the three shared test files below. The
-# keybind cut moves the branded controls-category lang key from key.category.wdl.downloader back to
-# key.categories.wdl.downloader, so every lang catalog and the test that names the key diverge from the mint parent.
-# Listed per file per the narrow-pattern rule above.
+# 1.21.8 band: two further down-port reverts beyond the 1.21.10 set, the 1.21.9 chunk-ctor cut and the 1.21.9
+# keybind-category cut. The chunk-ctor cut is mostly plug-local (adapter/impl/**, excluded by the gate), but its
+# SerializableChunkData/LevelChunkSection shape also reaches three shared test files of the 1.21.8 set,
+# ChunkRoundTripTest, SyntheticChunks and RegistriesSmokeTest. The keybind cut moves the branded controls-category lang
+# key from key.category.wdl.downloader back to key.categories.wdl.downloader, so every lang catalog and the test that
+# names the key differ from 1.21.9 and above. Listed per file, one reason per pattern, as the header requires.
 # ---------------------------------------------------------------------------
 
 # Chunk-ctor revert: SerializableChunkData.parse takes RegistryAccess directly, not the 1.21.9 PalettedContainerFactory.
@@ -216,10 +217,12 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
 # Chunk-ctor revert: sections built via LevelChunkSection(Registry<Biome>), not the 1.21.9 PalettedContainerFactory.
 common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
 
-# Chunk-ctor revert: the harness smoke test builds LevelChunkSection(Registry<Biome>), not PalettedContainerFactory.create.
+# Chunk-ctor revert: the harness smoke test builds LevelChunkSection(Registry<Biome>), not
+# PalettedContainerFactory.create.
 common/src/test/java/world/thearchive/wdl/testsupport/RegistriesSmokeTest.java
 
-# Keybind lang rekey: the EXTERNAL_CONSUMERS literal names the branded controls-category key, key.categories.wdl.downloader at this band.
+# Keybind lang rekey: the EXTERNAL_CONSUMERS literal names the branded controls-category key,
+# key.categories.wdl.downloader at 1.21.8.
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
 
 # Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
@@ -321,28 +324,39 @@ common/src/main/resources/assets/wdl/lang/zh_cn.json
 # Keybind lang rekey: branded controls-category key key.category.wdl.downloader -> key.categories.wdl.downloader.
 common/src/main/resources/assets/wdl/lang/zh_tw.json
 
-# Bookshelf hit-slot reimplemented: vanilla ChiseledBookShelfBlock.getHitSlot is private and takes the block state below 1.21.11, so the slot math is inlined.
+# Bookshelf hit-slot reimplemented: vanilla ChiseledBookShelfBlock.getHitSlot is private and takes the block state below
+# 1.21.11, so the slot math is inlined.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
-# Fabric-API render package: WorldRenderContext/Events resolve under rendering.v1, not rendering.v1.world, on this band's fabric-api.
+# Fabric-API render package: WorldRenderContext/Events resolve under rendering.v1, not rendering.v1.world, on Fabric API
+# 0.136.1+1.21.8.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
 
 # Beehive-occupant entity-data revert: the occupant carries CustomData, not the 1.21.9 TypedEntityData.
 common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
 
-# World-spawn revert: level.dat spawn is the flat SpawnX/SpawnY/SpawnZ + SpawnAngle, not the 1.21.9 LevelData.RespawnData compound, so the spawn assertions read the ints (no dimension).
+# World-spawn revert: level.dat spawn is the flat SpawnX/SpawnY/SpawnZ + SpawnAngle, not the 1.21.9
+# LevelData.RespawnData compound, so the spawn assertions read the ints (no dimension).
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
 
 # World-spawn revert: the round-trip asserts the flat SpawnX key, not the 1.21.9 spawn (RespawnData) compound.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 
-# Fabric-API render package (same axis as FabricOutlineRegistrar): the smoke test's WorldRenderEvents resolves under rendering.v1, not rendering.v1.world, and WorldRenderContext exposes matrixStack(), not matrices().
+# Natural-equipment armor-material test: COPPER_HELMET does not exist at 1.21.8 (added at 1.21.9), so the
+# zombie-armor assertion drops it and the header stamp reads "Verified against decompiled 1.21.8" rather than
+# 1.21.10.
+common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
+
+# fabric-api 0.136.1 for 1.21.8 keeps WorldRenderEvents under rendering.v1 and names the context's pose matrixStack;
+# 0.138.4 for 1.21.10 has the events under rendering.v1.world and the pose named matrices.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
 
-# JourneyMap plugin annotation: the beta-generation API this band's runtime bundles carries JourneyMapPlugin under
-# journeymap.api.v2.client, not the v2.common the 1.21.11 release added, so the plugin names the client-package annotation.
+# JourneyMap plugin annotation: the beta-generation API at journeymap_api_coordinate 2.0.0-1.21.7-SNAPSHOT carries
+# JourneyMapPlugin under journeymap.api.v2.client, not the v2.common the 1.21.11 release added, so the plugin names
+# the client-package annotation.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
 
-# The headless Level is band-local: every band declares a different abstract Level surface, so the stub is
-# written against this one. New at this band.
+# Below 1.21.11 the Level constructor dereferences its dimension-type holder, so the stub passes the overworld type
+# where 1.21.11's passes null; 1.21.8's abstract Level lacks the RespawnData accessors and explode's WeightedList of
+# ExplosionParticleInfo (both 1.21.9) and environmentAttributes (1.21.11), so the stubbed overrides differ.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
