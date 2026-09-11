@@ -122,6 +122,12 @@ common/src/test/java/world/thearchive/wdl/adapter/RecaptureRearmTest.java
 # its hover label from renderButton, the vanilla button gaining a tooltip parameter only at 1.16.5.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
+# New at 1.15.2 and carried below it: SystemToast.multiline is a 1.16 addition, and below 1.16 a body carrying a
+# newline renders as a tofu glyph and overruns the fixed 32-pixel toast slot, so this toast wraps the body and
+# stitches the frame sprite taller. Below 1.15 there is no RenderSystem (a 1.15 blaze3d addition), so the frame
+# tint is set through GlStateManager.color3f.
+common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
+
 # The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
 # below the cut) and read the biome registry via registryOrThrow and the section floor via getMinSection. Below
 # 1.20.5 ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update. Below
@@ -312,6 +318,12 @@ common/src/main/java/world/thearchive/wdl/adapter/RegionChunkWriter.java
 # carries are dropped and this maps and opens only region/.
 common/src/main/java/world/thearchive/wdl/adapter/WorldPaths.java
 
+# New at 1.14.4: below 1.15 there is no IOWorker, and RegionFileStorage is abstract with a protected constructor and
+# a protected write, so this subclass is the synchronous region store the writer, WorldPaths and the tests open. It
+# replaces the 1.15.2 test-tree shim under net.minecraft and the reflective open the 1.15.2 plug's package-private
+# constructors force; a subclass reaches both members across packages in a way the loader remap preserves.
+common/src/main/java/world/thearchive/wdl/adapter/WdlRegionStorage.java
+
 # Below the 1.20.6 cut there is no SimpleRegionStorage, so the drain is proven against the vanilla IOWorker (a
 # test-local subclass reaches its protected constructor) rather than constructing one via
 # RegionStorageInfo/DataFixers. Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
@@ -456,6 +468,18 @@ common/src/test/java/world/thearchive/wdl/adapter/LecternStashMergeTest.java
 
 # Below 1.20.5 MapItemSavedData.load takes only the tag, not a registries argument.
 common/src/test/java/world/thearchive/wdl/adapter/MapSinkRoundTripTest.java
+
+# Below 1.15 vanilla ItemStack.save shares the live stack's tag compound instead of copying it, so a guard captures a
+# live filled map through the real sink, remaps the holder and asserts the held stack keeps the server's map id.
+# Below 1.16 there is no RegistryAccess, so the test bootstraps vanilla and the holder fixtures take no registries,
+# and a map's dimension is the int DimensionType id; the Java 8 floor has no Set.of, so the id sets are Guava.
+common/src/test/java/world/thearchive/wdl/adapter/MapArchiveTest.java
+
+# New at 1.14.4 and carried below it: below 1.15 vanilla ItemStack.save shares the live stack's tag compound instead
+# of copying it, so this guard captures a headless player holding a filled map through the real player sink, remaps
+# the inventory and asserts the held stack keeps the server's map id; the copy vanilla makes from 1.15 up makes the
+# guard moot above.
+common/src/test/java/world/thearchive/wdl/adapter/PlayerCaptureAliasTest.java
 
 # Below 1.20.5 there is no BundleContents component; a bundle mutates its stack's tag."Items" list in place, so
 # the in-place-mutation fixture swaps that tag rather than the component.
@@ -623,6 +647,12 @@ common/src/main/java/world/thearchive/wdl/adapter/BookshelfSlots.java
 # own root stays required and scanned.
 common/src/test/java/world/thearchive/wdl/UiLiteralEnrollmentTest.java
 
+# The acknowledged-exclude set names WdlRegionStorage, the region-store shim new at 1.14.4 (IO plumbing beside
+# WorldPaths, effect-asserted rather than mutated). Below 1.17 the Java floor is 8: no Path.of, Files.readString or
+# String.strip (Java 11) and no Set.of (Java 9), so the paths are Paths.get, the read is readAllBytes, the trim is
+# trim and the set is Guava ImmutableSet.of.
+common/src/test/java/world/thearchive/wdl/PitestAllowlistEnrollmentTest.java
+
 # Deleted on this band: the chiseled-bookshelf slot-mask helper it tests (BookshelfSlots) is dropped because
 # ChiseledBookShelfBlock does not exist below 1.19.
 common/src/test/java/world/thearchive/wdl/adapter/BookshelfSlotsTest.java
@@ -688,6 +718,12 @@ common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressWriter.java
 # LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is acquired through
 # log4j2 LogManager directly.
 common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
+
+# Below 1.15 there is no PoseStack or MultiBufferSource (both arrive with the 1.15 blaze3d rewrite) and the view cull
+# is the Culler interface rather than the Frustum class, so the per-frame context carries the shared Tesselator
+# BufferBuilder the cull begins on POSITION_COLOR lines, a nullable Culler, and a line width applied once as legacy
+# GL state; the Java 8 floor has no records, so it is a final class with explicit accessors.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineRenderContext.java
 
 # LogUtils is a 1.18 addition, and below 1.17 there is no slf4j either, so the per-class logger is acquired through
 # log4j2 LogManager directly.
@@ -803,6 +839,17 @@ common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferScrub.java
 # resume scan hands the bank that whole chunk and the record side reads Level.Entities where the higher bands read a
 # top-level Entities. The apply side is not rewritten with it, taking the flat envelope the entity fold passes.
 common/src/main/java/world/thearchive/wdl/adapter/RecoveredEntityContent.java
+
+# Below 1.15 the primitive NBT tags have no valueOf factories (the cached instances behind private constructors are
+# a 1.15 addition), so the block-entity position compare builds its IntTags through the public constructor. The
+# Java 8 pattern-variable rewrite above applies here too: each instanceof over an NBT read is a local, an unbound
+# instanceof and a cast rather than the pattern form the higher bands use.
+common/src/main/java/world/thearchive/wdl/adapter/NbtMerge.java
+
+# Below 1.15 StringTag has no valueOf factory, so the malformed-value fixture builds it through the public
+# constructor; below 1.16 there is no RegistryAccess, so the test bootstraps vanilla through
+# TestRegistries.bootstrap; and the 1.21.5 getListOrEmpty accessor is spelled getList(key, 10).
+common/src/test/java/world/thearchive/wdl/adapter/NbtMergeTest.java
 
 # The Java 8 pattern-variable rewrite; and the merchant fixture builds its offer with a plain ItemStack buy cost and
 # serializes through MerchantOffers.createTag, there being no ItemCost or offers codec below 1.20.5.
