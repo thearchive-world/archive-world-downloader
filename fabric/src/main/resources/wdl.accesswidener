@@ -16,5 +16,5 @@ accessible	field	net/minecraft/world/inventory/HorseInventoryMenu	horse	Lnet/min
 
 # WDL: the pause menu row anchors to vanilla's own disconnect button, named in a private field with no getter.
 # Vanilla's reference is the one signal a mod adding a same-styled button below it cannot forge. Read-only, so
-# accessible alone suffices. The NeoForge analog is the access transformer.
+# accessible alone suffices. The Forge analog is the island's access transformer.
 accessible	field	net/minecraft/client/gui/screens/PauseScreen	disconnectButton	Lnet/minecraft/client/gui/components/Button;
