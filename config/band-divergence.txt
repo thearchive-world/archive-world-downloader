@@ -1536,7 +1536,7 @@ build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 # Below Java 11 Checkstyle cannot run on the band's own toolchain, so this file points the Checkstyle tasks at a
 # modern launcher, and PITest at the band's own Java 8 toolchain where mcp_mappings_version marks a classic-MCP
 # band (legacy FML cannot static-initialize above Java 8) or at the modern launcher otherwise; dev, a Java 25
-# band, carries no launcher block. The JUnit note names no loader subproject.
+# band, carries no launcher block.
 build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
 
 # This root includes only common: the band is Forge-only, its jar built by the island under forge/, and the
