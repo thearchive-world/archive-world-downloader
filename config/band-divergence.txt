@@ -125,8 +125,9 @@ common/src/test/java/world/thearchive/wdl/adapter/RecaptureRearmTest.java
 # its hover label from renderButton, the vanilla button gaining a tooltip parameter only at 1.16.5.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
-# Absent from dev, where SystemToast.multiline (a 1.16 addition) wraps the body, so this toast wraps its own body
-# and stitches the frame taller. Below 1.15 there is no RenderSystem, so the frame tint is GlStateManager.color3f.
+# Absent from dev, whose SystemToast wraps the body itself (multiline from 1.16, the constructor at 26.2), so this
+# toast wraps its own body and stitches the frame taller. Below 1.15 there is no RenderSystem, so the frame tint is
+# GlStateManager.color3f.
 common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
 
 # The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
@@ -471,7 +472,8 @@ common/src/test/java/world/thearchive/wdl/adapter/MapSinkRoundTripTest.java
 
 # Below 1.15 vanilla ItemStack.save shares the live stack's tag compound instead of copying it, so a guard pins that
 # the remap leaves the live stack's map id alone. Below 1.16 there is no RegistryAccess, so the test bootstraps
-# vanilla and the fixtures take no registries, a map's dimension is the int DimensionType id, and the id sets are Guava.
+# vanilla and the fixtures take no registries, and a map's dimension is the int DimensionType id; the Java 8 floor
+# has no Set.of, so the id sets are Guava.
 common/src/test/java/world/thearchive/wdl/adapter/MapArchiveTest.java
 
 # New at 1.14.4: below 1.15 vanilla ItemStack.save shares the live stack's tag compound instead of copying it, so
