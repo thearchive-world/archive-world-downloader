@@ -687,10 +687,6 @@ common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
 # and carries no such gate.
 build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 
-# The JUnit note names no loader subproject, this band including no :neoforge (dev's names common and neoforge);
-# the code is dev's.
-build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
-
 # The consumer comment names :fabric alone as the remapping loader, this band including no :neoforge; the code
 # is dev's.
 build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
