@@ -562,3 +562,15 @@ build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
 # The consumer comment names :fabric alone as the remapping loader, this band including no :neoforge; the code
 # is dev's.
 build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
+
+# This root includes common and fabric: the second loader is Forge, built by the island under forge/, and the
+# paragraph above include(...) names why NeoForge is absent; dev includes common, fabric and neoforge.
+settings.gradle.kts
+
+# The apply-false plugin block declares only the catalog-pinned plugins a subproject on this band applies, and
+# its notes name that band's appliers, where dev declares the set for common, fabric and neoforge.
+build.gradle.kts
+
+# The catalog carries only the plugins some build on this band applies, so it has no moddev
+# entry (dev's carries all three for its three loaders); the tool-library entries match dev's.
+gradle/libs.versions.toml
