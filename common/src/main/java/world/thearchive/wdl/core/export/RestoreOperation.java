@@ -86,12 +86,12 @@ public final class RestoreOperation {
     // re-probe the DEAD inode and could answer unlocked over a live lock on the new file. On consult
     // the current file's fileKey is compared; a mismatch tombstones the stale entry (never closing it,
     // which could drop a live holder's POSIX lock on the moved inode) and falls through to a fresh open.
-    private static final ConcurrentMap<Path, ParkedChannel> PARKED = new ConcurrentHashMap<Path, ParkedChannel>();
+    private static final ConcurrentMap<Path, ParkedChannel> parkedChannels = new ConcurrentHashMap<>();
 
     // Tombstoned parked channels: a stale entry lands here, strongly referenced so the cleaner never
     // GC-closes it (which would drop a live holder's POSIX lock on the moved inode) and never closed by
     // us. The queue exists only to keep the reference; nothing reads it back.
-    private static final Queue<FileChannel> GRAVEYARD = new ConcurrentLinkedQueue<FileChannel>();
+    private static final Queue<FileChannel> graveyard = new ConcurrentLinkedQueue<FileChannel>();
     private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
 
     // The never-published sentinel: a handler seeds the loaded world before dispatch, so a volatile
@@ -547,14 +547,14 @@ public final class RestoreOperation {
     static boolean probeLocked(Path folder) {
         Path lockFile = folder.resolve("session.lock");
         Path key = parkKey(lockFile);
-        ParkedChannel parked = PARKED.get(key);
+        ParkedChannel parked = parkedChannels.get(key);
         if (parked != null) {
             if (isStaleParked(parked, currentFileKey(lockFile))) {
                 // The file at the key path was replaced since we parked: the parked channel holds the
                 // dead inode and would answer over a live lock on the new file. Tombstone it (never
                 // close: that could drop a live holder's POSIX lock on the moved inode) and re-open.
-                PARKED.remove(key, parked);
-                GRAVEYARD.add(parked.channel);
+                parkedChannels.remove(key, parked);
+                graveyard.add(parked.channel);
                 LOGGER.warning("tombstoned a stale parked channel on " + lockFile + " (file replaced)");
             } else {
                 return probeThroughParked(parked.channel, lockFile);
@@ -596,11 +596,11 @@ public final class RestoreOperation {
      * drop a live holder's POSIX lock on the inode.
      */
     static void parkProbeChannel(Path key, FileChannel channel, Path lockFile) {
-        ParkedChannel existing = PARKED.putIfAbsent(key, new ParkedChannel(channel, currentFileKey(lockFile)));
+        ParkedChannel existing = parkedChannels.putIfAbsent(key, new ParkedChannel(channel, currentFileKey(lockFile)));
         if (existing == null) {
             LOGGER.warning("parked a probe channel on " + lockFile + " (same-JVM lock holder)");
         } else {
-            GRAVEYARD.add(channel);
+            graveyard.add(channel);
             LOGGER.warning("graveyarded a probe channel on " + lockFile + " (lost the park race)");
         }
     }
@@ -659,13 +659,13 @@ public final class RestoreOperation {
 
     /** Test-only: the channel currently parked for the key, or null when none is parked. */
     static @Nullable FileChannel parkedChannelForTest(Path key) {
-        ParkedChannel parked = PARKED.get(key);
+        ParkedChannel parked = parkedChannels.get(key);
         return parked == null ? null : parked.channel;
     }
 
     /** Test-only: whether the channel is retained in the never-closed graveyard. */
     static boolean graveyardContainsForTest(FileChannel channel) {
-        return GRAVEYARD.contains(channel);
+        return graveyard.contains(channel);
     }
 
     /**
