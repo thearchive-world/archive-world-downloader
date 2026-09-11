@@ -22,10 +22,10 @@ updates:
         patterns:
           - "*"
 
-  # The Gradle build plugins plus the nullness/test tool libraries (Error Prone core, NullAway, the JUnit
-  # BOM), all covered because they live in gradle/libs.versions.toml; Dependabot does not read the build-logic
-  # convention plugins that consume them. The Minecraft runtime + mod coordinates are ignored below because
-  # each is band-coupled and must be bumped by hand against the target band, re-verifying it resolves.
+  # The catalog-pinned Gradle build plugins plus the nullness/test tool libraries (Error Prone core, NullAway,
+  # the JUnit BOM), all covered because they live in gradle/libs.versions.toml; Dependabot does not read the
+  # build-logic convention plugins that consume them. The Minecraft runtime + mod coordinates are ignored below
+  # because each is band-coupled and must be bumped by hand against the target band, re-verifying it resolves.
   - package-ecosystem: gradle
     directory: "/"
     schedule:
