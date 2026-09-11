@@ -15,51 +15,620 @@
 # reads as stale.
 #
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
-# Every pattern carries a # reason directly above it, naming why the file diverges per band and to what;
-# checkBandDivergence fails the build on a pattern with no reason. Keep each pattern narrow: a directory-wide
-# glob would mask an unintended divergence, which is the drift this register exists to catch.
-#
-# This is the seed of the known, stable members. Each port adds its own per-file band-local divergences as it
-# creates them (the way the 26.x port records the players/ progress path), rather than pre-listing the bulk
-# renames whose files no branch has diverged yet: the Identifier and ResourceKey.identifier() rename set, the
-# band-fragile test assertions, and the keybind lang key. A broad glob for those would mask real drift or
-# guess divergences that do not exist yet.
+# Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
+# a shared reason across several files is repeated per line rather than written once over a group.
 
-# 26.x: RegistryDataLoader.load returns CompletableFuture<RegistryAccess.Frozen>, not the frozen access, so
-# this shared test bootstrap unwraps it there.
-common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
+# Below 1.21.6 WorldVersion exposes getName, renamed name() at 1.21.6. Camera.getPosition is dropped at 1.21.11 for
+# position().
+common/src/main/java/world/thearchive/wdl/Wdl.java
+# Below 1.21.6 ConfirmScreen exposes yesButton and noButton only as the Component labels and its setDelay holds every
+# exit button inert together, so the confirm delays both choices through setDelay; 1.21.6 made them Button fields,
+# which lets the later form focus the keep button and hold only the disable button.
+common/src/main/java/world/thearchive/wdl/client/WdlCaptureDisableConfirmScreen.java
+# 1.21.9 introduced KeyEvent and MouseButtonEvent, the renderContent split with getContentX, getContentY and
+# getContentWidth, and FaviconTexture.isClosed; 1.21.6 added GuiGraphics.setTooltipForNextFrame (below it
+# renderTooltip draws inside the list scissor, so the tooltip is deferred); 1.21.11 moved Util to net.minecraft.util.
+common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the controls
+# heading is keyed key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record over a resource id whose
+# label key is key.category.wdl.downloader.
+common/src/main/java/world/thearchive/wdl/client/WdlKeyBinds.java
+# Window.getAppropriateLineWidth and the per-vertex VertexConsumer.setLineWidth arrive at 1.21.11 with the
+# POSITION_COLOR_NORMAL_LINE_WIDTH lines format; below it the outline scale has nothing to scale. Camera.getPosition
+# is dropped at 1.21.11 for position().
+common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
+# 1.21.9 split a list entry's render into renderContent with getContentX, getContentY and getContentWidth;
+# CycleButton.builder(Function, T) arrives at 1.21.11, below it withInitialValue sets the start value; and the outline
+# line-width row is hidden because Window.getAppropriateLineWidth and the per-vertex line width arrive at 1.21.11.
+common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
+# Below 1.21.5 ClickEvent and HoverEvent are built from an Action and a value; 1.21.5 made them interfaces with
+# per-action records (OpenUrl over a URI, OpenFile, ShowText).
+common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDriver.java
+# The JourneyMap API at journeymap_api_coordinate 2.0.0-1.21.4-SNAPSHOT carries JourneyMapPlugin under
+# journeymap.api.v2.client, not the v2.common the 2.0.0-1.21.11 release added, so the plugin names the client-package
+# annotation.
+common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+common/src/main/java/world/thearchive/wdl/compat/xaeroplus/XaeroPlusBinding.java
 
-# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
-# ClientCommandManager) is Fabric-API-coupled and moves across bands.
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
+# Below 1.21.5 CompoundTag and ListTag return primitives and empty tags (getInt, getString, getCompound, getList with
+# a type id) rather than 1.21.5's Optionals with the getIntOr, getCompoundOrEmpty and getListOrEmpty defaults. Below
+# 1.21.5 NumericTag reads through getAsInt and getAsByte, renamed intValue and byteValue at 1.21.5.
+common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
+# Below 1.21.5 NumericTag reads through getAsInt and getAsByte, renamed intValue and byteValue at 1.21.5.
+common/src/main/java/world/thearchive/wdl/adapter/ChunkMerge.java
+# Below 1.21.11 the chested horse sits in animal.horse; 1.21.11 moved it to animal.equine.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
+# Below 1.21.5 CompoundTag lists its keys through getAllKeys, renamed keySet at 1.21.5. And below 1.21.5
+# BlockEntity.saveId writes the id through BlockEntityType.getKey rather than the type codec, so the gate's Javadoc
+# does not cite byNameCodec.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+# Below 1.21.5 CompoundTag.getList takes a type id and returns the list itself (Optional at 1.21.5, with the
+# getListOrEmpty default).
+common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
+# Below 1.21.5 the horse saddle is the SaddleItem inventory slot rather than the EquipmentSlot.SADDLE 1.21.5
+# introduced, and the Javadoc records that capture re-derives it from the synced saddled flag on every pass rather
+# than carrying it forward.
+common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
+# Below 1.21.5 the experience orb has its own ClientboundAddExperienceOrbPacket, which carries no UUID, so the
+# accumulator is typed over Packet, and the move packet reads getyRot and getxRot; EntityType.HAPPY_GHAST arrives at
+# 1.21.6 and CAMEL_HUSK, NAUTILUS and ZOMBIE_NAUTILUS at 1.21.11; ResourceKey.location is identifier() at 1.21.11.
+common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
+# Below 1.21.9 ChiseledBookShelfBlock.getHitSlot is private and takes the BlockState, so the shelf slot is derived
+# from the hit locally; 1.21.9 made it a public SelectableSlotContainer default taking a Direction. And below 1.21.5
+# DataComponents.BEES holds a List of BeehiveBlockEntity.Occupant; 1.21.5 wrapped it in the Bees record.
+common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
+# Below 1.21.5 CompoundTag lists its keys through getAllKeys, renamed keySet at 1.21.5.
+common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
+# Below 1.21.5: primitive tag reads, Entity.moveTo not yet snapTo, no Level.getEntity(UUID), a separate orb packet.
+# Below 1.21.9: no ChestBlock.getConnectedBlockPos or three-argument startRiding, GameProfile.getName and getId. Below
+# 1.21.11: ResourceKey.location, the flat npc and animal.horse packages, no NbtAccounter.uncompressedQuota.
+common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
+# NbtAccounter.uncompressedQuota arrives at 1.21.11; below it the compressed read takes unlimitedHeap. Below 1.21.5
+# CompoundTag.getCompound and getInt return the value itself (Optional at 1.21.5, with the getCompoundOrEmpty and
+# getIntOr defaults).
+common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
+# Below 1.21.5 NumericTag reads through getAsInt and getAsByte, renamed intValue and byteValue at 1.21.5.
+common/src/main/java/world/thearchive/wdl/adapter/NbtMerge.java
+# Below 1.21.11 the villager classes sit in the flat npc package; 1.21.11 moved them under npc.villager. Below 1.21.5
+# VillagerData.getProfession returns the VillagerProfession constant, compared by identity; 1.21.5 made VillagerData a
+# record holding a Holder tested with is against a ResourceKey.
+common/src/main/java/world/thearchive/wdl/adapter/OpenClickTracker.java
+# Below 1.21.11 the villager, wandering-trader and chested-horse classes sit in the flat npc and animal.horse packages
+# (npc.villager, npc.wanderingtrader, animal.equine at 1.21.11); below 1.21.5 VillagerData.getProfession returns the
+# constant, not a Holder tested with is; ChestBlock.getConnectedBlockPos arrives at 1.21.9.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier(). Below 1.21.5
+# CompoundTag.getString returns the value itself (Optional at 1.21.5, with the getStringOr default). Below 1.21.5
+# CompoundTag has no store and read with a Codec, so codec values go through NbtOps directly.
+common/src/main/java/world/thearchive/wdl/adapter/PlayerTag.java
+# Below 1.21.5 CompoundTag.getInt, getString and getByte return the value itself (Optional at 1.21.5, with the getIntOr,
+# getStringOr and getByteOr defaults).
+common/src/main/java/world/thearchive/wdl/adapter/RecoveredScan.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+common/src/main/java/world/thearchive/wdl/adapter/VanillaDimensions.java
+
+# fabric-api 0.119.4 for 1.21.4 registers the key through KeyBindingHelper.registerKeyBinding and the HUD overlay
+# through HudLayerRegistrationCallback with an IdentifiedLayer on a ResourceLocation; fabric-api 0.141.4 for 1.21.11
+# uses HudElementRegistry.addLast on an Identifier, and fabric-api 0.155.2 for 26.1 names the helper KeyMappingHelper.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
-
-# Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
+# fabric-api 0.119.4 for 1.21.4 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
+# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api 0.155.2 for
+# 26.1 carries them as KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
+# fabric-api 0.119.4 for 1.21.4 keeps WorldRenderEvents and WorldRenderContext under rendering.v1, names the pose
+# matrixStack and carries the frustum on the context; fabric-api 0.138.4 for 1.21.10 moved them under
+# rendering.v1.world, renamed the pose matrices and hands the frustum only on END_EXTRACTION.
+fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
+# Below 1.21.11 the mount inventory menu is HorseInventoryMenu with a private AbstractHorse horse field; 1.21.11
+# introduced AbstractMountInventoryMenu with a protected LivingEntity mount.
+fabric/src/main/java/world/thearchive/wdl/fabric/FabricMountMenuReader.java
+# Below 1.21.11 the widened mount field is HorseInventoryMenu.horse, an AbstractHorse; 1.21.11 introduced
+# AbstractMountInventoryMenu.mount, a LivingEntity.
+fabric/src/main/resources/wdl.accesswidener
 
-# The villager-trade capture gametest carries the deep-band client forms: villager types are the flat npc package,
-# EntityType is not yet EntityTypes, Minecraft.setScreen is not relocated into Minecraft.gui, the crosshair pick is
-# GameRenderer.pick rather than LocalPlayer.raycastHitResult, an entity is resolved by UUID over entitiesForRendering
-# rather than Level.getEntity(UUID), and the pre-1.21.5 CompoundTag/ListTag accessors (getCompound/getInt/getList)
-# replace the Optional-returning family.
+# Below 1.21.11 the mount inventory menu is HorseInventoryMenu with a private AbstractHorse horse field; 1.21.11
+# introduced AbstractMountInventoryMenu with a protected LivingEntity mount.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeMountMenuReader.java
+# NeoForge 21.4.157 fires one RenderLevelStageEvent carrying getStage and getFrustum, so the draw checks for
+# AFTER_TRANSLUCENT_BLOCKS on it; NeoForge 21.11.42 fires typed subevents such as AfterTranslucentBlocks and hands the
+# frustum on ExtractLevelRenderStateEvent. RenderType.lines moved to rendertype.RenderTypes at 1.21.11.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeOutlineRegistrar.java
+# Below 1.21.11 ResourceLocation stands where 1.21.11 has Identifier.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
+# Below 1.21.9 the SerializableChunkData constructor takes the biome Registry where 1.21.9's PalettedContainerFactory
+# goes, and below 1.21.11 the transformed mount field is HorseInventoryMenu.horse (private, an AbstractHorse) rather
+# than 1.21.11's protected AbstractMountInventoryMenu.mount.
+neoforge/src/main/resources/META-INF/accesstransformer.cfg
+
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/cs_cz.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/da_dk.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/de_de.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/en_pt.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/en_us.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_ar.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_cl.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_ec.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_es.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_mx.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_uy.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/es_ve.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/esan.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/fi_fi.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/fr_ca.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/fr_fr.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/it_it.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/ja_jp.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/ko_kr.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/nl_be.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/nl_nl.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/nn_no.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/no_no.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/pl_pl.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/pt_br.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/pt_pt.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/qcb_es.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/ru_ru.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/sv_se.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/tr_tr.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/uk_ua.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/zh_cn.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the catalog
+# keys the controls heading key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/main/resources/assets/wdl/lang/zh_tw.json
+# Below 1.21.9 a KeyMapping category is a String translation key of the vanilla key.categories shape, so the expected
+# controls-heading key is key.categories.wdl.downloader; 1.21.9 made KeyMapping.Category a record whose label key is
+# key.category.wdl.downloader.
+common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
+
+# Below 26.1 RegistryDataLoader.load returns the frozen access and DataComponentInitializers does not exist; 26.1 made
+# load take an Executor and return a CompletableFuture, which the 26.x bootstrap joins, and binds the data components in
+# the resource reload, so the 26.x bootstrap also runs the DataComponentInitializers.
+common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
+# Below 1.21.11 the Level constructor dereferences its dimension-type holder, so the stub passes the overworld type
+# where 1.21.11's passes null; 1.21.4's abstract Level still declares setMapData and getFreeMapId (dropped at 1.21.5)
+# and lacks the RespawnData accessors (1.21.9) and environmentAttributes (1.21.11), so the stubbed overrides differ.
+common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
+# Below 1.21.5 ItemEnchantments.STREAM_CODEC carries a trailing showInTooltip boolean after the level map, which
+# 1.21.5 dropped, so the hand-written wire form appends it.
+common/src/test/java/world/thearchive/wdl/testsupport/BadStacks.java
+# Below 1.21.5 CompoundTag and ListTag return primitives and empty tags (getInt, getString, getCompound, getList with
+# a type id) rather than 1.21.5's Optionals with the getIntOr, getCompoundOrEmpty and getListOrEmpty defaults. Below
+# 1.21.6 the components map is parsed through DataComponentMap.CODEC with NbtOps rather than a TagValueInput.
+common/src/test/java/world/thearchive/wdl/testsupport/BlockEntityFixtures.java
+# Below 1.21.5 CompoundTag has no store and read with a Codec, so codec values go through NbtOps directly.
+common/src/test/java/world/thearchive/wdl/testsupport/EntityFixtures.java
+# Below 1.21.11 ResourceLocation stands where 1.21.11 has Identifier. Below 1.21.5 CompoundTag.getList takes a type id
+# and getInt, getString, getByte and ListTag.getCompound return the value itself (Optional at 1.21.5, with the getIntOr,
+# getStringOr, getByteOr, getCompoundOrEmpty and getListOrEmpty defaults). Below 1.21.5 CompoundTag lists its keys
+# through getAllKeys, renamed keySet at 1.21.5. Below 1.21.6 ContainerHelper.loadAllItems and saveAllItems take a
+# CompoundTag and the registry provider rather than the 1.21.6 ValueInput and ValueOutput.
+common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
+# Below 1.21.6 a block entity's empty component map is encoded through an optional field and writes no components key
+# (1.21.6 stores it unconditionally), so a metadata-only tag is not expected to be faulted for components. Below 1.21.5
+# CompoundTag.getList takes a type id and getBoolean returns the value itself (Optional at 1.21.5, with the
+# getListOrEmpty and getBooleanOr defaults).
+common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelityTest.java
+# Below 1.21.11 ResourceLocation stands where 1.21.11 has Identifier. Below 1.21.5 CompoundTag.getList takes a type id
+# and ListTag.getCompound returns the value itself (Optional at 1.21.5, with the getListOrEmpty and getCompoundOrEmpty
+# defaults). Below 1.21.6 ContainerHelper.saveAllItems takes a CompoundTag and the registry provider rather than the
+# 1.21.6 ValueOutput.
+common/src/test/java/world/thearchive/wdl/testsupport/ItemFixtures.java
+# PalettedContainerFactory arrives at 1.21.9; below it LevelChunkSection is built from the biome Registry.
+common/src/test/java/world/thearchive/wdl/testsupport/RegistriesSmokeTest.java
+# PalettedContainerFactory arrives at 1.21.9; below it LevelChunkSection is built from the biome Registry.
+common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
+
+# Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
+# 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr,
+# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero while the
+# assertions rely on -1.
+common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt and ListTag.getCompound return the value itself (Optional
+# at 1.21.5, with the getListOrEmpty, getIntOr and getCompoundOrEmpty defaults). The test's intOr helper stands in for
+# getIntOr because getInt reads an absent key back as a real zero.
+common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getString and ListTag.getCompound return the value
+# itself (Optional at 1.21.5, with the getCompoundOrEmpty, getListOrEmpty and getStringOr defaults).
+common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getString and ListTag.getCompound return the value
+# itself (Optional at 1.21.5, with the getCompoundOrEmpty, getListOrEmpty and getStringOr defaults). Below 1.21.5
+# CompoundTag has no store with a Codec, so the UUID is encoded through NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getInt, getString and ListTag.getCompound return the
+# value itself (Optional at 1.21.5, with the getCompoundOrEmpty, getIntOr, getStringOr and getListOrEmpty defaults).
+# Below 1.21.6 ContainerHelper.loadAllItems takes the CompoundTag and the registry provider rather than a TagValueInput.
+common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
+# Below 1.21.5 CompoundTag.getByte returns the value itself (Optional at 1.21.5, with the getByteOr default).
+common/src/test/java/world/thearchive/wdl/adapter/BookshelfOccupancyFlushTest.java
+# Below 1.21.6 the entity double overrides addAdditionalSaveData and readAdditionalSaveData on CompoundTag rather than
+# the 1.21.6 ValueOutput and ValueInput.
+common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself (Optional at 1.21.5, with the getStringOr default).
+common/src/test/java/world/thearchive/wdl/adapter/CarryForwardWiringTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getByte and getIntArray return the value itself (Optional at
+# 1.21.5, with the getListOrEmpty and getByteOr defaults). ListTag.compoundStream arrives at 1.21.5.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkFlushPlanTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt, getLong, getShort, getByte, getBoolean, getString,
+# getIntArray and ListTag.getCompound return the value itself (Optional at 1.21.5, with the getIntOr, getLongOr,
+# getShortOr, getByteOr, getBooleanOr, getStringOr, getCompoundOrEmpty and getListOrEmpty defaults).
+# ListTag.compoundStream arrives at 1.21.5. CompoundTag.getByteArray is Optional from 1.21.5, so below it a light
+# layer's presence is a typed contains.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself (Optional at 1.21.5, with the getStringOr default).
+common/src/test/java/world/thearchive/wdl/adapter/ChunkReencodeFidelityTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt, getByte, getBoolean, getCompound and getByteArray return
+# the value itself (Optional at 1.21.5, with the getIntOr, getByteOr, getBooleanOr, getCompoundOrEmpty and
+# getListOrEmpty defaults). ListTag.compoundStream arrives at 1.21.5. PalettedContainerFactory arrives at 1.21.9; below
+# it SerializableChunkData.parse takes the RegistryAccess.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
+# Below 1.21.5 CompoundTag.getShort and getByte return the value itself (Optional at 1.21.5, with the getShortOr and
+# getByteOr defaults). Below 1.21.5 CompoundTag lists its keys through getAllKeys, renamed keySet at 1.21.5.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerCaptureTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt and getString return the value itself (Optional at 1.21.5,
+# with the getIntOr, getStringOr and getListOrEmpty defaults). Below 1.21.6 ContainerHelper.loadAllItems takes the
+# CompoundTag and the registry provider rather than a TagValueInput.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerMergeRoundTripTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and ListTag.getCompound returns the value itself (Optional at 1.21.5,
+# with the getListOrEmpty and getCompoundOrEmpty defaults). Below 1.21.6 ContainerHelper.loadAllItems takes the
+# CompoundTag and the registry provider rather than a TagValueInput.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerRecaptureSynergyTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt, getShort, getByte and getIntArray return the value itself
+# (Optional at 1.21.5, with the getListOrEmpty, getIntOr, getShortOr and getByteOr defaults). Below 1.21.6
+# ContainerHelper.loadAllItems takes the CompoundTag and the registry provider rather than a TagValueInput.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerStashMergeTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and returns the list itself (Optional at 1.21.5, with the
+# getListOrEmpty default).
+common/src/test/java/world/thearchive/wdl/adapter/ContainerTypeGateMergeTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself (Optional at 1.21.5, with the getStringOr default).
+common/src/test/java/world/thearchive/wdl/adapter/EntityBufferTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getString and ListTag.getCompound return the value itself
+# (Optional at 1.21.5, with the getListOrEmpty, getStringOr and getCompoundOrEmpty defaults). Below 1.21.6
+# ContainerHelper.loadAllItems takes the CompoundTag and the registry provider rather than a TagValueInput.
+common/src/test/java/world/thearchive/wdl/adapter/EntityContainerStashMergeTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getInt, getString and ListTag.getCompound return the
+# value itself (Optional at 1.21.5, with the getListOrEmpty, getCompoundOrEmpty, getIntOr and getStringOr defaults).
+common/src/test/java/world/thearchive/wdl/adapter/EntityMergeTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt, getString and ListTag.getCompound return the value itself
+# (Optional at 1.21.5, with the getListOrEmpty, getIntOr, getStringOr and getCompoundOrEmpty defaults). Below 1.21.5
+# CompoundTag has no store and read with a Codec, so codec values go through NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/EntityRoundTripTest.java
+# Below 1.21.5 CompoundTag.getShort and getString return the value itself (Optional at 1.21.5, with the getShortOr and
+# getStringOr defaults). Below 1.21.5 NumericTag reads through getAsInt and getAsByte, renamed intValue and byteValue at
+# 1.21.5. Below 1.21.5 CompoundTag has no store and read with a Codec, so codec values go through NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/EntityVehicleRelocationTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getString and getLong return the value itself (Optional at
+# 1.21.5, with the getListOrEmpty, getStringOr and getLongOr defaults). And below 1.21.6 there is no TagValueInput, so
+# the jukebox record and the bee occupants are parsed through their codecs with the registry NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
+# Below 1.21.6 ContainerHelper.loadAllItems takes the CompoundTag and the registry provider rather than a
+# TagValueInput. And below 1.21.5 DataComponents.BEES holds a List of BeehiveBlockEntity.Occupant; 1.21.5 wrapped it
+# in the Bees record.
+common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and returns the list itself (Optional at 1.21.5, with the
+# getListOrEmpty default). Below 1.21.6 ContainerHelper.loadAllItems takes the CompoundTag and provider and the lectern
+# item is parsed through ItemStack.CODEC with NbtOps; below 1.21.5 DataComponents.BEES is a List of Occupant (the Bees
+# record at 1.21.5), and below 1.21.9 an occupant's entity data is CustomData, not TypedEntityData.
+common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and ListTag.getCompound returns the value itself (Optional at 1.21.5,
+# with the getListOrEmpty and getCompoundOrEmpty defaults). Below 1.21.6 there is no TagValueInput, so the book is
+# parsed through ItemStack.CODEC with the registry NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/LecternRecaptureSynergyTest.java
+# Below 1.21.5 CompoundTag.getInt and getString return the value itself (Optional at 1.21.5, with the getIntOr and
+# getStringOr defaults). Below 1.21.6 there is no TagValueInput, so the book is parsed through ItemStack.CODEC with the
+# registry NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/LecternSinkRoundTripTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt returns the value itself (Optional at 1.21.5, with the
+# getListOrEmpty and getIntOr defaults). Below 1.21.6 there is no TagValueInput, so the book is parsed through
+# ItemStack.CODEC with the registry NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/LecternStashMergeTest.java
+# The fire_spread_radius_around_player game rule arrives at 1.21.11, so the curated set has nine rules rather than
+# ten, the integer fire-rule test is absent and the laid-out fire-spread row has no rule to map to.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.java
+# Below 1.21.5 CompoundTag.getCompound, getInt, getByte and getString return the value itself (Optional at 1.21.5, with
+# the getCompoundOrEmpty, getIntOr, getByteOr and getStringOr defaults). Below 1.21.9 level.dat carries the world spawn
+# as SpawnX, SpawnY and SpawnZ; 1.21.9 replaced them with a spawn compound holding LevelData.RespawnData. Below 1.21.5
+# CompoundTag has no store and read with a Codec, so codec values go through NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
+# Below 1.21.5 CompoundTag.getCompound, getInt and getString return the value itself (Optional at 1.21.5, with the
+# getCompoundOrEmpty and getIntOr defaults). Below 1.21.9 level.dat carries the world spawn as SpawnX, SpawnY and
+# SpawnZ; 1.21.9 replaced them with a spawn compound holding LevelData.RespawnData.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
+# Below 1.21.11 GameRules sits in level.dat as GameRules, is built from a Dynamic, reads camelCase keys through
+# getBoolean and lacks fire_spread_radius_around_player; 1.21.11 moved it to the gamerules package with a codec,
+# snake_case GameRule fields read with get, the fire rule and a game_rules key. Below 1.21.5 CompoundTag.getCompound,
+# getInt, getLong and getBoolean return the value itself (Optional at 1.21.5, with the getCompoundOrEmpty, getIntOr,
+# getLongOr and getBooleanOr defaults).
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
+# Below 1.21.11 ResourceLocation stands where 1.21.11 has Identifier.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
+# Below 1.21.6 the entity double overrides addAdditionalSaveData and readAdditionalSaveData on CompoundTag rather than
+# the 1.21.6 ValueOutput and ValueInput. Below 1.21.5 CompoundTag has no store and read with a Codec, so codec values
+# go through NbtOps directly. Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
+# Below 1.21.5 CompoundTag.getCompound, getInt and getString return the value itself (Optional at 1.21.5, with the
+# getCompoundOrEmpty, getIntOr and getStringOr defaults). The oversized-file test is absent because
+# NbtAccounter.uncompressedQuota and UNCOMPRESSED_NBT_QUOTA arrive at 1.21.11.
+common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.java
+# Below 1.21.5 MapItemSavedData is read through load(CompoundTag, provider) and its save puts the live colors array
+# into the tag; 1.21.5 replaced both with MapItemSavedData.CODEC, so the test decodes through load and adds an
+# aliasing check on the serialized colors.
+common/src/test/java/world/thearchive/wdl/adapter/MapSinkRoundTripTest.java
+# Below 1.21.5 CompoundTag.getCompound and getString return the value itself (Optional at 1.21.5, with the
+# getCompoundOrEmpty and getStringOr defaults).
+common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getInt and ListTag.getCompound return the value
+# itself (Optional at 1.21.5, with the getListOrEmpty, getCompoundOrEmpty and getIntOr defaults).
+common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getInt, getString and ListTag.getCompound return the
+# value itself (Optional at 1.21.5, with the getListOrEmpty, getCompoundOrEmpty, getIntOr and getStringOr defaults).
+common/src/test/java/world/thearchive/wdl/adapter/MerchantStashMergeTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and returns the list itself (Optional at 1.21.5, with the
+# getListOrEmpty default).
+common/src/test/java/world/thearchive/wdl/adapter/NbtMergeTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound, getInt, getString and ListTag.getCompound return the
+# value itself (Optional at 1.21.5, with the getListOrEmpty, getCompoundOrEmpty, getIntOr and getStringOr defaults).
+# Below 1.21.6 ContainerHelper.loadAllItems takes the CompoundTag and the registry provider rather than a TagValueInput.
+common/src/test/java/world/thearchive/wdl/adapter/OrphanedContainerSweepTest.java
+# Below 1.21.11 ResourceLocation stands where 1.21.11 has Identifier. Below 1.21.5 CompoundTag.getList takes a type id
+# and getCompound, getString and ListTag.getCompound return the value itself (Optional at 1.21.5, with the
+# getListOrEmpty, getCompoundOrEmpty and getStringOr defaults). Below 1.21.6 ContainerHelper.loadAllItems takes the
+# CompoundTag and the registry provider rather than a TagValueInput. Below 1.21.5 CompoundTag has no read with a Codec,
+# so the UUIDs are parsed through NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself (Optional at 1.21.5, with the getStringOr default). Below
+# 1.21.5 CompoundTag has no store and read with a Codec, so codec values go through NbtOps directly.
+common/src/test/java/world/thearchive/wdl/adapter/PriorPlayerReadRoundTripTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getInt, getByte and getByteArray return the value itself
+# (Optional at 1.21.5, with the getListOrEmpty, getIntOr and getByteOr defaults).
+common/src/test/java/world/thearchive/wdl/adapter/RegionIntegrationTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and ListTag.getCompound returns the value itself (Optional at 1.21.5,
+# with the getListOrEmpty and getCompoundOrEmpty defaults).
+common/src/test/java/world/thearchive/wdl/adapter/RiddenMountContentsFoldTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+common/src/test/java/world/thearchive/wdl/adapter/VanillaDimensionsTest.java
+
+# Below 1.21.5 CompoundTag and ListTag return primitives and empty tags (getInt, getString, getCompound, getList with
+# a type id) rather than 1.21.5's Optionals with the getIntOr, getCompoundOrEmpty and getListOrEmpty defaults. Below
+# 1.21.5 CompoundTag lists its keys through getAllKeys, renamed keySet at 1.21.5.
+common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkCodecImplTest.java
+# Below 1.21.6 ContainerHelper.saveAllItems encodes each stack through ItemStack.save, which throws on a rejected
+# component, so a bad stack loses the whole container rather than one entry as under the 1.21.6 TagValueOutput list;
+# and loadAllItems takes the CompoundTag and provider rather than a TagValueInput.
+common/src/test/java/world/thearchive/wdl/adapter/impl/ContainerSinkItemDegradationTest.java
+# Below 1.21.5 a Mob saves equipment as HandItems and ArmorItems lists (EntityEquipment at 1.21.5); below 1.21.6
+# ItemStack.save encodes with getOrThrow, so a rejected component throws the save out, not dropping the field, and the
+# saved stacks are read through ItemStack.parse, not a TagValueInput. Below 1.21.5 CompoundTag.getList takes a type id
+# and ListTag.getCompound returns the value itself (Optional at 1.21.5, with the getListOrEmpty and getCompoundOrEmpty
+# defaults).
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkItemDegradationTest.java
+# Below 1.21.6 the entity double overrides addAdditionalSaveData and readAdditionalSaveData on CompoundTag rather than
+# ValueOutput and ValueInput, Leashable.readLeashData takes a CompoundTag and the item list goes through
+# ContainerHelper.saveAllItems rather than ItemStackWithSlot. Below 1.21.5 CompoundTag.getList takes a type id and
+# ListTag.getCompound returns the value itself (Optional at 1.21.5, with the getListOrEmpty and getCompoundOrEmpty
+# defaults).
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkLeashDegradationTest.java
+# Below 1.21.6 the entity double overrides addAdditionalSaveData and readAdditionalSaveData on CompoundTag rather than
+# ValueOutput and ValueInput, and ContainerHelper.loadAllItems takes the CompoundTag and provider. Below 1.21.5
+# CompoundTag.getList takes a type id and getString and getBoolean return the value itself (Optional at 1.21.5, with the
+# getListOrEmpty and getStringOr defaults).
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest.java
+# Below 1.21.5 CompoundTag.getBoolean returns the value itself; 1.21.5 made it Optional.
+common/src/test/java/world/thearchive/wdl/adapter/impl/NamedMobPersistenceTest.java
+# Items.COPPER_HELMET arrives at 1.21.9 and EntityType.PARCHED at 1.21.11, so their assertions are absent and the
+# header stamp names 1.21.4.
+common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
+# Below 1.21.6 ItemStack.save throws on a bad stack and Player takes a BlockPos and yaw; below 1.21.5 worn armor saves
+# into the Inventory list at slot 100 plus the index and the offhand at 150 (no equipment field), Inventory.selected
+# is a field, Player abstracts isSpectator and isCreative, not gameMode, and there is no EquipmentSlot.SADDLE.
+common/src/test/java/world/thearchive/wdl/adapter/impl/PlayerSinkItemDegradationTest.java
+# Added: below 1.21.5 the horse-family saddle is a stack in the mount's inventory slot 0, which the server never sends
+# to the client, written as SaddleItem and mirrored by a synced flag; 1.21.5 moved it to EquipmentSlot.SADDLE, so the
+# test guarding the flag-derived saddle write has no counterpart above it.
+common/src/test/java/world/thearchive/wdl/adapter/impl/SaddleCaptureTest.java
+
+# Below 1.21.11 Villager sits in the flat npc package (npc.villager at 1.21.11) and LocalPlayer.raycastHitResult is
+# absent (added at 1.21.11), so the crosshair is refreshed through GameRenderer.pick; below 1.21.5 there is no
+# Level.getEntity(UUID), so an entity is resolved by UUID over entitiesForRendering; 26.2 moved the EntityType constants
+# to EntityTypes and setScreen into Minecraft.gui. Below 1.21.5 CompoundTag.getList takes a type id and getCompound,
+# getInt, getFloat, getString and ListTag.getCompound return the value itself (Optional at 1.21.5, with the
+# getCompoundOrEmpty, getListOrEmpty, getIntOr, getFloatOr and getStringOr defaults).
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
 # The shared capture driver reads the camera through GameRenderer.getMainCamera().getPosition(), the pre-26.2,
 # pre-1.21.11 forms.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
-
-# The headless Level is band-local: every band declares a different abstract Level surface, so the stub is
-# written against this one. New at this band.
-common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
-
-# The pre-1.21.5 CompoundTag and ListTag accessors (getCompound, getList, getString) replace the Optional-returning
-# getCompoundOrEmpty, getListOrEmpty and getStringOr family, and getIntOr becomes a local helper because getInt
-# reads an absent key back as a real zero while the assertions rely on -1.
-common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
-
-# The pre-1.21.5 accessors and the local getIntOr helper, as above.
-common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
-
-# The pre-1.21.5 accessors, as above.
-common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
-
-# The pre-1.21.5 accessors, as above.
-common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
+# Below 1.21.5 CompoundTag and ListTag return primitives and empty tags (getInt, getString, getCompound, getList with
+# a type id) rather than 1.21.5's Optionals with the getIntOr, getCompoundOrEmpty and getListOrEmpty defaults.
+# ListTag.compoundStream arrives at 1.21.5, so the lists are streamed as Tags and cast.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureReadback.java
+# Below 1.21.11 a game rule is a GameRules.Key whose command name is getId; 1.21.11 replaced it with a typed GameRule
+# whose name is id.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/GameRuleFixture.java
+# Below 1.21.5 CompoundTag.getCompound and getString return the value itself (Optional at 1.21.5, with the
+# getCompoundOrEmpty default). Below 1.21.11 the chested horse sits in animal.horse; 1.21.11 moved it to animal.equine.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlChestedAnimalCaptureTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayBoostedPairingTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayEntitiesOffTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayEntityRangeTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayIndexTest.java
+# Below 1.21.11 ResourceKey exposes its id as location() and Cow sits in the flat animal package; 1.21.11 renamed the
+# accessor identifier() and moved Cow to animal.cow.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayMobRangeTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRemovalArrivalOriginTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRemovalSeedOriginTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRespawnFloodTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayResumeTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayStationarySeedTest.java
+# Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayTeleportSuppressionTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself; 1.21.5 made it Optional. Below 1.21.11 ResourceKey
+# exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCustomLevelKeyRoutingTest.java
+# Below 1.21.5 a Mob saves its equipment as the HandItems and ArmorItems lists rather than the equipment slot map, and
+# Entity writes CustomName as a JSON string rather than through the component codec; below 1.21.5 CompoundTag.getList
+# takes a type id and getString, getBoolean and ListTag.getCompound return the value itself, made Optional at 1.21.5.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDerivedMobPersistenceTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself; 1.21.5 made it Optional. Below 1.21.11 ResourceKey
+# exposes its id as location(); 1.21.11 renamed it identifier().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDimensionRebindEntityCaptureTest.java
+# Below 1.21.5 CompoundTag.getCompound returns the value itself (Optional at 1.21.5, with the getCompoundOrEmpty
+# default).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDisconnectFlushTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound and getString return the value itself (Optional at
+# 1.21.5, with the getListOrEmpty and getCompoundOrEmpty defaults). ListTag.compoundStream arrives at 1.21.5.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlEnderChestCaptureTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself; 1.21.5 made it Optional.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlEntityCaptureTest.java
+# Below 1.21.5 CompoundTag.getCompound and getString return the value itself (Optional at 1.21.5, with the
+# getCompoundOrEmpty default).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlEntityContainerCaptureTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself; 1.21.5 made it Optional.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlFilledMapCaptureTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself; 1.21.5 made it Optional.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlFramedMapRevisitUnionTest.java
+# Below 1.21.5 CompoundTag.getInt returns the value itself (Optional at 1.21.5, with the getIntOr default).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlGameModeConfigTest.java
+# Below 1.21.11 the game rules are GameRules.Key fields with camelCase ids (RULE_DOMOBSPAWNING, RULE_DOMOBLOOT); 1.21.11
+# moved them to the gamerules package as typed GameRule fields (SPAWN_MOBS, MOB_DROPS). Below 1.21.5
+# CompoundTag.getString returns the value itself; 1.21.5 made it Optional.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlHalfFailedCaptureTest.java
+# LocalPlayer.raycastHitResult arrives at 1.21.11; below it the crosshair is refreshed through GameRenderer.pick.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlIncapableEntityClickCascadeTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound and getString return the value itself (Optional at
+# 1.21.5, with the getListOrEmpty default). ListTag.compoundStream arrives at 1.21.5.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlLecternCaptureTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getBoolean returns the value itself (Optional at 1.21.5, with the
+# getListOrEmpty and getBooleanOr defaults). ListTag.compoundStream arrives at 1.21.5. CompoundTag.getByteArray is
+# Optional from 1.21.5, so below it a light layer's presence is a typed contains.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlLightCaptureTest.java
+# Below 1.21.5 CompoundTag.getString, getCompound and getInt return the value itself; 1.21.5 made them Optional.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOffModeMapIdCaptureTest.java
+# fabric-api 0.119.4 for 1.21.4 keeps WorldRenderEvents directly under rendering.v1 and names the pose matrixStack;
+# fabric-api 0.138.4 for 1.21.10 moved it under rendering.v1.world and renamed the pose matrices. Camera.getPosition is
+# dropped at 1.21.11 for position().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound and getString return the value itself (Optional at
+# 1.21.5, with the getCompoundOrEmpty and getListOrEmpty defaults). ListTag.compoundStream arrives at 1.21.5.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPlayerDataCaptureTest.java
+# Below 1.21.5 CompoundTag.getString returns the value itself; 1.21.5 made it Optional.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPreexistingEntityCaptureTest.java
+# Below 1.21.11 ResourceKey exposes its id as location() and Pig sits in the flat animal package; 1.21.11 renamed the
+# accessor identifier() and moved Pig to animal.pig.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSpectateAnchorTest.java
+# Below 1.21.5 CompoundTag.getList takes a type id and getCompound and getString return the value itself (Optional at
+# 1.21.5, with the getListOrEmpty and getCompoundOrEmpty defaults). ListTag.compoundStream arrives at 1.21.5.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSpectatorContainerCaptureTest.java
+# Below 1.21.5 CompoundTag.getLong and getCompound return the value itself (Optional at 1.21.5, with the getLongOr and
+# getCompoundOrEmpty defaults). Below 1.21.11 level.dat stores the game rules under GameRules; 1.21.11 renamed the key
+# game_rules.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlWorldOutputConfigTest.java
