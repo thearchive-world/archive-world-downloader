@@ -456,3 +456,8 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # Below 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain
 # ItemStack buy cost and serializes through vanilla's own MerchantOffers.createTag.
 common/src/test/java/world/thearchive/wdl/adapter/RiddenMountContentsFoldTest.java
+
+# Below Java 21 the pinned Error Prone release, a Java 21 build, cannot load inside the compile toolchain, so this
+# band gates NullAway behind errorProneUsable and runs annotations-only, where dev runs the checker unconditionally
+# and carries no such gate.
+build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
