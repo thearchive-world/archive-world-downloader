@@ -15,35 +15,346 @@
 # reads as stale.
 #
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
-# Every pattern carries a # reason directly above it, naming why the file diverges per band and to what;
-# checkBandDivergence fails the build on a pattern with no reason. Keep each pattern narrow: a directory-wide
-# glob would mask an unintended divergence, which is the drift this register exists to catch.
-#
-# This is the seed of the known, stable members. Each port adds its own per-file band-local divergences as it
-# creates them (the way the 26.x port records the players/ progress path), rather than pre-listing the bulk
-# renames whose files no branch has diverged yet: the Identifier and ResourceKey.identifier() rename set, the
-# band-fragile test assertions, and the keybind lang key. A broad glob for those would mask real drift or
-# guess divergences that do not exist yet.
+# Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
+# a shared reason across several files is repeated per line rather than written once over a group.
 
-# 26.x: RegistryDataLoader.load returns CompletableFuture<RegistryAccess.Frozen>, not the frozen access, so
-# this shared test bootstrap unwraps it there.
+# 1.21.11 keeps the current screen on Minecraft.screen and opens one through Minecraft.setScreen, and reads the camera
+# through GameRenderer.getMainCamera; 26.2 moved the screen into Minecraft.gui (Gui.screen and Gui.setScreen) and
+# renamed the camera accessor mainCamera.
+common/src/main/java/world/thearchive/wdl/Wdl.java
+# 1.21.11 opens and closes its confirm screens through Minecraft.setScreen; 26.2 moved it to Gui.setScreen under
+# Minecraft.gui.
+common/src/main/java/world/thearchive/wdl/ResumeFlow.java
+# 1.21.11 paints through GuiGraphics with the renderWidget and renderContent overrides and opens the resume confirms
+# through Minecraft.setScreen; 26.1 replaced GuiGraphics with GuiGraphicsExtractor and renamed the overrides
+# extractWidgetRenderState and extractContent, and 26.2 moved setScreen into Minecraft.gui.
+common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
+# 1.21.11 paints through GuiGraphics (render, renderContent), opens its confirm screens through Minecraft.setScreen
+# and tests a tooltip key with I18n.exists; 26.1 replaced GuiGraphics with GuiGraphicsExtractor (extractRenderState,
+# extractContent), and 26.2 moved setScreen into Minecraft.gui and dropped I18n.exists for Language.getInstance().has.
+common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
+# 1.21.11's HUD callback takes a GuiGraphics; 26.1 replaced it with GuiGraphicsExtractor.
+common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
+
+# 1.21.11 chats through Player.displayClientMessage (26.1 removed it for ChatComponent.addClientSystemMessage), reads
+# Minecraft.screen, Options.hideGui and Minecraft.getToastManager, and builds toasts with SystemToast.multiline; 26.2
+# moved the screen and manager into Gui, hideGui and the chat onto Gui.hud, and dropped multiline for the constructor.
+common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
+
+# 1.21.11's ChunkPos is a class: built with new ChunkPos(BlockPos) or new ChunkPos(long), keyed with toLong and read
+# through the x and z fields; 26.1 made it a record (containing, unpack, pack, x() and z()). And the game-rule
+# resolution accessor is gameRules on 1.21.11's LevelData record, gameRuleResolution on 26.x's.
+common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
+# 1.21.11's ChunkPos is a class, so a chunk is built with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
+# 1.21.11's ChunkPos is a class, so a chunk is built with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+# 1.21.11's ChunkPos is a class, so a chunk key is ChunkPos.asLong(x, z); 26.1 made it a record keyed with pack(). And
+# 1.21.11 keeps the entity type constants on EntityType; 26.2 moved them to EntityTypes.
+common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
+# 1.21.11's ChunkPos is a class, so a chunk is built with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing. And 1.21.11 keeps the block entity type constants on BlockEntityType; 26.2 moved them to
+# BlockEntityTypes.
+common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
+# 1.21.11's ChunkPos is a class, so a chunk key is ChunkPos.asLong(x, z); 26.1 made it a record keyed with pack().
+common/src/main/java/world/thearchive/wdl/adapter/OutlineTracker.java
+
+# 1.21.11's WorldData still carries the worldgen settings and the game rules, so LevelData is the built WorldData, its
+# registries and the game-rule resolution; 26.1 split both into their own SavedData files, so 26.x's LevelData also
+# carries the WorldGenSettings and GameRules that save writes there.
+common/src/main/java/world/thearchive/wdl/adapter/LevelDataWriter.java
+# 1.21.11 keys the map index SavedData idcounts (data/idcounts.dat) and a map map_<id>; 26.1 renamed them maps/last_id
+# and maps/<id>, resolved under the namespaced data/minecraft/.
+common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
+# 1.21.11 writes advancements/ and stats/ at the save root (LevelResource PLAYER_ADVANCEMENTS_DIR and
+# PLAYER_STATS_DIR); 26.1 moved both under players/.
+common/src/main/java/world/thearchive/wdl/adapter/PlayerProgressWriter.java
+
+# 1.21.11 draws the outline immediately, so the context carries a PoseStack and a MultiBufferSource; 26.2 removed
+# MultiBufferSource and records the draw into the submit-node collector, which hands a Pose and a VertexConsumer.
+common/src/main/java/world/thearchive/wdl/adapter/OutlineRenderContext.java
+# 1.21.11 renders from a PoseStack and a MultiBufferSource and reads the camera through GameRenderer.getMainCamera;
+# 26.2 removed MultiBufferSource (the draw takes the collector's Pose and VertexConsumer) and renamed the accessor
+# mainCamera.
+common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
+# 1.21.11 stashes the frustum on fabric-api 0.141.4's WorldRenderEvents.END_EXTRACTION and draws on
+# BEFORE_DEBUG_RENDER from the context's consumers; fabric-api for 26.1 renamed the events LevelRenderEvents and
+# dropped the frustum, and 26.2 removed MultiBufferSource, so 26.2 submits the outline on COLLECT_SUBMITS.
+fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
+# 1.21.11 draws on RenderLevelStageEvent.AfterTranslucentBlocks into the shared render buffers and flushes the lines
+# batch itself; 26.2 removed MultiBufferSource and Minecraft.renderBuffers, so it records the outline on
+# SubmitCustomGeometryEvent through the submit-node collector.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeOutlineRegistrar.java
+
+# 1.21.11 registers its key through fabric-api 0.141.4's KeyBindingHelper.registerKeyBinding; fabric-api for 26.1
+# renamed it KeyMappingHelper.registerKeyMapping.
+fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
+# 1.21.11 registers its key through fabric-api 0.141.4's KeyBindingHelper.registerKeyBinding, reads the pause-menu
+# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api for 26.1
+# renamed them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
+fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
+# 1.21.11 is obfuscated and Loom remaps it to Mojang names, so the access widener names the named namespace; 26.1
+# ships unobfuscated, so the 26.x widener names official.
+fabric/src/main/resources/wdl.accesswidener
+
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/BookshelfOccupancyFlushTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/CarryForwardWiringTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkFlushPlanTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerRecaptureSynergyTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerStashMergeTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerTypeGateMergeTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/LecternRecaptureSynergyTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/adapter/LecternStashMergeTest.java
+# 1.21.11's ChunkPos is a class, so the fixture builds a chunk with new ChunkPos(BlockPos); 26.1 made it a record with
+# ChunkPos.containing.
+common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
+# 1.21.11's ChunkPos is a class, so the test keys a chunk with toLong; 26.1 made it a record keyed with pack().
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
+# 1.21.11's ChunkPos is a class, so the test keys a chunk with ChunkPos.asLong(x, z); 26.1 made it a record keyed with
+# pack(). And 1.21.11 keeps the entity type constants on EntityType; 26.2 moved them to EntityTypes.
+common/src/test/java/world/thearchive/wdl/adapter/EntityPacketCaptureTest.java
+# 1.21.11's ChunkPos is a class keyed with toLong (26.1 made it a record keyed with pack()); it keeps the entity type
+# constants on EntityType and its Entity draws its id from a static counter, so the entity double takes a null level;
+# 26.2 moved the constants to EntityTypes and the id onto Level.getNextEntityId, so the double takes HeadlessLevel.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
+
+# 1.21.11 keeps the block entity type constants on BlockEntityType; 26.2 moved them to BlockEntityTypes.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
+# 1.21.11 keeps the entity type constants on EntityType and its Entity draws its id from a static counter, so the
+# entity double takes a null level; 26.2 moved the constants to EntityTypes and the id onto Level.getNextEntityId, so
+# the double takes HeadlessLevel.
+common/src/test/java/world/thearchive/wdl/adapter/CaptureAnchorTest.java
+# 1.21.11 keeps the entity type constants on EntityType and its Entity draws its id from a static counter, so the
+# entity double takes a null level; 26.2 moved the constants to EntityTypes and the id onto Level.getNextEntityId, so
+# the double takes HeadlessLevel.
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkLeashDegradationTest.java
+# 1.21.11 keeps the entity type constants on EntityType and its Entity draws its id from a static counter, so the
+# entity doubles take a null level; 26.2 moved the constants to EntityTypes and the id onto Level.getNextEntityId, so
+# the doubles take HeadlessLevel.
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest.java
+# 1.21.11 keeps the entity type constants on EntityType and its Entity draws its id from a static counter, so the
+# doubles take a null level and serve registry access themselves; 26.2 moved the constants to EntityTypes and the id
+# onto Level.getNextEntityId, so the doubles take HeadlessLevel.
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkItemDegradationTest.java
+# 1.21.11 keeps the entity type constants on EntityType, its Entity draws its id from a static counter (the mob double
+# takes a null level), and the banner items are per-color constants such as Items.WHITE_BANNER; 26.2 moved the
+# constants to EntityTypes, the id onto Level.getNextEntityId, and the banners into the Items.BANNER collection.
+common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
+
+# 1.21.11's BundleContents holds ItemStacks and ItemContainerContents streams them through nonEmptyStream; 26.1 made
+# the bundle hold ItemStackTemplate (built with fromNonEmptyStack) and renamed the stream nonEmptyItemCopyStream. And
+# 1.21.11 keeps the entity type constants on EntityType; 26.2 moved them to EntityTypes.
+common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
+# 1.21.11's BundleContents holds ItemStacks; 26.1 made it hold ItemStackTemplate, built with fromNonEmptyStack.
+common/src/test/java/world/thearchive/wdl/adapter/MenuChangeTrackerTest.java
+# 1.21.11's BundleContents holds ItemStacks; 26.1 made it hold ItemStackTemplate, built with fromNonEmptyStack.
+common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
+
+# 1.21.11 keeps the worldgen settings, the curated game rules, the day time and the weather in the level.dat Data tag,
+# so the test reads them from the built WorldData; 26.1 split them into data/minecraft/world_gen_settings.dat,
+# game_rules.dat, world_clocks.dat and weather.dat, which the 26.x test reads back from the production save.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
+# 1.21.11 keeps the worldgen settings in the level.dat Data tag (WorldGenSettings), so the test round-trips that tag;
+# 26.1 split them into data/minecraft/world_gen_settings.dat, which the 26.x test reads off the production save.
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
+# 1.21.11 routes the captured player into level.dat's Player slot and the difficulty into its Difficulty byte through
+# saveDataTag(RegistryAccess, WorldData, CompoundTag); 26.1 moved the player to players/data/<uuid>.dat with a
+# singleplayer_uuid stamp in level.dat, the difficulty into difficulty_settings, and saveDataTag to (WorldData, UUID).
+common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
+# 1.21.11 writes advancements/ and stats/ at the save root, so the test expects the files there; 26.1 moved both under
+# players/.
+common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressWriterTest.java
+# 1.21.11 keys the map index SavedData idcounts (data/idcounts.dat), which the test reads and blocks at that path;
+# 26.1 renamed it maps/last_id under the namespaced data/minecraft/.
+common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.java
+# 1.21.11's map data and index are data/map_<id>.dat and data/idcounts.dat, which the test checks; 26.1 renamed them
+# maps/<id> and maps/last_id under the namespaced data/minecraft/.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionMapTallyTest.java
+# 1.21.11's map key is map_<id>, so a lost-map log line names it that way; 26.1 renamed it maps/<id>.
+common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossLogWiringTest.java
+# 1.21.11 stores the overworld at the save root, so its region/ sits there; 26.1 put every dimension under
+# dimensions/<namespace>/<path>.
+common/src/test/java/world/thearchive/wdl/adapter/RegionIntegrationTest.java
+
+# 1.21.11's abstract Level asks the stub for BlockAndTintGetter.getShade and declares no clock; 26.1 dropped getShade
+# and added Level.clockManager, so the stubbed overrides differ.
+common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
+# 1.21.11's RegistryDataLoader.load returns the frozen access and its item components are bound at registration; 26.1
+# made load take an Executor and return a CompletableFuture and binds the data components in the resource reload, so
+# the 26.x bootstrap joins the future and runs the DataComponentInitializers.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
-# ClientCommandManager) is Fabric-API-coupled and moves across bands.
-fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
+# 1.21.11's fabric-api 0.141.4 client gametest API waits for chunks through TestServerConnection.getClientWorld, a
+# TestClientWorldContext the fixture hands out as clientWorld; fabric-api 0.156.0 for 26.2 put waitForChunksDownload
+# on the connection itself and types the dedicated one TestDedicatedServerConnection.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/MultiplayerFixture.java
+# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext;
+# fabric-api 0.156.0 for 26.2 put the wait on the connection and the fixture exposes it directly.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlFramedMapRevisitUnionTest.java
+# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext;
+# fabric-api 0.156.0 for 26.2 put the wait on the connection and the fixture exposes it directly.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapSchemeSignalBeginTest.java
+# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext;
+# fabric-api 0.156.0 for 26.2 put the wait on the connection and the fixture exposes it directly.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapStreamCrashStateTest.java
+# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext;
+# fabric-api 0.156.0 for 26.2 put the wait on the connection and the fixture exposes it directly.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlResumeCaptureTest.java
+# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext, and keys
+# a chunk with ChunkPos.toLong; fabric-api 0.156.0 for 26.2 put the wait on the connection, and 26.1 made ChunkPos a
+# record keyed with pack().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayResumeTest.java
+# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext, and reads
+# the captured player back from level.dat's Player slot; fabric-api 0.156.0 for 26.2 put the wait on the connection,
+# and 26.1 moved the player to players/data/<uuid>.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDisconnectFlushTest.java
 
-# Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
-fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
-
-# The villager-trade capture gametest carries the pre-26.2 client forms: EntityType constants are not yet under
-# EntityTypes, and Minecraft.setScreen is not yet relocated into Minecraft.gui, so the screen dismissals and the
-# villager-type reads spell those the 1.21.x way.
+# 1.21.11 reads the current screen from Minecraft.screen; 26.2 moved it to Gui.screen under Minecraft.gui.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/ScreenDriver.java
+# 1.21.11 reads the current screen from Minecraft.screen and dismisses it through Minecraft.setScreen; 26.2 moved both
+# into Minecraft.gui (Gui.screen and Gui.setScreen).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/RestoreFlowTest.java
+# 1.21.11 reads the current screen from Minecraft.screen and dismisses it through Minecraft.setScreen; 26.2 moved both
+# into Minecraft.gui (Gui.screen and Gui.setScreen).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRespawnFloodTest.java
+# 1.21.11 dismisses the screen through Minecraft.setScreen; 26.2 moved it to Gui.setScreen under Minecraft.gui.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRemovalArrivalOriginTest.java
+# 1.21.11 dismisses the screen through Minecraft.setScreen; 26.2 moved it to Gui.setScreen under Minecraft.gui.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayRemovalSeedOriginTest.java
+# 1.21.11 dismisses the screen through Minecraft.setScreen and refreshes the crosshair hit through the public
+# GameRenderer.pick; 26.2 moved setScreen into Minecraft.gui, and 26.1 made pick a private Minecraft method, so 26.x
+# raycasts through LocalPlayer.raycastHitResult.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSneakPlaceClickCascadeTest.java
+# 1.21.11 keeps the entity type constants on EntityType and dismisses the screen through Minecraft.setScreen; 26.2
+# moved the constants to EntityTypes and setScreen into Minecraft.gui.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
-# The shared capture driver's new entity-rim readback reads the camera through GameRenderer.getMainCamera, not the
-# 26.2 mainCamera rename.
-fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
+# 1.21.11 keeps EntityType constants, dismisses the screen through Minecraft.setScreen and refreshes the crosshair
+# through the public GameRenderer.pick at 1.0f or LocalPlayer.raycastHitResult at 4.0f; 26.2 moved the constants to
+# EntityTypes and setScreen into Minecraft.gui, and 26.1 made pick private (26.x raycasts at 1.0f).
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlIncapableEntityClickCascadeTest.java
 
-# The headless Level is band-local: every band declares a different abstract Level surface, so the stub is
-# written against this one. New at this band.
-common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
+# 1.21.11 keeps the entity type constants on EntityType; 26.2 moved them to EntityTypes.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlHalfFailedCaptureTest.java
+# 1.21.11 keeps the entity type constants on EntityType and reads a ChunkPos through its x and z fields; 26.2 moved
+# the constants to EntityTypes, and 26.1 made ChunkPos a record with x() and z() accessors.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPreexistingEntityCaptureTest.java
+
+# 1.21.11 refreshes the crosshair hit through the public GameRenderer.pick; 26.1 made pick a private Minecraft method,
+# so 26.x raycasts through LocalPlayer.raycastHitResult.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlContainerCaptureTest.java
+# 1.21.11 refreshes the crosshair hit through the public GameRenderer.pick; 26.1 made pick a private Minecraft method,
+# so 26.x raycasts through LocalPlayer.raycastHitResult.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDoubleChestCaptureTest.java
+# 1.21.11 refreshes the crosshair hit through the public GameRenderer.pick and streams a container's items through
+# ItemContainerContents.nonEmptyStream; 26.1 made pick a private Minecraft method (26.x raycasts through
+# LocalPlayer.raycastHitResult) and renamed the stream nonEmptyItemCopyStream.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlStalePlacementCaptureTest.java
+# 1.21.11 refreshes the crosshair hit through the public GameRenderer.pick and builds a chunk with new
+# ChunkPos(BlockPos); 26.1 made pick a private Minecraft method (26.x raycasts through LocalPlayer.raycastHitResult)
+# and ChunkPos a record with ChunkPos.containing.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/ContainerDriver.java
+# 1.21.11 refreshes the crosshair hit through the public GameRenderer.pick and builds a chunk with new
+# ChunkPos(BlockPos); 26.1 made pick a private Minecraft method (26.x raycasts through LocalPlayer.raycastHitResult)
+# and ChunkPos a record with ChunkPos.containing.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlLecternCaptureTest.java
+# 1.21.11 refreshes the crosshair hit through the public GameRenderer.pick and builds a chunk with new
+# ChunkPos(BlockPos); 26.1 made pick a private Minecraft method (26.x raycasts through LocalPlayer.raycastHitResult)
+# and ChunkPos a record with ChunkPos.containing.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlResumeContainerClobberTest.java
+
+# 1.21.11 dismisses the screen through Minecraft.setScreen, picks through GameRenderer.pick, interacts through
+# MultiPlayerGameMode.interact(player, entity, hand) and reads the player's mount from level.dat; 26.2 moved setScreen
+# into Minecraft.gui; 26.1 made pick private, added interact's EntityHitResult and moved the player under players/.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlChestedAnimalCaptureTest.java
+# 1.21.11 dismisses the screen through Minecraft.setScreen, picks through GameRenderer.pick, interacts through
+# MultiPlayerGameMode.interact(player, entity, hand) and reads the player from level.dat; 26.2 moved setScreen into
+# Minecraft.gui; 26.1 made pick private, added interact's EntityHitResult and moved the player under players/.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlEnderChestCaptureTest.java
+# 1.21.11 dismisses the screen through Minecraft.setScreen, picks through GameRenderer.pick, interacts through
+# MultiPlayerGameMode.interact(player, entity, hand) and reads the player from level.dat; 26.2 moved setScreen into
+# Minecraft.gui; 26.1 made pick private, added interact's EntityHitResult and moved the player under players/.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSpectatorContainerCaptureTest.java
+# 1.21.11 keeps EntityType constants, Minecraft.setScreen, the public GameRenderer.pick, the three-argument
+# MultiPlayerGameMode.interact and the player in level.dat's Player slot; 26.2 moved the constants to EntityTypes and
+# setScreen into Minecraft.gui; 26.1 made pick private, gave interact an EntityHitResult, put the player in players/.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlEntityContainerCaptureTest.java
+
+# 1.21.11's ChunkPos is a class, so the test keys a chunk with ChunkPos.asLong(x, z) and reads the x and z fields;
+# 26.1 made it a record keyed with pack() and read through x() and z().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayStationarySeedTest.java
+# 1.21.11's ChunkPos is a class, so the test keys a chunk with toLong or ChunkPos.asLong(x, z) and reads the x and z
+# fields; 26.1 made it a record keyed with pack() and read through x() and z().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayIndexTest.java
+# 1.21.11's ChunkPos is a class, so the test keys a chunk with toLong or ChunkPos.asLong(x, z) and reads the x and z
+# fields; 26.1 made it a record keyed with pack() and read through x() and z().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayEntityRangeTest.java
+# 1.21.11's ChunkPos is a class, so the test keys a chunk with toLong or ChunkPos.asLong(x, z) and reads the x and z
+# fields; 26.1 made it a record keyed with pack() and read through x() and z().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayMobRangeTest.java
+# 1.21.11's ChunkPos is a class, so the test reads the x and z fields; 26.1 made it a record with x() and z().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlLightCaptureTest.java
+# 1.21.11's ChunkPos is a class, so the test builds a chunk with new ChunkPos(BlockPos) and keys it with toLong; 26.1
+# made it a record with ChunkPos.containing and pack().
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlSpectateAnchorTest.java
+
+# 1.21.11 keeps the overworld at the save root and the nether under DIM-1, maps at data/map_<id>.dat with the index at
+# data/idcounts.dat, the player and world metadata in level.dat, and advancements/ and stats/ at the root; 26.1 moved
+# dimensions under dimensions/, SavedData under data/minecraft/, the player and progress files under players/.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureReadback.java
+# 1.21.11 stores the overworld region at the save root's region/ and reads the current screen from Minecraft.screen;
+# 26.1 moved the region under dimensions/minecraft/overworld, and 26.2 moved the screen into Minecraft.gui.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPausedSaveCompletionTest.java
+# 1.21.11 stores the overworld at the save root, so a custom-key overworld's chunk lands in region/ and entities/ and
+# no dimensions/ folder exists, and builds a chunk with new ChunkPos(BlockPos); 26.1 moved the overworld type's folder
+# to dimensions/minecraft/overworld and made ChunkPos a record with ChunkPos.containing.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCustomLevelKeyRoutingTest.java
+# 1.21.11 stores nether entities under DIM-1/entities and builds a chunk with new ChunkPos(BlockPos); 26.1 moved them
+# to dimensions/minecraft/the_nether/entities and made ChunkPos a record with ChunkPos.containing.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDimensionRebindEntityCaptureTest.java
+# 1.21.11 keeps the captured player in level.dat's Player slot; 26.1 moved it to players/data/<uuid>.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPlayerDataCaptureTest.java
+# 1.21.11 keeps the day time and the curated game rules in the level.dat Data tag (DayTime and game_rules); 26.1 split
+# them into data/minecraft/world_clocks.dat and game_rules.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlWorldOutputConfigTest.java
+
+# 1.21.11 reaches the toast manager through Minecraft.getToastManager and a SystemToast's title is one Component; 26.2
+# moved the manager to Gui.toastManager and splits the title into titleLines.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/ToastReadback.java
+# 1.21.11 reads the camera through GameRenderer.getMainCamera; 26.2 renamed the accessor mainCamera.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
+# 1.21.11 draws the rim on fabric-api 0.141.4's WorldRenderEvents.BEFORE_DEBUG_RENDER from the context's consumers and
+# reads the camera through GameRenderer.getMainCamera; fabric-api for 26.1 renamed the events LevelRenderEvents, and
+# 26.2 removed MultiBufferSource (the rim is submitted on COLLECT_SUBMITS) and renamed the accessor mainCamera.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
+
+# 1.21.11 is obfuscated, so its Fabric build applies fabric-loom with layered Mojang plus Parchment mappings, declares
+# the mod dependencies through the mod* configurations and ships remapJar; 26.1 ships unobfuscated, so the 26.x build
+# applies the no-remap net.fabricmc.fabric-loom, plain configurations and the plain jar.
+fabric/build.gradle.kts
+# 1.21.11 carries an extra comment paragraph on the checkCoreJava8 --release 8 floor above the paragraph dev has; dev
+# has only that one.
+common/build.gradle.kts
