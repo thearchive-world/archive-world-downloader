@@ -174,21 +174,6 @@ common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 # protected x0 field, and MutableComponent has no withColor(int), so option labels are colored through withStyle.
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 
-# Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the HUD-layer id is built with the
-# public ResourceLocation(String, String) constructor. NeoForge 20.4 registers the HUD through
-# RegisterGuiOverlaysEvent plus an IGuiOverlay (RegisterGuiLayersEvent is later), the config screen through
-# ConfigScreenHandler.ConfigScreenFactory (not IConfigScreenFactory), and @Mod has no dist element; the
-# client-only declaration lives in mods.toml's side = "CLIENT" dependency entries instead.
-neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
-
-# NeoForge 20.4 scans META-INF/mods.toml for the mod manifest; it was renamed to META-INF/neoforge.mods.toml above
-# this band. The template content is unchanged, only the path, so this band ships the manifest under the 20.4 name.
-neoforge/src/main/resources/META-INF/mods.toml
-
-# The counterpart to the above: the dev branch's manifest name has no file on this band, which uses the 20.4
-# META-INF/mods.toml name instead.
-neoforge/src/main/resources/META-INF/neoforge.mods.toml
-
 # JourneyMap 5.10.0 for this version uses the older 1.9 API generation (journeymap.client.api), so this plugin binds
 # the @ClientPlugin annotation and the IClientPlugin.onEvent push model rather than the journeymap.api.v2 forms.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
@@ -428,15 +413,6 @@ common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelityTest.java
 # nested contents live under tag.BlockEntityTag.Items and tag.Items.
 common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
 
-# NeoForge 20.4's tick event is TickEvent.ClientTickEvent gated by a phase check (event.phase ==
-# TickEvent.Phase.END) rather than ClientTickEvent.Post.
-neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgePlatformBridge.java
-
-# This band leaves the FML-module test tier off (no junit-fml for FancyModLoader 2.0.x), so this lone FML-module
-# ServiceLoader smoke test is excluded from the build; it carries the 1.20.4 @Mod form (no dist element) for when
-# the tier returns.
-neoforge/src/test/java/world/thearchive/wdl/neoforge/NeoForgeServiceResolutionTest.java
-
 # Below 1.20.3 there is no Crafter block, block entity or menu (the Bats and Pots update added them, experimental),
 # so this band drops the crafter open-bind leg, the crafter stash and the crafter menu-only ContainerData; the
 # core CrafterSlots and ContainerAssociation.openCrafter stay as unused-but-compiling code.
@@ -506,3 +482,13 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # Below 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain
 # ItemStack buy cost and serializes through vanilla's own MerchantOffers.createTag.
 common/src/test/java/world/thearchive/wdl/adapter/RiddenMountContentsFoldTest.java
+
+# The loader-root loop is skip-if-absent for a loader root rather than dev's hard assertTrue, since this band ships
+# only some of the loader trees; common's own root stays required and scanned.
+common/src/test/java/world/thearchive/wdl/UiLiteralEnrollmentTest.java
+
+# Below 1.21.10 the keybind category key is key.categories.wdl.downloader, vanilla's key.categories.* shape at this
+# band, so the external-consumer set names that key. The loader-root loop is skip-if-absent for a loader root rather
+# than dev's hard assertTrue, since this band ships only some of the loader trees; common's own root stays required
+# and scanned.
+common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java

@@ -9,7 +9,7 @@ plugins {
     // (InvocationTargetException) under the configuration cache + build cache + parallel execution,
     // while from the root buildscript classpath it is stable.
     alias(libs.plugins.spotless) apply false
-    // The mod-publish-plugin is declared here apply-false so each loader subproject's publishMods
-    // configuration shares one catalog-pinned version; only :fabric and :neoforge apply it.
+    // The mod-publish-plugin is declared here apply-false so the loader subproject's publishMods
+    // configuration takes the catalog-pinned version; only :fabric applies it.
     alias(libs.plugins.mod.publish.plugin) apply false
 }
