@@ -15,15 +15,8 @@
 # reads as stale.
 #
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
-# Every pattern carries a # reason directly above it, naming why the file diverges per band and to what;
-# checkBandDivergence fails the build on a pattern with no reason. Keep each pattern narrow: a directory-wide
-# glob would mask an unintended divergence, which is the drift this register exists to catch.
-#
-# This is the seed of the known, stable members. Each port adds its own per-file band-local divergences as it
-# creates them (the way the 26.x port records the players/ progress path), rather than pre-listing the bulk
-# renames whose files no branch has diverged yet: the Identifier and ResourceKey.identifier() rename set, the
-# band-fragile test assertions, and the keybind lang key. A broad glob for those would mask real drift or
-# guess divergences that do not exist yet.
+# Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
+# a shared reason across several files is repeated per line rather than written once over a group.
 
 # Below 1.21.2 the registry-load path has no PendingTags step (TagLoader.loadTagsForExistingRegistries and
 # Registry.PendingTags are 1.21.2 and above), so this shared test bootstrap loads the WORLDGEN registries from the
@@ -32,28 +25,38 @@
 # Registries.tagsDirPath.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric HUD, screen-button and command registration (HudElementRegistry, Screens.getButtons,
-# ClientCommandManager) is Fabric-API-coupled and moves across bands.
+# At Fabric API 0.100.8+1.20.6 the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the
+# peek key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API for 26.2 registers a HUD
+# element through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
+# (keymapping.v1).
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# Same Fabric-API-coupled registration as the entrypoint above, here in the platform bridge.
+# At Fabric API 0.100.8+1.20.6 the platform bridge reads the pause-menu widget list through Screens.getButtons,
+# registers the key through KeyBindingHelper.registerKeyBinding and builds the client command tree through
+# ClientCommandManager (command.v2), where dev's Fabric API for 26.2 names them Screens.getWidgets,
+# KeyMappingHelper.registerKeyMapping and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # The villager-trade capture gametest carries the deep-band client forms: villager types are the flat npc package,
 # EntityType is not yet EntityTypes, Minecraft.setScreen is not relocated into Minecraft.gui, the crosshair pick is
 # GameRenderer.pick rather than LocalPlayer.raycastHitResult, an entity is resolved by UUID over entitiesForRendering
-# rather than Level.getEntity(UUID), and the pre-1.21.5 CompoundTag/ListTag accessors (getCompound/getInt/getList)
-# replace the Optional-returning family.
+# rather than Level.getEntity(UUID), and below 1.21.5 the CompoundTag and ListTag accessors getCompound, getInt, getList
+# and getString return the value, where from 1.21.5 they return Optional and dev reads through the defaulting
+# getCompoundOrEmpty, getIntOr, getListOrEmpty and getStringOr.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
 # The shared capture driver reads the camera through GameRenderer.getMainCamera().getPosition(), the pre-26.2,
 # pre-1.21.11 forms.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
+# 1.20.6's LiveCaptureSession warns skipping entity {}: capture failed directly from the catch block, where 1.21.1's
+# and dev's route the drop through the deduped CaptureLossLog entityEncodeLoss voice (failed to encode entity {}), so
+# this gametest filters captured events at WARN and matches that text instead of failed to encode entity.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlHalfFailedCaptureTest.java
 
 # Below the 1.21.2 chunk-serialization cut vanilla has no SerializableChunkData.SectionData record, so this
 # chunk-snapshot seam defines its own band-stable SectionData carrier for the static-write codec.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 
-# Reads the captured section through the band's own ChunkSnapshotSource.SectionData rather than the vanilla
+# Reads the captured section through the mod's own ChunkSnapshotSource.SectionData rather than the vanilla
 # SerializableChunkData.SectionData that exists only at 1.21.2 and above. Below the 1.21 update there is no
 # jukebox_playable item component (a playable disc is a RecordItem instance), and a captured jukebox carries the
 # pre-JukeboxSongPlayer playing state (IsPlaying, RecordStartTick, TickCount).
@@ -69,26 +72,30 @@ common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 # update VecDeltaCodec has no getBase accessor, so the packet-visible base position is read via decode(0, 0, 0).
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 
-# Below 1.21.2 there is no chunk unsaved-listener, so re-capture polls isUnsaved over the keep-hot buffer here;
-# it also reads the band's ChunkSnapshotSource.SectionData and reconstructs entities via the pre-spawn-reason
-# EntityType.create(Level). Below the 1.21 update leash state lives on Mob rather than the Leashable interface, so
-# the reconstruct path rebinds a saved leash via Mob.setLeashedTo.
+# Below 1.21.2 there is no chunk unsaved-listener, so re-capture polls isUnsaved over the keep-hot buffer here; it also
+# reads the mod's own ChunkSnapshotSource.SectionData and reconstructs entities through
+# EntityPacketCapture.createSpawnEntity, the pre-spawn-reason form. Below the 1.21 update leash state lives on Mob
+# rather than the Leashable interface, so the reconstruct path rebinds a saved leash via Mob.setLeashedTo.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager.
 common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
-# The chunk fixtures build the band's ChunkSnapshotSource.SectionData (vanilla has no SerializableChunkData.SectionData
-# below the cut) and read the biome registry via registryOrThrow and the section floor via getMinSection.
+# 1.20.6's adapter/impl has no ItemStackSanitizer, so serialize encodes each offer's sell item directly, without
+# repairing a disk-codec-invalid component before the write.
+common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
+
+# The chunk fixtures build the mod's own ChunkSnapshotSource.SectionData (vanilla has no
+# SerializableChunkData.SectionData below 1.21.2) and read the biome registry via registryOrThrow and the section floor
+# via getMinSection.
 common/src/test/java/world/thearchive/wdl/testsupport/SyntheticChunks.java
 
 # Below 1.21.2 the Mob constructor reads level.getProfilerSupplier(), so a mob cannot be built against a null level;
-# this headless Level supplies the overworld dimension type, the vanilla registries, and an inactive profiler. New at
-# this band.
+# this headless Level supplies the overworld dimension type, the vanilla registries, and an inactive profiler.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
 
 # Builds the section's biome registry via registryOrThrow, the pre-1.21.2 form (lookupOrThrow returns a
-# RegistryLookup, not a Registry, below the cut).
+# RegistryLookup, not a Registry, below 1.21.2).
 common/src/test/java/world/thearchive/wdl/testsupport/RegistriesSmokeTest.java
 
 # Resolves an item by id via Registry.get, the pre-1.21.2 accessor (renamed getValue at 1.21.2). Below the 1.21
@@ -100,12 +107,13 @@ common/src/test/java/world/thearchive/wdl/testsupport/ItemFixtures.java
 # self-consistency by decoding each section's block-state and biome container directly.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
 
-# The snapshot fixture carries the band's ChunkSnapshotSource.SectionData rather than the vanilla
+# The snapshot fixture carries the mod's own ChunkSnapshotSource.SectionData rather than the vanilla
 # SerializableChunkData.SectionData that exists only at 1.21.2 and above.
 common/src/test/java/world/thearchive/wdl/adapter/impl/ChunkCodecImplTest.java
 
-# Below 1.21.2 there is no ChunkPos.CODEC, so the entities-region Position is read back as its {x, z} int array, the
-# pre-1.21.2 EntityStorage form the sink writes.
+# Below 1.21.2 there is no ChunkPos.CODEC (and below 1.21.5 no CompoundTag.read(key, codec)), so the round trip reads
+# the entities-region Position back through getIntArray as the {x, z} int array EntityStorage writes at every version
+# (an IntArrayTag through 1.21.4, the same array through ChunkPos.CODEC from 1.21.5).
 common/src/test/java/world/thearchive/wdl/adapter/EntityRoundTripTest.java
 
 # Constructs GameRules from a Dynamic via the pre-1.21.2 single-argument constructor (the feature-flag-filtered
@@ -128,8 +136,35 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest
 # level.getProfilerSupplier() and cannot take a null level.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 
+# Deleted. 1.20.6's adapter/impl carries no ItemStackSanitizer for this unit test to guard.
+common/src/test/java/world/thearchive/wdl/adapter/impl/ItemStackSanitizerTest.java
+
+# Deleted. The disk-codec-invalid stack fixtures this helper built are unused on 1.20.6, which has no
+# ItemStackSanitizer for them to exercise.
+common/src/test/java/world/thearchive/wdl/testsupport/BadStacks.java
+
+# Deleted. 1.20.6's adapter/impl has no ItemStackSanitizer to repair a disk-codec-invalid container item, so
+# this guard has nothing to test.
+common/src/test/java/world/thearchive/wdl/adapter/impl/ContainerSinkItemDegradationTest.java
+
+# Deleted. 1.20.6's adapter/impl has no ItemStackSanitizer to repair a disk-codec-invalid equipped item, so
+# this guard has nothing to test.
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkItemDegradationTest.java
+
+# Deleted. 1.20.6's adapter/impl has no ItemStackSanitizer to repair a disk-codec-invalid worn item, so this
+# guard has nothing to test.
+common/src/test/java/world/thearchive/wdl/adapter/impl/PlayerSinkItemDegradationTest.java
+
+# Deleted. Below the 1.21 update leash state lives on Mob rather than the Leashable interface, so the
+# LeashData codec-throw this test guards against does not arise on 1.20.6.
+common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkLeashDegradationTest.java
+
+# The reflection-accessor javadoc names CaptureAnchorTest, not EntitySinkLeashDegradationTest, as the sibling
+# reaching Entity.vehicle the same way, since EntitySinkLeashDegradationTest does not exist on 1.20.6.
+common/src/test/java/world/thearchive/wdl/adapter/impl/SaddleCaptureTest.java
+
 # Below the 1.21 update the HUD render callback carries a float partial-tick rather than a DeltaTracker, so the
-# shared overlay's render entry point takes a float on this band.
+# shared overlay's render entry point takes a float.
 common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
 
 # Below the 1.21 update Util.OS has no openPath(Path), so the open-folder affordances call openFile(File).
@@ -139,7 +174,22 @@ common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 # public ResourceLocation(String, String) constructor.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
 
-# JourneyMap 5.10.0 for this version uses the older 1.9 API generation (journeymap.client.api), so this plugin binds
+# JourneyMap 5.10.0 for 1.20.6 uses the 1.9 API generation, published on jm.gserv.me rather than
+# maven.blamejared.com; common's compile-only pin takes the full journeymap-api coordinate with a
+# -neoforge-SNAPSHOT suffix, since the 1.9 generation ships one artifact per loader with no -common flavor.
+common/build.gradle.kts
+
+# The journeymap_api_coordinate pin 1.20.5-1.9 is the 1.9 JourneyMap API generation, published on jm.gserv.me rather
+# than maven.blamejared.com, so the Fabric compile-only pin is the journeymap-api coordinate with a -fabric-SNAPSHOT
+# suffix rather than the journeymap-api-fabric artifact.
+fabric/build.gradle.kts
+
+# The journeymap_api_coordinate pin 1.20.5-1.9 is the 1.9 JourneyMap API generation, published on jm.gserv.me rather
+# than maven.blamejared.com, so the NeoForge compile-only pin is the journeymap-api coordinate with a -neoforge-SNAPSHOT
+# suffix rather than the journeymap-api-neoforge artifact.
+neoforge/build.gradle.kts
+
+# JourneyMap 5.10.0 for 1.20.6 uses the older 1.9 API generation (journeymap.client.api), so this plugin binds
 # the @ClientPlugin annotation and the IClientPlugin.onEvent push model rather than the journeymap.api.v2 forms.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.java
 
@@ -171,16 +221,28 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
 # sidecar, so this round-trip asserts the playing flag.
 common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
 
-# The pre-1.21.5 CompoundTag and ListTag accessors (getCompound, getList, getString) replace the Optional-returning
-# getCompoundOrEmpty, getListOrEmpty and getStringOr family, and getIntOr becomes a local helper because getInt
-# reads an absent key back as a real zero while the assertions rely on -1.
+# Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
+# 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr,
+# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero while the
+# assertions rely on -1.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
 
-# The pre-1.21.5 accessors and the local getIntOr helper, as above.
+# Below 1.21.5 the CompoundTag and ListTag accessors getCompound and getList return the value, where from 1.21.5 they
+# return Optional and dev reads through the defaulting getCompoundOrEmpty and getListOrEmpty, and dev's getIntOr becomes
+# a local intOr helper because getInt reads an absent key back as a real zero while the assertions rely on -1.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
 
-# The pre-1.21.5 accessors, as above.
+# Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
+# 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr.
 common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
 
-# The pre-1.21.5 accessors, as above.
+# Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
+# 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr or
+# unwraps getList and getCompound with orElseThrow, and below 1.21.5 CompoundTag has no store(key, codec, value), so the
+# PRIOR_PLAYER UUID is put as UUIDUtil.CODEC.encodeStart(NbtOps.INSTANCE, PRIOR_PLAYER).getOrThrow().
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
+
+# 1.20.6 has no ItemStackSanitizer, so this file carries no sell-book repair tests. Below 1.21.5 the CompoundTag and
+# ListTag accessors getCompound, getList and getInt return the value, where from 1.21.5 they return Optional and dev
+# reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getIntOr.
+common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
