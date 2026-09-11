@@ -112,12 +112,11 @@ jobs:
           fi
           NOTES="$(awk -v v="$VERSION" '/^##[[:space:]]/ { if (inblk) exit; inblk = ($2 == v); next } inblk { print }' CHANGELOG.md)"
           # Where to get it, appended below the notes. These are store fronts rather than release-specific links,
-          # so they are constant here rather than derived. The Modrinth line states the listing is still in
-          # review and is the one line to change when it clears.
+          # so they are constant here rather than derived.
           LINKS="$(printf '%s\n' "" "**Get it**" \
             "- CurseForge: <https://www.curseforge.com/minecraft/mc-mods/wdl>" \
             "- GitHub Releases: <https://github.com/thearchive-world/archive-world-downloader/releases>" \
-            "- Modrinth: coming once review clears")"
+            "- Modrinth: <https://modrinth.com/mod/wdl>")"
           # Discord caps an embed description at 4096 characters. Trim the notes, never the links: the release is
           # already published by this point, and a truncated announcement beats a red finalize.
           NOTES="$(printf '%s' "$NOTES" | head -c 3400)"
