@@ -880,11 +880,6 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.j
 # connection tee and mount reader. forge/build.gradle.kts is excluded from the diff as a *.gradle.kts.
 forge/src/main/resources/mcmod.info
 
-# The other half of the same manifest split: the 1.13.2-and-above Forge bands ship only mods.toml, which the loader
-# at this band cannot read, so this band ships only the mcmod.info above and mods.toml is absent. Listed so the
-# propagation diff reads its absence as the intended band shape rather than as a dropped file.
-forge/src/main/resources/META-INF/mods.toml
-
 # The access transformer is re-pinned per band. This band keeps the classic SRG field_NNNNN_ member scheme (the
 # 1.17-and-above bands use TSRGv2 f_NNNNN_), and it carries no NetworkManager channel widening, since NetworkManager
 # exposes a public channel() getter here that the connection tee reads directly; the SPacketEntity entity id and the
@@ -1329,14 +1324,6 @@ common/src/main/java/world/thearchive/wdl/client/ClientText.java
 # since the fastutil BooleanConsumer is absent from the trimmed fastutil subset this band's Minecraft ships.
 common/src/main/java/world/thearchive/wdl/client/WdlCaptureDisableConfirmScreen.java
 
-# Below 1.13 there is no Mojang mapping, so this multi-line toast implements the classic IToast SPI (draw(GuiToast,
-# long) returning IToast.Visibility) rather than Toast/ToastComponent, stitches the frame with
-# Gui.drawTexturedModalRect, and draws its text through FontRenderer. Below 1.12 the file is deleted outright:
-# net/minecraft/client/gui/toasts yields no classes at all, so there is no IToast to implement and no GuiToast to
-# draw into, and WdlToastOverlay draws both notification streams itself. Listed so the propagation diff reads its
-# absence as the intended band shape.
-common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
-
 # fabric/ and neoforge/ are stripped on this Forge-only band (0 tracked files), so the PRODUCTION_ROOTS loop's
 # loader-root checks are skip-if-absent (if (!Files.isDirectory(root)) { continue; }) rather than dev's hard
 # assertTrue; common's own root stays required and scanned. forge/src constructs key.wdl.peek_hud
@@ -1441,22 +1428,6 @@ common/src/main/java/world/thearchive/wdl/adapter/CapturedProgress.java
 # SystemToast.Type categories used to provide. Drawn from the loader HUD pass while no blocking screen is open and
 # from each WDL screen's own render when one is, since the HUD pass runs before the screen.
 common/src/main/java/world/thearchive/wdl/client/WdlToastOverlay.java
-
-# The 2.0-API plugin entry point, deleted here with the rest of that binding: the JourneyMap build serving this band
-# bundles the 1.x journeymap.client.api surface and no journeymap.api.v2 at all, so the 1.x binding in the parent
-# package replaces it. Listed so the propagation diff reads its absence as the intended band shape.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/WdlJourneyMapPlugin.java
-
-# The 2.0-API overlay driver, deleted with the rest of that binding: it drove ClientEventRegistry.MAPPING_EVENT and
-# the v2 IClientAPI, neither of which this band's JourneyMap carries. The 1.x driver replaces it.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/JourneyMapOverlayDriver.java
-
-# The 2.0-API polygon builder, deleted with the rest of that binding: it bound journeymap.api.v2.client.model and
-# the holed-hull type the 1.x API has no equivalent for. The 1.x builder replaces it.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/CoveragePolygons.java
-
-# The v2 plugin package's @NullMarked marker, deleted with the package it marked.
-common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/package-info.java
 
 # Below 1.12 the pitest allowlist drops its AdvancementSnapshot entry, that class being deleted at this band. The
 # reference is a string literal, so nothing but this test's own staleness check sees it.
