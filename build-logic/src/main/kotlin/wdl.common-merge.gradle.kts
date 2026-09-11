@@ -4,8 +4,7 @@ import org.gradle.language.jvm.tasks.ProcessResources
 // Consumer side of the source-merge of :common into a loader subproject (MultiLoader-Template
 // "commonJava"/"commonResources" pattern). These resolvable configurations pull common's SOURCE (not a
 // compiled jar) and feed it to compileJava, so common's classes compile into the loader jar alongside the
-// loader's own: Loom remaps them in :fabric, while :neoforge runs Mojmap-named and needs no remap. The
-// producer side lives in :common.
+// loader's own, remapped by Loom in :fabric. The producer side lives in :common.
 plugins {
     java
 }
