@@ -3,13 +3,16 @@
 # checkBandDivergence diffs the working tree against the branch this band was minted from (mint_parent in
 # gradle.properties) and against dev, over every tracked path except gradle.properties, this file and the
 # per-band plug (common/src/main/java/world/thearchive/wdl/adapter/impl/). A path that differs from both must
-# match a pattern below; a pattern that matches no path differing from dev is stale; core/ main sources may
-# differ from neither and are never listed here. A path equal to the parent's is inherited and a path equal to
-# dev's is not this band's divergence, so neither needs an entry. Each entry records why the file legitimately
+# match a pattern below; a pattern that matches no path differing from dev is stale; core/ main sources may not
+# differ from the parent and are never listed here, which along the mint chain keeps them one blob on every band.
+# A path equal to the parent's is inherited and a path equal to dev's is not this band's divergence; an inherited
+# entry stays live while its file differs from dev and is kept. Each entry records why the file legitimately
 # carries band-local code, so neither the gate nor a future reader mistakes its difference for a lost fix or a
 # bug. Anchor a reason to a version rather than to "this band", say "deleted" for a file dev has and this band
 # does not, and re-read every inherited reason at a mint: the gate checks that a pattern is live, never that
-# its reason is true.
+# its reason is true. Patterns match as gitignore(5) matches: the last matching pattern is the one credited and a
+# directory pattern covers its subtree, so a pattern nested under a registered directory is never credited and
+# reads as stale.
 #
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
 # Every pattern carries a # reason directly above it, naming why the file diverges per band and to what;
