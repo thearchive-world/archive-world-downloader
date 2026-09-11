@@ -80,8 +80,8 @@ if (bandJavaVersion < 11) {
     }
 }
 
-// JUnit 5 for the subprojects that have tests (common, neoforge); applied uniformly here, so it is
-// inert on the test-less fabric subproject, whose test task stays NO-SOURCE. The BOM coordinate lives in
+// JUnit 5, applied uniformly rather than only where a subproject has tests: on a test-less subproject it
+// is inert and the test task stays NO-SOURCE. The BOM coordinate lives in
 // the version catalog (Dependabot currency); read via VersionCatalogsExtension since the libs accessor
 // is absent in precompiled script plugins (gradle/gradle#15383).
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
