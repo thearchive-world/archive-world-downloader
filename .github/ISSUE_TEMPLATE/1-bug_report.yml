@@ -15,7 +15,7 @@ body:
     attributes:
       label: Confirm
       options:
-        - label: I downloaded the mod from Modrinth or CurseForge and have not modified it.
+        - label: I downloaded the mod from Modrinth, CurseForge or the GitHub releases and have not modified it.
           required: true
 
   - type: input
