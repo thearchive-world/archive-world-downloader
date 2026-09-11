@@ -98,7 +98,7 @@ tasks.named<ProcessResources>("processResources") {
         exclude("**/.gitkeep")
     }
     // Keep mods.toml's and wdl-publishing.properties' templated fields in sync with the band coordinates,
-    // matching the fabric/neoforge processResources. The Forge floor (forge_version_min) is a deliberate value
+    // matching the fabric processResources. The Forge floor (forge_version_min) is a deliberate value
     // distinct from the build coordinate forge_version.
     val tokens = mapOf(
         "version" to version.toString(),
@@ -113,7 +113,7 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 // Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge
-// jar to CurseForge and Modrinth per this band's MC version, mirroring the fabric/neoforge loader subprojects.
+// jar to CurseForge and Modrinth per this band's MC version, mirroring the fabric loader subproject.
 // Coordinates come from band() (the island reads the root gradle.properties), not providers.gradleProperty,
 // because forge/gradle.properties carries none. No github block: the release workflow funnels every band's jars
 // into one shared GitHub release with gh. Nothing publishes on an ordinary build.

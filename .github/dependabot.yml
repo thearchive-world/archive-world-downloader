@@ -21,7 +21,7 @@ updates:
         patterns:
           - "*"
 
-  # Gradle build plugins (fabric-loom, net.neoforged.moddev, spotless, gradle-errorprone-plugin) plus the
+  # Gradle build plugins (fabric-loom, spotless, gradle-errorprone-plugin) plus the
   # nullness/test tool libraries (Error Prone core, NullAway, the JUnit BOM), all covered because
   # they live in gradle/libs.versions.toml; Dependabot does not read the build-logic convention plugins that
   # consume them. The Minecraft runtime + mod coordinates are ignored below because each is band-coupled and
