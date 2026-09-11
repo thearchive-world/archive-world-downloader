@@ -35,9 +35,9 @@ fix is available.
 
 Security fixes are made against the most recent release for each Minecraft version the
 project currently ships. The supported-versions list in the README names those versions,
-and the Modrinth and CurseForge listings are the live source of truth for exactly which
-builds are published. Older builds and pre-release snapshots are not supported: update
-to the latest release before reporting.
+and the Modrinth and CurseForge listings and the GitHub releases are the live source of
+truth for exactly which builds are published. Older builds and pre-release snapshots are
+not supported: update to the latest release before reporting.
 
 ## What the attack surface actually is
 
