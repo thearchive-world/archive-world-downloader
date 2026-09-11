@@ -327,19 +327,32 @@ val checkJavaVersion = tasks.register("checkJavaVersion") {
     }
 }
 
-// The band-divergence allowlist names the shared files that legitimately carry band-local code, checked by
-// the branch-versus-dev propagation diff. That diff needs band branches to run, so this task enforces the one
-// rule a path-pattern file cannot: every pattern carries a # reason, with text, on the line directly above it.
+// The band-divergence register names the shared files that legitimately carry band-local code, each with a
+// reason. Two halves. The reason half holds on every branch: a pattern with no # reason directly above it is
+// an error, the one rule a path-pattern file cannot enforce itself. The diff half runs on a band that names
+// the branch it was minted from (mint_parent in gradle.properties; dev names none and is the root): the
+// working tree is diffed against that parent and against dev, a shared path that differs from both must be
+// registered, a pattern that matches no path differing from dev is stale, and core/ main sources may differ
+// from neither. A path equal to the parent's is inherited and a path equal to dev's is the parent's lag or a
+// workaround this band does not need, so neither is this band's drift. Git does the diffing and the pattern
+// matching (check-ignore with the register as the only excludes source), so a pattern means exactly what
+// gitignore(5) says: the last match wins and a directory pattern covers its subtree. No fetch: the two refs
+// must already be present, a local branch first and origin/<name> second; the workflows fetch the tips.
 val checkBandDivergence = tasks.register("checkBandDivergence") {
     group = "verification"
-    description = "Fails if a config/band-divergence.txt path pattern carries no reason comment above it"
-    // Resolved at configuration time to a plain File, as the spotless config path above is, so doLast reads no
+    description = "Fails if config/band-divergence.txt disagrees with the tree: a pattern without a reason, " +
+        "an unregistered divergence from the mint parent, a stale pattern, or a core/ divergence"
+    // Resolved at configuration time to plain Files, as the spotless config path above is, so doLast reads no
     // project accessor the configuration cache would reject.
     val registryFile = rootProject.file("config/band-divergence.txt")
+    val repoDir = rootProject.layout.projectDirectory.asFile
+    // Blank on the command line (-Pmint_parent=) reads as absent, which is how the release build opts out.
+    val mintParent = providers.gradleProperty("mint_parent").orNull?.trim().orEmpty()
     inputs.file(registryFile)
+    inputs.property("mintParent", mintParent)
     doLast {
         val lines = registryFile.readLines()
-        val offenders = lines.mapIndexedNotNull { index, raw ->
+        val unreasoned = lines.mapIndexedNotNull { index, raw ->
             val line = raw.trim()
             if (line.isEmpty() || line.startsWith("#")) {
                 return@mapIndexedNotNull null
@@ -348,12 +361,108 @@ val checkBandDivergence = tasks.register("checkBandDivergence") {
             // The reason must carry text, not a bare # that names nothing.
             if (above.startsWith("#") && above.drop(1).isNotBlank()) null else "  - line ${index + 1}: $line"
         }
-        if (offenders.isNotEmpty()) {
+        if (unreasoned.isNotEmpty()) {
             throw GradleException(
                 "config/band-divergence.txt requires a # reason directly above every path pattern; missing for:\n" +
-                    offenders.joinToString("\n")
+                    unreasoned.joinToString("\n")
             )
         }
+        if (mintParent.isEmpty()) {
+            logger.lifecycle(
+                "checkBandDivergence: no mint_parent declared, so only the reason rule ran (dev is the propagation " +
+                    "root; a band names the branch it was minted from in gradle.properties)"
+            )
+            return@doLast
+        }
+
+        // stdin comes from a file rather than a pipe so a long path list cannot deadlock against git's output.
+        fun git(stdin: File?, vararg args: String): Pair<Int, String> {
+            val builder = ProcessBuilder(listOf("git") + args).directory(repoDir)
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+            if (stdin != null) builder.redirectInput(stdin) else builder.redirectInput(ProcessBuilder.Redirect.PIPE)
+            val process = builder.start()
+            if (stdin == null) process.outputStream.close()
+            val out = process.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+            return process.waitFor() to out
+        }
+        fun resolve(name: String): Pair<String, String> {
+            for (ref in listOf("refs/heads/$name", "refs/remotes/origin/$name")) {
+                val (code, out) = git(null, "rev-parse", "--verify", "-q", "$ref^{commit}")
+                if (code == 0) return ref to out.trim()
+            }
+            throw GradleException(
+                "checkBandDivergence: no ref named $name (neither refs/heads/$name nor refs/remotes/origin/$name); " +
+                    "fetch it with: git fetch --no-tags --depth=1 origin +refs/heads/$name:refs/remotes/origin/$name"
+            )
+        }
+        val excludedPaths = setOf("gradle.properties", "config/band-divergence.txt")
+        val plugPrefix = "common/src/main/java/world/thearchive/wdl/adapter/impl/"
+        val corePrefix = "common/src/main/java/world/thearchive/wdl/core/"
+        fun isShared(path: String) = path !in excludedPaths && !path.startsWith(plugPrefix)
+        // The working tree against a ref, as status letter per shared path (A, M or D; renames are split so
+        // each side registers on its own).
+        fun diffAgainst(sha: String): Map<String, String> {
+            val (code, out) = git(null, "diff", "--no-renames", "--name-status", "-z", sha)
+            if (code != 0) throw GradleException("checkBandDivergence: git diff against $sha exited $code")
+            val fields = out.split('\u0000').filter { it.isNotEmpty() }
+            return fields.chunked(2).filter { it.size == 2 && isShared(it[1]) }.associate { it[1] to it[0] }
+        }
+
+        val (parentRef, parentSha) = resolve(mintParent)
+        val (devRef, devSha) = resolve("dev")
+        val parentDiff = diffAgainst(parentSha)
+        val devDiff = diffAgainst(devSha)
+        val allPaths = (parentDiff.keys + devDiff.keys).sorted()
+
+        // check-ignore -v -z prints source, line, pattern and path per input path, the first three empty for a
+        // path nothing matches; only a match sourced from the register counts (a .gitignore hit is not a
+        // registration).
+        val credit = mutableMapOf<String, Int>()
+        if (allPaths.isNotEmpty()) {
+            val pathList = File(temporaryDir, "paths").apply { writeText(allPaths.joinToString("\u0000")) }
+            val (code, out) = git(
+                pathList, "-c", "core.excludesFile=${registryFile.absolutePath}",
+                "check-ignore", "--no-index", "-v", "-z", "--non-matching", "--stdin"
+            )
+            if (code != 0 && code != 1) throw GradleException("checkBandDivergence: git check-ignore exited $code")
+            out.split('\u0000').chunked(4).filter { it.size == 4 }.forEach { (source, line, pattern, path) ->
+                if (source == registryFile.absolutePath && !pattern.startsWith("!")) credit[path] = line.toInt()
+            }
+        }
+
+        val drift = parentDiff.keys.filter { it in devDiff && it !in credit && !it.startsWith(corePrefix) }.sorted()
+        val coreDrift = parentDiff.keys.filter { it.startsWith(corePrefix) }.sorted()
+        val coreRegistered = credit.keys.filter { it.startsWith(corePrefix) }.sorted()
+        val patternLines = lines.indices.filter { lines[it].trim().let { l -> l.isNotEmpty() && !l.startsWith("#") } }
+            .map { it + 1 }
+        val liveLines = credit.filterKeys { it in devDiff }.values.toSet()
+        val stale = patternLines.filter { it !in liveLines }
+
+        val report = StringBuilder()
+        if (drift.isNotEmpty()) {
+            report.append("  shared paths differing from both, with no pattern (register with a reason, or propagate the fix):\n")
+            drift.forEach { report.append("    ${parentDiff[it]} $it\n") }
+        }
+        if (stale.isNotEmpty()) {
+            report.append("  patterns no path differing from dev credits (drop the stale entry):\n")
+            stale.forEach { report.append("    line $it: ${lines[it - 1].trim()}\n") }
+        }
+        if (coreDrift.isNotEmpty()) {
+            report.append("  core/ main sources differing from the mint parent (a defect to fix, never to register):\n")
+            coreDrift.forEach { report.append("    ${parentDiff[it]} $it\n") }
+        }
+        if (coreRegistered.isNotEmpty()) {
+            report.append("  patterns credited by a core/ main source (core/ is never registered):\n")
+            coreRegistered.forEach { report.append("    line ${credit[it]}: $it\n") }
+        }
+        val baselines = "mint parent $mintParent = $parentRef at ${parentSha.take(9)}, dev = $devRef at ${devSha.take(9)}"
+        if (report.isNotEmpty()) {
+            throw GradleException("config/band-divergence.txt disagrees with the tree ($baselines):\n$report")
+        }
+        logger.lifecycle(
+            "checkBandDivergence: ${parentDiff.size} shared paths differ from $mintParent and ${devDiff.size} from dev, " +
+                "every divergence registered and every pattern live ($baselines)"
+        )
     }
 }
 
