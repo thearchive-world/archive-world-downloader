@@ -46,8 +46,7 @@ final class MerchantOfferScrub {
         }
         ListTag entities = (ListTag) rawEntities;
         int stripped = 0;
-        for (int i = 0; i < entities.size(); i++) {
-            Tag rawEntity = entities.get(i);
+        for (Tag rawEntity : entities) {
             if (rawEntity instanceof CompoundTag) {
                 stripped += stripInventedOffersFromRecord((CompoundTag) rawEntity);
             }

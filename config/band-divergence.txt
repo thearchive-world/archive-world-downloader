@@ -981,13 +981,15 @@ common/src/main/java/world/thearchive/wdl/adapter/NbtMerge.java
 common/src/test/java/world/thearchive/wdl/adapter/NbtMergeTest.java
 
 # The Java 8 floor cannot bind a pattern variable in a type test, so each instanceof over an NBT read is a local, an
-# unbound instanceof and a cast rather than the pattern form dev uses.
+# unbound instanceof and a cast rather than the pattern form dev uses. 1.13.2's ListTag.get answers an out-of-range
+# index with a sentinel EndTag rather than throwing, so the tag-list walks iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferScrub.java
 
 # The Java 8 floor cannot bind a pattern variable, so each instanceof over a tag is a local, a test and a cast; and
 # below 1.17 entities live inside the region chunk, so the resume scan hands the bank that whole chunk and the record
 # side reads Level.Entities where dev reads a top-level Entities, while applyTo takes the flat Entities envelope the
-# fold passes.
+# fold passes. 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
+# tag-list walks iterate the list instead of indexing it.
 common/src/main/java/world/thearchive/wdl/adapter/RecoveredEntityContent.java
 
 # Below 1.16 there is no RegistryAccess, so the test bootstraps through TestRegistries.bootstrap; below 1.14 there is
