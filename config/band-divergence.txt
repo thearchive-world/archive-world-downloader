@@ -1231,13 +1231,13 @@ common/src/test/java/world/thearchive/wdl/ResumeFlowTest.java
 
 # The Java 8 floor cannot bind a pattern variable in a type test, so each instanceof over an NBT read is a local, an
 # unbound instanceof and a cast rather than the pattern form dev uses; 1.12.2's NBT is classic MCP (NBTTagCompound,
-# NBTTagList, NBTBase, getTag, hasKey, removeTag and tagCount rather than get, contains, remove and size).
+# NBTTagList, NBTBase, getTag, hasKey and removeTag rather than get, contains and remove).
 common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferScrub.java
 
 # The Java 8 floor cannot bind a pattern variable, so each instanceof over a tag is a local, a test and a cast; below
 # 1.17 entities live inside the region chunk, so the resume scan hands the bank that whole chunk and the record side
 # reads Level.Entities where dev reads a top-level Entities, while applyTo takes the flat Entities envelope the fold
-# passes; the NBT is classic MCP (NBTTagCompound, NBTTagList, NBTBase, NBTTagInt, getTag, setTag and tagCount).
+# passes; the NBT is classic MCP (NBTTagCompound, NBTTagList, NBTBase, NBTTagInt, getTag and setTag).
 common/src/main/java/world/thearchive/wdl/adapter/RecoveredEntityContent.java
 
 # Below 1.16 there is no RegistryAccess, so the test bootstraps through TestRegistries.bootstrap; 1.12.2 has no

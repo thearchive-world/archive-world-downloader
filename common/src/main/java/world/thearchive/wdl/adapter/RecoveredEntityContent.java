@@ -60,8 +60,7 @@ final class RecoveredEntityContent {
             return;
         }
         NBTTagList entities = (NBTTagList) rawEntities;
-        for (int i = 0; i < entities.tagCount(); i++) {
-            NBTBase rawEntity = entities.get(i);
+        for (NBTBase rawEntity : entities) {
             if (!(rawEntity instanceof NBTTagCompound)) {
                 continue;
             }
@@ -86,8 +85,7 @@ final class RecoveredEntityContent {
         }
         NBTTagList entities = (NBTTagList) rawEntities;
         int carried = 0;
-        for (int i = 0; i < entities.tagCount(); i++) {
-            NBTBase rawEntity = entities.get(i);
+        for (NBTBase rawEntity : entities) {
             if (!(rawEntity instanceof NBTTagCompound)) {
                 continue;
             }
