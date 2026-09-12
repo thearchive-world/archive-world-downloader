@@ -46,8 +46,7 @@ final class MerchantOfferScrub {
         }
         NBTTagList entities = (NBTTagList) rawEntities;
         int stripped = 0;
-        for (int i = 0; i < entities.tagCount(); i++) {
-            NBTBase rawEntity = entities.get(i);
+        for (NBTBase rawEntity : NbtElements.of(entities)) {
             if (rawEntity instanceof NBTTagCompound) {
                 NBTTagCompound entity = (NBTTagCompound) rawEntity;
                 stripped += stripInventedOffersFromRecord(entity);
