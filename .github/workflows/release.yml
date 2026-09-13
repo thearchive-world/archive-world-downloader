@@ -1,4 +1,4 @@
-name: Release (CurseForge, Modrinth, GitHub)
+name: Release (Modrinth, CurseForge, GitHub)
 
 # Publishes one band of a coordinated release. The tag is the version core plus the MC build-metadata (e.g.
 # 1.1.0+26.2), mirroring the jar name archive-wdl-<loader>-<mod_version>+<minecraft_version>.jar. The published
@@ -8,8 +8,8 @@ name: Release (CurseForge, Modrinth, GitHub)
 # Every band shares one product version, and the release is ONE GitHub release titled at the core (e.g. 1.1.0)
 # carrying every band-times-loader jar. The publish plugin cannot build that release: its github block always
 # creates a new release and 422s on an existing tag, and its parent() link is a same-build dependency, so it
-# cannot reach a release another band's separate run created. So publishMods here does only CurseForge and
-# Modrinth (per MC version, unchanged), and the funnel step below appends this band's jars to one shared DRAFT
+# cannot reach a release another band's separate run created. So publishMods here does only Modrinth and
+# CurseForge (per MC version, unchanged), and the funnel step below appends this band's jars to one shared DRAFT
 # release with gh. The draft is created once beforehand by release-open, not here, so concurrent band runs never
 # race to create duplicate drafts (GitHub does not enforce tag uniqueness for drafts).
 #
@@ -228,7 +228,7 @@ jobs:
       # The notes are the authored changelog section for this version, plus this band's reproducibility record
       # for the platforms; a missing section fails the run. PUBLISH_DRY_RUN=true validates the platform
       # coordinates without uploading. The plugin no longer publishes to GitHub; the funnel step does.
-      - name: Publish to CurseForge and Modrinth
+      - name: Publish to Modrinth and CurseForge
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
