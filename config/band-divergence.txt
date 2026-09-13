@@ -1265,7 +1265,9 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # Java 8 bands gate NullAway behind errorProneUsable (java_version at least 21, the pinned Error Prone 2.50.0 being a
 # Java 21 build the compile toolchain cannot load) and run annotations-only, where dev runs the checker unconditionally
 # and carries no such gate; the loader-merge sentence names no wdl.common-merge plugin, 1.12.2 having no loader
-# subproject and no such plugin.
+# subproject and no such plugin. Below Java 11 the file also rewrites JSpecify's NullMarked to name no MODULE target,
+# the constant javac 8 and javadoc 8 warn on, and swaps that jar onto every source set's compile classpath; dev's
+# readers know the constant and carry no such rewrite.
 build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 
 # Below Java 11 Checkstyle 10 cannot run on a Java 8 band's own toolchain, so this points the Checkstyle tasks at a
@@ -1293,7 +1295,8 @@ common/build.gradle.kts
 
 # The catalog carries only the plugins some build of the Forge-only 1.12.2 root applies, so it has no loom, moddev or
 # mod-publish-plugin entry (dev's carries the three for its fabric and neoforge subprojects; 1.13.2's keeps loom for its
-# Loom-built common); the tool-library entries match dev's.
+# Loom-built common); the tool-library entries match dev's, and asm, which dev lacks, is what build-logic rewrites
+# JSpecify's NullMarked with below Java 11.
 gradle/libs.versions.toml
 
 # Deleted: the source-merge consumer plugin's only appliers are dev's fabric and neoforge subprojects, neither of which
