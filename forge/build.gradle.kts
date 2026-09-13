@@ -93,6 +93,23 @@ tasks.named<JavaCompile>("compileJava") {
     source(rootDir.resolve("../common/src/main/java"))
 }
 
+// Mirrors wdl.java-conventions, which this separate build never loads: doclint's reference group at the private
+// member level, so a {@link}, {@linkplain}, @see or @throws target the band lacks fails the island the way it fails
+// the root. Javadoc reads sourceSets.main.allJava, and the merge above adds common to compileJava.source alone,
+// so the task documents the shim's own sources and never re-reports common's, which the root build already
+// checks. It joins check on the same javadoc_gate key the root reads, so one knob gates the band's two builds;
+// the key is read off the properties directly because band() refuses a missing one, which here means off.
+tasks.withType<Javadoc>().configureEach {
+    (options as StandardJavadocDocletOptions).apply {
+        memberLevel = JavadocMemberLevel.PRIVATE
+        addBooleanOption("Xdoclint:reference", true)
+    }
+}
+
+if (band.getProperty("javadoc_gate").toBoolean()) {
+    tasks.named("check") { dependsOn(tasks.named("javadoc")) }
+}
+
 tasks.named<ProcessResources>("processResources") {
     from(rootDir.resolve("../common/src/main/resources")) {
         exclude("**/.gitkeep")
