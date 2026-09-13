@@ -40,7 +40,7 @@ final class NaturalEquipment {
 
     /**
      * Non-armor head items a spawn may legitimately wear: the Halloween pumpkins (zombie/skeleton) and the raid or
-     * patrol captain ominous banner. The ominous banner is a plain {@link Items#WHITE_BANNER} carrying a pattern
+     * patrol captain ominous banner. The ominous banner is a plain white {@link Items#BANNER} carrying a pattern
      * component, and a component-sanitizing server strips that pattern to the bare item, so the match is on the item
      * type. Exempting these for every type stays free of false positives: no despawn-capable mob acquires them in the
      * head slot through a persistence-setting pickup, and a mob that did pick up a pumpkin is the accepted
