@@ -20,7 +20,7 @@ loom = { id = "fabric-loom", version.ref = "loom" }
 moddev = { id = "net.neoforged.moddev", version.ref = "moddev" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 # One catalog-pinned version shared by every loader subproject's publishMods configuration (applied per
-# loader, declared apply-false at the root). Drives the release upload to Modrinth + GitHub.
+# loader, declared apply-false at the root). Drives the release upload to Modrinth + CurseForge.
 mod-publish-plugin = { id = "me.modmuss50.mod-publish-plugin", version.ref = "mod-publish-plugin" }
 
 [libraries]
