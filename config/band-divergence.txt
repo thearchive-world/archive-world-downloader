@@ -39,16 +39,10 @@ fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 # KeyMappingHelper.registerKeyMapping and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
-# The villager-trade capture gametest carries the deep-band client forms: villager types are the flat npc package,
-# EntityType is not yet EntityTypes, Minecraft.setScreen is not relocated into Minecraft.gui, the crosshair pick is
-# GameRenderer.pick rather than LocalPlayer.raycastHitResult, an entity is resolved by UUID over entitiesForRendering
-# rather than Level.getEntity(UUID), and below 1.21.5 the CompoundTag and ListTag accessors getCompound, getInt, getList
-# and getString return the value, where from 1.21.5 they return Optional and dev reads through the defaulting
-# getCompoundOrEmpty, getIntOr, getListOrEmpty and getStringOr.
-fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
-# The shared capture driver reads the camera through GameRenderer.getMainCamera().getPosition(), the pre-26.2,
-# pre-1.21.11 forms.
-fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
+# Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
+# at Minecraft 1.21.4; below it client_gametest=false in gradle.properties leaves the gametest source set uncreated
+# and its run unregistered, so nothing compiles the tree.
+fabric/src/gametest/
 
 # Below the 1.21.2 chunk-serialization cut vanilla has no SerializableChunkData.SectionData record, so this
 # chunk-snapshot seam defines its own band-stable SectionData carrier for the static-write codec. Below 1.20.5
