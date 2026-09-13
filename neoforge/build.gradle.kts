@@ -120,7 +120,7 @@ dependencies {
     compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-neoforge-SNAPSHOT")
 }
 
-// Release publishing (mod-publish-plugin): uploads the NeoForge jar to CurseForge and Modrinth per this band's
+// Release publishing (mod-publish-plugin): uploads the NeoForge jar to Modrinth and CurseForge per this band's
 // MC version. There is no github block, because the plugin's parent() link is a same-build dependency and
 // cannot reach a release another band's separate run created, so the release workflow creates the shared
 // release with gh. Nothing publishes on an ordinary build.
