@@ -15,14 +15,15 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>There is no advancement blob at this band. Advancements are a 1.12 addition and this band has achievements
  * instead, whose counts already ride the statistics surface, so the progress snapshot carries one file rather than two.
- *
- * @param playerUuid the local player's UUID, the {@code <uuid>.json} key for the file
- * @param statsJson  the {@code stats/<uuid>.json} bytes, or null to skip that file
  */
 final class CapturedProgress {
     private final UUID playerUuid;
     private final byte @Nullable [] statsJson;
 
+    /**
+     * @param playerUuid the local player's UUID, the {@code <uuid>.json} key for the file
+     * @param statsJson  the {@code stats/<uuid>.json} bytes, or null to skip that file
+     */
     CapturedProgress(UUID playerUuid, byte @Nullable [] statsJson) {
         this.playerUuid = playerUuid;
         this.statsJson = statsJson;
