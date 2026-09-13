@@ -141,6 +141,12 @@ jobs:
             echo "::error::nothing to compare: settings.gradle.kts includes no :fabric/:neoforge and there is no forge/ island"
             exit 1
           fi
+          # Run 1's jars do not survive the clean rebuild, so each run's jars are copied aside as they are hashed;
+          # the step below uploads them when the run fails.
+          keep_jars() {
+            mkdir -p "repro-jars/$1"
+            while read -r _ jar; do cp "$jar" "repro-jars/$1/"; done < "$1.sha"
+          }
           if [ "${#LOADER_TASKS[@]}" -eq 0 ]; then
             echo "no loader subprojects on this band (settings.gradle.kts includes no :fabric/:neoforge), so the root"
             echo "build produces no production jar; the forge/ island's ship jar is compared below."
@@ -165,16 +171,18 @@ jobs:
               for j in "${JARS[@]}"; do
                 [ -s "$j" ] || { echo "::error::production jar missing or empty: $j"; exit 1; }
               done
-              sha256sum "${JARS[@]}" | awk '{print $1}'
+              sha256sum "${JARS[@]}"
             }
             ./gradlew assemble --no-build-cache
             hash_jars > run1.sha
             echo "run 1:"; cat run1.sha
+            keep_jars run1
             ./gradlew clean assemble --no-build-cache
             hash_jars > run2.sha
             echo "run 2:"; cat run2.sha
+            keep_jars run2
             if ! diff -u run1.sha run2.sha; then
-              echo "::error::production jars are NOT byte-reproducible across two clean builds"; exit 1
+              echo "::error::production jars are NOT byte-reproducible across two clean builds: $(diff run1.sha run2.sha | sed -n 's/^> [0-9a-f]*  //p' | paste -sd ' ')"; exit 1
             fi
             echo "reproducible: both builds produced byte-identical production jars"
           fi
@@ -197,11 +205,24 @@ jobs:
             (cd forge && ./gradlew assemble --no-build-cache)
             hash_island_jar > island1.sha
             echo "island run 1:"; cat island1.sha
+            keep_jars island1
             (cd forge && ./gradlew clean assemble --no-build-cache)
             hash_island_jar > island2.sha
             echo "island run 2:"; cat island2.sha
+            keep_jars island2
             if ! diff -u island1.sha island2.sha; then
               echo "::error::the forge/ island's ship jar is NOT byte-reproducible across two clean builds: $(awk '{print $2}' island1.sha)"; exit 1
             fi
             echo "reproducible: both island builds produced a byte-identical ship jar"
           fi
+
+      # A mismatch is diagnosed from the run's own jars instead of a rebuild. A green run uploads nothing, and a run
+      # that failed before a jar was hashed has nothing to upload either.
+      - name: Upload both builds' jars
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: reproducibility-jars
+          path: repro-jars/
+          if-no-files-found: ignore
+          retention-days: 7
