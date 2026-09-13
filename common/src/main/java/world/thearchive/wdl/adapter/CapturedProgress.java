@@ -14,16 +14,17 @@ import org.jspecify.annotations.Nullable;
  * skips that file. {@code advancementsJson} is null when {@code captureAdvancements} is off or its serialization fails
  * (per-surface fail-soft); {@code statsJson} is null when {@code captureStatistics} is off or no stats reply has
  * landed.
- *
- * @param playerUuid       the local player's UUID, the {@code <uuid>.json} key for both files
- * @param advancementsJson the {@code advancements/<uuid>.json} bytes, or null to skip that file
- * @param statsJson        the {@code stats/<uuid>.json} bytes, or null to skip that file
  */
 final class CapturedProgress {
     private final UUID playerUuid;
     private final byte @Nullable [] advancementsJson;
     private final byte @Nullable [] statsJson;
 
+    /**
+     * @param playerUuid       the local player's UUID, the {@code <uuid>.json} key for both files
+     * @param advancementsJson the {@code advancements/<uuid>.json} bytes, or null to skip that file
+     * @param statsJson        the {@code stats/<uuid>.json} bytes, or null to skip that file
+     */
     CapturedProgress(UUID playerUuid, byte @Nullable [] advancementsJson, byte @Nullable [] statsJson) {
         this.playerUuid = playerUuid;
         this.advancementsJson = advancementsJson;

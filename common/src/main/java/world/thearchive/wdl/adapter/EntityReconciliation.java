@@ -27,26 +27,6 @@ package world.thearchive.wdl.adapter;
  * stay out of {@link #accounted} and {@link #unaccounted}; they join {@link #hasStructuralLoss} and
  * {@link #structuralLossCount} because either failure destroys a primed entity just as surely as a reconstructed one,
  * and the partial-download predicate must see both paths.
- *
- * @param received              the spawn packets fed in ({@code EntityPacketAccumulator.spawnCount})
- * @param reconstructedWritten  reconstructed root entities that reached the writer
- * @param nestedPassengers      reconstructed entities saved nested in a vehicle, so not a written root
- * @param droppedUncaptured     entities dropped at finish because their chunk's terrain was never captured, in the
- *                              dimension the download was bound to and against that dimension's own captured positions,
- *                              which is the only comparison that makes the drop a gate refusal rather than a misread
- *                              key
- * @param sinkSkips             reconstructed entities the sink refused; one of vanilla's own non-saves, not a loss
- * @param createDrops           reconstructed entities dropped because the typed entity could not be created
- * @param encodeFailures        reconstructed entities lost because {@code entity.save} threw or the envelope came back
- *                              without them
- * @param flushDrops            reconstructed entities lost when a whole entity-chunk threw or nulled out during its
- *                              flush
- * @param abortDrops            entities an aborted finish drain left held in a captured chunk, so nothing wrote them
- * @param unboundDimensionDrops entities received for a dimension other than the one the download was bound to when it
- *                              ended, whose own dimension had captured the terrain under them, so the gate would have
- *                              allowed the write and nothing performed it
- * @param primedEncodeFailures  primed entities the encode or the re-offer destroyed; outside the packet arithmetic
- * @param primedFlushDrops      primed entities lost to a flush failure; likewise outside the packet arithmetic
  */
 final class EntityReconciliation {
     private final long received;
@@ -62,6 +42,28 @@ final class EntityReconciliation {
     private final int primedEncodeFailures;
     private final int primedFlushDrops;
 
+    /**
+     * @param received              the spawn packets fed in ({@code EntityPacketAccumulator.spawnCount})
+     * @param reconstructedWritten  reconstructed root entities that reached the writer
+     * @param nestedPassengers      reconstructed entities saved nested in a vehicle, so not a written root
+     * @param droppedUncaptured     entities dropped at finish because their chunk's terrain was never captured, in the
+     *                              dimension the download was bound to and against that dimension's own captured
+     *                              positions, which is the only comparison that makes the drop a gate refusal rather
+     *                              than a misread key
+     * @param sinkSkips             reconstructed entities the sink refused; one of vanilla's own non-saves, not a loss
+     * @param createDrops           reconstructed entities dropped because the typed entity could not be created
+     * @param encodeFailures        reconstructed entities lost because {@code entity.save} threw or the envelope came
+     *                              back without them
+     * @param flushDrops            reconstructed entities lost when a whole entity-chunk threw or nulled out during its
+     *                              flush
+     * @param abortDrops            entities an aborted finish drain left held in a captured chunk, so nothing wrote
+     *                              them
+     * @param unboundDimensionDrops entities received for a dimension other than the one the download was bound to when
+     *                              it ended, whose own dimension had captured the terrain under them, so the gate would
+     *                              have allowed the write and nothing performed it
+     * @param primedEncodeFailures  primed entities the encode or the re-offer destroyed; outside the packet arithmetic
+     * @param primedFlushDrops      primed entities lost to a flush failure; likewise outside the packet arithmetic
+     */
     EntityReconciliation(long received, int reconstructedWritten, int nestedPassengers, int droppedUncaptured,
             int sinkSkips, int createDrops, int encodeFailures, int flushDrops, int abortDrops,
             int unboundDimensionDrops, int primedEncodeFailures, int primedFlushDrops) {
