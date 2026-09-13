@@ -467,6 +467,24 @@ class RestoreOperationTest {
         assertTrue(RestoreOperation.attemptReferences(saves, "World"));
     }
 
+    @Test
+    void sweepDuringTheSwapLeavesTheLiveAttemptAlone() throws IOException {
+        taintedWorldWithCleanExport("World");
+        RestoreOperation.RestoreSweep.SweepResult[] sweep = new RestoreOperation.RestoreSweep.SweepResult[1];
+        // The sweep runs from inside the swap window, after collections that would clear a weakly held attempt
+        // lock from the JDK 8 lock table; a held lock keeps the sweep's tryLock overlapping and the attempt live.
+        RestoreOperation operation = opWithMoveHook("World", betweenMoves(() -> {
+            for (int i = 0; i < 10; i++) {
+                System.gc();
+            }
+            sweep[0] = RestoreOperation.RestoreSweep.run(saves);
+        }));
+        RestoreOperation.Result result = operation.run();
+        assertEquals(RestoreOperation.Outcome.RESTORED, result.outcome());
+        assertFalse(sweep[0].changedDisk());
+        assertTrue(sweep[0].movedBack().isEmpty());
+    }
+
     private RestoreOperation.Outcome runOp(String name, RestoreSource source) {
         RestoreOperation operation = RestoreOperation.create(saves, name, source, true);
         operation.publishLoadedWorld(null);
