@@ -37,16 +37,10 @@ fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 # renamed them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
-# Below 1.21.11 Villager sits in the flat npc package (npc.villager at 1.21.11) and LocalPlayer.raycastHitResult is
-# absent (added at 1.21.11), so the crosshair is refreshed through GameRenderer.pick; below 1.21.5 there is no
-# Level.getEntity(UUID), so an entity is resolved by UUID over entitiesForRendering; 26.2 moved the EntityType constants
-# to EntityTypes and setScreen into Minecraft.gui. Below 1.21.5 CompoundTag.getList takes a type id and getCompound,
-# getInt, getFloat, getString and ListTag.getCompound return the value itself (Optional at 1.21.5, with the
-# getCompoundOrEmpty, getListOrEmpty, getIntOr, getFloatOr and getStringOr defaults).
-fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMerchantCaptureTest.java
-# The shared capture driver reads the camera through GameRenderer.getMainCamera().getPosition(), the pre-26.2,
-# pre-1.21.11 forms.
-fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
+# Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
+# at Minecraft 1.21.4; below it client_gametest=false in gradle.properties leaves the gametest source set uncreated
+# and its run unregistered, so nothing compiles the tree.
+fabric/src/gametest/
 
 # Below 1.21.4 the abstract Level declares no dragonParts(), which 1.21.4 added; the stub otherwise carries the 1.21.4
 # surface (the overworld dimension type passed where 1.21.11's constructor takes null, setMapData and getFreeMapId until
