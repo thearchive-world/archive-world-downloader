@@ -267,14 +267,18 @@ public final class RestoreOperation {
         Path temporaryRoot = savesDirectory.resolve(TEMPORARY_ROOT);
         Path attempt = createAttemptDirectory(temporaryRoot);
         FileChannel attemptLock = null;
+        FileLock attemptHeld = null;
         try {
             attemptLock = FileChannel.open(attempt.resolve(ATTEMPT_LOCK),
                     StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-            attemptLock.lock();
+            // Held and released in the finally, never discarded: JDK 8's lock table holds a FileLock only weakly
+            // (JDK-8166253, fixed in 11), so a dropped one is collected and a same-JVM sweep on POSIX reads it as free.
+            attemptHeld = attemptLock.lock();
             Files.createDirectory(attempt.resolve(ASIDE));
             Files.createDirectory(attempt.resolve(INSTALL));
             return replaceThroughAttempt(folder, temporaryRoot, attempt, attemptLock);
         } finally {
+            releaseQuietly(attemptHeld);
             closeQuietly(attemptLock);
         }
     }
@@ -761,6 +765,17 @@ public final class RestoreOperation {
                 return FileVisitResult.CONTINUE;
             }
         });
+    }
+
+    private static void releaseQuietly(@Nullable FileLock lock) {
+        if (lock == null || !lock.isValid()) {
+            return;
+        }
+        try {
+            lock.release();
+        } catch (IOException e) {
+            LOGGER.log(Level.FINE, "lock release failed", e);
+        }
     }
 
     private static void closeQuietly(@Nullable FileChannel channel) {
