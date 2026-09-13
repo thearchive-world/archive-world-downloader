@@ -52,7 +52,7 @@ if (errorProneUsable) {
     // Production code only. Test code stays @NullMarked for IDE and documentation value but stays
     // unchecked: JUnit lifecycle initialization (fields set in @BeforeEach or @BeforeAll) trips
     // NullAway's field-initialization analysis with no production payoff.
-    tasks.named<JavaCompile>("compileTestJava") {
+    tasks.named<JavaCompile>("compileTestJava").configure {
         options.errorprone.enabled.set(false)
     }
 } else {
