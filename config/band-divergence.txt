@@ -556,5 +556,5 @@ gradle/gradle-daemon-jvm.properties
 
 # Reads the loader set from settings.gradle.kts's include statements rather than assuming exactly two, since 1.20.2
 # includes only fabric at the root and builds Forge separately under forge/; the byte-diff runs on that one jar, and a
-# forge/ modJar byte-diff is a TODO the script itself defers.
+# second arm builds the forge/ island twice and byte-diffs its ship jar, which dev's job has no island to compare.
 .github/workflows/reproducibility.yml
