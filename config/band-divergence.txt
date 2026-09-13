@@ -6,7 +6,9 @@
 # match a pattern below; a pattern that matches no path differing from dev is stale; core/ main sources may not
 # differ from the parent and are never listed here, which along the mint chain keeps them one blob on every band.
 # A path equal to the parent's is inherited and a path equal to dev's is not this band's divergence; an inherited
-# entry stays live while its file differs from dev and is kept. Each entry records why the file legitimately
+# entry stays live while its file differs from dev and is kept. An inherited path may have no entry here, since
+# the gate asks for none where the path equals the parent's; its reason then sits on an ancestor's register, found
+# by following mint_parent upward until a register credits the path. Each entry records why the file legitimately
 # carries band-local code, so neither the gate nor a future reader mistakes its difference for a lost fix or a
 # bug. Anchor a reason to a version rather than to "this band", say "deleted" for a file dev has and this band
 # does not, and re-read every inherited reason at a mint: the gate checks that a pattern is live, never that
