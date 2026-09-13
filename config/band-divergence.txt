@@ -1104,7 +1104,9 @@ common/src/test/java/world/thearchive/wdl/ResumeFlowTest.java
 # Below Java 21 the pinned Error Prone release, a Java 21 build, cannot load inside the compile toolchain, so 1.16.5
 # gates NullAway behind errorProneUsable and runs annotations-only, where dev runs the checker unconditionally and
 # carries no such gate; the floor comment drops the clause comparing 1.16.5 to the deep Java 8 bands, 1.16.5 being
-# one of them.
+# one of them. Below Java 11 the file also rewrites JSpecify's NullMarked to name no MODULE target, the constant
+# javac 8 and javadoc 8 warn on, and swaps that jar onto every source set's compile classpath; dev's readers know
+# the constant and carry no such rewrite.
 build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 
 # Below Java 11 Checkstyle cannot run on the java_version toolchain, so this file points the Checkstyle tasks at a
@@ -1125,9 +1127,11 @@ settings.gradle.kts
 # notes name 1.16.5's appliers, where dev declares the set for common, fabric and neoforge. The pattern also credits
 # the subproject scripts: common and fabric pin the JourneyMap 2.0 API (journeymap-api-common and -fabric from
 # blamejared) where 1.17.1 pins the 1.8 SNAPSHOT, and forge/build.gradle.kts is the Architectury Loom island build.
+# It also credits build-logic/build.gradle.kts, which depends on the catalog's asm for the NullMarked rewrite
+# wdl.nullness-conventions runs below Java 11; dev's build-logic has no such dependency.
 build.gradle.kts
 
 # The catalog carries only the plugins some build on 1.16.5 applies, so it has no moddev
-# entry (dev's carries loom, moddev and mod-publish-plugin for its fabric and neoforge subprojects); the
-# tool-library entries match dev's.
+# entry (dev's carries loom, moddev and mod-publish-plugin for its fabric and neoforge subprojects); the tool-library
+# entries match dev's, and asm, which dev lacks, is what build-logic rewrites JSpecify's NullMarked with below Java 11.
 gradle/libs.versions.toml
