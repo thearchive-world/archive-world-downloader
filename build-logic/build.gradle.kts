@@ -14,4 +14,6 @@ dependencies {
     // the subproject build files) because loaded from this included build, its Eclipse JDT formatter
     // fails intermittently under the configuration cache + build cache + parallel execution.
     implementation(libs.errorprone.gradle.plugin)
+    // ASM drives wdl.nullness-conventions' rewrite of JSpecify's NullMarked for the Java 8 readers.
+    implementation(libs.asm)
 }

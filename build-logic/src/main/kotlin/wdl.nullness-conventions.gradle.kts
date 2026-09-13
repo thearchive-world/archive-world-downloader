@@ -1,5 +1,13 @@
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import net.ltgt.gradle.errorprone.CheckSeverity
 import net.ltgt.gradle.errorprone.errorprone
+import org.objectweb.asm.AnnotationVisitor
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.Opcodes
 
 // NullAway-based nullness checking, shared by every wdl subproject's production compile.
 plugins {
@@ -16,12 +24,14 @@ val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 // Java 21 build that a lower toolchain cannot load. A band below that floor therefore runs
 // annotations-only. The nullness verdict is not wholly lost: core is byte-identical to the bands that
 // do run NullAway, so it carries their verdict; everything else in this band's tree goes unchecked.
-val errorProneUsable = providers.gradleProperty("java_version").get().toInt() >= 21
+val bandJavaVersion = providers.gradleProperty("java_version").get().toInt()
+val errorProneUsable = bandJavaVersion >= 21
+
+val jspecify = libs.findLibrary("jspecify").get()
 
 dependencies {
     // JSpecify nullness annotations (@NullMarked, @Nullable). CLASS-retention and compile-only,
     // so nothing enters the runtime jar; supplied to both main and test compilation.
-    val jspecify = libs.findLibrary("jspecify").get()
     compileOnly(jspecify)
     testCompileOnly(jspecify)
 
@@ -30,6 +40,77 @@ dependencies {
     if (errorProneUsable) {
         "errorprone"(libs.findLibrary("errorprone-core").get())
         "errorprone"(libs.findLibrary("nullaway").get())
+    }
+}
+
+// --- The Java 8 readers' view of JSpecify ---
+// The Target on NullMarked names ElementType.MODULE, a constant Java 8 lacks, so javac 8 and javadoc 8 each warn
+// "unknown enum constant" whenever they read the class. The fix is on the class-file side: below Java 11 every
+// source set compiles and documents against a rewritten jar that drops the MODULE element from that Target and
+// copies every other entry as is. The jar is compile-only and never ships, and our class files name the annotation
+// by descriptor alone, so nothing shipped changes.
+abstract class StripNullMarkedModuleTarget : DefaultTask() {
+    @get:InputFiles
+    abstract val jspecifyJar: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun strip() {
+        val outDir = outputDir.get().asFile
+        outDir.mkdirs()
+        outDir.listFiles()?.forEach { it.delete() }
+        val jar = jspecifyJar.singleFile
+        val target = outDir.resolve(jar.nameWithoutExtension + "-stripped.jar")
+        ZipInputStream(jar.inputStream().buffered()).use { zin ->
+            ZipOutputStream(target.outputStream().buffered()).use { zout ->
+                var entry = zin.nextEntry
+                while (entry != null) {
+                    val bytes = zin.readBytes()
+                    val nullMarked = entry.name == "org/jspecify/annotations/NullMarked.class"
+                    val transformed = if (nullMarked) stripModuleTarget(bytes) else bytes
+                    zout.putNextEntry(ZipEntry(entry.name))
+                    zout.write(transformed)
+                    zout.closeEntry()
+                    entry = zin.nextEntry
+                }
+            }
+        }
+    }
+
+    // The writer is given no reader to copy the constant pool from, so the MODULE constant leaves with its one use.
+    private fun stripModuleTarget(bytes: ByteArray): ByteArray {
+        val writer = ClassWriter(0)
+        ClassReader(bytes).accept(object : ClassVisitor(Opcodes.ASM9, writer) {
+            override fun visitAnnotation(descriptor: String?, visible: Boolean): AnnotationVisitor? {
+                val annotation = super.visitAnnotation(descriptor, visible)
+                if (annotation == null || descriptor != "Ljava/lang/annotation/Target;") return annotation
+                return object : AnnotationVisitor(Opcodes.ASM9, annotation) {
+                    override fun visitArray(name: String?): AnnotationVisitor? {
+                        val array = super.visitArray(name) ?: return null
+                        return object : AnnotationVisitor(Opcodes.ASM9, array) {
+                            override fun visitEnum(name: String?, descriptor: String?, value: String?) {
+                                if (value != "MODULE") super.visitEnum(name, descriptor, value)
+                            }
+                        }
+                    }
+                }
+            }
+        }, 0)
+        return writer.toByteArray()
+    }
+}
+
+if (bandJavaVersion < 11) {
+    val strippedJspecifyDir = layout.buildDirectory.dir("stripped-jspecify")
+    val stripNullMarkedModuleTarget = tasks.register<StripNullMarkedModuleTarget>("stripNullMarkedModuleTarget") {
+        jspecifyJar.from(configurations.detachedConfiguration().apply { dependencies.addLater(jspecify) })
+        outputDir.set(strippedJspecifyDir)
+    }
+    val strippedJspecify = fileTree(strippedJspecifyDir) { include("*.jar") }.builtBy(stripNullMarkedModuleTarget)
+    sourceSets.configureEach {
+        compileClasspath = compileClasspath.filter { !it.name.startsWith("jspecify-") } + strippedJspecify
     }
 }
 
