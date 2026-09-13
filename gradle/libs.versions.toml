@@ -26,3 +26,7 @@ jspecify        = { module = "org.jspecify:jspecify",                  version =
 errorprone-core = { module = "com.google.errorprone:error_prone_core", version = "2.50.0" }
 nullaway        = { module = "com.uber.nullaway:nullaway",             version = "0.14.1" }
 junit-bom       = { module = "org.junit:junit-bom",                    version = "5.14.4" }
+
+# ASM for build-logic's compile-side rewrite of JSpecify's NullMarked on the bands below Java 11, at the version
+# the Forge island pins.
+asm             = { module = "org.ow2.asm:asm",                        version = "9.10.1" }
