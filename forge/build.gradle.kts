@@ -1,8 +1,11 @@
 import java.util.Properties
+import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import org.objectweb.asm.AnnotationVisitor
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.FieldVisitor
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
@@ -158,12 +161,14 @@ sourceSets {
     create("reobftest")
 }
 
+val jspecify = "org.jspecify:jspecify:1.0.0"
+
 dependencies {
     // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
     // shim are null-marked. NullAway itself does not run on this island (it is a build-logic pass that runs on
     // the root, at 8.14.5, over common); here the annotations only need to resolve so the marked
     // source compiles.
-    compileOnly("org.jspecify:jspecify:1.0.0")
+    compileOnly(jspecify)
 
     // JourneyMap 2.0 API for the source-merged binding (compat/journeymap/v2), compile-only, never a runtime
     // require (JourneyMap provides it jar-in-jar). The island compiles under the same classic-MCP classpath
@@ -172,6 +177,74 @@ dependencies {
     // do not exist below the Mojmap floor. JourneyMap discovers the plugin by annotation scan. No XaeroPlus
     // binding on this band, matching :common.
     compileOnly("info.journeymap:journeymap-api-forge:${band("journeymap_api_v2_coordinate")}")
+}
+
+// Mirrors wdl.nullness-conventions, which this separate build never loads: the Target on NullMarked names
+// ElementType.MODULE, a constant Java 8 lacks, so javac 8 and javadoc 8 each warn "unknown enum constant" whenever
+// they read the class. The rewrite below drops the one MODULE element from that Target, copies every other entry as
+// is, and takes the resolved jar's place on every source set's compile classpath, which compileJava and javadoc both
+// derive from. The jar is compile-only and never ships.
+abstract class StripNullMarkedModuleTarget : DefaultTask() {
+    @get:InputFiles
+    abstract val jspecifyJar: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun strip() {
+        val outDir = outputDir.get().asFile
+        outDir.mkdirs()
+        outDir.listFiles()?.forEach { it.delete() }
+        val jar = jspecifyJar.singleFile
+        val target = outDir.resolve(jar.nameWithoutExtension + "-stripped.jar")
+        ZipInputStream(jar.inputStream().buffered()).use { zin ->
+            ZipOutputStream(target.outputStream().buffered()).use { zout ->
+                var entry = zin.nextEntry
+                while (entry != null) {
+                    val bytes = zin.readBytes()
+                    val nullMarked = entry.name == "org/jspecify/annotations/NullMarked.class"
+                    val transformed = if (nullMarked) stripModuleTarget(bytes) else bytes
+                    zout.putNextEntry(ZipEntry(entry.name))
+                    zout.write(transformed)
+                    zout.closeEntry()
+                    entry = zin.nextEntry
+                }
+            }
+        }
+    }
+
+    // The writer is given no reader to copy the constant pool from, so the MODULE constant leaves with its one use.
+    private fun stripModuleTarget(bytes: ByteArray): ByteArray {
+        val writer = ClassWriter(0)
+        ClassReader(bytes).accept(object : ClassVisitor(Opcodes.ASM9, writer) {
+            override fun visitAnnotation(descriptor: String?, visible: Boolean): AnnotationVisitor? {
+                val annotation = super.visitAnnotation(descriptor, visible)
+                if (annotation == null || descriptor != "Ljava/lang/annotation/Target;") return annotation
+                return object : AnnotationVisitor(Opcodes.ASM9, annotation) {
+                    override fun visitArray(name: String?): AnnotationVisitor? {
+                        val array = super.visitArray(name) ?: return null
+                        return object : AnnotationVisitor(Opcodes.ASM9, array) {
+                            override fun visitEnum(name: String?, descriptor: String?, value: String?) {
+                                if (value != "MODULE") super.visitEnum(name, descriptor, value)
+                            }
+                        }
+                    }
+                }
+            }
+        }, 0)
+        return writer.toByteArray()
+    }
+}
+
+val strippedJspecifyDir = layout.buildDirectory.dir("stripped-jspecify")
+val stripNullMarkedModuleTarget = tasks.register<StripNullMarkedModuleTarget>("stripNullMarkedModuleTarget") {
+    jspecifyJar.from(configurations.detachedConfiguration(dependencies.create(jspecify)))
+    outputDir.set(strippedJspecifyDir)
+}
+val strippedJspecify = fileTree(strippedJspecifyDir) { include("*.jar") }.builtBy(stripNullMarkedModuleTarget)
+sourceSets.configureEach {
+    compileClasspath = compileClasspath.filter { !it.name.startsWith("jspecify-") } + strippedJspecify
 }
 
 // Source-merge :common the way a loader subproject does on the higher bands, but by direct path
