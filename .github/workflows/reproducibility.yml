@@ -1,6 +1,6 @@
 name: Reproducibility
 
-# Advisory (non-required) guard: builds the two production jars twice and fails on any SHA-256 mismatch,
+# Advisory (non-required) guard: builds every production jar twice and fails on any SHA-256 mismatch,
 # so a future plugin/dependency bump that breaks byte-reproducibility is caught per-commit. Same-machine,
 # shared-warm-GRADLE_USER_HOME scope only (a strict subset of the third-party guarantee); the cold-cache /
 # cross-image acceptance lives in the release process, not here. Kept off the fast ci.yml gate, like
@@ -18,8 +18,13 @@ on:
       - 'gradle/**'          # the wrapper's pinned Gradle version as much as the catalog
       - 'gradlew'            # sets DEFAULT_JVM_OPTS and picks the JVM; gradle/** and **/*.gradle.kts miss it
       - 'build-logic/**'
-      - '**/*.gradle.kts'    # root, settings, build-logic and the three subprojects
+      - '**/*.gradle.kts'    # root, settings, build-logic, the subprojects and the forge/ island's own two
       - 'gradle.properties'
+      # The forge/ island is a separate build with its own wrapper and pinned Gradle version, each a determinism
+      # input of the ship jar the island arm below diffs; the root patterns above stop at the root's copies.
+      - 'forge/gradlew'
+      - 'forge/gradle/**'
+      - 'forge/gradle.properties'
       # This file too: the exact JDK patch is pinned below and is itself a determinism input, so a bump has to
       # re-baseline here rather than wait for someone to touch build-logic.
       - '.github/workflows/reproducibility.yml'
@@ -30,6 +35,9 @@ on:
       - 'build-logic/**'
       - '**/*.gradle.kts'
       - 'gradle.properties'
+      - 'forge/gradlew'
+      - 'forge/gradle/**'
+      - 'forge/gradle.properties'
       - '.github/workflows/reproducibility.yml'
   # On demand: re-baselining after a Temurin patch bump or re-checking a tag needs no commit to carry it.
   workflow_dispatch:
@@ -50,8 +58,8 @@ defaults:
 jobs:
   reproducibility:
     runs-on: ubuntu-latest
-    # Two full builds; the second reuses the warm GRADLE_USER_HOME Minecraft remap, so budget ~ cold-once
-    # + assemble-twice rather than 2x a cold build.
+    # Two full builds, plus two of the forge/ island where the band ships one; the second of each reuses the
+    # warm GRADLE_USER_HOME Minecraft remap, so budget ~ cold-once + assemble-twice rather than 2x a cold build.
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -114,57 +122,86 @@ jobs:
         run: |
           set -euo pipefail
           # Loader-aware jar resolution. The root build's production jars come from the loader subprojects the
-          # band includes: a fabric+neoforge band includes :fabric and :neoforge, a forge-only deep band includes
-          # neither (its Forge jar is a separate hand-rolled plain-java island under forge/, no ForgeGradle and no
-          # Loom, which resolves the three real Forge-classpath libraries its glue transitively reaches at compile
-          # time: eventbus and forgespi from the Forge maven, maven-artifact from Maven Central, the real API view
-          # that replaced the deleted compile-only stubs). Read the loader set from settings.gradle.kts's
-          # include(...) statements -- matching the quoted project name on an include line, so a comment naming a
-          # loader cannot false-positive -- and never assert a :<loader>:printProductionJar for a project this
-          # band does not include.
+          # band includes: a fabric+neoforge band includes :fabric and :neoforge, a deep band includes :fabric alone
+          # or neither, its Forge jar coming from the separate forge/ island build that the island arm below
+          # covers. Read the loader set from settings.gradle.kts's include(...) statements -- matching the quoted
+          # project name on an include line, so a comment naming a loader cannot false-positive -- and never
+          # assert a :<loader>:printProductionJar for a project this band does not include.
           LOADER_TASKS=()
           for loader in fabric neoforge; do
             if grep -E '^[[:space:]]*include\(' settings.gradle.kts | grep -q "\"${loader}\""; then
               LOADER_TASKS+=(":${loader}:printProductionJar")
             fi
           done
+          # The island arm is gated on the island existing, never on the loader set being empty: a band can carry
+          # both a loader subproject and an island, and then both arms run. A band with neither has nothing to
+          # compare, and a run that compares nothing must not read as a passing check.
+          if [ -f forge/gradlew ]; then ISLAND=true; else ISLAND=false; fi
+          if [ "${#LOADER_TASKS[@]}" -eq 0 ] && [ "$ISLAND" = false ]; then
+            echo "::error::nothing to compare: settings.gradle.kts includes no :fabric/:neoforge and there is no forge/ island"
+            exit 1
+          fi
           if [ "${#LOADER_TASKS[@]}" -eq 0 ]; then
-            # The shippable Forge jar is the forge/ island's modJar (a separate hand-rolled plain-java build). Its
-            # modJar is authored for byte-stability (a reproducible file order plus stripped timestamps), but this
-            # workflow does not yet re-diff it across two builds, and the island's checkShipJar gate is a class-file
-            # health check, not a byte-identity guard.
-            # TODO: when the forge/ island build is wired into a warmed-GRADLE_USER_HOME CI path (as the root job
-            # above has), add a real two-build byte-diff of forge/'s modJar here; the modJar is already
-            # order-normalized and timestamp-stripped, so only the CI wiring is missing.
-            echo "no loader subprojects on this band (settings.gradle.kts includes no :fabric/:neoforge); the"
-            echo "shippable Forge jar is the forge/ island's modJar, produced by that separate build. No root"
-            echo "production jar to byte-diff here; see the TODO above for the island modJar byte-diff."
-            exit 0
-          fi
-          # Resolve the authoritative jar paths deterministically: capture via command substitution, so set -e
-          # catches a gradle failure (a process-substitution < <(...) would swallow its exit code); filter to jar
-          # paths under build/libs (tolerating any stray -q line); and sort, so parallel execution
-          # (org.gradle.parallel=true races the subprojects' stdout) can't reorder the list and false-fail the
-          # diff on byte-identical jars.
-          hash_jars() {
-            local out
-            out="$(./gradlew -q "${LOADER_TASKS[@]}")"
-            mapfile -t JARS < <(printf '%s\n' "$out" | grep -E '/build/libs/.*\.jar$' | sort)
-            if [ "${#JARS[@]}" -ne "${#LOADER_TASKS[@]}" ]; then
-              echo "::error::expected ${#LOADER_TASKS[@]} production jars, got ${#JARS[@]}"; printf '%s\n' "$out"; exit 1
+            echo "no loader subprojects on this band (settings.gradle.kts includes no :fabric/:neoforge), so the root"
+            echo "build produces no production jar; the forge/ island's ship jar is compared below."
+            # The island still builds on top of the root build, as it does in ci.yml and release.yml: an island can
+            # configure against the root's outputs (the hand-rolled one reads the Minecraft classpath the root's
+            # Loom resolved out of common/build), so the root is assembled once here even though it yields no jar
+            # to compare.
+            ./gradlew assemble --no-build-cache
+          else
+            # Resolve the authoritative jar paths deterministically: capture via command substitution, so set -e
+            # catches a gradle failure (a process-substitution < <(...) would swallow its exit code); filter to jar
+            # paths under build/libs (tolerating any stray -q line); and sort, so parallel execution
+            # (org.gradle.parallel=true races the subprojects' stdout) can't reorder the list and false-fail the
+            # diff on byte-identical jars.
+            hash_jars() {
+              local out
+              out="$(./gradlew -q "${LOADER_TASKS[@]}")"
+              mapfile -t JARS < <(printf '%s\n' "$out" | grep -E '/build/libs/.*\.jar$' | sort)
+              if [ "${#JARS[@]}" -ne "${#LOADER_TASKS[@]}" ]; then
+                echo "::error::expected ${#LOADER_TASKS[@]} production jars, got ${#JARS[@]}"; printf '%s\n' "$out"; exit 1
+              fi
+              for j in "${JARS[@]}"; do
+                [ -s "$j" ] || { echo "::error::production jar missing or empty: $j"; exit 1; }
+              done
+              sha256sum "${JARS[@]}" | awk '{print $1}'
+            }
+            ./gradlew assemble --no-build-cache
+            hash_jars > run1.sha
+            echo "run 1:"; cat run1.sha
+            ./gradlew clean assemble --no-build-cache
+            hash_jars > run2.sha
+            echo "run 2:"; cat run2.sha
+            if ! diff -u run1.sha run2.sha; then
+              echo "::error::production jars are NOT byte-reproducible across two clean builds"; exit 1
             fi
-            for j in "${JARS[@]}"; do
-              [ -s "$j" ] || { echo "::error::production jar missing or empty: $j"; exit 1; }
-            done
-            sha256sum "${JARS[@]}" | awk '{print $1}'
-          }
-          ./gradlew assemble --no-build-cache
-          hash_jars > run1.sha
-          echo "run 1:"; cat run1.sha
-          ./gradlew clean assemble --no-build-cache
-          hash_jars > run2.sha
-          echo "run 2:"; cat run2.sha
-          if ! diff -u run1.sha run2.sha; then
-            echo "::error::production jars are NOT byte-reproducible across two clean builds"; exit 1
+            echo "reproducible: both builds produced byte-identical production jars"
           fi
-          echo "reproducible: both builds produced byte-identical production jars"
+          if [ "$ISLAND" = true ]; then
+            # The island exposes no printProductionJar, so its ship jar is selected the way release.yml selects it:
+            # every jar under forge/build/libs except the sources and dev jars. Exactly one must remain, so an
+            # intermediate landing beside the ship jar fails the run instead of being hashed in its place.
+            hash_island_jar() {
+              local jars=()
+              for j in forge/build/libs/*.jar; do
+                case "$j" in *-sources.jar | *-dev.jar) continue ;; esac
+                [ -e "$j" ] && jars+=("$j")
+              done
+              if [ "${#jars[@]}" -ne 1 ]; then
+                echo "::error::expected exactly 1 island ship jar under forge/build/libs, got ${#jars[@]}"; ls -l forge/build/libs || true; exit 1
+              fi
+              [ -s "${jars[0]}" ] || { echo "::error::island ship jar missing or empty: ${jars[0]}"; exit 1; }
+              sha256sum "${jars[0]}"
+            }
+            (cd forge && ./gradlew assemble --no-build-cache)
+            hash_island_jar > island1.sha
+            echo "island run 1:"; cat island1.sha
+            (cd forge && ./gradlew clean assemble --no-build-cache)
+            hash_island_jar > island2.sha
+            echo "island run 2:"; cat island2.sha
+            if ! diff -u island1.sha island2.sha; then
+              echo "::error::the forge/ island's ship jar is NOT byte-reproducible across two clean builds: $(awk '{print $2}' island1.sha)"; exit 1
+            fi
+            echo "reproducible: both island builds produced a byte-identical ship jar"
+          fi
