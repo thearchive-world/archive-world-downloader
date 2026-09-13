@@ -349,7 +349,8 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/JourneyMapOverlayDri
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.java
 
 # The shared coverage-polygon tracer is made public so the re-homed compat/journeymap/v2 plugin package can reach it
-# across the package boundary, and its JDK collection factory becomes a Guava ImmutableList for the Java 8 floor.
+# across the package boundary, and its JDK collection factory becomes a Guava ImmutableList for the Java 8 floor. Its
+# javadoc no longer names CoveragePolygons, which sits in that v2 package here rather than beside it.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygonTracer.java
 
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the datapack-dimension id is built
