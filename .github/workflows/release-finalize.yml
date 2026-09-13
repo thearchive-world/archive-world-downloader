@@ -4,7 +4,7 @@ name: Release finalize (verify matrix, publish)
 # release.yml run is green. It reads the declared matrix in release-matrix.txt, fails if any band-times-loader
 # jar is missing from the draft, sets the authored changelog section as the body, and publishes. Publishing
 # the draft is the only moment the release goes public and fires a release event, so an announcement webhook
-# fires once for the whole matrix. No publish secrets are needed, and CurseForge and Modrinth are untouched.
+# fires once for the whole matrix. No publish secrets are needed, and Modrinth and CurseForge are untouched.
 on:
   workflow_dispatch:
     inputs:
@@ -114,9 +114,9 @@ jobs:
           # Where to get it, appended below the notes. These are store fronts rather than release-specific links,
           # so they are constant here rather than derived.
           LINKS="$(printf '%s\n' "" "**Get it**" \
+            "- Modrinth: <https://modrinth.com/mod/wdl>" \
             "- CurseForge: <https://www.curseforge.com/minecraft/mc-mods/wdl>" \
-            "- GitHub Releases: <https://github.com/thearchive-world/archive-world-downloader/releases>" \
-            "- Modrinth: <https://modrinth.com/mod/wdl>")"
+            "- GitHub Releases: <https://github.com/thearchive-world/archive-world-downloader/releases>")"
           # Discord caps an embed description at 4096 characters. Trim the notes, never the links: the release is
           # already published by this point, and a truncated announcement beats a red finalize.
           NOTES="$(printf '%s' "$NOTES" | head -c 3400)"
