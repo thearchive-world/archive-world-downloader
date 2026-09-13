@@ -15,12 +15,6 @@ import org.jspecify.annotations.Nullable;
  * on the POSITION_COLOR line format by the cull before any rim is drawn and flushed after, and the line width is
  * applied once as legacy GL state rather than carried per vertex. The cull reads the band-stable members and passes the
  * whole context to the injected {@link RimRenderer}, which owns the band-and-loader-varying draw.
- *
- * @param frustum   the live view frustum for the section cull, or null on a loader whose render event exposes none
- *                  (this band's Forge render event), where every section is drawn and off-screen geometry is clipped by
- *                  the GPU rather than skipped before build
- * @param lineWidth the effective rim line width in GL pixels, the config scale applied once as legacy line-width state
- *                  before the draw
  */
 public final class OutlineRenderContext {
     private final BufferBuilder lines;
@@ -28,6 +22,13 @@ public final class OutlineRenderContext {
     private final Vec3d cameraPos;
     private final float lineWidth;
 
+    /**
+     * @param frustum   the live view frustum for the section cull, or null on a loader whose render event exposes none
+     *                  (this band's Forge render event), where every section is drawn and off-screen geometry is
+     *                  clipped by the GPU rather than skipped before build
+     * @param lineWidth the effective rim line width in GL pixels, the config scale applied once as legacy line-width
+     *                  state before the draw
+     */
     public OutlineRenderContext(BufferBuilder lines, @Nullable ICamera frustum, Vec3d cameraPos, float lineWidth) {
         this.lines = lines;
         this.frustum = frustum;
