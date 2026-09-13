@@ -13,8 +13,7 @@ import java.util.List;
 
 /**
  * Traces chunk-space coverage rectangles into merged block-space polygon rings with correctly nested holes. Pure
- * java.awt geometry with no MC or JourneyMap types, so it is headless-testable; {@link CoveragePolygons} wraps the
- * rings it returns into the JourneyMap polygon model.
+ * java.awt geometry with no MC or JourneyMap types, so it is headless-testable.
  *
  * <p>This stands in for JourneyMap's {@code PolygonHelper.createPolygonFromArea}, whose {@code classifyAndGroup}
  * assigns a hole to the first hull whose filled outline it merely intersects. When a suspect island sits inside a

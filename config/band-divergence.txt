@@ -273,7 +273,7 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.jav
 
 # The shared coverage-polygon tracer is public with public HoledRing accessors, where dev's is package-private, so the
 # v2 subpackage can reach it, and its empty list is a Guava ImmutableList.of for the Java 8 floor (no List.of below Java
-# 9).
+# 9). Its javadoc no longer names CoveragePolygons, which sits in the v2 subpackage here rather than beside it.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygonTracer.java
 
 # At 1.12.2 the dimension is the classic net.minecraft.world.DimensionType enum, so the rebind is driven with its
