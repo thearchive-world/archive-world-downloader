@@ -15,18 +15,6 @@ import net.minecraft.world.level.Level;
  * by the writer thread when it writes the save. Everything here is already finished, an already-serialized
  * {@code playerTag} plus primitives and band-stable value types, so it crosses the thread boundary safely, the same
  * render-thread-snapshot discipline as the entity and container captures.
- *
- * @param playerTag  the processed {@code saveWithoutId} tag (strips, scrub, dimension, ender remap applied) written as
- *                   the band's saved player (a level.dat {@code "Player"} compound pre-26.x, a
- *                   {@code players/data/<uuid>.dat} entry at 26.x)
- * @param spawnPos   the capture block position, written as the world spawn so a non-inheriting opener still lands at
- *                   the base
- * @param yaw        the capture yaw, for the world spawn
- * @param pitch      the capture pitch, for the world spawn
- * @param dimension  the canonical capture dimension, shared by the {@code "Player"} tag and the world spawn
- * @param gameType   the gamemode for the level.dat {@code GameType} (creative by default, the real mode on the survival
- *                   opt-out)
- * @param difficulty the captured client difficulty for the level.dat {@code Difficulty}
  */
 public final class CapturedPlayer {
     private final CompoundTag playerTag;
@@ -37,6 +25,19 @@ public final class CapturedPlayer {
     private final GameType gameType;
     private final Difficulty difficulty;
 
+    /**
+     * @param playerTag  the processed {@code saveWithoutId} tag (strips, scrub, dimension, ender remap applied) written
+     *                   as the band's saved player (a level.dat {@code "Player"} compound pre-26.x, a
+     *                   {@code players/data/<uuid>.dat} entry at 26.x)
+     * @param spawnPos   the capture block position, written as the world spawn so a non-inheriting opener still lands
+     *                   at the base
+     * @param yaw        the capture yaw, for the world spawn
+     * @param pitch      the capture pitch, for the world spawn
+     * @param dimension  the canonical capture dimension, shared by the {@code "Player"} tag and the world spawn
+     * @param gameType   the gamemode for the level.dat {@code GameType} (creative by default, the real mode on the
+     *                   survival opt-out)
+     * @param difficulty the captured client difficulty for the level.dat {@code Difficulty}
+     */
     CapturedPlayer(CompoundTag playerTag, BlockPos spawnPos, float yaw, float pitch, ResourceKey<Level> dimension,
             GameType gameType, Difficulty difficulty) {
         this.playerTag = playerTag;
