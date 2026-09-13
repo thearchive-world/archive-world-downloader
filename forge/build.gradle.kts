@@ -113,7 +113,7 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 // Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge
-// jar to CurseForge and Modrinth per this band's MC version, mirroring the fabric loader subproject.
+// jar to Modrinth and CurseForge per this band's MC version, mirroring the fabric loader subproject.
 // Coordinates come from band() (the island reads the root gradle.properties), not providers.gradleProperty,
 // because forge/gradle.properties carries none. There is no github block: the release workflow funnels every
 // band's jars into one shared GitHub release with gh. Nothing publishes on an ordinary build.
