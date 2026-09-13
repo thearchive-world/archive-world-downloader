@@ -40,6 +40,15 @@ base {
     archivesName.set("${band("mod_archives_base")}-forge")
 }
 
+// Mirrors wdl.java-conventions, which this separate build never loads. Load-bearing here rather than a backstop:
+// reobfJar hands the jar task's output to ForgeAutoRenamingTool, which copies every entry's time into the
+// reobfuscated jar it writes back over it, so the Jar defaults would put the build's wall clock into the shipped
+// bytes and no two clean builds would match.
+tasks.withType<AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
 // Mirrors wdl.java-conventions: the JDK that compiles is the language target unless the band overrides it
 // through java_toolchain_version, and --release then pins this island's bytecode back to that target. band()
 // errors on a missing key, so the optional coordinate is read off the properties directly.
