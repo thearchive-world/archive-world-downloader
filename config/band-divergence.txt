@@ -1086,7 +1086,9 @@ common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
 
 # Below Java 21 the pinned Error Prone release, a Java 21 build, cannot load inside the compile toolchain, so 1.14.4
 # gates NullAway behind errorProneUsable and runs annotations-only, where dev runs the checker unconditionally and
-# carries no such gate.
+# carries no such gate. Below Java 11 the file also rewrites JSpecify's NullMarked to name no MODULE target, the
+# constant javac 8 and javadoc 8 warn on, and swaps that jar onto every source set's compile classpath; dev's readers
+# know the constant and carry no such rewrite.
 build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 
 # Below Java 11 Checkstyle cannot run on the java_version toolchain, so this file points the Checkstyle tasks at a
@@ -1110,9 +1112,12 @@ settings.gradle.kts
 # 1.14.4-1.5-SNAPSHOT from jm.gserv.me) where 1.16.5 pins the 2.0 API from blamejared, common/build.gradle.kts builds
 # on NeoGradle vanilla because NeoForm has no release below 1.20.2, fabric/build.gradle.kts enables Loom's mixin
 # annotation processor for the wdl.refmap.json the mixins need, forge/build.gradle.kts is the Architectury Loom island
-# build (added with the island, absent from dev), and neoforge/build.gradle.kts is deleted with the loader.
+# build (added with the island, absent from dev), and neoforge/build.gradle.kts is deleted with the loader. It also
+# credits build-logic/build.gradle.kts, which depends on the catalog's asm for the NullMarked rewrite
+# wdl.nullness-conventions runs below Java 11; dev's build-logic has no such dependency.
 build.gradle.kts
 
 # The catalog carries only the plugins some build on 1.14.4 applies, so it has no moddev entry (dev's carries loom,
-# moddev and mod-publish-plugin for its fabric and neoforge subprojects); the tool-library entries match dev's.
+# moddev and mod-publish-plugin for its fabric and neoforge subprojects); the tool-library entries match dev's, and asm,
+# which dev lacks, is what build-logic rewrites JSpecify's NullMarked with below Java 11.
 gradle/libs.versions.toml
