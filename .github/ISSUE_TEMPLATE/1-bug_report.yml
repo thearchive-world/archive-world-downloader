@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for reporting a bug. Before you start:
 
-        - For questions or general chat, open a [Discussion](https://github.com/thearchive-world/archive-world-downloader/discussions) instead.
+        - For questions or general chat, ask on [Discord](https://discord.gg/eDUscXhtUa) instead.
         - For crashes, freezes, or saves that won't load, use the **Crash report** template.
 
   - type: checkboxes
