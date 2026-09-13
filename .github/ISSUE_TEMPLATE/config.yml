@@ -3,12 +3,9 @@ contact_links:
   - name: Discord community
     url: https://discord.gg/eDUscXhtUa
     about: Chat, support, and release news. Ask here for quick help before filing an issue.
-  - name: Q&A and discussions
-    url: https://github.com/thearchive-world/archive-world-downloader/discussions
-    about: Usage questions, ideas, and general discussion go here, not the issue tracker.
   - name: Modrinth page
     url: https://modrinth.com/mod/wdl
-    about: Download the mod and read its description.
+    about: Download the mod from Modrinth.
   - name: CurseForge page
     url: https://www.curseforge.com/minecraft/mc-mods/wdl
     about: Download the mod from CurseForge.

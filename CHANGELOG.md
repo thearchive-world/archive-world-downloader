@@ -3,7 +3,7 @@
 User-facing changes to Archive World Downloader, newest first.
 
 The release pipeline ships the section whose heading matches the release version (a line `## <version>`, where
-`<version>` is the mod_version core) as the notes on CurseForge, Modrinth, and the GitHub release. Write each
+`<version>` is the mod_version core) as the notes on Modrinth, CurseForge, and the GitHub release. Write each
 version's notes here before tagging; a release with no matching section fails rather than shipping empty notes.
 
 ## 1.3.0
