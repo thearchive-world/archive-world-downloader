@@ -287,10 +287,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private LongOpenHashSet allCaptured = new LongOpenHashSet();
 
     /**
-     * Positions a block-STATE change marked unsaved since the last re-encode, pushed here by the
-     * {@link LevelChunk.UnsavedListener} installed at first capture (change-driven, low-latency rung). A bounded slice
-     * is drained and re-encoded each tick. Nulled at {@link #finish()} teardown so the listeners still attached to
-     * loaded chunks become no-ops and stop pinning the finished session's set.
+     * Positions a block-STATE change marked unsaved since the last re-encode, found by {@link #pollDirtyChunks}'s
+     * per-tick walk of the keep-hot buffer (change-driven, low-latency rung). This band has no unsaved-listener push to
+     * be fed from, so the set is filled by pull and nothing outside this session ever writes it. A bounded slice is
+     * drained and re-encoded each tick. Nulled at {@link #finish()} teardown to release it.
      */
     private @Nullable LongOpenHashSet dirty = new LongOpenHashSet();
 
@@ -1788,10 +1788,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Detach the re-capture change tracking at session teardown: drop the dirty set so the
-     * {@link LevelChunk.UnsavedListener}s still attached to loaded {@link ClientLevel} chunks become inert (they guard
-     * on it being non-null) and stop pinning this finished session's set until those chunks unload. A later session
-     * re-installs its own listeners at its own first capture.
+     * Detach the re-capture change tracking at session teardown: drop the dirty set and the floor queue. Nothing is
+     * attached to a {@link ClientLevel} chunk to detach, the rung being a poll this session drives rather than a
+     * callback installed on the chunk, so dropping the set is the whole teardown.
      */
     private void detachRecapture() {
         dirty = null;
@@ -2451,7 +2450,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // snapshot rather than a stale-present one and cannot persist content the player just reverted.
             reencodePendingInteractionChunks(level().getChunkSource(), adapter.chunkCodec(), reencodedThisTick);
         }
-        detachRecapture(); // teardown: release the dirty set; loaded chunks' listeners become inert
+        detachRecapture(); // teardown: release the dirty set, which is all the poll-driven rung holds
         deactivateInteractionCapture(); // stop the use-block hook feeding this session; the drain reads the instance
         deactivateOpenClickTracker(); // stop the use hooks seeding this session's open bind
         if (totalCapturedChunks() == 0) {
