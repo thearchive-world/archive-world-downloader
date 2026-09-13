@@ -252,10 +252,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private final Map<ChunkPos, ChunkSnapshotSource> captured = new LinkedHashMap<>();
 
     /**
-     * Captured chunk positions per dimension (as {@link ChunkPos#toLong()}), retained for the whole session: the
-     * position space is dimension-local (the overworld and the nether share positions), so following the player across
-     * a portal must not let one dimension's captures dedup the other's. {@link #allCaptured} references the current
-     * dimension's set; this map backs the per-dimension chunk count at finish.
+     * Captured chunk positions per dimension (as {@link ChunkPos#asLong(int, int)}), retained for the whole session:
+     * the position space is dimension-local (the overworld and the nether share positions), so following the player
+     * across a portal must not let one dimension's captures dedup the other's. {@link #allCaptured} references the
+     * current dimension's set; this map backs the per-dimension chunk count at finish.
      */
     private final Map<DimensionType, LongOpenHashSet> capturedByDimension = new LinkedHashMap<>();
 
