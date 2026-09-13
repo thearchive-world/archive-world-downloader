@@ -33,9 +33,9 @@ recorded in that release's GitHub notes.
 ```
 
 This compiles `common` and whichever root loader modules the branch ships, runs the checks
-(Checkstyle, Spotless, NullAway, the license-header check, and the `core` invariants), and produces
-those loaders' jars under `<loader>/build/libs`. A branch that ships Forge builds it separately with
-`forge/gradlew build`, which puts its jar under `forge/build/libs`.
+(Checkstyle, Spotless, NullAway, doclint reference checks, the license-header check, and the `core`
+invariants), and produces those loaders' jars under `<loader>/build/libs`. A branch that ships Forge
+builds it separately with `forge/gradlew build`, which puts its jar under `forge/build/libs`.
 
 ## Running a development client
 
@@ -112,8 +112,9 @@ seam, and raise the case in an issue first.
 ## Code style
 
 Style is enforced mechanically. `./gradlew build` runs Checkstyle (layout and imports), Spotless
-(formatting), NullAway (nullness), and a license-header check, so a nonconforming change cannot
-land. The config in the
+(formatting), NullAway (nullness), doclint reference checks (every `{@link}`, `@see`, `@throws` and
+`@param` name in a Javadoc comment resolves on the branch), and a license-header check, so a
+nonconforming change cannot land. The config in the
 repository is the source of truth: `.editorconfig` at the root, `config/checkstyle/`, and
 `config/spotless/`. If a formatting check fails, `./gradlew spotlessApply` reformats the code.
 
