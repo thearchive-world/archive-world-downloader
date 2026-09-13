@@ -16,12 +16,12 @@ import world.thearchive.wdl.core.RimFace;
 
 /**
  * The 1.21.11 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
- * {@link RenderTypes#lines()} type, camera-relative. The rectangle's two in-plane axes come from the block cell and its
- * normal axis from the model shape, lifted a small standoff along the face normal, so the rim frames a recessed model
- * (a chest) at block extent yet never z-fights a flush one. Each edge carries its own direction as its normal, because
- * the lines shader thickens perpendicular to position plus normal, so a face-outward normal would collapse the edge to
- * zero width. We draw the edges explicitly rather than feed a flat {@code VoxelShape} to {@code renderShape}, which
- * risks degenerate zero-length edges.
+ * {@link net.minecraft.client.renderer.rendertype.RenderTypes#lines()} type, camera-relative. The rectangle's two
+ * in-plane axes come from the block cell and its normal axis from the model shape, lifted a small standoff along the
+ * face normal, so the rim frames a recessed model (a chest) at block extent yet never z-fights a flush one. Each edge
+ * carries its own direction as its normal, because the lines shader thickens perpendicular to position plus normal, so
+ * a face-outward normal would collapse the edge to zero width. We draw the edges explicitly rather than feed a flat
+ * {@code VoxelShape} to {@code renderShape}, which risks degenerate zero-length edges.
  */
 public final class RimRendererImpl implements RimRenderer {
     // A small outward lift of the drawn face along its normal, so the rim clears the model surface it planes
