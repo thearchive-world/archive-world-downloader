@@ -1344,9 +1344,10 @@ gradle/wrapper/gradle-wrapper.properties
 # .gradle/unimined caches when a build fails before compileJava, the Unimined provision failing cold and passing warm.
 .github/workflows/ci.yml
 
-# The byte-reproducibility job reads the loader set off settings.gradle.kts's include lines and exits early with a
-# message on a root that includes no fabric or neoforge subproject, as the Forge-only 1.11.2 root does not, where dev's
-# job byte-diffs the two loader jars unconditionally; the Forge island's modJar is not re-diffed.
+# The byte-reproducibility job reads the loader set off settings.gradle.kts's include lines and skips the root
+# byte-diff on a root that includes no fabric or neoforge subproject, as the Forge-only 1.11.2 root does not, where
+# dev's job byte-diffs the two loader jars unconditionally; a second arm builds the forge/ island twice and
+# byte-diffs its modJar, which dev has no island to compare.
 .github/workflows/reproducibility.yml
 
 # Added, absent from dev: the Apache 2.0 license text. Minecraft 1.11.2 ships a 355-class trimmed cut of fastutil 7.0.12
