@@ -150,7 +150,7 @@ tasks.register("printVersion") {
 }
 
 // Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the
-// Fabric jar to CurseForge and Modrinth per this band's MC version. There is no github block, because the
+// Fabric jar to Modrinth and CurseForge per this band's MC version. There is no github block, because the
 // plugin cannot carry one GitHub release across the separate per-band runs, so the release workflow creates
 // that release with gh. The changelog arrives via the CHANGELOG env; nothing publishes on an ordinary build.
 publishMods {
