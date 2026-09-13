@@ -24,8 +24,8 @@ final class VanillaDimensions {
 
     /**
      * The vanilla single-player dimension for a captured dimension {@code type}: the Nether goes to
-     * {@link DimensionType#NETHER}, the End to {@link DimensionType#THE_END}, and everything else (overworld, its
-     * variants, and any unrecognized or modded type) to {@link DimensionType#OVERWORLD}.
+     * {@link DimensionType#NETHER}, the End to {@link DimensionType#field_18956}, and everything else (overworld, its
+     * variants, and any unrecognized or modded type) to {@link DimensionType#field_18954}.
      */
     static DimensionType forType(@Nullable DimensionType type) {
         if (type == DimensionType.NETHER) {
