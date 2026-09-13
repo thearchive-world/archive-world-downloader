@@ -91,8 +91,8 @@ repositories {
     maven("https://maven.minecraftforge.net/")
 }
 
-// The Minecraft toolchain the root's Fabric Loom resolved: the Mojmap-remapped 1.13.2 jar (parameter-annotation
-// stripped) plus every transitive library, one absolute path per line. common's assemble depends on
+// The Minecraft toolchain the root's Fabric Loom resolved: the Mojmap-remapped 1.13.2 jar (annotation-stripped)
+// plus every transitive library, one absolute path per line. common's assemble depends on
 // writeIslandClasspath, so a plain `./gradlew build` at the root produces this before this island ever
 // configures; run ./gradlew :common:writeIslandClasspath by hand if only the island is being built.
 val islandClasspathFile = rootDir.resolve("../common/build/island-classpath.txt")

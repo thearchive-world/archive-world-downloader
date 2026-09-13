@@ -1048,7 +1048,8 @@ build-logic/src/main/kotlin/wdl.java-conventions.gradle.kts
 
 # No NeoForm or NeoGradle vanilla release exists for 1.13.2, so common builds on Fabric Loom in vanilla mode over
 # Legacy Fabric's intermediary and the tools/mojmap-bridge mapping (NeoGradle vanilla on 1.14.4, ModDevGradle on dev):
-# remap tasks off, the malformed parameter annotations stripped for javac 8, writeIslandClasspath, no commonJava.
+# remap tasks off, the merged jar stripped of its malformed parameter annotations and of Loom's EnvType markers for
+# javac 8 and javadoc, writeIslandClasspath, no commonJava.
 common/build.gradle.kts
 
 # The catalog carries only the plugins some build of the Forge-only 1.13.2 root applies, so it has no moddev or

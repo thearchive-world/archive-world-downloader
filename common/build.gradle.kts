@@ -6,11 +6,12 @@ import org.objectweb.asm.AnnotationVisitor
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.FieldVisitor
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
 // ASM on the buildscript classpath drives the compile-side Minecraft annotation strip below
-// (stripMinecraftParameterAnnotations); pinned to the version the tools/mojmap-bridge generator uses.
+// (stripMinecraftAnnotations); pinned to the version the tools/mojmap-bridge generator uses.
 buildscript {
     repositories { mavenCentral() }
     dependencies { classpath("org.ow2.asm:asm:9.10.1") }
@@ -503,13 +504,23 @@ dependencies {
 // The Mojmap-remapped 1.13.2 jar carries Minecraft's own malformed empty RuntimeVisibleParameterAnnotations
 // attributes: they are present on Minecraft's classes in the vanilla obf jar and are merely preserved by the
 // remap. JDK 8's javac rejects them ("bad class file"), which would sink the clean subset before it reaches a
-// single seam. Because the attributes sit on Minecraft's own classes, which never ship in the mod jar (Forge
-// supplies Minecraft at runtime), removing them is a compile-side fix with no ship consequence. An ASM pass drops
-// every parameter annotation from the provisioned jar, and the stripped jar is interposed onto the compile
-// classpaths in place of Loom's own minecraft entry, so the same stripped jar feeds compileJava and
-// compileTestJava. The runtime classpath keeps Loom's entry: the malformed attribute poisons javac only, and the
-// JVM ignores unread annotation attributes, so the registry-boot tests still run against the provisioned jar.
-abstract class StripParameterAnnotations : DefaultTask() {
+// single seam. Loom's merge also stamps @Environment(EnvType.CLIENT) on every client class and on the client-only
+// members of shared classes (and EnvironmentInterfaces on the two chest block entities), and no fabric-loader,
+// which defines EnvType, sits on any classpath of this Forge-only band, so javac and javadoc each warn unknown
+// enum constant once per class they read, up to the hundred-warning cap. Because both sit on Minecraft's own
+// classes, which never ship in the mod jar (Forge supplies Minecraft at runtime), removing them is a compile-side
+// fix with no ship consequence. An ASM pass drops every parameter annotation and every Fabric environment
+// annotation from the provisioned jar, and the stripped jar is interposed onto the compile and javadoc classpaths
+// in place of Loom's own minecraft entry, so the same stripped jar feeds compileJava, compileTestJava and javadoc.
+// The runtime classpath keeps Loom's entry: the malformed attribute poisons javac only, and the JVM ignores unread
+// annotation attributes, so the registry-boot tests still run against the provisioned jar.
+abstract class StripMinecraftAnnotations : DefaultTask() {
+    private val fabricEnvironmentAnnotations = setOf(
+        "Lnet/fabricmc/api/Environment;",
+        "Lnet/fabricmc/api/EnvironmentInterface;",
+        "Lnet/fabricmc/api/EnvironmentInterfaces;",
+    )
+
     @get:InputFiles
     abstract val inputJars: ConfigurableFileCollection
 
@@ -536,7 +547,7 @@ abstract class StripParameterAnnotations : DefaultTask() {
                     }
                 }
             }
-            logger.lifecycle("stripped parameter annotations from ${jar.name} -> ${target.name}")
+            logger.lifecycle("stripped annotations from ${jar.name} -> ${target.name}")
         }
     }
 
@@ -544,6 +555,23 @@ abstract class StripParameterAnnotations : DefaultTask() {
         val reader = ClassReader(bytes)
         val writer = ClassWriter(0)
         reader.accept(object : ClassVisitor(Opcodes.ASM9, writer) {
+            override fun visitAnnotation(descriptor: String?, visible: Boolean): AnnotationVisitor? =
+                if (descriptor in fabricEnvironmentAnnotations) null else super.visitAnnotation(descriptor, visible)
+
+            override fun visitField(
+                access: Int,
+                name: String?,
+                descriptor: String?,
+                signature: String?,
+                value: Any?,
+            ): FieldVisitor? {
+                val delegate = super.visitField(access, name, descriptor, signature, value) ?: return null
+                return object : FieldVisitor(Opcodes.ASM9, delegate) {
+                    override fun visitAnnotation(descriptor: String?, visible: Boolean): AnnotationVisitor? =
+                        if (descriptor in fabricEnvironmentAnnotations) null else super.visitAnnotation(descriptor, visible)
+                }
+            }
+
             override fun visitMethod(
                 access: Int,
                 name: String?,
@@ -553,6 +581,9 @@ abstract class StripParameterAnnotations : DefaultTask() {
             ): MethodVisitor? {
                 val delegate = super.visitMethod(access, name, descriptor, signature, exceptions) ?: return null
                 return object : MethodVisitor(Opcodes.ASM9, delegate) {
+                    override fun visitAnnotation(descriptor: String?, visible: Boolean): AnnotationVisitor? =
+                        if (descriptor in fabricEnvironmentAnnotations) null else super.visitAnnotation(descriptor, visible)
+
                     // Drop the count and every parameter annotation so no (malformed) RuntimeVisible /
                     // RuntimeInvisibleParameterAnnotations attribute is written back for this method.
                     override fun visitAnnotableParameterCount(parameterCount: Int, visible: Boolean) {}
@@ -565,23 +596,27 @@ abstract class StripParameterAnnotations : DefaultTask() {
     }
 }
 
-// Only Minecraft's own remapped jar carries the malformed attributes; Loom names it minecraft-*, distinct from
-// every library on the classpath, so a name filter isolates it. The stripped jar carries the strip task as its
-// producer, and each compile classpath drops the original minecraft entry and adds the stripped one in its place.
+// Only Minecraft's own remapped jar carries what the pass strips; Loom names it minecraft-*, distinct from every
+// library on the classpath, so a name filter isolates it. The stripped jar carries the strip task as its producer,
+// and each compile classpath and the javadoc classpath drop the original minecraft entry and add the stripped one
+// in its place.
 val strippedMinecraftDir = layout.buildDirectory.dir("stripped-minecraft").get().asFile
 
-val stripMinecraftParameterAnnotations = tasks.register<StripParameterAnnotations>("stripMinecraftParameterAnnotations") {
+val stripMinecraftAnnotations = tasks.register<StripMinecraftAnnotations>("stripMinecraftAnnotations") {
     inputJars.from(sourceSets["main"].compileClasspath.filter { it.name.startsWith("minecraft-") })
     outputDir.set(strippedMinecraftDir)
 }
 
-val strippedMinecraft = fileTree(strippedMinecraftDir) { include("**/*.jar") }.builtBy(stripMinecraftParameterAnnotations)
+val strippedMinecraft = fileTree(strippedMinecraftDir) { include("**/*.jar") }.builtBy(stripMinecraftAnnotations)
 
 tasks.named<JavaCompile>("compileJava") {
     classpath = sourceSets["main"].compileClasspath.filter { !it.name.startsWith("minecraft-") } + strippedMinecraft
 }
 tasks.named<JavaCompile>("compileTestJava") {
     classpath = sourceSets["test"].compileClasspath.filter { !it.name.startsWith("minecraft-") } + strippedMinecraft
+}
+tasks.named<Javadoc>("javadoc") {
+    classpath = sourceSets["main"].output + sourceSets["main"].compileClasspath.filter { !it.name.startsWith("minecraft-") } + strippedMinecraft
 }
 
 // --- Publish the island classpath: the exact compile classpath the separate Forge build consumes ---
