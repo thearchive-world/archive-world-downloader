@@ -101,6 +101,24 @@ tasks.withType<Test>().configureEach {
     }
 }
 
+// Doclint's reference group: javadoc is the one tool in this build that resolves a {@link}, {@linkplain}, @see or
+// @throws target, since Checkstyle's JavadocStyle checks structure only, so a reference to a symbol the band lacks
+// otherwise ships green. The other groups stay off; missing would demand @param and @return on every documented
+// member. PRIVATE member level because doclint checks only what javadoc documents, and at the default -protected
+// every private member and package-private type, where most of the prose lives, goes unchecked. The task joins
+// check only where a band sets javadoc_gate=true, so a band with references still to fix stays green while the
+// shared wiring propagates unchanged.
+tasks.withType<Javadoc>().configureEach {
+    (options as StandardJavadocDocletOptions).apply {
+        memberLevel = JavadocMemberLevel.PRIVATE
+        addBooleanOption("Xdoclint:reference", true)
+    }
+}
+
+if (providers.gradleProperty("javadoc_gate").orNull.toBoolean()) {
+    tasks.named("check") { dependsOn(tasks.named("javadoc")) }
+}
+
 // Reproducible archives: constant entry timestamps + stable order, so a jar rebuilt from a tag on the
 // same compile-toolchain JDK is byte-identical. This is a backstop: Loom's remapJar and ModDevGradle's
 // jar are already reproducible, so it locks that against a future default change and covers the sources jar.
