@@ -77,7 +77,7 @@ class OrphanedContainerSweepTest {
     private static AsyncSaveWriter regionWriter(Path region) {
         return new AsyncSaveWriter(
                 dimension -> storage(region),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
     }
 
     /** A mutable single-entry holder map, matching what the session's per-chunk drain hands the fold. */

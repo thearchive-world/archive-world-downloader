@@ -543,6 +543,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return new AsyncSaveWriter(
                 paths::openRegionStorage,
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {},

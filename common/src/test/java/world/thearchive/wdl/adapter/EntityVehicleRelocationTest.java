@@ -300,6 +300,7 @@ class EntityVehicleRelocationTest {
         return new AsyncSaveWriter(
                 paths::openRegionStorage,
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {},

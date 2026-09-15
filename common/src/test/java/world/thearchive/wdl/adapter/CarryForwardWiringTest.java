@@ -255,7 +255,7 @@ class CarryForwardWiringTest {
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
                 dimension -> regionStorage(paths),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
     }
 
     @SuppressWarnings("unchecked")

@@ -58,9 +58,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The off-main-thread save writer drained against a real {@link IOWorker}: chunk encode-and-fold thunks submitted from
- * the (test) main thread are resolved on the writer's own thread, the finalizer (the level.dat stand-in) runs there
- * too, and the completion future reports the per-target tallies. This is the headless half of the no-render-freeze
- * contract; the live freeze itself is not exercised headless.
+ * the (test) main thread are resolved on the writer's own thread, the level.dat write and the finalizer run there too,
+ * and the completion future reports the per-target tallies. This is the headless half of the no-render-freeze contract;
+ * the live freeze itself is not exercised headless.
  */
 class AsyncSaveWriterTest {
     private static final String WRITER_LOGGER = "world.thearchive.wdl.adapter.AsyncSaveWriter";
@@ -101,7 +101,8 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {},                  // preflight: the resume backup
-                (chunksFailed, entityChunksFailed) -> finalized.set(true), // the level.dat write stand-in
+                () -> {},                  // the level.dat write stand-in
+                (chunksFailed, entityChunksFailed) -> finalized.set(true), // the finalizer stand-in
                 () -> null,                  // outputs: export + size
                 () -> {}, new SaveProgress());                 // the LevelStorageAccess close stand-in
 
@@ -115,7 +116,7 @@ class AsyncSaveWriterTest {
         assertEquals(2, result.chunksWritten());
         assertEquals(0, result.chunksFailed());
         assertEquals(0, result.entityChunksWritten());
-        assertTrue(finalized.get(), "the finalizer (level.dat) ran on the writer thread after the drain");
+        assertTrue(finalized.get(), "the finalizer ran on the writer thread after the drain");
 
         try (IOWorker in = storage(region, "chunk")) {
             assertTrue(Optional.ofNullable(in.load(new ChunkPos(0, 0))).isPresent(), "submitted chunk reached disk");
@@ -147,6 +148,7 @@ class AsyncSaveWriterTest {
                     }
                     return storage(region, "chunk");
                 },
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {
                     finalizedChunksFailed.set(chunksFailed);
@@ -200,6 +202,7 @@ class AsyncSaveWriterTest {
                     return storage(region, "chunk");
                 },
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {
                     finalizedChunksFailed.set(chunksFailed);
                     finalizedEntityChunksFailed.set(entityChunksFailed);
@@ -240,6 +243,7 @@ class AsyncSaveWriterTest {
                     throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
                 },
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> finalized.set(true),
                 () -> null,
                 () -> {},
@@ -267,6 +271,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {},
@@ -292,6 +297,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> order.add("finalize"),
                 () -> null,
@@ -328,6 +334,7 @@ class AsyncSaveWriterTest {
                     throw new AssertionError("no chunk was submitted, so the region storage must not open");
                 },
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {},
@@ -355,6 +362,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {},
@@ -375,6 +383,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -405,6 +414,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(dimension == Level.NETHER ? netherRegion : overworldRegion, "chunk"),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -438,6 +448,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(dimension == Level.NETHER ? netherRegion : overworldRegion, "chunk"),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -479,6 +490,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalized.set(true),
                 () -> null,
@@ -524,6 +536,7 @@ class AsyncSaveWriterTest {
                     }
                 },
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {}, new SaveProgress());
@@ -559,6 +572,7 @@ class AsyncSaveWriterTest {
                     }
                 },
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {}, new SaveProgress());
@@ -581,6 +595,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
@@ -623,6 +638,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {}, new SaveProgress());
@@ -663,7 +679,8 @@ class AsyncSaveWriterTest {
                     return storage(region, "chunk");
                 },
                 () -> preflightAt.set(order.getAndIncrement()), // preflight: the resume backup
-                (chunksFailed, entityChunksFailed) -> {},                                        // finalizer: level.dat
+                () -> {},                                          // the level.dat write
+                (chunksFailed, entityChunksFailed) -> {},          // finalizer: the completion record
                 () -> null,                                        // outputs: export + size
                 () -> {}, new SaveProgress());                                       // access close
 
@@ -689,6 +706,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {},                                          // preflight
+                () -> {},                                          // the level.dat write
                 (chunksFailed, entityChunksFailed) -> finalizerAt.set(order.getAndIncrement()), // finalizer
                 () -> {                                            // outputs: export + size
                     outputsAt.set(order.getAndIncrement());
@@ -701,7 +719,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter.SaveResult result = writer.finish().get(30, TimeUnit.SECONDS);
 
         assertFalse(result.failed());
-        assertTrue(finalizerAt.get() < accessCloseAt.get(), "the level.dat finalizer runs before the folder closes");
+        assertTrue(finalizerAt.get() < accessCloseAt.get(), "the finalizer runs before the folder closes");
         assertTrue(accessCloseAt.get() < outputsAt.get(),
                 "the export zip runs after the folder is fully written and closed");
     }
@@ -713,6 +731,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> "world.zip", // outputs: the export reports the zip it wrote
@@ -734,6 +753,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> {
@@ -760,6 +780,7 @@ class AsyncSaveWriterTest {
                 () -> {
                     throw new RuntimeException("the resume backup blew up");
                 },
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {}, new SaveProgress());
@@ -784,8 +805,9 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {
-                    throw new RuntimeException("the level.dat write failed"); // the finalizer fails -> the save fails
+                    throw new RuntimeException("the completion record failed"); // the finalizer fails -> the save fails
                 },
                 () -> {
                     outputsRan.set(true); // the export + size must NOT run on a failed save
@@ -811,7 +833,7 @@ class AsyncSaveWriterTest {
         // Prior session: write a chunk carrying a filled chest to disk.
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, true,
                 ImmutableList.of(blockEntity("minecraft:chest", 2, 64, 2)));
         NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
@@ -830,7 +852,7 @@ class AsyncSaveWriterTest {
         AtomicReference<CompoundTag> observed = new AtomicReference<>();
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         second.observeResumeReads((dimension, onDisk) -> {
             observedDimension.set(dimension);
             observed.set(onDisk);
@@ -856,7 +878,7 @@ class AsyncSaveWriterTest {
         // Prior session: fold an entity carrying a filled chest minecart into the region/ chunk.
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         first.submitEntity(Level.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(cart)));
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
@@ -865,7 +887,7 @@ class AsyncSaveWriterTest {
         AtomicReference<CompoundTag> observed = new AtomicReference<>();
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         second.observeEntityResumeReads((dimension, onDisk) -> {
             observedDimension.set(dimension);
             observed.set(onDisk);
@@ -904,7 +926,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
 
         // The open-after-flush recovery: the vehicle first flushed empty (seen but not opened), then the return
         // approach re-accumulated it and the re-flush folded in the contents the player then opened.
@@ -971,14 +993,14 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         first.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         second.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
         second.submitChunk(Level.OVERWORLD, new ChunkPos(1, 1),
@@ -998,14 +1020,14 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         first.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         second.submitChunkRewrite(Level.OVERWORLD, new ChunkPos(0, 0), onDisk -> {
             onDisk.putString("wdl_test_folded", "contents");
             return 2;
@@ -1031,7 +1053,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
 
         writer.submit(() -> {
             ran.set(true);
@@ -1118,6 +1140,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> new FaultyStorage(region, "chunk", true, false),
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
                 () -> {},
@@ -1149,6 +1172,7 @@ class AsyncSaveWriterTest {
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
                 () -> {},
@@ -1172,13 +1196,14 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter first = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
         first.submitEntity(Level.OVERWORLD, new ChunkPos(0, 0), entityChunk(filledVehicle(parked)));
         assertFalse(first.finish().get(30, TimeUnit.SECONDS).failed());
 
         AtomicInteger finalizedEntityChunksFailed = new AtomicInteger(-1);
         AsyncSaveWriter second = new AsyncSaveWriter(
                 dimension -> new FaultyStorage(region, "chunk", true, false),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedEntityChunksFailed.set(entityChunksFailed),
                 () -> null,
@@ -1215,6 +1240,7 @@ class AsyncSaveWriterTest {
         AtomicInteger finalizedChunksFailed = new AtomicInteger(-1);
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
@@ -1317,6 +1343,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> new FaultyStorage(region, "chunk", false, true),
+                () -> {},
                 () -> {},
                 (chunksFailed, entityChunksFailed) -> finalizedChunksFailed.set(chunksFailed),
                 () -> null,
@@ -1526,49 +1553,49 @@ class AsyncSaveWriterTest {
     }
 
     @Test
-    void runsNoFinalizeWhileEncodingIsPaused(@TempDir Path save) throws Exception {
+    void runsNoLevelDataWriteWhileEncodingIsPaused(@TempDir Path save) throws Exception {
         Path region = Files.createDirectories(save.resolve("region"));
         AtomicBoolean loaderStateAvailable = new AtomicBoolean(true);
-        AtomicBoolean finalizedDuringRebuild = new AtomicBoolean(false);
-        CountDownLatch finalized = new CountDownLatch(1);
+        AtomicBoolean writtenDuringRebuild = new AtomicBoolean(false);
+        CountDownLatch written = new CountDownLatch(1);
 
-        AsyncSaveWriter writer = newWriter(region, (chunksFailed, entityChunksFailed) -> {
+        AsyncSaveWriter writer = newWriter(region, () -> {
             if (!loaderStateAvailable.get()) {
-                finalizedDuringRebuild.set(true);
+                writtenDuringRebuild.set(true);
             }
-            finalized.countDown();
-        });
+            written.countDown();
+        }, (chunksFailed, entityChunksFailed) -> {});
 
         writer.pauseEncoding();
         loaderStateAvailable.set(false);
         CompletableFuture<AsyncSaveWriter.SaveResult> result = writer.finish();
 
         // Well inside the writer's own self-release bound, so this observes the hold rather than racing it.
-        assertFalse(finalized.await(200, TimeUnit.MILLISECONDS), "no finalize runs while the writer is held");
+        assertFalse(written.await(200, TimeUnit.MILLISECONDS), "no level.dat write runs while the writer is held");
 
         loaderStateAvailable.set(true);
         writer.resumeEncoding();
 
         assertFalse(result.get(30, TimeUnit.SECONDS).failed(), "the save completed");
-        assertEquals(0L, finalized.getCount(), "the finalize ran once resumed");
-        assertFalse(finalizedDuringRebuild.get(), "the finalize did not run while the loader state was unavailable");
+        assertEquals(0L, written.getCount(), "the level.dat write ran once resumed");
+        assertFalse(writtenDuringRebuild.get(), "level.dat was not written while the loader state was unavailable");
     }
 
     @Test
-    void pauseWaitsForTheFinalizeAlreadyInFlight(@TempDir Path save) throws Exception {
+    void pauseWaitsForTheLevelDataWriteAlreadyInFlight(@TempDir Path save) throws Exception {
         Path region = Files.createDirectories(save.resolve("region"));
-        CountDownLatch finalizeStarted = new CountDownLatch(1);
-        CountDownLatch releaseFinalize = new CountDownLatch(1);
-        AtomicBoolean finalizeFinished = new AtomicBoolean(false);
+        CountDownLatch writeStarted = new CountDownLatch(1);
+        CountDownLatch releaseWrite = new CountDownLatch(1);
+        AtomicBoolean writeFinished = new AtomicBoolean(false);
 
-        AsyncSaveWriter writer = newWriter(region, (chunksFailed, entityChunksFailed) -> {
-            finalizeStarted.countDown();
-            releaseFinalize.await(30, TimeUnit.SECONDS);
-            finalizeFinished.set(true);
-        });
+        AsyncSaveWriter writer = newWriter(region, () -> {
+            writeStarted.countDown();
+            releaseWrite.await(30, TimeUnit.SECONDS);
+            writeFinished.set(true);
+        }, (chunksFailed, entityChunksFailed) -> {});
 
         CompletableFuture<AsyncSaveWriter.SaveResult> result = writer.finish();
-        assertTrue(finalizeStarted.await(30, TimeUnit.SECONDS), "the writer reached the finalize");
+        assertTrue(writeStarted.await(30, TimeUnit.SECONDS), "the writer reached the level.dat write");
 
         AtomicBoolean pauseReturned = new AtomicBoolean(false);
         Thread client = new Thread(() -> {
@@ -1577,24 +1604,54 @@ class AsyncSaveWriterTest {
         }, "test-client-thread");
         client.start();
 
-        // Past the chunk bound and inside the finalize one, so a finalize left on the chunk bound fails here.
+        // Past the chunk bound and inside the finalize one, so a level.dat write left on the chunk bound fails here.
         for (int i = 0; i < 80 && !pauseReturned.get(); i++) {
             Thread.sleep(5);
         }
-        assertFalse(pauseReturned.get(), "pause must not return while a finalize is still in flight");
+        assertFalse(pauseReturned.get(), "pause must not return while a level.dat write is still in flight");
 
-        releaseFinalize.countDown();
+        releaseWrite.countDown();
         client.join(30_000);
 
-        assertTrue(pauseReturned.get(), "pause returns once the in-flight finalize finishes");
-        assertTrue(finalizeFinished.get(), "the in-flight finalize was allowed to complete rather than abandoned");
+        assertTrue(pauseReturned.get(), "pause returns once the in-flight level.dat write finishes");
+        assertTrue(writeFinished.get(), "the in-flight level.dat write was allowed to complete rather than abandoned");
 
         writer.resumeEncoding();
         assertFalse(result.get(30, TimeUnit.SECONDS).failed(), "the save completed");
     }
 
     @Test
-    void lapsedWaitAroundTheFinalizeCountsAsLost(@TempDir Path save) throws Exception {
+    void lapsedWaitAroundTheLevelDataWriteCountsAsLost(@TempDir Path save) throws Exception {
+        Path region = Files.createDirectories(save.resolve("region"));
+        CountDownLatch writeStarted = new CountDownLatch(1);
+        CountDownLatch releaseWrite = new CountDownLatch(1);
+        AtomicInteger tallyReceived = new AtomicInteger(-1);
+
+        AsyncSaveWriter writer = newWriter(region, () -> {
+            writeStarted.countDown();
+            releaseWrite.await(30, TimeUnit.SECONDS);
+        }, (chunksFailed, entityChunksFailed) -> tallyReceived.set(chunksFailed));
+
+        CompletableFuture<AsyncSaveWriter.SaveResult> result = writer.finish();
+        assertTrue(writeStarted.await(30, TimeUnit.SECONDS), "the writer reached the level.dat write");
+
+        Thread client = new Thread(writer::pauseEncoding, "test-client-thread");
+        client.start();
+        client.join(10_000);
+        assertFalse(client.isAlive(), "pause gave up on the parked level.dat write once its bound lapsed");
+
+        releaseWrite.countDown();
+        writer.resumeEncoding();
+        AsyncSaveWriter.SaveResult saved = result.get(30, TimeUnit.SECONDS);
+
+        assertFalse(saved.failed(), "the save completed");
+        assertEquals(1, saved.chunksFailed(), "the lapse is counted, so the finish reports partial");
+        assertEquals(saved.chunksFailed(), tallyReceived.get(),
+                "the finalizer received the counted lapse, so the record stamps what the finish reports");
+    }
+
+    @Test
+    void pauseDoesNotWaitForTheFinalizeInFlight(@TempDir Path save) throws Exception {
         Path region = Files.createDirectories(save.resolve("region"));
         CountDownLatch finalizeStarted = new CountDownLatch(1);
         CountDownLatch releaseFinalize = new CountDownLatch(1);
@@ -1609,25 +1666,54 @@ class AsyncSaveWriterTest {
 
         Thread client = new Thread(writer::pauseEncoding, "test-client-thread");
         client.start();
-        client.join(10_000);
-        assertFalse(client.isAlive(), "pause gave up on the parked finalize once its bound lapsed");
+        // Inside the finalize bound and past the chunk one: a finalizer held under the finalize permit is still
+        // waiting here, and one held under a chunk permit has lapsed and shows at the tally below.
+        client.join(500);
+        assertFalse(client.isAlive(), "pause returns at once while the finalize runs, since it holds no permit");
 
         releaseFinalize.countDown();
         writer.resumeEncoding();
         AsyncSaveWriter.SaveResult saved = result.get(30, TimeUnit.SECONDS);
 
         assertFalse(saved.failed(), "the save completed");
-        assertEquals(1, saved.chunksFailed(), "the lapse is counted, so the finish reports partial");
+        assertEquals(0, saved.chunksFailed(), "nothing lapsed, so the finish reports clean");
+    }
+
+    @Test
+    void aThrowingLevelDataWriteFailsTheSaveAndReleasesThePermit(@TempDir Path save) throws Exception {
+        Path region = Files.createDirectories(save.resolve("region"));
+        AtomicBoolean finalized = new AtomicBoolean(false);
+
+        AsyncSaveWriter writer = newWriter(region, () -> {
+            throw new IOException("level.dat could not be written");
+        }, (chunksFailed, entityChunksFailed) -> finalized.set(true));
+
+        AsyncSaveWriter.SaveResult saved = writer.finish().get(30, TimeUnit.SECONDS);
+        assertTrue(saved.failed(), "a level.dat write that throws fails the save");
+        assertFalse(finalized.get(), "and the finalizer never ran");
+
+        Thread client = new Thread(writer::pauseEncoding, "test-client-thread");
+        client.start();
+        client.join(500);
+        assertFalse(client.isAlive(), "the permit was released on the throw, so a pause returns at once");
     }
 
     private AsyncSaveWriter newWriter(Path region) {
         return newWriter(region, (chunksFailed, entityChunksFailed) -> {});
     }
 
-    /** A writer over one region directory whose finish runs {@code finalizer}. */
     private AsyncSaveWriter newWriter(Path region, AsyncSaveWriter.Finalizer finalizer) {
+        return newWriter(region, () -> {}, finalizer);
+    }
+
+    /**
+     * A writer over one region directory whose finish runs {@code levelDataWrite} under the permit, then
+     * {@code finalizer}.
+     */
+    private AsyncSaveWriter newWriter(Path region, AsyncSaveWriter.LevelDataWrite levelDataWrite,
+            AsyncSaveWriter.Finalizer finalizer) {
         return new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, finalizer, () -> null, () -> {}, new SaveProgress());
+                () -> {}, levelDataWrite, finalizer, () -> null, () -> {}, new SaveProgress());
     }
 }
