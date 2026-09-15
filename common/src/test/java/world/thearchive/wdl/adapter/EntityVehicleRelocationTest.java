@@ -281,6 +281,7 @@ class EntityVehicleRelocationTest {
                 paths::openRegionStorage,
                 paths::openEntitiesStorage,
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {},
