@@ -39,11 +39,11 @@ import world.thearchive.wdl.core.SaveProgress;
  * {@link ChunkPos} and would lose a merge if interleaved. And the finalize order is fixed.
  *
  * <p>{@link #finish()} enqueues an end-of-stream marker; the writer drains the remaining tags, closes each storage
- * (which is what flushes its region files, there being no channel force at this band), runs the {@link Finalizer} (the
- * band's level.dat write), and completes the returned future with the per-target tallies (or the error that aborted
- * it). At 1.14.4 the vanilla {@code LevelStorage} holds no OS lock to release at finish (session.lock is advisory
- * pre-1.16), so there is nothing to close here. The future is completed normally even on failure, so the caller polls
- * it with one branch.
+ * (which is what flushes its region files, there being no channel force at this band), runs the {@link LevelDataWrite}
+ * and then the {@link Finalizer}, and completes the returned future with the per-target tallies (or the error that
+ * aborted it). At 1.14.4 the vanilla {@code LevelStorage} holds no OS lock to release at finish (session.lock is
+ * advisory pre-1.16), so there is nothing to close here. The future is completed normally even on failure, so the
+ * caller polls it with one branch.
  */
 final class AsyncSaveWriter {
     private static final Logger LOGGER = LogManager.getLogger(AsyncSaveWriter.class);
@@ -52,7 +52,8 @@ final class AsyncSaveWriter {
     // the pause exists to protect, while the client thread waits.
     private static final long ENCODE_HANDSHAKE_TIMEOUT_MILLIS = 250L;
 
-    // Twenty times a finalize's measured tail (headless, no loader registry snapshot); inside the tolerable freeze.
+    // Twenty times the level.dat write's measured worst case on a light pack (about 100 ms headless, no loader
+    // registry snapshot); inside the tolerable freeze.
     private static final long FINALIZE_HANDSHAKE_TIMEOUT_MILLIS = 2_000L;
 
     // Only a stuck-save backstop, so it sits far above the registry rebuild it waits out (tens of milliseconds).
@@ -75,9 +76,18 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * The on-disk step run on the writer thread after the storages are drained and closed (level.dat, then idcounts and
-     * the completion record). It receives the writer's soft-failure tallies as they stand when it starts, so the
-     * completion record can stamp the clean-or-partial status; both are zero on a loss-free save.
+     * The level.dat write, run on the writer thread after the drain and under the encode permit, since the registries
+     * can be read inside it, by the write itself or by a loader's save hook.
+     */
+    @FunctionalInterface
+    public interface LevelDataWrite {
+        void run() throws Exception;
+    }
+
+    /**
+     * The on-disk steps run on the writer thread after the level.dat write, with no permit held (the player record,
+     * idcounts, the map manifest and the completion record). It receives the writer's soft-failure tallies so the
+     * completion record can stamp the real clean-or-partial status; both are zero on a loss-free save.
      */
     @FunctionalInterface
     public interface Finalizer {
@@ -308,6 +318,7 @@ final class AsyncSaveWriter {
 
     private final StorageOpener regionOpener;
     private final Preflight preflight;
+    private final LevelDataWrite levelDataWrite;
     private final Finalizer finalizer;
     private final OutputFinalizer outputs;
     private final SaveProgress progress;
@@ -339,18 +350,19 @@ final class AsyncSaveWriter {
     private volatile @Nullable RecoveredEntityContent recoveredEntityContent;
 
     /**
-     * The three writer-thread steps run around the drain, in lifecycle order: {@code preflight} before any chunk is
-     * written into the folder (the pre-merge resume backup), {@code finalizer} after the drain while the folder is open
-     * (the band's level.dat write), and {@code outputs} after the storages have closed (the export zip).
-     * {@code preflight} and {@code outputs} are best-effort: a throw from either is caught and logged, never failing
-     * the save, so a zip failure can never endanger the openable folder. A {@code finalizer} throw aborts the save the
-     * usual way (it is the level.dat write), except that 1.15.2 vanilla LevelStorage.saveLevelData catches and logs an
-     * IO failure rather than throwing, so a disk-level level.dat write failure is not surfaced here.
+     * The writer-thread steps run around the drain, in lifecycle order: {@code preflight} before any chunk is written
+     * into the folder (the pre-merge resume backup), {@code levelDataWrite} and then {@code finalizer} after the drain
+     * while the folder is open, and {@code outputs} after the storages have closed (the export zip). {@code preflight}
+     * and {@code outputs} are best-effort: a throw from either is caught and logged, never failing the save, so a zip
+     * failure can never endanger the openable folder. A {@code levelDataWrite} or {@code finalizer} throw aborts the
+     * save the usual way, except that 1.15.2 vanilla LevelStorage.saveLevelData catches and logs an IO failure rather
+     * than throwing, so a disk-level level.dat write failure is not surfaced here.
      */
-    public AsyncSaveWriter(StorageOpener regionOpener, Preflight preflight,
+    public AsyncSaveWriter(StorageOpener regionOpener, Preflight preflight, LevelDataWrite levelDataWrite,
             Finalizer finalizer, OutputFinalizer outputs, SaveProgress progress) {
         this.regionOpener = regionOpener;
         this.preflight = preflight;
+        this.levelDataWrite = levelDataWrite;
         this.finalizer = finalizer;
         this.outputs = outputs;
         this.progress = progress;
@@ -509,8 +521,8 @@ final class AsyncSaveWriter {
                         // Counted, not just logged: the save this may have torn has to reach the player as partial.
                         guardLapses++;
                         if (finalizeHoldsPermit) {
-                            LOGGER.warn("the finalize was still running after {} ms; letting the loader proceed "
-                                    + "anyway, so level.dat may hold a torn registry snapshot", timeoutMillis);
+                            LOGGER.warn("the level.dat write was still running after {} ms; letting the loader proceed "
+                                    + "anyway, so what it wrote from the registries may be torn", timeoutMillis);
                         } else {
                             LOGGER.warn("an encode was still running after {} ms; letting the loader proceed anyway, "
                                     + "so this chunk may lose blocks", timeoutMillis);
@@ -736,12 +748,18 @@ final class AsyncSaveWriter {
             // Under the permit although nothing here names a registry: a loader's level.dat hook can read the live
             // registries from this thread, and a rebuild overlapping it can tear the snapshot without a throw.
             acquireEncodePermit(true);
+            long levelDataStartNanos = System.nanoTime();
             try {
-                // level.dat, idcounts, and the completion record
-                finalizer.run(chunksFailed + guardLapses(), entityChunksFailed);
+                levelDataWrite.run();
             } finally {
                 releaseEncodePermit();
             }
+            long finalizeStartNanos = System.nanoTime();
+            // No permit is held here, so the tally reaches the finalizer with every lapse the writer can count.
+            finalizer.run(chunksFailed + guardLapses(), entityChunksFailed);
+            LOGGER.info("ran the finalize: the level.dat write took {} ms and the remaining steps {} ms",
+                    (finalizeStartNanos - levelDataStartNanos) / 1_000_000L,
+                    (System.nanoTime() - finalizeStartNanos) / 1_000_000L);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             error = e;

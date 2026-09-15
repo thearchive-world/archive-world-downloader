@@ -106,6 +106,7 @@ class LiveCaptureSessionLossLogWiringTest {
                     throw new AssertionError("a map write must not open a region storage");
                 },
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 new SaveProgress());
