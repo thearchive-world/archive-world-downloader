@@ -496,32 +496,42 @@ final class AsyncSaveWriter {
      * rather than freezing the client, costing the one chunk or level.dat this was protecting.
      */
     public void pauseEncoding() {
-        synchronized (encodeLock) {
-            encodingPaused = true;
-            long timeoutMillis = finalizeHoldsPermit ? FINALIZE_HANDSHAKE_TIMEOUT_MILLIS
-                    : ENCODE_HANDSHAKE_TIMEOUT_MILLIS;
-            long deadline = System.nanoTime() + timeoutMillis * 1_000_000L;
-            while (permitHeld) {
-                long remainingMillis = (deadline - System.nanoTime()) / 1_000_000L;
-                if (remainingMillis <= 0) {
-                    // Counted, not just logged: the save this may have torn has to reach the player as partial.
-                    guardLapses++;
-                    if (finalizeHoldsPermit) {
-                        LOGGER.warn("the finalize was still running after {} ms; letting the loader proceed anyway, "
-                                + "so level.dat may hold a torn registry snapshot", timeoutMillis);
-                    } else {
-                        LOGGER.warn("an encode was still running after {} ms; letting the loader proceed anyway, so "
-                                + "this chunk may lose blocks", timeoutMillis);
+        long startNanos = System.nanoTime();
+        try {
+            synchronized (encodeLock) {
+                encodingPaused = true;
+                long timeoutMillis = finalizeHoldsPermit ? FINALIZE_HANDSHAKE_TIMEOUT_MILLIS
+                        : ENCODE_HANDSHAKE_TIMEOUT_MILLIS;
+                long deadline = System.nanoTime() + timeoutMillis * 1_000_000L;
+                while (permitHeld) {
+                    long remainingMillis = (deadline - System.nanoTime()) / 1_000_000L;
+                    if (remainingMillis <= 0) {
+                        // Counted, not just logged: the save this may have torn has to reach the player as partial.
+                        guardLapses++;
+                        if (finalizeHoldsPermit) {
+                            LOGGER.warn("the finalize was still running after {} ms; letting the loader proceed "
+                                    + "anyway, so level.dat may hold a torn registry snapshot", timeoutMillis);
+                        } else {
+                            LOGGER.warn("an encode was still running after {} ms; letting the loader proceed anyway, "
+                                    + "so this chunk may lose blocks", timeoutMillis);
+                        }
+                        return;
                     }
-                    return;
-                }
-                try {
-                    encodeLock.wait(remainingMillis);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
+                    try {
+                        encodeLock.wait(remainingMillis);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
                 }
             }
+        } finally {
+            // INFO rather than DEBUG, and not behind a toggle, because a report of a stalled teardown arrives
+            // with the game log and nothing else, and this is the only number in it that separates this mod's share
+            // of that stall from every other mod's. Bounded without a toggle: nothing reaches this call unless a
+            // download is running.
+            LOGGER.info("held the save writer off the registry: the calling thread blocked for {} ms",
+                    (System.nanoTime() - startNanos) / 1_000_000L);
         }
     }
 
