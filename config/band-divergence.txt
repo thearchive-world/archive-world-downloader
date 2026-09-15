@@ -483,7 +483,7 @@ common/src/test/java/net/minecraft/world/level/chunk/storage/package-info.java
 # through the WdlRegionStorage shim (the constructor is package-private at 1.15.2) rather than constructing one via
 # RegionStorageInfo/DataFixers. Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument. Below 1.16
 # the tasks are keyed by DimensionType, the codec and sinks take no registries, and the writer takes no session-lock
-# argument, so the output-order test asserts the export against the level.dat finalizer alone; the entity UUID is
+# argument, so the output-order test asserts the export against the finalizer alone; the entity UUID is
 # read back through EntityMerge.readUuid (the UUIDMost/UUIDLeast pair).
 common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
 
