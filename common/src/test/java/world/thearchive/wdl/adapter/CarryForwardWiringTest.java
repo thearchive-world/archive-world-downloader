@@ -254,7 +254,7 @@ class CarryForwardWiringTest {
         return new AsyncSaveWriter(
                 dimension -> regionStorage(paths),
                 paths::openEntitiesStorage,
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
     }
 
     @SuppressWarnings("unchecked")

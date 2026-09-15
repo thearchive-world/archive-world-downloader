@@ -524,6 +524,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
                 paths::openRegionStorage,
                 paths::openEntitiesStorage,
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {},
