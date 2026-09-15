@@ -129,7 +129,9 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPos.java
 # back to survival, and NbtIo.readCompressed takes only a stream, so the prior level.dat is read through an
 # InputStream. Below 1.15 the bound level is a MultiPlayerLevel (renamed ClientLevel at 1.15), the player position is
 # read off the public x and z fields (Entity.getX and getZ are 1.15 accessors), and Entity has no getSelfAndPassengers,
-# so the root-vehicle exclusion set is the root plus getIndirectPassengers. Java 8 form: no records, switch
+# so the root-vehicle exclusion set is the root plus getIndirectPassengers. From 1.13.2 through 1.15.2 Forge patches
+# the player write path with a per-dimension spawn map whose null key throws at finish, so a player serialize that
+# throws falls back to a salvaged record started from the inventory alone. Java 8 form: no records, switch
 # expressions, pattern instanceof or List.of/Map.of.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 

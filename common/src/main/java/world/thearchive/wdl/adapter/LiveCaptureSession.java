@@ -2610,20 +2610,18 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // The mount is player-state, so this is not gated on captureEntities.
             prepareRootVehicleCapture(player);
             // Fail-soft: a serialize or scrub throw here, after chunks have committed, must not abort before
-            // activeWriter.finish() and leave a chunks-without-level.dat unopenable world plus a leaked lock, so
-            // any throw degrades to a null capturedPlayer (the openable void-world level.dat) and the save runs on.
+            // activeWriter.finish() and leave a chunks-without-level.dat unopenable world plus a leaked lock, so a
+            // throw degrades to the salvaged record below or, failing that too, to a null capturedPlayer (the
+            // openable void-world level.dat), and the save runs on.
             this.capturedPlayer = failSoft("player", () -> assembleCapturedPlayer(player, minecraft));
             this.capturedProgress = failSoft("progress", () -> assembleCapturedProgress(player, minecraft));
-            UUID salvageAttach = rootVehicleAttach;
-            CompoundTag salvageMount = rootVehicleTag;
-            if (this.capturedPlayer == null && salvageMount != null && salvageAttach != null) {
-                // The full player assembly threw (the void-world fail-soft), but a seated mount was already
-                // excluded from the standalone write and its loot drained from the stash, so a bare void-world
-                // save would drop the mount and its capture-once contents from both the entities region and the
-                // player record. Salvage a minimal player carrying just the RootVehicle. Its own fail-soft: if even
-                // this throws, the void-world save stands and the mount is lost (the accepted worst case).
-                this.capturedPlayer = failSoft("salvaged mount",
-                        () -> assembleSalvageMountPlayer(player, minecraft, salvageAttach, salvageMount));
+            if (this.capturedPlayer == null) {
+                this.capturedPlayer = failSoft("salvaged player", () -> assembleSalvagedPlayer(player, minecraft));
+                if (this.capturedPlayer != null) {
+                    LOGGER.warn("salvaged a partial player record: the inventory, the position, the dimension and the "
+                            + "game mode, plus any open-time ender chest or seated mount; the rest of the player "
+                            + "state is lost and the download reports partial");
+                }
             }
         } else {
             // Always a loss, never a download that simply had no player: a session that captured nothing returns
@@ -3035,15 +3033,35 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Assemble the immutable player finish-snapshot from the live client (main thread): serialize the player, apply the
-     * strip knobs and the unconditional death-location strip, the opt-in item-coordinate scrub, the canonical
-     * {@code "Dimension"}, and the open-time ender-chest merge, then bundle the spawn position, gamemode, and
-     * difficulty. Everything in the returned {@link CapturedPlayer} is finished, so it crosses to the writer thread
-     * safely. Throwing is the caller's fail-soft contract.
+     * Assemble the immutable player finish-snapshot from the live client (main thread): serialize the whole player and
+     * finish the record. Throwing is the caller's fail-soft contract.
      */
     private CapturedPlayer assembleCapturedPlayer(LocalPlayer player, Minecraft minecraft) {
+        return assemblePlayer(player, minecraft, adapter.playerSink().capturePlayer(player));
+    }
+
+    /**
+     * Assemble a partial player finish-snapshot for the fail-soft path where the whole-player serialize threw: the
+     * record starts from the inventory alone, which serializes nothing but the stacks, and the finishing tail adds the
+     * position, the dimension, the open-time ender chest, the seated mount and the game mode. Everything else the
+     * serialize would have written is lost with it. The mount matters most: a seated one was excluded from the
+     * standalone entity write and its loot drained from the stash, so a save without this record loses it and its
+     * contents from both the entities region and the player record. Throwing is the caller's fail-soft contract, and
+     * then this finish writes no player record.
+     */
+    private CapturedPlayer assembleSalvagedPlayer(LocalPlayer player, Minecraft minecraft) {
+        return assemblePlayer(player, minecraft, adapter.playerSink().captureInventory(player.inventory));
+    }
+
+    /**
+     * Finish {@code raw}, a serialized player compound or the salvaged partial one, into the immutable player
+     * finish-snapshot (main thread): apply the strip knobs and the unconditional death-location strip, the opt-in
+     * item-coordinate scrub, the on-sight map remap, the canonical {@code "Dimension"}, and the open-time ender-chest
+     * merge, then bundle the spawn position, gamemode, and difficulty. Everything in the returned
+     * {@link CapturedPlayer} is finished, so it crosses to the writer thread safely.
+     */
+    private CapturedPlayer assemblePlayer(LocalPlayer player, Minecraft minecraft, CompoundTag raw) {
         Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
-        CompoundTag raw = adapter.playerSink().capturePlayer(player);
         PlayerTag.applyStripKnobs(raw, config.savePlayerInventory(), config.savePlayerEnderChest());
         PlayerTag.stripDeathLocation(raw);
         if (!config.saveItemCoordinates()) {
@@ -3109,26 +3127,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         Difficulty difficulty = level().getLevelData().getDifficulty();
         return new CapturedPlayer(raw, new BlockPos(anchor), anchor.yRot, anchor.xRot,
                 targetDimension, gameType, difficulty);
-    }
-
-    /**
-     * Salvage a minimal player finish-snapshot carrying only the seated mount's {@code RootVehicle} record and a safe
-     * spawn, for the fail-soft path where {@link #assembleCapturedPlayer} threw after the mount was already excluded
-     * from the standalone write and its loot drained from the stash. Rebuilds a fresh tag rather than reusing the
-     * partial one the throw left: only the dimension, the safe position, and the RootVehicle, none of the fallible
-     * player-state serialization. The real game mode and the rest of the player state are lost with the failed
-     * assembly, so it opens survival at the mount, which is strictly better than losing the mount too.
-     */
-    private CapturedPlayer assembleSalvageMountPlayer(LocalPlayer player, Minecraft minecraft, UUID attach,
-            CompoundTag mountTag) {
-        Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
-        CompoundTag raw = new CompoundTag();
-        PlayerTag.setDimension(raw, targetDimension);
-        PlayerTag.setPosition(raw, new BlockPos(anchor), anchor.yRot, anchor.xRot);
-        PlayerTag.setRootVehicle(raw, attach, mountTag);
-        Difficulty difficulty = level().getLevelData().getDifficulty();
-        return new CapturedPlayer(raw, new BlockPos(anchor), anchor.yRot, anchor.xRot,
-                targetDimension, GameType.SURVIVAL, difficulty);
     }
 
     /**
