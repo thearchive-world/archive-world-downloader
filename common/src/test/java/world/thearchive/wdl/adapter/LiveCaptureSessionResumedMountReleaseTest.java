@@ -80,6 +80,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
     private static final UUID MOUNT = UUID.fromString("f4c1a8d2-3b76-4e05-9a1c-8d2e6b70f513");
     private static final UUID OTHER_MOUNT = UUID.fromString("0a7e2c95-641b-4d38-8f02-b3d54e18a7c6");
     private static final UUID PRIOR_PLAYER = UUID.fromString("2b9d6f10-84c3-4a57-9e21-7c0f5a3b8d64");
+    private static final UUID VILLAGER = UUID.fromString("6d3f9b21-5c8e-4a70-b1d4-9e27c05f83a6");
     private static final String MOUNT_LOOT = "minecraft:diamond";
     // x is negative and just below a chunk boundary, so flooring and truncating land in DIFFERENT chunks and a
     // locator that casts instead of flooring misses. x and z also differ, so an axis swap misses too.
@@ -322,6 +323,35 @@ class LiveCaptureSessionResumedMountReleaseTest {
         assertFalse(session.isPartialSave(0, 0), "so the finish verdict stays clean");
     }
 
+    /**
+     * {@link MerchantOfferScrub} removes an {@code Offers} key without reading its value, so the fixture's stand-in for
+     * the invented trade list is an empty compound and this test names no merchant type or trade-list API, the types
+     * that change between versions.
+     */
+    @Test
+    void aVillagerLeftAboardTheParkedBoatLosesTheTradesItsClientMadeUp(@TempDir Path temporary) throws Exception {
+        Path save = temporary.resolve("save");
+        LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
+        CompoundTag villager = EntityFixtures.entity("minecraft:villager", VILLAGER);
+        villager.put("Offers", new CompoundTag());
+        writePriorLevelDat(session, save, Level.NETHER, EntityFixtures.entityCarrying(
+                EntityFixtures.entityAt("minecraft:boat", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z), villager));
+        WorldPaths paths = paths(save);
+        AsyncSaveWriter writer = saveWriter(paths);
+
+        session.releaseResumedDismountedMount(writer);
+        assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the release must not fail the save");
+
+        CompoundTag released = entityChunk(paths, Level.NETHER, mountChunk());
+        assertNotNull(released, "a boat shared with a villager is released like any other parked mount");
+        CompoundTag boat = soleEntity(released);
+        assertEquals(MOUNT, EntityMerge.readUuid(boat), "and it is the boat");
+        CompoundTag passenger = solePassenger(boat);
+        assertEquals(VILLAGER, EntityMerge.readUuid(passenger),
+                "still carrying the villager that rode with the player");
+        assertFalse(passenger.contains("Offers"), "which reaches the archive without the trades its client made up");
+    }
+
     /** The prior download's mount, carrying the loot whose survival is the whole point of releasing it. */
     private static CompoundTag mount() {
         return EntityFixtures.containerVehicleAt("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z,
@@ -523,6 +553,14 @@ class LiveCaptureSessionResumedMountReleaseTest {
         UUID uuid = EntityMerge.readUuid(entities.getCompound(0));
         assertNotNull(uuid, "the written mount keeps the identity the prior tag recorded");
         return uuid.toString();
+    }
+
+    /** The one passenger an entity carries, so what rode with the mount can be read back as well as the mount. */
+    private static CompoundTag solePassenger(CompoundTag entity) {
+        assertTrue(entity.contains("Passengers", Tag.TAG_LIST), "the released mount carries a Passengers list");
+        ListTag passengers = entity.getList("Passengers", Tag.TAG_COMPOUND);
+        assertEquals(1, passengers.size(), "the fixture seats exactly one passenger");
+        return passengers.getCompound(0);
     }
 
     /** The item id of the one stack an entity's container holds. */
