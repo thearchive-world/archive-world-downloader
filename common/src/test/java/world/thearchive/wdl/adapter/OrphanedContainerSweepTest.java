@@ -72,7 +72,7 @@ class OrphanedContainerSweepTest {
                 dimension -> {
                     throw new AssertionError("no entities were submitted, so the entities storage must not open");
                 },
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
     }
 
     /** A mutable single-entry holder map, matching what the session's per-chunk drain hands the fold. */
