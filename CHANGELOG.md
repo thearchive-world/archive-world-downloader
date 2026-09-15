@@ -29,6 +29,7 @@ version's notes here before tagging; a release with no matching section fails ra
 - Minecraft 1.11.2-1.13.2: a download no longer loses your character when you disconnect, are kicked, or lose the connection.
 - Minecraft 26.1.2 and 26.2: a download interrupted by a disconnect no longer loses track of its character, so resuming it keeps your ender chest and your mount.
 - Minecraft 26.1.2 and 26.2: downloading two worlds around the same time no longer leaves one of them incomplete (missing level.dat) and absent from your singleplayer world list.
+- Minecraft 1.17.1-1.21.4: the first click on a Settings choice such as Keep Chunks Current no longer jumps to the second option in its list (Everywhere went to Nearby instead of Off).
 
 ## 1.2.0
 
