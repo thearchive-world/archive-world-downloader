@@ -1452,10 +1452,109 @@ class AsyncSaveWriterTest {
         assertFalse(writer.finish().get(30, TimeUnit.SECONDS).failed(), "the drain succeeded");
     }
 
-    /** A writer over one region directory, for the cases that only need chunks to reach disk. */
+    @Test
+    void runsNoFinalizeWhileEncodingIsPaused(@TempDir Path save) throws Exception {
+        Path region = Files.createDirectories(save.resolve("region"));
+        AtomicBoolean loaderStateAvailable = new AtomicBoolean(true);
+        AtomicBoolean finalizedDuringRebuild = new AtomicBoolean(false);
+        CountDownLatch finalized = new CountDownLatch(1);
+
+        AsyncSaveWriter writer = newWriter(region, (chunksFailed, entityChunksFailed) -> {
+            if (!loaderStateAvailable.get()) {
+                finalizedDuringRebuild.set(true);
+            }
+            finalized.countDown();
+        });
+
+        writer.pauseEncoding();
+        loaderStateAvailable.set(false);
+        CompletableFuture<AsyncSaveWriter.SaveResult> result = writer.finish();
+
+        // Well inside the writer's own self-release bound, so this observes the hold rather than racing it.
+        assertFalse(finalized.await(200, TimeUnit.MILLISECONDS), "no finalize runs while the writer is held");
+
+        loaderStateAvailable.set(true);
+        writer.resumeEncoding();
+
+        assertFalse(result.get(30, TimeUnit.SECONDS).failed(), "the save completed");
+        assertEquals(0L, finalized.getCount(), "the finalize ran once resumed");
+        assertFalse(finalizedDuringRebuild.get(), "the finalize did not run while the loader state was unavailable");
+    }
+
+    @Test
+    void pauseWaitsForTheFinalizeAlreadyInFlight(@TempDir Path save) throws Exception {
+        Path region = Files.createDirectories(save.resolve("region"));
+        CountDownLatch finalizeStarted = new CountDownLatch(1);
+        CountDownLatch releaseFinalize = new CountDownLatch(1);
+        AtomicBoolean finalizeFinished = new AtomicBoolean(false);
+
+        AsyncSaveWriter writer = newWriter(region, (chunksFailed, entityChunksFailed) -> {
+            finalizeStarted.countDown();
+            releaseFinalize.await(30, TimeUnit.SECONDS);
+            finalizeFinished.set(true);
+        });
+
+        CompletableFuture<AsyncSaveWriter.SaveResult> result = writer.finish();
+        assertTrue(finalizeStarted.await(30, TimeUnit.SECONDS), "the writer reached the finalize");
+
+        AtomicBoolean pauseReturned = new AtomicBoolean(false);
+        Thread client = new Thread(() -> {
+            writer.pauseEncoding();
+            pauseReturned.set(true);
+        }, "test-client-thread");
+        client.start();
+
+        // Past the chunk bound and inside the finalize one, so a finalize left on the chunk bound fails here.
+        for (int i = 0; i < 80 && !pauseReturned.get(); i++) {
+            Thread.sleep(5);
+        }
+        assertFalse(pauseReturned.get(), "pause must not return while a finalize is still in flight");
+
+        releaseFinalize.countDown();
+        client.join(30_000);
+
+        assertTrue(pauseReturned.get(), "pause returns once the in-flight finalize finishes");
+        assertTrue(finalizeFinished.get(), "the in-flight finalize was allowed to complete rather than abandoned");
+
+        writer.resumeEncoding();
+        assertFalse(result.get(30, TimeUnit.SECONDS).failed(), "the save completed");
+    }
+
+    @Test
+    void lapsedWaitAroundTheFinalizeCountsAsLost(@TempDir Path save) throws Exception {
+        Path region = Files.createDirectories(save.resolve("region"));
+        CountDownLatch finalizeStarted = new CountDownLatch(1);
+        CountDownLatch releaseFinalize = new CountDownLatch(1);
+
+        AsyncSaveWriter writer = newWriter(region, (chunksFailed, entityChunksFailed) -> {
+            finalizeStarted.countDown();
+            releaseFinalize.await(30, TimeUnit.SECONDS);
+        });
+
+        CompletableFuture<AsyncSaveWriter.SaveResult> result = writer.finish();
+        assertTrue(finalizeStarted.await(30, TimeUnit.SECONDS), "the writer reached the finalize");
+
+        Thread client = new Thread(writer::pauseEncoding, "test-client-thread");
+        client.start();
+        client.join(10_000);
+        assertFalse(client.isAlive(), "pause gave up on the parked finalize once its bound lapsed");
+
+        releaseFinalize.countDown();
+        writer.resumeEncoding();
+        AsyncSaveWriter.SaveResult saved = result.get(30, TimeUnit.SECONDS);
+
+        assertFalse(saved.failed(), "the save completed");
+        assertEquals(1, saved.chunksFailed(), "the lapse is counted, so the finish reports partial");
+    }
+
     private AsyncSaveWriter newWriter(Path region) {
+        return newWriter(region, (chunksFailed, entityChunksFailed) -> {});
+    }
+
+    /** A writer over one region directory whose finish runs {@code finalizer}. */
+    private AsyncSaveWriter newWriter(Path region, AsyncSaveWriter.Finalizer finalizer) {
         return new AsyncSaveWriter(
                 dimension -> storage(region, "chunk"),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, new SaveProgress());
+                () -> {}, finalizer, () -> null, new SaveProgress());
     }
 }
