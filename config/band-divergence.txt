@@ -90,7 +90,8 @@ common/src/main/java/world/thearchive/wdl/adapter/LecternSink.java
 # Below 1.16 there is no RegistryAccess, so serializeMap takes no registries argument.
 common/src/main/java/world/thearchive/wdl/adapter/MapSink.java
 
-# Below 1.16 there is no RegistryAccess, so capturePlayer takes no registries argument.
+# Below 1.16 there is no RegistryAccess, so capturePlayer takes no registries argument. From 1.13.2 through 1.15.2
+# the sink also captures the inventory alone, the salvage source for a finish whose player serialize threw.
 common/src/main/java/world/thearchive/wdl/adapter/PlayerSink.java
 
 # Below 1.16 there is no WorldData, LevelStorageSource.LevelStorageAccess, LevelResource or RegistryAccess: a 1.15.2
@@ -176,7 +177,10 @@ common/src/main/java/world/thearchive/wdl/adapter/CapturedPlayer.java
 # holds no session lock to hand the writer (DirectoryLock is a 1.16 addition); Entity has no blockPosition (the
 # BlockPos(Entity) constructor stands in), MultiPlayerGameMode has no getPreviousPlayerMode, so a spectator's
 # captured game type falls back to survival, and NbtIo.readCompressed takes only a stream, so the prior level.dat is
-# read through an InputStream. Java 8 form: no records, switch expressions, pattern instanceof or List.of/Map.of.
+# read through an InputStream. From 1.13.2 through 1.15.2 Forge patches the player write path with a per-dimension
+# spawn map whose null key throws at finish, so a player serialize that throws falls back to a salvaged record
+# started from the inventory alone. Java 8 form: no records, switch expressions, pattern instanceof or
+# List.of/Map.of.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Deleted: the test pins the session's sourceMotd helper, which dereferences the Component motd ServerData carries
@@ -318,6 +322,10 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/MountArmorCaptureTest.jav
 # field is read by reflection to prove slot 0 empty), ItemStack.is(Item) or Tag.TAG_COMPOUND; below 1.16 the fixture
 # saddles through AbstractHorse.setSaddled (a flag-only setter 1.16 dropped), the sinks take no registries; no List.of.
 common/src/test/java/world/thearchive/wdl/adapter/impl/SaddleCaptureTest.java
+
+# Added from 1.13.2 through 1.15.2 with the inventory-only capture it pins, and absent from dev, whose sink has no
+# such step.
+common/src/test/java/world/thearchive/wdl/adapter/impl/PlayerSinkImplTest.java
 
 # Below the 1.21 update the HUD render callback carries a float partial-tick rather than a DeltaTracker, so the
 # shared overlay's render entry point takes a float; below 1.16 the GUI render path carries no PoseStack and
