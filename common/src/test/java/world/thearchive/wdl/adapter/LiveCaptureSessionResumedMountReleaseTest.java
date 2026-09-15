@@ -527,6 +527,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
                         paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
                         DataFixTypes.ENTITY_CHUNK),
                 () -> {},
+                () -> {},
                 (chunksFailed, entityChunksFailed) -> {},
                 () -> null,
                 () -> {},
