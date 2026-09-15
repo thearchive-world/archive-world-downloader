@@ -140,7 +140,7 @@ class LiveCaptureSessionFailSoftTest {
 
     @Test
     void eachDegradedStepIsCountedOnItsOwn(@TempDir Path temporary) throws Exception {
-        // These are independent losses, and one of them (the salvaged mount) runs only because another
+        // These are independent losses, and one of them (the salvaged player) runs only because another
         // already failed, so a tally that latched on the first would under-report every finish that lost
         // more than one snapshot.
         LiveCaptureSession session = session(temporary);
