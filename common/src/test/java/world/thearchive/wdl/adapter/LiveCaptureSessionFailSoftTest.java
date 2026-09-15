@@ -159,7 +159,7 @@ class LiveCaptureSessionFailSoftTest {
      * Bind a session to a writer with no storage behind it, which is all the end-of-stream contract needs: the guard
      * submits nothing, so the drain opens neither target, and what matters is whether the writer reached its finalize
      * at all. The finalizer arrives as a parameter so a test can read the session through it, on the writer thread, at
-     * the instant the production one writes level.dat and stamps the completion record.
+     * the instant the production one stamps the completion record.
      */
     private static AsyncSaveWriter bindWriter(LiveCaptureSession session, Path temporary,
             AsyncSaveWriter.Finalizer finalizer) {
@@ -172,6 +172,7 @@ class LiveCaptureSessionFailSoftTest {
                 dimension -> {
                     throw new AssertionError("no entity was submitted, so the entities storage must not open");
                 },
+                () -> {},
                 () -> {},
                 finalizer,
                 () -> null,
