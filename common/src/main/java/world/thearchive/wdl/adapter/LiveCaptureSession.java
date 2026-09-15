@@ -616,7 +616,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * The finish-snapshot of the local player, assembled on the main thread in {@link #finish()} and read by the writer
-     * thread when the finalizer writes level.dat. Volatile because it crosses that boundary; the writer's queue already
+     * thread when the level.dat write runs. Volatile because it crosses that boundary; the writer's queue already
      * establishes the happens-before, the keyword documents it. Stays null on a disconnect-flush or when the assembly
      * fails soft, and the level.dat write degrades to the openable void-world output.
      */
@@ -3817,15 +3817,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         FinalizeOutputs.backupBeforeResume(saveRoot, target.mode(), config.zipOnResume());
                         report.refreshHumanRendering(saveRoot);
                     },
-                    // Read the volatile capturedPlayer/capturedProgress LAZILY inside the thunk:
-                    // ensureWriter builds this thunk at the first incremental flush, mid-capture,
-                    // before finish() sets the fields, so a snapshot taken here would always be null. The thunk runs
+                    // Read the volatile capturedPlayer/capturedProgress LAZILY inside the thunks:
+                    // ensureWriter builds these thunks at the first incremental flush, mid-capture,
+                    // before finish() sets the fields, so a snapshot taken here would always be null. The thunks run
                     // on the writer thread strictly after the chunk drain, so the fields set in finish() are visible.
                     // level.dat is written FIRST, then idcounts (the map files themselves streamed during capture),
                     // each write caught, so a map IO failure never aborts before level.dat (an unopenable save) or
                     // fails it.
+                    () -> levelDataWriter.save(access, levelData, capturedPlayer),
                     (chunksFailed, entityChunksFailed) -> {
-                        levelDataWriter.save(access, levelData, capturedPlayer);
                         PlayerProgressWriter.write(saveRoot, capturedProgress);
                         writeIdCounts(paths);
                         saveMapManifest(); // after the data/ files, so a torn write never precedes them
