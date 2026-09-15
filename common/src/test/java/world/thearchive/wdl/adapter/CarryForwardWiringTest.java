@@ -258,7 +258,7 @@ class CarryForwardWiringTest {
                 dimension -> new SimpleRegionStorage(paths.entitiesStorageInfo(dimension),
                         paths.entitiesDirectory(dimension), DataFixers.getDataFixer(), false,
                         DataFixTypes.ENTITY_CHUNK),
-                () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
+                () -> {}, () -> {}, (chunksFailed, entityChunksFailed) -> {}, () -> null, () -> {}, new SaveProgress());
     }
 
     @SuppressWarnings("unchecked")
