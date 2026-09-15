@@ -50,7 +50,10 @@ final class AsyncSaveWriter {
 
     // Comfortably over a measured chunk encode (single-digit milliseconds), since overrunning it costs the very chunk
     // the pause exists to protect, while the client thread waits.
-    private static final long PAUSE_HANDSHAKE_TIMEOUT_MILLIS = 250L;
+    private static final long ENCODE_HANDSHAKE_TIMEOUT_MILLIS = 250L;
+
+    // Twenty times a finalize's measured tail (headless, no loader registry snapshot); inside the tolerable freeze.
+    private static final long FINALIZE_HANDSHAKE_TIMEOUT_MILLIS = 2_000L;
 
     // Only a stuck-save backstop, so it sits far above the registry rebuild it waits out (tens of milliseconds).
     private static final long PAUSE_SELF_RELEASE_TIMEOUT_MILLIS = 10_000L;
@@ -73,8 +76,8 @@ final class AsyncSaveWriter {
 
     /**
      * The on-disk step run on the writer thread after the storages are drained and closed (level.dat, then idcounts and
-     * the completion record). It receives the writer's soft-failure tallies so the completion record can stamp the real
-     * clean-or-partial status; both are zero on a loss-free save.
+     * the completion record). It receives the writer's soft-failure tallies as they stand when it starts, so the
+     * completion record can stamp the clean-or-partial status; both are zero on a loss-free save.
      */
     @FunctionalInterface
     public interface Finalizer {
@@ -149,7 +152,8 @@ final class AsyncSaveWriter {
     private final CompletableFuture<SaveResult> result = new CompletableFuture<>();
     private final Object encodeLock = new Object();
     private boolean encodingPaused;
-    private boolean encodeInFlight;
+    private boolean permitHeld;
+    private boolean finalizeHoldsPermit;
     private int guardLapses;
     private final Thread thread;
 
@@ -314,27 +318,33 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * Stop the writer resolving any further encode thunk, and wait for one already in flight to finish (main thread).
-     * Forge rebuilds the client's block registry in place when a level closes, and an encode reading it meanwhile
-     * resolves blocks to nothing, which some bands write as air rather than reporting. Returning from this call is the
-     * guarantee the caller needs: no encode is running, and none will start until {@link #resumeEncoding}, so the
-     * rebuild cannot overlap one.
+     * Stop the writer reading the loader's registries, and wait for a read already in flight to finish (main thread).
+     * Forge rebuilds the client's registries in place when a level closes: a chunk encode reading them meanwhile
+     * resolves blocks to nothing, which some bands write as air rather than reporting, and the level.dat write reads
+     * them through the loader's own save hook and can carry a torn snapshot. Returning from this call is the guarantee
+     * the caller needs: no read is running, and none starts until {@link #resumeEncoding}.
      *
-     * <p>The wait is bounded because it runs on the thread the player is waiting on: an encode that overruns it is let
-     * go rather than freezing the client, which costs at most the one chunk this was protecting.
+     * <p>The wait is bounded because it runs on the thread the player is waiting on: a read that overruns it is let go
+     * rather than freezing the client, costing the one chunk or level.dat this was protecting.
      */
     public void pauseEncoding() {
         synchronized (encodeLock) {
             encodingPaused = true;
-            long deadline = System.nanoTime() + PAUSE_HANDSHAKE_TIMEOUT_MILLIS * 1_000_000L;
-            while (encodeInFlight) {
+            long timeoutMillis = finalizeHoldsPermit ? FINALIZE_HANDSHAKE_TIMEOUT_MILLIS
+                    : ENCODE_HANDSHAKE_TIMEOUT_MILLIS;
+            long deadline = System.nanoTime() + timeoutMillis * 1_000_000L;
+            while (permitHeld) {
                 long remainingMillis = (deadline - System.nanoTime()) / 1_000_000L;
                 if (remainingMillis <= 0) {
-                    // Counted, not just logged: the chunk this abandons is written either way, and a save that may
-                    // hold air where terrain was has to reach the player as partial rather than as clean.
+                    // Counted, not just logged: the save this may have torn has to reach the player as partial.
                     guardLapses++;
-                    LOGGER.warn("an encode was still running after {} ms; letting the loader proceed anyway, so this "
-                            + "chunk may lose blocks", PAUSE_HANDSHAKE_TIMEOUT_MILLIS);
+                    if (finalizeHoldsPermit) {
+                        LOGGER.warn("the finalize was still running after {} ms; letting the loader proceed anyway, "
+                                + "so level.dat may hold a torn registry snapshot", timeoutMillis);
+                    } else {
+                        LOGGER.warn("an encode was still running after {} ms; letting the loader proceed anyway, so "
+                                + "this chunk may lose blocks", timeoutMillis);
+                    }
                     return;
                 }
                 try {
@@ -354,7 +364,7 @@ final class AsyncSaveWriter {
         }
     }
 
-    /** Let the writer resolve encode thunks again, once the loader has finished rebuilding (main thread). */
+    /** Let the writer read the registries again, once the loader has finished rebuilding (main thread). */
     public void resumeEncoding() {
         synchronized (encodeLock) {
             encodingPaused = false;
@@ -363,19 +373,18 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * Bounded because a resume that never arrives must not strand the save: the drain would never reach the finalize
-     * and the download would sit in saving forever, which is worse than the race the wait avoids.
+     * Bounded because a resume that never arrives must not strand the save: the download would sit in saving forever,
+     * which is worse than the race the wait avoids.
      */
-    private void acquireEncodePermit() {
+    private void acquireEncodePermit(boolean finalize) {
         synchronized (encodeLock) {
             long deadline = System.nanoTime() + PAUSE_SELF_RELEASE_TIMEOUT_MILLIS * 1_000_000L;
             while (encodingPaused) {
                 long remainingMillis = (deadline - System.nanoTime()) / 1_000_000L;
                 if (remainingMillis <= 0) {
-                    // Counted for the same reason as the handshake lapse: what follows is an encode taken with no
-                    // guarantee about the loader's registries, so the save reports partial rather than clean.
+                    // Counted for the same reason as the handshake lapse: what follows runs unguarded.
                     guardLapses++;
-                    LOGGER.warn("no resume arrived within {} ms; encoding again so the save can finalize",
+                    LOGGER.warn("no resume arrived within {} ms; proceeding unguarded so the save can finalize",
                             PAUSE_SELF_RELEASE_TIMEOUT_MILLIS);
                     encodingPaused = false;
                     break;
@@ -387,11 +396,12 @@ final class AsyncSaveWriter {
                     break;
                 }
             }
-            encodeInFlight = true;
+            permitHeld = true;
+            finalizeHoldsPermit = finalize;
         }
     }
 
-    /** How many times a bounded wait gave up and let an encode run unguarded, each one a chunk that may hold air. */
+    /** Bounded waits that gave up, each counted as a loss: a chunk that may hold air, or a torn level.dat. */
     private int guardLapses() {
         synchronized (encodeLock) {
             return guardLapses;
@@ -400,7 +410,8 @@ final class AsyncSaveWriter {
 
     private void releaseEncodePermit() {
         synchronized (encodeLock) {
-            encodeInFlight = false;
+            permitHeld = false;
+            finalizeHoldsPermit = false;
             encodeLock.notifyAll();
         }
     }
@@ -457,7 +468,7 @@ final class AsyncSaveWriter {
                 WriteTask task = (WriteTask) next;
                 progress.chunks(++drained, submitted); // both REGION and ENTITIES drain under the one chunks phase
                 CompoundTag tag;
-                acquireEncodePermit();
+                acquireEncodePermit(false);
                 try {
                     tag = task.encode().get(); // encode + stage-(a) fold on this thread (a no-op for entities)
                 } catch (RuntimeException e) {
@@ -529,8 +540,15 @@ final class AsyncSaveWriter {
             }
             regions.synchronizeAll();
             entities.synchronizeAll();
-            // level.dat, idcounts, and the completion record
-            finalizer.run(chunksFailed + guardLapses(), entityChunksFailed);
+            // Under the permit although nothing here names a registry: a loader's level.dat hook can read the live
+            // registries from this thread, and a rebuild overlapping it can tear the snapshot without a throw.
+            acquireEncodePermit(true);
+            try {
+                // level.dat, idcounts, and the completion record
+                finalizer.run(chunksFailed + guardLapses(), entityChunksFailed);
+            } finally {
+                releaseEncodePermit();
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             error = e;
@@ -548,9 +566,8 @@ final class AsyncSaveWriter {
         if (error == null) {
             zipFileName = bestEffortOutput(outputs, "the export zip");
         }
-        // A lapsed guard means a chunk was encoded while the loader may have been rebuilding what the encode reads,
-        // which is the silent half of the defect the guard exists for. It reaches the tally so the download reports
-        // partial and names the log, rather than reporting clean over blocks that may have become air.
+        // A lapsed guard means a chunk or level.dat was written across a possible rebuild, the silent half of the
+        // defect the guard exists for; it reaches this tally so every surface this result feeds reports partial.
         result.complete(new SaveResult(chunksNew, chunksRecaptured, mergedContainers, chunksFailed + guardLapses(),
                 entityChunksWritten, entityChunksFailed, entitiesCarriedForward, entitiesRecovered, zipFileName,
                 error));
