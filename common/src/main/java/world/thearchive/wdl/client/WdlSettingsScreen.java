@@ -304,8 +304,8 @@ public final class WdlSettingsScreen extends Screen {
 
     private <E extends Enum<E>> Control cycleControl(String key, Class<E> type, List<E> values, E initial) {
         CycleButton<E> cycle = CycleButton.<E>builder(value -> Component.translatable(valueLabelKey(value)))
-                .withInitialValue(initial)
                 .withValues(values)
+                .withInitialValue(initial)
                 .displayOnlyValue()
                 .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty(),
                         (button, value) -> this.draft.set(key, value.name()));
@@ -315,8 +315,8 @@ public final class WdlSettingsScreen extends Screen {
     private Control recaptureControl(String key) {
         CycleButton<RecaptureMode> cycle = CycleButton.<RecaptureMode>builder(
                 value -> Component.translatable(valueLabelKey(value)))
-                .withInitialValue(this.draft.getEnum(key, RecaptureMode.class))
                 .withValues(List.of(RecaptureMode.values()))
+                .withInitialValue(this.draft.getEnum(key, RecaptureMode.class))
                 .displayOnlyValue()
                 .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty(),
                         (button, value) -> onRecaptureChange(key, value));
