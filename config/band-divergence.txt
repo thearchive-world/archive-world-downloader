@@ -314,7 +314,7 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.
 # rather than draining a second entities/ storage, the resume scan reads the same chunk, and a fold with no host chunk
 # is a counted loss. The tags are classic MCP NBTTagCompound. At 1.12.2 the pause self-release backstop is 60 seconds
 # against 10 on 1.13.2 and dev, sized over the whole client level teardown the hold brackets (other mods' unload
-# listeners and a synchronous resource reload), and pauseEncoding logs at INFO how long the hold blocked its caller.
+# listeners and a synchronous resource reload).
 common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 
 # Below 1.20.5 there is no SimpleRegionStorage and below 1.15 no IOWorker, so the merge-write reads and writes through
@@ -334,8 +334,7 @@ common/src/main/java/world/thearchive/wdl/adapter/WorldPaths.java
 # Below 1.20.5 there is no SimpleRegionStorage and below 1.15 no IOWorker, so the drain is proven against a test-local
 # subclass of the mod's own WdlRegionStorage rather than one built from RegionStorageInfo and DataFixers; item lists are
 # read with ItemStackHelper.loadAllItems (no registries argument below 1.20.5), and the tags are classic MCP
-# NBTTagCompound. Added at 1.12.2, a case that captures the INFO line pauseEncoding logs and pins the blocked-for
-# milliseconds it reports.
+# NBTTagCompound.
 common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
 
 # Deleted: the whole test exercises chiseled-bookshelf occupancy flush, and ChiseledBookShelfBlock does not exist at
