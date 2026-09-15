@@ -405,7 +405,7 @@ common/src/main/java/world/thearchive/wdl/adapter/WdlRegionStorage.java
 # RegionStorageInfo and DataFixers, and the flush-failure case 1.15.2 carries is dropped because the synchronous store
 # has no synchronize step to fail. Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument. Below 1.16
 # the tasks are keyed by DimensionType, the codec and sinks take no registries, and the writer takes no session-lock
-# argument, so the output-order test asserts the export against the level.dat finalizer alone; the entity UUID is read
+# argument, so the output-order test asserts the export against the finalizer alone; the entity UUID is read
 # back through EntityMerge.readUuid (the UUIDMost/UUIDLeast pair). The encode-pause Javadoc names the registry rebuilds
 # 1.14.4 has (the server's ids written in on the way into a server on both loaders, Fabric's unmap at level close).
 common/src/test/java/world/thearchive/wdl/adapter/AsyncSaveWriterTest.java
