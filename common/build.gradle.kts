@@ -64,8 +64,8 @@ neoForge.addModdingDependenciesTo(sourceSets["test"])
 // CI-gated by .github/workflows/mutation-testing.yml on dev and version-branch pushes; a new survivor is
 // triaged (killed, suppressed, or rewritten away) rather than absorbed by lowering the floor.
 pitest {
-    pitestVersion = "1.22.1"
-    junit5PluginVersion = "1.2.2" // required: the test platform is JUnit 5; this is PIT's JUnit-Platform bridge
+    pitestVersion = "1.30.0"
+    junit5PluginVersion = "1.2.3" // required: the test platform is JUnit 5; this is PIT's JUnit-Platform bridge
 
     // The fidelity-critical registry. Exact FQNs, never a package glob (see the rationale above).
     targetClasses.set(listOf(
@@ -165,11 +165,6 @@ pitest {
     // suppressed with a reason, or rewritten away) rather than absorbed by lowering this; never lower it to
     // swallow one, and never widen it past the run-to-run variance the gated runs show (none seen).
     mutationThreshold = 100
-
-    // Incremental history at the plugin's default location under the git-ignored build directory: repeat local
-    // runs re-mutate only changed code against the stored run. A fresh CI checkout has no prior history, so CI
-    // always runs full-scope.
-    enableDefaultIncrementalAnalysis = true
 
     // Explicit minion thread count, defaulting to a size a standard CI runner carries without oversubscribing;
     // a larger machine raises it with -PpitestThreads=N. PIT's +auto_threads is deliberately NOT used: its own
