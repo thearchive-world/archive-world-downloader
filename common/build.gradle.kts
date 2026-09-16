@@ -1,7 +1,7 @@
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
-    id("net.neoforged.gradle.vanilla") version "7.1.38" // common's Minecraft toolchain, versioned inline
+    id("net.neoforged.gradle.vanilla") version "7.1.39" // common's Minecraft toolchain, versioned inline
     id("com.diffplug.spotless")    // applied per-subproject, not via build-logic (see below)
     id("wdl.java-conventions")
     id("wdl.nullness-conventions")
