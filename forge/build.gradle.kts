@@ -36,15 +36,14 @@ buildscript {
 }
 
 // The non-Fabric jar for this deep band, a hand-rolled plain-java island beside the band's Gradle-9 root. This
-// band predates the Mojmap floor, so no ForgeGradle or NeoGradle resolves official Mojang mappings for 1.13.2, and
-// Architectury Loom (which the 1.16.5-and-up Forge islands use) is unproven on the Gradle 8.14.5 this island runs.
-// So the island carries no Loom at all: the root's Fabric-Loom provision remaps the vanilla 1.13.2 jar to Mojmap
-// through the tools/mojmap-bridge mapping and publishes that jar plus its transitive libraries to
-// ../common/build/island-classpath.txt, which this build reads as plain file dependencies. The Forge API the six
-// glue files reference has no Mojmap-named distribution at this band either, so remapForgeApi builds one from the
-// real forge-1.13.2-25.0.223 universal jar (see below). The island stays a separate build with its own wrapper
-// because it runs a different Java toolchain (Java 8) than the Gradle-9 root; two wrappers, one set of coordinates
-// read from the root gradle.properties.
+// band predates the Mojmap floor, so no ForgeGradle, NeoGradle or Architectury Loom (the plugin of the 1.14.4 to
+// 1.16.5 islands) resolves official Mojang mappings for 1.13.2. So the island carries no Loom at all: the root's
+// Fabric-Loom provision remaps the vanilla 1.13.2 jar to Mojmap through the tools/mojmap-bridge mapping and
+// publishes that jar plus its transitive libraries to ../common/build/island-classpath.txt, which this build reads
+// as plain file dependencies. The Forge API the six glue files reference has no Mojmap-named distribution at this
+// band either, so remapForgeApi builds one from the real forge-1.13.2-25.0.223 universal jar (see below). The
+// island stays a separate build with its own wrapper because it runs a different Java toolchain (Java 8) than the
+// Gradle-9 root; two wrappers, one set of coordinates read from the root gradle.properties.
 plugins {
     java
     // Release publishing. Pinned as a literal because the island is a separate build with no access to the root
