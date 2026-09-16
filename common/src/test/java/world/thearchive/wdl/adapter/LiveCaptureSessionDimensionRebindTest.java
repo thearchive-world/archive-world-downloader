@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Properties;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -107,6 +108,20 @@ class LiveCaptureSessionDimensionRebindTest {
         assertEquals("minecraft:worlds/example/example_nether", field(session, "liveDimensionId"),
                 "while the packet-side stores stay keyed by the name entities are announced under, which on that "
                         + "server is not the vanilla one");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aStemKeepsTheSeaLevelItWasFirstEnteredWith(@TempDir Path temporary) throws Exception {
+        LiveCaptureSession session = session(temporary);
+
+        session.recordSeaLevel(Level.OVERWORLD, 63);
+        session.recordSeaLevel(Level.NETHER, 32);
+        session.recordSeaLevel(Level.OVERWORLD, 70);
+
+        assertEquals(Map.of(Level.OVERWORLD, 63, Level.NETHER, 32),
+                (Map<ResourceKey<Level>, Integer>) field(session, "capturedSeaLevels"),
+                "a stem's first entry is the server's value for it; a later one is the same dimension re-entered");
     }
 
     /** Mark {@code positions} captured in the dimension the session is currently bound to. */
