@@ -113,7 +113,7 @@ class ConfigSchemaTest {
             + "# What fills the space between the chunks you downloaded. Your downloaded area is always the real "
             + "thing;\n"
             + "# this only governs the surroundings.\n"
-            + "# VOID (default): superflat empty air, the honest archive view of just your build against nothing.\n"
+            + "# VOID (default): empty air, the honest archive view of just your build against nothing.\n"
             + "# DEFAULT: normal terrain generation. FLAT: superflat layers. DEFAULT and FLAT fill the gaps with\n"
             + "# freshly generated terrain that is plausible but NOT the server's real land (a client cannot recover\n"
             + "# the server's seed), so they are off by default; the downloaded chunks still blend into it without a\n"
