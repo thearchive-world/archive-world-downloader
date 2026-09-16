@@ -550,6 +550,10 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/GameRuleFixture.ja
 # Below 1.21.5 CompoundTag.getCompound and getString return the value itself (Optional at 1.21.5, with the
 # getCompoundOrEmpty default). Below 1.21.11 the chested horse sits in animal.horse; 1.21.11 moved it to animal.equine.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlChestedAnimalCaptureTest.java
+# Below 1.21.5 CompoundTag.getBoolean, getString and getList (with a type id) return the value itself, and CustomName
+# is a serialized JSON text component rather than 1.21.5's component codec, so the name is decoded like the sibling
+# tests do.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOrderedToSitCaptureTest.java
 # Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayBoostedPairingTest.java
 # Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
