@@ -80,7 +80,7 @@ jobs:
           # The language target's own JDK is installed alongside the toolchain's wherever the two differ, because
           # era-specific build tooling still asks for that one: ForgeGradle runs its MCP steps on the Minecraft
           # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it
-          # takes the default JAVA_HOME, which is what launches the daemon, and fabric-loom 1.17.19 publishes
+          # takes the default JAVA_HOME, which is what launches the daemon, and fabric-loom publishes
           # org.gradle.jvm.version=21 that a daemon below it cannot resolve at all.
           target="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
           jdks="$version"
@@ -93,7 +93,7 @@ jobs:
           verify=true
           for j in $jdks; do case "$j" in 16 | 16.*) verify=false ;; esac; done
           echo "verify=$verify" >> "$GITHUB_OUTPUT"
-          # fabric-loom 1.17.19 publishes org.gradle.jvm.version=21, so a daemon below 21 cannot resolve it
+          # fabric-loom publishes org.gradle.jvm.version=21, so a daemon below 21 cannot resolve it
           # at all and the build dies while configuring the root project, which declares the plugin apply-false
           # even on a band that ships no Fabric module. A band whose own build JDK is older therefore installs
           # 21 beside it and lets 21 be the default JAVA_HOME, since that is what launches the daemon and
