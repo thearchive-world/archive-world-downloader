@@ -546,7 +546,7 @@ common/build.gradle.kts
 # mention (1.20.2 includes no :neoforge).
 fabric/build.gradle.kts
 
-# Added. The catalog's fabric-loom 1.17.19 declares a Java 21 runtime requirement in its plugin metadata, so the JVM
+# Added. The catalog's fabric-loom declares a Java 21 runtime requirement in its plugin metadata, so the JVM
 # launching Gradle must be Java 21 while java_version (17) stays the compile toolchain; this file pins the daemon JVM
 # by toolchain criteria. The forge/ island keeps its own Gradle 8.14.5 wrapper on Java 17 and does not read it.
 gradle/gradle-daemon-jvm.properties
