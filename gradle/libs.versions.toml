@@ -9,10 +9,10 @@
 # (gradle/gradle#15383).
 
 [versions]
-loom = "1.17.19"
-moddev = "2.0.146"
-spotless = "8.10.1"
-errorprone-plugin = "5.1.0"
+loom = "1.17.21"
+moddev = "2.0.147"
+spotless = "8.10.2"
+errorprone-plugin = "5.1.1"
 mod-publish-plugin = "2.2.0"
 
 [plugins]
