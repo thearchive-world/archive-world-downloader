@@ -9,8 +9,8 @@
 # (gradle/gradle#15383).
 
 [versions]
-spotless = "8.10.1"
-errorprone-plugin = "5.1.0"
+spotless = "8.10.2"
+errorprone-plugin = "5.1.1"
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
