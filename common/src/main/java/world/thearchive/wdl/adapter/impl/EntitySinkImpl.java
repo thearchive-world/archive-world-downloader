@@ -20,6 +20,7 @@ import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.entity.animal.horse.Horse;
 import net.minecraft.world.entity.animal.horse.Llama;
@@ -60,7 +61,7 @@ public final class EntitySinkImpl implements EntitySink {
                          // list would otherwise write them twice), removed entities, and player-only vehicles
             }
             CompoundTag entityTag = new CompoundTag();
-            if (entity.save(entityTag)) {
+            if (saveOrderingPetsToSit(entity, entityTag)) {
                 applySaddleItem(entityTag, entity);
                 applyMountArmor(entityTag, entity);
                 applyMobPersistence(entityTag, entity, forceMobPersistence);
@@ -79,13 +80,54 @@ public final class EntitySinkImpl implements EntitySink {
         // PersistenceRequired restoration the standalone entity path applies via applyMobPersistence (a named mob,
         // a loot-equipped mob, and every mob under forceMobPersistence).
         CompoundTag tag = new CompoundTag();
-        if (!vehicle.save(tag)) {
+        if (!saveOrderingPetsToSit(vehicle, tag)) {
             return null;
         }
         applySaddleItem(tag, vehicle);
         applyMountArmor(tag, vehicle);
         applyMobPersistence(tag, vehicle, forceMobPersistence);
         return tag;
+    }
+
+    private static boolean saveOrderingPetsToSit(Entity entity, CompoundTag entityTag) {
+        List<Runnable> restores = orderToSitFromPose(entity, null);
+        if (entity.isVehicle()) {
+            for (Entity passenger : entity.getIndirectPassengers()) {
+                restores = orderToSitFromPose(passenger, restores);
+            }
+        }
+        try {
+            return entity.save(entityTag);
+        } finally {
+            if (restores != null) {
+                for (Runnable restore : restores) {
+                    restore.run();
+                }
+            }
+        }
+    }
+
+    /**
+     * Restore the server-authoritative {@code Sitting} the client never receives: {@code TamableAnimal.orderedToSit} is
+     * private server state, while the sit pose it drives is synced. Saved as {@code false}, a pet stands up on load and
+     * walks or teleports to an owner in the world.
+     */
+    private static @Nullable List<Runnable> orderToSitFromPose(Entity entity, @Nullable List<Runnable> restores) {
+        if (entity instanceof TamableAnimal tamable) {
+            boolean ordered = tamable.isOrderedToSit();
+            boolean posed = tamable.isInSittingPose();
+            if (ordered != posed) {
+                tamable.setOrderedToSit(posed);
+                restores = addRestore(restores, () -> tamable.setOrderedToSit(ordered));
+            }
+        }
+        return restores;
+    }
+
+    private static List<Runnable> addRestore(@Nullable List<Runnable> restores, Runnable restore) {
+        List<Runnable> list = restores != null ? restores : new ArrayList<>();
+        list.add(restore);
+        return list;
     }
 
     /**
