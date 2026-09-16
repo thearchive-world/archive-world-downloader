@@ -29,7 +29,7 @@ buildscript {
         maven("https://maven.fabricmc.net/")
     }
     dependencies {
-        classpath("net.fabricmc:tiny-remapper:0.14.0")
+        classpath("net.fabricmc:tiny-remapper:0.14.1")
         classpath("org.ow2.asm:asm:9.10.1")
         classpath("org.ow2.asm:asm-commons:9.10.1")
     }

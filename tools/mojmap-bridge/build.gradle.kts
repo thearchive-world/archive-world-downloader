@@ -14,8 +14,8 @@ java {
 }
 
 dependencies {
-    implementation("net.fabricmc:mapping-io:0.8.0")
-    implementation("net.fabricmc:tiny-remapper:0.14.0")
+    implementation("net.fabricmc:mapping-io:0.9.1")
+    implementation("net.fabricmc:tiny-remapper:0.14.1")
     implementation("org.ow2.asm:asm:9.10.1")
     implementation("org.ow2.asm:asm-commons:9.10.1")
 }
