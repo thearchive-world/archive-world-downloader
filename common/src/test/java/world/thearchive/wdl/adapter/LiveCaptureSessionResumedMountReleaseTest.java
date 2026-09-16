@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -466,7 +467,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
     private static void writePriorPlayerTag(LiveCaptureSession session, Path save, CompoundTag player)
             throws Exception {
         LevelDataWriter writer = new LevelDataWriterImpl();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
+        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null, Map.of());
         CapturedPlayer captured = new CapturedPlayer(player, BlockPos.ZERO, 0.0F, 0.0F, Level.OVERWORLD,
                 GameType.SURVIVAL, Difficulty.NORMAL);
         LevelStorageSource source = LevelStorageSource.createDefault(save.getParent());
