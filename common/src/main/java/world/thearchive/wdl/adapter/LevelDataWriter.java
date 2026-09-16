@@ -5,8 +5,11 @@ package world.thearchive.wdl.adapter;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.LevelStorageSource;
@@ -21,11 +24,13 @@ import world.thearchive.wdl.core.WorldOutputConfig;
  * Per-band {@code level.dat} axis: build the metadata for a captured world.
  *
  * <p>A multiplayer client cannot recover the server's worldgen ({@code LEVEL_STEM}, {@code WORLD_PRESET} and the noise
- * settings it needs are never synced), so the captured world is a <b>superflat VOID</b> world (all air) for
- * overworld/nether/end: the captured chunks supply the real terrain from their region files, and everything un-captured
- * is air rather than mismatched regenerated terrain. A void flat generator needs only {@code BIOME} +
- * {@code DIMENSION_TYPE}, both of which the client does sync, so the dimensions are derived straight from the live
- * {@code ClientLevel} reg.
+ * settings it needs are never synced), so the captured world is an all-air <b>VOID</b> for overworld/nether/end: the
+ * captured chunks supply the real terrain from their region files, and everything un-captured is air rather than
+ * mismatched regenerated terrain. Where the band reads the generator's sea level (1.21.2 and later put the snow line
+ * and the water-mob spawn rules on it), each stem carries the value the client held for that dimension. The void needs
+ * only {@code BIOME} + {@code DIMENSION_TYPE}, both of which the client does sync, so the dimensions derive straight
+ * from the live {@code ClientLevel} reg. Vanilla's {@code the_void} biome places its start platform at the origin of a
+ * dimension whose origin chunks were not captured; that is accepted.
  */
 public interface LevelDataWriter {
     /**
@@ -42,9 +47,12 @@ public interface LevelDataWriter {
      * <p>{@code worldName} is the world's {@code LevelName} (the download screen's typed name on a new download; the
      * existing name on a resume so the world is not renamed). A null or empty value falls back to the writer's default
      * name.
+     *
+     * <p>{@code seaLevels} is the sea level the client held for each vanilla stem the session entered, keyed by
+     * {@code Level.OVERWORLD}/{@code NETHER}/{@code END}; a stem absent from it gets the vanilla default (63, 32, 0).
      */
     LevelData buildLevelData(RegistryAccess clientRegistries, WorldOutputConfig worldOutput,
-            @Nullable String worldName);
+            @Nullable String worldName, Map<ResourceKey<Level>, Integer> seaLevels);
 
     /**
      * Reconstruct this band's client-side worldgen registries ahead of time, off the render thread, so the first
