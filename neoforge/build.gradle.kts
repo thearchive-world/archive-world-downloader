@@ -20,7 +20,7 @@ base {
 spotless {
     java {
         target("src/**/*.java")
-        eclipse("4.39").configFile(rootProject.file("config/spotless/eclipse-formatter.prefs"))
+        eclipse("4.40").configFile(rootProject.file("config/spotless/eclipse-formatter.prefs"))
         trimTrailingWhitespace()
         endWithNewline()
     }
