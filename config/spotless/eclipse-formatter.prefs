@@ -1,5 +1,5 @@
 # Eclipse JDT formatter profile for the Archive World Downloader Java tree.
-# Driven by Spotless (com.diffplug.spotless) via the eclipse() step, pinned to JDT 4.39.
+# Driven by Spotless (com.diffplug.spotless) via the eclipse() step; the JDT version is the one each build script pins there.
 #
 # Spotless owns mechanical layout (indentation, braces, wrapping, whitespace,
 # blank lines); Checkstyle (config/checkstyle/checkstyle.xml) owns lint and naming.
