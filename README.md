@@ -2,7 +2,6 @@
 
 **Keep the multiplayer worlds you visit.** As you explore, Archive World Downloader saves the terrain, mobs, and maps around you into a singleplayer world you can open offline. Opening a container saves what is inside it. Everything comes from your own game, so nothing runs on the server.
 
-[![CI](https://github.com/thearchive-world/archive-world-downloader/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/thearchive-world/archive-world-downloader/actions/workflows/ci.yml)
 [![Modrinth](https://img.shields.io/modrinth/dt/x6JOJ1sf?label=Modrinth)](https://modrinth.com/mod/wdl)
 [![CurseForge](https://img.shields.io/curseforge/dt/1554389?label=CurseForge)](https://www.curseforge.com/minecraft/mc-mods/wdl)
 [![License: LGPL-3.0-or-later](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue.svg)](LICENSE)
