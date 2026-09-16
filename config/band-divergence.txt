@@ -717,12 +717,13 @@ forge/src/main/java/world/thearchive/wdl/forge/ForgeMountMenuReader.java
 # gradle.properties; 1.17.1's ForgeGradle island has no such file.
 forge/gradle.properties
 
-# Architectury Loom 1.14.476, the island's plugin, is a Java 21 build (class file version 65), so the island daemon is
-# pinned to toolchainVersion 21, where 1.17.1's island pins 17 for mod-publish-plugin; dev ships no forge/ tree.
+# Architectury Loom, the island's plugin, is a Java 21 build (class file version 65), so the island daemon is pinned
+# to toolchainVersion 21, where 1.17.1's island pins 17 for mod-publish-plugin; dev ships no forge/ tree.
 forge/gradle/gradle-daemon-jvm.properties
 
-# The wrapper comment gives Architectury Loom 1.14, which targets the Gradle 8.x line, as the reason for the 8.14.5 pin,
-# where 1.17.1's gives ForgeGradle 6's Gradle 8 limit; the distribution pin itself is the same 8.14.5.
+# Architectury Loom's 1.17 line runs only on Gradle 9 (its configuration wiring calls Configuration.extendsFrom over
+# providers, a Gradle 9 API), so the island runs the same Gradle 9 wrapper as the band's root, where 1.17.1's
+# ForgeGradle 6 island is held on Gradle 8 by that plugin's environment check.
 forge/gradle/wrapper/gradle-wrapper.properties
 
 # Below the 1.19 registry split the code-defined registries are static fields on Registry (Registry.ENTITY_TYPE),

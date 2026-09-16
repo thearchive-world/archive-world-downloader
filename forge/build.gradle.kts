@@ -29,7 +29,7 @@ buildscript {
 // switch, not because of any Gradle-version limit; two wrappers, one set of coordinates read from the root
 // gradle.properties.
 plugins {
-    id("dev.architectury.loom") version "1.14.476"
+    id("dev.architectury.loom") version "1.17.493"
     // Release publishing. Pinned as a literal because the island is a separate build with no access to the root
     // version catalog (the same reason Loom above is a literal); keep in sync with gradle/libs.versions.toml's
     // mod-publish-plugin.
