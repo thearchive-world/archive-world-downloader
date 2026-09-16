@@ -9,9 +9,9 @@
 # (gradle/gradle#15383).
 
 [versions]
-loom = "1.17.19"
-spotless = "8.10.1"
-errorprone-plugin = "5.1.0"
+loom = "1.17.21"
+spotless = "8.10.2"
+errorprone-plugin = "5.1.1"
 
 [plugins]
 loom = { id = "fabric-loom", version.ref = "loom" }
