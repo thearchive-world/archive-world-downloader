@@ -21,6 +21,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -79,24 +80,26 @@ public final class EntitySinkImpl implements EntitySink {
     }
 
     /**
-     * Save the entity, first detaching any leash the client cannot save and swapping in a sanitized copy of any
-     * equipment or carried-item stack the client cannot save, both from the entity and its passengers. A leash with
-     * neither a resolved holder nor a delayed attachment is what vanilla's {@link Leashable.LeashData} codec
-     * requireNonNulls on, so {@link Entity#save} throws on it; and because save recurses into passengers, a passenger's
-     * unsavable leash aborts the whole vehicle group, dropping a chested mob's container with it. Detaching just those
-     * unsavable leash links loses only the leash, mirroring the reconstruct path which leaves an unresolved leash link
-     * unset. An item component the disk codec rejects costs either the entity or the whole field being written, so
-     * {@link #sanitizeStacks} repairs the stack up front rather than recovering from either outcome. Capture runs on
-     * the client main thread, so both kinds of swap are unobservable, and every detached leash and swapped stack is
-     * restored before returning so the live entities are unchanged.
+     * Save the entity, first detaching any leash the client cannot save, swapping in a sanitized copy of any equipment
+     * or carried-item stack the client cannot save, and ordering a pet to sit from its synced pose, each on the entity
+     * and its passengers. A leash with neither a resolved holder nor a delayed attachment is what vanilla's
+     * {@link Leashable.LeashData} codec requireNonNulls on, so {@link Entity#save} throws on it; and because save
+     * recurses into passengers, a passenger's unsavable leash aborts the whole vehicle group, dropping a chested mob's
+     * container with it. Detaching just those unsavable leash links loses only the leash, mirroring the reconstruct
+     * path which leaves an unresolved leash link unset. An item component the disk codec rejects costs either the
+     * entity or the whole field being written, so {@link #sanitizeStacks} repairs the stack up front rather than
+     * recovering from either outcome. Capture runs on the client main thread, so every swap is unobservable, and each
+     * detached leash, swapped stack, and sit order is restored before returning so the live entities are unchanged.
      */
     private static boolean saveDroppingUnsavableLeashes(Entity entity, CompoundTag out) {
         List<DetachedLeash> detached = detachIfUnsavable(entity, null);
-        List<Runnable> stackRestores = sanitizeStacks(entity, null);
+        List<Runnable> restores = sanitizeStacks(entity, null);
+        restores = orderToSitFromPose(entity, restores);
         if (entity.isVehicle()) {
             for (Entity passenger : entity.getIndirectPassengers()) {
                 detached = detachIfUnsavable(passenger, detached);
-                stackRestores = sanitizeStacks(passenger, stackRestores);
+                restores = sanitizeStacks(passenger, restores);
+                restores = orderToSitFromPose(passenger, restores);
             }
         }
         try {
@@ -107,12 +110,29 @@ public final class EntitySinkImpl implements EntitySink {
                     restore.leashable().setLeashData(restore.leashData());
                 }
             }
-            if (stackRestores != null) {
-                for (Runnable restore : stackRestores) {
+            if (restores != null) {
+                for (Runnable restore : restores) {
                     restore.run();
                 }
             }
         }
+    }
+
+    /**
+     * Restore the server-authoritative {@code Sitting} the client never receives: {@code TamableAnimal.orderedToSit} is
+     * private server state, while the sit pose it drives is synced. Saved as {@code false}, a pet stands up on load and
+     * walks or teleports to an owner in the world.
+     */
+    private static @Nullable List<Runnable> orderToSitFromPose(Entity entity, @Nullable List<Runnable> restores) {
+        if (entity instanceof TamableAnimal tamable) {
+            boolean ordered = tamable.isOrderedToSit();
+            boolean posed = tamable.isInSittingPose();
+            if (ordered != posed) {
+                tamable.setOrderedToSit(posed);
+                restores = addRestore(restores, () -> tamable.setOrderedToSit(ordered));
+            }
+        }
+        return restores;
     }
 
     /**
