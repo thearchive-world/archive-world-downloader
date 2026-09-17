@@ -50,9 +50,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Cancel superseded PR runs; a dev / version-branch run that has started is left to finish (a queued run can
-  # still be superseded by a newer push).
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push cancels the run its commit superseded, on a branch as on a pull request: only the tip's result
+  # is ever read.
+  cancel-in-progress: true
 
 # Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
 # pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
