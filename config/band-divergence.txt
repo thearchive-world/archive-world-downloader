@@ -19,3 +19,85 @@
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
 # Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
 # a shared reason across several files is repeated per line rather than written once over a group.
+# 26.2 harvests the advancement progress through a ClientAdvancements listener, its only public enumeration path;
+# 26.3 made ClientAdvancements.progress() public, so the snapshot copies it directly.
+common/src/main/java/world/thearchive/wdl/adapter/AdvancementSnapshot.java
+# 26.2 reads a relative move as the short delta triple getXa, getYa and getZa and decodes each axis itself, the
+# position sync as one PositionMoveRotation and the removal ids through getEntityIds; 26.3 moved the delta to a
+# VecDelta decoded through VecDeltaCodec, split the sync into a PositionPath and two rotation fields, and renamed
+# the removal accessor entityIds.
+common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
+# 26.2 checks Enter against the GLFW key codes and opens folders and links through Util.getPlatform(); 26.3 replaced
+# GLFW with SDL, so the check is KeyEvent.isConfirmation() and the opens go through Blaze3D.openPath and openUri.
+common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
+# 26.2's brewing stand persists BrewTime as a short and Fuel as a byte, and the open-time capture writes those two;
+# 26.3 widened both to int and its screen scales the arrow and fuel bar by total_brew_time and total_fuel, so the
+# capture writes four ints.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
+# 26.2's brewing stand persists BrewTime as a short and Fuel as a byte, so those are the two carried state keys and
+# their defaults; 26.3 widened both to int and added total_brew_time and total_fuel, carried as two more int fields.
+common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
+# 26.2's brewing stand menu carries two data values, the brew ticks and the fuel; 26.3 carries the two totals as well,
+# so the open-time capture reads four.
+common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
+# 26.2's brewing stand menu carries two data values, which the change signal names; 26.3 carries the two totals as
+# well.
+common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
+# 26.2's brewing stand persists BrewTime and Fuel alone, which the open-time state copy names; 26.3 added the two
+# totals to the whitelist it describes.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+
+# 26.2 builds a PosRot move from three short deltas; 26.3 wraps them in a VecDelta.Linear.
+common/src/test/java/world/thearchive/wdl/adapter/EntityPacketCaptureTest.java
+# 26.2 loads the worldgen registries under RegistryLayer.WORLDGEN from RegistryDataLoader.WORLDGEN_REGISTRIES; 26.3
+# renamed both WORLD.
+common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
+# 26.2's Level declares potionBrewing() and fuelValues(), which the headless double has to implement; 26.3 dropped
+# both.
+common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
+# 26.2 streams a bundle's items through BundleContents.itemCopyStream(); 26.3 renamed it itemCopies().
+common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
+# 26.2's brewing stand persists BrewTime as a short and Fuel as a byte, and the fixture and its assertions use those
+# two; 26.3 widened both to int and added total_brew_time and total_fuel, which the fixture carries too.
+common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
+# 26.2's brewing stand persists BrewTime as a short and Fuel as a byte, which the test pins on the holder; 26.3
+# widened both to int and added total_brew_time and total_fuel, pinned the same way.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerCaptureTest.java
+# 26.2's brewing stand persists BrewTime as a short and Fuel as a byte, and the holder fixture and its assertions
+# use those two; 26.3 widened both to int and added total_brew_time and total_fuel, asserted the same way.
+common/src/test/java/world/thearchive/wdl/adapter/ContainerStashMergeTest.java
+
+# 26.2 presses keys by GLFW code and rebinds through InputConstants.Type.KEYSYM; 26.3 replaced GLFW with SDL, so
+# the codes are InputConstants.KEY_F13 and KEY_END and the type is KEYBOARD.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/RestoreFlowTest.java
+# 26.2 writes every block-state palette entry as a compound with Name and Properties; 26.3 writes a default state as
+# the bare block id and keys a state with properties by id, so the reader takes both shapes.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureReadback.java
+# 26.2 clicks with the GLFW mouse-button code; 26.3 replaced GLFW with SDL, so the code is
+# InputConstants.MOUSE_BUTTON_LEFT.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/ScreenDriver.java
+# 26.2 registers the keybind with InputConstants.Type.KEYSYM and a GLFW key code; 26.3 replaced GLFW with SDL, so
+# the mapping takes InputConstants.UNKNOWN's value as a keyboard key.
+fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
+# 26.2 registers the peek key with InputConstants.Type.KEYSYM and a GLFW key code; 26.3 replaced GLFW with SDL, so
+# the mapping takes InputConstants.KEY_LALT as a keyboard key.
+fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
+# 26.2 registers the keybind with InputConstants.Type.KEYSYM and a GLFW key code; 26.3 replaced GLFW with SDL, so
+# the mapping takes InputConstants.UNKNOWN's value as a keyboard key.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgePlatformBridge.java
+# 26.2 registers the peek key with InputConstants.Type.KEYSYM and a GLFW key code; 26.3 replaced GLFW with SDL, so
+# the mapping takes InputConstants.KEY_LALT as a keyboard key.
+neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
+# 26.2's SerializableChunkData constructor carries the long-array carving mask in its descriptor; 26.3 dropped that
+# component.
+neoforge/src/main/resources/META-INF/accesstransformer.cfg
+
+# 26.2 pulls XaeroPlus by the templated minecraft_version; 26.3 names the 26.2 artifact, XaeroPlus having published
+# nothing for 26.3.
+common/build.gradle.kts
+# 26.2 pulls XaeroPlus by the templated minecraft_version; 26.3 names the 26.2 artifact, XaeroPlus having published
+# nothing for 26.3.
+fabric/build.gradle.kts
+# 26.2 pulls XaeroPlus by the templated minecraft_version; 26.3 names the 26.2 artifact, XaeroPlus having published
+# nothing for 26.3.
+neoforge/build.gradle.kts
