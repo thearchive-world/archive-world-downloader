@@ -33,11 +33,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Cancel superseded runs only for PRs, where only the latest push matters. On push to dev or a version
-  # branch a run is not canceled once it is in progress, so a commit that has started building finishes and
-  # keeps its own status. (A run still pending in the queue can be superseded by a newer push, so this
-  # reduces, not eliminates, bisect gaps on rapid back-to-back pushes.)
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push cancels the run its commit superseded, on a branch as on a pull request: only the tip's result
+  # is ever read, and a run that outlives its commit judges a stale tree against baselines the newer push moved.
+  cancel-in-progress: true
 
 # Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
 # pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
