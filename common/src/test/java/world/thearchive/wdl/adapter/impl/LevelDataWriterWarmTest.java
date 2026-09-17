@@ -9,12 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -65,7 +62,7 @@ class LevelDataWriterWarmTest {
         writer.warmWorldgen();
 
         LevelDataWriter.LevelData data = assertDoesNotThrow(() -> writer.buildLevelData(
-                TestRegistries.frozen(), defaultWorld(), "Warmed", Map.of()));
+                TestRegistries.frozen(), defaultWorld(), "Warmed"));
         assertNotNull(data.worldData(), "a DEFAULT world encodes against the same set the warm populated");
         assertEquals(1, VanillaWorldgenRegistries.loadCountForTesting(),
                 "the build reuses the warmed set rather than reconstructing again");
@@ -76,7 +73,7 @@ class LevelDataWriterWarmTest {
         LevelDataWriter neverReconstructs = new LevelDataWriter() {
             @Override
             public LevelData buildLevelData(RegistryAccess clientRegistries, WorldOutputConfig worldOutput,
-                    @Nullable String worldName, Map<ResourceKey<Level>, Integer> seaLevels) {
+                    @Nullable String worldName) {
                 throw new UnsupportedOperationException();
             }
 
