@@ -13,7 +13,6 @@ import com.mojang.serialization.DynamicOps;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -22,7 +21,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.dimension.LevelStem;
-import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.FlatLevelSource;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.junit.jupiter.api.Test;
@@ -34,8 +33,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * level.dat round-trip: from a client-like reg (BIOME + DIMENSION_TYPE, NO LEVEL_STEM, just what a multiplayer client
- * syncs), the writer produces an all-air VOID world whose Data tag, written to a real compressed level.dat and read
- * back, preserves seed, the three dimensions and DataVersion, with the dimensions being all-air noise generators.
+ * syncs), the writer produces a superflat VOID world whose Data tag, written to a real compressed level.dat and read
+ * back, preserves seed, the three dimensions and DataVersion, with the dimensions being flat-void generators.
  */
 class LevelDatRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
@@ -43,7 +42,7 @@ class LevelDatRoundTripTest {
     @Test
     void levelDatRoundTripsVoidDimensionsSeedAndDataVersion(@TempDir Path directory) throws IOException {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null, Map.of());
+        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
         DynamicOps<Tag> ops = built.registries().createSerializationContext(NbtOps.INSTANCE);
 
         CompoundTag dataTag = built.worldData().createTag(built.registries(), null);
@@ -65,9 +64,9 @@ class LevelDatRoundTripTest {
                 .getOrThrow();
         assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
         assertEquals(originalSeed, worldGen.options().seed(), "seed survives the round-trip");
-        assertInstanceOf(NoiseBasedChunkGenerator.class,
+        assertInstanceOf(FlatLevelSource.class,
                 worldGen.dimensions().dimensions().get(LevelStem.OVERWORLD).generator(),
-                "overworld is the all-air noise void");
+                "overworld is a (void) superflat generator");
     }
 
     @Test
@@ -76,14 +75,14 @@ class LevelDatRoundTripTest {
         // Precondition mirrors a real multiplayer client: dimension types + biomes synced, no LEVEL_STEM.
         assertTrue(registries.lookup(Registries.LEVEL_STEM).isEmpty(),
                 "precondition: client-like reg has no LEVEL_STEM");
-        assertDoesNotThrow(() -> writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null, Map.of()),
+        assertDoesNotThrow(() -> writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null),
                 "must derive void dimensions, not fail");
     }
 
     @Test
     void savesLevelDatThroughTheProductionLevelStorageAccess(@TempDir Path saves) throws IOException {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null, Map.of());
+        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
 
         // Drive the REAL production save (LevelStorageAccess.saveDataTag) rather than a hand-rolled NbtIo write,
         // so the headless suite guards the band-specific saveDataTag call inside LevelDataWriter.save()
@@ -103,9 +102,9 @@ class LevelDatRoundTripTest {
         WorldGenSettings worldGen = WorldGenSettings.CODEC.parse(ops, data.getCompound("WorldGenSettings"))
                 .getOrThrow();
         assertEquals(3, worldGen.dimensions().dimensions().size(), "overworld + nether + end survive");
-        assertInstanceOf(NoiseBasedChunkGenerator.class,
+        assertInstanceOf(FlatLevelSource.class,
                 worldGen.dimensions().dimensions().get(LevelStem.OVERWORLD).generator(),
-                "overworld is the all-air noise void");
+                "overworld is a (void) superflat generator");
     }
 
     @Test
@@ -113,8 +112,7 @@ class LevelDatRoundTripTest {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("named")) {
-            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, "My Base", Map.of()),
-                    null);
+            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, "My Base"), null);
         }
         assertEquals("My Base", levelName(saves.resolve("named")), "the typed name is written as LevelName");
     }
@@ -124,7 +122,7 @@ class LevelDatRoundTripTest {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("unnamed")) {
-            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null, Map.of()), null);
+            writer.save(access, writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null), null);
         }
         assertEquals("Archive World Downloader", levelName(saves.resolve("unnamed")),
                 "a null name falls back to the writer default");
