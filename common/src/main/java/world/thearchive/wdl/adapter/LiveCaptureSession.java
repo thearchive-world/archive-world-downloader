@@ -2258,7 +2258,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 // Items capture stays generic; only the rider is menu-typed, and the write itself
                 // is the pure tested helper.
                 ContainerCapture.putBrewingState(holder, brewingStand.getBrewingTicks(),
-                        brewingStand.getFuel());
+                        brewingStand.getTotalBrewingTicks(), brewingStand.getFuel(), brewingStand.getTotalFuel());
             }
             stashBlockHolder(containerStash, BlockPos.of(posKey), holder);
         }
@@ -2277,8 +2277,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * The menu-only ContainerData values the change gate tracks beside the slots: the crafter's nine disabled flags
-     * plus triggered, the brewing stand's brew time plus fuel. Every other menu tracks no data; the state-less constant
-     * keeps the per-tick call allocation-free for them.
+     * plus triggered, the brewing stand's brew time and fuel with their totals. Every other menu tracks no data; the
+     * state-less constant keeps the per-tick call allocation-free for them.
      */
     private static int[] menuDataVector(AbstractContainerMenu menu) {
         if (menu instanceof CrafterMenu crafter) {
@@ -2290,7 +2290,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return data;
         }
         if (menu instanceof BrewingStandMenu brewingStand) {
-            return new int[] { brewingStand.getBrewingTicks(), brewingStand.getFuel() };
+            return new int[] { brewingStand.getBrewingTicks(), brewingStand.getTotalBrewingTicks(),
+                    brewingStand.getFuel(), brewingStand.getTotalFuel() };
         }
         return MenuChangeTracker.NO_DATA;
     }

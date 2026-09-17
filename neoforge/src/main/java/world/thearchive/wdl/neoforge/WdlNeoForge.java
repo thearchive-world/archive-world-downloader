@@ -16,7 +16,6 @@ import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.InteractionCapture;
@@ -65,8 +64,7 @@ public final class WdlNeoForge {
         NeoForge.EVENT_BUS.addListener((PlayerInteractEvent.EntityInteract event) -> OpenClickTracker
                 .dispatchUseEntity(event.getEntity(), event.getLevel(), event.getTarget()));
 
-        KeyMapping peekKey = new KeyMapping(
-                "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY);
+        KeyMapping peekKey = new KeyMapping("key.wdl.peek_hud", InputConstants.KEY_LALT, WdlKeyBinds.CATEGORY);
         modEventBus.addListener(RegisterKeyMappingsEvent.class, event -> event.register(peekKey));
         WdlHudOverlay.bindPeekKey(peekKey);
         // Register above all layers rather than relative to a gamemode-gated vanilla layer (the experience bar is

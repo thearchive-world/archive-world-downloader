@@ -28,7 +28,6 @@ import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.jspecify.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
 import world.thearchive.wdl.platform.AbstractPlatformBridge;
@@ -60,8 +59,7 @@ final class NeoForgePlatformBridge extends AbstractPlatformBridge {
     /** The mapping registers on the mod bus; its clicks poll on the game bus once per client tick. */
     @Override
     protected void registerKeybind(String keyId, Runnable onPress) {
-        KeyMapping key = new KeyMapping(keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
-                WdlKeyBinds.CATEGORY);
+        KeyMapping key = new KeyMapping(keyId, InputConstants.UNKNOWN.getValue(), WdlKeyBinds.CATEGORY);
         modEventBus.addListener(RegisterKeyMappingsEvent.class, event -> event.register(key));
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> {
             while (key.consumeClick()) {

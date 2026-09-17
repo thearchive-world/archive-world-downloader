@@ -160,8 +160,10 @@ class ContainerStashMergeTest {
         holder.put("Items", new ListTag());
         holder.putIntArray("disabled_slots", new int[] { 0, 4 });
         holder.putInt("triggered", 1);
-        holder.putShort("BrewTime", (short) 123);
-        holder.putByte("Fuel", (byte) 7);
+        holder.putInt("BrewTime", 123);
+        holder.putInt("total_brew_time", 400);
+        holder.putInt("Fuel", 7);
+        holder.putInt("total_fuel", 20);
         holder.putString("wdl_block_entity_id", "minecraft:crafter");
         holder.putString("junk", "never");
         // The three captured content keys the sink does not own. They are what tells a whitelist keyed on
@@ -179,8 +181,10 @@ class ContainerStashMergeTest {
         CompoundTag mergedBlockEntity = findByPos(chunkTag, 10, 70, 20);
         assertArrayEquals(new int[] { 0, 4 }, mergedBlockEntity.getIntArray("disabled_slots").orElseThrow());
         assertEquals(1, mergedBlockEntity.getIntOr("triggered", 0));
-        assertEquals((short) 123, mergedBlockEntity.getShortOr("BrewTime", (short) 0));
-        assertEquals((byte) 7, mergedBlockEntity.getByteOr("Fuel", (byte) 0));
+        assertEquals(123, mergedBlockEntity.getIntOr("BrewTime", 0));
+        assertEquals(400, mergedBlockEntity.getIntOr("total_brew_time", 0));
+        assertEquals(7, mergedBlockEntity.getIntOr("Fuel", 0));
+        assertEquals(20, mergedBlockEntity.getIntOr("total_fuel", 0));
         assertFalse(mergedBlockEntity.contains("wdl_block_entity_id"), "the internal holder key never reaches disk");
         assertFalse(mergedBlockEntity.contains("junk"), "a non-whitelisted holder key never reaches disk");
         assertFalse(mergedBlockEntity.contains("Book"), "a lectern book is content, not open-time state");

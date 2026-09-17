@@ -367,12 +367,15 @@ final class ContainerCapture {
 
     /**
      * Ride the brewing stand's persisted menu-only state on {@code holder}: vanilla's exact key names and NBT types
-     * (BrewTime short, Fuel byte), so the merged block entity loads unchanged. Pure so the key/type contract is
-     * testable headless; the caller reads the live menu's two data values.
+     * ({@code BrewTime}, {@code total_brew_time}, {@code Fuel} and {@code total_fuel}, all int), so the merged block
+     * entity loads unchanged and its screen draws the progress arrow and the fuel bar, which are gated on the two
+     * totals. Pure so the key/type contract is testable headless; the caller reads the live menu's four data values.
      */
-    static void putBrewingState(CompoundTag holder, int brewingTicks, int fuel) {
-        holder.putShort("BrewTime", (short) brewingTicks);
-        holder.putByte("Fuel", (byte) fuel);
+    static void putBrewingState(CompoundTag holder, int brewingTicks, int totalBrewingTicks, int fuel, int totalFuel) {
+        holder.putInt("BrewTime", brewingTicks);
+        holder.putInt("total_brew_time", totalBrewingTicks);
+        holder.putInt("Fuel", fuel);
+        holder.putInt("total_fuel", totalFuel);
     }
 
     /**

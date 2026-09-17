@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 import net.minecraft.core.Holder;
@@ -50,16 +51,16 @@ import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.gamerules.GameRule;
 import net.minecraft.world.level.gamerules.GameRules;
-import net.minecraft.world.level.levelgen.DensityFunction;
-import net.minecraft.world.level.levelgen.DensityFunctions;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.NoiseRouter;
 import net.minecraft.world.level.levelgen.NoiseSettings;
-import net.minecraft.world.level.levelgen.SurfaceRules;
 import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.levelgen.WorldOptions;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunctions;
+import net.minecraft.world.level.levelgen.material.rule.BlockRule;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.storage.LevelData.RespawnData;
 import net.minecraft.world.level.storage.LevelStorageSource;
@@ -426,11 +427,11 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         Registry<DimensionType> dimensionTypes = registries.lookupOrThrow(Registries.DIMENSION_TYPE);
         Map<ResourceKey<LevelStem>, LevelStem> stems = Map.of(
                 LevelStem.OVERWORLD, voidStem(dimensionTypes, BuiltinDimensionTypes.OVERWORLD, voidBiome,
-                        NoiseSettings.create(-64, 384, 1, 2), seaLevels.getOrDefault(Level.OVERWORLD, 63)),
+                        NoiseSettings.create(-64, 384), seaLevels.getOrDefault(Level.OVERWORLD, 63)),
                 LevelStem.NETHER, voidStem(dimensionTypes, BuiltinDimensionTypes.NETHER, voidBiome,
-                        NoiseSettings.create(0, 256, 1, 2), seaLevels.getOrDefault(Level.NETHER, 32)),
+                        NoiseSettings.create(0, 256), seaLevels.getOrDefault(Level.NETHER, 32)),
                 LevelStem.END, voidStem(dimensionTypes, BuiltinDimensionTypes.END, voidBiome,
-                        NoiseSettings.create(0, 256, 2, 1), seaLevels.getOrDefault(Level.END, 0)));
+                        NoiseSettings.create(0, 256), seaLevels.getOrDefault(Level.END, 0)));
 
         return new WorldDimensions(stems).bake(emptyLevelStems());
     }
@@ -443,15 +444,13 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
     /**
      * Settings that place nothing: a positive constant density with an air default block writes no block and never
-     * consults the fluid picker, so no lava floor forms below y=-54. The surface rule is never reached on an all-air
-     * column but has to exist, since an empty sequence throws.
+     * consults the fluid picker, and the void biome carves nothing, so no lava floor forms below y=-54.
      */
     private static NoiseGeneratorSettings voidNoiseSettings(NoiseSettings window, int seaLevel) {
         BlockState air = Blocks.AIR.defaultBlockState();
         DensityFunction zero = DensityFunctions.zero();
-        NoiseRouter router = new NoiseRouter(zero, zero, zero, zero, zero, zero, zero, zero, zero, zero, zero,
-                DensityFunctions.constant(1.0), zero, zero, zero);
-        return new NoiseGeneratorSettings(window, air, air, router, SurfaceRules.state(air), List.of(), seaLevel,
-                true, false, false, false);
+        NoiseRouter router = new NoiseRouter(zero, zero, zero, zero, zero, zero, zero, DensityFunctions.constant(1.0F));
+        return new NoiseGeneratorSettings(window, air, air, router, Holder.direct(new BlockRule(air)), List.of(),
+                seaLevel, true, Optional.empty(), false, NoiseGeneratorSettings.DebugFunctions.EMPTY);
     }
 }

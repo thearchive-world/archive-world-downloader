@@ -13,7 +13,6 @@ import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionResult;
-import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.InteractionCapture;
@@ -52,7 +51,7 @@ public final class WdlFabricClient implements ClientModInitializer {
         });
 
         KeyMapping peekKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY));
+                "key.wdl.peek_hud", InputConstants.KEY_LALT, WdlKeyBinds.CATEGORY));
         WdlHudOverlay.bindPeekKey(peekKey);
         // addLast inherits no vanilla render condition. Anchoring relative to a vanilla element would adopt its
         // condition, and those are gamemode-gated (the experience bar is hidden in creative, the hotbar in

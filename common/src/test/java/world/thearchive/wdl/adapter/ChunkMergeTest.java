@@ -394,16 +394,19 @@ class ChunkMergeTest {
         return crafter(x, y, z, new int[0], 0);
     }
 
-    private static CompoundTag brewingStand(int x, int y, int z, short brewTime, byte fuel) {
+    private static CompoundTag brewingStand(int x, int y, int z, int brewTime, int totalBrewTime, int fuel,
+            int totalFuel) {
         CompoundTag blockEntity = blockEntity("minecraft:brewing_stand", x, y, z);
-        blockEntity.putShort("BrewTime", brewTime);
-        blockEntity.putByte("Fuel", fuel);
+        blockEntity.putInt("BrewTime", brewTime);
+        blockEntity.putInt("total_brew_time", totalBrewTime);
+        blockEntity.putInt("Fuel", fuel);
+        blockEntity.putInt("total_fuel", totalFuel);
         return blockEntity;
     }
 
     /** A brewing stand as the client re-captures one it never opened: the keys present, at their defaults. */
     private static CompoundTag freshBrewingStand(int x, int y, int z) {
-        return brewingStand(x, y, z, (short) 0, (byte) 0);
+        return brewingStand(x, y, z, 0, 0, 0, 0);
     }
 
     @Test
@@ -578,13 +581,15 @@ class ChunkMergeTest {
 
     @Test
     void aBrewingStandKeepsItsBrewTimeAndFuelAcrossAnyRewrite() {
-        CompoundTag onDisk = chunkTagWith(brewingStand(7, 64, 7, (short) 220, (byte) 12));
+        CompoundTag onDisk = chunkTagWith(brewingStand(7, 64, 7, 220, 400, 12, 20));
         CompoundTag fresh = chunkTagWith(freshBrewingStand(7, 64, 7));
 
         assertEquals(1, ChunkMerge.merge(onDisk, fresh));
         CompoundTag merged = findByPos(fresh, 7, 64, 7);
-        assertEquals((short) 220, merged.getShortOr("BrewTime", (short) -1), "a mid-brew stand does not restart");
-        assertEquals((byte) 12, merged.getByteOr("Fuel", (byte) -1), "and keeps its blaze powder");
+        assertEquals(220, merged.getIntOr("BrewTime", -1), "a mid-brew stand does not restart");
+        assertEquals(400, merged.getIntOr("total_brew_time", -1), "and its screen can still scale the arrow");
+        assertEquals(12, merged.getIntOr("Fuel", -1), "and keeps its blaze powder");
+        assertEquals(20, merged.getIntOr("total_fuel", -1), "and the fuel bar");
     }
 
     @Test
@@ -674,7 +679,7 @@ class ChunkMergeTest {
         // outline the container was recovered when nothing of its contents was.
         assertFalse(ChunkMerge.hasCapturedContent(crafter(0, 0, 0, new int[] { 1 }, 1)),
                 "state without items is not captured content");
-        assertFalse(ChunkMerge.hasCapturedContent(brewingStand(0, 0, 0, (short) 20, (byte) 3)),
+        assertFalse(ChunkMerge.hasCapturedContent(brewingStand(0, 0, 0, 20, 400, 3, 20)),
                 "a brewing stand's ticks and fuel are not captured content");
     }
 

@@ -27,10 +27,10 @@ import net.minecraft.tags.TagLoader;
  *
  * <p>There is no game running here. Every call below is a static method on a vanilla class that MDG puts on the
  * {@code common} test classpath (along with the bundled vanilla data pack). The sequence mirrors
- * {@code net.minecraft.server.WorldLoader#load} up to the WORLDGEN layer, which is all the chunk codec needs: the
- * STATIC layer (built-in registries: blocks, etc., from {@link Bootstrap#bootStrap()}) composed with the dynamic
- * WORLDGEN registries (biomes, ...) loaded from the vanilla JSONs. We deliberately stop before
- * {@code DIMENSION_REGISTRIES}; {@code LEVEL_STEM} is derived from a world preset where it is needed.
+ * {@code net.minecraft.server.WorldLoader#load} up to the WORLD layer, which is all the chunk codec needs: the STATIC
+ * layer (built-in registries: blocks, etc., from {@link Bootstrap#bootStrap()}) composed with the dynamic WORLD
+ * registries (biomes, ...) loaded from the vanilla JSONs. We deliberately stop before {@code DIMENSION_REGISTRIES};
+ * {@code LEVEL_STEM} is derived from a world preset where it is needed.
  *
  * <p>The result is memoized: the vanilla bootstrap is idempotent but expensive, and the frozen access is immutable, so
  * it is built once per JVM.
@@ -48,7 +48,7 @@ public final class TestRegistries {
 
     private TestRegistries() {}
 
-    /** The composite STATIC + WORLDGEN registry access, built once per JVM. */
+    /** The composite STATIC + WORLD registry access, built once per JVM. */
     public static synchronized RegistryAccess.Frozen frozen() {
         if (frozen != null) {
             return frozen;
@@ -70,24 +70,24 @@ public final class TestRegistries {
         List<PackResources> openPacks = packs.openAllSelected();
         CloseableResourceManager resources = new MultiPackResourceManager(PackType.SERVER_DATA, openPacks);
 
-        // Mirror WorldLoader: load tags against the STATIC layer, then load the WORLDGEN registries
+        // Mirror WorldLoader: load tags against the STATIC layer, then load the WORLD registries
         // (the dynamic ones, biomes are not in BuiltInRegistries) and compose them over STATIC.
         LayeredRegistryAccess<RegistryLayer> layered = RegistryLayer.createRegistryAccess();
         List<Registry.PendingTags<?>> pendingTags = TagLoader.loadTagsForExistingRegistries(resources,
                 layered.getLayer(RegistryLayer.STATIC));
-        RegistryAccess.Frozen loadingBase = layered.getAccessForLoading(RegistryLayer.WORLDGEN);
+        RegistryAccess.Frozen loadingBase = layered.getAccessForLoading(RegistryLayer.WORLD);
         List<HolderLookup.RegistryLookup<?>> lookups = TagLoader.buildUpdatedLookups(loadingBase, pendingTags);
         // 26.x RegistryDataLoader.load is asynchronous: it takes an Executor and returns a future. Run it on the
         // calling thread and join, keeping this bootstrap synchronous.
         RegistryAccess.Frozen worldgen = RegistryDataLoader.load(resources, lookups,
-                RegistryDataLoader.WORLDGEN_REGISTRIES, Runnable::run).join();
+                RegistryDataLoader.WORLD_REGISTRIES, Runnable::run).join();
 
         // Bind the loaded tags onto the STATIC registries (the updateStaticRegistryTags step WorldLoader runs
         // last via ReloadableServerResources), so ItemStack.is(tag) resolves against BuiltInRegistries headless.
         pendingTags.forEach(Registry.PendingTags::apply);
 
         // Keep resources open (as WorldLoader does): the composite is the long-lived result.
-        frozen = layered.replaceFrom(RegistryLayer.WORLDGEN, worldgen).compositeAccess();
+        frozen = layered.replaceFrom(RegistryLayer.WORLD, worldgen).compositeAccess();
 
         // 26.x binds item and block data components during the resource reload, not in Bootstrap.bootStrap, so a
         // headless new ItemStack reads an unbound registry-holder component and throws. Run the registered

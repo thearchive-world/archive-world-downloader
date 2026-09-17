@@ -99,7 +99,7 @@ dependencies {
     // XaeroPlus public API for the source-merged overlay binding (compat/xaeroplus), compile-only. NeoForge is
     // ModDev (no remap), neoforge flavor, no runtime require. XaeroPlus hard-depends on xaeroworldmap, so the
     // whole Xaero family stays out of the build; the manual render gate installs it in a real client.
-    compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+neoforge-${property("minecraft_version")}")
+    compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+neoforge-26.2")
 
     // JourneyMap public API for the source-merged overlay binding (compat/journeymap), compile-only. NeoForge
     // is ModDev (no remap), neoforge flavor, no runtime require.

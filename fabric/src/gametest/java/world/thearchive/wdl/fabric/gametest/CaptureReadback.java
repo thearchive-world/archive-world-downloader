@@ -37,6 +37,7 @@ import net.minecraft.world.clock.WorldClocks;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.StateHolder;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
 import net.minecraft.world.level.gamerules.GameRules;
@@ -95,13 +96,19 @@ final class CaptureReadback {
         }
     }
 
-    /** Every block id present in any section palette of a stored chunk tag (the terrain assertion target). */
+    /**
+     * Every block id present in any section palette of a stored chunk tag (the terrain assertion target). A palette
+     * entry is the bare block id for a default state and a compound carrying the id for one with properties.
+     */
     static List<String> paletteBlockNames(CompoundTag chunkTag) {
         List<String> names = new ArrayList<>();
         chunkTag.getListOrEmpty("sections").compoundStream()
                 .forEach(section -> section.getCompound("block_states")
-                        .ifPresent(blockStates -> blockStates.getList("palette").ifPresent(palette -> palette
-                                .compoundStream().forEach(entry -> entry.getString("Name").ifPresent(names::add)))));
+                        .ifPresent(blockStates -> blockStates.getList("palette").ifPresent(palette -> palette.stream()
+                                .forEach(entry -> entry.asString()
+                                        .or(() -> entry.asCompound()
+                                                .flatMap(compound -> compound.getString(StateHolder.ID_TAG)))
+                                        .ifPresent(names::add)))));
         return names;
     }
 

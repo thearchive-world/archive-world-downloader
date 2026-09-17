@@ -26,7 +26,6 @@ import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import org.apache.logging.log4j.core.LogEvent;
 import org.jspecify.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.client.WdlDownloadsScreen;
@@ -51,7 +50,7 @@ import world.thearchive.wdl.core.export.RestoreOperation;
 public class RestoreFlowTest implements FabricClientGameTest {
     private static final String BRIDGE_LOGGER = "world.thearchive.wdl.platform.AbstractPlatformBridge";
     private static final String TOGGLE_KEY = "key.wdl.toggle";
-    private static final int TOGGLE_KEY_CODE = GLFW.GLFW_KEY_F13;
+    private static final int TOGGLE_KEY_CODE = InputConstants.KEY_F13;
     private static final int IDLE_WAIT_TICKS = 400;
 
     @Override
@@ -340,7 +339,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
         Check.that(waitForWidgetText(context, resolved("wdl.screen.downloads.resume")),
                 "a selected row must offer Resume");
         focusNameField(context);
-        context.getInput().pressKey(GLFW.GLFW_KEY_END);
+        context.getInput().pressKey(InputConstants.KEY_END);
         Check.that(folder.equals(nameFieldValue(context))
                 && waitForWidgetText(context, resolved("wdl.screen.downloads.resume")),
                 "a caret move is not an edit, so the row stays selected and the action stays Resume");
@@ -513,7 +512,7 @@ public class RestoreFlowTest implements FabricClientGameTest {
         context.runOnClient(client -> {
             for (KeyMapping mapping : client.options.keyMappings) {
                 if (mapping.getName().equals(TOGGLE_KEY)) {
-                    mapping.setKey(InputConstants.Type.KEYSYM.getOrCreate(TOGGLE_KEY_CODE));
+                    mapping.setKey(InputConstants.Type.KEYBOARD.getOrCreate(TOGGLE_KEY_CODE));
                 }
             }
             KeyMapping.resetMapping();

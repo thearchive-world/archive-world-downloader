@@ -12,9 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ShortTag;
+import net.minecraft.nbt.IntTag;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -33,20 +32,23 @@ class ContainerCaptureTest {
     @Test
     void brewingStateRidesTheHolderWithVanillaTypes() {
         CompoundTag holder = new CompoundTag();
-        ContainerCapture.putBrewingState(holder, 123, 7);
-        assertEquals((short) 123, holder.getShortOr("BrewTime", (short) 0));
-        assertEquals((byte) 7, holder.getByteOr("Fuel", (byte) 0));
-        // The coercing getShortOr/getByteOr above would pass on a swapped short/byte too, so pin the on-disk
-        // tag type directly: vanilla persists BrewTime as a short and Fuel as a byte, and the archive must match.
-        assertInstanceOf(ShortTag.class, holder.get("BrewTime"), "BrewTime must be a short tag");
-        assertInstanceOf(ByteTag.class, holder.get("Fuel"), "Fuel must be a byte tag");
+        ContainerCapture.putBrewingState(holder, 123, 400, 7, 20);
+        assertEquals(123, holder.getIntOr("BrewTime", 0));
+        assertEquals(400, holder.getIntOr("total_brew_time", 0));
+        assertEquals(7, holder.getIntOr("Fuel", 0));
+        assertEquals(20, holder.getIntOr("total_fuel", 0));
+        // The coercing getIntOr above would pass on a narrower numeric tag too, so pin the on-disk tag type
+        // directly: vanilla persists all four as ints, and the archive must match.
+        for (String key : new String[] { "BrewTime", "total_brew_time", "Fuel", "total_fuel" }) {
+            assertInstanceOf(IntTag.class, holder.get(key), key + " must be an int tag");
+        }
     }
 
     @Test
-    void zeroStateStillWritesBothKeys() {
+    void zeroStateStillWritesAllFourKeys() {
         CompoundTag holder = new CompoundTag();
-        ContainerCapture.putBrewingState(holder, 0, 0);
-        assertEquals(2, holder.keySet().size());
+        ContainerCapture.putBrewingState(holder, 0, 0, 0, 0);
+        assertEquals(4, holder.keySet().size());
     }
 
     @Test

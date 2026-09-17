@@ -49,10 +49,10 @@ final class ContainerMerge {
 
     /**
      * Copy the open-time state keys present on {@code holder} onto {@code merged} (band-stable NBT ops): the crafter's
-     * {@code disabled_slots}/{@code triggered} and the brewing stand's {@code BrewTime}/{@code Fuel}, read off
-     * {@link CapturedBlockField} so the same list drives the chunk carry-forward that has to preserve them across a
-     * re-write. Still a whitelist, and still fails closed, so an internal holder key ({@code wdl_block_entity_id}) can
-     * never leak to disk.
+     * {@code disabled_slots}/{@code triggered} and the brewing stand's {@code BrewTime}/{@code Fuel} with their totals,
+     * read off {@link CapturedBlockField} so the same list drives the chunk carry-forward that has to preserve them
+     * across a re-write. Still a whitelist, and still fails closed, so an internal holder key
+     * ({@code wdl_block_entity_id}) can never leak to disk.
      */
     private static CompoundTag mergeStateKeys(CompoundTag merged, CompoundTag holder) {
         for (CapturedBlockField field : CapturedBlockField.fields()) {

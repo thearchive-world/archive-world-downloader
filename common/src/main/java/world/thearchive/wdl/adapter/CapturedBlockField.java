@@ -4,11 +4,9 @@
 package world.thearchive.wdl.adapter;
 
 import java.util.List;
-import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntArrayTag;
 import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.ShortTag;
 import net.minecraft.nbt.Tag;
 import org.jspecify.annotations.Nullable;
 
@@ -30,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The fields enumerated here are vanilla's own on this band. The carry-forward considers all of them for every block
  * entity in a re-written chunk, so a non-vanilla block entity that happened to use one of these key names could receive
- * a carried value; no vanilla block entity besides the crafter and the brewing stand writes any of the four state keys.
+ * a carried value; no vanilla block entity besides the crafter and the brewing stand writes any of the six state keys.
  */
 enum CapturedBlockField {
     /** A block container's slots, written by {@link ContainerSink#merge} (chiseled bookshelves included). */
@@ -45,10 +43,14 @@ enum CapturedBlockField {
     DISABLED_SLOTS("disabled_slots", new IntArrayTag(new int[0])),
     /** Whether a crafter is powered; vanilla writes an int, zero when it is not. */
     TRIGGERED("triggered", IntTag.valueOf(0)),
-    /** A brewing stand's remaining brew ticks; vanilla writes a short, zero when it is not brewing. */
-    BREW_TIME("BrewTime", ShortTag.valueOf((short) 0)),
-    /** A brewing stand's blaze-powder fuel; vanilla writes a byte, zero when it has none. */
-    FUEL("Fuel", ByteTag.valueOf((byte) 0));
+    /** A brewing stand's remaining brew ticks; vanilla writes an int, zero when it is not brewing. */
+    BREW_TIME("BrewTime", IntTag.valueOf(0)),
+    /** The length of a brewing stand's current brew, which its screen scales the arrow by; vanilla writes an int. */
+    TOTAL_BREW_TIME("total_brew_time", IntTag.valueOf(0)),
+    /** A brewing stand's blaze-powder fuel; vanilla writes an int, zero when it has none. */
+    FUEL("Fuel", IntTag.valueOf(0)),
+    /** The fuel a brewing stand's last blaze powder gave, which its screen scales the bar by; vanilla writes an int. */
+    TOTAL_FUEL("total_fuel", IntTag.valueOf(0));
 
     /**
      * Iterating this instead of {@code values()} keeps the per-block-entity loops from cloning the backing array on

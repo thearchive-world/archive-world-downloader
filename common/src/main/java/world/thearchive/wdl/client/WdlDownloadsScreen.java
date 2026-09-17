@@ -3,8 +3,10 @@
 
 package world.thearchive.wdl.client;
 
+import com.mojang.blaze3d.Blaze3D;
 import com.mojang.blaze3d.platform.NativeImage;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -45,7 +47,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
 import org.jspecify.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.RenderSurface;
@@ -734,7 +735,7 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         public void onClick(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
-            Util.getPlatform().openPath(savesDirectory);
+            Blaze3D.openPath(savesDirectory);
         }
 
         @Override
@@ -791,7 +792,7 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         public void onClick(MouseButtonEvent mouseButtonEvent, boolean doubleClick) {
-            Util.getPlatform().openUri(this.url);
+            Blaze3D.openUri(URI.create(this.url));
         }
 
         @Override
@@ -949,7 +950,7 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         public boolean keyPressed(KeyEvent keyEvent) {
-            if (keyEvent.key() == GLFW.GLFW_KEY_ENTER || keyEvent.key() == GLFW.GLFW_KEY_KP_ENTER) {
+            if (keyEvent.isConfirmation()) {
                 if (primaryButton != null && primaryButton.active) {
                     onPrimary();
                     return true;
@@ -1267,7 +1268,7 @@ public final class WdlDownloadsScreen extends Screen {
 
             boolean handleEdgeClick(int mouseX, int mouseY) {
                 if (inLine(mouseX, mouseY, this.arrowLeft, this.arrowRight, this.line2Top)) {
-                    Util.getPlatform().openPath(this.folder); // the per-row open-folder affordance
+                    Blaze3D.openPath(this.folder); // the per-row open-folder affordance
                     return true;
                 }
                 if (this.entry.health() == DownloadHealth.RECOVERABLE && this.recoverLeft >= 0

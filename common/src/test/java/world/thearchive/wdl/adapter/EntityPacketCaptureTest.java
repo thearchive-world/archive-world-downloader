@@ -5,10 +5,12 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
+import net.minecraft.network.protocol.game.VecDelta;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
@@ -61,12 +63,30 @@ class EntityPacketCaptureTest {
 
         // A relative move is a delta in 1/4096 of a block off the held position, so this walks seven blocks east,
         // across the chunk border at x=16.
-        capture.onMove(1, new ClientboundMoveEntityPacket.PosRot(1, (short) (7 * 4096), (short) 0, (short) 0,
-                (byte) 0, (byte) 0, true));
+        capture.onMove(1, new ClientboundMoveEntityPacket.PosRot(1,
+                new VecDelta.Linear((short) (7 * 4096), (short) 0, (short) 0), (byte) 0, (byte) 0, true));
 
         assertEquals(19.0, position(capture, 1).x(), "the delta resolves against the held position");
         assertEquals(Set.of(new ChunkPos(1, 0).pack()), capture.chunks(OVERWORLD),
                 "a move that carries a position re-homes the entity to the chunk it ends in");
+    }
+
+    @Test
+    void aSteppedMoveLandsTheEntityAtTheEndOfItsPath() {
+        EntityPacketCapture capture = capture();
+        capture.spawn(1, VEHICLE_UUID, new ChunkPos(0, 0).pack(), entityPos(12.0, 64.0, 8.0),
+                addEntity(1, VEHICLE_UUID));
+
+        // A living entity's walk arrives as steps, each a delta off the step before it, so this walks three blocks
+        // east and then four more, ending across the chunk border at x=16 like the single delta above.
+        capture.onMove(1, new ClientboundMoveEntityPacket.PosRot(1, new VecDelta.Stepped(List.of(
+                new VecDelta.Stepped.DeltaStep((short) (3 * 4096), (short) 0, (short) 0, 1),
+                new VecDelta.Stepped.DeltaStep((short) (4 * 4096), (short) 0, (short) 0, 2))),
+                (byte) 0, (byte) 0, true));
+
+        assertEquals(19.0, position(capture, 1).x(), "the steps resolve in turn against the held position");
+        assertEquals(Set.of(new ChunkPos(1, 0).pack()), capture.chunks(OVERWORLD),
+                "the entity is re-homed to the chunk the path ends in");
     }
 
     private static EntityPacketCapture capture() {

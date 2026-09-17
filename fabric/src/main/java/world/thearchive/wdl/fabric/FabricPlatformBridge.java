@@ -21,7 +21,6 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import org.jspecify.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlKeyBinds;
 import world.thearchive.wdl.platform.AbstractPlatformBridge;
@@ -37,7 +36,7 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
     @Override
     protected void registerKeybind(String keyId, Runnable onPress) {
         KeyMapping key = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, WdlKeyBinds.CATEGORY));
+                keyId, InputConstants.UNKNOWN.getValue(), WdlKeyBinds.CATEGORY));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (key.consumeClick()) {
                 onPress.run();

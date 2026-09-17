@@ -237,7 +237,7 @@ class ItemLocationScrubTest {
 
         BundleContents bundle = back.get(1).get(DataComponents.BUNDLE_CONTENTS);
         assertNotNull(bundle, "the bundle keeps its contents component");
-        ItemStack nestedInBundle = bundle.itemCopyStream().toList().get(0);
+        ItemStack nestedInBundle = bundle.itemCopies().toList().get(0);
         assertTrue(targetOf(nestedInBundle).isEmpty(), "a lodestone nested in a bundle is blanked");
     }
 
@@ -300,7 +300,7 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrubBlockEntity(potWithBundle);
         BundleContents bundle = itemOf(potWithBundle).get(DataComponents.BUNDLE_CONTENTS);
         assertNotNull(bundle, "the bundle keeps its contents component");
-        assertTrue(targetOf(bundle.itemCopyStream().toList().get(0)).isEmpty(),
+        assertTrue(targetOf(bundle.itemCopies().toList().get(0)).isEmpty(),
                 "a lodestone nested in a bundle stored as the block entity's item is blanked");
     }
 

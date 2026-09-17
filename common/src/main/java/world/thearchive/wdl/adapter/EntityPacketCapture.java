@@ -25,6 +25,8 @@ import net.minecraft.network.protocol.game.ClientboundSetEntityLinkPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
 import net.minecraft.network.protocol.game.ClientboundSetPassengersPacket;
 import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
+import net.minecraft.network.protocol.game.VecDelta;
+import net.minecraft.network.protocol.game.VecDeltaCodec;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -281,7 +283,7 @@ final class EntityPacketCapture
         }
         int plausibleMaxBlocks = SendRangeSampler.plausibleMaxBlocks(minecraft.options.getEffectiveRenderDistance());
         String dimensionId = level.dimension().identifier().toString();
-        IntList ids = packet.getEntityIds();
+        IntList ids = packet.entityIds();
         for (int i = 0; i < ids.size(); i++) {
             int distanceBlocks = sampler.removalSample(ids.getInt(i), player.getX(), player.getZ());
             if (distanceBlocks != SendRangeSampler.NO_SAMPLE && distanceBlocks <= plausibleMaxBlocks) {
@@ -347,25 +349,26 @@ final class EntityPacketCapture
     }
 
     private void onPositionSync(ClientboundEntityPositionSyncPacket packet) {
-        Vec3 position = packet.values().position();
+        Vec3 position = packet.position().endPosition();
         sampler.markMovedAbsolute(packet.id(), position.x, position.z);
         if (tracks(packet.id())) {
-            applyAbsolute(packet.id(), packet.values());
+            applyAbsolute(packet.id(), position, packet.yRot(), packet.xRot());
         }
     }
 
     /**
      * Apply a relative move ({@code ClientboundMoveEntityPacket}, the common walk update) keyed by the entity id the
-     * tee read from the packet's non-public field. A relative move is a short delta in 1/4096 of a block off the last
-     * sent base, so it is resolved against the current accumulated position (vanilla's VecDeltaCodec).
+     * tee read from the packet's non-public field. A relative move is a delta off the last sent base, a single short
+     * triple in 1/4096 of a block or a stepped path of them, so it is resolved against the current accumulated position
+     * through vanilla's {@link VecDeltaCodec}.
      *
      * <p>Vanilla sends a rider rotation but never a position, so a rider's held coordinates stay frozen at where it
      * boarded; a chunk home derived from them would revert the re-home onto its vehicle and split the pair across two
      * drain batches. A rotation-only update therefore leaves the home alone.
      */
     public void onMove(int id, ClientboundMoveEntityPacket move) {
-        sampler.markMovedRelative(id, move.hasPosition()
-                && (move.getXa() != 0 || move.getYa() != 0 || move.getZa() != 0));
+        VecDelta delta = move.getPositionDelta();
+        sampler.markMovedRelative(id, move.hasPosition() && hasDelta(delta));
         EntityPos current = positionOf(id);
         if (current == null) {
             return;
@@ -376,23 +379,38 @@ final class EntityPacketCapture
             recordRotation(id, yRot, xRot);
             return;
         }
-        double x = decodeAxis(current.x(), move.getXa());
-        double y = decodeAxis(current.y(), move.getYa());
-        double z = decodeAxis(current.z(), move.getZa());
-        reposition(id, chunkKey(x, z), new EntityPos(x, y, z, yRot, xRot));
+        VecDeltaCodec codec = new VecDeltaCodec();
+        codec.setBase(new Vec3(current.x(), current.y(), current.z()));
+        Vec3 end = delta.decode(codec).endPosition();
+        reposition(id, chunkKey(end.x, end.z), new EntityPos(end.x, end.y, end.z, yRot, xRot));
     }
 
     private void applyAbsolute(int id, PositionMoveRotation values) {
-        Vec3 position = values.position();
+        applyAbsolute(id, values.position(), values.yRot(), values.xRot());
+    }
+
+    private void applyAbsolute(int id, Vec3 position, float yRot, float xRot) {
         reposition(id, chunkKey(position.x, position.z),
-                new EntityPos(position.x, position.y, position.z, values.yRot(), values.xRot()));
+                new EntityPos(position.x, position.y, position.z, yRot, xRot));
     }
 
     private static long chunkKey(double x, double z) {
         return new ChunkPos(Mth.floor(x) >> 4, Mth.floor(z) >> 4).pack();
     }
 
-    private static double decodeAxis(double base, short delta) {
-        return delta == 0 ? base : (Math.round(base * 4096.0) + delta) / 4096.0;
+    private static boolean hasDelta(VecDelta delta) {
+        switch (delta) {
+            case VecDelta.Linear linear -> {
+                return linear.xa() != 0 || linear.ya() != 0 || linear.za() != 0;
+            }
+            case VecDelta.Stepped stepped -> {
+                for (VecDelta.Stepped.DeltaStep step : stepped.steps()) {
+                    if (step.xa() != 0 || step.ya() != 0 || step.za() != 0) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
     }
 }

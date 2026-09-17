@@ -126,8 +126,8 @@ public final class ChunkCodecImpl implements ChunkCodec {
     public CompoundTag encode(ChunkSnapshotSource snapshot, RegistryAccess registries, boolean synthesizeBlending) {
         PalettedContainerFactory containerFactory = PalettedContainerFactory.create(registries);
 
-        // NeoForge marks the vanilla canonical SerializableChunkData constructor deprecated in favor of a
-        // 20-argument attachment-aware overload that does not exist in vanilla. This captures vanilla client-chunk
+        // NeoForge marks the vanilla canonical SerializableChunkData constructor deprecated in favor of an
+        // attachment-aware overload that does not exist in vanilla. This captures vanilla client-chunk
         // data only, so the canonical constructor is the correct call; vanilla and Fabric do not deprecate
         // it, leaving the suppression inert there.
         @SuppressWarnings("deprecation")
@@ -141,7 +141,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
                 synthesizeBlending ? OVERWORLD_BLENDING : null, // blendingData: synthesized for a blended overworld
                 null,                                 // belowZeroRetrogen: none
                 UpgradeData.EMPTY,                    // upgradeData: none
-                null,                                 // carvingMask: LEVELCHUNK type, none
                 clientHeightmaps(snapshot),
                 NO_TICKS,
                 NO_POST_PROCESSING,

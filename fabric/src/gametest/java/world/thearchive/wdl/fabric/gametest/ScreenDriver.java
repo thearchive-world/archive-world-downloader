@@ -3,11 +3,11 @@
 
 package world.thearchive.wdl.fabric.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import org.jspecify.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 import world.thearchive.wdl.client.WdlDownloadsScreen;
 
@@ -74,6 +74,6 @@ final class ScreenDriver {
             return new double[] { rawX, rawY };
         });
         context.getInput().setCursorPos(physical[0], physical[1]);
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
     }
 }

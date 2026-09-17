@@ -89,13 +89,13 @@ final class VanillaWorldgenRegistries {
             // Unlike WorldLoader, the STATIC-layer tags are deliberately left unbound: worldgen codecs store tag
             // references as lazy TagKeys, and this access only builds the presets and encodes WorldGenSettings by
             // id, never generates terrain, so binding block/item tags would be needless work.
-            List<HolderLookup.RegistryLookup<?>> loadingBase = layered.getAccessForLoading(RegistryLayer.WORLDGEN)
+            List<HolderLookup.RegistryLookup<?>> loadingBase = layered.getAccessForLoading(RegistryLayer.WORLD)
                     .listRegistries().toList();
             // 26.x RegistryDataLoader.load is asynchronous: it takes an Executor and returns a future. Run it on
             // the calling thread and join, so this memoized reconstruction stays synchronous.
             RegistryAccess.Frozen loaded = RegistryDataLoader.load(resources, loadingBase,
-                    RegistryDataLoader.WORLDGEN_REGISTRIES, Runnable::run).join();
-            return layered.replaceFrom(RegistryLayer.WORLDGEN, loaded).compositeAccess();
+                    RegistryDataLoader.WORLD_REGISTRIES, Runnable::run).join();
+            return layered.replaceFrom(RegistryLayer.WORLD, loaded).compositeAccess();
         }
     }
 }

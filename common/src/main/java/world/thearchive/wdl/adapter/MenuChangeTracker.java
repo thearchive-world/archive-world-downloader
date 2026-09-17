@@ -21,9 +21,9 @@ import org.jspecify.annotations.Nullable;
  * the slot-resident stack, and the server's matching ack resends no slot; BundleContents is immutable and swapped
  * wholesale on every insert or remove, so a reference compare catches it). BundleItem is the only vanilla overrider of
  * the stack-on-stack click hooks, so no other component mutates in a slot. The signal also carries a small menu-only
- * ContainerData vector (a crafter's disabled and triggered flags, a brewing stand's brew time and fuel), so a data-only
- * tick like a running brew with no slot movement re-stashes. Main-thread only, reset at bind and close so one open menu
- * never inherits another's snapshot.
+ * ContainerData vector (a crafter's disabled and triggered flags, a brewing stand's brew time and fuel with their
+ * totals), so a data-only tick like a running brew with no slot movement re-stashes. Main-thread only, reset at bind
+ * and close so one open menu never inherits another's snapshot.
  */
 final class MenuChangeTracker {
     static final int[] NO_DATA = new int[0];
