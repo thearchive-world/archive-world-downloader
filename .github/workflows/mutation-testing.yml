@@ -21,6 +21,7 @@ on:
     # tier rather than silently ceasing to.
     paths-ignore:
       - '**/*.md'
+      - 'release-matrix.txt'
       - '.github/**'
       - 'art/**'
       - 'config/**'
@@ -32,6 +33,7 @@ on:
   pull_request:
     paths-ignore:
       - '**/*.md'
+      - 'release-matrix.txt'
       - '.github/**'
       - 'art/**'
       - 'config/**'
