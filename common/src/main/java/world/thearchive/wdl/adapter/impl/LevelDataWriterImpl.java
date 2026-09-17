@@ -17,8 +17,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -33,28 +35,20 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.biome.FixedBiomeSource;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.dimension.LevelStem;
-import net.minecraft.world.level.levelgen.DensityFunction;
-import net.minecraft.world.level.levelgen.DensityFunctions;
-import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
-import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
-import net.minecraft.world.level.levelgen.NoiseRouter;
-import net.minecraft.world.level.levelgen.NoiseSettings;
-import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.FlatLevelSource;
 import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.levelgen.WorldOptions;
+import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
@@ -70,12 +64,11 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.21.5 {@code level.dat} writer for the selected generator: the default all-air VOID (a noise generator placing
- * nothing and carrying the client's sea level per dimension, built from the client's synced {@code BIOME} +
- * {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from the reconstructed worldgen
- * registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the real terrain; the generator
- * only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the server's actual land (the
- * server's seed is not recoverable from a client).
+ * 1.21.5 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
+ * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
+ * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
+ * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
+ * server's actual land (the server's seed is not recoverable from a client).
  */
 public final class LevelDataWriterImpl implements LevelDataWriter {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -101,11 +94,11 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     private record CuratedSpec(String wdlId, String bandId, String curatedValue) {}
 
     // SpecialWorldProperty is vanilla-deprecated, but the only public PrimaryLevelData ctor still
-    // requires it; we take it from the baked dimensions (NONE for the void, FLAT only for the FLAT preset).
+    // requires it; we take it from the baked dimensions (FLAT, for this superflat void world).
     @SuppressWarnings("deprecation")
     @Override
     public LevelData buildLevelData(RegistryAccess clientRegistries, WorldOutputConfig worldOutput,
-            @Nullable String worldName, Map<ResourceKey<Level>, Integer> seaLevels) {
+            @Nullable String worldName) {
         WorldType worldType = worldOutput.worldType();
         // A real generator needs the full vanilla worldgen registries, which a multiplayer client is never sent;
         // the void generator only needs the client's synced biome/dimension-type registries, so it stays on them
@@ -114,7 +107,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         RegistryAccess generatorRegistries = worldType.needsWorldgenReconstruction()
                 ? VanillaWorldgenRegistries.get()
                 : clientRegistries;
-        WorldDimensions.Complete dimensions = bakedDimensions(worldType, generatorRegistries, seaLevels);
+        WorldDimensions.Complete dimensions = bakedDimensions(worldType, generatorRegistries);
         RegistryAccess.Frozen registries = new RegistryAccess.ImmutableRegistryAccess(
                 Stream.concat(generatorRegistries.registries(), dimensions.dimensionsRegistryAccess().registries()))
                         .freeze();
@@ -311,16 +304,15 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
     /**
      * The baked dimensions for the chosen generator: the vanilla NORMAL/FLAT presets (real terrain, built from the same
-     * worldgen registries the encode resolves against) or the all-air void. The captured chunks always supply the real
-     * terrain; the generator only governs the un-captured surroundings, which for DEFAULT/FLAT are freshly generated
-     * and not the server's actual land (the server seed is not recoverable).
+     * worldgen registries the encode resolves against) or the hardcoded superflat void. The captured chunks always
+     * supply the real terrain; the generator only governs the un-captured surroundings, which for DEFAULT/FLAT are
+     * freshly generated and not the server's actual land (the server seed is not recoverable).
      */
-    private static WorldDimensions.Complete bakedDimensions(WorldType worldType, RegistryAccess registries,
-            Map<ResourceKey<Level>, Integer> seaLevels) {
+    private static WorldDimensions.Complete bakedDimensions(WorldType worldType, RegistryAccess registries) {
         return switch (worldType) {
             case DEFAULT -> WorldPresets.createNormalWorldDimensions(registries).bake(emptyLevelStems());
             case FLAT -> WorldPresets.createFlatWorldDimensions(registries).bake(emptyLevelStems());
-            case VOID -> voidDimensions(registries, seaLevels);
+            case VOID -> voidDimensions(registries);
         };
     }
 
@@ -335,46 +327,27 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable());
     }
 
-    /**
-     * The three vanilla dimensions, each an all-air noise generator carrying the sea level captured for it (vanilla's
-     * default for a dimension the session never entered), baked into a LEVEL_STEM set. Not the flat generator: its sea
-     * level is a hardcoded -63, which since 1.21.2 sets the snow line and the water-mob spawn rules.
-     */
-    private static WorldDimensions.Complete voidDimensions(RegistryAccess registries,
-            Map<ResourceKey<Level>, Integer> seaLevels) {
+    /** The three vanilla dimensions, each a void superflat generator, baked into a LEVEL_STEM set. */
+    private static WorldDimensions.Complete voidDimensions(RegistryAccess registries) {
         Registry<Biome> biomes = registries.lookupOrThrow(Registries.BIOME);
         ResourceKey<Biome> biomeKey = biomes.containsKey(Biomes.THE_VOID) ? Biomes.THE_VOID : Biomes.PLAINS;
         Holder<Biome> voidBiome = biomes.getOrThrow(biomeKey);
 
+        FlatLevelGeneratorSettings flat = new FlatLevelGeneratorSettings(Optional.of(HolderSet.<StructureSet>empty()),
+                voidBiome, List.of());
+        flat.updateLayers(); // no layers -> all air (voidSettings)
+
         Registry<DimensionType> dimensionTypes = registries.lookupOrThrow(Registries.DIMENSION_TYPE);
         Map<ResourceKey<LevelStem>, LevelStem> stems = Map.of(
-                LevelStem.OVERWORLD, voidStem(dimensionTypes, BuiltinDimensionTypes.OVERWORLD, voidBiome,
-                        NoiseSettings.create(-64, 384, 1, 2), seaLevels.getOrDefault(Level.OVERWORLD, 63)),
-                LevelStem.NETHER, voidStem(dimensionTypes, BuiltinDimensionTypes.NETHER, voidBiome,
-                        NoiseSettings.create(0, 256, 1, 2), seaLevels.getOrDefault(Level.NETHER, 32)),
-                LevelStem.END, voidStem(dimensionTypes, BuiltinDimensionTypes.END, voidBiome,
-                        NoiseSettings.create(0, 256, 2, 1), seaLevels.getOrDefault(Level.END, 0)));
+                LevelStem.OVERWORLD, voidStem(dimensionTypes, BuiltinDimensionTypes.OVERWORLD, flat),
+                LevelStem.NETHER, voidStem(dimensionTypes, BuiltinDimensionTypes.NETHER, flat),
+                LevelStem.END, voidStem(dimensionTypes, BuiltinDimensionTypes.END, flat));
 
         return new WorldDimensions(stems).bake(emptyLevelStems());
     }
 
-    private static LevelStem voidStem(Registry<DimensionType> dimensionTypes, ResourceKey<DimensionType> type,
-            Holder<Biome> biome, NoiseSettings window, int seaLevel) {
-        return new LevelStem(dimensionTypes.getOrThrow(type), new NoiseBasedChunkGenerator(
-                new FixedBiomeSource(biome), Holder.direct(voidNoiseSettings(window, seaLevel))));
-    }
-
-    /**
-     * Settings that place nothing: a positive constant density with an air default block writes no block and never
-     * consults the fluid picker, so no lava floor forms below y=-54. The surface rule is never reached on an all-air
-     * column but has to exist, since an empty sequence throws.
-     */
-    private static NoiseGeneratorSettings voidNoiseSettings(NoiseSettings window, int seaLevel) {
-        BlockState air = Blocks.AIR.defaultBlockState();
-        DensityFunction zero = DensityFunctions.zero();
-        NoiseRouter router = new NoiseRouter(zero, zero, zero, zero, zero, zero, zero, zero, zero, zero, zero,
-                DensityFunctions.constant(1.0), zero, zero, zero);
-        return new NoiseGeneratorSettings(window, air, air, router, SurfaceRules.state(air), List.of(), seaLevel,
-                true, false, false, false);
+    private static LevelStem voidStem(
+            Registry<DimensionType> dimensionTypes, ResourceKey<DimensionType> type, FlatLevelGeneratorSettings flat) {
+        return new LevelStem(dimensionTypes.getOrThrow(type), new FlatLevelSource(flat));
     }
 }
