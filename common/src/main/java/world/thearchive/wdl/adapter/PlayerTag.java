@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  * <li>{@link #applyStripKnobs} drops the inventory and/or ender-chest keys per the opt-out config.</li>
  * <li>{@link #stripDeathLocation} is the unconditional privacy strip (no toggle).</li>
+ * <li>{@link #stripRespawnPoint} drops the client's copy of the server's world spawn (no toggle).</li>
  * <li>{@link #setDimension} writes the {@code "Dimension"} (absent from a {@code LocalPlayer} serialize, so we own that
  * single write), and {@link #dimensionOf} reads it back.</li>
  * <li>{@link #setPosition} overwrites {@code "Pos"} and {@code "Rotation"} with the capture anchor, so the saved player
@@ -61,6 +62,18 @@ final class PlayerTag {
     static void stripDeathLocation(CompoundTag raw) {
         raw.remove("LastDeathLocation");
         raw.remove("current_explosion_impact_pos");
+    }
+
+    /**
+     * Remove the respawn point keys. A client-side serialize carries at most the client's copy of the server's world
+     * spawn there, never the player's bed, and the keys are optional on read, so the tag still loads.
+     */
+    static void stripRespawnPoint(CompoundTag raw) {
+        raw.remove("SpawnX");
+        raw.remove("SpawnY");
+        raw.remove("SpawnZ");
+        raw.remove("SpawnForced");
+        raw.remove("Spawns");
     }
 
     /**
