@@ -147,6 +147,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // write; noon is world_clocks.dat written by save(), not a setDayTime call, since that method is gone at 26.x.
         PrimaryLevelData worldData = new PrimaryLevelData(
                 settings, dimensions.specialWorldProperty(), dimensions.lifecycle());
+        // Vanilla treats a level.dat whose initialized flag is false as new and replaces the spawn on first open.
+        worldData.setInitialized(true);
         return new LevelData(worldData, registries, gameRuleResolution, worldGenSettings, gameRules);
     }
 
