@@ -28,3 +28,4 @@
 1.21.11  fabric,neoforge
 26.1.2   fabric,neoforge
 26.2     fabric,neoforge
+26.3     fabric,neoforge
