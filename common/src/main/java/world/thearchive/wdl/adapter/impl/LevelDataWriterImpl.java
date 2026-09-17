@@ -135,6 +135,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
         PrimaryLevelData worldData = new PrimaryLevelData(
                 settings, worldOptions, dimensions.specialWorldProperty(), dimensions.lifecycle());
+        // Vanilla treats a level.dat whose initialized flag is false as new and replaces the spawn on first open.
+        worldData.setInitialized(true);
         // Downloaded worlds always open at noon, a fixed world-open invariant. A fresh PrimaryLevelData already
         // opens clear (raining, thundering, and their timers default off), so weather needs no write here.
         worldData.setDayTime(NOON);
