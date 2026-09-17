@@ -5,7 +5,6 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,7 +13,6 @@ import com.mojang.serialization.Lifecycle;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.Properties;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
@@ -24,17 +22,12 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.clock.ClockState;
 import net.minecraft.world.clock.PackedClockStates;
 import net.minecraft.world.clock.WorldClock;
 import net.minecraft.world.clock.WorldClocks;
 import net.minecraft.world.flag.FeatureFlags;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.gamerules.GameRules;
-import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
-import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
@@ -64,21 +57,13 @@ class LevelDatWorldOutputTest {
     private record Saved(LevelDataWriter.LevelData built, Path saveRoot) {}
 
     private LevelDataWriter.LevelData build(WorldOutputConfig worldOutput) {
-        return build(worldOutput, Map.of());
-    }
-
-    private LevelDataWriter.LevelData build(WorldOutputConfig worldOutput, Map<ResourceKey<Level>, Integer> seaLevels) {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        return writer.buildLevelData(registries, worldOutput, null, seaLevels);
+        return writer.buildLevelData(registries, worldOutput, null);
     }
 
     /** Build the metadata and run the real production save to disk, returning it paired with its save root. */
     private Saved save(WorldOutputConfig worldOutput) throws IOException {
-        return save(worldOutput, Map.of());
-    }
-
-    private Saved save(WorldOutputConfig worldOutput, Map<ResourceKey<Level>, Integer> seaLevels) throws IOException {
-        LevelDataWriter.LevelData built = build(worldOutput, seaLevels);
+        LevelDataWriter.LevelData built = build(worldOutput);
         String name = "world" + worldCounter++;
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess(name)) {
@@ -171,8 +156,7 @@ class LevelDatWorldOutputTest {
     @Test
     void aDefaultWorldIsStableWhileVoidStaysExperimental() {
         // A DEFAULT world is the three vanilla generators, so its re-derived lifecycle is stable and it opens
-        // without the experimental-world warning; the void world's nether/end are direct noise settings, not
-        // the vanilla presets, so they are experimental.
+        // without the experimental-world warning; the void world's flat nether/end are inherently experimental.
         // The lifecycle is re-derived from the baked generators at load, never read from level.dat, so no
         // level.dat write can suppress the void world's warning.
         assertEquals(Lifecycle.stable(), lifecycle(build(with("worldType", "DEFAULT"))));
@@ -275,26 +259,5 @@ class LevelDatWorldOutputTest {
         GameRules rules = gameRules(save(with("gamerule.immediate_respawn", "true")));
 
         assertTrue(rules.get(GameRules.IMMEDIATE_RESPAWN), "an arbitrary valid rule passes through");
-    }
-
-    @Test
-    void voidGeneratorCarriesTheCapturedSeaLevelPerDimension() throws IOException {
-        // Since 1.21.2 the snow line and the water-mob spawn rules read the generator's sea level, so each stem
-        // carries the server's value and a stem never entered gets vanilla's default; the round trip through the
-        // written file is what proves the direct settings holder decodes inline.
-        WorldGenSettings written = worldGen(
-                save(WorldOutputConfig.DEFAULTS, Map.of(Level.OVERWORLD, 70, Level.END, 5)));
-        Map<ResourceKey<LevelStem>, LevelStem> stems = written.dimensions().dimensions();
-
-        assertEquals(70, stems.get(LevelStem.OVERWORLD).generator().getSeaLevel(),
-                "the overworld carries its captured sea level");
-        assertEquals(32, stems.get(LevelStem.NETHER).generator().getSeaLevel(),
-                "a stem never entered carries vanilla's default");
-        assertEquals(5, stems.get(LevelStem.END).generator().getSeaLevel(), "the end carries its captured sea level");
-        for (LevelStem stem : stems.values()) {
-            NoiseBasedChunkGenerator generator = assertInstanceOf(NoiseBasedChunkGenerator.class, stem.generator());
-            NoiseGeneratorSettings settings = generator.generatorSettings().value();
-            assertTrue(settings.defaultBlock().isAir() && settings.defaultFluid().isAir(), "the void places only air");
-        }
     }
 }
