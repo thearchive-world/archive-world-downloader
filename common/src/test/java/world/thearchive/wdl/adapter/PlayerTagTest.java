@@ -28,9 +28,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for the band-agnostic {@link PlayerTag} operations on an already-serialized player tag: the strip
  * knob (drop {@code Inventory}/{@code SelectedItemSlot}, which at this band also carries the armor and offhand slots),
- * the death-location strip (a harmless no-op here; neither key exists in a 1.12.2 player tag), the {@code Dimension}
- * write and the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure
- * NBT, so it round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
+ * the death-location strip (a harmless no-op here; neither key exists in a 1.12.2 player tag), the respawn-point strip
+ * ({@code SpawnX}/{@code SpawnY}/{@code SpawnZ}/{@code SpawnForced}/{@code Spawns}), the {@code Dimension} write and
+ * the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure NBT, so it
+ * round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
  */
 class PlayerTagTest {
     private final ContainerSink sink = new ContainerSinkImpl();
@@ -104,6 +105,43 @@ class PlayerTagTest {
         assertFalse(tag.hasKey("LastDeathLocation"));
         assertFalse(tag.hasKey("current_explosion_impact_pos"));
         assertTrue(tag.hasKey("Air"), "the strip removes only the two location keys");
+    }
+
+    @Test
+    void stripRespawnPointRemovesTheFlatSpawnKeys() {
+        NBTTagCompound tag = playerTag();
+        tag.setInteger("SpawnX", 120); // the client's copy of the server's world spawn, never a bed
+        tag.setInteger("SpawnY", 72);
+        tag.setInteger("SpawnZ", -340);
+        tag.setBoolean("SpawnForced", true);
+
+        PlayerTag.stripRespawnPoint(tag);
+
+        assertFalse(tag.hasKey("SpawnX"), "the position is removed");
+        assertFalse(tag.hasKey("SpawnY"));
+        assertFalse(tag.hasKey("SpawnZ"));
+        assertFalse(tag.hasKey("SpawnForced"), "the forced flag goes with the position");
+        assertTrue(tag.hasKey("Air"), "the strip leaves the rest of the tag intact");
+    }
+
+    @Test
+    void stripRespawnPointRemovesThePerDimensionSpawnList() {
+        NBTTagCompound tag = playerTag();
+        tag.setTag("Spawns", new NBTTagList());
+
+        PlayerTag.stripRespawnPoint(tag);
+
+        assertFalse(tag.hasKey("Spawns"), "the per-dimension list is removed");
+    }
+
+    @Test
+    void stripRespawnPointOnTagWithoutSpawnKeysChangesNothing() {
+        NBTTagCompound tag = playerTag();
+        NBTTagCompound before = tag.copy();
+
+        PlayerTag.stripRespawnPoint(tag);
+
+        assertEquals(before, tag, "no spawn keys, nothing removed");
     }
 
     @Test

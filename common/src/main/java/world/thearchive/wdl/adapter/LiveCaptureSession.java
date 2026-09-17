@@ -2985,16 +2985,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Assemble the immutable player finish-snapshot from the live client (main thread): serialize the player, apply the
-     * strip knobs and the unconditional death-location strip, the opt-in item-coordinate scrub, the canonical
-     * {@code "Dimension"}, and the open-time ender-chest merge, then bundle the spawn position, gamemode, and
-     * difficulty. Everything in the returned {@link CapturedPlayer} is finished, so it crosses to the writer thread
-     * safely. Throwing is the caller's fail-soft contract.
+     * strip knobs and the unconditional strips, the opt-in item-coordinate scrub, the canonical {@code "Dimension"},
+     * and the open-time ender-chest merge, then bundle the spawn position, gamemode, and difficulty. Everything in the
+     * returned {@link CapturedPlayer} is finished, so it crosses to the writer thread safely. Throwing is the caller's
+     * fail-soft contract.
      */
     private CapturedPlayer assembleCapturedPlayer(EntityPlayerSP player, Minecraft minecraft) {
         Entity anchor = captureAnchor(player, anchorEntity(minecraft, player));
         NBTTagCompound raw = adapter.playerSink().capturePlayer(player);
         PlayerTag.applyStripKnobs(raw, config.savePlayerInventory(), config.savePlayerEnderChest());
         PlayerTag.stripDeathLocation(raw);
+        PlayerTag.stripRespawnPoint(raw);
         if (!config.saveItemCoordinates()) {
             // The player tag is entity-shaped, so the entity scrub covers the Inventory list and the
             // equipment compound (offhand and armor live there, not in Inventory, since 1.21.5).
