@@ -10,6 +10,7 @@ version's notes here before tagging; a release with no matching section fails ra
 
 ### Added
 
+- Support for Minecraft 26.3.
 - Support for Minecraft 1.10.2, on Forge.
 - The download report names what a partial download lost.
 - Minecraft 1.11.2-1.15.2: the "..." button beside Download This World shows its "Settings" label on hover.
