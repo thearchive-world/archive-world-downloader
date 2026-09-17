@@ -160,25 +160,3 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.j
 # itself (Optional at 1.21.5, with the getCompoundOrEmpty, getListOrEmpty and getStringOr defaults). Below 1.21.5
 # CompoundTag has no store with a Codec, so the UUID is encoded through NbtOps directly.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
-
-# Below 1.21.2 Level.getSeaLevel() is a constant 63 and nothing reads the generator's sea level, so buildLevelData
-# takes no captured sea levels and the void stays the flat generator; 1.21.3 and above carry them into a noise void.
-common/src/main/java/world/thearchive/wdl/adapter/LevelDataWriter.java
-
-# The void stays the flat generator below 1.21.2 (see LevelDataWriter.java), so the overworld assertion expects
-# FlatLevelSource, where 1.21.3 and above expect NoiseBasedChunkGenerator.
-common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
-
-# Below 1.21.2 the session records no captured sea level (see LevelDataWriter.java), so the recordSeaLevel test of
-# 1.21.3 and above does not exist.
-common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionRebindTest.java
-
-# Below 1.21.2 buildLevelData takes no captured sea levels (see LevelDataWriter.java), so its callers pass none.
-common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
-
-# Below 1.21.2 buildLevelData takes no captured sea levels (see LevelDataWriter.java), so its callers pass none.
-common/src/test/java/world/thearchive/wdl/adapter/PriorPlayerReadRoundTripTest.java
-
-# Below 1.21.2 buildLevelData takes no captured sea levels (see LevelDataWriter.java), so its callers pass none and
-# the test's own writer implements the three-argument form.
-common/src/test/java/world/thearchive/wdl/adapter/impl/LevelDataWriterWarmTest.java
