@@ -38,9 +38,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for the 26.x player-data apply: {@link LevelDataWriter#save} with a {@link CapturedPlayer} writes
  * the captured tag to {@code players/data/<uuid>.dat} and stamps its uuid as the level.dat {@code singleplayer_uuid},
- * flips {@code GameType}, sets the world {@code spawn} ({@code RespawnData}) to the capture dimension + position, and
- * writes the captured {@code Difficulty} into {@code difficulty_settings}; with a {@code null} {@code CapturedPlayer}
- * the output is the void world (no player file, default spawn, {@code SURVIVAL}). Driven through the real production
+ * flips {@code GameType}, sets the world {@code spawn} ({@code RespawnData}) to the capture dimension + position, marks
+ * the level data {@code initialized} so vanilla keeps that spawn on first open, and writes the captured
+ * {@code Difficulty} into {@code difficulty_settings}; with a {@code null} {@code CapturedPlayer} the output is the
+ * void world (no player file, default spawn, {@code initialized}, {@code SURVIVAL}). Driven through the real production
  * {@code LevelStorageAccess.saveDataTag}, so the headless suite guards the band-specific 2-argument form and the
  * separate player-file write.
  */
@@ -95,6 +96,8 @@ class LevelDatPlayerRoundTripTest {
         GlobalPos spawn = data.read("spawn", LevelData.RespawnData.CODEC).orElseThrow().globalPos();
         assertEquals(Level.NETHER, spawn.dimension(), "the world spawn carries the capture dimension");
         assertEquals(new BlockPos(120, 72, -340), spawn.pos(), "the world spawn is the capture position");
+        assertTrue(data.getBooleanOr("initialized", false),
+                "level.dat is marked initialized so vanilla keeps this spawn on first open");
     }
 
     @Test
@@ -116,6 +119,7 @@ class LevelDatPlayerRoundTripTest {
         assertEquals(GameType.SURVIVAL.getId(), data.getIntOr("GameType", -99),
                 "the void world stays the default survival");
         assertTrue(data.contains("spawn"), "the default spawn is still written");
+        assertTrue(data.getBooleanOr("initialized", false), "the void world is marked initialized too");
     }
 
     @Test
