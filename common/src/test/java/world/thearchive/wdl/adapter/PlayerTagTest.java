@@ -33,9 +33,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for the band-agnostic {@link PlayerTag} operations on an already-serialized player tag: the strip
  * knobs (drop {@code Inventory}/{@code SelectedItemSlot}/{@code equipment}/{@code EnderItems}), the unconditional
- * Death-location double strip ({@code LastDeathLocation} + {@code current_explosion_impact_pos}), the {@code Dimension}
- * write and the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure
- * NBT, so it round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
+ * Death-location double strip ({@code LastDeathLocation} + {@code current_explosion_impact_pos}), the respawn-point
+ * strip ({@code SpawnX}/{@code SpawnY}/{@code SpawnZ}/{@code SpawnForced}/{@code Spawns}), the {@code Dimension} write
+ * and the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure NBT, so
+ * it round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
  */
 class PlayerTagTest {
     private static RegistryAccess registries;
@@ -106,6 +107,43 @@ class PlayerTagTest {
         assertFalse(tag.contains("LastDeathLocation"), "no config combination restores the death location");
         assertFalse(tag.contains("current_explosion_impact_pos"), "nor the explosion-impact coordinate");
         assertTrue(tag.contains("Air"), "the strip leaves the rest of the tag intact");
+    }
+
+    @Test
+    void stripRespawnPointRemovesTheFlatSpawnKeys() {
+        CompoundTag tag = playerTag();
+        tag.putInt("SpawnX", 120); // the client's copy of the server's world spawn, never a bed
+        tag.putInt("SpawnY", 72);
+        tag.putInt("SpawnZ", -340);
+        tag.putBoolean("SpawnForced", true);
+
+        PlayerTag.stripRespawnPoint(tag);
+
+        assertFalse(tag.contains("SpawnX"), "the position is removed");
+        assertFalse(tag.contains("SpawnY"));
+        assertFalse(tag.contains("SpawnZ"));
+        assertFalse(tag.contains("SpawnForced"), "the forced flag goes with the position");
+        assertTrue(tag.contains("Air"), "the strip leaves the rest of the tag intact");
+    }
+
+    @Test
+    void stripRespawnPointRemovesThePerDimensionSpawnList() {
+        CompoundTag tag = playerTag();
+        tag.put("Spawns", new ListTag());
+
+        PlayerTag.stripRespawnPoint(tag);
+
+        assertFalse(tag.contains("Spawns"), "the per-dimension list is removed");
+    }
+
+    @Test
+    void stripRespawnPointOnTagWithoutSpawnKeysChangesNothing() {
+        CompoundTag tag = playerTag();
+        CompoundTag before = tag.copy();
+
+        PlayerTag.stripRespawnPoint(tag);
+
+        assertEquals(before, tag, "no spawn keys, nothing removed");
     }
 
     @Test
