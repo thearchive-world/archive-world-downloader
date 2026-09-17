@@ -105,6 +105,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         String levelName = worldName == null || worldName.isEmpty() ? LEVEL_NAME : worldName;
         net.minecraft.world.level.storage.LevelData levelData = new net.minecraft.world.level.storage.LevelData(
                 settings, levelName);
+        // Vanilla treats a level.dat whose initialized flag is false as new and replaces the spawn on first open.
+        levelData.setInitialized(true);
         GameRuleResolution gameRuleResolution = applyGameRules(levelData.getGameRules(), worldOutput);
         // Downloaded worlds always open at noon, a fixed world-open invariant. A fresh LevelData already opens clear
         // (raining, thundering, and their timers default off), so weather needs no write here.
