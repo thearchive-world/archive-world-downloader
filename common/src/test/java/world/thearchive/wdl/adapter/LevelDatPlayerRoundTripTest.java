@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
@@ -62,7 +61,7 @@ class LevelDatPlayerRoundTripTest {
     private CompoundTag saveAndReadBack(Path saves, String name, @Nullable CapturedPlayer player)
             throws IOException {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null, Map.of());
+        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess(name)) {
             writer.save(access, built, player);

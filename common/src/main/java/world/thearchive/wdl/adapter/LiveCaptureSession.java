@@ -28,7 +28,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -251,9 +250,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // still write to the vanilla dimension's own folder, not one derived from the custom level key.
     // Non-final: rebound on a dimension change to lay the new dimension out under its own folder.
     private ResourceKey<Level> targetDimension;
-    // Keyed by the vanilla stem the dimension is laid out under; a stem never entered is absent and the writer
-    // applies vanilla's default for it.
-    private final Map<ResourceKey<Level>, Integer> capturedSeaLevels = new HashMap<>();
     // The server's OWN key for the dimension being captured, as the id string the packet-side per-dimension
     // stores share, which on a Multiverse/Paper server is not the vanilla-mapped targetDimension above. It is
     // the identity the inbound tee stamps each held entity with, so the promote gate compares a held frame
@@ -629,14 +625,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * fails soft, and the level.dat write degrades to the openable void-world output.
      */
     private volatile @Nullable CapturedPlayer capturedPlayer;
-    /**
-     * The built world metadata, assembled on the main thread at world open and rebuilt there when a portal crossing
-     * records a stem's sea level; read by the writer thread when the level.dat write runs. Volatile for the same reason
-     * as {@link #capturedPlayer}.
-     */
-    private volatile LevelDataWriter.@Nullable LevelData levelData;
-    /** The name resolved at the first build, reused by a rebuild so a resume does not re-read its prior level.dat. */
-    private @Nullable String resolvedWorldName;
     private volatile @Nullable CapturedProgress capturedProgress;
 
     /**
@@ -890,7 +878,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 VanillaDimensions.forType(level.dimensionTypeRegistration().unwrapKey().orElse(null)),
                 level.dimension(), level.registryAccess(), target, overlayIndex, coveredIndex, sendRange,
                 overlayActive, cameraDetachedAtStart, bobbyFilter, saveCompletePoke);
-        recordSeaLevel(this.targetDimension, level.getSeaLevel());
     }
 
     /**
@@ -1339,7 +1326,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         rebindDimension(VanillaDimensions.forType(newLevel.dimensionTypeRegistration().unwrapKey().orElse(null)),
                 newLevel.dimension());
         this.level = newLevel;
-        recordSeaLevel(this.targetDimension, newLevel.getSeaLevel());
     }
 
     /**
@@ -1350,23 +1336,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         dimensionRebind.rebind(newTarget);
         this.targetDimension = newTarget;
         this.liveDimensionId = liveDimension.identifier().toString();
-    }
-
-    /**
-     * First entry per stem wins. Rebuilds the level data once the writer exists, since the open baked the map into it;
-     * a rebuild that fails keeps the earlier build.
-     */
-    void recordSeaLevel(ResourceKey<Level> stem, int seaLevel) {
-        if (capturedSeaLevels.putIfAbsent(stem, seaLevel) != null || writer == null) {
-            return;
-        }
-        try {
-            levelData = adapter.levelDataWriter().buildLevelData(registries, config.worldOutput(), resolvedWorldName,
-                    Map.copyOf(capturedSeaLevels));
-        } catch (RuntimeException e) {
-            LOGGER.warn("the level data could not be rebuilt for the sea level of {}; the earlier build stands", stem,
-                    e);
-        }
     }
 
     /**
@@ -3789,8 +3758,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null;
         }
         try {
-            // level.dat: an all-air VOID world derived from the client reg, each stem carrying the sea level the
-            // client held for it. The version-coupled saveDataTag
+            // level.dat: a superflat VOID world derived from the client reg. The version-coupled saveDataTag
             // call lives behind LevelDataWriter.save() (its vanilla signature drifts across bands: it drops
             // RegistryAccess at 26.1.2), so this shared session stays cherry-pickable. Built here on the main
             // thread; the writer thread only writes the finished data.
@@ -3828,11 +3796,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 LOGGER.warn("the download report could not be stamped at world-open; the save continues", e);
             }
             LevelDataWriter levelDataWriter = adapter.levelDataWriter();
-            resolvedWorldName = resolveWorldName();
-            LevelDataWriter.LevelData built = levelDataWriter.buildLevelData(registries, config.worldOutput(),
-                    resolvedWorldName, Map.copyOf(capturedSeaLevels));
-            this.levelData = built;
-            surfaceGameRuleOverrideLoss(built.gameRuleResolution());
+            LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(registries, config.worldOutput(),
+                    resolveWorldName());
+            surfaceGameRuleOverrideLoss(levelData.gameRuleResolution());
             writer = new AsyncSaveWriter(
                     dimension -> new SimpleRegionStorage(paths.regionStorageInfo(dimension),
                             paths.regionDirectory(dimension), DataFixers.getDataFixer(), false, DataFixTypes.CHUNK),
@@ -3848,17 +3814,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
                         FinalizeOutputs.backupBeforeResume(saveRoot, target.mode(), config.zipOnResume());
                         report.refreshHumanRendering(saveRoot);
                     },
-                    // Read the volatile capturedPlayer/capturedProgress/levelData LAZILY inside the thunks:
-                    // ensureWriter builds these thunks at the first incremental flush, mid-capture, before finish()
-                    // sets the first two and before a portal crossing can rebuild the third, so a snapshot taken here
-                    // would be null or stale. The thunks run on the writer thread strictly after the chunk drain, so
-                    // the fields set in finish() and the last rebuild are visible.
+                    // Read the volatile capturedPlayer/capturedProgress LAZILY inside the thunks:
+                    // ensureWriter builds these thunks at the first incremental flush, mid-capture,
+                    // before finish() sets the fields, so a snapshot taken here would always be null. The thunks run
+                    // on the writer thread strictly after the chunk drain, so the fields set in finish() are visible.
                     // level.dat is written FIRST, then idcounts (the map files themselves streamed during capture),
                     // each write caught, so a map IO failure never aborts before level.dat (an unopenable save) or
                     // fails it.
-                    () -> levelDataWriter.save(access,
-                            Objects.requireNonNull(levelData, "level data is built before the writer exists"),
-                            capturedPlayer),
+                    () -> levelDataWriter.save(access, levelData, capturedPlayer),
                     (chunksFailed, entityChunksFailed) -> {
                         PlayerProgressWriter.write(saveRoot, capturedProgress);
                         writeIdCounts(paths);
