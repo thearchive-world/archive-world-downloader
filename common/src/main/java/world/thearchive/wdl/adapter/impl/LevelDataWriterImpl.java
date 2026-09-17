@@ -103,6 +103,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
         String levelName = worldName == null || worldName.isEmpty() ? LEVEL_NAME : worldName;
         WorldInfo levelData = new WorldInfo(settings, levelName);
+        // Vanilla treats a level.dat whose initialized flag is false as new and replaces the spawn on first open.
+        levelData.setServerInitialized(true);
         GameRuleResolution gameRuleResolution = applyGameRules(levelData.getGameRulesInstance(), worldOutput);
         // Downloaded worlds always open at noon, a fixed world-open invariant. A fresh WorldInfo already opens clear
         // (raining, thundering, and their timers default off), so weather needs no write here.
