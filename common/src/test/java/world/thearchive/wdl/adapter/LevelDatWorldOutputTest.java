@@ -5,25 +5,18 @@ package world.thearchive.wdl.adapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.Lifecycle;
-import java.util.Map;
 import java.util.Properties;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.GameRules;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.dimension.LevelStem;
-import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
-import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import org.junit.jupiter.api.Test;
@@ -42,12 +35,8 @@ class LevelDatWorldOutputTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
     private LevelDataWriter.LevelData build(WorldOutputConfig worldOutput) {
-        return build(worldOutput, Map.of());
-    }
-
-    private LevelDataWriter.LevelData build(WorldOutputConfig worldOutput, Map<ResourceKey<Level>, Integer> seaLevels) {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        return writer.buildLevelData(registries, worldOutput, null, seaLevels);
+        return writer.buildLevelData(registries, worldOutput, null);
     }
 
     private CompoundTag dataTag(LevelDataWriter.LevelData built) {
@@ -114,8 +103,7 @@ class LevelDatWorldOutputTest {
     @Test
     void aDefaultWorldIsStableWhileVoidStaysExperimental() {
         // A DEFAULT world is the three vanilla generators, so its re-derived lifecycle is stable and it opens
-        // without the experimental-world warning; the void world's nether/end are direct noise settings, not
-        // the vanilla presets, so they are experimental.
+        // without the experimental-world warning; the void world's flat nether/end are inherently experimental.
         // The lifecycle is re-derived from the baked generators at load, never read from level.dat, so no
         // level.dat write can suppress the void world's warning.
         assertEquals(Lifecycle.stable(), lifecycle(build(with("worldType", "DEFAULT"))));
@@ -226,26 +214,5 @@ class LevelDatWorldOutputTest {
         GameRules rules = gameRules(build(with("gamerule.doImmediateRespawn", "true")));
 
         assertTrue(rules.getBoolean(GameRules.RULE_DO_IMMEDIATE_RESPAWN), "an arbitrary valid rule passes through");
-    }
-
-    @Test
-    void voidGeneratorCarriesTheCapturedSeaLevelPerDimension() {
-        // Since 1.21.2 the snow line and the water-mob spawn rules read the generator's sea level, so each stem
-        // carries the server's value and a stem never entered gets vanilla's default; the round trip through the
-        // Data tag is what proves the direct settings holder decodes inline.
-        WorldGenSettings written = worldGen(
-                build(WorldOutputConfig.DEFAULTS, Map.of(Level.OVERWORLD, 70, Level.END, 5)));
-        Map<ResourceKey<LevelStem>, LevelStem> stems = written.dimensions().dimensions();
-
-        assertEquals(70, stems.get(LevelStem.OVERWORLD).generator().getSeaLevel(),
-                "the overworld carries its captured sea level");
-        assertEquals(32, stems.get(LevelStem.NETHER).generator().getSeaLevel(),
-                "a stem never entered carries vanilla's default");
-        assertEquals(5, stems.get(LevelStem.END).generator().getSeaLevel(), "the end carries its captured sea level");
-        for (LevelStem stem : stems.values()) {
-            NoiseBasedChunkGenerator generator = assertInstanceOf(NoiseBasedChunkGenerator.class, stem.generator());
-            NoiseGeneratorSettings settings = generator.generatorSettings().value();
-            assertTrue(settings.defaultBlock().isAir() && settings.defaultFluid().isAir(), "the void places only air");
-        }
     }
 }

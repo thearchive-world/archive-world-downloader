@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
@@ -62,7 +61,7 @@ class PriorPlayerReadRoundTripTest {
 
     private Path saveDownload(Path saves, String name, ListTag enderItems) throws IOException {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null, Map.of());
+        LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
         CapturedPlayer captured = new CapturedPlayer(capturedPlayerTag(enderItems), BlockPos.ZERO, 0.0F, 0.0F,
                 Level.OVERWORLD, GameType.SURVIVAL, Difficulty.NORMAL);
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
