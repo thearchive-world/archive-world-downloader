@@ -20,6 +20,8 @@ version's notes here before tagging; a release with no matching section fails ra
 - A download that could not save your character reports as partial instead of completed.
 - A failure while recording the server's details no longer costs you the whole download.
 - Resuming a download no longer loses the trades an earlier session saved for a villager that has moved since.
+- For downloads made or resumed with this version, dying in the downloaded world respawns you where the download stopped.
+- Minecraft 1.11.2-1.21.8: a download stopped in the Nether or the End brings you back in the overworld at those coordinates when you die.
 - Minecraft 1.11.2-1.21.11: a download that ends before it can save your character no longer erases the one an earlier download saved.
 - Minecraft 1.12.2 and above: a download that ends before it can save your advancements no longer erases the ones an earlier download saved.
 - Minecraft 1.16.5 and above: downloads from a server joined by direct connect no longer come out empty.
