@@ -16,10 +16,10 @@ import world.thearchive.wdl.core.SettingsLayout;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The curated game-rule set surfaced across the SPI for the settings menu: the curated safe rules (nine at 1.21.10),
+ * The curated game-rule set surfaced across the SPI for the settings menu: the curated safe rules (nine on this band),
  * each with its curated (safe) value and the two toggle-position values, computed from the live {@code GameRules} so
- * the menu never re-hardcodes a band-specific set. The band-neutral fire-spread row has no 1.21.10 rule, so the menu
- * skips its order slot.
+ * the menu never re-hardcodes a band-specific set. The band-neutral fire-spread row has no spec on this band, so the
+ * menu skips its order slot.
  */
 class LevelDatCuratedGameRulesTest {
     private Map<String, CuratedGameRule> curated() {
