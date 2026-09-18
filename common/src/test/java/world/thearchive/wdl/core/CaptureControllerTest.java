@@ -24,8 +24,8 @@ import org.junit.jupiter.api.Test;
  * <p>The save is asynchronous: {@code finish()} only <em>begins</em> the background write, and the controller stays
  * {@code SAVING} until the write reports done. Two routes lead out of it in production: the per-tick
  * {@code isSaveComplete()} poll, and the session's own re-poll once its write completes, which may re-enter
- * {@code tick()} from inside {@code stop()}. The fake here models the tick route only, with a {@link #saveDone} toggle
- * the test flips to signal completion.
+ * {@code tick()} from inside {@code stop()}. The fake here models the tick route, with a {@link FakeSession#saveDone}
+ * toggle the test flips to signal completion; one test subclasses it to take the re-poll route.
  *
  * <p>Wall-clock-dependent behavior (the elapsed timer and the post-save done linger) is driven by a controllable clock
  * so the assertions are deterministic.
@@ -37,7 +37,7 @@ class CaptureControllerTest {
         return new CaptureController(() -> now[0]);
     }
 
-    private static final class FakeSession implements CaptureController.Session {
+    private static class FakeSession implements CaptureController.Session {
         int captures;
         int finishes;
         boolean saveDone; // the test flips this true to signal the background save has completed
@@ -780,7 +780,6 @@ class CaptureControllerTest {
         assertEquals(0, session.releases, "and nothing releases it before the client has torn the level down");
     }
 
-    /** The hold is released by a later tick, never by the re-entrant poll the finish itself makes. */
     @Test
     void theHoldOutlivesTheFinishAndIsReleasedByTheNextTick() {
         CaptureController controller = controller();
@@ -808,5 +807,33 @@ class CaptureControllerTest {
         controller.onServerJoin();
 
         assertEquals(1, session.holds, "the join edge holds the still-draining writer");
+    }
+
+    /**
+     * A finish with nothing to write completes inside {@code finish()} and re-polls the controller from there, as the
+     * live session does.
+     */
+    @Test
+    void aPollReenteringFromInsideTheFinishLeavesTheHoldForTheNextTick() {
+        CaptureController controller = controller();
+        FakeSession session = new FakeSession() {
+            @Override
+            public void finish() {
+                super.finish();
+                saveDone = true;
+                controller.tick();
+            }
+        };
+        controller.start(() -> session);
+
+        controller.onDisconnect();
+
+        assertEquals(CaptureState.IDLE, controller.state(), "the finish's own poll completed the save");
+        assertEquals(1, session.holds, "the disconnect holds first");
+        assertEquals(0, session.releases, "the finish's own poll must not release the hold");
+
+        controller.tick();
+
+        assertEquals(1, session.releases, "the first tick after the finish releases it");
     }
 }
