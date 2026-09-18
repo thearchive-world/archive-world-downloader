@@ -525,9 +525,11 @@ common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 
 # Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the
 # raw LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position (carried
-# by a pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and
-# tag.BlockEntityTag.FlowerPos, both scrubbed by the same pass. Java 8 form: every pattern instanceof over the item,
-# entity, equipment, passenger and bee reads is unbound.
+# by a pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData and
+# tag.BlockEntityTag.FlowerPos, both scrubbed by the same pass. Below 1.17 the hive stores a bee's whole saved tag
+# with only the UUID stripped, so under each EntityData the pass blanks FlowerPos, HivePos, Pos, Leash and Dimension
+# (the entity's own dimension id, written below 1.16), where the component era blanks the flower position alone.
+# Java 8 form: every pattern instanceof over the item, entity, equipment, passenger and bee reads is unbound.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
@@ -554,11 +556,12 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
 
 # Below 1.20.5 there are no item components: the lodestone target is the raw LodestonePos/LodestoneDimension/
 # LodestoneTracked keys vanilla's CompassItem.addLodestoneTags writes, a beehive item's occupants and the hive's
-# own flower position are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and tag.BlockEntityTag.FlowerPos,
-# shulker contents live under tag.BlockEntityTag.Items, ContainerHelper.loadAllItems takes no registries argument,
-# and DataResult.getOrThrow takes (boolean, Consumer<String>). Below 1.17 there is no bundle item, so the
-# bundle-holding fixtures and their assertions are dropped, and no Tag.TAG_COMPOUND, so the list reads pass the raw
-# type id 10. Java 8 form: no Optional.isEmpty (the empty assertions negate isPresent) and no pattern instanceof.
+# own flower position are tag.BlockEntityTag.Bees[].EntityData (a stored bee's whole saved tag below 1.17, with its
+# Pos, HivePos, FlowerPos, Leash and, below 1.16, Dimension) and tag.BlockEntityTag.FlowerPos, shulker contents live
+# under tag.BlockEntityTag.Items, ContainerHelper.loadAllItems takes no registries argument, and
+# DataResult.getOrThrow takes (boolean, Consumer<String>). Below 1.17 there is no bundle item, so the bundle-holding
+# fixtures and their assertions are dropped, and no Tag.TAG_COMPOUND, so the list reads pass the raw type id 10.
+# Java 8 form: no Optional.isEmpty (the empty assertions negate isPresent) and no pattern instanceof.
 common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk drives hand-built NBT keyed by tag.BlockEntityTag.Items (a

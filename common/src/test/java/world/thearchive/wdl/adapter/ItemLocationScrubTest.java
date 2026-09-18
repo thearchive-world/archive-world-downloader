@@ -17,6 +17,7 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NbtUtils;
@@ -47,13 +48,13 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for the item-coordinate privacy scrub: {@link ItemLocationScrub} blanks the lodestone target and
- * the beehive bee flower positions on every item it reaches, over a serialized item list (the inventory or the ender
- * items), a block entity's own NBT (a decorated pot, a campfire), and a serialized entity (an item frame, mob
- * equipment, an inventory list, passengers), reaching items nested inside a shulker box ({@code tag.BlockEntityTag})
- * and inside a bundle ({@code tag.Items}), while leaving the scrubbed item valid and every other item untouched. Real
- * {@link ItemStack}s serialized via the production {@link ContainerSink#captureItems} drive the round-trip, so neither
- * a live menu nor a {@code Level} is needed; the scrub key strings are pinned by the assertions (a wrong key leaves the
- * coordinate and fails).
+ * the positions a beehive item's stored bees carry on every item it reaches, over a serialized item list (the inventory
+ * or the ender items), a block entity's own NBT (a decorated pot, a campfire), and a serialized entity (an item frame,
+ * mob equipment, an inventory list, passengers), reaching items nested inside a shulker box
+ * ({@code tag.BlockEntityTag}) and inside a bundle ({@code tag.Items}), while leaving the scrubbed item valid and every
+ * other item untouched. Real {@link ItemStack}s serialized via the production {@link ContainerSink#captureItems} drive
+ * the round-trip, so neither a live menu nor a {@code Level} is needed; the scrub key strings are pinned by the
+ * assertions (a wrong key leaves the coordinate and fails).
  */
 class ItemLocationScrubTest {
     private static final String LODESTONE_POS = "LodestonePos";
@@ -62,6 +63,10 @@ class ItemLocationScrubTest {
     private static final String BEES = "Bees";
     private static final String ENTITY_DATA = "EntityData";
     private static final String FLOWER_POS = "FlowerPos";
+    private static final String POS = "Pos";
+    private static final String HIVE_POS = "HivePos";
+    private static final String LEASH = "Leash";
+    private static final String DIMENSION = "Dimension";
     private static final String BLOCK_ENTITY_TAG = "BlockEntityTag";
 
     private static RegistryAccess registries;
@@ -101,24 +106,55 @@ class ItemLocationScrubTest {
     }
 
     /**
-     * A beehive item carrying two flower positions the scrub must both blank: the hive's own top-level
-     * {@code BlockEntityTag.FlowerPos} (the pre-component item copies the hive's whole block-entity NBT, so it carries
-     * the hive's own flower position too, an E2a-only leak the component era does not carry), and one occupant's
-     * {@code BlockEntityTag.Bees[].EntityData.FlowerPos}.
+     * A beehive item carrying the coordinates the scrub must blank: the hive's own top-level
+     * {@code BlockEntityTag.FlowerPos} (a creative pick copies the hive's whole block-entity NBT onto the item, so it
+     * can carry the hive's own flower position too, which the component era does not carry) and one occupant stored as
+     * {@link #storedBee()} under {@code BlockEntityTag.Bees[].EntityData}.
      */
-    private static ItemStack beehiveWithBeeFlowerPos() {
+    private static ItemStack beehiveWithStoredBee() {
         ItemStack hive = new ItemStack(Items.BEEHIVE);
         CompoundTag blockEntityTag = new CompoundTag();
         blockEntityTag.put(FLOWER_POS, NbtUtils.writeBlockPos(new BlockPos(130, 64, -510)));
-        CompoundTag entityData = new CompoundTag();
-        entityData.put(FLOWER_POS, NbtUtils.writeBlockPos(new BlockPos(128, 64, -512)));
         CompoundTag occupant = new CompoundTag();
-        occupant.put(ENTITY_DATA, entityData);
+        occupant.put(ENTITY_DATA, storedBee());
         ListTag bees = new ListTag();
         bees.add(occupant);
         blockEntityTag.put(BEES, bees);
         hive.getOrCreateTag().put(BLOCK_ENTITY_TAG, blockEntityTag);
         return hive;
+    }
+
+    /**
+     * A bee's saved NBT as a hive stores it below 1.17, where vanilla strips only the UUID on entry, so the whole
+     * entity tag rides a silk-touched hive item: its own {@code Pos}, its {@code HivePos} and {@code FlowerPos}, the
+     * {@code Leash} of a bee leashed to a fence, and the {@code Dimension} id the entity tag carries below 1.16, beside
+     * the id, a flag, the motion and the empty brain a released bee keeps.
+     */
+    private static CompoundTag storedBee() {
+        CompoundTag bee = EntityFixtures.entityTag("minecraft:bee");
+        bee.put(POS, doubles(128.5, 66.0, -510.5));
+        bee.put(HIVE_POS, NbtUtils.writeBlockPos(new BlockPos(128, 66, -512)));
+        bee.put(FLOWER_POS, NbtUtils.writeBlockPos(new BlockPos(128, 64, -512)));
+        CompoundTag leash = new CompoundTag();
+        leash.putInt("X", 127);
+        leash.putInt("Y", 66);
+        leash.putInt("Z", -512);
+        bee.put(LEASH, leash);
+        bee.putInt(DIMENSION, 0);
+        bee.putBoolean("HasNectar", true);
+        bee.put("Motion", doubles(0.0, 0.0, 0.0));
+        CompoundTag brain = new CompoundTag();
+        brain.put("memories", new CompoundTag());
+        bee.put("Brain", brain);
+        return bee;
+    }
+
+    private static ListTag doubles(double... values) {
+        ListTag list = new ListTag();
+        for (double value : values) {
+            list.add(DoubleTag.valueOf(value));
+        }
+        return list;
     }
 
     /** Whether the hive's own top-level flower_pos (the pre-component block-entity copy) is present. */
@@ -151,6 +187,12 @@ class ItemLocationScrubTest {
     private static Optional<Tag> targetDimensionOf(ItemStack stack) {
         CompoundTag tag = stack.getTag();
         return tag == null ? Optional.empty() : Optional.ofNullable(tag.get(LODESTONE_DIMENSION));
+    }
+
+    /** The first occupant's {@code EntityData}, or an empty compound when the item carries no occupant. */
+    private static CompoundTag occupantOf(ItemStack hive) {
+        ListTag bees = beesOf(hive);
+        return bees.isEmpty() ? new CompoundTag() : bees.getCompound(0).getCompound(ENTITY_DATA);
     }
 
     /** The hive item's {@code BlockEntityTag.Bees} list, or an empty list when the item carries none. */
@@ -366,7 +408,7 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubBlanksBeeFlowerPosButKeepsTheOccupant() {
-        CompoundTag holder = holderOf(beehiveWithBeeFlowerPos(), new ItemStack(Items.DIAMOND, 3));
+        CompoundTag holder = holderOf(beehiveWithStoredBee(), new ItemStack(Items.DIAMOND, 3));
         ItemStack precondition = readBack(holder, 2).get(0);
         assertTrue(hiveFlowerPosPresent(precondition), "precondition: the fixture hive has its own flower_pos");
         assertTrue(beeFlowerPresent(precondition), "precondition: the fixture bee has a flower_pos");
@@ -387,10 +429,33 @@ class ItemLocationScrubTest {
     }
 
     @Test
+    void scrubBlanksTheStoredBeesPositionsAndKeepsTheBee() {
+        CompoundTag holder = holderOf(beehiveWithStoredBee());
+        CompoundTag stored = storedBee();
+        assertEquals(stored, occupantOf(readBack(holder, 1).get(0)),
+                "precondition: the occupant round-trips as stored");
+
+        ItemLocationScrub.scrub(holder, "Items");
+
+        CompoundTag occupant = occupantOf(readBack(holder, 1).get(0));
+        assertFalse(occupant.contains(POS), "the bee's own position, the hive's coordinates, is blanked");
+        assertFalse(occupant.contains(HIVE_POS), "the home hive position is blanked");
+        assertFalse(occupant.contains(LEASH), "the leash knot position is blanked");
+        assertFalse(occupant.contains(DIMENSION),
+                "the dimension id, the world half of the bee's own position, is blanked");
+        assertFalse(occupant.contains(FLOWER_POS), "the flower position is blanked");
+        assertEquals("minecraft:bee", occupant.getString("id"), "still a bee");
+        for (String key : new String[] { POS, HIVE_POS, LEASH, DIMENSION, FLOWER_POS }) {
+            stored.remove(key);
+        }
+        assertEquals(stored, occupant, "nothing beyond the coordinate keys is touched");
+    }
+
+    @Test
     void scrubReachesBeeFlowerPosNestedInShulker() {
         ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
         CompoundTag blockEntityTag = new CompoundTag();
-        blockEntityTag.put("Items", ItemFixtures.items(beehiveWithBeeFlowerPos()));
+        blockEntityTag.put("Items", ItemFixtures.items(beehiveWithStoredBee()));
         shulker.getOrCreateTag().put(BLOCK_ENTITY_TAG, blockEntityTag);
         CompoundTag holder = holderOf(shulker);
 
@@ -480,7 +545,7 @@ class ItemLocationScrubTest {
     @Test
     void scrubEntityBlanksBeehiveHeldByAnEntity() {
         CompoundTag frame = entity("minecraft:item_frame");
-        frame.put("Item", itemNbt(beehiveWithBeeFlowerPos()));
+        frame.put("Item", itemNbt(beehiveWithStoredBee()));
 
         ItemLocationScrub.scrubEntity(frame);
 
