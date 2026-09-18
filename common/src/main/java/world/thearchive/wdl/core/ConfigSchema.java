@@ -46,8 +46,9 @@ public final class ConfigSchema {
             + "# downloaded; these choose the extra data kinds, so set any to false to skip it.\n";
 
     private static final String CAPTURE_ADVANCEMENTS_PREAMBLE = ""
-            + "# Player advancements and statistics, written as advancements/<uuid>.json and stats/<uuid>.json.\n"
-            + "# Tied to your account's UUID, so opening on a different account does not auto-inherit them.\n";
+            + "# Player statistics, and advancements where your Minecraft version has them, each written as a\n"
+            + "# <uuid>.json file in the download. Tied to your account's UUID, so opening on a different account\n"
+            + "# does not auto-inherit them.\n";
 
     private static final String RECAPTURE_CHUNKS_PREAMBLE = ""
             + "\n"
@@ -140,9 +141,9 @@ public final class ConfigSchema {
     private static final String OVERRIDE_GAME_RULES_PREAMBLE = ""
             + "\n"
             + "# Game rules written into the download so it opens calm and safe. On by default: the download\n"
-            + "# writes a curated safe set (no mob spawning or griefing, no fire or vine spread, day and weather\n"
-            + "# frozen, inventory kept). Set false to write no game rules at all (the world's vanilla defaults\n"
-            + "# stand).\n";
+            + "# writes a curated safe set (no mob spawning or griefing, day frozen, inventory kept, and, where\n"
+            + "# your Minecraft version has those rules, weather frozen and no vine spread). Set false to write\n"
+            + "# no game rules at all (the world's vanilla defaults stand).\n";
 
     private static final String OVERRIDE_WORLD_DEFAULTS_PREAMBLE = ""
             + "# Override or add an individual rule with gamerule.<id>=<value>, using this Minecraft version's\n"
