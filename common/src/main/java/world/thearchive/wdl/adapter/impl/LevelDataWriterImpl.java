@@ -84,9 +84,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /**
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Every curated rule is a boolean here: the newer bands' integer fire rule has no 1.21.4 id and carries no spec.
-     * The user's gamerule.* overrides, keyed by band id, are validated and applied on top of this (see
-     * {@link WorldOutputConfig}).
+     * Every curated rule is a boolean here; the fire-spread row carries no spec on this band. The user's gamerule.*
+     * overrides, keyed by band id, are validated and applied on top of this (see {@link WorldOutputConfig}).
      */
     private static final List<CuratedSpec> CURATED_GAME_RULES = buildCuratedGameRules();
 
@@ -249,8 +248,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are dev's band-neutral keys; each maps to its 1.21.4 vanilla rule id here, and the newer bands'
-    // fire rule is dropped by omitting its spec, since 1.21.4 has no equivalent.
+    // The WDL names are dev's band-neutral keys; each maps to its vanilla rule id here. The fire-spread row has no
+    // spec on this band, so the menu skips its slot.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
