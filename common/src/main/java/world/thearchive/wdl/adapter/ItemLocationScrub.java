@@ -8,15 +8,17 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * Reusable privacy scrub for item-borne location data: blanks the lodestone-compass target and the flower position
- * carried by a silk-touched beehive item on every item it reaches, recursing into shulker boxes (the item's
+ * Reusable privacy scrub for item-borne location data: blanks the lodestone-compass target and the positions the bees
+ * stored in a silk-touched beehive item carry, on every item it reaches, recursing into shulker boxes (the item's
  * {@code BlockEntityTag.Items}) and bundles (the item's {@code Items}) over the shared {@link ItemTreeWalk}. Below the
  * 1.20.5 component update an item's data lives in its {@code tag} compound, so the scrub removes the coordinate keys
  * there: the lodestone target ({@code LodestonePos} plus {@code LodestoneDimension}, leaving {@code LodestoneTracked})
- * and, on a beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and each occupant's
- * {@code BlockEntityTag.Bees[].EntityData.FlowerPos} (leaving each a valid bee). The pre-component item copies the
- * hive's whole block-entity NBT, so it carries the hive's own top-level flower position too, which the component era
- * drops; both are stripped here.
+ * and, on a beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and, under each occupant's
+ * {@code BlockEntityTag.Bees[].EntityData}, its {@code FlowerPos}, {@code HivePos}, {@code Pos}, {@code Leash} and
+ * {@code Dimension}. A creative pick copies the hive's whole block-entity NBT, so the item can carry the hive's own
+ * top-level flower position too, which the component era drops, and below 1.17 the hive stores a bee's whole saved tag
+ * with only the UUID stripped, so the bee's own position, its home hive, its leash and, below 1.16, its dimension id
+ * ride the item beside the flower position. Each occupant stays a bee vanilla loads.
  *
  * <p>Operates only on already-serialized NBT (our own captured copy), never on a live {@code ItemStack}, so it cannot
  * corrupt the player's session. Below the 1.20.5 update it uses the {@code {id, Count, tag}} item shape and the
@@ -28,9 +30,9 @@ import net.minecraft.nbt.Tag;
  * shelf), and a serialized entity via {@link #scrubEntity(CompoundTag)} (an item frame, an item display, mob equipment,
  * an allay, a dropped item, and their passengers).
  *
- * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive flower
- * positions only. Opaque server NBT whose coordinate leak is speculative is left alone, since blanking a whole unknown
- * subtree would corrupt legitimate items, unlike the single-key removals above.
+ * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive bee
+ * positions named above only. Opaque server NBT whose coordinate leak is speculative is left alone, since blanking a
+ * whole unknown subtree would corrupt legitimate items, unlike the single-key removals above.
  */
 final class ItemLocationScrub {
     private static final String LODESTONE_POS = "LodestonePos";
@@ -39,6 +41,10 @@ final class ItemLocationScrub {
     private static final String BEES = "Bees";
     private static final String ENTITY_DATA = "EntityData";
     private static final String FLOWER_POS = "FlowerPos";
+    private static final String HIVE_POS = "HivePos";
+    private static final String POS = "Pos";
+    private static final String LEASH = "Leash";
+    private static final String DIMENSION = "Dimension";
     private static final String EQUIPMENT = "equipment";
     private static final String PASSENGERS = "Passengers";
 
@@ -124,7 +130,7 @@ final class ItemLocationScrub {
         ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
     }
 
-    /** Blank the lodestone target and the beehive flower positions on an item's {@code tag}. */
+    /** Blank the lodestone target and the beehive bee positions on an item's {@code tag}. */
     private static void scrubItemTag(CompoundTag tag) {
         tag.remove(LODESTONE_POS);
         tag.remove(LODESTONE_DIMENSION);
@@ -138,6 +144,10 @@ final class ItemLocationScrub {
                     if (occupant != null && occupant.get(ENTITY_DATA) instanceof CompoundTag) {
                         CompoundTag entityData = (CompoundTag) occupant.get(ENTITY_DATA);
                         entityData.remove(FLOWER_POS);
+                        entityData.remove(HIVE_POS);
+                        entityData.remove(POS);
+                        entityData.remove(LEASH);
+                        entityData.remove(DIMENSION);
                     }
                 }
             }
