@@ -520,9 +520,11 @@ common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 # Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the raw
 # LodestonePos/LodestoneDimension keys (the lodestone compass itself is a 1.16 addition), and a beehive's occupants
 # and the hive's own flower position (carried by a pre-component item's whole block-entity copy) are
-# tag.BlockEntityTag.Bees[].EntityData.FlowerPos and tag.BlockEntityTag.FlowerPos, both scrubbed by the same pass (the
-# beehive is a 1.15 addition, so on 1.14.4 that shape is a foreign or modded item's). Java 8 form: every instanceof
-# over the item, entity, equipment, passenger and bee reads is unbound.
+# tag.BlockEntityTag.Bees[].EntityData and tag.BlockEntityTag.FlowerPos, both scrubbed by the same pass (the beehive
+# is a 1.15 addition, so on 1.14.4 that shape is a foreign or modded item's). Below 1.17 the hive stores a bee's whole
+# saved tag with only the UUID stripped, so under each EntityData the pass blanks FlowerPos, HivePos, Pos, Leash and
+# Dimension (the entity's own dimension id, written below 1.16), where the component era blanks the flower position
+# alone. Java 8 form: every instanceof over the item, entity, equipment, passenger and bee reads is unbound.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument; below 1.16 captureItems takes none either.
@@ -554,15 +556,16 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
 
 # Below 1.20.5 there are no item components: the lodestone target is the raw LodestonePos/LodestoneDimension/
 # LodestoneTracked keys (hand-written on a plain compass, the lodestone compass being a 1.16 addition), an item's
-# beehive-shaped block-entity NBT carries the occupants' and the hive's own flower positions as
-# tag.BlockEntityTag.Bees[].EntityData.FlowerPos and tag.BlockEntityTag.FlowerPos, shulker contents live under
+# beehive-shaped block-entity NBT carries the occupants and the hive's own flower position as
+# tag.BlockEntityTag.Bees[].EntityData (a stored bee's whole saved tag below 1.17, with its Pos, HivePos, FlowerPos,
+# Leash and, below 1.16, Dimension) and tag.BlockEntityTag.FlowerPos, shulker contents live under
 # tag.BlockEntityTag.Items, and ContainerHelper.loadAllItems takes no registries argument. Below 1.15 there is no
 # beehive item, so a chest item stands in as the carrier of that NBT, the foreign or modded shape the scrub still
-# reaches. Below 1.17 there is no bundle item, so the bundle-holding fixtures and their assertions are dropped, and no
-# Tag.TAG_COMPOUND, so the list reads pass the raw type id 10. Below 1.16 there is no com.mojang.serialization, so the
-# stacks round-trip through ItemStack#save and ItemStack.of, the lodestone dimension is DimensionType.getName's
-# string, and captureItems takes no registries. Java 8 form: no Optional.isEmpty (the empty assertions negate
-# isPresent) and no pattern instanceof.
+# reaches, and no DoubleTag.valueOf, so a DoubleTag is constructed directly. Below 1.17 there is no bundle item, so the
+# bundle-holding fixtures and their assertions are dropped, and no Tag.TAG_COMPOUND, so the list reads pass the raw
+# type id 10. Below 1.16 there is no com.mojang.serialization, so the stacks round-trip through ItemStack#save and
+# ItemStack.of, the lodestone dimension is DimensionType.getName's string, and captureItems takes no registries.
+# Java 8 form: no Optional.isEmpty (the empty assertions negate isPresent) and no pattern instanceof.
 common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk drives hand-built NBT keyed by tag.BlockEntityTag.Items (a
