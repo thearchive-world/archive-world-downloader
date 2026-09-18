@@ -123,11 +123,13 @@ jobs:
         with:
           cache-provider: basic
 
-      # xvfb supplies the virtual framebuffer; libgl1-mesa-dri supplies the llvmpipe software rasterizer the
-      # client's GL context needs on a runner with no GPU (it is usually preinstalled, but pin it explicitly).
-      - name: Install Xvfb + software OpenGL (virtual framebuffer for the headless client)
+      # xvfb supplies the virtual framebuffer; libgl1-mesa-dri supplies the llvmpipe software rasterizer behind a
+      # GL context and mesa-vulkan-drivers the same rasterizer behind a Vulkan device, so a client that finds no
+      # GLX visual under Xvfb and falls back to Vulkan still gets a device. Without the Vulkan driver that client
+      # hangs on the missing backend until the job's timeout cancels it.
+      - name: Install Xvfb + software OpenGL and Vulkan (virtual framebuffer for the headless client)
         if: steps.tier.outputs.enabled == 'true'
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri mesa-vulkan-drivers
 
       # LIBGL_ALWAYS_SOFTWARE pins mesa to llvmpipe so GL never tries a (nonexistent) GPU. --no-configuration-cache
       # is required because the Loom run task reads a stale argFile under the configuration cache (enabled in
