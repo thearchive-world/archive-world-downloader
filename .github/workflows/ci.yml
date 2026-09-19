@@ -121,10 +121,8 @@ jobs:
       - name: Build (source-merge gate) + core invariant + headless suite
         run: ./gradlew build --stacktrace
 
-      # The non-Fabric jar on the deep bands is a separate ForgeGradle-6 Gradle-8 island (forge/) with its own
-      # wrapper, which the root build above does not reach. Build it only on bands that carry one. It runs on the
-      # setup-java JDK (Java 17), where ForgeGradle 6 is supported; the root build's daemon runs on a detected
-      # Java 21 for Loom.
+      # The non-Fabric jar on the deep bands is a separate island build (forge/) with its own wrapper, which the
+      # root build above does not reach. Build it only on bands that carry one.
       - name: Build the Forge island (deep bands only)
         if: hashFiles('forge/gradlew') != ''
         run: cd forge && ./gradlew build --stacktrace
