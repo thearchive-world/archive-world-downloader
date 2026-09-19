@@ -26,24 +26,24 @@
 # class's.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric registration is Fabric-API-coupled and moves across bands: Fabric API 0.28.5+1.15 registers the keybind
-# through KeyBindingHelper.registerKeyBinding and the HUD through HudRenderCallback, where dev's release uses
-# KeyMappingHelper and HudElementRegistry.
+# Fabric registration is Fabric-API-coupled and moves across bands: 1.15.2's Fabric API registers the keybind through
+# KeyBindingHelper.registerKeyBinding and the HUD through HudRenderCallback, where dev's release uses KeyMappingHelper
+# and HudElementRegistry.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# Fabric API 0.28.5+1.15 ships no fabric-screen-api-v1 (ScreenEvents, Screens) and its fabric-command-api-v1 1.0.3
-# has no ClientCommandManager, so the bridge exposes the pause-menu row as a factory the PauseScreenMixin reads and
-# registers no /wdl client command; Fabric API 0.42.0+1.16 carries both.
+# Fabric API 0.28.5+1.15 ships no fabric-screen-api-v1 (ScreenEvents, Screens) and its fabric-command-api-v1 1.0.3 has
+# no ClientCommandManager, so the bridge exposes the pause-menu row as a factory the PauseScreenMixin reads and
+# registers no /wdl client command; 1.16.5's Fabric API carries both.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # The fabric-rendering-v1 module of Fabric API 0.28.5+1.15 (1.2.1) has no WorldRenderEvents or WorldRenderContext
-# (present in 0.42.0+1.16's 1.6.1), so the registrar subscribes nothing and the in-world outline does not draw on
+# (present in 1.16.5's, module 1.6.1), so the registrar subscribes nothing and the in-world outline does not draw on
 # 1.15.2 Fabric.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
 
-# Added: fabric-networking-api-v1 1.0.1 (Fabric API 0.28.5+1.15) fires ClientPlayConnectionEvents.DISCONNECT only
-# from ClientPacketListener.onDisconnect, which a pause-menu disconnect never reaches, where 0.42.0+1.16's 1.0.5 also
-# fires it from Connection.channelInactive; the mixin auto-saves from the head of Minecraft.clearLevel instead.
+# Added: fabric-networking-api-v1 1.0.1 (1.15.2's Fabric API) fires ClientPlayConnectionEvents.DISCONNECT only from
+# ClientPacketListener.onDisconnect, which a pause-menu disconnect never reaches, where 1.16.5's 1.0.5 also fires it
+# from Connection.channelInactive; the mixin auto-saves from the head of Minecraft.clearLevel instead.
 fabric/src/main/java/world/thearchive/wdl/fabric/mixin/MinecraftDisconnectMixin.java
 
 # Added: Fabric API 0.28.5+1.15 ships no fabric-screen-api-v1, so the pause-menu row is injected at the tail of
@@ -59,9 +59,9 @@ fabric/src/main/java/world/thearchive/wdl/fabric/mixin/package-info.java
 # Added: the mixin configuration for the three Fabric mixins, at compatibility level JAVA_8.
 fabric/src/main/resources/wdl.mixins.json
 
-# Fabric API 0.28.5+1.15, the release pinned for 1.15.2, ships its own fabric.mod.json under the id fabric, where dev's
-# later releases renamed it to fabric-api; the manifest names wdl.mixins.json and carries no journeymap entrypoint,
-# no Fabric JourneyMap existing for 1.15.2.
+# 1.15.2's Fabric API ships its own fabric.mod.json under the id fabric, where dev's later releases renamed it to
+# fabric-api; the manifest names wdl.mixins.json and carries no journeymap entrypoint, no Fabric JourneyMap existing for
+# 1.15.2.
 fabric/src/main/resources/fabric.mod.json
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -793,14 +793,14 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 # well), so this write-task test reads the file through Files.newInputStream; TestRegistries only runs the bootstrap.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 
-# ModMenu 1.10.7, the API 1.15.2 pins, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived
-# in a later ModMenu) and its ModMenuApi and ConfigScreenFactory live in io.github.prospector.modmenu.api (the
-# com.terraformersmc package is 1.16.23's), so this entrypoint implements only the config-screen factory and does
-# not override getUpdateChecker.
+# ModMenu 1.10.x, the 1.15.2 line, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived in a
+# later ModMenu) and its ModMenuApi and ConfigScreenFactory live in io.github.prospector.modmenu.api (the
+# com.terraformersmc package is 1.16.5's), so this entrypoint implements only the config-screen factory and does not
+# override getUpdateChecker.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 
-# ModMenu 1.10.7, the API 1.15.2 pins, ships no update-checker API, so the ModMenu update-badge feeder is deleted,
-# not merely divergent; the launch update check still runs, only its ModMenu badge is gone.
+# ModMenu 1.10.x, the 1.15.2 line, ships no update-checker API, so the ModMenu update-badge feeder is deleted, not
+# merely divergent; the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
 # Below 1.20.2 there is no AdvancementHolder/AdvancementNode split (the advancement datapack rewrite is 1.20.2),
@@ -819,8 +819,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 # the map keys); below 1.16 TestRegistries only runs the bootstrap.
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
-# The Forge island's manifest carries loaderVersion [31,), Forge 31.x for 1.15.2 (31.2.62 pinned), versus the [36,) of
-# the 1.16.5 mint parent; dev ships no forge/ tree at all.
+# The Forge island's manifest carries loaderVersion [31,), Forge 31.x for 1.15.2, versus the [36,) of the 1.16.5 mint
+# parent; dev ships no forge/ tree at all.
 forge/src/main/resources/META-INF/mods.toml
 
 # Absent from dev, which ships no forge/ tree: the island's resource pack_format is 5 for 1.15.2, versus the parent's
