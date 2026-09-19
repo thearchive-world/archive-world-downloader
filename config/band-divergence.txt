@@ -27,13 +27,13 @@
 # by 1.19.4 and Registry.PendingTags at 1.21.2), and no kept test binds data-driven tags.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric API 0.42.0+1.16 registers a key through KeyBindingHelper.registerKeyBinding, where dev's release uses
-# KeyMappingHelper.registerKeyMapping, and draws the capture HUD through HudRenderCallback, which fires after the
-# whole vanilla HUD, where dev registers it through HudElementRegistry.addLast.
+# 1.16.5's Fabric API registers a key through KeyBindingHelper.registerKeyBinding, where dev's release uses
+# KeyMappingHelper.registerKeyMapping, and draws the capture HUD through HudRenderCallback, which fires after the whole
+# vanilla HUD, where dev registers it through HudElementRegistry.addLast.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# Fabric API 0.42.0+1.16 registers a key through KeyBindingHelper.registerKeyBinding (dev's KeyMappingHelper), reads
-# the pause menu's widgets through Screens.getButtons (dev's getWidgets), and registers the /wdl client command on the
+# 1.16.5's Fabric API registers a key through KeyBindingHelper.registerKeyBinding (dev's KeyMappingHelper), reads the
+# pause menu's widgets through Screens.getButtons (dev's getWidgets), and registers the /wdl client command on the
 # fabric-command-api-v1 ClientCommandManager.DISPATCHER rather than dev's v2 ClientCommandRegistrationCallback. Java 8
 # form: javac 8 cannot infer the command-source type through register(), so the /wdl command tree names
 # FabricClientCommandSource as an explicit type witness.
@@ -47,8 +47,8 @@ fabric/src/main/java/world/thearchive/wdl/fabric/FabricConnectionTee.java
 # and a cast.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricMountMenuReader.java
 
-# Fabric API 0.42.0+1.16, the release pinned for 1.16.5, ships its own fabric.mod.json under the id fabric, where dev's
-# later releases renamed it to fabric-api; the journeymap entrypoint names the compat/journeymap/v2 plugin.
+# 1.16.5's Fabric API ships its own fabric.mod.json under the id fabric, where dev's later releases renamed it to
+# fabric-api; the journeymap entrypoint names the compat/journeymap/v2 plugin.
 fabric/src/main/resources/fabric.mod.json
 
 # Below 1.17 ClientboundMoveEntityPacket has no getXa/getYa/getZa accessors, so the widener also opens the protected
@@ -669,13 +669,12 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 
-# ModMenu 1.16.23, the API 1.16.5 pins, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived
-# in a later ModMenu), so this entrypoint implements only the config-screen factory and does not override
-# getUpdateChecker.
+# ModMenu 1.16.x, the 1.16.5 line, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived in a
+# later ModMenu), so this entrypoint implements only the config-screen factory and does not override getUpdateChecker.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 
-# ModMenu 1.16.23, the API 1.16.5 pins, ships no update-checker API, so the ModMenu update-badge feeder is deleted,
-# not merely divergent; the launch update check still runs, only its ModMenu badge is gone.
+# ModMenu 1.16.x, the 1.16.5 line, ships no update-checker API, so the ModMenu update-badge feeder is deleted, not
+# merely divergent; the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
 # Below 1.20.2 there is no AdvancementHolder/AdvancementNode split (the advancement datapack rewrite is 1.20.2),
@@ -695,8 +694,8 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 # the map keys).
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
-# The Forge island's manifest carries loaderVersion [36,), Forge 36.x for 1.16.5 (36.2.42 pinned), versus the [37,) of
-# the 1.17.1 mint parent; dev ships no forge/ tree at all.
+# The Forge island's manifest carries loaderVersion [36,), Forge 36.x for 1.16.5, versus the [37,) of the 1.17.1 mint
+# parent; dev ships no forge/ tree at all.
 forge/src/main/resources/META-INF/mods.toml
 
 # The resource pack_format is 6 for 1.16.5, versus the parent's 7 for 1.17.1.
