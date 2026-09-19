@@ -425,8 +425,9 @@ common/src/test/java/world/thearchive/wdl/adapter/LecternSinkRoundTripTest.java
 # getListOrEmpty and getIntOr defaults). Below 1.21.6 there is no TagValueInput, so the book is parsed through
 # ItemStack.CODEC with the registry NbtOps directly.
 common/src/test/java/world/thearchive/wdl/adapter/LecternStashMergeTest.java
-# The fire_spread_radius_around_player game rule arrives at 1.21.11, so the curated set has nine rules rather than
-# ten, the integer fire-rule test is absent and the laid-out fire-spread row has no rule to map to.
+# Below 1.21.11 the fire-spread row binds the boolean doFireTick rather than the integer
+# fire_spread_radius_around_player, so the fire-rule test asserts true and false positions in place of the band's
+# radius and 0.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.java
 # Below 1.21.5 CompoundTag.getCompound, getInt, getByte and getString return the value itself (Optional at 1.21.5, with
 # the getCompoundOrEmpty, getIntOr, getByteOr and getStringOr defaults). Below 1.21.9 level.dat carries the world spawn
