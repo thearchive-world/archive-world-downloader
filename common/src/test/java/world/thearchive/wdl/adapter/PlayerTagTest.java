@@ -81,7 +81,7 @@ class PlayerTagTest {
     @Test
     void stripDeathLocationIsNoOpAtThisBand() {
         // Neither key exists in a 1.10.2 player tag (LastDeathLocation is 1.19, current_explosion_impact_pos is
-        // 1.21), so the strip has nothing to remove and the rest of the tag is untouched either way.
+        // 1.20.5), so the strip has nothing to remove and the rest of the tag is untouched either way.
         NBTTagCompound tag = playerTag();
 
         PlayerTag.stripDeathLocation(tag);
