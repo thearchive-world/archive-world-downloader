@@ -26,18 +26,18 @@
 # at 1.19.4, Registry.PendingTags is 1.21.2 and above), and no kept test binds data-driven tags.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# At Fabric API 0.77.0+1.18.2 the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the
-# peek key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API for 26.2 registers a HUD
-# element through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
+# On 1.18.2's Fabric API the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the peek
+# key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API registers a HUD element
+# through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
 # (keymapping.v1).
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# At Fabric API 0.77.0+1.18.2 the platform bridge reads the pause-menu widget list through Screens.getButtons,
-# registers the key through KeyBindingHelper.registerKeyBinding and registers the client command tree on the static
-# ClientCommandManager.DISPATCHER (command.v1), where dev's Fabric API for 26.2 names them Screens.getWidgets and
-# KeyMappingHelper.registerKeyMapping and builds the tree through ClientCommands under
-# ClientCommandRegistrationCallback (command.v2); against 1.19.4 the file also carries no disconnectButton override,
-# 1.18.2's pause screen naming no disconnect button.
+# On 1.18.2's Fabric API the platform bridge reads the pause-menu widget list through Screens.getButtons, registers the
+# key through KeyBindingHelper.registerKeyBinding and registers the client command tree on the static
+# ClientCommandManager.DISPATCHER (command.v1), where dev's Fabric API names them Screens.getWidgets and
+# KeyMappingHelper.registerKeyMapping and builds the tree through ClientCommands under ClientCommandRegistrationCallback
+# (command.v2); against 1.19.4 the file also carries no disconnectButton override, 1.18.2's pause screen naming no
+# disconnect button.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # 1.18.2's pause-menu anchor is geometry-only (AbstractPlatformBridge.lowestColumnButton), so this widener carries
@@ -492,13 +492,12 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 
-# ModMenu 3.2.5, the API 1.18.2 pins, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived
-# in a later ModMenu), so this entrypoint implements only the config-screen factory and does not override
-# getUpdateChecker.
+# ModMenu 3.x, the 1.18.2 line, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived in a later
+# ModMenu), so this entrypoint implements only the config-screen factory and does not override getUpdateChecker.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 
-# ModMenu 3.2.5, the API 1.18.2 pins, ships no update-checker API, so the ModMenu update-badge feeder is deleted,
-# not merely divergent; the launch update check still runs, only its ModMenu badge is gone.
+# ModMenu 3.x, the 1.18.2 line, ships no update-checker API, so the ModMenu update-badge feeder is deleted, not merely
+# divergent; the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
 # Below 1.20.2 there is no AdvancementHolder/AdvancementNode split (the advancement datapack rewrite is 1.20.2),
@@ -672,7 +671,7 @@ build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
 /build.gradle.kts
 
 # NeoForm has no 1.18.x release (NeoForged forked from Forge at 1.20.2), so common builds on NeoGradle's vanilla plugin
-# (net.neoforged.gradle.vanilla 7.1.38, versioned inline) over mcp_config 1.18.2, with net.minecraft:client as an
+# (net.neoforged.gradle.vanilla, versioned inline) over the official client mappings, with net.minecraft:client as an
 # implementation dependency and no Parchment layer, where dev builds on ModDevGradle Vanilla mode over a
 # neoform_version. It pulls the loader-suffixless 1.9 JourneyMap API SNAPSHOT from jm.gserv.me and no XaeroPlus API
 # (XaeroPlus ships no 1.18.x build); against 1.19.4 it drops the XaeroPlus +forge pin and the deleted BookshelfSlots
