@@ -27,18 +27,18 @@
 # by 1.19.4 and Registry.PendingTags at 1.21.2), and no kept test binds data-driven tags.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric API 0.46.1+1.17 registers a key through KeyBindingHelper.registerKeyBinding, where dev's release uses
-# KeyMappingHelper.registerKeyMapping, and draws the capture HUD through HudRenderCallback, which fires after the
-# whole vanilla HUD, where dev registers it through HudElementRegistry.addLast.
+# 1.17.1's Fabric API registers a key through KeyBindingHelper.registerKeyBinding, where dev's release uses
+# KeyMappingHelper.registerKeyMapping, and draws the capture HUD through HudRenderCallback, which fires after the whole
+# vanilla HUD, where dev registers it through HudElementRegistry.addLast.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# Fabric API 0.46.1+1.17 registers a key through KeyBindingHelper.registerKeyBinding (dev's KeyMappingHelper), reads
-# the pause menu's widgets through Screens.getButtons (dev's getWidgets), and registers the /wdl client command on the
+# 1.17.1's Fabric API registers a key through KeyBindingHelper.registerKeyBinding (dev's KeyMappingHelper), reads the
+# pause menu's widgets through Screens.getButtons (dev's getWidgets), and registers the /wdl client command on the
 # fabric-command-api-v1 ClientCommandManager.DISPATCHER rather than dev's v2 ClientCommandRegistrationCallback.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
-# Fabric API 0.46.1+1.17, the release pinned for 1.17.1, ships its own fabric.mod.json under the id fabric; the
-# parent's 0.77.0+1.18.2 and dev's later releases renamed it to fabric-api.
+# 1.17.1's Fabric API ships its own fabric.mod.json under the id fabric; the parent's release for 1.18.2 and dev's later
+# releases renamed it to fabric-api.
 fabric/src/main/resources/fabric.mod.json
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -484,13 +484,12 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 
-# ModMenu 2.0.17, the API 1.17.1 pins, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived
-# in a later ModMenu), so this entrypoint implements only the config-screen factory and does not override
-# getUpdateChecker.
+# ModMenu 2.x, the 1.17.1 line, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived in a later
+# ModMenu), so this entrypoint implements only the config-screen factory and does not override getUpdateChecker.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 
-# ModMenu 2.0.17, the API 1.17.1 pins, ships no update-checker API, so the ModMenu update-badge feeder is deleted,
-# not merely divergent; the launch update check still runs, only its ModMenu badge is gone.
+# ModMenu 2.x, the 1.17.1 line, ships no update-checker API, so the ModMenu update-badge feeder is deleted, not merely
+# divergent; the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
 # Below 1.20.2 there is no AdvancementHolder/AdvancementNode split (the advancement datapack rewrite is 1.20.2),
@@ -508,7 +507,7 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
 # Added with the Forge island, which dev does not ship: the island's manifest carries loaderVersion [37,), Forge 37.x
-# for 1.17.1 (37.1.1 pinned), versus the [40,) of 1.18.2.
+# for 1.17.1, versus the [40,) of 1.18.2.
 forge/src/main/resources/META-INF/mods.toml
 
 # The resource pack_format is 7 for 1.17.1, versus the parent's 8 for 1.18.2.
