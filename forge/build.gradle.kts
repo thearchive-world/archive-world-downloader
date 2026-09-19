@@ -19,15 +19,14 @@ buildscript {
     }
 }
 
-// The non-Fabric jar for this deep band. ForgeGradle 6 cannot build it at 1.16.5: below the 1.17 Great Rename it
-// serves the frozen mcp_config SRG package layout (net.minecraft.network.play.server) and its official channel
-// overlays only member names, so the mod's Mojang-official source (net.minecraft.network.protocol.game) resolves
-// to nothing. This island builds on Architectury Loom instead, which puts officialMojangMappings on the dev
-// classpath, the exact namespace common/ and the Fabric island compile against, and reobfuscates the jar to SRG
-// for the Forge runtime. The island stays a separate build beside the band's Gradle-9 root (common + fabric)
-// because it runs a different Loom fork than the root's Fabric Loom and carries a build-wide loom.platform=forge
-// switch, not because of any Gradle-version limit; two wrappers, one set of coordinates read from the root
-// gradle.properties.
+// The non-Fabric jar, which ForgeGradle 6 cannot build below the 1.17 Great Rename: there it serves the frozen
+// mcp_config SRG package layout (net.minecraft.network.play.server) and its official channel overlays only member
+// names, so the mod's Mojang-official source (net.minecraft.network.protocol.game) resolves to nothing. This island
+// builds on Architectury Loom instead, which puts officialMojangMappings on the dev classpath, the exact namespace
+// common/ and fabric/ compile against, and reobfuscates the jar to SRG for the Forge runtime. The island stays a
+// separate build beside the band's Gradle-9 root (common + fabric) because it runs a different Loom fork than the
+// root's Fabric Loom and carries a build-wide loom.platform=forge switch, not because of any Gradle-version limit;
+// two wrappers, one set of coordinates read from the root gradle.properties.
 plugins {
     id("dev.architectury.loom") version "1.17.493"
     // Release publishing. Pinned as a literal because the island is a separate build with no access to the root
@@ -44,7 +43,7 @@ val band = Properties().apply {
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.16.5.
+// Match wdl.java-conventions: the MC version rides as SemVer build metadata, mod_version+minecraft_version.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
@@ -94,16 +93,16 @@ dependencies {
     "forge"("net.minecraftforge:forge:${band("forge_version")}")
 
     // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
-    // shim are null-marked. NullAway itself does not run on this island (it is a Gradle-9 build-logic pass over
-    // common + fabric); here the annotations only need to resolve so the marked source compiles.
+    // shim are null-marked, so the annotations need only resolve for the marked source to compile. Nothing checks
+    // them: the root's nullness plugin runs annotations-only on a band below Java 21, and this build never loads it.
     compileOnly(jspecify)
 
     // JourneyMap public API for the source-merged binding (compat/journeymap), compile-only, never a runtime
-    // require. The 1.15.2 JourneyMap (5.7.0) is Forge-only and bundles the 1.8 API generation
-    // (journeymap.client.api); the island compiles under officialMojangMappings, matching the plain
-    // loader-suffixless 1.8 jar :common resolves, and remapJar maps WDL's calls to SRG for the shipped jar.
-    // JourneyMap discovers the plugin here by annotation scan. No XaeroPlus binding on this band: XaeroPlus ships
-    // no 1.15.x build, so the overlay is dropped as a disclosed limit, matching :common.
+    // require. JourneyMap for 1.14.4 and 1.15.2 is Forge-only and bundles the older 1.x API generation
+    // (journeymap.client.api); the island compiles under officialMojangMappings against the same plain
+    // loader-suffixless stem :common resolves, and remapJar maps WDL's calls to SRG for the shipped jar. JourneyMap
+    // discovers the plugin here by annotation scan. No XaeroPlus binding: XaeroPlus publishes no 1.13 through 1.18
+    // build, so the overlay is dropped as a disclosed limit, matching :common.
     compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
 }
 
