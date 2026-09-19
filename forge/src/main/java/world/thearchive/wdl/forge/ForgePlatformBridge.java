@@ -51,7 +51,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
         KeyMapping key = new KeyMapping(keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
                 WdlKeyBinds.CATEGORY);
         // Below 1.19 there is no RegisterKeyMappingsEvent; keys register through ClientRegistry during client
-        // setup. At 1.15.2 the setup event has no enqueueWork, so the main-thread registration is deferred through
+        // setup. The setup event has no enqueueWork, so the main-thread registration is deferred through
         // DeferredWorkQueue instead.
         modEventBus.addListener((FMLClientSetupEvent event) -> DeferredWorkQueue
                 .runLater(() -> ClientRegistry.registerKeyBinding(key)));
