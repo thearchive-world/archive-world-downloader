@@ -64,13 +64,13 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.
 # Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
 common/src/main/java/world/thearchive/wdl/compat/xaeroplus/XaeroPlusBinding.java
 
-# fabric-api 0.138.4 for 1.21.10 registers the key through KeyBindingHelper.registerKeyBinding and the HUD element
-# through HudElementRegistry.addLast on a ResourceLocation (Identifier from 1.21.11); fabric-api 0.155.2 for 26.1
-# names the helper KeyMappingHelper.registerKeyMapping.
+# 1.21.10's fabric-api registers the key through KeyBindingHelper.registerKeyBinding and the HUD element through
+# HudElementRegistry.addLast on a ResourceLocation (Identifier from 1.21.11); 26.1's fabric-api names the helper
+# KeyMappingHelper.registerKeyMapping.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
-# fabric-api 0.138.4 for 1.21.10 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
-# widgets through Screens.getButtons and builds the command tree from ClientCommandManager (KeyMappingHelper,
-# Screens.getWidgets and ClientCommands in fabric-api 0.155.2 for 26.1); against 1.21.11 only one line wrap differs.
+# 1.21.10's fabric-api registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu widgets
+# through Screens.getButtons and builds the command tree from ClientCommandManager (KeyMappingHelper, Screens.getWidgets
+# and ClientCommands in 26.1's fabric-api); against 1.21.11 only one line wrap differs.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 # Below 1.21.11 the mount menu is HorseInventoryMenu with the animal in its private horse field; 1.21.11 moved the field
 # to AbstractMountInventoryMenu.mount.
