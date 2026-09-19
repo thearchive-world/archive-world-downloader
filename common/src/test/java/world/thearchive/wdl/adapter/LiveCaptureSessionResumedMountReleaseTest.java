@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.passive.HorseType;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.BlockPos;
@@ -46,6 +47,7 @@ import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
+import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
@@ -54,17 +56,18 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * gate, so its single copy is that session's level.dat RootVehicle. A resume that finishes un-seated rewrites the
  * level.dat with no RootVehicle, which destroys that copy, and the release is what puts the mount into the world as a
  * standalone entity before that happens. Everything it fails to write is gone for good, including whatever the previous
- * download archived inside a chest minecart or a chested animal.
+ * download archived in the chest a donkey or mule carries.
  *
  * <p>Three axes. ROUTING: the position and the dimension must come from the same tag, so the cross-dimension case
  * asserts both the arrival and the absence, since a write that reaches the right folder while also reaching the wrong
  * one is still a corrupt save. IDENTITY: the release must decline exactly when this finish already saved the prior
  * mount inside the player's own RootVehicle, which is a question about the whole captured mount tree rather than its
- * root, so the two mounts here share an entity type and differ only by UUID and one of them rides nested inside the
- * other. COUNTING: each exit that reaches the release proper and writes nothing is asserted twice over, on the named
- * counter and on the verdict the completion record stamps from, since a counter no term of the sum reads reports
- * nothing; and every no-op is asserted in the other direction, on the absence of the WRITE rather than the absence of a
- * loss, because a path that wrongly runs and succeeds also loses nothing.
+ * root, so the switch case's two mounts share an entity type and are told apart by UUID alone, and the nested case
+ * seats the prior mount inside a minecart that scooped it up. COUNTING: each exit that reaches the release proper and
+ * writes nothing is asserted twice over, on the named counter and on the verdict the completion record stamps from,
+ * since a counter no term of the sum reads reports nothing; and every no-op is asserted in the other direction, on the
+ * absence of the WRITE rather than the absence of a loss, because a path that wrongly runs and succeeds also loses
+ * nothing.
  *
  * <p>The release is driven directly, package-private for that, because every production caller runs behind the client
  * singleton; what that leaves unpinned is {@code finish()} calling it at all, and calling it in the right place, which
@@ -78,6 +81,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
     private static final UUID PRIOR_PLAYER = UUID.fromString("2b9d6f10-84c3-4a57-9e21-7c0f5a3b8d64");
     private static final UUID VILLAGER = UUID.fromString("6d3f9b21-5c8e-4a70-b1d4-9e27c05f83a6");
     private static final String MOUNT_LOOT = "minecraft:diamond";
+    private static final int CHEST_SLOT_START = 2;
     // x is negative and just below a chunk boundary, so flooring and truncating land in DIFFERENT chunks and a
     // locator that casts instead of flooring misses. x and z also differ, so an axis swap misses too.
     private static final double MOUNT_X = -1120.5;
@@ -158,7 +162,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
         writePriorLevelDat(session, save, DimensionType.NETHER,
-                EntityFixtures.entityWithShortPos("MinecartChest", MOUNT, MOUNT_X, MOUNT_Y));
+                chestedDonkey(EntityFixtures.entityWithShortPos("EntityHorse", MOUNT, MOUNT_X, MOUNT_Y)));
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
 
@@ -274,10 +278,12 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
         writePriorLevelDat(session, save, DimensionType.NETHER, mount());
-        // The player is riding the prior mount, but that mount is itself in a second vehicle, so the RootVehicle
-        // record holds the OUTER vehicle with the mount nested under it. The mount is still under the player and
+        // The player is riding the prior mount, but a moving minecart has scooped that mount up, so the RootVehicle
+        // record holds the OUTER minecart with the mount nested under it. The mount is still under the player and
         // still saved by this finish, so releasing it would put a second copy of it in the world.
-        seatedOn(session, EntityFixtures.entityCarrying(otherMount(), mount()), OTHER_MOUNT, MOUNT);
+        seatedOn(session, EntityFixtures.entityCarrying(
+                EntityFixtures.entityAt("MinecartRideable", OTHER_MOUNT, 8.5, 64.0, 8.5), mount()),
+                OTHER_MOUNT, MOUNT);
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
 
@@ -362,8 +368,29 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
     /** The prior download's mount, carrying the loot whose survival is the whole point of releasing it. */
     private static NBTTagCompound mount() {
-        return EntityFixtures.containerVehicleAt("MinecartChest", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z,
-                MOUNT_LOOT);
+        return chestedDonkeyAt(MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z, MOUNT_LOOT);
+    }
+
+    /**
+     * A chested donkey at a position, in the shape {@code EntityHorse.writeEntityToNBT} gives those keys:
+     * {@code EntityHorse} is the one id the whole horse family shares and {@code Type} tells a donkey from a horse,
+     * {@code Items} is read only where {@code ChestedHorse} is set, and the chest's stacks sit at slots from two, past
+     * the saddle and armor slots.
+     */
+    private static NBTTagCompound chestedDonkeyAt(UUID uuid, double x, double y, double z, String... itemIds) {
+        return chestedDonkey(EntityFixtures.entityAt("EntityHorse", uuid, x, y, z), itemIds);
+    }
+
+    /** As {@link #chestedDonkeyAt}, stamped onto an {@code EntityHorse} tag built elsewhere. */
+    private static NBTTagCompound chestedDonkey(NBTTagCompound horse, String... itemIds) {
+        horse.setInteger("Type", HorseType.DONKEY.getOrdinal());
+        horse.setBoolean("ChestedHorse", true);
+        int[] slots = new int[itemIds.length];
+        for (int i = 0; i < slots.length; i++) {
+            slots[i] = CHEST_SLOT_START + i;
+        }
+        horse.setTag("Items", ItemFixtures.itemsAtSlots(slots, itemIds));
+        return horse;
     }
 
     /**
@@ -384,8 +411,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         // A mount ridden at a finish is refused every standalone write, so its entity-chunk copy is frozen at the
         // last flush it was dismounted for, while the player record holds what the player saw from horseback.
         writePriorLevelDat(session, save, DimensionType.NETHER,
-                EntityFixtures.containerVehicleAt("MinecartChest", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z,
-                        "minecraft:diamond", "minecraft:emerald"));
+                chestedDonkeyAt(MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z, "minecraft:diamond", "minecraft:emerald"));
         bankRecoveredContents(session, MOUNT, "minecraft:diamond");
 
         NBTTagCompound raw = seatedRawWithEmptyMount();
@@ -414,11 +440,13 @@ class LiveCaptureSessionResumedMountReleaseTest {
                 "and where that record holds nothing, the entity chunks are the only source there is");
     }
 
-    /** The fresh seated record as a live client serializes it: the mount is there, its container reads empty. */
+    /**
+     * The fresh seated record as a live client serializes it: the mount reads chested with an empty chest list, because
+     * the client never resizes the two-slot chest it builds every mount with when the chested flag arrives.
+     */
     private static NBTTagCompound seatedRawWithEmptyMount() {
         NBTTagCompound raw = new NBTTagCompound();
-        PlayerTag.setRootVehicle(raw, MOUNT,
-                EntityFixtures.entityAt("MinecartChest", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z));
+        PlayerTag.setRootVehicle(raw, MOUNT, chestedDonkeyAt(MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z));
         return raw;
     }
 
@@ -431,7 +459,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
             throws Exception {
         RecoveredEntityContent bank = state(session, "recoveredEntityContent");
         NBTTagCompound chunk = EntityFixtures.entityChunkTagWith(
-                EntityFixtures.containerVehicleAt("MinecartChest", uuid, MOUNT_X, MOUNT_Y, MOUNT_Z, itemIds));
+                chestedDonkeyAt(uuid, MOUNT_X, MOUNT_Y, MOUNT_Z, itemIds));
         // The scan hands the bank the region chunk, whose entities sit under Level.Entities at this band.
         NBTTagCompound level = new NBTTagCompound();
         level.setTag("Entities", chunk.getTagList("Entities", 10));
@@ -445,7 +473,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
      * realistic switch; two different types would let a check comparing entity types pass by accident.
      */
     private static NBTTagCompound otherMount() {
-        return EntityFixtures.entityAt("MinecartChest", OTHER_MOUNT, 8.5, 64.0, 8.5);
+        return chestedDonkeyAt(OTHER_MOUNT, 8.5, 64.0, 8.5);
     }
 
     /** A prior level.dat player tag: the dimension it finished in, and the mount it was riding if any. */
