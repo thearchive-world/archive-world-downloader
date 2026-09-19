@@ -91,27 +91,27 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkItemDegradation
 # the constants to EntityTypes, the id onto Level.getNextEntityId, and the banners into the Items.BANNER collection.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 
-# 26.1.2's fabric-api 0.155.2 client gametest API waits for chunks through TestServerConnection.getClientLevel, a
-# TestClientLevelContext the fixture hands out as clientWorld; fabric-api 0.156.0 for 26.2 put waitForChunksDownload
-# on the connection itself and types the dedicated one TestDedicatedServerConnection.
+# 26.1.2's fabric-api client gametest API waits for chunks through TestServerConnection.getClientLevel, a
+# TestClientLevelContext the fixture hands out as clientWorld; fabric-api 0.156.0 for 26.2 put waitForChunksDownload on
+# the connection itself and types the dedicated one TestDedicatedServerConnection.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/MultiplayerFixture.java
-# 26.1.2 waits for chunks through the fixture's clientWorld, the fabric-api 0.155.2 TestClientLevelContext; at 26.2
-# fabric-api 0.156.0 put the wait on the connection and the fixture exposes it directly.
+# 26.1.2 waits for chunks through the fixture's clientWorld, fabric-api's TestClientLevelContext; at 26.2 fabric-api
+# 0.156.0 put the wait on the connection and the fixture exposes it directly.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayResumeTest.java
-# 26.1.2 waits for chunks through the fixture's clientWorld, the fabric-api 0.155.2 TestClientLevelContext; at 26.2
-# fabric-api 0.156.0 put the wait on the connection and the fixture exposes it directly.
+# 26.1.2 waits for chunks through the fixture's clientWorld, fabric-api's TestClientLevelContext; at 26.2 fabric-api
+# 0.156.0 put the wait on the connection and the fixture exposes it directly.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDisconnectFlushTest.java
-# 26.1.2 waits for chunks through the fixture's clientWorld, the fabric-api 0.155.2 TestClientLevelContext; at 26.2
-# fabric-api 0.156.0 put the wait on the connection and the fixture exposes it directly.
+# 26.1.2 waits for chunks through the fixture's clientWorld, fabric-api's TestClientLevelContext; at 26.2 fabric-api
+# 0.156.0 put the wait on the connection and the fixture exposes it directly.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlFramedMapRevisitUnionTest.java
-# 26.1.2 waits for chunks through the fixture's clientWorld, the fabric-api 0.155.2 TestClientLevelContext; at 26.2
-# fabric-api 0.156.0 put the wait on the connection and the fixture exposes it directly.
+# 26.1.2 waits for chunks through the fixture's clientWorld, fabric-api's TestClientLevelContext; at 26.2 fabric-api
+# 0.156.0 put the wait on the connection and the fixture exposes it directly.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapSchemeSignalBeginTest.java
-# 26.1.2 waits for chunks through the fixture's clientWorld, the fabric-api 0.155.2 TestClientLevelContext; at 26.2
-# fabric-api 0.156.0 put the wait on the connection and the fixture exposes it directly.
+# 26.1.2 waits for chunks through the fixture's clientWorld, fabric-api's TestClientLevelContext; at 26.2 fabric-api
+# 0.156.0 put the wait on the connection and the fixture exposes it directly.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapStreamCrashStateTest.java
-# 26.1.2 waits for chunks through the fixture's clientWorld, the fabric-api 0.155.2 TestClientLevelContext; at 26.2
-# fabric-api 0.156.0 put the wait on the connection and the fixture exposes it directly.
+# 26.1.2 waits for chunks through the fixture's clientWorld, fabric-api's TestClientLevelContext; at 26.2 fabric-api
+# 0.156.0 put the wait on the connection and the fixture exposes it directly.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlResumeCaptureTest.java
 
 # 26.1.2 reads the current screen from Minecraft.screen; 26.2 moved it to Gui.screen under Minecraft.gui.
