@@ -33,13 +33,14 @@ class LevelDatCuratedGameRulesTest {
     }
 
     @Test
-    void surfacesTheSevenCuratedRulesById() {
+    void surfacesTheEightCuratedRulesById() {
         // Two of the nine band-neutral curated specs have no rule at 1.18.2 (doVinesSpread and doWardenSpawning are
         // 1.19 additions), so the runtime filter drops them and seven surface.
         Map<String, CuratedGameRule> byId = curated();
-        assertEquals(7, byId.size());
+        assertEquals(8, byId.size());
         assertTrue(byId.containsKey("keep_inventory"));
         assertTrue(byId.containsKey("spawn_mobs"));
+        assertTrue(byId.containsKey("fire_spread_radius_around_player"));
     }
 
     @Test
@@ -65,12 +66,21 @@ class LevelDatCuratedGameRulesTest {
         }
         // At 1.18.2 three laid-out rows have no live rule: the band-neutral fire-spread row (no rule at any current
         // band) plus vine-spread and warden-spawn, both 1.19 additions.
-        Set<String> absentAtThisBand = Set.of("fire_spread_radius_around_player", "spread_vines", "spawn_wardens");
+        Set<String> absentAtThisBand = Set.of("spread_vines", "spawn_wardens");
         for (String id : SettingsLayout.GAME_RULE_ORDER) {
             if (!byId.containsKey(id)) {
                 assertTrue(absentAtThisBand.contains(id),
                         id + " is laid out but has no curated rule at this band");
             }
         }
+    }
+
+    @Test
+    void booleanFireRuleBindsDoFireTickAndTogglesTrueFalse() {
+        CuratedGameRule fire = curated().get("fire_spread_radius_around_player");
+        assertEquals("doFireTick", fire.bandId(), "the band-neutral fire-spread row binds this band's boolean rule");
+        assertEquals("false", fire.curatedValue(), "fire spread is curated off");
+        assertEquals("true", fire.enabledValue());
+        assertEquals("false", fire.disabledValue());
     }
 }
