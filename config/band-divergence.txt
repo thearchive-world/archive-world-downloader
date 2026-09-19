@@ -26,14 +26,14 @@
 # pre-1.21.2 forms.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric API 0.114.0 for 1.21.1 draws the HUD overlay through HudRenderCallback, unconditionally after the
-# whole vanilla HUD; fabric-api 0.119.4 for 1.21.4 moves to HudLayerRegistrationCallback with an
-# IdentifiedLayer, and 0.141.4 for 1.21.11 to HudElementRegistry.addLast on an Identifier.
+# 1.21.1's Fabric API draws the HUD overlay through HudRenderCallback, unconditionally after the whole vanilla HUD;
+# 1.21.4's fabric-api moves to HudLayerRegistrationCallback with an IdentifiedLayer, and 1.21.11's to
+# HudElementRegistry.addLast on an Identifier.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# fabric-api 0.114.0 for 1.21.1 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
-# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api 0.155.2 for 26.1
-# renamed them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
+# 1.21.1's fabric-api registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu widgets
+# through Screens.getButtons and builds the command tree from ClientCommandManager; 26.1's fabric-api renamed them
+# KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
