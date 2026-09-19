@@ -27,14 +27,14 @@ buildscript {
     }
 }
 
-// The non-Fabric jar for this deep band, a separate Gradle build beside the 8.14.5 root. This band
+// The non-Fabric jar for this deep band, a separate Gradle build beside the root. This band
 // predates the Mojmap floor (no Mojang mappings exist for 1.10.2), so the toolchain reaches for classic MCP
 // (searge intermediary plus the MCP project's community names) instead, exactly as common/build.gradle.kts does.
 // Unimined provisions the MCP-named Minecraft jar and the real Forge API natively, through its minecraftForge
 // loader block, and reobfuscates the shipped jar MCP -> searge natively (defaultRemapJar), so this island carries
 // no hand-rolled toolchain: no island-classpath consumption, no Mojmap-view remap of the Forge universal jar, and
 // no custom tiny-remapper reobf pass. The island stays a separate Gradle build with its own wrapper as a
-// structural choice, not because its Gradle version or Java toolchain differ from the root's (both run 8.14.5
+// structural choice, not because its Gradle version or Java toolchain differ from the root's (both pin Gradle 8.x
 // and target Java 8); two wrappers, one set of coordinates read from the root gradle.properties.
 plugins {
     java
@@ -44,7 +44,7 @@ plugins {
     id("me.modmuss50.mod-publish-plugin") version "2.2.0"
 }
 
-// Single source of coordinates: the island reads the band's gradle.properties from the sibling 8.14.5 root
+// Single source of coordinates: the island reads the band's gradle.properties from the sibling root
 // rather than duplicating the version, MC pin, and compat coordinates. Two wrappers, one set of coordinates.
 val band = Properties().apply {
     rootDir.resolve("../gradle.properties").inputStream().use { load(it) }
@@ -200,9 +200,8 @@ val jspecify = "org.jspecify:jspecify:1.0.0"
 
 dependencies {
     // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
-    // shim are null-marked. NullAway itself does not run on this island (it is a build-logic pass that runs on
-    // the root, at 8.14.5, over common); here the annotations only need to resolve so the marked
-    // source compiles.
+    // shim are null-marked, so the annotations need only resolve for the marked source to compile. Nothing checks
+    // them: the root's nullness plugin runs annotations-only on a band below Java 21, and this build never loads it.
     compileOnly(jspecify)
 
     // JourneyMap 1.x API for the source-merged binding (compat/journeymap), compile-only, never a runtime require
