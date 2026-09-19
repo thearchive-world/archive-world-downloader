@@ -52,8 +52,8 @@ final class PlayerTag {
 
     /**
      * Unconditional privacy strip: remove both coordinate-bearing real-world location fields. Neither key exists in a
-     * 1.12.2 player tag (the last death location is a 1.19 addition and the explosion-impact position a 1.21 addition),
-     * so this is a harmless no-op kept for signature parity with the shared caller.
+     * 1.11.2 player tag (the last death location is a 1.19 addition and the explosion-impact position a 1.20.5
+     * addition), so this is a harmless no-op kept for signature parity with the shared caller.
      */
     static void stripDeathLocation(NBTTagCompound raw) {
         raw.removeTag("LastDeathLocation");
