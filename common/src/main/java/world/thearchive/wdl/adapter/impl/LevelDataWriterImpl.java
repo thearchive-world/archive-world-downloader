@@ -254,6 +254,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
+        curated.add(new CuratedSpec("fire_spread_radius_around_player", "doFireTick", "false"));
         curated.add(new CuratedSpec("spread_vines", "doVinesSpread", "false"));
         curated.add(new CuratedSpec("advance_time", "doDaylightCycle", "false"));
         curated.add(new CuratedSpec("advance_weather", "doWeatherCycle", "false"));
