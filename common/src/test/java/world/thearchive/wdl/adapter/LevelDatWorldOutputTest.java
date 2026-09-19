@@ -188,11 +188,11 @@ class LevelDatWorldOutputTest {
 
     @Test
     void aValidOverrideIsWritten() {
-        // doFireTick is not in the curated set; a valid override of it passes through. The rule this named before the
-        // port, doLimitedCrafting, arrives at 1.12 and so is rejected here as an unknown id, which would have made
-        // this test assert the opposite of what it is for.
-        GameRules rules = gameRules(build(with("gamerule.doFireTick", "true")));
+        // reducedDebugInfo is not in the curated set, and its vanilla default is false: an override equal to a rule's
+        // own default would pass whether or not it was written. doLimitedCrafting arrives at 1.12 and is rejected here
+        // as an unknown id, which would make this test assert the opposite of what it is for.
+        GameRules rules = gameRules(build(with("gamerule.reducedDebugInfo", "true")));
 
-        assertTrue(rules.getBoolean("doFireTick"), "an arbitrary valid rule passes through");
+        assertTrue(rules.getBoolean("reducedDebugInfo"), "an arbitrary valid rule passes through");
     }
 }
