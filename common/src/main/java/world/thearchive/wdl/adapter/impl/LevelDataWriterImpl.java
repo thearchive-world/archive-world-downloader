@@ -235,7 +235,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         }
         WorldInfo worldInfo = data.worldData();
         worldInfo.setGameType(player.gameType());
-        // 1.12.2 setSpawn takes only a position; the spawn yaw has no level.dat field at this band.
+        // The spawn yaw has no level.dat field at 1.11.2.
         worldInfo.setSpawn(player.spawnPos());
         worldInfo.setDifficulty(player.difficulty());
         storage.saveWorldInfoWithPlayer(worldInfo, player.playerTag());
@@ -246,7 +246,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         if (!Files.exists(levelDatFile)) {
             return null;
         }
-        // 1.12.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(levelDatFile)) {
             NBTTagCompound root = CompressedStreamTools.readCompressed(input);
             if (!root.hasKey("Data", 10)) {
