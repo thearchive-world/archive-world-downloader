@@ -141,9 +141,9 @@ public final class ConfigSchema {
     private static final String OVERRIDE_GAME_RULES_PREAMBLE = ""
             + "\n"
             + "# Game rules written into the download so it opens calm and safe. On by default: the download\n"
-            + "# writes a curated safe set (no mob spawning or griefing, day frozen, inventory kept, and, where\n"
-            + "# your Minecraft version has those rules, weather frozen and no vine spread). Set false to write\n"
-            + "# no game rules at all (the world's vanilla defaults stand).\n";
+            + "# writes a curated safe set (no mob spawning or griefing, no fire spread, day frozen, inventory\n"
+            + "# kept, and, where your Minecraft version has those rules, weather frozen and no vine spread). Set\n"
+            + "# false to write no game rules at all (the world's vanilla defaults stand).\n";
 
     private static final String OVERRIDE_WORLD_DEFAULTS_PREAMBLE = ""
             + "# Override or add an individual rule with gamerule.<id>=<value>, using this Minecraft version's\n"
