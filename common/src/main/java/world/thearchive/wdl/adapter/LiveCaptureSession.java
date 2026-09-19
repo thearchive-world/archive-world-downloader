@@ -1557,16 +1557,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
      *
      * <p>Package-private so the loss its own catch counts stays testable.
      */
-    /** The client entity with this uuid, or null when none is loaded. The client has no by-uuid index at this band. */
-    private @Nullable Entity entityByUuid(UUID uuid) {
-        for (Entity entity : level().loadedEntityList) {
-            if (entity.getUniqueID().equals(uuid)) {
-                return entity;
-            }
-        }
-        return null;
-    }
-
     void retryRefusedPrimes() {
         EntityPacketCapture capture = this.packetCapture;
         if (capture == null) {
@@ -1606,6 +1596,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
         }
         primeRefusedEntities.clear();
+    }
+
+    /** The client entity with this uuid, or null when none is loaded. The client exposes no by-uuid lookup. */
+    private @Nullable Entity entityByUuid(UUID uuid) {
+        for (Entity entity : level().loadedEntityList) {
+            if (entity.getUniqueID().equals(uuid)) {
+                return entity;
+            }
+        }
+        return null;
     }
 
     /**
