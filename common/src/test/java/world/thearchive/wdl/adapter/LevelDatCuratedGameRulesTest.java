@@ -18,10 +18,10 @@ import world.thearchive.wdl.core.SettingsLayout;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The curated game-rule set surfaced across the SPI for the settings menu: the curated safe rules (seven on this band),
+ * The curated game-rule set surfaced across the SPI for the settings menu: the curated safe rules (eight on this band),
  * each with its curated (safe) value and the two toggle-position values, computed from the live {@code GameRules} so
  * the menu never re-hardcodes a band-specific set. The band-neutral order carries rows with no curated rule on this
- * band (fire-spread, vine-spread and warden-spawn), whose order slots the menu skips.
+ * band (vine-spread and warden-spawn), whose order slots the menu skips.
  */
 class LevelDatCuratedGameRulesTest {
     private Map<String, CuratedGameRule> curated() {
@@ -34,13 +34,14 @@ class LevelDatCuratedGameRulesTest {
     }
 
     @Test
-    void surfacesTheSevenCuratedRulesById() {
-        // Two of the nine band-neutral curated specs have no rule on this band (doVinesSpread and doWardenSpawning are
-        // 1.19 additions), so the runtime filter drops them and seven surface.
+    void surfacesTheEightCuratedRulesById() {
+        // Two of the ten band-neutral curated specs have no rule on this band (doVinesSpread and doWardenSpawning are
+        // 1.19 additions), so the runtime filter drops them and eight surface.
         Map<String, CuratedGameRule> byId = curated();
-        assertEquals(7, byId.size());
+        assertEquals(8, byId.size());
         assertTrue(byId.containsKey("keep_inventory"));
         assertTrue(byId.containsKey("spawn_mobs"));
+        assertTrue(byId.containsKey("fire_spread_radius_around_player"));
     }
 
     @Test
@@ -64,15 +65,22 @@ class LevelDatCuratedGameRulesTest {
         for (String id : byId.keySet()) {
             assertTrue(SettingsLayout.GAME_RULE_ORDER.contains(id), id + " is curated but not laid out as a row");
         }
-        // On this band three laid-out rows have no curated rule: the band-neutral fire-spread row (no spec here) plus
-        // vine-spread and warden-spawn, both 1.19 additions.
-        Set<String> absentAtThisBand = ImmutableSet.of("fire_spread_radius_around_player", "spread_vines",
-                "spawn_wardens");
+        // On this band two laid-out rows have no curated rule: vine-spread and warden-spawn, both 1.19 additions.
+        Set<String> absentAtThisBand = ImmutableSet.of("spread_vines", "spawn_wardens");
         for (String id : SettingsLayout.GAME_RULE_ORDER) {
             if (!byId.containsKey(id)) {
                 assertTrue(absentAtThisBand.contains(id),
                         id + " is laid out but has no curated rule at this band");
             }
         }
+    }
+
+    @Test
+    void booleanFireRuleBindsDoFireTickAndTogglesTrueFalse() {
+        CuratedGameRule fire = curated().get("fire_spread_radius_around_player");
+        assertEquals("doFireTick", fire.bandId(), "the band-neutral fire-spread row binds this band's boolean rule");
+        assertEquals("false", fire.curatedValue(), "fire spread is curated off");
+        assertEquals("true", fire.enabledValue());
+        assertEquals("false", fire.disabledValue());
     }
 }
