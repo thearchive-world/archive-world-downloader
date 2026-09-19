@@ -114,17 +114,17 @@ common/src/main/java/world/thearchive/wdl/adapter/RecoveredScan.java
 # Below 1.21.11 ResourceKey exposes its id as location(); 1.21.11 renamed it identifier().
 common/src/main/java/world/thearchive/wdl/adapter/VanillaDimensions.java
 
-# fabric-api 0.119.4 for 1.21.4 registers the key through KeyBindingHelper.registerKeyBinding and the HUD overlay
-# through HudLayerRegistrationCallback with an IdentifiedLayer on a ResourceLocation; fabric-api 0.141.4 for 1.21.11
-# uses HudElementRegistry.addLast on an Identifier, and fabric-api 0.155.2 for 26.1 names the helper KeyMappingHelper.
+# 1.21.4's fabric-api registers the key through KeyBindingHelper.registerKeyBinding and the HUD overlay through
+# HudLayerRegistrationCallback with an IdentifiedLayer on a ResourceLocation; 1.21.11's fabric-api uses
+# HudElementRegistry.addLast on an Identifier, and 26.1's names the helper KeyMappingHelper.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
-# fabric-api 0.119.4 for 1.21.4 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
-# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api 0.155.2 for
-# 26.1 carries them as KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
+# 1.21.4's fabric-api registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu widgets
+# through Screens.getButtons and builds the command tree from ClientCommandManager; 26.1's fabric-api carries them as
+# KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
-# fabric-api 0.119.4 for 1.21.4 keeps WorldRenderEvents and WorldRenderContext under rendering.v1, names the pose
-# matrixStack and carries the frustum on the context; fabric-api 0.138.4 for 1.21.10 moved them under
-# rendering.v1.world, renamed the pose matrices and hands the frustum only on END_EXTRACTION.
+# 1.21.4's fabric-api keeps WorldRenderEvents and WorldRenderContext under rendering.v1, names the pose matrixStack and
+# carries the frustum on the context; 1.21.10's has them under rendering.v1.world, names the pose matrices and hands the
+# frustum only on END_EXTRACTION.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
 # Below 1.21.11 the mount inventory menu is HorseInventoryMenu with a private AbstractHorse horse field; 1.21.11
 # introduced AbstractMountInventoryMenu with a protected LivingEntity mount.
@@ -136,8 +136,8 @@ fabric/src/main/resources/wdl.accesswidener
 # Below 1.21.11 the mount inventory menu is HorseInventoryMenu with a private AbstractHorse horse field; 1.21.11
 # introduced AbstractMountInventoryMenu with a protected LivingEntity mount.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeMountMenuReader.java
-# NeoForge 21.4.157 fires one RenderLevelStageEvent carrying getStage and getFrustum, so the draw checks for
-# AFTER_TRANSLUCENT_BLOCKS on it; NeoForge 21.11.42 fires typed subevents such as AfterTranslucentBlocks and hands the
+# 1.21.4's NeoForge fires one RenderLevelStageEvent carrying getStage and getFrustum, so the draw checks for
+# AFTER_TRANSLUCENT_BLOCKS on it; 1.21.11's NeoForge fires typed subevents such as AfterTranslucentBlocks and hands the
 # frustum on ExtractLevelRenderStateEvent. RenderType.lines moved to rendertype.RenderTypes at 1.21.11.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeOutlineRegistrar.java
 # Below 1.21.11 ResourceLocation stands where 1.21.11 has Identifier.
@@ -620,9 +620,8 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlLecternCaptureT
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlLightCaptureTest.java
 # Below 1.21.5 CompoundTag.getString, getCompound and getInt return the value itself; 1.21.5 made them Optional.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOffModeMapIdCaptureTest.java
-# fabric-api 0.119.4 for 1.21.4 keeps WorldRenderEvents directly under rendering.v1 and names the pose matrixStack;
-# fabric-api 0.138.4 for 1.21.10 moved it under rendering.v1.world and renamed the pose matrices. Camera.getPosition is
-# dropped at 1.21.11 for position().
+# 1.21.4's fabric-api keeps WorldRenderEvents directly under rendering.v1 and names the pose matrixStack; 1.21.10's has
+# it under rendering.v1.world and names the pose matrices. Camera.getPosition is dropped at 1.21.11 for position().
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
 # Below 1.21.5 CompoundTag.getList takes a type id and getCompound and getString return the value itself (Optional at
 # 1.21.5, with the getCompoundOrEmpty and getListOrEmpty defaults). ListTag.compoundStream arrives at 1.21.5.
