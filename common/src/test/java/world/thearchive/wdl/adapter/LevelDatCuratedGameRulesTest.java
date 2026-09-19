@@ -34,14 +34,15 @@ class LevelDatCuratedGameRulesTest {
     }
 
     @Test
-    void surfacesTheFiveCuratedRulesById() {
+    void surfacesTheSixCuratedRulesById() {
         // Four of the nine band-neutral curated specs have no rule at 1.14.4 (doVinesSpread, doWardenSpawning,
         // doTraderSpawning and doPatrolSpawning are all later additions), so the runtime filter drops them and five
         // surface.
         Map<String, CuratedGameRule> byId = curated();
-        assertEquals(5, byId.size());
+        assertEquals(6, byId.size());
         assertTrue(byId.containsKey("keep_inventory"));
         assertTrue(byId.containsKey("spawn_mobs"));
+        assertTrue(byId.containsKey("fire_spread_radius_around_player"));
     }
 
     @Test
@@ -67,13 +68,22 @@ class LevelDatCuratedGameRulesTest {
         }
         // At 1.14.4 five laid-out rows have no live rule: the band-neutral fire-spread row (no rule at any current
         // band) plus vine-spread, warden-spawn, wandering-trader-spawn and patrol-spawn, all later additions.
-        Set<String> absentAtThisBand = ImmutableSet.of("fire_spread_radius_around_player", "spread_vines",
-                "spawn_wardens", "spawn_wandering_traders", "spawn_patrols");
+        Set<String> absentAtThisBand = ImmutableSet.of("spread_vines", "spawn_wardens", "spawn_wandering_traders",
+                "spawn_patrols");
         for (String id : SettingsLayout.GAME_RULE_ORDER) {
             if (!byId.containsKey(id)) {
                 assertTrue(absentAtThisBand.contains(id),
                         id + " is laid out but has no curated rule at this band");
             }
         }
+    }
+
+    @Test
+    void booleanFireRuleBindsDoFireTickAndTogglesTrueFalse() {
+        CuratedGameRule fire = curated().get("fire_spread_radius_around_player");
+        assertEquals("doFireTick", fire.bandId(), "the band-neutral fire-spread row binds this band's boolean rule");
+        assertEquals("false", fire.curatedValue(), "fire spread is curated off");
+        assertEquals("true", fire.enabledValue());
+        assertEquals("false", fire.disabledValue());
     }
 }
