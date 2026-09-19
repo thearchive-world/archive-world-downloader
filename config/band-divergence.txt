@@ -384,7 +384,10 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityVehicleRelocationTest.ja
 # the mod's own WdlRegionStorage through WorldPaths, and the prior player tag is written through the ISaveHandler that
 # AnvilSaveConverter(File, DataFixer).getSaveLoader returns below 1.13, with the difficulty as EnumDifficulty. The scan
 # hands the bank a region chunk whose entities sit under Level.Entities below 1.17, so the fixture standing in for a
-# prior download's record builds that shape; below 1.11 the mount fixtures carry the unnamespaced MinecartChest id.
+# prior download's record builds that shape. Below 1.11 the entity ids are unnamespaced: the chested-mount fixtures
+# carry EntityHorse, the horse family's one registration, stamped as a chested donkey by Type and ChestedHorse with
+# Items at slots from two; the nested case's outer vehicle is MinecartRideable, the minecart that scoops a mob up;
+# and the villager case rides a Boat with a Villager aboard.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
 
 # Below 1.20.5 there is no SimpleRegionStorage and below 1.15 no IOWorker, so the sweep is proven against the mod's own
