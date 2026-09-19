@@ -29,16 +29,16 @@
 # method reference directly.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# At Fabric API 0.97.3+1.20.4 the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the
-# peek key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API for 26.2 registers a HUD
-# element through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
+# On 1.20.4's Fabric API the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the peek
+# key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API registers a HUD element
+# through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
 # (keymapping.v1).
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# At Fabric API 0.97.3+1.20.4 the platform bridge reads the pause-menu widget list through Screens.getButtons,
-# registers the key through KeyBindingHelper.registerKeyBinding and builds the client command tree through
-# ClientCommandManager (command.v2), where dev's Fabric API for 26.2 names them Screens.getWidgets,
-# KeyMappingHelper.registerKeyMapping and ClientCommands.
+# On 1.20.4's Fabric API the platform bridge reads the pause-menu widget list through Screens.getButtons, registers the
+# key through KeyBindingHelper.registerKeyBinding and builds the client command tree through ClientCommandManager
+# (command.v2), where dev's Fabric API names them Screens.getWidgets, KeyMappingHelper.registerKeyMapping and
+# ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
