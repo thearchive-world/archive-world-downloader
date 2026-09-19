@@ -30,17 +30,16 @@
 # PackRepository(new ServerPacksSource()).
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# At Fabric API 0.92.11+1.20.1 the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the
-# peek key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API for 26.2 registers a HUD
-# element through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
+# On 1.20.1's Fabric API the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the peek
+# key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API registers a HUD element
+# through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
 # (keymapping.v1).
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# At Fabric API 0.92.11+1.20.1 the platform bridge reads the pause-menu widget list through Screens.getButtons,
-# registers the key through KeyBindingHelper.registerKeyBinding and builds the client command tree through
-# ClientCommandManager (command.v2), where dev's Fabric API for 26.2 names them Screens.getWidgets,
-# KeyMappingHelper.registerKeyMapping and ClientCommands; against 1.20.2 the file differs only in where the
-# buildPauseMenuRow call wraps.
+# On 1.20.1's Fabric API the platform bridge reads the pause-menu widget list through Screens.getButtons, registers the
+# key through KeyBindingHelper.registerKeyBinding and builds the client command tree through ClientCommandManager
+# (command.v2), where dev's Fabric API names them Screens.getWidgets, KeyMappingHelper.registerKeyMapping and
+# ClientCommands; against 1.20.2 the file differs only in where the buildPauseMenuRow call wraps.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -506,12 +505,12 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 
-# ModMenu 7.2.2, the 1.20.1 pin, ships no update-checker API (UpdateChecker, UpdateInfo and UpdateChannel arrived in a
-# later ModMenu; the 9.2.0 that 1.20.4 pins has them), so the entrypoint implements only the config-screen factory and
+# ModMenu 7.x, the 1.20.1 line, ships no update-checker API (UpdateChecker, UpdateInfo and UpdateChannel arrived in a
+# later ModMenu; the 9.x line 1.20.4 pins has them), so the entrypoint implements only the config-screen factory and
 # does not override getUpdateChecker.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 
-# Deleted: ModMenu 7.2.2, the 1.20.1 pin, ships no update-checker API, so the ModMenu update-badge feeder is deleted
+# Deleted: ModMenu 7.x, the 1.20.1 line, ships no update-checker API, so the ModMenu update-badge feeder is deleted
 # rather than divergent; the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
@@ -597,7 +596,7 @@ build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
 /build.gradle.kts
 
 # NeoForm has no 1.20.1 release (NeoForged forked from Forge at 1.20.2), so common builds on NeoGradle's vanilla plugin
-# (net.neoforged.gradle.vanilla 7.1.38, versioned inline) over mcp_config 1.20.1, with net.minecraft:client as an
+# (net.neoforged.gradle.vanilla, versioned inline) over the official client mappings, with net.minecraft:client as an
 # implementation dependency and no Parchment layer, where 1.20.2 and dev build on ModDevGradle Vanilla mode over a
 # neoform_version. It pulls XaeroPlus's +forge flavor (1.20.2's common pulls +neoforge) and both JourneyMap API
 # generations, the loader-suffixless 1.9 SNAPSHOT and the 2.0 -common flavor, from jm.gserv.me and maven.blamejared.com.
@@ -617,6 +616,6 @@ fabric/build.gradle.kts
 forge/build.gradle.kts
 
 # The catalog carries loom, spotless and mod-publish-plugin, the plugins 1.20.1's builds apply, and no moddev entry
-# (1.20.2's carries moddev 2.0.146 for its ModDevGradle-built common; dev's carries loom for fabric, moddev for common
+# (1.20.2's carries a moddev entry for its ModDevGradle-built common; dev's carries loom for fabric, moddev for common
 # and neoforge, and mod-publish-plugin for fabric and neoforge); the tool-library entries match dev's.
 gradle/libs.versions.toml
