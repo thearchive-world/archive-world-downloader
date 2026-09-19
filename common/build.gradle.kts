@@ -470,9 +470,9 @@ repositories {
 
 dependencies {
     // XaeroPlus public API for the overlay binding (compat/xaeroplus), compile-only (never a runtime require).
-    // common is Mojmap here (NeoGradle vanilla), so it needs a Mojmapped flavor. XaeroPlus 2.35.1 publishes no
-    // separate +neoforge-1.20.1 file at this band; its +forge-1.20.1 file declares both the forge and neoforge
-    // loaders, and the binding uses only XaeroPlus's own API types, so it matches this classpath.
+    // common is Mojmap here (NeoGradle vanilla), so it needs a Mojmapped flavor. XaeroPlus publishes no separate
+    // +neoforge-1.20.1 file; its +forge-1.20.1 file declares both the forge and neoforge loaders, and the binding
+    // uses only XaeroPlus's own API types, so it matches this classpath.
     compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+forge-${property("minecraft_version")}")
 
     // JourneyMap public APIs for the overlay bindings, compile-only (never a runtime require). This band binds
