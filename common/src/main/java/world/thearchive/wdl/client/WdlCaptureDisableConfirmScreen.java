@@ -18,7 +18,6 @@ final class WdlCaptureDisableConfirmScreen extends ConfirmScreen {
 
     WdlCaptureDisableConfirmScreen(BooleanConsumer callback, Component title, Component message,
             Component disableButton, Component keepButton) {
-        // 1.15.2 ConfirmScreen takes the two button labels as plain strings.
         super(callback, title, message, disableButton.getString(), keepButton.getString());
     }
 
