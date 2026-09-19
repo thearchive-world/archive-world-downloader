@@ -113,10 +113,11 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     }
 
     /**
-     * The one edge ahead of the loader's registry revert. Minecraft.loadWorld posts WorldEvent.Unload at its head and
-     * calls FMLClientHandler.handleClientWorldClosing, which reverts the registries on any non-local connection, later
-     * in that same method on that same thread, and nothing between the two runs a client tick. So the disconnect
-     * callbacks above, which ride the tick edge, cannot reach a subscriber until the revert is over, and this can.
+     * The one edge ahead of the loader's registry revert. {@code Minecraft.loadWorld} posts {@code WorldEvent.Unload}
+     * at its head and calls {@code FMLClientHandler.handleClientWorldClosing}, which reverts the registries on any
+     * non-local connection, later in that same method on that same thread, and nothing between the two runs a client
+     * tick. So the disconnect callbacks above, which ride the tick edge, cannot reach a subscriber until the revert is
+     * over, and this can.
      *
      * <p>Gated on the client's own world: with an integrated server running, the server thread posts this event for
      * its worlds too, and a callback taken there would reach the capture off the client thread it belongs to. Firing
