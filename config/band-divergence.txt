@@ -26,15 +26,15 @@
 # (TestRegistries.bootstrap, no registries argument) are this class's.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# Fabric registration is Fabric-API-coupled and moves across bands: Fabric API 0.28.5+1.14 registers the keybind
-# through KeyBindingHelper.registerKeyBinding where dev's release uses KeyMappingHelper, and it ships no
-# fabric-rendering-v1 (HudRenderCallback, which 0.28.5+1.15 has), so the capture HUD overlay has no draw hook on 1.14.4
-# Fabric and does not draw there, where dev registers it through HudElementRegistry.
+# Fabric registration is Fabric-API-coupled and moves across bands: 1.14.4's Fabric API registers the keybind through
+# KeyBindingHelper.registerKeyBinding where dev's release uses KeyMappingHelper, and it ships no fabric-rendering-v1
+# (HudRenderCallback, which 1.15.2's has), so the capture HUD overlay has no draw hook on 1.14.4 Fabric and does not
+# draw there, where dev registers it through HudElementRegistry.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
 # Fabric API 0.28.5+1.14 ships no fabric-screen-api-v1 (ScreenEvents, Screens) and its fabric-command-api-v1 has no
 # ClientCommandManager, so the bridge exposes the pause-menu row as a factory the PauseScreenMixin reads and registers
-# no /wdl client command; Fabric API 0.42.0+1.16 carries both.
+# no /wdl client command; 1.16.5's Fabric API carries both.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -716,15 +716,15 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 # well), so this write-task test reads the file through Files.newInputStream; TestRegistries only runs the bootstrap.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 
-# ModMenu 1.7.17, the API 1.14.4 pins, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived in
-# a later ModMenu), and its io.github.prospector.modmenu.api.ModMenuApi keys each provider by getModId and takes the
-# parent-to-screen factory from getConfigScreenFactory (1.15.2's 1.10.7 has getModConfigScreenFactory and
-# ConfigScreenFactory; the com.terraformersmc package is 1.16.23's), so this entrypoint implements only those two and
+# ModMenu 1.7.x, the 1.14.4 line, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived in a later
+# ModMenu), and its io.github.prospector.modmenu.api.ModMenuApi keys each provider by getModId and takes the
+# parent-to-screen factory from getConfigScreenFactory (1.15.2's ModMenu has getModConfigScreenFactory and
+# ConfigScreenFactory; the com.terraformersmc package is 1.16.5's), so this entrypoint implements only those two and
 # does not override getUpdateChecker.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 
-# ModMenu 1.7.17, the API 1.14.4 pins, ships no update-checker API, so the ModMenu update-badge feeder is deleted, not
-# merely divergent; the launch update check still runs, only its ModMenu badge is gone.
+# ModMenu 1.7.x, the 1.14.4 line, ships no update-checker API, so the ModMenu update-badge feeder is deleted, not merely
+# divergent; the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
 # Below 1.20.2 there is no AdvancementHolder/AdvancementNode split (the advancement datapack rewrite is 1.20.2), so
@@ -744,7 +744,7 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
 # Added with the Forge island, which dev does not ship: the island's manifest carries loaderVersion [28,), Forge 28.x
-# for 1.14.4 (28.2.30 pinned), versus the [31,) of 1.15.2.
+# for 1.14.4, versus the [31,) of 1.15.2.
 forge/src/main/resources/META-INF/mods.toml
 
 # Added with the island and absent from dev, which ships no forge/ tree: the island's resource pack_format is 4 for
