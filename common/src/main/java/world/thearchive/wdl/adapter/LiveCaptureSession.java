@@ -2550,18 +2550,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
         this.finishMapWrites = null; // the writer holds its own copy; dropping ours frees the batched map tags
         this.finishBatchClosed = true;
         // INFO because a field report of a missing player record is undiagnosable without it, and never has debug.log.
-        LOGGER.info("finish: the live client state was read {} ms in, the entity drain and flush finished {} ms "
-                + "in; the first figure is the window a concurrent client teardown has to beat",
+        LOGGER.info("finish: the live client state was read {} ms in, the entity drain and flush finished {} ms in",
                 (liveStateNanos - finishStartNanos) / 1_000_000L, (drainDoneNanos - finishStartNanos) / 1_000_000L);
     }
 
     /**
-     * Everything this finish must read from the live client, taken before the entity drain rather than after it.
-     *
-     * <p>Do not move any of it back behind the drain. A disconnect the player did not initiate delivers this finish on
-     * the network IO thread while the client main thread is inside {@code Minecraft.disconnect}, so the two run
-     * concurrently and every read here is void once the field it needs is nulled. Being early shortens that window
-     * without closing it: a client already torn down when the finish is entered still loses the player record.
+     * Everything this finish must read from the live client, taken before the entity drain rather than after it. Do not
+     * move it behind the entity drain: {@link #prepareRootVehicleCapture} fills the set the drain and the flush consult
+     * to hold the ridden mount and its passengers out of the standalone write and folds the mount's opened contents
+     * into the record; run after the flush it would leave the mount on disk twice on one UUID, and run after the drain
+     * alone it would count the mount as a written entity the flush then drops.
      */
     private void captureLiveClientState(Minecraft minecraft, @Nullable LocalPlayer player) {
         if (player != null && minecraft.level == level()) {
