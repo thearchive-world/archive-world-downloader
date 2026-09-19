@@ -25,15 +25,15 @@
 # the resource reload, so the 26.x bootstrap also runs the DataComponentInitializers.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# fabric-api 0.128.2 for 1.21.5 registers the key through KeyBindingHelper.registerKeyBinding and the HUD overlay
-# through HudLayerRegistrationCallback with an IdentifiedLayer on a ResourceLocation; fabric-api 0.136.1 for 1.21.8 uses
-# HudElementRegistry.addLast, 1.21.11 renamed ResourceLocation Identifier, and fabric-api 0.155.2 for 26.1 names the
-# helper KeyMappingHelper.registerKeyMapping.
+# 1.21.5's fabric-api registers the key through KeyBindingHelper.registerKeyBinding and the HUD overlay through
+# HudLayerRegistrationCallback with an IdentifiedLayer on a ResourceLocation; 1.21.8's fabric-api uses
+# HudElementRegistry.addLast, 1.21.11 renamed ResourceLocation Identifier, and 26.1's names the helper
+# KeyMappingHelper.registerKeyMapping.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# fabric-api 0.128.2 for 1.21.5 registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu
-# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api 0.155.2 for 26.1
-# names them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
+# 1.21.5's fabric-api registers the key through KeyBindingHelper.registerKeyBinding, reads the pause-menu widgets
+# through Screens.getButtons and builds the command tree from ClientCommandManager; 26.1's fabric-api names them
+# KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # The villager-trade capture gametest carries the pre-26.2 client forms: EntityType constants are not yet under
@@ -194,8 +194,8 @@ fabric/src/main/resources/wdl.accesswidener
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeMountMenuReader.java
 
 # Rendertype revert (renderer.rendertype.RenderTypes -> renderer.RenderType) plus a 1.21.5 outline-event form: the
-# frustum is read off a raw RenderLevelStageEvent with an explicit AFTER_TRANSLUCENT_BLOCKS stage check on NeoForge
-# 21.5.98, not the typed AfterTranslucentBlocks subevent 1.21.8's NeoForge exposes.
+# frustum is read off a raw RenderLevelStageEvent with an explicit AFTER_TRANSLUCENT_BLOCKS stage check on 1.21.5's
+# NeoForge, not the typed AfterTranslucentBlocks subevent 1.21.8's NeoForge exposes.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeOutlineRegistrar.java
 
 # Identifier rename revert: net.minecraft.resources.Identifier -> ResourceLocation for the HUD element id.
@@ -334,8 +334,8 @@ common/src/main/resources/assets/wdl/lang/zh_tw.json
 # 1.21.11, so the slot math is inlined.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
-# Fabric-API render package: WorldRenderContext/Events resolve under rendering.v1, not rendering.v1.world, on Fabric API
-# 0.128.2+1.21.5.
+# Fabric-API render package: WorldRenderContext/Events resolve under rendering.v1, not rendering.v1.world, on 1.21.5's
+# Fabric API.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
 
 # Beehive-occupant entity-data revert: the occupant carries CustomData, not the 1.21.9 TypedEntityData.
@@ -353,10 +353,9 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 # 1.21.10.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 
-# fabric-api 0.128.2 for 1.21.5 keeps WorldRenderEvents under rendering.v1 and names the context's pose matrixStack, as
-# 0.136.1 for 1.21.8 does; 0.138.4 for 1.21.10 has the events under rendering.v1.world and the pose named matrices.
-# Below 1.21.6 Camera exposes its position as getPosition() alone; 1.21.6 added position() and 1.21.11 dropped
-# getPosition.
+# 1.21.5's fabric-api keeps WorldRenderEvents under rendering.v1 and names the context's pose matrixStack, as 1.21.8's
+# does; 1.21.10's has the events under rendering.v1.world and the pose named matrices. Below 1.21.6 Camera exposes its
+# position as getPosition() alone; 1.21.6 added position() and 1.21.11 dropped getPosition.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
 
 # ---------------------------------------------------------------------------
