@@ -770,7 +770,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * A player record this finish did not get intact from the live client (main thread). At most one per download, and
      * two shapes: no record at all, the finish having arrived after the teardown, and a record assembled while the
-     * teardown ran under it, whose game mode or advancements then silently took a fallback.
+     * teardown ran under it, whose game mode then silently took a fallback.
      */
     private int playerRecordsLost;
 
@@ -2471,9 +2471,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     void countMissingPlayerRecord() {
         playerRecordsLost = 1;
         LOGGER.warn("no player record reached the save: the finish found no live player to read, so this download "
-                + "contributed no inventory, ender chest, advancements, statistics or game mode, and a folder it "
-                + "opened fresh opens at its default spawn rather than where the download was taken; the download "
-                + "reports partial, and resuming it while connected captures the player");
+                + "contributed no inventory, ender chest, statistics or game mode, and a folder it opened fresh "
+                + "opens at its default spawn rather than where the download was taken; the download reports "
+                + "partial, and resuming it while connected captures the player");
     }
 
     /**

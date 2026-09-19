@@ -126,8 +126,8 @@ class LiveCaptureSessionCompletionRecordTest {
 
         assertTrue(session.isPartialSave(0, 0),
                 "a save carrying no player record is partial: it opens at the default spawn rather than where the "
-                        + "download was taken, and carries none of the inventory, ender chest, advancements, "
-                        + "statistics or game mode");
+                        + "download was taken, and carries none of the inventory, ender chest, statistics or "
+                        + "game mode");
 
         freezeAndReport(session, cleanWrite());
 
