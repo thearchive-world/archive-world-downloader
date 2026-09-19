@@ -730,8 +730,8 @@ forge/gradle.properties
 # java_version 8.
 forge/gradle/gradle-daemon-jvm.properties
 
-# Absent from dev: the island wrapper pins Gradle 8.14.5, the newest 8.x line, as 1.13.2's does; at 1.12.2 the pin holds
-# because Unimined 1.4.1 is untested on Gradle 9 and 8.8 is the oldest 8.x with the
+# Absent from dev: the island wrapper pins the Gradle 8.x line where 1.13.2's island runs the Gradle 9 line; at 1.12.2
+# the pin holds because Unimined is untested on Gradle 9 and 8.8 is the oldest 8.x with the
 # ConfigurableFileCollection.convention overload mod-publish-plugin 2.2.0 calls.
 forge/gradle/wrapper/gradle-wrapper.properties
 
@@ -1265,12 +1265,12 @@ common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.jav
 # DimensionType.OVERWORLD, and the accessors are the classic getTagList, getCompoundTag and getString.
 common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
 
-# Java 8 bands gate NullAway behind errorProneUsable (java_version at least 21, the pinned Error Prone 2.50.0 being a
-# Java 21 build the compile toolchain cannot load) and run annotations-only, where dev runs the checker unconditionally
-# and carries no such gate; the loader-merge sentence names no wdl.common-merge plugin, 1.12.2 having no loader
-# subproject and no such plugin. Below Java 11 the file also rewrites JSpecify's NullMarked to name no MODULE target,
-# the constant javac 8 and javadoc 8 warn on, and swaps that jar onto every source set's compile classpath; dev's
-# readers know the constant and carry no such rewrite.
+# Java 8 bands gate NullAway behind errorProneUsable (java_version at least 21, the Error Prone release the catalog pins
+# being a Java 21 build the compile toolchain cannot load) and run annotations-only, where dev runs the checker
+# unconditionally and carries no such gate; the loader-merge sentence names no wdl.common-merge plugin, 1.12.2 having no
+# loader subproject and no such plugin. Below Java 11 the file also rewrites JSpecify's NullMarked to name no MODULE
+# target, the constant javac 8 and javadoc 8 warn on, and swaps that jar onto every source set's compile classpath;
+# dev's readers know the constant and carry no such rewrite.
 build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 
 # Below Java 11 Checkstyle 10 cannot run on a Java 8 band's own toolchain, so this points the Checkstyle tasks at a
@@ -1306,8 +1306,8 @@ gradle/libs.versions.toml
 # the Forge-only 1.12.2 root includes, and the island merges common by direct path.
 build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
 
-# The root wrapper pins Gradle 8.14.5, the newest 8.x line, where 1.13.2 and dev pin 9.7.1: the root's Unimined 1.4.1
-# provision is untested on Gradle 9, and the pin matches the island's so both wrappers on 1.12.2 run one Gradle version.
+# The root wrapper pins the Gradle 8.x line, where 1.13.2 and dev pin the 9.x line: the root's Unimined provision
+# is untested on Gradle 9, and the pin matches the island's so both wrappers on 1.12.2 run one Gradle version.
 gradle/wrapper/gradle-wrapper.properties
 
 # The deep-band era of the workflow: the Forge island's own build step, a Forge artifact upload, and per-loader upload
