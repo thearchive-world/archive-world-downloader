@@ -123,7 +123,7 @@ class LevelDatPlayerRoundTripTest {
             throws IOException {
         NBTTagCompound playerTag = capturedPlayerTag();
         UUID vehicle = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
-        NBTTagCompound vehicleTag = EntityFixtures.entityTag("MinecartChest"); // the id loadEntityRecursive reads
+        NBTTagCompound vehicleTag = EntityFixtures.entityTag("EntityHorse"); // the id loadEntityRecursive reads
         PlayerTag.setRootVehicle(playerTag, vehicle, vehicleTag);
         CapturedPlayer captured = new CapturedPlayer(playerTag, BlockPos.ORIGIN, 0.0F, 0.0F,
                 DimensionType.OVERWORLD, GameType.CREATIVE, EnumDifficulty.NORMAL);
@@ -131,7 +131,7 @@ class LevelDatPlayerRoundTripTest {
         NBTTagCompound data = saveAndReadBack(saves, "rootvehicle", captured);
 
         NBTTagCompound rootVehicle = data.getCompoundTag("Player").getCompoundTag("RootVehicle");
-        assertEquals("MinecartChest", rootVehicle.getCompoundTag("Entity").getString("id"),
+        assertEquals("EntityHorse", rootVehicle.getCompoundTag("Entity").getString("id"),
                 "the Entity child keeps its id, or loadEntityRecursive silently skips it (no re-seat)");
         assertEquals(vehicle,
                 rootVehicle.getUniqueId("Attach"),
