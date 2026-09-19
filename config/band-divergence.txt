@@ -572,9 +572,10 @@ common/src/test/java/world/thearchive/wdl/adapter/BookshelfSlotsTest.java
 # ten-argument form.
 common/src/test/java/world/thearchive/wdl/adapter/EntityPacketCaptureTest.java
 
-# Two of the nine band-neutral curated game-rule specs have no rule at 1.17.1 (doWardenSpawning arrived at 1.19 and
-# doVinesSpread by 1.19.4), so the runtime filter surfaces seven and the layout skips their order slots alongside the
-# band-neutral fire-spread row.
+# Two of the ten band-neutral curated game-rule specs have no rule at 1.17.1 (doWardenSpawning arrived at 1.19 and
+# doVinesSpread by 1.19.4), so the runtime filter surfaces eight and the layout skips their order slots. Below 1.21.11
+# the fire-spread row binds the boolean doFireTick rather than the integer fire_spread_radius_around_player, so the
+# fire-rule test asserts true and false positions in place of the band's radius and 0.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.java
 
 # Below the 1.19 registry-sync rework forType classifies a dimension type by its effects id (the keyless client holder
