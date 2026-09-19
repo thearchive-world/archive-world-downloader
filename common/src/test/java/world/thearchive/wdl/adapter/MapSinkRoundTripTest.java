@@ -35,7 +35,7 @@ class MapSinkRoundTripTest {
     }
 
     private static MapItemSavedData clientMap(byte scale, boolean locked) {
-        // 1.16.5 has no MapItemSavedData.createForClient; a client map is the bare instance with its public
+        // MapItemSavedData has no createForClient; a client map is the bare instance with its public
         // scale/dimension/locked fields set, the colors array already sized by the field initializer.
         MapItemSavedData map = new MapItemSavedData("map");
         map.scale = scale;

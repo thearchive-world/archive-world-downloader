@@ -139,7 +139,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
         ListTag sectionsTag = new ListTag();
         for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
             if (section.y() < MIN_BLOCK_SECTION - 1 || section.y() > MAX_BLOCK_SECTION + 1) {
-                continue; // outside the 1.15.2 section column (block range plus the one-section light pad); dropped
+                continue; // outside the section column (block range plus the one-section light pad); dropped
             }
             CompoundTag sectionTag = new CompoundTag();
             LevelChunkSection chunkSection = section.chunkSection();

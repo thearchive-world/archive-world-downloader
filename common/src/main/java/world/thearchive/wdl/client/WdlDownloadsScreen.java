@@ -346,7 +346,7 @@ public final class WdlDownloadsScreen extends Screen {
             boolean primaryActive) {
         int total = BUTTON_WIDTH * 2 + BUTTON_GAP;
         int startX = (this.width - total) / 2;
-        // 1.15.2 Button carries no hover-tooltip parameter, so the disabled-primary explanation is not shown on hover.
+        // Button carries no hover-tooltip parameter, so the disabled-primary explanation is not shown on hover.
         Button primary = new Button(startX, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT, primaryLabel.getString(),
                 onPrimary);
         primary.active = primaryActive;
@@ -883,9 +883,8 @@ public final class WdlDownloadsScreen extends Screen {
 
     @Override
     public void render(int mouseX, int mouseY, float partialTick) {
-        // At 1.15.2 the screen paints its own background each frame; without it the widgets render in the world
-        // render's leftover GL state and stay invisible, leaving only the list's own dirt fill (the settings screen
-        // needs the same, and the higher bands did not).
+        // The screen paints its own background each frame; without it the widgets render in the world render's
+        // leftover GL state and stay invisible, leaving only the list's own dirt fill.
         this.renderBackground();
         super.render(mouseX, mouseY, partialTick);
         // Below the 1.19.4 GUI additions Screen.render paints only its buttons, so the list added as a widget is
@@ -1009,10 +1008,9 @@ public final class WdlDownloadsScreen extends Screen {
 
         @Override
         protected int getScrollbarPosition() {
-            // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row and a list at
-            // x zero, so with this screen's wider row and setX applied it lands inside each row and
-            // getEntryAtPosition treats everything past it as the scrollbar. Later bands derive it from the real
-            // row right edge, which this follows.
+            // The vanilla default is a fixed width/2 + 124 that assumes the 220-wide default row and a list at
+            // x zero, so with this screen's wider row and setLeftPos applied it lands inside each row and
+            // getEntryAtPosition treats everything past it as the scrollbar.
             return this.x0 + this.width / 2 + getRowWidth() / 2 + 10;
         }
 
@@ -1365,8 +1363,8 @@ public final class WdlDownloadsScreen extends Screen {
 
             @Override
             public boolean mouseClicked(double mouseX, double mouseY, int button) {
-                // At 1.20.4 ObjectSelectionList.Entry has no mouseClicked override, so a clicked row returns false
-                // and the list's setFocused-driven selection never fires; later bands override it to return true.
+                // ObjectSelectionList.Entry has no mouseClicked override and the list's own click handling only
+                // focuses a row that consumed the click, so without this a click never selects a row.
                 DownloadList.this.setSelected(this);
                 return true;
             }

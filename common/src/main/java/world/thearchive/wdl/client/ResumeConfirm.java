@@ -60,8 +60,8 @@ public final class ResumeConfirm {
                 onNo.run();
             }
         };
-        // 1.15.2 ConfirmScreen takes the two button labels as plain strings, and Style carries only a named
-        // color, so the brand amber is drawn as the nearest vanilla color (gold).
+        // ConfirmScreen takes the two button labels as plain strings, and Style carries only a named color, so
+        // the brand amber is drawn as the nearest vanilla color (gold).
         return new ConfirmScreen(onChoice, amberComponent(new TranslatableComponent(keyPrefix + ".title")),
                 message, yesLabel.getString(), noLabel.getString());
     }

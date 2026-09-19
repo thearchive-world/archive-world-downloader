@@ -11,11 +11,10 @@ import net.minecraft.client.gui.components.toasts.Toast;
 import net.minecraft.client.gui.components.toasts.ToastComponent;
 
 /**
- * A toast that renders a title over several wrapped body lines. The 1.15.2 SystemToast draws its body as one line and
- * its ToastComponent slot is a fixed 32 pixels, so a body carrying a newline (the download-complete chunk count then
- * the save name) renders the newline as a tofu glyph and overruns the frame. This wraps the body to the frame width and
- * stitches the 160 by 32 frame sprite taller to hold the extra lines. The higher bands use SystemToast.multiline,
- * absent here.
+ * A toast that renders a title over several wrapped body lines. Vanilla's {@code SystemToast} draws its body as one
+ * line and its {@code ToastComponent} slot is a fixed 32 pixels, so a body carrying a newline (the download-complete
+ * chunk count then the save name) renders the newline as a tofu glyph and overruns the frame. This wraps the body to
+ * the frame width and stitches the 160 by 32 frame sprite taller to hold the extra lines.
  */
 final class WdlMultilineToast implements Toast {
     private static final int INNER_WIDTH = 160 - 18 - 8;

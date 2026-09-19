@@ -192,7 +192,7 @@ public final class WdlSettingsScreen extends Screen {
         int discardX = defaultsX + buttonWidth + GAP;
         addButton(new Button(doneX, footerY, buttonWidth, 20, I18n.get("gui.done"),
                 button -> onClose()));
-        // 1.15.2 Button carries no hover-tooltip parameter, so the Defaults button has no hover explanation.
+        // Button carries no hover-tooltip parameter, so the Defaults button has no hover explanation.
         this.defaults = addButton(new Button(defaultsX, footerY, buttonWidth, 20,
                 I18n.get("wdl.settings.defaults"), button -> onDefaults()));
         // the last button absorbs the division remainder so the footer's right edge meets the control edge
@@ -522,9 +522,8 @@ public final class WdlSettingsScreen extends Screen {
 
         @Override
         protected int getScrollbarPosition() {
-            // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row, so with this
-            // screen's wider row it lands inside each row and cuts through the controls; later bands derive it
-            // from the row right edge, which this follows.
+            // The vanilla default is a fixed width/2 + 124 that assumes the 220-wide default row, so with this
+            // screen's wider row it lands inside each row and cuts through the controls.
             return this.x0 + this.width / 2 + getRowWidth() / 2 + 10;
         }
     }
@@ -761,7 +760,6 @@ public final class WdlSettingsScreen extends Screen {
         final String key;
 
         RangeSlider(String key, double initialFraction) {
-            // 1.15.2 AbstractSliderButton takes no message argument.
             super(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, initialFraction);
             this.key = key;
         }

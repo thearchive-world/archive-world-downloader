@@ -108,7 +108,7 @@ final class RecoveredScan {
 
     /**
      * Writer thread: collect every prior-captured container-entity UUID in {@code onDiskChunkTag}'s
-     * {@code Level.Entities} (the 1.15.2 in-chunk entity location, sibling of the {@code Level.TileEntities} that
+     * {@code Level.Entities} (the in-chunk entity location, sibling of the {@code Level.TileEntities} that
      * {@link #record} reads). Keyed by the dimension being scanned so the current dimension's snapshot is republished
      * with the new ids; the ids themselves are globally unique, so the accumulator behind them is flat.
      */

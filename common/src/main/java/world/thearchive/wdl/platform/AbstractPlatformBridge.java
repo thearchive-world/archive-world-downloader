@@ -221,8 +221,8 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             mc.getToasts().addToast(new SystemToast(id, new TranslatableComponent(toast.titleKey()), body));
             return;
         }
-        // A job-done body can carry a newline (the chunk count then the save name), which the 1.15.2 SystemToast draws
-        // as one overrunning line; a multiline toast wraps it and stitches its own frame instead.
+        // A job-done body can carry a newline (the chunk count then the save name), which SystemToast draws as one
+        // overrunning line; a multiline toast wraps it and stitches its own frame instead.
         int bodyRgb = toast.bodyColor().isPresent() ? 0xFF000000 | toast.bodyColor().getAsInt() : -1;
         mc.getToasts().addToast(new WdlMultilineToast(mc.font,
                 new TranslatableComponent(toast.titleKey()).getString(), body.getString(), bodyRgb));

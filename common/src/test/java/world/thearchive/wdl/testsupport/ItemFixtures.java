@@ -108,9 +108,8 @@ public final class ItemFixtures {
 
     /**
      * The tag vanilla writes for {@code stack}, as a lectern's {@code "Book"} or a jukebox's {@code "RecordItem"}
-     * carries it: {@code ItemStack#save}, the same call every 1.20.4 block-entity single-stack field uses (a
-     * {@code {id, Count, tag}} compound with {@code Count} as a byte). {@code ItemStack.CODEC} exists on this band but
-     * encodes {@code Count} as an int, which is not byte-for-byte what a real block entity's own save produces.
+     * carries it: {@code ItemStack#save}, the same call every block-entity single-stack field uses (a
+     * {@code {id, Count, tag}} compound with {@code Count} as a byte).
      */
     public static CompoundTag itemTag(ItemStack stack) {
         return stack.save(new CompoundTag());

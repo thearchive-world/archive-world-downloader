@@ -28,7 +28,7 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * A 26.x server reached through a downgrade proxy (ViaBackwards) sends a 1.16.5 client sections outside the 0..256
+ * A 26.x server reached through a downgrade proxy (ViaBackwards) sends a 1.14.4 client sections outside the 0..256
  * column. A block section outside 0..15 crashes vanilla's unchecked {@code sections[index]} on load, so the codec must
  * drop everything outside the -1..16 light column and keep block data only inside 0..15.
  */

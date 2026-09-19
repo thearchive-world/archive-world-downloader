@@ -30,7 +30,7 @@ import world.thearchive.wdl.adapter.ChunkSnapshotSource;
  * {@code LevelChunk} cannot avoid, so the round-trip exercises the mod's encode slice.
  */
 public final class SyntheticChunks {
-    /** A standard 1.15.2 overworld column: 0..256, so {@code minSectionY == 0}. */
+    /** A standard overworld column: 0..256, so {@code minSectionY == 0}. */
     public static final int MIN_Y = 0;
     public static final int HEIGHT = 256;
     public static final long GAME_TIME = 1234L;
@@ -214,7 +214,7 @@ public final class SyntheticChunks {
         return data;
     }
 
-    /** PLAINS-filled per-chunk biome ids sized to the 1.15.2 column: 16 * ceilDiv(HEIGHT, 4) = 1024 for 0..256. */
+    /** PLAINS-filled per-chunk biome ids; a 1.14.4 save stores the flat 16x16 grid, one id per block column. */
     private static int[] plainsBiomes() {
         int plainsId = Registry.BIOME.getId(Biomes.PLAINS);
         int[] biomes = new int[16 * ((HEIGHT + 3) / 4)];

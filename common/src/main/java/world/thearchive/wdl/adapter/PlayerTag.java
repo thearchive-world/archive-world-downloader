@@ -79,9 +79,9 @@ final class PlayerTag {
     /**
      * Write the canonical {@code "Dimension"} id. The caller passes the by-type-canonicalized capture dimension
      * ({@code targetDimension}), so a non-standard server level key and a datapack dimension alike already resolve to
-     * one of the three {@link VanillaDimensions#forType} returns. At 1.15.2 vanilla reads this back as the integer id
-     * ({@code Entity.readAdditionalSaveData}), so it is written as the id, not the 1.16 string form: a string here is
-     * read by {@code getInt} as 0 and lands the player in the overworld.
+     * one of the three {@link VanillaDimensions#forType} returns. Vanilla reads this back as the integer id
+     * ({@code Entity.load}), so it is written as the id, not the 1.16 string form: a string here is read by
+     * {@code getInt} as 0 and lands the player in the overworld.
      */
     static void setDimension(CompoundTag raw, DimensionType dimension) {
         raw.putInt("Dimension", dimension.getId());

@@ -312,8 +312,8 @@ final class ContainerCapture {
         }
         int size = blockContainer.getContainerSize();
         NonNullList<ItemStack> items = NonNullList.withSize(size, ItemStack.EMPTY);
-        // 1.16.5 Slot has no getContainerSlot accessor, so the container index is the menu order of the
-        // non-player slots: a client block container adds its slots consecutively in container-index order.
+        // Slot has no getContainerSlot accessor, so the container index is the menu order of the non-player
+        // slots: a client block container adds its slots consecutively in container-index order.
         int index = 0;
         for (Slot slot : menu.slots) {
             if (slot.container == playerInventory) {
@@ -380,8 +380,8 @@ final class ContainerCapture {
         Container playerInventory = player.inventory;
         NonNullList<ItemStack> items = NonNullList.withSize(high - low, ItemStack.EMPTY);
         boolean any = false;
-        // 1.16.5 Slot has no getContainerSlot accessor, so the container index is the menu order of the
-        // non-player slots. The client double-chest menu is one SimpleContainer(54) with contiguous indices
+        // Slot has no getContainerSlot accessor, so the container index is the menu order of the non-player
+        // slots. The client double-chest menu is one SimpleContainer(54) with contiguous indices
         // 0..53, so menu order equals the container index; do not unify this lift with captureChestSlots, which
         // offsets its holder from SLOT_INVENTORY_START into the mount's whole inventory. This one stays 0-based,
         // a chest block entity really reading its Items from slot zero, so merging the two would push every

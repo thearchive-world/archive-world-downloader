@@ -262,7 +262,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         }
         net.minecraft.world.level.storage.LevelData levelData = data.worldData();
         levelData.setGameType(player.gameType());
-        // 1.15.2 setSpawn takes only a position; the spawn yaw has no level.dat field at this band.
+        // setSpawn takes only a position: level.dat has no spawn-yaw field.
         levelData.setSpawn(player.spawnPos());
         levelData.setDifficulty(player.difficulty());
         storage.saveLevelData(levelData, player.playerTag());
@@ -273,7 +273,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         if (!Files.exists(levelDatFile)) {
             return null;
         }
-        // 1.15.2 NbtIo.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(levelDatFile)) {
             CompoundTag root = NbtIo.readCompressed(input);
             return root.get("Data") instanceof CompoundTag

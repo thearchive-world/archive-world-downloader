@@ -52,7 +52,6 @@ final class MapDataWriter {
     public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");
         Files.createDirectories(file.getParent());
-        // 1.15.2 NbtIo.writeCompressed takes an OutputStream, not a File.
         try (OutputStream out = Files.newOutputStream(file)) {
             NbtIo.writeCompressed(envelope(dataTag), out);
         }
@@ -87,7 +86,6 @@ final class MapDataWriter {
         if (!Files.exists(file)) {
             return -1;
         }
-        // 1.15.2 NbtIo.readCompressed takes an InputStream, not a File.
         CompoundTag envelope;
         try (InputStream input = Files.newInputStream(file)) {
             envelope = NbtIo.readCompressed(input);
