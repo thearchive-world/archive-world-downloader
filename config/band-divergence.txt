@@ -29,17 +29,16 @@
 # method reference directly.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# At Fabric API 0.87.2+1.19.4 the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the
-# peek key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API for 26.2 registers a HUD
-# element through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
+# On 1.19.4's Fabric API the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the peek
+# key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API registers a HUD element
+# through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
 # (keymapping.v1).
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# At Fabric API 0.87.2+1.19.4 the platform bridge reads the pause-menu widget list through Screens.getButtons,
-# registers the key through KeyBindingHelper.registerKeyBinding and builds the client command tree through
-# ClientCommandManager (command.v2), where dev's Fabric API for 26.2 names them Screens.getWidgets,
-# KeyMappingHelper.registerKeyMapping and ClientCommands; against 1.20.1 the file differs only in where the
-# buildPauseMenuRow call wraps.
+# On 1.19.4's Fabric API the platform bridge reads the pause-menu widget list through Screens.getButtons, registers the
+# key through KeyBindingHelper.registerKeyBinding and builds the client command tree through ClientCommandManager
+# (command.v2), where dev's Fabric API names them Screens.getWidgets, KeyMappingHelper.registerKeyMapping and
+# ClientCommands; against 1.20.1 the file differs only in where the buildPauseMenuRow call wraps.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -478,13 +477,12 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 
-# ModMenu 6.3.1, the API 1.19.4 pins, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived in
-# a later ModMenu), so this entrypoint implements only the config-screen factory and does not override
-# getUpdateChecker.
+# ModMenu 6.x, the 1.19.4 line, ships no update-checker API (UpdateChecker/UpdateInfo/UpdateChannel arrived in a later
+# ModMenu), so this entrypoint implements only the config-screen factory and does not override getUpdateChecker.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 
-# ModMenu 6.3.1, the API 1.19.4 pins, ships no update-checker API, so the ModMenu update-badge feeder is deleted,
-# not merely divergent; the launch update check still runs, only its ModMenu badge is gone.
+# ModMenu 6.x, the 1.19.4 line, ships no update-checker API, so the ModMenu update-badge feeder is deleted, not merely
+# divergent; the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
 # Below 1.20.2 there is no AdvancementHolder/AdvancementNode split (the advancement datapack rewrite is 1.20.2),
@@ -563,7 +561,7 @@ build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
 /build.gradle.kts
 
 # NeoForm has no 1.19.4 release (NeoForged forked from Forge at 1.20.2), so common builds on NeoGradle's vanilla plugin
-# (net.neoforged.gradle.vanilla 7.1.38, versioned inline) over mcp_config 1.19.4, with net.minecraft:client as an
+# (net.neoforged.gradle.vanilla, versioned inline) over the official client mappings, with net.minecraft:client as an
 # implementation dependency and no Parchment layer, where dev builds on ModDevGradle Vanilla mode over a
 # neoform_version. It pulls XaeroPlus's +forge flavor and the loader-suffixless 1.9 JourneyMap API SNAPSHOT from
 # jm.gserv.me; against 1.20.1 it drops the 2.0 generation's -common flavor and maven.blamejared.com, 1.19.4 binding one
