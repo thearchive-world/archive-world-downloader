@@ -29,16 +29,16 @@
 # method reference directly.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# At Fabric API 0.91.6+1.20.2 the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the
-# peek key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API for 26.2 registers a HUD
-# element through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
+# On 1.20.2's Fabric API the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the peek
+# key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API registers a HUD element
+# through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
 # (keymapping.v1).
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# At Fabric API 0.91.6+1.20.2 the platform bridge reads the pause-menu widget list through Screens.getButtons,
-# registers the key through KeyBindingHelper.registerKeyBinding and builds the client command tree through
-# ClientCommandManager (command.v2), where dev's Fabric API for 26.2 names them Screens.getWidgets,
-# KeyMappingHelper.registerKeyMapping and ClientCommands.
+# On 1.20.2's Fabric API the platform bridge reads the pause-menu widget list through Screens.getButtons, registers the
+# key through KeyBindingHelper.registerKeyBinding and builds the client command tree through ClientCommandManager
+# (command.v2), where dev's Fabric API names them Screens.getWidgets, KeyMappingHelper.registerKeyMapping and
+# ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # The Forge-analog comments point at forge/src/main/resources/META-INF/accesstransformer.cfg and name Forge,
@@ -469,9 +469,9 @@ fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 # at 1.20.2 (deleted, not merely divergent); the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
-# Added. 1.20.4, the mint parent, and dev both lack a forge/ tree; 1.20.2 ships Forge instead, on a separate
-# ForgeGradle-6 Gradle-8 island built by forge/gradlew, outside the root's include list. The directory pattern is
-# right: nothing under forge/ is shared with 1.20.4 or dev.
+# Added. 1.20.4, the mint parent, and dev both lack a forge/ tree; 1.20.2 ships Forge instead, on a separate ForgeGradle
+# island built by forge/gradlew, outside the root's include list. The directory pattern is right: nothing under forge/
+# is shared with 1.20.4 or dev.
 forge/
 
 # Deleted. 1.20.4, the mint parent, and dev both ship the neoforge/ tree; 1.20.2 ships Forge as its second loader
@@ -546,9 +546,9 @@ common/build.gradle.kts
 # mention (1.20.2 includes no :neoforge).
 fabric/build.gradle.kts
 
-# Added. The catalog's fabric-loom declares a Java 21 runtime requirement in its plugin metadata, so the JVM
-# launching Gradle must be Java 21 while java_version (17) stays the compile toolchain; this file pins the daemon JVM
-# by toolchain criteria. The forge/ island keeps its own Gradle 8.14.5 wrapper on Java 17 and does not read it.
+# Added. The catalog's fabric-loom declares a Java 21 runtime requirement in its plugin metadata, so the JVM launching
+# Gradle must be Java 21 while java_version (17) stays the compile toolchain; this file pins the daemon JVM by toolchain
+# criteria. The forge/ island keeps its own Gradle 8 wrapper and does not read it.
 gradle/gradle-daemon-jvm.properties
 
 # Adds the Forge island's own CI build step, run only when a band carries a forge/gradlew wrapper, since that island
