@@ -29,9 +29,9 @@ class LevelDatCuratedGameRulesTest {
      * The band ids of the curated superset, restated rather than read back from the plug so the expected count stays
      * independent of the value under test.
      */
-    private static final Set<String> CURATED_BAND_RULE_IDS = ImmutableSet.of("doMobSpawning", "doVinesSpread",
-            "doDaylightCycle", "doWeatherCycle", "keepInventory", "mobGriefing", "doWardenSpawning",
-            "doTraderSpawning", "doPatrolSpawning");
+    private static final Set<String> CURATED_BAND_RULE_IDS = ImmutableSet.of("doMobSpawning", "doFireTick",
+            "doVinesSpread", "doDaylightCycle", "doWeatherCycle", "keepInventory", "mobGriefing",
+            "doWardenSpawning", "doTraderSpawning", "doPatrolSpawning");
 
     private Map<String, CuratedGameRule> curated() {
         TestRegistries.bootstrap(); // bootstrap the vanilla registries so a default GameRules can be built
@@ -82,14 +82,22 @@ class LevelDatCuratedGameRulesTest {
         for (String id : byId.keySet()) {
             assertTrue(SettingsLayout.GAME_RULE_ORDER.contains(id), id + " is curated but not laid out as a row");
         }
-        // fire_spread_radius_around_player is laid out but curated on no band, not merely absent at this one.
-        Set<String> absentAtThisBand = ImmutableSet.of("fire_spread_radius_around_player", "spread_vines",
-                "advance_weather", "spawn_wardens", "spawn_wandering_traders", "spawn_patrols");
+        Set<String> absentAtThisBand = ImmutableSet.of("spread_vines", "advance_weather", "spawn_wardens",
+                "spawn_wandering_traders", "spawn_patrols");
         for (String id : SettingsLayout.GAME_RULE_ORDER) {
             if (!byId.containsKey(id)) {
                 assertTrue(absentAtThisBand.contains(id),
                         id + " is laid out but has no curated rule at this band");
             }
         }
+    }
+
+    @Test
+    void booleanFireRuleBindsDoFireTickAndTogglesTrueFalse() {
+        CuratedGameRule fire = curated().get("fire_spread_radius_around_player");
+        assertEquals("doFireTick", fire.bandId(), "the band-neutral fire-spread row binds this band's boolean rule");
+        assertEquals("false", fire.curatedValue(), "fire spread is curated off");
+        assertEquals("true", fire.enabledValue());
+        assertEquals("false", fire.disabledValue());
     }
 }

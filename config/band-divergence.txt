@@ -874,10 +874,11 @@ common/src/test/java/world/thearchive/wdl/adapter/BookshelfSlotsTest.java
 # are classic MCP NBTTagCompound.
 common/src/test/java/world/thearchive/wdl/adapter/EntityPacketCaptureTest.java
 
-# Five of the nine band-neutral curated game-rule specs have no rule at 1.10.2 (doWeatherCycle arrives at 1.11;
+# Five of the ten band-neutral curated game-rule specs have no rule at 1.10.2 (doWeatherCycle arrives at 1.11;
 # doVinesSpread, doWardenSpawning, doTraderSpawning and doPatrolSpawning later), so the runtime filter surfaces the
-# count GameRules.hasRule answers for the curated ids, four, and the layout skips their order slots alongside the
-# fire-spread row, whose rule fire_spread_radius_around_player exists only from 1.21.11.
+# count GameRules.hasRule answers for the curated ids, five, and the layout skips their order slots. Below 1.21.11 the
+# fire-spread row binds the boolean doFireTick rather than the integer fire_spread_radius_around_player, so the
+# fire-rule test asserts true and false positions in place of the band's radius and 0.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatCuratedGameRulesTest.java
 
 # Below 1.13 the dimension is the classic net.minecraft.world.DimensionType enum, so the cases drive forType and forId
