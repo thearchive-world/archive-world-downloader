@@ -26,8 +26,8 @@ import world.thearchive.wdl.core.MapManifest;
  * to the content-dedup archive id, so a carried map always renders. The remap rewrite is single-pass: each captured
  * holder is a fresh serialized copy and is remapped exactly once, at the point it is consumed.
  *
- * <p>The three hashed fields are read off the serialized inner {@code "data"} tag with the plain NBT getters; at 1.15.2
- * the dimension is an int id, hashed by its string form. {@code locked} and the centers are excluded from the hash.
+ * <p>The three hashed fields are read off the serialized inner {@code "data"} tag with the plain NBT getters; the
+ * dimension is an int id, hashed by its string form. {@code locked} and the centers are excluded from the hash.
  */
 final class MapArchive {
     /** Resolves a session-local map id to its serialized inner data tag, or null if the colors were not received. */
@@ -150,8 +150,7 @@ final class MapArchive {
 
     /**
      * The content hash of a serialized inner map data tag: SHA-256 over the colors, scale and dimension; {@code locked}
-     * and the centers are excluded. At 1.15.2 the map data stores its dimension as an int id, so it is hashed by its
-     * string form.
+     * and the centers are excluded. The map data stores its dimension as an int id, so it is hashed by its string form.
      */
     static String hashOf(Tag dataTag) {
         if (!(dataTag instanceof CompoundTag)) {
