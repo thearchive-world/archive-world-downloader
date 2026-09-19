@@ -335,8 +335,8 @@ public final class InteractionCapture {
 
     /**
      * The 0-to-5 chiseled-bookshelf slot a hit lands in, or empty when the hit is not on the shelf face. Mirrors
-     * vanilla ChiseledBookShelfBlock.getHitSlot, which is private and takes the block state below 1.21.11: the face is
-     * three columns wide and two rows tall, the top row slots 0 to 2 and the bottom row 3 to 5.
+     * vanilla's private {@code ChiseledBookShelfBlock.getHitSlot}: the face is three columns wide and two rows tall,
+     * the top row slots 0 to 2 and the bottom row 3 to 5.
      */
     private static OptionalInt bookshelfHitSlot(BlockState state, BlockHitResult hit) {
         Direction facing = state.getValue(HorizontalDirectionalBlock.FACING);
@@ -609,8 +609,8 @@ public final class InteractionCapture {
     /**
      * Serialize {@code disc} to a holder carrying the jukebox disc ({@code "RecordItem"}) plus the just-started playing
      * state a fresh insert leaves ({@code "IsPlaying"} true, {@code "RecordStartTick"} and {@code "TickCount"} zero).
-     * Vanilla loadAdditional restores that state, so the saved jukebox plays and emits the note particles; the disc
-     * sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
+     * Vanilla's {@code JukeboxBlockEntity.load} restores that state, so the saved jukebox plays and emits the note
+     * particles; the disc sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
      */
     static CompoundTag captureRecordItem(ItemStack disc) {
         CompoundTag holder = new CompoundTag();

@@ -8,9 +8,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 
 /**
- * The 1.20.4 walk over a serialized item tree: apply a leaf action to each item's {@code tag} compound, then recurse
- * into the items nested inside a shulker box (the {@code BlockEntityTag.Items} list) and a bundle (the {@code Items}
- * list). Operates only on already-serialized NBT, never a live ItemStack. Each caller supplies its own per-item leaf
+ * The walk over a serialized item tree: apply a leaf action to each item's {@code tag} compound, then recurse into the
+ * items nested inside a shulker box (the {@code BlockEntityTag.Items} list) and a bundle (the {@code Items} list).
+ * Operates only on already-serialized NBT, never a live {@code ItemStack}. Each caller supplies its own per-item leaf
  * action.
  */
 final class ItemTreeWalk {

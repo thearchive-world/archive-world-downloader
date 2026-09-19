@@ -36,9 +36,9 @@ public final class BlockEntityFixtures {
 
     /**
      * As {@link #blockEntity} for a block entity the player renamed, so a merge can be shown to leave a real sibling
-     * field alone. Below 1.20.5 only a {@link net.minecraft.world.level.block.entity.BaseContainerBlockEntity} (a chest
-     * and the like) carries an arbitrary name; the raw {@code "CustomName"} JSON key written here is exactly what its
-     * {@code setCustomName} would write, so the fidelity round trip still passes for one.
+     * field alone. A {@link net.minecraft.world.level.block.entity.BaseContainerBlockEntity} (a chest and the like), a
+     * beacon, a banner and an enchantment table each save an arbitrary name as exactly the raw {@code "CustomName"}
+     * JSON key written here, so the fidelity round trip still passes for one of those.
      */
     public static CompoundTag namedBlockEntity(String id, int x, int y, int z, String customName) {
         CompoundTag tag = blockEntity(id, x, y, z);

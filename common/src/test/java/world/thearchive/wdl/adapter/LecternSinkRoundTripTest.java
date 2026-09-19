@@ -25,8 +25,8 @@ import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for lectern-book capture: the {@link LecternSink} 1.20.4 path (captureBook -> merge) plus
- * vanilla's own {@code ItemStack.of} read-back (the exact form {@code LecternBlockEntity.loadAdditional} uses) is a
+ * The automated guard for lectern-book capture: the {@link LecternSink} path ({@code captureBook} then {@code merge})
+ * plus vanilla's own {@code ItemStack.of} read-back (the exact form {@code LecternBlockEntity.load} uses) is a
  * self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity tag under
  * {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field
  * clobbered. Runs for both a signed <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern
@@ -83,7 +83,6 @@ class LecternSinkRoundTripTest {
     }
 
     private static ItemStack readBackBook(CompoundTag merged) {
-        // vanilla loadAdditional's exact read
         ItemStack back = ItemStack.of(merged.getCompound("Book"));
         assertTrue(!back.isEmpty(), "the merged Book must decode via vanilla ItemStack.of");
         return back;

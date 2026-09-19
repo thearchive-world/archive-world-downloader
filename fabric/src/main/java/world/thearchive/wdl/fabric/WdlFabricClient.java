@@ -53,9 +53,6 @@ public final class WdlFabricClient implements ClientModInitializer {
         KeyMapping peekKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY));
         WdlHudOverlay.bindPeekKey(peekKey);
-        // This band's Fabric API predates the layered-HUD registration (HudLayerRegistrationCallback/IdentifiedLayer,
-        // fabric-api 0.116+): HudRenderCallback fires after the whole vanilla HUD, unconditionally, so the overlay
-        // inherits no gamemode render condition and stays visible in every gamemode (see the class note).
         HudRenderCallback.EVENT.register(WdlHudOverlay::render);
         new FabricOutlineRegistrar().register();
     }
