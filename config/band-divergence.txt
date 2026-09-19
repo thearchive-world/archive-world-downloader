@@ -299,8 +299,10 @@ common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionReb
 # string, so the dimension cases assert the id written for DimensionType.NETHER and an id outside the three; below
 # 1.21.5 the armor and offhand live in Inventory, so no equipment compound is built or asserted; the tags are classic
 # MCP NBTTagCompound and NBTTagList. Below 1.11 there is no NonNullList, so the ender-chest list is read back through
-# the plug's ItemListNbt.loadAllItems into an ItemStack array, a count is the stackSize field, and the vehicle fixtures
-# carry the unnamespaced MinecartChest and Boat ids.
+# the plug's ItemListNbt.loadAllItems into an ItemStack array, a count is the stackSize field, and the entity ids are
+# unnamespaced: the mount fixtures carry EntityHorse, the horse family's one registration, which the contents cases
+# stamp as a chested donkey by Type and ChestedHorse with Items at slots from two; the nested case's outer vehicle is
+# MinecartRideable, the minecart that scoops a mob up; and the fresh-mount case rides a Boat.
 common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 
 # Below 1.13 the NBT API is classic MCP, so the guard's own vocabulary is the classic setter spelling: every write onto
@@ -708,7 +710,7 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkFlushPlanTest.java
 # Below 1.13 the level.dat is written through the ISaveHandler that AnvilSaveConverter(File, DataFixer).getSaveLoader
 # returns rather than a LevelStorage, read back with CompressedStreamTools.readCompressed over an InputStream (no
 # NbtAccounter below 1.20.3), and the game type is compared by GameType.getID with the difficulty as EnumDifficulty,
-# whose id is getDifficultyId; below 1.11 the root-vehicle fixture carries the unnamespaced MinecartChest id.
+# whose id is getDifficultyId; below 1.11 the root-vehicle fixture carries the unnamespaced EntityHorse id.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
 
 # Below 1.13 the round trip is classic CompressedStreamTools rather than NbtIo, the map file's data envelope carries no

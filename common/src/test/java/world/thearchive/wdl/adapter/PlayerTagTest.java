@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
+import net.minecraft.entity.passive.HorseType;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -33,6 +34,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
  */
 class PlayerTagTest {
+    private static final int CHEST_SLOT_START = 2;
+
     private final ContainerSink sink = new ContainerSinkImpl();
 
     @BeforeAll
@@ -209,7 +212,7 @@ class PlayerTagTest {
     void setRootVehicleWritesTheVanillaAttachAndEntityShape() {
         NBTTagCompound tag = playerTag();
         UUID directVehicle = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
-        NBTTagCompound vehicleTag = EntityFixtures.entityTag("MinecartChest");
+        NBTTagCompound vehicleTag = EntityFixtures.entityTag("EntityHorse");
 
         PlayerTag.setRootVehicle(tag, directVehicle, vehicleTag);
 
@@ -217,7 +220,7 @@ class PlayerTagTest {
         assertEquals(directVehicle,
                 rootVehicle.getUniqueId("Attach"),
                 "Attach is the direct vehicle UUID the pre-1.16 AttachMost/AttachLeast form serializes");
-        assertEquals("MinecartChest", rootVehicle.getCompoundTag("Entity").getString("id"),
+        assertEquals("EntityHorse", rootVehicle.getCompoundTag("Entity").getString("id"),
                 "the vehicle NBT nests under Entity, the shape loadAndSpawnParentVehicle spawns from");
         assertTrue(tag.hasKey("Air"), "the rest of the player tag is untouched");
     }
@@ -225,7 +228,7 @@ class PlayerTagTest {
     private static NBTTagCompound priorPlayerWithRootVehicle() {
         NBTTagCompound prior = new NBTTagCompound();
         NBTTagCompound rootVehicle = new NBTTagCompound();
-        rootVehicle.setTag("Entity", EntityFixtures.entityTag("MinecartChest"));
+        rootVehicle.setTag("Entity", EntityFixtures.entityTag("EntityHorse"));
         prior.setTag("RootVehicle", rootVehicle);
         return prior;
     }
@@ -280,11 +283,23 @@ class PlayerTagTest {
         assertFalse(fresh.hasKey("RootVehicle"));
     }
 
-    /** A RootVehicle whose Entity carries the mount's own UUID and an Items list, the seated-mount capture shape. */
-    private static NBTTagCompound mountRootVehicle(UUID mountUuid, NBTTagList items) {
+    /**
+     * A {@code RootVehicle} whose {@code Entity} carries the mount's own {@code UUID} and an {@code Items} list, the
+     * seated-mount capture shape: a chested donkey holding {@code itemIds}, in the shape
+     * {@code EntityHorse.writeEntityToNBT} gives those keys. {@code EntityHorse} is the one id the whole horse family
+     * shares and {@code Type} tells a donkey from a horse, {@code Items} is read only where {@code ChestedHorse} is
+     * set, and the chest's stacks sit at slots from two, past the saddle and armor slots.
+     */
+    private static NBTTagCompound mountRootVehicle(UUID mountUuid, String... itemIds) {
         NBTTagCompound rootVehicle = new NBTTagCompound();
-        NBTTagCompound entity = EntityFixtures.entity("MinecartChest", mountUuid);
-        entity.setTag("Items", items);
+        NBTTagCompound entity = EntityFixtures.entity("EntityHorse", mountUuid);
+        entity.setInteger("Type", HorseType.DONKEY.getOrdinal());
+        entity.setBoolean("ChestedHorse", true);
+        int[] slots = new int[itemIds.length];
+        for (int i = 0; i < slots.length; i++) {
+            slots[i] = CHEST_SLOT_START + i;
+        }
+        entity.setTag("Items", ItemFixtures.itemsAtSlots(slots, itemIds));
         rootVehicle.setTag("Entity", entity);
         return rootVehicle;
     }
@@ -302,9 +317,8 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsWhenResumingSeatedInTheSameMount() {
         UUID mount = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        NBTTagCompound prior = playerSeatedIn(
-                mountRootVehicle(mount, itemList("minecraft:diamond", "minecraft:gold_ingot")));
-        NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount, new NBTTagList())); // seated, mount not reopened
+        NBTTagCompound prior = playerSeatedIn(mountRootVehicle(mount, "minecraft:diamond", "minecraft:gold_ingot"));
+        NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount)); // seated, mount not reopened
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -317,10 +331,8 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsYieldsToTheReopenedSeatedMount() {
         UUID mount = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        NBTTagCompound prior = playerSeatedIn(
-                mountRootVehicle(mount, itemList("minecraft:diamond", "minecraft:gold_ingot")));
-        NBTTagCompound fresh = playerSeatedIn(
-                mountRootVehicle(mount, itemList("minecraft:emerald"))); // reopened this session
+        NBTTagCompound prior = playerSeatedIn(mountRootVehicle(mount, "minecraft:diamond", "minecraft:gold_ingot"));
+        NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount, "minecraft:emerald")); // reopened this session
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -331,9 +343,9 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsNeverGraftsAcrossTheMountSwitch() {
         NBTTagCompound prior = playerSeatedIn(mountRootVehicle(
-                UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"), itemList("minecraft:diamond")));
+                UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"), "minecraft:diamond"));
         NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(
-                UUID.fromString("11111111-2222-3333-4444-555555555555"), new NBTTagList())); // a different mount
+                UUID.fromString("11111111-2222-3333-4444-555555555555"))); // a different mount
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -344,8 +356,8 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsRestoresNothingWhenThePriorMountHeldNothing() {
         UUID mount = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        NBTTagCompound prior = playerSeatedIn(mountRootVehicle(mount, new NBTTagList())); // prior mount was empty too
-        NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount, new NBTTagList()));
+        NBTTagCompound prior = playerSeatedIn(mountRootVehicle(mount)); // prior mount was empty too
+        NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount));
 
         assertFalse(PlayerTag.restorePriorMountContents(prior, fresh), "an empty prior mount is not a recovery");
         assertTrue(mountItems(fresh).hasNoTags(), "the fresh seated mount stays empty");
@@ -356,9 +368,9 @@ class PlayerTagTest {
      * vanilla stores is the tree from its root, so a mount in that state is not the root of its own record and the two
      * fixtures differ in nothing else.
      */
-    private static NBTTagCompound nestedMountRootVehicle(UUID carrierUuid, UUID mountUuid, NBTTagList items) {
+    private static NBTTagCompound nestedMountRootVehicle(UUID carrierUuid, UUID mountUuid, String... itemIds) {
         NBTTagCompound rootVehicle = new NBTTagCompound();
-        NBTTagCompound mount = mountRootVehicle(mountUuid, items).getCompoundTag("Entity");
+        NBTTagCompound mount = mountRootVehicle(mountUuid, itemIds).getCompoundTag("Entity");
         rootVehicle.setTag("Entity",
                 EntityFixtures.entityCarrying(EntityFixtures.entity("MinecartRideable", carrierUuid), mount));
         return rootVehicle;
@@ -372,10 +384,9 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsCarriesOntoTheSameMountNestedUnderTheFreshRoot() {
         UUID mount = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        NBTTagCompound prior = playerSeatedIn(
-                mountRootVehicle(mount, itemList("minecraft:diamond", "minecraft:gold_ingot")));
+        NBTTagCompound prior = playerSeatedIn(mountRootVehicle(mount, "minecraft:diamond", "minecraft:gold_ingot"));
         NBTTagCompound fresh = playerSeatedIn(nestedMountRootVehicle(
-                UUID.fromString("6b1d5f2c-9a30-4e11-b8c7-5d0e3a71f402"), mount, new NBTTagList()));
+                UUID.fromString("6b1d5f2c-9a30-4e11-b8c7-5d0e3a71f402"), mount));
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -388,10 +399,10 @@ class PlayerTagTest {
     void restorePriorMountContentsNeverGraftsWhenNoNodeMatchesAnywhereInTheTree() {
         NBTTagCompound prior = playerSeatedIn(nestedMountRootVehicle(
                 UUID.fromString("6b1d5f2c-9a30-4e11-b8c7-5d0e3a71f402"),
-                UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"), itemList("minecraft:diamond")));
+                UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"), "minecraft:diamond"));
         NBTTagCompound fresh = playerSeatedIn(nestedMountRootVehicle(
                 UUID.fromString("22222222-3333-4444-5555-666666666666"),
-                UUID.fromString("11111111-2222-3333-4444-555555555555"), new NBTTagList()));
+                UUID.fromString("11111111-2222-3333-4444-555555555555")));
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
