@@ -346,7 +346,6 @@ public final class WdlDownloadsScreen extends Screen {
             boolean primaryActive) {
         int total = BUTTON_WIDTH * 2 + BUTTON_GAP;
         int startX = (this.width - total) / 2;
-        // Button carries no hover-tooltip parameter, so the disabled-primary explanation is not shown on hover.
         Button primary = new Button(startX, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT, primaryLabel.getString(),
                 onPrimary);
         primary.active = primaryActive;
