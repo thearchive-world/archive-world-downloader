@@ -763,8 +763,8 @@ class CaptureControllerTest {
     /**
      * Stopping a download and then leaving the server is a routine order, and it is the order the first version of this
      * guard missed: by the time the disconnect arrives the state has already left recording, so the flush is a no-op,
-     * while a full drain is still encoding against registries the client is about to rebuild. The hold has to be taken
-     * on the disconnect whatever the state.
+     * while a full drain is still encoding against registries a loader can rebuild on the way out. The hold has to be
+     * taken on the disconnect whatever the state.
      */
     @Test
     void disconnectHoldsTheWriterEvenWhenTheSaveIsAlreadyRunning() {
