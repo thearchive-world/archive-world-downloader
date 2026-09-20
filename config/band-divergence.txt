@@ -91,13 +91,3 @@ neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
 # 26.2's SerializableChunkData constructor carries the long-array carving mask in its descriptor; 26.3 dropped that
 # component.
 neoforge/src/main/resources/META-INF/accesstransformer.cfg
-
-# 26.2 pulls XaeroPlus by the templated minecraft_version; 26.3 names the 26.2 artifact, XaeroPlus having published
-# nothing for 26.3.
-common/build.gradle.kts
-# 26.2 pulls XaeroPlus by the templated minecraft_version; 26.3 names the 26.2 artifact, XaeroPlus having published
-# nothing for 26.3.
-fabric/build.gradle.kts
-# 26.2 pulls XaeroPlus by the templated minecraft_version; 26.3 names the 26.2 artifact, XaeroPlus having published
-# nothing for 26.3.
-neoforge/build.gradle.kts
