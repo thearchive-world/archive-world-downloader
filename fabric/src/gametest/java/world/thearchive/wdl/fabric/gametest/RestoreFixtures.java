@@ -44,7 +44,7 @@ final class RestoreFixtures {
         }
     }
 
-    /** Replace whatever is at {@code path} with a husk directory holding only a {@code session.lock}. */
+    /** Replace whatever is at {@code path} with a husk directory holding only a session.lock. */
     static void huskWithSessionLock(Path path) {
         deleteRecursively(path);
         try {
@@ -67,9 +67,9 @@ final class RestoreFixtures {
 
     /**
      * Craft a torn restore attempt for {@code folderName} under the saves temporary root: an attempt directory with its
-     * {@code attempt.lock}, the download folder moved into the attempt's {@code aside}, and an empty {@code install}.
-     * The live folder is left absent, the state a client that quit mid-swap leaves behind and the next sweep rolls
-     * back. Returns the attempt directory.
+     * attempt.lock, the download folder moved into the attempt's {@code aside}, and an empty {@code install}. The live
+     * folder is left absent, the state a client that quit mid-swap leaves behind and the next sweep rolls back. Returns
+     * the attempt directory.
      */
     static Path craftTornAttempt(Path savesDirectory, String folderName) {
         try {
@@ -87,9 +87,9 @@ final class RestoreFixtures {
     }
 
     /**
-     * Craft a torn attempt whose kept-aside carries a locked {@code session.lock}, so a sweep defers it rather than
-     * moving it back and {@link RestoreOperation.RestoreSweep#hasWork} stays true while the returned lock is held. The
-     * live folder is left absent. The caller closes the returned handle to release the lock.
+     * Craft a torn attempt whose kept-aside carries a locked session.lock, so a sweep defers it rather than moving it
+     * back and {@link RestoreOperation.RestoreSweep#hasWork} stays true while the returned lock is held. The live
+     * folder is left absent. The caller closes the returned handle to release the lock.
      */
     static LockedAside craftLockedTornAttempt(Path savesDirectory, String folderName) {
         try {

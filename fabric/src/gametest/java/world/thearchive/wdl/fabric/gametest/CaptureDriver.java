@@ -183,7 +183,7 @@ final class CaptureDriver {
         return controller.overlayCoveredChunks(liveConfig, dimensionId);
     }
 
-    /** The estimator's covered radius for the dimension, chunk units, clamped by capChunks. */
+    /** The estimator's covered radius for the dimension, chunk units, clamped by {@code capChunks}. */
     int rangeRadiusChunks(String dimensionId, int capChunks) {
         return controller.sendRange().radiusChunks(dimensionId, capChunks);
     }
@@ -242,7 +242,8 @@ final class CaptureDriver {
 
     /**
      * Stop recording and await the save WITHOUT ever ticking this driver's controller, so the only route to IDLE is the
-     * marshaled completion poke drained by runAllTasks (the paused-replay decoupling). Returns the save root on disk.
+     * marshaled completion poke drained by {@code runAllTasks} (the paused-replay decoupling). Returns the save root on
+     * disk.
      */
     Path stopAndAwaitSaveWithoutTick() {
         return stopAndAwaitSave(false, "did not reach IDLE via the completion poke");

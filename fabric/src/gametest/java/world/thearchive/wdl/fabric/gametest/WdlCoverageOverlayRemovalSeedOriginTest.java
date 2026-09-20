@@ -21,9 +21,9 @@ import world.thearchive.wdl.core.WdlConfig;
  * SendRangeSampler.HAIRCUT_BLOCKS}, floors to radius 0). The calibration event under test is the removal: the player
  * walks straight away on real forward-key input, and once the horizontal distance passes the scaled 48-block send range
  * ({@code entity-broadcast-range-percentage} 30 of {@code clientTrackingRange(10)
- * * 16}) the server unpairs the frame and the teed RemoveEntities packet samples the anchored distance minus the
- * haircut. A sibling test pins the same removal against an arrival-registered anchor; the two registration origins are
- * pinned separately so a broken resolution in one cannot hide behind the other.
+ * * 16}) the server unpairs the frame and the teed {@code RemoveEntities} packet samples the anchored distance minus
+ * the haircut. A sibling test pins the same removal against an arrival-registered anchor; the two registration origins
+ * are pinned separately so a broken resolution in one cannot hide behind the other.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlCoverageOverlayRemovalSeedOriginTest implements FabricClientGameTest {
