@@ -59,8 +59,8 @@ final class ReleaseIndex {
 
     /**
      * Tree-model parse reading each snake_case key explicitly: default POJO binding would match camelCase field names
-     * against these keys and silently null every one of them, including the load-bearing version_number, so the check
-     * would never fire.
+     * against these keys and silently null every one of them, including the load-bearing {@code version_number}, so the
+     * check would never fire.
      */
     private static List<Release> parseRows(String body) {
         JsonElement root;
