@@ -101,7 +101,8 @@ common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
 # CycleButton revert: 2-arg builder(fn, value) -> 1-arg builder(fn) + withInitialValue.
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 
-# Game-rule typed-leg test revert: gamerules.GameRules -> flat GameRules, RULE_* names, getBoolean, fire rule dropped.
+# Game-rule typed-leg test revert: gamerules.GameRules -> flat GameRules, RULE_* names, getBoolean; the fire
+# assertion reads the boolean doFireTick.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
 
 # Below 1.21.11 the fire-spread row binds the boolean doFireTick rather than the integer
