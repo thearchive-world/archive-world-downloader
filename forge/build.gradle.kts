@@ -108,7 +108,7 @@ unimined.minecraft {
 // itself resolves, de.oceanlabs.mcp:mcp_config for this band's exact Minecraft version, and extracts its
 // config/joined.tsrg to a stable build/ path via a real Gradle dependency (backed by the ordinary Gradle module
 // cache), independent of Unimined's own provisioning.
-val seargeOracle: Configuration by configurations.creating { isTransitive = false }
+val seargeOracle: Configuration = configurations.create("seargeOracle") { isTransitive = false }
 
 dependencies {
     seargeOracle("de.oceanlabs.mcp:mcp_config:${band("minecraft_version")}@zip")
