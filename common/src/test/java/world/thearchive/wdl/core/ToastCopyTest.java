@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The job-done toast copy is MC-free and unit-tested headless: the title and two-line body are wdl.toast translation
  * keys resolved here against the shipped en_us lang file, with the folder and zip destination variants, the
- * amber-over-default completion tint, the wholly-rust error tint, and the showToasts gate.
+ * amber-over-default completion tint, the wholly-rust error tint, and the {@code showToasts} gate.
  */
 class ToastCopyTest {
     private static final Map<String, String> LANG = Collections.unmodifiableMap(loadLang());

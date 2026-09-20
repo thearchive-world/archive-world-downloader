@@ -49,7 +49,7 @@ class ChunkFlushPlanTest {
         TestRegistries.bootstrap();
     }
 
-    /** Built on demand, never as a static initializer: ChunkPos static init needs the vanilla bootstrap. */
+    /** Built on demand, never as a static initializer: {@code ChunkPos} static init needs the vanilla bootstrap. */
     private static ChunkPos origin() {
         return new ChunkPos(0, 0);
     }

@@ -17,12 +17,12 @@ import world.thearchive.wdl.adapter.impl.MapSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the per-band map serialize: serializeMap turns a client-shaped {@link MapData} into the inner
- * {@code "data"} tag vanilla's own {@code MapData.readFromNBT} reads back to an equal map (the image, dimension, and
- * scale faithful). Map locking is a 1.14 addition absent at this band, so the serialize writes no {@code "locked"} key.
- * The dimension is the primitive int {@code MapData.d} at this band, not a nullable {@code DimensionType}, so there is
- * no version-bridging-proxy null-dimension case to stand in for here. Server-free by construction: a constructed client
- * map drives it, so neither a live menu nor a {@code World} is needed.
+ * The automated guard for the per-band map serialize: {@code serializeMap} turns a client-shaped {@link MapData} into
+ * the inner {@code "data"} tag vanilla's own {@code MapData.readFromNBT} reads back to an equal map (the image,
+ * dimension, and scale faithful). Map locking is a 1.14 addition absent at this band, so the serialize writes no
+ * {@code "locked"} key. The dimension is the primitive int {@code MapData.d} at this band, not a nullable
+ * {@code DimensionType}, so there is no version-bridging-proxy null-dimension case to stand in for here. Server-free by
+ * construction: a constructed client map drives it, so neither a live menu nor a {@code World} is needed.
  */
 class MapSinkRoundTripTest {
     private final MapSink sink = new MapSinkImpl();

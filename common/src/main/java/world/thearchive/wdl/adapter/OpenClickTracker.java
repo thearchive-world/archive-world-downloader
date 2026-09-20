@@ -91,8 +91,8 @@ public final class OpenClickTracker {
 
     /**
      * Vanilla's own gate: sneaking with a non-empty hand skips the block's use entirely and places the item, so no menu
-     * can open. Identical predicate on both sides (MultiPlayerGameMode / ServerPlayerGameMode), so a click in this
-     * state owes no open and must not be latched.
+     * can open. Identical predicate on both sides ({@code MultiPlayerGameMode} / {@code ServerPlayerGameMode}), so a
+     * click in this state owes no open and must not be latched.
      */
     private static boolean suppressesBlockUse(EntityPlayer player) {
         boolean haveSomethingInOurHands = player.getHeldItemMainhand() != null

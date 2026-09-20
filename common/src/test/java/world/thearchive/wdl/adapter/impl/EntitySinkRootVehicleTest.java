@@ -28,11 +28,11 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the ridden-vehicle RootVehicle capture. A vehicle carrying exactly one player is refused by
- * the entities region (vanilla persists it in the player's own {@code RootVehicle}, not the entities region), so the
- * chunk path drops it. {@link EntitySink#captureRootVehicle} is the sibling that serializes it anyway, the way
- * {@code EntityPlayerMP.writeEntityToNBT}'s own root-vehicle write does, and the captured container loot folds into it
- * by {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone entity path's
+ * The automated guard for the ridden-vehicle {@code RootVehicle} capture. A vehicle carrying exactly one player is
+ * refused by the entities region (vanilla persists it in the player's own {@code RootVehicle}, not the entities
+ * region), so the chunk path drops it. {@link EntitySink#captureRootVehicle} is the sibling that serializes it anyway,
+ * the way {@code EntityPlayerMP.writeEntityToNBT}'s own root-vehicle write does, and the captured container loot folds
+ * into it by {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone entity path's
  * {@code applyMobPersistence} seam: {@code PersistenceRequired} is server-authoritative and arrives false on the
  * client, so a name-tagged mount, and any mount under {@code forceMobPersistence}, keeps the stamp or it despawns once
  * the player dismounts in the downloaded world.

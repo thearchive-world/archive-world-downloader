@@ -894,9 +894,9 @@ class AsyncSaveWriterTest {
     /**
      * The entity-borne sibling of the block orphan sweep: a container vehicle opened after its chunk flushed is
      * recovered by re-approach rather than by an on-disk sweep. To open a vehicle the player is adjacent, so the server
-     * is tracking it, so a fresh AddEntity has re-accumulated it in the packet path (it left the tracking view when its
-     * chunk left the keep-hot square, KEEP_HOT_MARGIN wider than the view), and its chunk flushes a second time. That
-     * second write to an already-written entity chunk read-modifies the prior on disk
+     * is tracking it, so a fresh {@code AddEntity} has re-accumulated it in the packet path (it left the tracking view
+     * when its chunk left the keep-hot square, {@code KEEP_HOT_MARGIN} wider than the view), and its chunk flushes a
+     * second time. That second write to an already-written entity chunk read-modifies the prior on disk
      * ({@link AsyncSaveWriter#submitEntity} routes through {@link RegionChunkWriter#foldEntitiesIntoRegion} with
      * {@link EntityMerge}), so the opened contents survive in either order. Pinned here, at the real writer and
      * storage, because a change of that route to a plain overwrite would silently drop the contents and no

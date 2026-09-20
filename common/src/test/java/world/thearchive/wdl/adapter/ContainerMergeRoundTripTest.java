@@ -21,10 +21,10 @@ import world.thearchive.wdl.adapter.impl.ItemListNbt;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for container capture: the {@link ContainerSink} 1.21.11 path (captureItems -> merge) plus the
- * band's own {@code ItemListNbt.loadAllItems} read-back is a self-consistent round-trip: the captured slots survive
- * serialization, land on the block-entity tag under {@code "Items"}, and decode to the same stacks at the same slots,
- * with no other block-entity field clobbered.
+ * The automated guard for container capture: the {@link ContainerSink} 1.21.11 path ({@code captureItems} -> merge)
+ * plus the band's own {@code ItemListNbt.loadAllItems} read-back is a self-consistent round-trip: the captured slots
+ * survive serialization, land on the block-entity tag under {@code "Items"}, and decode to the same stacks at the same
+ * slots, with no other block-entity field clobbered.
  *
  * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
  * neither a live menu nor a {@code Level} is needed (items, unlike entities, parse back without one). The one
