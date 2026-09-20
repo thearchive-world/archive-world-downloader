@@ -127,6 +127,7 @@ class LevelDatWorldOutputTest {
 
         assertFalse(rules.getBoolean(GameRules.RULE_DOMOBSPAWNING), "no mob spawning");
         assertTrue(rules.getBoolean(GameRules.RULE_KEEPINVENTORY), "keep inventory");
+        assertFalse(rules.getBoolean(GameRules.RULE_DOFIRETICK), "no fire spread");
         assertFalse(rules.getBoolean(GameRules.RULE_MOBGRIEFING), "no mob griefing");
         assertFalse(rules.getBoolean(GameRules.RULE_DAYLIGHT), "day frozen");
         assertFalse(rules.getBoolean(GameRules.RULE_WEATHER_CYCLE), "weather frozen");
