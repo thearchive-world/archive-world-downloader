@@ -37,8 +37,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * RespawnData}) to the capture dimension + position, marks the level data {@code initialized} so vanilla keeps that
  * spawn on first open, and writes the captured {@code Difficulty}; with a {@code null} {@code CapturedPlayer} the
  * output is today's void world (no {@code Player}, default spawn, {@code initialized}, {@code SURVIVAL}). Driven
- * through the real production {@code LevelStorageAccess.saveDataTag}, so the headless suite guards the band-specific
- * 3-argument form.
+ * through the real production {@code LevelStorage.saveLevelData(LevelData, playerTag)}, so the headless suite guards
+ * the two-argument form the plug calls.
  */
 class LevelDatPlayerRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
