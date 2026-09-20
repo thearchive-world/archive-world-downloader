@@ -55,20 +55,20 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The one path that carries a previous download's parked mount forward. A mount ridden at the end of a download is
  * written to no entities region at all, because a vehicle with exactly one player passenger fails vanilla's own save
- * gate, so its single copy is that session's level.dat RootVehicle. A resume that finishes un-seated rewrites the
- * level.dat with no RootVehicle, which destroys that copy, and the release is what puts the mount into the world as a
- * standalone entity before that happens. Everything it fails to write is gone for good, including whatever the previous
- * download archived inside a chest boat or a chested animal.
+ * gate, so its single copy is that session's level.dat {@code RootVehicle}. A resume that finishes un-seated rewrites
+ * the level.dat with no {@code RootVehicle}, which destroys that copy, and the release is what puts the mount into the
+ * world as a standalone entity before that happens. Everything it fails to write is gone for good, including whatever
+ * the previous download archived inside a chest boat or a chested animal.
  *
  * <p>Three axes. ROUTING: the position and the dimension must come from the same tag, so the cross-dimension case
  * asserts both the arrival and the absence, since a write that reaches the right folder while also reaching the wrong
  * one is still a corrupt save. IDENTITY: the release must decline exactly when this finish already saved the prior
- * mount inside the player's own RootVehicle, which is a question about the whole captured mount tree rather than its
- * root, so the two mounts here share an entity type and differ only by UUID and one of them rides nested inside the
- * other. COUNTING: each exit that reaches the release proper and writes nothing is asserted twice over, on the named
- * counter and on the verdict the completion record stamps from, since a counter no term of the sum reads reports
- * nothing; and every no-op is asserted in the other direction, on the absence of the WRITE rather than the absence of a
- * loss, because a path that wrongly runs and succeeds also loses nothing.
+ * mount inside the player's own {@code RootVehicle}, which is a question about the whole captured mount tree rather
+ * than its root, so the two mounts here share an entity type and differ only by UUID and one of them rides nested
+ * inside the other. COUNTING: each exit that reaches the release proper and writes nothing is asserted twice over, on
+ * the named counter and on the verdict the completion record stamps from, since a counter no term of the sum reads
+ * reports nothing; and every no-op is asserted in the other direction, on the absence of the WRITE rather than the
+ * absence of a loss, because a path that wrongly runs and succeeds also loses nothing.
  *
  * <p>The release is driven directly, package-private for that, because every production caller runs behind the client
  * singleton; what that leaves unpinned is {@code finish()} calling it at all, and calling it in the right place, which
@@ -360,8 +360,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
     /**
      * The chunk the mount's position lands in, stated rather than recomputed with production's own formula, which would
-     * agree with whatever formula production used. Not a constant: ChunkPos's class initializer reaches a built-in
-     * registry, so touching one before the bootstrap fails the whole class.
+     * agree with whatever formula production used. Not a constant: {@code ChunkPos}'s class initializer reaches a
+     * built-in registry, so touching one before the bootstrap fails the whole class.
      */
     private static ChunkPos mountChunk() {
         return new ChunkPos(-71, 30);
@@ -476,7 +476,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
     /**
      * Put the session in the state a finish that captured a mount leaves behind: the player tag carrying the
-     * RootVehicle record, AND the exclusion set holding every entity of the captured mount tree. Both, because
+     * {@code RootVehicle} record, AND the exclusion set holding every entity of the captured mount tree. Both, because
      * production writes them together and the release reads the set; seeding only the tag would let a check that
      * consults the wrong one pass.
      */

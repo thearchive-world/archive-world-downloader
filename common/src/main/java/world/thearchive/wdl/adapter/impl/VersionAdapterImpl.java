@@ -24,9 +24,9 @@ import world.thearchive.wdl.adapter.WorldPaths;
 public final class VersionAdapterImpl implements VersionAdapter {
     /**
      * The floor of the era band this plug serves (see the package note). The build's {@code checkPlugBand} task asserts
-     * the targeted {@code minecraft_version} from {@code gradle.properties} is at or above this, the intentional guard
-     * that a plug never lands on a branch whose MC version predates its band. A version newer than the band is caught
-     * instead by compile failure against the divergent vanilla save types.
+     * the targeted {@code minecraft_version} from gradle.properties is at or above this, the intentional guard that a
+     * plug never lands on a branch whose MC version predates its band. A version newer than the band is caught instead
+     * by compile failure against the divergent vanilla save types.
      */
     static final String BAND_FLOOR = "1.21.10";
 

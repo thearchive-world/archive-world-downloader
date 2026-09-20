@@ -6,10 +6,10 @@ package world.thearchive.wdl.core.browse;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Read-side validation of a download's world icon. A {@code icon.png} read from disk to render a row is validated,
- * magic-bytes and size-capped, before it is decoded, so a malformed or oversized image is refused rather than crashing
- * or stalling the screen. The write side trusts its bytes (vanilla validated the live server icon); the read side
- * cannot, because the file may have been replaced, truncated, or copied in.
+ * Read-side validation of a download's world icon. A icon.png read from disk to render a row is validated, magic-bytes
+ * and size-capped, before it is decoded, so a malformed or oversized image is refused rather than crashing or stalling
+ * the screen. The write side trusts its bytes (vanilla validated the live server icon); the read side cannot, because
+ * the file may have been replaced, truncated, or copied in.
  *
  * <p>MC-free: a pure byte inspection (the PNG signature and the IHDR width/height), never a decode. The actual decode
  * to a texture happens in the view, only on bytes this has accepted.

@@ -251,7 +251,7 @@ public final class InteractionCapture {
     /**
      * A jukebox disc, placed shulker, or placed beehive: one merge-ready single-key holder
      * ({@code "RecordItem"}/{@code "Items"}/{@code "bees"}). The gate keeps it whole only when the authoritative
-     * block-state confirms the content is present (HAS_RECORD, or the expected placed block type).
+     * block-state confirms the content is present ({@code HAS_RECORD}, or the expected placed block type).
      */
     record HolderCandidate(InteractionKind kind, CompoundTag holder) implements Candidate {}
 
@@ -577,9 +577,9 @@ public final class InteractionCapture {
 
     /**
      * Serialize {@code disc} to a holder carrying the jukebox disc ({@code "RecordItem"}) plus its song-start tick
-     * ({@code "ticks_since_song_started"} = 0, since the disc just started at the click). Vanilla loadAdditional starts
-     * the song player from that tick on load, so the saved jukebox emits the note particles; the disc sound itself
-     * cannot resume on load (an MC limitation, it fires only on the insert event).
+     * ({@code "ticks_since_song_started"} = 0, since the disc just started at the click). Vanilla
+     * {@code loadAdditional} starts the song player from that tick on load, so the saved jukebox emits the note
+     * particles; the disc sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
      */
     static CompoundTag captureRecordItem(ItemStack disc, RegistryAccess registries) {
         RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
