@@ -615,8 +615,8 @@ tasks.named<Javadoc>("javadoc") {
 }
 
 // --- Publish the island classpath: the exact compile classpath the separate Forge build consumes ---
-// The hand-rolled Forge island (forge/, its own Gradle 8 wrapper) has no Loom to resolve Minecraft and its
-// transitive libraries (com.mojang datafixers/brigadier/authlib, gson, netty, guava, fastutil, jopt, log4j). It
+// The hand-rolled Forge island (forge/, a separate build on its own wrapper) has no Loom to resolve Minecraft and
+// its transitive libraries (com.mojang datafixers/brigadier/authlib, gson, netty, guava, fastutil, jopt, log4j). It
 // reads this file, one absolute path per line: the main compile classpath with Loom's raw minecraft-* jar swapped
 // for the stripped one (the same interposition compileJava does above), so the island compiles the source-merged
 // common against exactly the classpath Loom resolved here. Unlike genBridge, the island reads this file from a
