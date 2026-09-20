@@ -67,10 +67,10 @@ public final class CaptureController {
         boolean isSaveComplete();
 
         /**
-         * Hold the background writer off the loader's registries, and wait for any read already under way to finish.
-         * The client rebuilds those registries in place on both edges of a connection, and a write encoded across a
-         * rebuild loses its blocks, so this is taken before the client is allowed to start one. Default no-op, because
-         * a session with no background write of its own has nothing to hold.
+         * Hold the background writer off the loader's registries, and wait for any read already under way to finish. A
+         * loader can rebuild those registries in place at either edge of a connection, and a write encoded across a
+         * rebuild loses its blocks, so this is taken on a connection edge. Default no-op, because a session with no
+         * background write of its own has nothing to hold.
          */
         default void holdWriterEncoding() {}
 
@@ -397,14 +397,14 @@ public final class CaptureController {
      * Hold the writer, then flush. The hold comes first and is taken whatever the state, because the save the
      * disconnect has to protect is often one already running: stopping a download and then leaving the server is a
      * routine order, and a stop that already moved the state out of recording makes the flush below a no-op while
-     * leaving a full drain to encode straight through the client's registry rebuild.
+     * leaving a full drain to encode straight through the registry rebuild a loader can run on the way out.
      */
     public void onDisconnect() {
         holdWriterEncoding();
         stop();
     }
 
-    /** The join edge rebuilds the registries too, so a save still draining from the last server is held across it. */
+    /** Joining rebuilds the registries too, so the hold is taken for a save still draining from the last server. */
     public void onServerJoin() {
         holdWriterEncoding();
     }
