@@ -503,7 +503,7 @@ class RestoreOperationTest {
         };
     }
 
-    /** A hook body that may touch the filesystem; the wrapper rethrows its IOException unchecked. */
+    /** A hook body that may touch the filesystem; the wrapper rethrows its {@code IOException} unchecked. */
     private interface IoAction {
         void run() throws IOException;
     }
@@ -574,7 +574,7 @@ class RestoreOperationTest {
         return folder;
     }
 
-    /** Creates parents and writes the single byte contentByte at file. */
+    /** Creates parents and writes the single byte {@code contentByte} at file. */
     private static void write(Path file, int contentByte) throws IOException {
         write(file, new byte[] { (byte) contentByte });
     }
