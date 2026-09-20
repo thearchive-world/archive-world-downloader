@@ -101,7 +101,7 @@ dependencies {
     // the fabric flavor to Mojmap for the compile; there is no runtime require. XaeroPlus hard-depends on
     // xaeroworldmap, so the whole Xaero family is kept off every run and the headless gametest never hits
     // Xaero's startup update modal; the manual render gate installs the family in a real client.
-    compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+fabric-26.2")
+    compileOnly("maven.modrinth:xaeroplus:${property("xaeroplus_version")}+fabric-${property("minecraft_version")}")
 
     // ModMenu API for the mod-list config-screen entrypoint (WdlModMenu), compile-only. Loom remaps it to
     // Mojmap for the compile; there is no runtime require, so ModMenu's absence just means the entrypoint is
