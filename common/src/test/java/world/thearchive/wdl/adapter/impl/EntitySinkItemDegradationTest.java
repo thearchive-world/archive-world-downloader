@@ -134,7 +134,7 @@ class EntitySinkItemDegradationTest {
         public void onEquipItem(EquipmentSlot slot, ItemStack oldItem, ItemStack newItem) {}
     }
 
-    /** A headless ItemEntity double carrying a caller-set stack. */
+    /** A headless {@code ItemEntity} double carrying a caller-set stack. */
     private static final class DropItem extends ItemEntity {
         private DropItem() {
             super(EntityType.ITEM, null);

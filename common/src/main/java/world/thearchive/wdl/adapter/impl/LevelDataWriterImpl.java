@@ -64,10 +64,10 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.21.3 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
- * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
- * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
- * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
+ * 1.21.3 level.dat writer for the selected generator: the default superflat VOID (all air, built from the client's
+ * synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from the
+ * reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the real
+ * terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
  * server's actual land (the server's seed is not recoverable from a client).
  */
 public final class LevelDataWriterImpl implements LevelDataWriter {
@@ -84,8 +84,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /**
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Every curated rule is a boolean here. The user's gamerule.* overrides, keyed by band id, are validated and
-     * applied on top of this (see {@link WorldOutputConfig}).
+     * Every curated rule is a boolean here. The user's {@code gamerule.*} overrides, keyed by band id, are validated
+     * and applied on top of this (see {@link WorldOutputConfig}).
      */
     private static final List<CuratedSpec> CURATED_GAME_RULES = buildCuratedGameRules();
 
@@ -208,7 +208,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return false;
     }
 
-    /** Set one validated rule on its offline GameRules value (no server, so the change-callback is skipped). */
+    /** Set one validated rule on its offline {@code GameRules} value (no server, so the change-callback is skipped). */
     private static void setRule(GameRules.Value<?> rule, String rawValue) {
         if (rule instanceof GameRules.BooleanValue booleanValue) {
             booleanValue.set(Boolean.parseBoolean(rawValue), null);
@@ -327,7 +327,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable());
     }
 
-    /** The three vanilla dimensions, each a void superflat generator, baked into a LEVEL_STEM set. */
+    /** The three vanilla dimensions, each a void superflat generator, baked into a {@code LEVEL_STEM} set. */
     private static WorldDimensions.Complete voidDimensions(RegistryAccess registries) {
         Registry<Biome> biomes = registries.lookupOrThrow(Registries.BIOME);
         ResourceKey<Biome> biomeKey = biomes.containsKey(Biomes.THE_VOID) ? Biomes.THE_VOID : Biomes.PLAINS;

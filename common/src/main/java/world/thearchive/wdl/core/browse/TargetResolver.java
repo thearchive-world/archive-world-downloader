@@ -18,8 +18,8 @@ import world.thearchive.wdl.core.DownloadTarget;
 /**
  * Resolves a typed or selected name into a {@link DownloadTarget}, MC-free and headless. Owns the screen's name rules:
  * sanitize and contain to the saves directory, judge whether a typed name is usable at all, disambiguate a new folder
- * with an idempotent date suffix that also names the world in {@code level.dat} (the screen strips the date for the row
- * label), target an existing folder on a resume normalized to its filesystem-reported spelling, and recognize the
+ * with an idempotent date suffix that also names the world in level.dat (the screen strips the date for the row label),
+ * target an existing folder on a resume normalized to its filesystem-reported spelling, and recognize the
  * currently-loaded world by filesystem identity so it is refused as a target.
  *
  * <p>The name model contains a name to a single path component (no separator, no parent element); the world-open
@@ -40,10 +40,9 @@ public final class TargetResolver {
 
     /**
      * A fresh download: a contained folder whose name is the sanitized {@code name}, decorated with a
-     * {@code -YYYY-MM-DD} suffix when {@code appendDateSuffix} is set. The same resolved name is written to
-     * {@code level.dat} (the screen strips any date for the row label), so with the suffix off both the folder and the
-     * world name are the bare sanitized name. Callers gate on {@link #hasUsableName}, so {@code name} is already usable
-     * here.
+     * {@code -YYYY-MM-DD} suffix when {@code appendDateSuffix} is set. The same resolved name is written to level.dat
+     * (the screen strips any date for the row label), so with the suffix off both the folder and the world name are the
+     * bare sanitized name. Callers gate on {@link #hasUsableName}, so {@code name} is already usable here.
      */
     public static DownloadTarget resolveNew(String name, LocalDate date, boolean appendDateSuffix) {
         String base = sanitize(name);
@@ -53,9 +52,9 @@ public final class TargetResolver {
 
     /**
      * A resume: the existing folder under {@code savesDirectory}, normalized to the filesystem-reported spelling (no
-     * new date suffix). The worldName is the folder name only for the report's recorded name; the resumed world's
-     * actual level.dat name is read from disk by the session (it is not renamed), so this never overwrites the existing
-     * name.
+     * new date suffix). The {@code worldName} is the folder name only for the report's recorded name; the resumed
+     * world's actual level.dat name is read from disk by the session (it is not renamed), so this never overwrites the
+     * existing name.
      */
     public static DownloadTarget resolveResume(String folderName, Path savesDirectory) {
         String onDiskName = readBackOnDiskSpelling(folderName, savesDirectory);
