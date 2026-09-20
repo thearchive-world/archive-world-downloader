@@ -54,7 +54,7 @@ class RestoreSourceTest {
                 root + "/wdl/download.jsonl", record(finishedAt));
     }
 
-    /** Exactly MAX_RECORD_BYTES of record content: a padded garbage first line, then the record line. */
+    /** Exactly {@code MAX_RECORD_BYTES} of record content: a padded garbage first line, then the record line. */
     private static byte[] atCapRecord(String finishedAt) {
         byte[] content = new byte[(int) RestoreSource.MAX_RECORD_BYTES];
         Arrays.fill(content, (byte) 'a');

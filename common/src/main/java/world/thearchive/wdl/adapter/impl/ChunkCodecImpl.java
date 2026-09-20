@@ -58,7 +58,10 @@ public final class ChunkCodecImpl implements ChunkCodec {
     /** Client chunks have no post-processing (a worldgen artifact). */
     private static final ShortList[] NO_POST_PROCESSING = new ShortList[0];
 
-    /** Vanilla full-height overworld: min block -64, height 384; the range BlendingDataFix marks as old generation. */
+    /**
+     * Vanilla full-height overworld: min block -64, height 384; the range {@code BlendingDataFix} marks as old
+     * generation.
+     */
     private static final int OVERWORLD_MIN_Y = -64;
     private static final int OVERWORLD_HEIGHT = 384;
 

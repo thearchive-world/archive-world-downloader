@@ -19,13 +19,13 @@ import org.jspecify.annotations.Nullable;
  * chest is around fifteen hundred item encodes per pass). The change signal is per-slot stack identity, count, and
  * bundle contents: a client-side slot mutation either replaces the slot's stack object (a sync packet's fresh stack, a
  * click prediction's move or split), changes its count (a prediction's grow or shrink), or, in the one vanilla in-place
- * case, mutates the bundle's contents NBT in place (BundleItem's click-prediction override mutates the slot-resident
- * stack's tag, and the server's matching ack resends no slot; the contents are a mutable {@code "Items"} list, so a
- * value compare of a per-slot snapshot catches an insert or remove). BundleItem is the only vanilla overrider of the
- * stack-on-stack click hooks, so no other item mutates its contents in a slot. The signal also carries a small
- * menu-only ContainerData vector (a crafter's disabled and triggered flags, a brewing stand's brew time and fuel), so a
- * data-only tick like a running brew with no slot movement re-stashes. Main-thread only, reset at bind and close so one
- * open menu never inherits another's snapshot.
+ * case, mutates the bundle's contents NBT in place ({@code BundleItem}'s click-prediction override mutates the
+ * slot-resident stack's tag, and the server's matching ack resends no slot; the contents are a mutable {@code "Items"}
+ * list, so a value compare of a per-slot snapshot catches an insert or remove). {@code BundleItem} is the only vanilla
+ * overrider of the stack-on-stack click hooks, so no other item mutates its contents in a slot. The signal also carries
+ * a small menu-only {@code ContainerData} vector (a crafter's disabled and triggered flags, a brewing stand's brew time
+ * and fuel), so a data-only tick like a running brew with no slot movement re-stashes. Main-thread only, reset at bind
+ * and close so one open menu never inherits another's snapshot.
  */
 final class MenuChangeTracker {
     static final int[] NO_DATA = new int[0];
