@@ -762,8 +762,8 @@ class CaptureControllerTest {
     /**
      * Stopping a download and then leaving the server is a routine order, and it is the order the first version of this
      * guard missed: by the time the disconnect arrives the state has already left recording, so the flush is a no-op,
-     * while a full drain is still encoding against registries the client is about to rebuild. The hold has to be taken
-     * on the disconnect whatever the state.
+     * while a full drain is still encoding against registries a loader can rebuild on the way out. The hold has to be
+     * taken on the disconnect whatever the state.
      */
     @Test
     void disconnectHoldsTheWriterEvenWhenTheSaveIsAlreadyRunning() {
@@ -796,7 +796,7 @@ class CaptureControllerTest {
         assertEquals(1, session.releases, "the first tick after the finish releases it");
     }
 
-    /** Joining rebuilds the registries too, so a save still draining from the previous server is held across it. */
+    /** Joining rebuilds the registries too, so the hold is taken for a save still draining from the previous server. */
     @Test
     void joiningHoldsTheWriterStillDrainingFromTheLastServer() {
         CaptureController controller = controller();
