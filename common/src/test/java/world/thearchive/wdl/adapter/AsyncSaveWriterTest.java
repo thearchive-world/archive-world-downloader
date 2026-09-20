@@ -1384,9 +1384,9 @@ class AsyncSaveWriterTest {
     }
 
     /**
-     * Forge rebuilds the client's block registry in place when a level closes, so a block is unresolvable for as long
-     * as the rebuild runs; an encode that reads it meanwhile writes air instead of the real block, and on the bands
-     * that encode by name the download still reports complete. The writer must resolve no encode across that window.
+     * The loader rebuilds the client's block registry in place when a level closes, so a block is unresolvable while
+     * the rebuild runs; an encode that reads it meanwhile writes air instead of the real block, and on the bands that
+     * encode by name the download still reports complete. The writer must resolve no encode across that window.
      */
     @Test
     void resolvesNoEncodeWhileEncodingIsPaused(@TempDir Path save) throws Exception {
