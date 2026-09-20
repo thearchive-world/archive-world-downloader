@@ -20,10 +20,10 @@ import world.thearchive.wdl.core.WdlConfig;
  * entities present when the download began). The arrival itself commits a roughly 20-block sample, radius 1, which
  * cannot reach the assertion bracket, so the [2, 3] assert still pins the removal resolving against that anchor: once
  * the walking player passes the scaled 48-block send range ({@code entity-broadcast-range-percentage} 30 of
- * {@code clientTrackingRange(10) * 16}) the server unpairs the frame and the teed RemoveEntities packet samples the
- * anchored distance minus the 16-block haircut ({@code SendRangeSampler.HAIRCUT_BLOCKS}). A sibling test pins the same
- * removal against a seed-registered anchor; the two registration origins are pinned separately so a broken resolution
- * in one cannot hide behind the other.
+ * {@code clientTrackingRange(10) * 16}) the server unpairs the frame and the teed {@code RemoveEntities} packet samples
+ * the anchored distance minus the 16-block haircut ({@code SendRangeSampler.HAIRCUT_BLOCKS}). A sibling test pins the
+ * same removal against a seed-registered anchor; the two registration origins are pinned separately so a broken
+ * resolution in one cannot hide behind the other.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlCoverageOverlayRemovalArrivalOriginTest implements FabricClientGameTest {

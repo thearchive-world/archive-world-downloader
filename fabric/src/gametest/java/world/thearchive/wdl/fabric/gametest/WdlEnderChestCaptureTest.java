@@ -79,10 +79,10 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
     }
 
     /**
-     * Third scenario: with savePlayerEnderChest off the finish strips EnderItems, so the open must bind nothing. A bind
-     * would clear the captured-set ender flag and tally a container the save does not hold, which is the report
-     * claiming content the archive deliberately drops. The menu still syncs the contents, so the empty EnderItems below
-     * is the strip and not an unsynced client.
+     * Third scenario: with {@code savePlayerEnderChest} off the finish strips {@code EnderItems}, so the open must bind
+     * nothing. A bind would clear the captured-set ender flag and tally a container the save does not hold, which is
+     * the report claiming content the archive deliberately drops. The menu still syncs the contents, so the empty
+     * {@code EnderItems} below is the strip and not an unsynced client.
      */
     private static void enderChestOffBindsNothing(ClientGameTestContext context, TestServerContext server,
             BlockPos stand) {

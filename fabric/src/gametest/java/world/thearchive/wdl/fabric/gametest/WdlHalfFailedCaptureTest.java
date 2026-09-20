@@ -140,11 +140,11 @@ public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
      * the downloads screen renders. It reads the record through the production reader, so a status written under the
      * wrong key or in the wrong sense fails here.
      *
-     * <p>It is the only tier that can assert this end to end: the write is driven from finish(), which needs a client.
-     * The headless suite pins the derivation the flag comes from and both of its arms; what this adds is that the whole
-     * live path from a real capture to the file on disk agrees with it. Only the clean arm is asserted, because this
-     * fixture's half-failure is one the mod recovers from silently by design, and inducing a real loss to see the
-     * partial arm would be a different test.
+     * <p>It is the only tier that can assert this end to end: the write is driven from {@code finish()}, which needs a
+     * client. The headless suite pins the derivation the flag comes from and both of its arms; what this adds is that
+     * the whole live path from a real capture to the file on disk agrees with it. Only the clean arm is asserted,
+     * because this fixture's half-failure is one the mod recovers from silently by design, and inducing a real loss to
+     * see the partial arm would be a different test.
      *
      * <p>The flag sums every capture-loss tally, so this reads wider than the rest of the class: a red here means some
      * tally moved, not necessarily the entity drop the log scrape beside it is about. The message says so, and says
