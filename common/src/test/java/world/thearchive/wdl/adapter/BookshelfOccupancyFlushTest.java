@@ -103,9 +103,9 @@ class BookshelfOccupancyFlushTest {
 
     /**
      * The bookshelf block entity as the client's own save produces it, rather than the subset this test's assertions
-     * happen to read. Vanilla writes an empty Items list and last_interacted_slot unconditionally and the chunk capture
-     * adds keepPacked, so a fixture carrying only id and position is a shape production never emits, and a later change
-     * that told an empty Items apart from an absent one would pass here and fail in the world.
+     * happen to read. Vanilla writes an empty Items list and {@code last_interacted_slot} unconditionally and the chunk
+     * capture adds {@code keepPacked}, so a fixture carrying only id and position is a shape production never emits,
+     * and a later change that told an empty Items apart from an absent one would pass here and fail in the world.
      */
     private CompoundTag freshShelfBlockEntity() {
         return BlockEntityFixtures.savedBlockEntity(
