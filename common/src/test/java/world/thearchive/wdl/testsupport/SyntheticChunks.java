@@ -36,7 +36,7 @@ public final class SyntheticChunks {
     public static final int HEIGHT = 384;
     public static final long GAME_TIME = 1234L;
 
-    /** A recognizable WORLD_SURFACE payload so the round-trip can assert the kept heightmap survives. */
+    /** A recognizable {@code WORLD_SURFACE} payload so the round-trip can assert the kept heightmap survives. */
     public static final long WORLD_SURFACE_SENTINEL = 0x0102030405060708L;
 
     /** Uniform per-cell light levels for the lit fixture, distinct so a swapped layer is caught. */
@@ -55,7 +55,7 @@ public final class SyntheticChunks {
 
     /**
      * A FULL chunk at (0,0): a single stone block in the bottom section, the rest air, PLAINS biomes. Its heightmap set
-     * deliberately includes {@code OCEAN_FLOOR} (Usage.LIVE_WORLD, never sent to a client) alongside the three
+     * deliberately includes {@code OCEAN_FLOOR} ({@code Usage.LIVE_WORLD}, never sent to a client) alongside the three
      * CLIENT-usage maps, so the codec is proven to drop the one the client never receives. {@code lightCorrect} is
      * caller-controlled so a test can prove {@code isLightOn} tracks the flag rather than being hardcoded.
      */
@@ -120,7 +120,7 @@ public final class SyntheticChunks {
         return List.copyOf(stamped);
     }
 
-    /** The standard heightmap set: OCEAN_FLOOR (must be dropped by the codec) + the three CLIENT-usage maps. */
+    /** The standard heightmap set: {@code OCEAN_FLOOR} (must be dropped by the codec) + the three CLIENT-usage maps. */
     private static Map<Heightmap.Types, long[]> standardHeightmaps() {
         Map<Heightmap.Types, long[]> heightmaps = new EnumMap<>(Heightmap.Types.class);
         heightmaps.put(Heightmap.Types.OCEAN_FLOOR, new long[HEIGHTMAP_LONGS]);                 // must be dropped

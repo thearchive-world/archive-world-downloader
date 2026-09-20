@@ -37,14 +37,14 @@ import world.thearchive.wdl.adapter.EntitySink;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the ridden-vehicle RootVehicle capture. A vehicle carrying exactly one player is refused by
- * {@code Entity.shouldBeSaved()} (vanilla persists it in the player's own {@code RootVehicle}, not the entities
- * region), so the chunk path drops it. {@link EntitySink#captureRootVehicle} is the sibling that serializes it anyway,
- * the way {@code ServerPlayer.saveParentVehicle} does with {@code root.save}, and the captured chest-boat contents fold
- * into it by {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone entity path's
- * {@code applyMobPersistence} seam: {@code PersistenceRequired} is server-authoritative and arrives false on the
- * client, so a name-tagged mount, and any mount under {@code forceMobPersistence}, keeps the stamp or it despawns once
- * the player dismounts in the downloaded world.
+ * The automated guard for the ridden-vehicle {@code RootVehicle} capture. A vehicle carrying exactly one player is
+ * refused by {@code Entity.shouldBeSaved()} (vanilla persists it in the player's own {@code RootVehicle}, not the
+ * entities region), so the chunk path drops it. {@link EntitySink#captureRootVehicle} is the sibling that serializes it
+ * anyway, the way {@code ServerPlayer.saveParentVehicle} does with {@code root.save}, and the captured chest-boat
+ * contents fold into it by {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone
+ * entity path's {@code applyMobPersistence} seam: {@code PersistenceRequired} is server-authoritative and arrives false
+ * on the client, so a name-tagged mount, and any mount under {@code forceMobPersistence}, keeps the stamp or it
+ * despawns once the player dismounts in the downloaded world.
  *
  * <p>Uses two headless doubles: an {@link Entity} whose {@code shouldBeSaved()} is forced false (a real player
  * passenger cannot be built headless), and a {@link Mob} for the branch the restoration is gated on.

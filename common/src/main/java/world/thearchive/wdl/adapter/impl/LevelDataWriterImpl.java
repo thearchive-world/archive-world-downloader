@@ -71,14 +71,14 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 26.1.2 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
- * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
- * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
- * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
+ * 26.1.2 level.dat writer for the selected generator: the default superflat VOID (all air, built from the client's
+ * synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from the
+ * reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the real
+ * terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
  * server's actual land (the server's seed is not recoverable from a client).
  *
- * <p>At 26.x the world metadata no longer lives in one {@code level.dat}: worldgen, the game rules and the world clocks
- * are their own namespaced {@code data/minecraft/*.dat} SavedData files, and the captured player is a
+ * <p>At 26.x the world metadata no longer lives in one level.dat: worldgen, the game rules and the world clocks are
+ * their own namespaced {@code data/minecraft/*.dat} {@code SavedData} files, and the captured player is a
  * {@code players/data/<uuid>.dat} rather than a {@code level.dat "Player"} compound.
  */
 public final class LevelDataWriterImpl implements LevelDataWriter {
@@ -95,8 +95,9 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     /**
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Fire is the integer fire_spread_radius_around_player=0 here; the rest are booleans. The user's gamerule.*
-     * overrides, keyed by band id, are validated and applied on top of this (see {@link WorldOutputConfig}).
+     * Fire is the integer {@code fire_spread_radius_around_player}=0 here; the rest are booleans. The user's
+     * {@code gamerule.*} overrides, keyed by band id, are validated and applied on top of this (see
+     * {@link WorldOutputConfig}).
      */
     private static final List<CuratedSpec> CURATED_GAME_RULES = buildCuratedGameRules();
 
@@ -194,7 +195,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return byBandId;
     }
 
-    /** Set one validated rule on the offline GameRules (no server, so the change-callback is skipped). */
+    /** Set one validated rule on the offline {@code GameRules} (no server, so the change-callback is skipped). */
     private static <T> void setRule(GameRules gameRules, GameRule<T> rule, String rawValue) {
         rule.deserialize(rawValue).result().ifPresent(value -> gameRules.set(rule, value, null));
     }
@@ -317,9 +318,9 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     }
 
     /**
-     * Write the three namespaced save-side SavedData files under {@code data/minecraft/}: worldgen, game rules and the
-     * world clocks. Any {@code IOException} aborts the save unchecked rather than catch-and-degrade: a swallowed
-     * worldgen write regenerates a random-seed world, and a missing clocks file freezes the world at tick 0.
+     * Write the three namespaced save-side {@code SavedData} files under {@code data/minecraft/}: worldgen, game rules
+     * and the world clocks. Any {@code IOException} aborts the save unchecked rather than catch-and-degrade: a
+     * swallowed worldgen write regenerates a random-seed world, and a missing clocks file freezes the world at tick 0.
      */
     private void writeMetadata(Path saveRoot, RegistryAccess registries, WorldData worldData,
             WorldGenSettings worldGenSettings, GameRules gameRules) {
@@ -334,8 +335,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
     /**
      * Hand-write {@code data/minecraft/world_clocks.dat}: vanilla exports no writer (the {@code ServerClockManager}
-     * constructor and its {@code writeSavedData} are both private). The WORLD_CLOCK registry is client-synced, so the
-     * overworld holder comes straight from the composed registries with no worldgen reconstruction.
+     * constructor and its {@code writeSavedData} are both private). The {@code WORLD_CLOCK} registry is client-synced,
+     * so the overworld holder comes straight from the composed registries with no worldgen reconstruction.
      */
     private static void writeWorldClocks(Path saveRoot, RegistryAccess registries) throws IOException {
         Holder<WorldClock> overworld = registries.lookupOrThrow(Registries.WORLD_CLOCK)
@@ -403,7 +404,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable());
     }
 
-    /** The three vanilla dimensions, each a void superflat generator, baked into a LEVEL_STEM set. */
+    /** The three vanilla dimensions, each a void superflat generator, baked into a {@code LEVEL_STEM} set. */
     private static WorldDimensions.Complete voidDimensions(RegistryAccess registries) {
         Registry<Biome> biomes = registries.lookupOrThrow(Registries.BIOME);
         ResourceKey<Biome> biomeKey = biomes.containsKey(Biomes.THE_VOID) ? Biomes.THE_VOID : Biomes.PLAINS;
