@@ -202,7 +202,6 @@ public final class WdlSettingsScreen extends Screen {
                 method_18608();
             }
         });
-        // This band's button carries no hover-tooltip parameter, so the Defaults button has no hover explanation.
         this.defaults = method_13411(new class_356(0, defaultsX, footerY, buttonWidth, 20,
                 I18n.get("wdl.settings.defaults")) {
             @Override

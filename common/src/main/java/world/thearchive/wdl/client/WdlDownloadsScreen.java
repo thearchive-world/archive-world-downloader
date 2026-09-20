@@ -351,7 +351,6 @@ public final class WdlDownloadsScreen extends Screen {
             boolean primaryActive) {
         int total = BUTTON_WIDTH * 2 + BUTTON_GAP;
         int startX = (this.field_1230 - total) / 2;
-        // This band's button carries no hover-tooltip parameter, so the disabled-primary explanation is not shown.
         class_356 primary = new class_356(0, startX, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
                 primaryLabel.getString()) {
             @Override
