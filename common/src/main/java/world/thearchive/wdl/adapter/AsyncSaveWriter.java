@@ -502,7 +502,7 @@ final class AsyncSaveWriter {
 
     /**
      * Stop the writer reading the loader's registries, and wait for a read already in flight to finish (main thread).
-     * Forge rebuilds the client's registries in place when a level closes: a chunk encode reading them meanwhile
+     * The loader rebuilds the client's registries in place when a level closes: a chunk encode reading them meanwhile
      * resolves blocks to nothing, which some bands write as air rather than reporting, and the level.dat write reads
      * them through the loader's own save hook and can carry a torn snapshot. Returning from this call is the guarantee
      * the caller needs: no read is running, and none starts until {@link #resumeEncoding}.
