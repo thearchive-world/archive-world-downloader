@@ -16,12 +16,12 @@ import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
 
 /**
- * Per-loader ServiceLoader-resolution + entrypoint smoke test.
+ * Per-loader {@code ServiceLoader}-resolution + entrypoint smoke test.
  *
- * <p>Runs on a production-faithful FML load: MDG NeoForge-mode's {@code unitTest} block boots FMLLoader and loads this
- * module as a mod (the same module setup the client uses), so the {@code net.neoforged.*} bridge classes load and the
- * {@code META-INF/services} provider metadata is present. This exercises the loader-agnostic core, the source-merge,
- * and ServiceLoader against a second loader.
+ * <p>Runs on a production-faithful FML load: MDG NeoForge-mode's {@code unitTest} block boots {@code FMLLoader} and
+ * loads this module as a mod (the same module setup the client uses), so the {@code net.neoforged.*} bridge classes
+ * load and the {@code META-INF/services} provider metadata is present. This exercises the loader-agnostic core, the
+ * source-merge, and {@code ServiceLoader} against a second loader.
  *
  * <p>The resolution test uses the exact classloader {@code Wdl.initialize} uses ({@code Wdl.class.getClassLoader()}),
  * asserting the discovered SPI binds to its implementation:
