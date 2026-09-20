@@ -10,16 +10,16 @@ import java.time.format.DateTimeParseException;
 import java.util.Optional;
 
 /**
- * The strict finished-timestamp read for restore-source discovery: the newest parseable finishedAt across a download
- * report log, or empty. Deliberately stricter than the report screen's lenient parser, which EPOCH-defaults a bad
- * timestamp; discovery must EXCLUDE such a candidate, never order it at the epoch.
+ * The strict finished-timestamp read for restore-source discovery: the newest parseable {@code finishedAt} across a
+ * download report log, or empty. Deliberately stricter than the report screen's lenient parser, which EPOCH-defaults a
+ * bad timestamp; discovery must EXCLUDE such a candidate, never order it at the epoch.
  */
 public final class StrictReportReader {
     private static final String KEY = "\"finishedAt\":\"";
 
     private StrictReportReader() {}
 
-    /** Newest parseable finishedAt across all lines; empty when none parses. IO errors propagate. */
+    /** Newest parseable {@code finishedAt} across all lines; empty when none parses. IO errors propagate. */
     public static Optional<Instant> latestFinishedAt(BufferedReader reader) throws IOException {
         Instant latest = null;
         String line;

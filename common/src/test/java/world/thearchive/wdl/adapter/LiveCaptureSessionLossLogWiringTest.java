@@ -96,10 +96,10 @@ class LiveCaptureSessionLossLogWiringTest {
     }
 
     /**
-     * A writer whose region and entity storages are never opened, since a map write reaches disk through MapDataWriter
-     * and never through a region storage. The openers throw rather than returning a stub, but the writer thread turns a
-     * throw into a failed SaveResult, so a test that binds this must assert the result did not fail for the guard to
-     * have any force.
+     * A writer whose region and entity storages are never opened, since a map write reaches disk through
+     * {@code MapDataWriter} and never through a region storage. The openers throw rather than returning a stub, but the
+     * writer thread turns a throw into a failed {@code SaveResult}, so a test that binds this must assert the result
+     * did not fail for the guard to have any force.
      */
     private static AsyncSaveWriter mapOnlyWriter() {
         return new AsyncSaveWriter(
@@ -117,7 +117,9 @@ class LiveCaptureSessionLossLogWiringTest {
                 new SaveProgress());
     }
 
-    /** A regular file where the {@code data/} directory belongs, so createDirectories throws for every write. */
+    /**
+     * A regular file where the {@code data/} directory belongs, so {@code createDirectories} throws for every write.
+     */
     private static Path unwritableDataRoot(Path save) throws Exception {
         Files.createDirectories(save);
         Files.writeString(save.resolve("data"), "not a directory");
