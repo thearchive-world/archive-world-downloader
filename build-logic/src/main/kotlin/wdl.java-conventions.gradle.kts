@@ -133,7 +133,7 @@ tasks.register("printCompileJavaVersion") {
     val meta = javaToolchains.compilerFor(java.toolchain).map { it.metadata }
     doLast {
         val m = meta.get()
-        println("${m.vendor} ${m.jvmVersion} (Java ${m.languageVersion.asInt()})")
+        println("${m.vendor} ${m.javaRuntimeVersion} (Java ${m.languageVersion.asInt()})")
     }
 }
 
