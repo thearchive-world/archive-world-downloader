@@ -32,9 +32,9 @@ public final class DownloadFolders {
 
     /**
      * Validate a typed {@code /wdl resume} name and resolve it to a RESUME target, or null to reject. The name is
-     * sanitized and contained to a single path component before the probe (resolveResume is verbatim and the resume
-     * argument is a greedyString that could otherwise traverse); a name that is empty after sanitize is rejected rather
-     * than resolved to a default, and a name that is not an existing wdl-managed folder is rejected.
+     * sanitized and contained to a single path component before the probe ({@code resolveResume} is verbatim and the
+     * resume argument is a {@code greedyString} that could otherwise traverse); a name that is empty after sanitize is
+     * rejected rather than resolved to a default, and a name that is not an existing wdl-managed folder is rejected.
      */
     public static @Nullable DownloadTarget resolveManagedResume(String typedName, Path savesDirectory) {
         String name = TargetResolver.sanitize(typedName);

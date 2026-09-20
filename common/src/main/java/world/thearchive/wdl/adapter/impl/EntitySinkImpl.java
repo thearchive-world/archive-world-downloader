@@ -75,13 +75,14 @@ public final class EntitySinkImpl implements EntitySink {
      * Save the entity, first detaching any leash the client cannot save, swapping in a sanitized copy of any equipment
      * or carried-item stack the client cannot save, and ordering a pet to sit from its synced pose, each on the entity
      * and its passengers. A leash with neither a resolved holder nor a delayed attachment is what vanilla's
-     * {@link Leashable.LeashData} codec requireNonNulls on, so {@link Entity#save} throws on it; and because save
-     * recurses into passengers, a passenger's unsavable leash aborts the whole vehicle group, dropping a chested mob's
-     * container with it. Detaching just those unsavable leash links loses only the leash, mirroring the reconstruct
-     * path which leaves an unresolved leash link unset. An item component the disk codec rejects costs either the
-     * entity or the whole field being written, so {@link #sanitizeStacks} repairs the stack up front rather than
-     * recovering from either outcome. Capture runs on the client main thread, so every swap is unobservable, and each
-     * detached leash, swapped stack, and sit order is restored before returning so the live entities are unchanged.
+     * {@link Leashable.LeashData} codec {@code requireNonNulls} on, so {@link Entity#save} throws on it; and because
+     * save recurses into passengers, a passenger's unsavable leash aborts the whole vehicle group, dropping a chested
+     * mob's container with it. Detaching just those unsavable leash links loses only the leash, mirroring the
+     * reconstruct path which leaves an unresolved leash link unset. An item component the disk codec rejects costs
+     * either the entity or the whole field being written, so {@link #sanitizeStacks} repairs the stack up front rather
+     * than recovering from either outcome. Capture runs on the client main thread, so every swap is unobservable, and
+     * each detached leash, swapped stack, and sit order is restored before returning so the live entities are
+     * unchanged.
      */
     private static boolean saveDroppingUnsavableLeashes(Entity entity, CompoundTag out) {
         List<DetachedLeash> detached = detachIfUnsavable(entity, null);
@@ -193,7 +194,7 @@ public final class EntitySinkImpl implements EntitySink {
 
     /**
      * Restore the server-authoritative {@code PersistenceRequired} the client never receives. Two vanilla mechanisms
-     * set it that the capture can reconstruct: the NameTagItem sets it on any {@link Mob} it renames, and
+     * set it that the capture can reconstruct: the {@code NameTagItem} sets it on any {@link Mob} it renames, and
      * {@code Mob.setItemSlotAndDropWhenKilled} sets it when a mob equips a picked-up item. A named mob and a mob whose
      * equipment proves such a pickup (an item impossible for its natural spawn,
      * {@link NaturalEquipment#wasLootEquipped}) are both stamped unconditionally, since either is a lossless
