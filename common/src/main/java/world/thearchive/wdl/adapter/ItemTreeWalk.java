@@ -13,8 +13,8 @@ import net.minecraft.nbt.ListTag;
  * are {@code {slot, item}}), a bundle (the {@code minecraft:bundle_contents} component, whose elements are bare item
  * NBT) and a sulfur cube (the {@code minecraft:sulfur_cube_content} component, whose value is a single bare item NBT;
  * the component does not exist before 26.2, so the branch is inert there). Operates only on already-serialized NBT,
- * never a live ItemStack, and uses only the post-1.20.5 component shape and band-stable get/instanceof ops, so one
- * definition stays byte-identical across the era bands. Each caller supplies its own per-item leaf action.
+ * never a live {@code ItemStack}, and uses only the post-1.20.5 component shape and band-stable get/instanceof ops, so
+ * one definition stays byte-identical across the era bands. Each caller supplies its own per-item leaf action.
  */
 final class ItemTreeWalk {
     private static final String COMPONENTS = "components";

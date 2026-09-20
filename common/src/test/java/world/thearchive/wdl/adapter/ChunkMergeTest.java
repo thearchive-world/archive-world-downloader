@@ -383,7 +383,7 @@ class ChunkMergeTest {
     }
 
     /**
-     * A crafter block entity. Both state keys are always present, because vanilla's saveAdditional writes them
+     * A crafter block entity. Both state keys are always present, because vanilla's {@code saveAdditional} writes them
      * unconditionally and this mod's chunk capture serializes the client's own block entity: a fixture that omits them
      * is a shape vanilla never produces, and a carry-forward tested against it proves nothing.
      */
