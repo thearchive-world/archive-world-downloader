@@ -121,12 +121,12 @@ class EntitySinkItemDegradationTest {
             return false;
         }
 
-        /** onEquipItem is emptied because its sound and game-event calls both throw here. */
+        /** {@code onEquipItem} is emptied because its sound and game-event calls both throw here. */
         @Override
         public void onEquipItem(EquipmentSlot slot, ItemStack oldItem, ItemStack newItem) {}
     }
 
-    /** A headless ItemEntity double carrying a caller-set stack. */
+    /** A headless {@code ItemEntity} double carrying a caller-set stack. */
     private static final class DropItem extends ItemEntity {
         private DropItem() {
             super(EntityTypes.ITEM, HeadlessLevel.get());

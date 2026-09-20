@@ -18,7 +18,7 @@ import world.thearchive.wdl.core.GameRuleResolution;
 import world.thearchive.wdl.core.WorldOutputConfig;
 
 /**
- * Per-band {@code level.dat} axis: build the metadata for a captured world.
+ * Per-band level.dat axis: build the metadata for a captured world.
  *
  * <p>A multiplayer client cannot recover the server's worldgen ({@code LEVEL_STEM}, {@code WORLD_PRESET} and the noise
  * settings it needs are never synced), so the captured world is a <b>superflat VOID</b> world (all air) for
@@ -96,8 +96,8 @@ public interface LevelDataWriter {
     /**
      * A built {@code WorldData} paired with the registries needed to serialize it, the game-rule resolution (the
      * effective rules were already applied to the world data; the diagnostics are for the caller to log and surface),
-     * and the two values {@link #save} writes to the save-side SavedData files that this band's {@code WorldData} no
-     * longer carries.
+     * and the two values {@link #save} writes to the save-side {@code SavedData} files that this band's
+     * {@code WorldData} no longer carries.
      *
      * <p>Do not move those last two onto the writer: it is one shared instance, so two downloads whose open and
      * finalize interleave would overwrite each other's values and the loser's save would abort before level.dat exists.

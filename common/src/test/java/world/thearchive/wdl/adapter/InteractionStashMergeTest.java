@@ -88,8 +88,8 @@ class InteractionStashMergeTest {
 
     /**
      * A right-click on the north face of a default-facing bookshelf at {@code pos} that resolves to {@code slot},
-     * reproducing vanilla SelectableSlotContainer.getHitSlot (three columns, two rows): the hit aims at the center of
-     * that slot's section.
+     * reproducing vanilla {@code SelectableSlotContainer.getHitSlot} (three columns, two rows): the hit aims at the
+     * center of that slot's section.
      */
     private static BlockHitResult bookshelfHit(BlockPos pos, int slot) {
         double columnCenter = (slot % 3 + 0.5) / 3.0;

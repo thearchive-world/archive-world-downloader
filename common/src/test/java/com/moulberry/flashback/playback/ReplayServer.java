@@ -4,9 +4,9 @@
 package com.moulberry.flashback.playback;
 
 /**
- * Bare stand-in at Flashback's real class name so FlashbackReplayProbe's Class.forName resolution and isInstance check
- * can be exercised without a dependency on the Flashback mod. It extends the local-server stand-in because the real
- * Flashback ReplayServer extends IntegratedServer, and that relation is the point: the probe must match the subclass
- * and refuse the superclass.
+ * Bare stand-in at Flashback's real class name so {@code FlashbackReplayProbe}'s {@code Class.forName} resolution and
+ * {@code isInstance} check can be exercised without a dependency on the Flashback mod. It extends the local-server
+ * stand-in because the real Flashback {@code ReplayServer} extends {@code IntegratedServer}, and that relation is the
+ * point: the probe must match the subclass and refuse the superclass.
  */
 public final class ReplayServer extends LocalServer {}

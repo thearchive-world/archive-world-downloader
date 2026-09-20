@@ -21,8 +21,8 @@ import org.slf4j.LoggerFactory;
  * forwards log4j/slf4j to {@code logs/latest.log} but does not forward JUL, so a fail-soft warning a {@code core/}
  * class emits (it catches an I/O failure, logs, and keeps the save openable) is invisible in the one place a user or
  * developer looks. {@link #install()} attaches a forwarding handler to the {@code world.thearchive.wdl} JUL namespace
- * (every {@code core/} logger is named under it), so those records reach {@code latest.log} without {@code core/}
- * taking any MC or slf4j dependency.
+ * (every {@code core/} logger is named under it), so those records reach latest.log without {@code core/} taking any MC
+ * or slf4j dependency.
  *
  * <p>Scoped on purpose: it forwards only our own namespace, never the JVM-global JUL stream, so it cannot capture
  * another mod's logging in the shared client and needs no new dependency (slf4j is already on this layer's classpath
