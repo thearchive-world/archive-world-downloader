@@ -37,11 +37,11 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.13.2 {@code level.dat} writer for the selected generator: the default superflat VOID (a single air layer over the
- * void biome), or the vanilla DEFAULT/FLAT presets. Pre-1.16 {@code level.dat} records only the generator name and its
- * options string, so no worldgen registries are reconstructed here. The captured chunks always supply the real terrain;
- * the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the server's
- * actual land (the server's seed is not recoverable from a client).
+ * 1.13.2 level.dat writer for the selected generator: the default superflat VOID (a single air layer over the void
+ * biome), or the vanilla DEFAULT/FLAT presets. Pre-1.16 level.dat records only the generator name and its options
+ * string, so no worldgen registries are reconstructed here. The captured chunks always supply the real terrain; the
+ * generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the server's actual
+ * land (the server's seed is not recoverable from a client).
  */
 public final class LevelDataWriterImpl implements LevelDataWriter {
     private static final Logger LOGGER = LogManager.getLogger(LevelDataWriterImpl.class);
@@ -55,8 +55,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
      * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
      * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
      * Every curated rule is a boolean here; a curated rule with no rule at this band is dropped at runtime by
-     * {@link #curatedGameRules} and skipped by {@link #applyGameRules}. The user's gamerule.* overrides, keyed by band
-     * id, are validated and applied on top of this (see {@link WorldOutputConfig}).
+     * {@link #curatedGameRules} and skipped by {@link #applyGameRules}. The user's {@code gamerule.*} overrides, keyed
+     * by band id, are validated and applied on top of this (see {@link WorldOutputConfig}).
      */
     private static final List<CuratedSpec> CURATED_GAME_RULES = buildCuratedGameRules();
 

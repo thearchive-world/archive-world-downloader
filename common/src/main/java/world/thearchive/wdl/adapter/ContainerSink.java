@@ -30,8 +30,8 @@ public interface ContainerSink {
 
     /**
      * Set {@code "Items"} on a copy of {@code blockEntityTag} from {@code capturedItemsHolder}, leaving every other
-     * field intact (id, x/y/z, CustomName, ...): the captured chunk's block entity gains its real contents with no
-     * clobber. The input tag is not mutated.
+     * field intact (id, x/y/z, {@code CustomName}, ...): the captured chunk's block entity gains its real contents with
+     * no clobber. The input tag is not mutated.
      */
     CompoundTag merge(CompoundTag blockEntityTag, CompoundTag capturedItemsHolder);
 }

@@ -27,9 +27,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * level.dat round-trip: the writer produces a superflat VOID world whose Data tag, written to a real compressed
- * level.dat and read back, preserves the seed, DataVersion, and the flat-void generator name. At 1.15.2 the generator
- * is stored as a {@code generatorName} plus its options in the Data tag (the void world uses the {@code flat} preset),
- * not as the per-dimension {@code WorldGenSettings} of 1.16 and later.
+ * level.dat and read back, preserves the seed, {@code DataVersion}, and the flat-void generator name. At 1.15.2 the
+ * generator is stored as a {@code generatorName} plus its options in the Data tag (the void world uses the {@code flat}
+ * preset), not as the per-dimension {@code WorldGenSettings} of 1.16 and later.
  */
 class LevelDatRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();

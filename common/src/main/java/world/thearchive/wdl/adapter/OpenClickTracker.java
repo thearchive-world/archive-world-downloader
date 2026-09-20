@@ -76,7 +76,7 @@ public final class OpenClickTracker {
      * is the load-bearing filter. A placement target, door, or lever reports no provider and stays unlatched; a latched
      * click on one could only supersede real intents. The ender chest is the one vanilla menu-opening block with no
      * provider (its menu is built in the block's use handler over the per-player ender container), so it is latched by
-     * its block entity; every other openMenu block either overrides {@code getMenuProvider} or has a
+     * its block entity; every other {@code openMenu} block either overrides {@code getMenuProvider} or has a
      * {@code MenuProvider} block entity (verified across 1.21.11). A server GUI opened from a provider-less block falls
      * into the documented {@link #FRESH_WINDOW_TICKS} leak class instead of the chain.
      */
@@ -91,8 +91,8 @@ public final class OpenClickTracker {
 
     /**
      * Vanilla's own gate: sneaking with a non-empty hand skips the block's use entirely and places the item, so no menu
-     * can open. Identical predicate on both sides (MultiPlayerGameMode / ServerPlayerGameMode), so a click in this
-     * state owes no open and must not be latched.
+     * can open. Identical predicate on both sides ({@code MultiPlayerGameMode} / {@code ServerPlayerGameMode}), so a
+     * click in this state owes no open and must not be latched.
      */
     private static boolean suppressesBlockUse(Player player) {
         boolean haveSomethingInOurHands = !player.getMainHandItem().isEmpty() || !player.getOffhandItem().isEmpty();

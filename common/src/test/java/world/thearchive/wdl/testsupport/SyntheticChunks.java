@@ -42,7 +42,7 @@ public final class SyntheticChunks {
      */
     private static final ChunkStatus FULL = ChunkStatus.field_18865;
 
-    /** A recognizable WORLD_SURFACE payload so the round-trip can assert the kept heightmap survives. */
+    /** A recognizable {@code WORLD_SURFACE} payload so the round-trip can assert the kept heightmap survives. */
     public static final long WORLD_SURFACE_SENTINEL = 0x0102030405060708L;
 
     /** Uniform per-cell light levels for the lit fixture, distinct so a swapped layer is caught. */

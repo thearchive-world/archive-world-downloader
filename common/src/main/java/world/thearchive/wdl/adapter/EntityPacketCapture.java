@@ -269,8 +269,8 @@ final class EntityPacketCapture
     /**
      * Feed 1, arrivals: register always (a spawn is the fresh codec base and overwrites the anchor; bits survive),
      * sample unless the suppression predicate or the same-flush commit rule blocks it. The commit rule drops an arrival
-     * any same-bundle SetPassengers names anywhere: a ridden vehicle pairs at its passenger's boosted range, the plugin
-     * chair pattern, so its arrival distance over-claims; the one collected set also feeds the ridden bit (a
+     * any same-bundle {@code SetPassengers} names anywhere: a ridden vehicle pairs at its passenger's boosted range,
+     * the plugin chair pattern, so its arrival distance over-claims; the one collected set also feeds the ridden bit (a
      * passenger-named qualifying arrival is thereby suppressed although its own pairing is unboosted, a deliberate
      * one-set concession, under-claim). Reads the player and dimension from the client singleton at netty time; the
      * render-distance bound caps what a stale read can commit.

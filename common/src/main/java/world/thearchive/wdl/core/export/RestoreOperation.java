@@ -166,7 +166,7 @@ public final class RestoreOperation {
 
         /**
          * The kept-aside paths a failure notice names; empty when nothing stays staged, which covers a plain success
-         * and a RELOCATED move alike (the relocated sibling is reported by relocatedTo).
+         * and a RELOCATED move alike (the relocated sibling is reported by {@code relocatedTo}).
          */
         public List<Path> survivingPaths() {
             return survivingPaths;
@@ -487,9 +487,9 @@ public final class RestoreOperation {
     }
 
     /**
-     * The next free attempt directory under the temporary root, created: folderName-1, then -2 on collision. A vanished
-     * temporary root (another instance emptied and removed it between our create calls) is re-created and the same name
-     * retried.
+     * The next free attempt directory under the temporary root, created: {@code folderName}-1, then -2 on collision. A
+     * vanished temporary root (another instance emptied and removed it between our create calls) is re-created and the
+     * same name retried.
      */
     private Path createAttemptDirectory(Path temporaryRoot) throws IOException {
         Files.createDirectories(temporaryRoot);
@@ -545,8 +545,8 @@ public final class RestoreOperation {
     }
 
     /**
-     * One point-in-time folder-open probe; an absent lock file is unlocked (vanilla isLocked semantics). WRITE only,
-     * never CREATE: the probe must never mutate the folder it judges. Shared with the sweep.
+     * One point-in-time folder-open probe; an absent lock file is unlocked (vanilla {@code isLocked} semantics). WRITE
+     * only, never CREATE: the probe must never mutate the folder it judges. Shared with the sweep.
      */
     static boolean probeLocked(Path folder) {
         Path lockFile = folder.resolve("session.lock");
@@ -609,7 +609,7 @@ public final class RestoreOperation {
         }
     }
 
-    /** A parked probe channel paired with the fileKey of the file it was opened on (may be null). */
+    /** A parked probe channel paired with the {@code fileKey} of the file it was opened on (may be null). */
     private static final class ParkedChannel {
         private final FileChannel channel;
         private final @Nullable Object fileKey;
@@ -622,8 +622,9 @@ public final class RestoreOperation {
 
     /**
      * Whether a parked entry no longer identifies the file now at its key path. Only a definite mismatch of two known
-     * fileKeys is stale; a null on either side (a filesystem that reports none, a vanished file) leaves the stale check
-     * impossible, so the conservative answer is not-stale and the existing re-probe-through behavior stands.
+     * {@code fileKeys} is stale; a null on either side (a filesystem that reports none, a vanished file) leaves the
+     * stale check impossible, so the conservative answer is not-stale and the existing re-probe-through behavior
+     * stands.
      */
     private static boolean isStaleParked(ParkedChannel parked, @Nullable Object currentFileKey) {
         return parked.fileKey != null && currentFileKey != null && !parked.fileKey.equals(currentFileKey);
@@ -673,7 +674,7 @@ public final class RestoreOperation {
     }
 
     /**
-     * Whether any attempt under the saves directory's temporary root stages folderName in its aside or install
+     * Whether any attempt under the saves directory's temporary root stages {@code folderName} in its aside or install
      * directory, child names compared case-insensitively. An unreadable scan reports false after one warning: the
      * caller fails open.
      */
@@ -793,15 +794,15 @@ public final class RestoreOperation {
      * The roll-back-only sweep of torn restore attempts left under the saves temporary root, plus the age-gated cleanup
      * of orphaned export {@code .part} files. It lives beside the operation because one file owns the attempt-directory
      * layout. {@link #hasWork} is a main-thread-cheap dispatch predicate (a signature memo with a TTL and per-attempt
-     * blocker kinds; it may probe session locks but never opens {@code attempt.lock} and never takes the RESTORING
-     * flip); {@link #run} is the mutating pass a worker thread performs under that flip.
+     * blocker kinds; it may probe session locks but never opens attempt.lock and never takes the RESTORING flip);
+     * {@link #run} is the mutating pass a worker thread performs under that flip.
      *
      * <p>The sweep only ever rolls a torn attempt back toward its pre-restore state or disposes an unreachable
      * kept-aside; it never installs a clean export (an interrupted restore is re-driven by the operation, not completed
      * here) and never overwrites a live world folder.
      */
     public static final class RestoreSweep {
-        /** The memo staleness window: past it, hasWork re-evaluates the per-attempt blocker kinds. */
+        /** The memo staleness window: past it, {@code hasWork} re-evaluates the per-attempt blocker kinds. */
         public static final long TTL_MS = 5 * 60_000;
 
         /** The shared per-attempt dispatch ceiling; a blocked attempt waits for relaunch past it. */
@@ -851,7 +852,7 @@ public final class RestoreOperation {
             runStartBarrier = barrier;
         }
 
-        /** The blocker that keeps a swept attempt (or a spared part) around, driving hasWork past the TTL. */
+        /** The blocker that keeps a swept attempt (or a spared part) around, driving {@code hasWork} past the TTL. */
         enum Kind {
             PROBE_SHAPED, IO_FAILURE, AGE_SHAPED
         }
@@ -899,8 +900,8 @@ public final class RestoreOperation {
          * completed run's memo. A changed layout re-arms immediately; an unchanged layout stays quiet until the TTL,
          * past which the per-attempt blocker kinds decide (a probe-shaped block dispatches only on a fail-to-pass flip
          * of its aside session lock, an io-failure block dispatches while its bound remains, an age-shaped part
-         * dispatches once it crosses the hour). This never opens {@code attempt.lock} and never takes the RESTORING
-         * flip; it may open session locks.
+         * dispatches once it crosses the hour). This never opens attempt.lock and never takes the RESTORING flip; it
+         * may open session locks.
          */
         public static boolean hasWork(Path savesDirectory) {
             long now = clock.getAsLong();
@@ -918,7 +919,7 @@ public final class RestoreOperation {
         }
 
         /**
-         * The mutating sweep: per attempt under the temporary root, take {@code attempt.lock} (a held lock means a live
+         * The mutating sweep: per attempt under the temporary root, take attempt.lock (a held lock means a live
          * attempt, skipped this pass) and branch on whether the aside, the install, and the live folder exist, rolling
          * the torn attempt back or disposing the kept-aside; then delete orphaned export parts older than an hour.
          * Refreshes the memo from the resulting layout.
