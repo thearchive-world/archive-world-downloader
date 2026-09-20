@@ -602,7 +602,6 @@ public final class WdlDownloadsScreen extends GuiScreen {
         setPrimaryActive(TargetResolver.hasUsableName(text));
     }
 
-    /** Set the primary action's enabled state, explaining a disabled Download with the why tooltip. */
     private void setPrimaryActive(boolean active) {
         if (this.primaryButton == null) {
             return;
