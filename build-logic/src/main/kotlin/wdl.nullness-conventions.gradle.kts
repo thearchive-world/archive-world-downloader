@@ -12,8 +12,8 @@ plugins {
 // back through VersionCatalogsExtension.
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
-// The Error Prone javac plugin runs inside the compile toolchain, and the pinned release (2.50) is a
-// Java 21 build that a lower toolchain cannot load. A band below that floor therefore runs
+// The Error Prone javac plugin runs inside the compile toolchain, and the Error Prone release the
+// catalog pins is a Java 21 build that a lower toolchain cannot load. A band below that floor runs
 // annotations-only, the same posture the deep Java 8 bands take. The nullness verdict is not wholly
 // lost: core is byte-identical to the bands that do run NullAway, so it carries their verdict;
 // everything else in this band's tree goes unchecked.
