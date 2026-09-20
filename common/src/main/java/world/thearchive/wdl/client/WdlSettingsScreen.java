@@ -223,9 +223,8 @@ public final class WdlSettingsScreen extends Screen {
     public void render(int mouseX, int mouseY, float partialTick) {
         this.method_1043();
         // The Defaults button would only revert to a state the draft is already in, so it grays out (never
-        // hides, keeping the footer stable and the feature discoverable) while the draft equals defaults, and
-        // a tooltip on the gray state says why. Kept current with live edits by resolving before the widgets
-        // draw; the equality check gates the write so the tooltip is rebuilt only when the state flips.
+        // hides, keeping the footer stable and the feature discoverable) while the draft equals defaults. Kept
+        // current with live edits by resolving before the widgets draw.
         if (this.defaults != null) {
             boolean atDefaults = this.draft.isAtDefaults(this::isRowVisible);
             if (this.defaults.field_1055 == atDefaults) {
