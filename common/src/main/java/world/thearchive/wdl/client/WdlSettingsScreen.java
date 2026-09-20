@@ -262,7 +262,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         int defaultsX = doneX + buttonWidth + GAP;
         int discardX = defaultsX + buttonWidth + GAP;
         addButton(new ActionButton(doneX, footerY, buttonWidth, 20, I18n.format("gui.done"), this::closeAndSave));
-        // This band's button carries no hover-tooltip parameter, so the Defaults button has no hover explanation.
         this.defaults = addButton(new ActionButton(defaultsX, footerY, buttonWidth, 20,
                 I18n.format("wdl.settings.defaults"), this::onDefaults));
         // the last button absorbs the division remainder so the footer's right edge meets the control edge

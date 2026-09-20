@@ -468,7 +468,6 @@ public final class WdlDownloadsScreen extends GuiScreen {
             boolean primaryActive) {
         int total = BUTTON_WIDTH * 2 + BUTTON_GAP;
         int startX = (this.width - total) / 2;
-        // This band's button carries no hover-tooltip parameter, so the disabled-primary explanation is not shown.
         ActionButton primary = new ActionButton(startX, buttonRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
                 primaryLabel.getUnformattedText(), onPrimary);
         primary.enabled = primaryActive;
