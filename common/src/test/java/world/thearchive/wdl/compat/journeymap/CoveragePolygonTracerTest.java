@@ -31,8 +31,8 @@ final class CoveragePolygonTracerTest {
     }
 
     /**
-     * The two tone-rectangle sets JourneyMapOverlayDriver.buildBatch selects: fine partition, or coarsened past the
-     * cap.
+     * The two tone-rectangle sets {@code JourneyMapOverlayDriver.buildBatch} selects: fine partition, or coarsened past
+     * the cap.
      */
     private static int[][] toneRectangles(long[] saved, long[] covered) {
         OverlayHighlights.TonePartition part = OverlayHighlights.partitionTones(saved, covered);

@@ -91,17 +91,17 @@ final class EntityPacketCapture
 
     /**
      * Range-10 types excluded from range sampling, for two reasons. The player-mountables: a riding player raises their
-     * broadcast range to the player's own (TrackedEntity.getEffectiveRange takes the max over indirect passengers), and
-     * passenger state is not visible at AddEntity time, so a boosted sample would over-claim the range. The Display
-     * types: category-configured servers commonly track their display category farther than the decorations' categories
-     * (a plugin hologram near the player would over-claim teal until the first decoration takes over). Only range-10
-     * non-decoration types are otherwise sampled, so this lists only members whose vanilla clientTrackingRange is 10:
-     * the range-8 mounts (all minecarts, the mule) are never sampled and need no entry. Re-derive per band from
-     * PlayerRideable, ItemSteerable, Boat, AbstractHorse, canAddPassenger overrides, and the Display hierarchy, keeping
-     * only the range-10 members; a missing entry over-claims coverage, the failure the measured range exists to
-     * prevent. Interaction is range 10, non-mountable, and absent from vanilla worlds; its real-world use is plugin
-     * frameworks that teleport interaction and display pairs to follow players, the hazard profile that excluded the
-     * Displays.
+     * broadcast range to the player's own ({@code TrackedEntity.getEffectiveRange} takes the max over indirect
+     * passengers), and passenger state is not visible at {@code AddEntity} time, so a boosted sample would over-claim
+     * the range. The Display types: category-configured servers commonly track their display category farther than the
+     * decorations' categories (a plugin hologram near the player would over-claim teal until the first decoration takes
+     * over). Only range-10 non-decoration types are otherwise sampled, so this lists only members whose vanilla
+     * {@code clientTrackingRange} is 10: the range-8 mounts (all minecarts, the mule) are never sampled and need no
+     * entry. Re-derive per band from {@code PlayerRideable}, {@code ItemSteerable}, Boat, {@code AbstractHorse},
+     * {@code canAddPassenger} overrides, and the Display hierarchy, keeping only the range-10 members; a missing entry
+     * over-claims coverage, the failure the measured range exists to prevent. Interaction is range 10, non-mountable,
+     * and absent from vanilla worlds; its real-world use is plugin frameworks that teleport interaction and display
+     * pairs to follow players, the hazard profile that excluded the Displays.
      */
     private static final Set<EntityType<?>> RANGE_SAMPLING_EXCLUSIONS = Set.of(
             EntityType.BOAT,
@@ -221,8 +221,8 @@ final class EntityPacketCapture
     /**
      * Feed 1, arrivals: register always (a spawn is the fresh codec base and overwrites the anchor; bits survive),
      * sample unless the suppression predicate or the same-flush commit rule blocks it. The commit rule drops an arrival
-     * any same-bundle SetPassengers names anywhere: a ridden vehicle pairs at its passenger's boosted range, the plugin
-     * chair pattern, so its arrival distance over-claims; the one collected set also feeds the ridden bit (a
+     * any same-bundle {@code SetPassengers} names anywhere: a ridden vehicle pairs at its passenger's boosted range,
+     * the plugin chair pattern, so its arrival distance over-claims; the one collected set also feeds the ridden bit (a
      * passenger-named qualifying arrival is thereby suppressed although its own pairing is unboosted, a deliberate
      * one-set concession, under-claim). Reads the player and dimension from the client singleton at netty time; the
      * render-distance bound caps what a stale read can commit.
