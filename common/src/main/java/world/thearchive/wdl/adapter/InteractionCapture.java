@@ -247,7 +247,7 @@ public final class InteractionCapture {
     /**
      * A jukebox disc, placed shulker, or placed beehive: one merge-ready single-key holder
      * ({@code "RecordItem"}/{@code "Items"}/{@code "Bees"}). The gate keeps it whole only when the authoritative
-     * block-state confirms the content is present (HAS_RECORD, or the expected placed block type).
+     * block-state confirms the content is present ({@code HAS_RECORD}, or the expected placed block type).
      */
     record HolderCandidate(InteractionKind kind, CompoundTag holder) implements Candidate {}
 
@@ -609,8 +609,8 @@ public final class InteractionCapture {
     /**
      * Serialize {@code disc} to a holder carrying the jukebox disc ({@code "RecordItem"}) plus the just-started playing
      * state a fresh insert leaves ({@code "IsPlaying"} true, {@code "RecordStartTick"} and {@code "TickCount"} zero).
-     * Vanilla loadAdditional restores that state, so the saved jukebox plays and emits the note particles; the disc
-     * sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
+     * Vanilla {@code loadAdditional} restores that state, so the saved jukebox plays and emits the note particles; the
+     * disc sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
      */
     static CompoundTag captureRecordItem(ItemStack disc) {
         CompoundTag holder = new CompoundTag();

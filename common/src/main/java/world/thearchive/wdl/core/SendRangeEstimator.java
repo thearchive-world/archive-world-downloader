@@ -10,7 +10,7 @@ import java.util.Map;
  * The per-dimension entity send range for the two-tone overlay: one running max over every accepted sample, floored to
  * chunks and clamped to the live effective render distance at read. A sample is a horizontal block distance at which
  * the server demonstrably served a qualifying entity; the three feeds and every over-claim guard live in
- * SendRangeSampler and the adapter, this class only fuses accepted samples.
+ * {@code SendRangeSampler} and the adapter, this class only fuses accepted samples.
  *
  * Trade-offs, deliberate: the max never shrinks within a session (no sound client-side downward signal exists; a
  * decoration removal at close range is indistinguishable from the frame being broken). On a Spigot-family per-category
@@ -43,10 +43,10 @@ public final class SendRangeEstimator {
     }
 
     /**
-     * The covered-disc radius in chunks: the floored running max, clamped to capChunks (the live effective render
-     * distance). Clamping at read is deliberate: a sample proves the scaled range regardless of the later cap, so the
-     * max legitimately resurfaces when the view distance rises again; the covered index's per-center caps keep the
-     * retroactive paint honest.
+     * The covered-disc radius in chunks: the floored running max, clamped to {@code capChunks} (the live effective
+     * render distance). Clamping at read is deliberate: a sample proves the scaled range regardless of the later cap,
+     * so the max legitimately resurfaces when the view distance rises again; the covered index's per-center caps keep
+     * the retroactive paint honest.
      */
     public synchronized int radiusChunks(String dimensionId, int capChunks) {
         Integer max = maxByDimension.get(dimensionId);

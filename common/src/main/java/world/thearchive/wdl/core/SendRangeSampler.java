@@ -71,7 +71,7 @@ public final class SendRangeSampler {
         armWindow(); // capture start is itself an anomaly: a teleport landing just before start predates the sampler
     }
 
-    /** Netty side: the id appeared anywhere in a SetPassengers packet; permanently feed-3-ineligible. */
+    /** Netty side: the id appeared anywhere in a {@code SetPassengers} packet; permanently feed-3-ineligible. */
     public void markRidden(int id) {
         book.compute(id, (key, entry) -> entry == null
                 ? new Entry(false, 0.0, 0.0, false, true)
@@ -127,7 +127,7 @@ public final class SendRangeSampler {
                 : new Entry(true, x, z, entry.moved, entry.ridden));
     }
 
-    /** Main side: a prime registration fills a missing anchor only (putIfAbsent shape); bits survive. */
+    /** Main side: a prime registration fills a missing anchor only ({@code putIfAbsent} shape); bits survive. */
     public void registerSeed(int id, double x, double z) {
         book.compute(id, (key, entry) -> {
             if (entry == null) {
@@ -176,7 +176,7 @@ public final class SendRangeSampler {
         sweepArmGeneration.incrementAndGet(); // every arming re-arms the pending sweep, uniformly
     }
 
-    /** Netty side: a teed PlayerPosition or Respawn packet. */
+    /** Netty side: a teed {@code PlayerPosition} or Respawn packet. */
     public void onAnomalyPacket() {
         armWindow();
     }
@@ -187,7 +187,7 @@ public final class SendRangeSampler {
         armWindow();
     }
 
-    /** Netty side: any SetCamera latches flag A; the id is deliberately not read. */
+    /** Netty side: any {@code SetCamera} latches flag A; the id is deliberately not read. */
     public void onSetCamera() {
         cameraLatchGeneration.incrementAndGet();
     }
