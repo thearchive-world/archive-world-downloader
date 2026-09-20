@@ -66,7 +66,10 @@ class OpenClickIntentTest {
                 "a marker exactly WINDOW ticks old is still fresh and poisons this open");
     }
 
-    /** Marker freshness is the age nowTick minus clickTick, not any function of the absolute tick values. */
+    /**
+     * Marker freshness is the age {@code nowTick} minus {@code clickTick}, not any function of the absolute tick
+     * values.
+     */
     @Test
     void aFreshSupersededMarkerSurvivesLargeAbsoluteTicks() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
@@ -281,7 +284,7 @@ class OpenClickIntentTest {
                 "an intent WINDOW ticks old is still fresh, measured from its own press tick");
     }
 
-    /** clear() drops a pending vehicle intent (the dimension-rebind and respawn cases). */
+    /** {@code clear()} drops a pending vehicle intent (the dimension-rebind and respawn cases). */
     @Test
     void clearDropsPendingVehicleIntent() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
@@ -467,7 +470,7 @@ class OpenClickIntentTest {
                 "a stale-resolved click is cleared and cannot resurrect on an earlier tick");
     }
 
-    /** clear() drops a pending click without acting on it, so a following resolve is NONE (the rebind case). */
+    /** {@code clear()} drops a pending click without acting on it, so a following resolve is NONE (the rebind case). */
     @Test
     void clearDropsPendingClick() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
@@ -479,7 +482,7 @@ class OpenClickIntentTest {
                 "a cleared click must not seed an open, even on the same tick it was recorded");
     }
 
-    /** clear() drops superseded markers too, so an old dimension's burst cannot poison the new one's opens. */
+    /** {@code clear()} drops superseded markers too, so an old dimension's burst cannot poison the new one's opens. */
     @Test
     void clearDropsSupersededMarkers() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);

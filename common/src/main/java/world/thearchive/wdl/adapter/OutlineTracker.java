@@ -152,7 +152,7 @@ public final class OutlineTracker {
         lastLevel = null;
     }
 
-    /** Injected once from Wdl.initialize so the outline scan skips Bobby's cached chunks. */
+    /** Injected once from {@code Wdl.initialize} so the outline scan skips Bobby's cached chunks. */
     public void useBobbyFilter(BobbyChunkFilter filter) {
         this.bobbyFilter = filter;
     }

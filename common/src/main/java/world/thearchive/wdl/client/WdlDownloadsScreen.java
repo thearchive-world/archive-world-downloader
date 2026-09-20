@@ -365,8 +365,9 @@ public final class WdlDownloadsScreen extends Screen {
      * The newer-release banner: a bordered footer notice below the button row, sized to its content (capped at the list
      * band) and centered, added when a result is held and not dismissed, re-evaluated on every open so a result that
      * lands after the first open still surfaces; dismissal is remembered on the launch-scoped check, not this recreated
-     * screen. It deliberately ignores showChatMessages: silencing chat must not hide an affordance inside the mod's own
-     * UI. Returns the y where the content below the band resumes, {@code y} untouched when the banner is hidden.
+     * screen. It deliberately ignores {@code showChatMessages}: silencing chat must not hide an affordance inside the
+     * mod's own UI. Returns the y where the content below the band resumes, {@code y} untouched when the banner is
+     * hidden.
      */
     private int addUpdateBanner(int y) {
         UpdateCheck updateCheck = Wdl.updateCheck();
@@ -683,7 +684,7 @@ public final class WdlDownloadsScreen extends Screen {
         }
     }
 
-    /** Request that the running capture stop; tick() swaps to the saving widget set once the state flips. */
+    /** Request that the running capture stop; {@code tick()} swaps to the saving widget set once the state flips. */
     private void stopCapture() {
         this.onStop.run();
     }
@@ -1271,7 +1272,7 @@ public final class WdlDownloadsScreen extends Screen {
                 }
             }
 
-            /** The restore chip's tooltip: the action, the source zip, and the snapshot fate by zipOnResume. */
+            /** The restore chip's tooltip: the action, the source zip, and the snapshot fate by {@code zipOnResume}. */
             private Component restoreTooltip(Path source) {
                 String sourceName = source.getFileName().toString();
                 if (!zipOnResume) {
