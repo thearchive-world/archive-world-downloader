@@ -27,9 +27,9 @@ import org.junit.jupiter.api.Test;
  * in the PITest {@code targetClasses} or listed in {@link #ACKNOWLEDGED_EXCLUDES} here. A new class that is neither
  * fails the build until someone classifies it.
  *
- * <p>The allowlist is read from {@code build.gradle.kts} rather than duplicated, so the enrollment registry and the
- * classes PIT actually mutates cannot drift: a class listed here but absent from {@code targetClasses} (believed
- * covered yet never mutated) is caught too.
+ * <p>The allowlist is read from build.gradle.kts rather than duplicated, so the enrollment registry and the classes PIT
+ * actually mutates cannot drift: a class listed here but absent from {@code targetClasses} (believed covered yet never
+ * mutated) is caught too.
  */
 class PitestAllowlistEnrollmentTest {
     private static final Path SOURCE_ROOT = Path.of("src/main/java/world/thearchive/wdl");
@@ -201,9 +201,9 @@ class PitestAllowlistEnrollmentTest {
 
     /**
      * The structural predicate: every top-level {@code core/} class (which imports no {@code net.minecraft} by the
-     * checkCoreImports invariant) and every top-level {@code adapter/} class that imports {@code net.minecraft} (a
-     * transform operates on vanilla NBT / value types). Subpackages are out of scope by not being scanned, matching the
-     * allowlist's top-level-only reach.
+     * {@code checkCoreImports} invariant) and every top-level {@code adapter/} class that imports {@code net.minecraft}
+     * (a transform operates on vanilla NBT / value types). Subpackages are out of scope by not being scanned, matching
+     * the allowlist's top-level-only reach.
      */
     private static Set<String> fidelityCandidates() {
         Set<String> candidates = new TreeSet<>();

@@ -264,7 +264,7 @@ public final class Wdl {
      * Server-join hook: when {@code autoDownload} is enabled, begin a download on joining a remote world, only while
      * idle, through the same smart flow as the keybind. A folder that already exists (a same-day rejoin, or any rejoin
      * with the date suffix off) resumes it via the merge confirm, so Cancel on join aborts the auto-download; with
-     * confirmResume off it continues silently. The config is re-read so a hand-edit applies, and the idle and
+     * {@code confirmResume} off it continues silently. The config is re-read so a hand-edit applies, and the idle and
      * activation gates are checked here, so a join into the user's own local world stays a silent no-op. Two skips are
      * spoken: a restore in progress, and a world served from elsewhere with no server identity behind it, which is
      * refused aloud rather than started under a generic name. Every other skip cause stays silent.
@@ -537,8 +537,9 @@ public final class Wdl {
 
     /**
      * Open the download screen directly on the click, for the pause-menu button. The pause button is not
-     * chat-originated, so it needs none of the tick deferral openDownloadsScreen uses to survive Fabric's post-dispatch
-     * chat close; opening inline is what lets it work while a replay's paused timer has suspended the game tick.
+     * chat-originated, so it needs none of the tick deferral {@code openDownloadsScreen} uses to survive Fabric's
+     * post-dispatch chat close; opening inline is what lets it work while a replay's paused timer has suspended the
+     * game tick.
      */
     private static void openDownloadsScreenNow() {
         // The inline open consumes the deferred slot the same way a deferred open would. The slot holds any
@@ -664,7 +665,7 @@ public final class Wdl {
         }
     }
 
-    /** One toast per swept folder, converting the three SweepResult lists to their cleanup notices. */
+    /** One toast per swept folder, converting the three {@code SweepResult} lists to their cleanup notices. */
     private static void surfaceSweepOutcome(RestoreOperation.RestoreSweep.SweepResult result) {
         for (Path folder : result.movedBack()) {
             bridge.sendToast(ToastCopy.sweepMovedBack(folderLabel(folder)));

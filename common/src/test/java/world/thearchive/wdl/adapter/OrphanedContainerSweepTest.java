@@ -45,9 +45,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The orphaned open-time container and lectern loss: a container or lectern opened in a chunk that had already left the
  * keep-hot buffer is stashed by block pos, but the per-chunk flush only ever drains the still-buffered chunks, and the
- * chunk is never re-buffered (the allCaptured skip), so its captured contents were silently dropped. The trigger is the
- * normal way a storage base is downloaded: backtracking through chunks already flown past. The fix folds each such
- * residual holder into its on-disk chunk through a writer-thread read-modify-write
+ * chunk is never re-buffered (the {@code allCaptured} skip), so its captured contents were silently dropped. The
+ * trigger is the normal way a storage base is downloaded: backtracking through chunks already flown past. The fix folds
+ * each such residual holder into its on-disk chunk through a writer-thread read-modify-write
  * ({@link AsyncSaveWriter#submitChunkRewrite} over {@link RegionChunkWriter#rewriteExisting}), reusing the
  * {@link ContainerMerge} fold.
  *

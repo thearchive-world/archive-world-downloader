@@ -146,7 +146,7 @@ class FolderUnzipperTest {
         return target;
     }
 
-    /** Creates parents and writes the single byte contentByte at file. */
+    /** Creates parents and writes the single byte {@code contentByte} at file. */
     private static void write(Path file, int contentByte) throws IOException {
         Files.createDirectories(file.getParent());
         Files.write(file, new byte[] { (byte) contentByte });
