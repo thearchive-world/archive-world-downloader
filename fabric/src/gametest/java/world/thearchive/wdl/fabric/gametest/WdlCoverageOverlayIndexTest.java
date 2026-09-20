@@ -15,9 +15,9 @@ import world.thearchive.wdl.core.WdlConfig;
 /**
  * Coverage overlay data axis (no map overlay mod needed, this proves the wdl side): a real capture populates the
  * off-thread saved-chunk index under the live client dimension id, and the completed save clears it. It also pins the
- * renderCoverageOverlay toggle: a capture at the same spawn with the overlay off yields an empty highlight set even
- * while chunks are captured. The render integration itself is not exercised headless; this guards the record-site write
- * + facade + the clear + the overlay-enabled gate.
+ * {@code renderCoverageOverlay} toggle: a capture at the same spawn with the overlay off yields an empty highlight set
+ * even while chunks are captured. The render integration itself is not exercised headless; this guards the record-site
+ * write + facade + the clear + the overlay-enabled gate.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlCoverageOverlayIndexTest implements FabricClientGameTest {

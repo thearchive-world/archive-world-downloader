@@ -44,9 +44,9 @@ public class WdlPausedSaveCompletionTest implements FabricClientGameTest {
     }
 
     /**
-     * A capture stopped with zero recorded ticks: no chunk is captured, so finish() short-circuits before it builds a
-     * writer and runs the poke inline. Without that inline poke the controller has no route out of SAVING at all, since
-     * this driver is never ticked.
+     * A capture stopped with zero recorded ticks: no chunk is captured, so {@code finish()} short-circuits before it
+     * builds a writer and runs the poke inline. Without that inline poke the controller has no route out of SAVING at
+     * all, since this driver is never ticked.
      */
     private void nothingCapturedCompletesWithoutTick(ClientGameTestContext context) {
         DownloadTarget target = new DownloadTarget("wdl-paused-nothing", "wdl-paused-nothing", DownloadMode.NEW);
