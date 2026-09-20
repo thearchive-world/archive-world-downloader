@@ -75,7 +75,7 @@ class MapArchiveTest {
         return ids;
     }
 
-    /** A collecting sink: records each streamed (archiveId, dataTag), in order, and counts fires. */
+    /** A collecting sink: records each streamed ({@code archiveId}, {@code dataTag}), in order, and counts fires. */
     private static final class CollectingSink implements MapArchive.MapDataSink {
         final Map<Integer, NBTBase> streamed = new LinkedHashMap<>();
         int fires;

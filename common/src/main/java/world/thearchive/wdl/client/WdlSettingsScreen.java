@@ -537,7 +537,9 @@ public final class WdlSettingsScreen extends GuiScreen {
         return SettingsLayout.valueLabelKey(value);
     }
 
-    /** Attach the option's help tooltip to its control, only when the language file carries the key (helpKey). */
+    /**
+     * Attach the option's help tooltip to its control, only when the language file carries the key ({@code helpKey}).
+     */
     private void applyTooltip(Gui widget, String key) {
         String tooltipKey = SettingsLayout.optionTooltipKey(key);
         if (I18n.hasKey(tooltipKey)) {
