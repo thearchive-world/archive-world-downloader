@@ -9,8 +9,8 @@ import net.minecraft.world.level.GameRules;
 /**
  * Sets a gamerule with the command name taken from {@link GameRules.Key#getId()}, so a band rename cannot silently
  * no-op it. The framework's {@code runCommand} is void and swallows a failed command, so a hardcoded name that has
- * drifted across bands (1.21.5 renamed them to snake_case, e.g. doMobLoot to mob_drops) would set nothing while the run
- * stays green. Taking the name from the {@code GameRules.Key} field instead (e.g. {@code
+ * drifted across bands (1.21.5 renamed them to snake_case, e.g. {@code doMobLoot} to {@code mob_drops}) would set
+ * nothing while the run stays green. Taking the name from the {@code GameRules.Key} field instead (e.g. {@code
  * GameRules.RULE_DOMOBLOOT}) makes it compile-forced-correct per band: a port that names the wrong field does not
  * compile, and the right field carries the right command name.
  */

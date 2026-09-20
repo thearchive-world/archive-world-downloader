@@ -86,7 +86,9 @@ final class CaptureReadback {
         return names;
     }
 
-    /** The stored light nibbles of {@code layerKey} ("BlockLight"/"SkyLight") at section Y, or empty. */
+    /**
+     * The stored light nibbles of {@code layerKey} ({@code "BlockLight"}/{@code "SkyLight"}) at section Y, or empty.
+     */
     static Optional<byte[]> sectionLightLayer(CompoundTag chunkTag, int sectionY, String layerKey) {
         return chunkTag.getList("sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
                 .filter(section -> (section.contains("Y") ? section.getByte("Y") : Byte.MIN_VALUE) == sectionY)
