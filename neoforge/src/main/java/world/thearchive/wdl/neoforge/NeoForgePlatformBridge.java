@@ -157,10 +157,10 @@ final class NeoForgePlatformBridge extends AbstractPlatformBridge {
 
     /**
      * False, the opposite of the block axis, and by this loader's own design ("don't fire for spectators to match
-     * non-specific EntityInteract"). {@code EntityInteract} is posted only from {@code CommonHooks.onInteractEntity},
-     * called inside the else of the spectator branch of the patched {@code Player.interactOn}, and the client never
-     * reaches that method for a spectator anyway: both {@code MultiPlayerGameMode.interact} and {@code interactAt}
-     * return PASS for one after sending the packet.
+     * non-specific {@code EntityInteract}"). {@code EntityInteract} is posted only from
+     * {@code CommonHooks.onInteractEntity}, called inside the else of the spectator branch of the patched
+     * {@code Player.interactOn}, and the client never reaches that method for a spectator anyway: both
+     * {@code MultiPlayerGameMode.interact} and {@code interactAt} return PASS for one after sending the packet.
      */
     @Override
     public boolean observesSpectatorEntityClick() {
