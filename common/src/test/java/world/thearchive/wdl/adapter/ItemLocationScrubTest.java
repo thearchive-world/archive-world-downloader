@@ -230,8 +230,9 @@ class ItemLocationScrubTest {
 
     /**
      * A session with no bound level, which is all the scrub gate needs. Entity and container capture are off so the
-     * constructor publishes no process-wide capture into the static activation slots, which only finish() clears; the
-     * toggles are asserted rather than assumed, since an unrecognized key falls back to a default that is on.
+     * constructor publishes no process-wide capture into the static activation slots, which only {@code finish()}
+     * clears; the toggles are asserted rather than assumed, since an unrecognized key falls back to a default that is
+     * on.
      */
     private static LiveCaptureSession session(Path configDirectory, boolean saveItemCoordinates) {
         Properties properties = new Properties();

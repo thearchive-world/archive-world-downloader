@@ -267,7 +267,8 @@ final class ContainerCapture {
     }
 
     /**
-     * Count the menu's non-player slots: the block container's slots (the client backs them with a SimpleContainer).
+     * Count the menu's non-player slots: the block container's slots (the client backs them with a
+     * {@code SimpleContainer}).
      */
     static int countBlockSlots(AbstractContainerMenu menu, LocalPlayer player) {
         Container playerInventory = player.inventory;

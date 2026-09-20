@@ -289,7 +289,7 @@ public final class EntitySinkImpl implements EntitySink {
 
     /**
      * Restore the server-authoritative {@code PersistenceRequired} the client never receives. Two vanilla mechanisms
-     * set it that the capture can reconstruct: the NameTagItem sets it on any {@link Mob} it renames, and
+     * set it that the capture can reconstruct: the {@code NameTagItem} sets it on any {@link Mob} it renames, and
      * {@code Mob.setItemSlotAndDropWhenKilled} sets it when a mob equips a picked-up item. A named mob and a mob whose
      * equipment proves such a pickup (an item impossible for its natural spawn,
      * {@link NaturalEquipment#wasLootEquipped}) are both stamped unconditionally, since either is a lossless

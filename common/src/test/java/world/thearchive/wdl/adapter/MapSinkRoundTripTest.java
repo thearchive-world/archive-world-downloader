@@ -21,11 +21,11 @@ import world.thearchive.wdl.adapter.impl.MapSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the per-band map serialize: serializeMap turns a client-shaped {@link MapItemSavedData} into
- * the inner {@code "data"} tag vanilla's own {@code MapItemSavedData.load} reads back to an equal map (the image,
- * dimension, and scale faithful), and a locked map serializes {@code locked=true}. Server-free by construction: a
- * constructed client map drives it, so neither a live menu nor a {@code Level} is needed; the live {@code getMapData}
- * resolution is not exercised headless.
+ * The automated guard for the per-band map serialize: {@code serializeMap} turns a client-shaped
+ * {@link MapItemSavedData} into the inner {@code "data"} tag vanilla's own {@code MapItemSavedData.load} reads back to
+ * an equal map (the image, dimension, and scale faithful), and a locked map serializes {@code locked=true}. Server-free
+ * by construction: a constructed client map drives it, so neither a live menu nor a {@code Level} is needed; the live
+ * {@code getMapData} resolution is not exercised headless.
  */
 class MapSinkRoundTripTest {
     private static RegistryAccess registries;

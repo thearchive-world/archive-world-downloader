@@ -25,7 +25,7 @@ import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for lectern-book capture: the {@link LecternSink} 1.20.4 path (captureBook -> merge) plus
+ * The automated guard for lectern-book capture: the {@link LecternSink} 1.20.4 path ({@code captureBook} -> merge) plus
  * vanilla's own {@code ItemStack.of} read-back (the exact form {@code LecternBlockEntity.loadAdditional} uses) is a
  * self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity tag under
  * {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field
