@@ -123,7 +123,7 @@ sourceSets {
 // and keeps ONLY the net/minecraftforge/** entries, so the universal's own patched net.minecraft.* classes never
 // shadow the Mojmap Minecraft the island already compiles against. forgespi supplies the mod-info SPI (IModInfo) the
 // universal does not carry; it names no Minecraft, so it needs no remap.
-val forgeUniversal: Configuration by configurations.creating { isTransitive = false }
+val forgeUniversal: Configuration = configurations.create("forgeUniversal") { isTransitive = false }
 
 val forgeApiMappingFile = rootDir.resolve("../tools/mojmap-bridge/build/bridge/mojmap-srg.tiny")
 require(forgeApiMappingFile.exists()) {
