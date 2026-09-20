@@ -42,7 +42,7 @@ public interface PlatformBridge {
     /** Run {@code callback} when the client disconnects from a world/server. */
     void onDisconnect(Runnable callback);
 
-    /** Run {@code callback} when the client finishes joining a world/server (the mirror of onDisconnect). */
+    /** Run {@code callback} when the client finishes joining a world/server (the mirror of {@code onDisconnect}). */
     void onServerJoin(Runnable callback);
 
     /** The loader's config directory. */

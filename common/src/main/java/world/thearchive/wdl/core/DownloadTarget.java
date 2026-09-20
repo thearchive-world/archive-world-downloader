@@ -13,9 +13,9 @@ import org.jspecify.annotations.Nullable;
  * the server-derived default on the keybind and auto-download paths, dated unless the date suffix is off), and a
  * {@link DownloadMode#RESUME} passes the existing folder verbatim so the re-run lands on the same folder.
  *
- * <p>{@code worldName} is the name written into a new world's {@code level.dat}: the resolved folder name, which
- * carries the {@code -YYYY-MM-DD} suffix when it is enabled. On a resume the session preserves the existing world's
- * name rather than using this.
+ * <p>{@code worldName} is the name written into a new world's level.dat: the resolved folder name, which carries the
+ * {@code -YYYY-MM-DD} suffix when it is enabled. On a resume the session preserves the existing world's name rather
+ * than using this.
  *
  * <p>Version-agnostic core: imports no {@code net.minecraft.*} type, so it crosses the capture seam on every band.
  */
@@ -49,7 +49,7 @@ public final class DownloadTarget {
         return folderName;
     }
 
-    /** The new download's {@code level.dat} name (its resolved folder name), or null to use the writer's default. */
+    /** The new download's level.dat name (its resolved folder name), or null to use the writer's default. */
     public @Nullable String worldName() {
         return worldName;
     }

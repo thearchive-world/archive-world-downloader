@@ -36,11 +36,11 @@ import world.thearchive.wdl.core.report.StrictReportReader;
  * name belongs to the download folder's export family. A candidate qualifies only by passing seven fail-closed rules in
  * order: its file name matches the family grammar exactly; every entry is rooted at the folder name with no dotdot
  * segment on any slash or backslash boundary; no duplicate entry names once lowercased and trailing-slash normalized;
- * no file entry path-prefixes another entry; the exact-case file folder/level.dat exists; no entry path names a
+ * no file entry path-prefixes another entry; the exact-case file {@code folder/level.dat} exists; no entry path names a
  * server-only artifact per {@link SinglePlayerTaint#entryPathIsServerArtifact}; and the exact-case record
  * folder/wdl/download.jsonl stays within {@link #MAX_RECORD_BYTES} uncompressed and yields a parseable newest
- * finishedAt. Qualifying candidates order by recorded finish, newest first, with the file modification time breaking
- * ties.
+ * {@code finishedAt}. Qualifying candidates order by recorded finish, newest first, with the file modification time
+ * breaking ties.
  *
  * <p>The scan never throws: a failure judging one candidate excludes that candidate, each exclusion logged with the
  * candidate name and failing rule at FINE, and a harness-level failure logs one WARN and reports no source.
@@ -85,8 +85,8 @@ public final class RestoreSource {
     }
 
     /**
-     * The newest clean restore source for folderName among the family-named zips in savesDirectory, or empty when no
-     * candidate qualifies. Never throws.
+     * The newest clean restore source for {@code folderName} among the family-named zips in {@code savesDirectory}, or
+     * empty when no candidate qualifies. Never throws.
      */
     public static Optional<RestoreSource> find(Path savesDirectory, String folderName) {
         try {
@@ -249,7 +249,7 @@ public final class RestoreSource {
     }
 
     /**
-     * Counts uncompressed bytes delivered and fails the read past MAX_RECORD_BYTES, whatever sizes the central
+     * Counts uncompressed bytes delivered and fails the read past {@code MAX_RECORD_BYTES}, whatever sizes the central
      * directory claims, so a lying or absent size never lets a decompression bomb through.
      */
     private static final class CappedInputStream extends FilterInputStream {

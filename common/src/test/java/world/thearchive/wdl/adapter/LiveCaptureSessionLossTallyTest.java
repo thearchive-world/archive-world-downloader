@@ -840,11 +840,12 @@ class LiveCaptureSessionLossTallyTest {
      * The reconstruct's own per-entity isolation, the sibling of the single-entity encode's. A chunk has already left
      * the accumulator when it is reconstructed, so a reconstruct that threw and escaped the loop would take every
      * sibling in that drained chunk down with it and skip the pass's later chunks; each must instead be skipped and
-     * counted on its own. Three entities across two captured chunks whose reconstructs all throw, two out of level() as
-     * an IllegalStateException and one, given a null spawn packet, as a NullPointerException from a different hop. The
-     * count discriminates three regressions at once: a catch hoisted out of the per-entity loop would destroy the
-     * siblings behind the first thrower, a throw that escaped the pass would never reach the later chunk, and a catch
-     * narrowed below RuntimeException would let one of the two exception types escape; none could then report three.
+     * counted on its own. Three entities across two captured chunks whose reconstructs all throw, two out of
+     * {@code level()} as an {@code IllegalStateException} and one, given a null spawn packet, as a
+     * {@code NullPointerException} from a different hop. The count discriminates three regressions at once: a catch
+     * hoisted out of the per-entity loop would destroy the siblings behind the first thrower, a throw that escaped the
+     * pass would never reach the later chunk, and a catch narrowed below {@code RuntimeException} would let one of the
+     * two exception types escape; none could then report three.
      */
     @Test
     void anEntityWhoseReconstructThrowsIsSkippedPerEntityRatherThanAbortingTheDrainedChunk(@TempDir Path temporary)
@@ -1027,9 +1028,9 @@ class LiveCaptureSessionLossTallyTest {
     }
 
     /**
-     * A mount captured into the player's RootVehicle reaches disk inside level.dat, so its abandoned frame is not a
-     * loss. The drain's own promote filters that mount out before counting anything; the abort sweep has to filter it
-     * too, or a download that saved the boat reports having lost it.
+     * A mount captured into the player's {@code RootVehicle} reaches disk inside level.dat, so its abandoned frame is
+     * not a loss. The drain's own promote filters that mount out before counting anything; the abort sweep has to
+     * filter it too, or a download that saved the boat reports having lost it.
      */
     @Test
     void aMountCapturedIntoTheRootVehicleIsNotCountedAbandoned(@TempDir Path temporary) throws Exception {
@@ -1144,9 +1145,9 @@ class LiveCaptureSessionLossTallyTest {
     }
 
     /**
-     * Install the packet capture the reconciliation reads. Set directly rather than by turning captureEntities on: the
-     * constructor publishes a capture it creates into the process-wide activation slot, which only {@code finish()}
-     * clears, so an armed fixture would leave this session live for the rest of the suite JVM.
+     * Install the packet capture the reconciliation reads. Set directly rather than by turning {@code captureEntities}
+     * on: the constructor publishes a capture it creates into the process-wide activation slot, which only
+     * {@code finish()} clears, so an armed fixture would leave this session live for the rest of the suite JVM.
      */
     private static EntityPacketCapture installPacketCapture(LiveCaptureSession session) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField("packetCapture");
@@ -1159,7 +1160,7 @@ class LiveCaptureSessionLossTallyTest {
 
     /**
      * Hold {@code uuid} back from the standalone entity write, which production does when it captures a ridden mount
-     * into the player's RootVehicle, behind the client reads this fixture does without.
+     * into the player's {@code RootVehicle}, behind the client reads this fixture does without.
      */
     private static void excludeFromStandaloneWrite(LiveCaptureSession session, UUID uuid) throws Exception {
         Set<UUID> excluded = state(session, "excludedRootVehicleUuids");
