@@ -118,7 +118,7 @@ unimined.minecraft {
 // mcp_config has no 1.11.x publication at all: sorted ascending its oldest release is 1.12.2, so the parent band
 // sits exactly on that floor and every band below it takes the older mcp:<mc>:srg line instead. That is a format
 // change as well as a coordinate change, from TSRG to SRG v1; see the grammar note above ExtractSeargeOracle.
-val seargeOracle: Configuration by configurations.creating { isTransitive = false }
+val seargeOracle: Configuration = configurations.create("seargeOracle") { isTransitive = false }
 
 // This band's joined.srg parses to exactly these counts under a correct SRG v1 reader: 3122 CL: records, and
 // 18826 distinct searge member ids (9941 field_* and 8885 func_*). The member figure is corroborated
@@ -413,8 +413,8 @@ tasks.named<Jar>("remapJar") {
 // shipped source imports, and the closure is walked over the full jar's own bytecode. A hand-curated absent list
 // would go stale the first time core/ binds another type, and on this project such a list has been found
 // incomplete twice.
-val fastutilBundleSource: Configuration by configurations.creating { isTransitive = false }
-val fastutilShipped: Configuration by configurations.creating { isTransitive = false }
+val fastutilBundleSource: Configuration = configurations.create("fastutilBundleSource") { isTransitive = false }
+val fastutilShipped: Configuration = configurations.create("fastutilShipped") { isTransitive = false }
 
 dependencies {
     fastutilBundleSource("it.unimi.dsi:fastutil:${band("fastutil_bundle_version")}@jar")
