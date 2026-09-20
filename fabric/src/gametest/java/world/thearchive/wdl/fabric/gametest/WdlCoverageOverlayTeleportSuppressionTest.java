@@ -18,20 +18,20 @@ import world.thearchive.wdl.core.WdlConfig;
  * every entity removal the teleport tees while the window holds must be dropped, never fed to the estimator. On a
  * reduced {@code entity-broadcast-range-percentage} server (30 percent, scaled range 48 blocks) an item frame 40 blocks
  * away arrives in range and calibrates a radius-2 baseline. Teleporting the player 50 blocks the opposite way pushes
- * the frame out of range, and the server's unpair tees a RemoveEntities the instant after the teleport's PlayerPosition
- * packet. That removal's honest distance is about 90 blocks, 74 post-haircut ({@code SendRangeSampler.HAIRCUT_BLOCKS});
- * if it were sampled it would ratchet the radius from 2 to 4.
+ * the frame out of range, and the server's unpair tees a {@code RemoveEntities} the instant after the teleport's
+ * {@code PlayerPosition} packet. That removal's honest distance is about 90 blocks, 74 post-haircut
+ * ({@code SendRangeSampler.HAIRCUT_BLOCKS}); if it were sampled it would ratchet the radius from 2 to 4.
  *
  * <p>The two suppression guards are pinned as distinct effects. The 74-block removal sits strictly inside the
  * {@code renderDistance} times 16, 80-block, plausibility bound, so the bound does not reject it and cannot stand in
- * for the window: the only thing that keeps the radius at 2 is the anomaly window the teleport's PlayerPosition packet
- * arms ({@code SendRangeSampler.onAnomalyPacket}). The flat fixture world spawns no mobs and holds no other decoration,
- * so the summoned frame is the sole calibration source and nothing else pre-calibrates the dimension.
+ * for the window: the only thing that keeps the radius at 2 is the anomaly window the teleport's {@code PlayerPosition}
+ * packet arms ({@code SendRangeSampler.onAnomalyPacket}). The flat fixture world spawns no mobs and holds no other
+ * decoration, so the summoned frame is the sole calibration source and nothing else pre-calibrates the dimension.
  *
- * <p>The leak arithmetic rests on one timing assumption: the unpair's RemoveEntities trails the teleport's
- * PlayerPosition by about one server tick, because {@code runCommand} runs between ticks, so the removal is teed after
- * the client has applied the teleport and armed the window. Were both ever to land in a single flush with the removal
- * ordered first, this test would lose its failure power silently, not go false-red.
+ * <p>The leak arithmetic rests on one timing assumption: the unpair's {@code RemoveEntities} trails the teleport's
+ * {@code PlayerPosition} by about one server tick, because {@code runCommand} runs between ticks, so the removal is
+ * teed after the client has applied the teleport and armed the window. Were both ever to land in a single flush with
+ * the removal ordered first, this test would lose its failure power silently, not go false-red.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlCoverageOverlayTeleportSuppressionTest implements FabricClientGameTest {

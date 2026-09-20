@@ -19,10 +19,10 @@ import world.thearchive.wdl.core.WdlConfig;
  * A respawn survives the sampler's book clear without losing the death flood it just fed. On a full-range server
  * (default 100 percent, so the binding range is the 80-block view-distance cap) an item frame 20 blocks away arrives
  * and calibrates radius 1. The player walks out to a stop inside the death-distance window and dies: removing the old
- * player during the respawn tees a RemoveEntities for every entity it was tracking, the frame included, and that
- * removal samples the walked-out distance minus the haircut ({@code SendRangeSampler.HAIRCUT_BLOCKS}). The subsequent
- * Respawn packet clears the sampler's position book ({@code SendRangeSampler.onRespawn}) but not the estimator's
- * running max, so the death flood's sample must survive the respawn.
+ * player during the respawn tees a {@code RemoveEntities} for every entity it was tracking, the frame included, and
+ * that removal samples the walked-out distance minus the haircut ({@code SendRangeSampler.HAIRCUT_BLOCKS}). The
+ * subsequent Respawn packet clears the sampler's position book ({@code SendRangeSampler.onRespawn}) but not the
+ * estimator's running max, so the death flood's sample must survive the respawn.
  *
  * <p>The stop window is chosen so only the death flood can produce the asserted radius. The player releases the walk
  * key around 70 blocks from the frame: below 64 the flood would sample under 48 and floor to radius 2, a false red; at

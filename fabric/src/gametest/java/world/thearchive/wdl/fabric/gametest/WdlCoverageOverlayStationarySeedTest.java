@@ -26,10 +26,10 @@ import world.thearchive.wdl.core.WdlConfig;
  * false red. The sweep's post-haircut samples (roughly 19 and 28 blocks) floor to a 1-chunk covered radius under the
  * harness's pinned render distance 5.
  *
- * <p>The covered assertion is the per-tick re-read pin: recordCoveredDisc re-reads the radius every capture tick ahead
- * of its same-chunk early return, so the sweep's radius change recomputes the covered disc while the player stands
- * still, and a non-center chunk inside the seeded radius reads covered although the player never crossed a chunk border
- * (the trail holds exactly one center).
+ * <p>The covered assertion is the per-tick re-read pin: {@code recordCoveredDisc} re-reads the radius every capture
+ * tick ahead of its same-chunk early return, so the sweep's radius change recomputes the covered disc while the player
+ * stands still, and a non-center chunk inside the seeded radius reads covered although the player never crossed a chunk
+ * border (the trail holds exactly one center).
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlCoverageOverlayStationarySeedTest implements FabricClientGameTest {
