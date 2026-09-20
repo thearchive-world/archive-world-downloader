@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Test;
  * The automated guard for the mob persistence restoration and its {@code forceMobPersistence} extension.
  * {@code PersistenceRequired} is server-authoritative and arrives {@code false} on the client, so a name-tagged
  * pet/villager despawns after the downloaded world is opened. Capture must stamp it back, unconditionally, on every
- * captured named {@code Mob} (vanilla NameTagItem semantics); likewise on a mob whose equipment proves a loot pickup
- * (an item impossible for its natural spawn); and with {@code forceMobPersistence} on it stamps every captured
+ * captured named {@code Mob} (vanilla {@code NameTagItem} semantics); likewise on a mob whose equipment proves a loot
+ * pickup (an item impossible for its natural spawn); and with {@code forceMobPersistence} on it stamps every captured
  * {@code Mob}, named or not.
  *
  * <p>This test pins the on-disk contract directly by driving {@code applyMobPersistence} with the derived flags: the

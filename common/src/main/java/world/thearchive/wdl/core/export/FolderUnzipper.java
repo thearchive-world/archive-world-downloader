@@ -20,15 +20,16 @@ import java.util.zip.ZipFile;
 import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 
 /**
- * The verified extractor mirroring {@link FolderZipper}: extracts the zip's folderName tree so that
- * targetParent.resolve(folderName) is the extracted world. Two passes over one open zip session: a validation pass
- * proving the contract first (root identity, no duplicate entry names once lowercased and trailing-slash normalized, no
- * file entry path-prefixing another entry, every file entry contained under the target folder, no entry naming a
- * server-only artifact per {@link SinglePlayerTaint#entryPathIsServerArtifact}, and the exact-case file entries
- * folder/level.dat and folder/wdl/download.jsonl present), then the extract pass, so any violation throws
- * {@link IOException} before a byte lands. Extraction materializes file entries only, skipping session.lock and
- * wdl/download.pending; directory entries never materialize, parents come from file entries. The caller owns the
- * pre-open re-stat of the source and the cleanup of a partial tree when a mid-extract failure propagates.
+ * The verified extractor mirroring {@link FolderZipper}: extracts the zip's {@code folderName} tree so that
+ * {@code targetParent.resolve(folderName)} is the extracted world. Two passes over one open zip session: a validation
+ * pass proving the contract first (root identity, no duplicate entry names once lowercased and trailing-slash
+ * normalized, no file entry path-prefixing another entry, every file entry contained under the target folder, no entry
+ * naming a server-only artifact per {@link SinglePlayerTaint#entryPathIsServerArtifact}, and the exact-case file
+ * entries {@code folder/level.dat} and {@code folder/wdl/download.jsonl} present), then the extract pass, so any
+ * violation throws {@link IOException} before a byte lands. Extraction materializes file entries only, skipping
+ * session.lock and wdl/download.pending; directory entries never materialize, parents come from file entries. The
+ * caller owns the pre-open re-stat of the source and the cleanup of a partial tree when a mid-extract failure
+ * propagates.
  */
 final class FolderUnzipper {
     private FolderUnzipper() {}

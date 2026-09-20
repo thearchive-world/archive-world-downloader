@@ -168,8 +168,8 @@ final class RecoveredScan {
     /**
      * Resume init (main thread): mark the shared player ender inventory already saved by a prior download, so every
      * ender chest reads no-rim on this resume without the player reopening one. The gate that this is a RESUME with
-     * savePlayerEnderChest on and a non-empty prior EnderItems lives at the call site, so the fact is never marked when
-     * the resume would strip the inventory.
+     * {@code savePlayerEnderChest} on and a non-empty prior {@code EnderItems} lives at the call site, so the fact is
+     * never marked when the resume would strip the inventory.
      */
     void markEnderRecovered() {
         enderRecovered = true;

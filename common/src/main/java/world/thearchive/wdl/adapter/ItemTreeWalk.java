@@ -11,11 +11,11 @@ import net.minecraft.nbt.NBTTagList;
 /**
  * The classic-MCP walk over a serialized item tree, recursing into the items nested inside a shulker box (the
  * {@code tag.BlockEntityTag.Items} list) and a bundle (the {@code tag.Items} list). Operates only on already-serialized
- * NBT, never a live ItemStack. Two views share the one recursion: {@link #walkList}/{@link #walkItem} hand the leaf
- * each item's {@code tag} compound (the item-borne coordinate scrub reaches its keys there), and {@link #forEachItem}
- * hands the leaf each item compound itself. At this band the filled-map id is the item-level {@code Damage}, not the
- * inner {@code tag}, so the map-id pass takes the item view; a filled map carries no {@code tag} at all and the tag
- * view would never see it. Each caller supplies its own per-item leaf action.
+ * NBT, never a live {@code ItemStack}. Two views share the one recursion: {@link #walkList}/{@link #walkItem} hand the
+ * leaf each item's {@code tag} compound (the item-borne coordinate scrub reaches its keys there), and
+ * {@link #forEachItem} hands the leaf each item compound itself. At this band the filled-map id is the item-level
+ * {@code Damage}, not the inner {@code tag}, so the map-id pass takes the item view; a filled map carries no
+ * {@code tag} at all and the tag view would never see it. Each caller supplies its own per-item leaf action.
  */
 final class ItemTreeWalk {
     private static final String TAG = "tag";

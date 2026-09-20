@@ -115,8 +115,8 @@ public final class CoveragePolygonTracer {
     /**
      * Walk the area boundary into one flat x,z ring per subpath, collinear run midpoints dropped. A pair of gaps that
      * touch only at a diagonal corner yields one self-touching (figure-8) hole ring, which is left intact, matching
-     * JourneyMap's own createPolygonFromArea; the renderer's Earcut can then leave a degenerate sliver at the pinch. We
-     * deliberately do not split such rings: the artifact is cosmetic and rare.
+     * JourneyMap's own {@code createPolygonFromArea}; the renderer's Earcut can then leave a degenerate sliver at the
+     * pinch. We deliberately do not split such rings: the artifact is cosmetic and rare.
      */
     private static List<int[]> contours(Area area) {
         List<int[]> rings = new ArrayList<>();

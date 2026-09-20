@@ -46,7 +46,7 @@ public final class DownloadEntry {
         return folderName;
     }
 
-    /** The world's full {@code level.dat} name (the dated name), prefilled into the field when the row is picked. */
+    /** The world's full level.dat name (the dated name), prefilled into the field when the row is picked. */
     public String worldName() {
         return worldName;
     }

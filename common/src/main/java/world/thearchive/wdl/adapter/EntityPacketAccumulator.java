@@ -134,8 +134,8 @@ class EntityPacketAccumulator<P, V, E> {
      * Record (or wholesale replace, for a reused id) the entity at {@code id}, clearing all post-spawn state, under the
      * dimension the stream is currently in. A new id past {@link #MAX_TRACKED_ENTITIES} is skipped and counted; the
      * fed-spawn tally still ticks so the finish reconciliation stays honest about what arrived. The check-then-act on
-     * the map is safe because the inbound tee is the only spawner and the main thread's dropChunk only removes, so a
-     * concurrent drain can only shrink the size read here.
+     * the map is safe because the inbound tee is the only spawner and the main thread's {@code dropChunk} only removes,
+     * so a concurrent drain can only shrink the size read here.
      */
     public void spawn(int id, UUID uuid, long chunkPos, EntityPos pos, P spawn) {
         spawnCount++;
