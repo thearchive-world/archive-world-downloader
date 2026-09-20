@@ -48,7 +48,7 @@ final class MapDataWriter {
      * Wrap {@code dataTag} as {@code {data, DataVersion}} and gzip it to {@code dataDirectory/<key>.dat}, creating the
      * target's parent first since {@code NbtIo.writeCompressed} opens the file without making parents. The key can name
      * a subfolder (the 26.x {@code maps/<id>} form), so the parent is the file's own directory, not {@code
-     * dataDirectory}. The same envelope vanilla's {@code DimensionDataStorage} writes for every SavedData.
+     * dataDirectory}. The same envelope vanilla's {@code DimensionDataStorage} writes for every {@code SavedData}.
      */
     public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");

@@ -42,8 +42,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The 26.1.2 world-output writes, verified through the production save to disk. The 26.x world metadata is split across
  * namespaced save-side files rather than one level.dat: worldgen is {@code data/minecraft/world_gen_settings.dat}, the
  * curated game rules are {@code data/minecraft/game_rules.dat}, and noon is a {@code data/minecraft/world_clocks.dat}
- * payload (setDayTime is gone). Weather is left unwritten so vanilla opens clear. The game-rule master gates the
- * curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it.
+ * payload ({@code setDayTime} is gone). Weather is left unwritten so vanilla opens clear. The game-rule master gates
+ * the curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it.
  */
 class LevelDatWorldOutputTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
@@ -53,7 +53,10 @@ class LevelDatWorldOutputTest {
 
     private int worldCounter;
 
-    /** A built and paired save root: everything worldgen, game rules and clocks land in is on disk under saveRoot. */
+    /**
+     * A built and paired save root: everything worldgen, game rules and clocks land in is on disk under
+     * {@code saveRoot}.
+     */
     private record Saved(LevelDataWriter.LevelData built, Path saveRoot) {}
 
     private LevelDataWriter.LevelData build(WorldOutputConfig worldOutput) {
@@ -76,7 +79,7 @@ class LevelDatWorldOutputTest {
         return built.worldData().createTag(null);
     }
 
-    /** The inner {@code data} tag of a namespaced {@code data/minecraft/<name>.dat} SavedData envelope. */
+    /** The inner {@code data} tag of a namespaced {@code data/minecraft/<name>.dat} {@code SavedData} envelope. */
     private static CompoundTag savedData(Path saveRoot, String name) throws IOException {
         Path file = saveRoot.resolve("data").resolve("minecraft").resolve(name + ".dat");
         return NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("data");
@@ -103,7 +106,7 @@ class LevelDatWorldOutputTest {
         return state.totalTicks();
     }
 
-    /** Whether a weather SavedData was written; the mod writes none so vanilla opens the world clear. */
+    /** Whether a weather {@code SavedData} was written; the mod writes none so vanilla opens the world clear. */
     private static boolean weatherWritten(Path saveRoot) {
         return Files.exists(saveRoot.resolve("data").resolve("minecraft").resolve("weather.dat"));
     }

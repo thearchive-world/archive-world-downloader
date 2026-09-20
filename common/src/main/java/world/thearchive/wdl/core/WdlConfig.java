@@ -16,11 +16,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * The band-agnostic, hand-editable mod config ({@code wdl.properties}). MC-free (java.util/java.nio only) so the core
- * owns it on every band with no per-loader config API. {@link #load(Path)} materializes a documented default file on
- * first run; the per-key comments are written from a template because {@code Properties.store} cannot emit them. The
- * template, parse, defaults, and report diff are all derived from one descriptor list ({@link ConfigSchema}); the typed
- * fields and accessors below stay hand-written.
+ * The band-agnostic, hand-editable mod config (wdl.properties). MC-free (java.util/java.nio only) so the core owns it
+ * on every band with no per-loader config API. {@link #load(Path)} materializes a documented default file on first run;
+ * the per-key comments are written from a template because {@code Properties.store} cannot emit them. The template,
+ * parse, defaults, and report diff are all derived from one descriptor list ({@link ConfigSchema}); the typed fields
+ * and accessors below stay hand-written.
  */
 public final class WdlConfig {
     /** The config schema version; bump it and add a migrator when a key's name or value shape changes. */
