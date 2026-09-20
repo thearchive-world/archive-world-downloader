@@ -112,7 +112,9 @@ final class CaptureReadback {
         return names;
     }
 
-    /** The stored light nibbles of {@code layerKey} ("BlockLight"/"SkyLight") at section Y, or empty. */
+    /**
+     * The stored light nibbles of {@code layerKey} ({@code "BlockLight"}/{@code "SkyLight"}) at section Y, or empty.
+     */
     static Optional<byte[]> sectionLightLayer(CompoundTag chunkTag, int sectionY, String layerKey) {
         return chunkTag.getListOrEmpty("sections").compoundStream()
                 .filter(section -> section.getByteOr("Y", Byte.MIN_VALUE) == sectionY)
@@ -146,7 +148,7 @@ final class CaptureReadback {
                 .toList();
     }
 
-    /** The {@code Data} compound of {@code <save>/level.dat} (world game type, cheats, singleplayer_uuid). */
+    /** The {@code Data} compound of {@code <save>/level.dat} (world game type, cheats, {@code singleplayer_uuid}). */
     static CompoundTag levelData(Path saveRoot) {
         try {
             CompoundTag root = NbtIo.readCompressed(saveRoot.resolve("level.dat"), NbtAccounter.unlimitedHeap());
@@ -190,7 +192,9 @@ final class CaptureReadback {
                 .parse(NbtOps.INSTANCE, savedDataInner(saveRoot, "game_rules")).getOrThrow();
     }
 
-    /** The inner {@code data} tag of a namespaced {@code <save>/data/minecraft/<name>.dat} SavedData envelope. */
+    /**
+     * The inner {@code data} tag of a namespaced {@code <save>/data/minecraft/<name>.dat} {@code SavedData} envelope.
+     */
     static CompoundTag savedDataInner(Path saveRoot, String name) {
         return readDataInner(saveRoot.resolve("data").resolve("minecraft").resolve(name + ".dat"));
     }

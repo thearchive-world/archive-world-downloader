@@ -25,8 +25,8 @@ import world.thearchive.wdl.core.WdlConfig;
  * while a zombie holding a natural-pool iron sword is the ambiguous control and must not be. Summoning them at one spot
  * down an otherwise identical code path proves the capture discriminates rather than blindly stamping, and reaches the
  * live {@code Mob} paths the headless unit tests cannot (a real {@code Mob} needs a {@code Level}). Force persistence
- * stays off (WdlConfig.DEFAULTS) so each stamp is attributable to its own mechanism, and the mobs are {@code NoAI} so
- * they neither wander out of the chunk nor pick anything up.
+ * stays off ({@code WdlConfig.DEFAULTS}) so each stamp is attributable to its own mechanism, and the mobs are
+ * {@code NoAI} so they neither wander out of the chunk nor pick anything up.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlDerivedMobPersistenceTest implements FabricClientGameTest {
@@ -109,7 +109,10 @@ public class WdlDerivedMobPersistenceTest implements FabricClientGameTest {
         return entity.getString("CustomName").orElse("");
     }
 
-    /** The serialized item id worn in a slot: entities/ writes equipment as a slot-name map (EntityEquipment.CODEC). */
+    /**
+     * The serialized item id worn in a slot: entities/ writes equipment as a slot-name map
+     * ({@code EntityEquipment.CODEC}).
+     */
     private static String slotItemId(CompoundTag entity, String slot) {
         return entity.getCompound("equipment")
                 .flatMap(equipment -> equipment.getCompound(slot))

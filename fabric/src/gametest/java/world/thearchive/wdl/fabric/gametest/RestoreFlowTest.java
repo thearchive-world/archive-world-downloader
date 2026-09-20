@@ -73,8 +73,8 @@ public class RestoreFlowTest implements FabricClientGameTest {
 
     /**
      * Case 1: a tainted folder beside its clean export zip restores through the row's restore chip and the
-     * ConfirmScreen's real Restore button, and the folder is the clean copy afterward with the snapshot kept and the
-     * temporary root gone.
+     * {@code ConfirmScreen}'s real Restore button, and the folder is the clean copy afterward with the snapshot kept
+     * and the temporary root gone.
      */
     private void chipRoundTrip(ClientGameTestContext context, Path saves) {
         String folder = "wdl-restore-1";
