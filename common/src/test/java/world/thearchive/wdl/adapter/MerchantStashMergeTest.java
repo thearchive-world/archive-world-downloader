@@ -57,7 +57,9 @@ class MerchantStashMergeTest {
         return EntityFixtures.entityChunkTagWith(entities);
     }
 
-    /** The Recipes offers holder vanilla's own MerchantOffers codec writes, one offer selling the given item. */
+    /**
+     * The Recipes offers holder vanilla's own {@code MerchantOffers} codec writes, one offer selling the given item.
+     */
     private static CompoundTag offersWith(String sellId) {
         MerchantOffers offers = new MerchantOffers();
         offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, 1), ItemFixtures.stack(sellId), 1, 0, 0.0f));

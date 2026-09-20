@@ -17,9 +17,9 @@ import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 /**
- * Repairs a client-held ItemStack so Minecraft's disk codec accepts it. A component the network codec carries can be
- * one the disk codec rejects, which costs the entity or the item that carries it. Vanilla's own codec decides which
- * component is at fault.
+ * Repairs a client-held {@code ItemStack} so Minecraft's disk codec accepts it. A component the network codec carries
+ * can be one the disk codec rejects, which costs the entity or the item that carries it. Vanilla's own codec decides
+ * which component is at fault.
  */
 public final class ItemStackSanitizer {
     private static final int MAX_CONTAINER_SLOTS = 256;

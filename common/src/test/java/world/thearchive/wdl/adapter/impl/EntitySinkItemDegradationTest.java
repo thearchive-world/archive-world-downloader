@@ -118,7 +118,7 @@ class EntitySinkItemDegradationTest {
         }
     }
 
-    /** A headless ItemEntity double carrying a caller-set stack. */
+    /** A headless {@code ItemEntity} double carrying a caller-set stack. */
     private static final class DropItem extends ItemEntity {
         private DropItem() {
             super(EntityType.ITEM, HeadlessLevel.get());
