@@ -192,7 +192,6 @@ public final class WdlSettingsScreen extends Screen {
         int discardX = defaultsX + buttonWidth + GAP;
         addButton(new Button(doneX, footerY, buttonWidth, 20, I18n.get("gui.done"),
                 button -> onClose()));
-        // 1.15.2 Button carries no hover-tooltip parameter, so the Defaults button has no hover explanation.
         this.defaults = addButton(new Button(defaultsX, footerY, buttonWidth, 20,
                 I18n.get("wdl.settings.defaults"), button -> onDefaults()));
         // the last button absorbs the division remainder so the footer's right edge meets the control edge
