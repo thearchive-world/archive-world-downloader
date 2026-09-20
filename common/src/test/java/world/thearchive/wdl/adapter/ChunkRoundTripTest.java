@@ -116,7 +116,7 @@ class ChunkRoundTripTest {
             }
         }
         int[] biomeIds = level.getIntArray("Biomes");
-        assertEquals(16 * ((SyntheticChunks.HEIGHT + 3) / 4), biomeIds.length, "biomes cover the whole column");
+        assertEquals(16 * 16, biomeIds.length, "biomes cover the 16x16 block-column grid");
         for (int id : biomeIds) {
             assertNotNull(biomeRegistry.byId(id), "every written biome id resolves to a registered biome");
         }

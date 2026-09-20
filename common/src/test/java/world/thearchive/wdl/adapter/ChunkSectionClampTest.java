@@ -127,7 +127,7 @@ class ChunkSectionClampTest {
 
         @Override
         public int[] biomes() {
-            return new int[1024];
+            return new int[16 * 16];
         }
     }
 }

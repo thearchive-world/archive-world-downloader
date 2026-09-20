@@ -217,7 +217,7 @@ public final class SyntheticChunks {
     /** PLAINS-filled per-chunk biome ids sized to the 1.15.2 column: 16 * ceilDiv(HEIGHT, 4) = 1024 for 0..256. */
     private static int[] plainsBiomes() {
         int plainsId = Registry.BIOME.getId(Biomes.PLAINS);
-        int[] biomes = new int[16 * ((HEIGHT + 3) / 4)];
+        int[] biomes = new int[16 * 16];
         Arrays.fill(biomes, plainsId);
         return biomes;
     }
