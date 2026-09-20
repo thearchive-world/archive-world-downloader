@@ -217,7 +217,7 @@ public final class SyntheticChunks {
     /** PLAINS-filled per-chunk biome ids; a 1.14.4 save stores the flat 16x16 grid, one id per block column. */
     private static int[] plainsBiomes() {
         int plainsId = Registry.BIOME.getId(Biomes.PLAINS);
-        int[] biomes = new int[16 * ((HEIGHT + 3) / 4)];
+        int[] biomes = new int[16 * 16];
         Arrays.fill(biomes, plainsId);
         return biomes;
     }
