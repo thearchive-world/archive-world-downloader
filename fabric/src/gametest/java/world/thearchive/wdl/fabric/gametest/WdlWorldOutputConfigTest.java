@@ -14,7 +14,7 @@ import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
 /**
- * World-output axis: the configured world-open state and game rules reach the 26.x sibling SavedData files. The
+ * World-output axis: the configured world-open state and game rules reach the 26.x sibling {@code SavedData} files. The
  * downloaded world opens at noon (overworld clock 6000 in {@code data/minecraft/world_clocks.dat}) as a fixed
  * world-open invariant, and the default config has the game-rule master on, so the curated safe rule set is written to
  * {@code data/minecraft/game_rules.dat}. Both prove the world-output config is applied to the assembled save, not just
