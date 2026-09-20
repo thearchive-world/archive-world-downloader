@@ -500,7 +500,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** Reconstructed root entities written this session, tallied at successful submit. */
     private int packetEntitiesWritten;
 
-    /** Primed root entities (loaded before their AddEntity) written this session, tallied at successful submit. */
+    /**
+     * Primed root entities (loaded before their {@code AddEntity}) written this session, tallied at successful submit.
+     */
     private int primedEntitiesWritten;
 
     /** Held entities dropped at finish because their chunk's terrain was never captured, for the diagnostic. */
@@ -544,10 +546,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Primed entities the sink refused. An unresolvable leash never lands here (the sink strips it and saves the mob
-     * unleashed), so a refusal means shouldBeSaved returned false (a live passenger saved nested under its vehicle, a
-     * removed entity, or a player-only vehicle vanilla persists through the player) or {@code save()} returned false (a
-     * non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips. Reported so the drop
-     * is visible; not a loss, and not part of the packet reconciliation residual (a primed entity has no spawn packet).
+     * unleashed), so a refusal means {@code shouldBeSaved} returned false (a live passenger saved nested under its
+     * vehicle, a removed entity, or a player-only vehicle vanilla persists through the player) or {@code save()}
+     * returned false (a non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips.
+     * Reported so the drop is visible; not a loss, and not part of the packet reconciliation residual (a primed entity
+     * has no spawn packet).
      */
     private int primeSinkSkips;
 
@@ -575,16 +578,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * The seated player's mount, captured at finish before the entity drain and attached to the saved player tag as
      * vanilla's {@code RootVehicle} record ({@link #rootVehicleAttach} is the direct vehicle UUID,
      * {@link #rootVehicleTag} the root vehicle NBT). Both null unless the player finished riding a vehicle carrying
-     * only itself. Main-thread-only scratch, deliberately not volatile: the RootVehicle NBT crosses to the writer
-     * thread only folded into the immutable {@link CapturedPlayer} through the existing volatile publish.
+     * only itself. Main-thread-only scratch, deliberately not volatile: the {@code RootVehicle} NBT crosses to the
+     * writer thread only folded into the immutable {@link CapturedPlayer} through the existing volatile publish.
      */
     private @Nullable UUID rootVehicleAttach;
 
     private @Nullable CompoundTag rootVehicleTag;
 
     /**
-     * The root vehicle and its non-player passengers, held from the standalone entity write so the RootVehicle copy is
-     * not duplicated by a region-file copy on the same UUID.
+     * The root vehicle and its non-player passengers, held from the standalone entity write so the {@code RootVehicle}
+     * copy is not duplicated by a region-file copy on the same UUID.
      */
     private final Set<UUID> excludedRootVehicleUuids = new HashSet<>();
 
@@ -633,7 +636,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** The save's level.dat ({@code <save>/level.dat}); read on a resume to carry the ender chest forward. */
     private @Nullable Path levelDatFile;
 
-    /** containerId of the menu currently tracked, or {@link #NO_MENU} when none is open. */
+    /** {@code containerId} of the menu currently tracked, or {@link #NO_MENU} when none is open. */
     private int openContainerId = NO_MENU;
 
     /** The background writer draining captured tags to disk; opened lazily on the first chunk to flush. */
@@ -776,8 +779,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * A prior download's parked mount the resumed release could not place (main thread). At most one per download,
-     * since the prior player records at most one RootVehicle, and the whole mount rather than a part of it: this
-     * session's own player tag overwrites the only copy it had.
+     * since the prior player records at most one {@code RootVehicle}, and the whole mount rather than a part of it:
+     * this session's own player tag overwrites the only copy it had.
      */
     private int resumedMountsLost;
 
@@ -1105,8 +1108,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * The finish-snapshot position anchor: a seated player anchors to its root vehicle's block (a standing-height
      * coordinate over the vehicle's own captured resting floor or water), a standing player to the ordinary camera
-     * anchor. Keyed on {@code isPassenger()}, never on whether a RootVehicle was written, so a vehicle carrying more
-     * than one player or a save-refused mount still gets the safe vehicle-block Pos instead of the floored
+     * anchor. Keyed on {@code isPassenger()}, never on whether a {@code RootVehicle} was written, so a vehicle carrying
+     * more than one player or a save-refused mount still gets the safe vehicle-block Pos instead of the floored
      * passenger-offset seat coordinate. Pure and package-private so the seated-versus-standing choice is
      * headless-testable; {@link #anchorEntity} stays the live-only camera resolver.
      */
@@ -1485,13 +1488,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Prime the entities of a freshly-captured loaded chunk, the entity analog of {@link #captureLoadedChunks}: encode
      * each non-player entity the packet accumulator does not already track, so an entity that was already in range when
-     * the download started (its one-shot AddEntity fired before the inbound tee was feeding a capture) is still
+     * the download started (its one-shot {@code AddEntity} fired before the inbound tee was feeding a capture) is still
      * written. The packet path owns everything that streams in or reloads afterward (tracked, and held independent of
      * unload), so this only back-fills the pre-existing set: it skips tracked and already-buffered entities, and skips
      * an entity straddling the border unless this is its home chunk. The live entity is encoded directly (it is loaded,
      * so no reconstruction is needed); its post-prime movement is not packet-tracked, so a pre-existing mob that then
      * wanders is saved at its prime-time position. The captured-chunk privacy gate holds by construction: this runs
-     * only for a chunk just added to allCaptured.
+     * only for a chunk just added to {@code allCaptured}.
      */
     private void captureLoadedEntities(ChunkPos pos, LocalPlayer player, int plausibleMaxBlocks,
             String overlayDimensionId) {
@@ -2179,7 +2182,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Bind a freshly-opened merchant menu to the click-tracked villager, or drop it. Unlike the block and vehicle binds
      * this is identity-only: a merchant menu's offers come from a list with no slotted container to size-match, so the
      * confidence is the menu type (villager-exclusive) plus the villager the open resolved to. The instanceof narrowing
-     * sits inside the guard so openMerchant records the drop for a non-villager target either way; a null or
+     * sits inside the guard so {@code openMerchant} records the drop for a non-villager target either way; a null or
      * non-villager target binds nothing, per the drop-on-uncertainty rule. The trade count is added at real capture in
      * {@link #stashMerchantOffers}, not here, since the offers can land a tick after the open.
      */
@@ -2235,8 +2238,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The menu-only ContainerData values the change gate tracks beside the slots: the brewing stand's brew time plus
-     * fuel. Every other menu tracks no data; the state-less constant keeps the per-tick call allocation-free for them.
+     * The menu-only {@code ContainerData} values the change gate tracks beside the slots: the brewing stand's brew time
+     * plus fuel. Every other menu tracks no data; the state-less constant keeps the per-tick call allocation-free for
+     * them.
      */
     private static int[] menuDataVector(AbstractContainerMenu menu) {
         if (menu instanceof BrewingStandMenu) {
@@ -2841,9 +2845,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * How many of {@code drained} nothing else saved. A mount captured into the player's RootVehicle is excluded, the
-     * same way promoteChunk excludes it, because it reaches disk inside level.dat and counting its abandoned frame
-     * would report a loss the download did not take.
+     * How many of {@code drained} nothing else saved. A mount captured into the player's {@code RootVehicle} is
+     * excluded, the same way {@code promoteChunk} excludes it, because it reaches disk inside level.dat and counting
+     * its abandoned frame would report a loss the download did not take.
      */
     private int abandonedCount(List<? extends PacketEntity<?, ?, ?>> drained) {
         int abandoned = 0;
@@ -3196,8 +3200,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * player-state, independent of the ender, inventory, and capture-entities knobs) and after the fresh
      * {@code setRootVehicle}. Scrubs the restored mount's own coordinates per the current knob on the {@code Entity}
      * child (not {@code scrub(raw, key)}, a no-op on a compound, and not {@code scrubEntity(raw)}, which does not
-     * descend a RootVehicle child); the prior session already map-remapped it, so it is not re-remapped. Fail-soft on a
-     * missing or unreadable prior level.dat.
+     * descend a {@code RootVehicle} child); the prior session already map-remapped it, so it is not re-remapped.
+     * Fail-soft on a missing or unreadable prior level.dat.
      */
     private void restorePriorMountContents(CompoundTag raw) {
         CompoundTag priorPlayer = readPriorPlayerTag();
@@ -3259,14 +3263,15 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Release a prior download's parked mount as a standalone entity on a resume, so a mount the player rode in an
      * earlier download and has since left is preserved as a world entity rather than lost. A mount ridden at a finish
-     * is a one-player vehicle the entity capture refuses, so that finish saved it only as the RootVehicle in its saved
-     * player, and this resume's own player tag replaces that record wholesale. Nothing else carries it forward.
+     * is a one-player vehicle the entity capture refuses, so that finish saved it only as the {@code RootVehicle} in
+     * its saved player, and this resume's own player tag replaces that record wholesale. Nothing else carries it
+     * forward.
      *
      * <p>Skipped when this finish already preserved that mount itself, either by writing it as a standalone entity or
-     * by capturing it into the player's own RootVehicle, the latter matched by UUID against the whole captured mount
-     * tree rather than against its root. The root is not the mount: a mount can be ridden while itself riding another
-     * vehicle, and then the RootVehicle record holds the outer vehicle with the mount nested under it. Matching the
-     * root alone would release a mount the player is still on, putting a second copy of it in the world.
+     * by capturing it into the player's own {@code RootVehicle}, the latter matched by UUID against the whole captured
+     * mount tree rather than against its root. The root is not the mount: a mount can be ridden while itself riding
+     * another vehicle, and then the {@code RootVehicle} record holds the outer vehicle with the mount nested under it.
+     * Matching the root alone would release a mount the player is still on, putting a second copy of it in the world.
      *
      * <p>Routed to the dimension the PRIOR tag records, not to the live {@link #targetDimension}: the position comes
      * from the prior tag too, and this session can finish anywhere, so pairing prior coordinates with the current
@@ -3385,10 +3390,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * At resume init, mark the shared player ender inventory already recovered so the outline draws no rim on any ender
      * chest without the player reopening one. Gated so the rim never claims a save this resume will strip: only on a
-     * RESUME with savePlayerEnderChest on this session and a present, non-empty prior {@code "EnderItems"}. If the
-     * toggle is off this session the resume drops the ender inventory, so the fact must not be marked; if it was off
-     * last session the prior save has no EnderItems, so the non-empty guard leaves the rims red on its own. Mirrors the
-     * non-empty guard {@link PlayerTag#carryForwardEnderItems} uses.
+     * RESUME with {@code savePlayerEnderChest} on this session and a present, non-empty prior {@code "EnderItems"}. If
+     * the toggle is off this session the resume drops the ender inventory, so the fact must not be marked; if it was
+     * off last session the prior save has no {@code EnderItems}, so the non-empty guard leaves the rims red on its own.
+     * Mirrors the non-empty guard {@link PlayerTag#carryForwardEnderItems} uses.
      */
     private void markPriorEnderRecovered() {
         if (target.mode() != DownloadMode.RESUME || !config.savePlayerEnderChest()) {
@@ -3541,11 +3546,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The map-id floor from a prior {@code idcounts.dat}, or -1 if that read faults. Its own -1 fallback keeps a fault
-     * in this source from discarding the data-file floor read independently above. It can exceed the data-file source,
-     * which is why both are read: an imageless id writes no data file, so a prior download whose highest id was
-     * imageless is recorded here and nowhere else. It only reaches disk at finalize, so a prior download that crashed
-     * leaves this source empty and the data-file scan carrying the floor alone.
+     * The map-id floor from a prior idcounts.dat, or -1 if that read faults. Its own -1 fallback keeps a fault in this
+     * source from discarding the data-file floor read independently above. It can exceed the data-file source, which is
+     * why both are read: an imageless id writes no data file, so a prior download whose highest id was imageless is
+     * recorded here and nowhere else. It only reaches disk at finalize, so a prior download that crashed leaves this
+     * source empty and the data-file scan carrying the floor alone.
      */
     private static int idCountsFloor(Path dataDirectory) {
         try {
@@ -3713,7 +3718,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Open the world for writing once and start the background {@link AsyncSaveWriter}. Lazy so a never-captured
      * session creates nothing; idempotent so the flush pump and {@code finish()} share one writer. Returns null (and
      * records {@link #startError}) if the world cannot be opened; that failure is logged once where it is surfaced
-     * (reportSaveFailure at finish), not here, so a deferred open error is not dumped to the log twice.
+     * ({@code reportSaveFailure} at finish), not here, so a deferred open error is not dumped to the log twice.
      */
     private @Nullable AsyncSaveWriter ensureWriter() {
         if (writer != null) {
@@ -4102,8 +4107,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Sweep the container and lectern holders still stashed after a whole-buffer drain: the open-time contents of a
      * container opened in a chunk that had already left the keep-hot buffer. Its chunk is on disk but was never
-     * re-buffered (the allCaptured skip in {@link #captureLoadedChunks}), so the per-chunk drain never reached its
-     * holder; fold each residual holder into its on-disk chunk through a writer-thread read-modify-write, so
+     * re-buffered (the {@code allCaptured} skip in {@link #captureLoadedChunks}), so the per-chunk drain never reached
+     * its holder; fold each residual holder into its on-disk chunk through a writer-thread read-modify-write, so
      * backtracking through an already-flushed base still saves what the player opened. Runs only on a whole-buffer
      * drain ({@code all}), never per tick, so it adds no per-tick whole-stash pass. Finish and the dimension rebind
      * always reach it (both call {@link #flushBuffer} directly); the capture-paused drain reaches it only alongside a
@@ -4296,8 +4301,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Drop from a drained entity-chunk any UUID captured into the player's RootVehicle this finish, so a primed or
-     * reconstructed mount is not also written standalone (a same-UUID clash on load). {@code drainChunk} returns a
+     * Drop from a drained entity-chunk any UUID captured into the player's {@code RootVehicle} this finish, so a primed
+     * or reconstructed mount is not also written standalone (a same-UUID clash on load). {@code drainChunk} returns a
      * fresh mutable list, so the {@code removeIf} is safe; the source tally is dropped too, since a filtered mount is
      * player-state, not a standalone write. The set is empty until finish, so mid-session flushes are untouched. A
      * primed mount already flushed to disk before finish cannot be retracted here; that is the accepted UUID-collision

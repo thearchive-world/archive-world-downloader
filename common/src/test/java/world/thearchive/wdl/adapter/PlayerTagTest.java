@@ -256,7 +256,10 @@ class PlayerTagTest {
         assertFalse(fresh.contains("RootVehicle"));
     }
 
-    /** A RootVehicle whose Entity carries the mount's own UUID and an Items list, the seated-mount capture shape. */
+    /**
+     * A {@code RootVehicle} whose Entity carries the mount's own UUID and an Items list, the seated-mount capture
+     * shape.
+     */
     private static CompoundTag mountRootVehicle(UUID mountUuid, ListTag items) {
         CompoundTag rootVehicle = new CompoundTag();
         CompoundTag entity = EntityFixtures.entity("minecraft:chest_boat", mountUuid);

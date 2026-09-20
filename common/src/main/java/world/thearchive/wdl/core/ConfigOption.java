@@ -42,7 +42,7 @@ public final class ConfigOption {
         this.losesDataOnDisable = losesDataOnDisable;
     }
 
-    /** The {@code wdl.properties} key, the settings row's binding and its {@code gamerule.*}-free identity. */
+    /** The wdl.properties key, the settings row's binding and its {@code gamerule.*}-free identity. */
     public String key() {
         return key;
     }

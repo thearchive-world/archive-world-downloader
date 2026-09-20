@@ -231,7 +231,7 @@ public final class InteractionCapture {
     /**
      * A jukebox disc, placed shulker, or placed beehive: one merge-ready single-key holder
      * ({@code "RecordItem"}/{@code "Items"}/{@code "Bees"}). The gate keeps it whole only when the authoritative
-     * block-state confirms the content is present (HAS_RECORD, or the expected placed block type).
+     * block-state confirms the content is present ({@code HAS_RECORD}, or the expected placed block type).
      */
     static final class HolderCandidate implements Candidate {
         private final InteractionKind kind;

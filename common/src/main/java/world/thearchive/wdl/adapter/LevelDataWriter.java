@@ -14,7 +14,7 @@ import world.thearchive.wdl.core.GameRuleResolution;
 import world.thearchive.wdl.core.WorldOutputConfig;
 
 /**
- * Per-band {@code level.dat} axis: build the metadata for a captured world.
+ * Per-band level.dat axis: build the metadata for a captured world.
  *
  * <p>A multiplayer client cannot recover the server's worldgen (the server's seed and generator settings are never
  * synced), so the captured world is a <b>superflat VOID</b> world (all air) for overworld/nether/end: the captured
