@@ -206,8 +206,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
     // The WDL names are the band-neutral curated keys; each maps to its 1.10.2 vanilla rule id here. The fire-spread
     // row is named for the newer integer radius rule; the boolean doFireTick is this band's equivalent. A curated
-    // name with no rule at this band (the wandering-trader, patrol, warden and vine-spread rules are all 1.14 and
-    // above) is dropped at runtime, so this list is the superset.
+    // name with no rule at this band (the weather-cycle rule is 1.11 and the wandering-trader, patrol, warden and
+    // vine-spread rules 1.14 and above) is dropped at runtime, so this list is the superset.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
