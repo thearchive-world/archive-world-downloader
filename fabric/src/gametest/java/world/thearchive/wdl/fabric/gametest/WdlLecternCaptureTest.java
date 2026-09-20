@@ -88,7 +88,10 @@ public class WdlLecternCaptureTest implements FabricClientGameTest {
         }
     }
 
-    /** Whether the lectern holds a book, read from the synced has_book blockstate (the book NBT is client-blind). */
+    /**
+     * Whether the lectern holds a book, read from the synced {@code has_book} blockstate (the book NBT is
+     * client-blind).
+     */
     private static boolean hasBook(BlockState state) {
         return state.hasProperty(LecternBlock.HAS_BOOK) && state.getValue(LecternBlock.HAS_BOOK);
     }

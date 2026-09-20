@@ -22,7 +22,7 @@ import world.thearchive.wdl.core.WdlConfig;
  *
  * <p>Vanilla spectating is the entire mechanism, so this reproduces the Flashback playback defect with no replay mod on
  * the classpath: {@code ServerPlayer.tick} snaps the server-side player onto the camera every tick and re-centers chunk
- * tracking from there, while the owning client is sent no position, so its LocalPlayer parks where it stood.
+ * tracking from there, while the owning client is sent no position, so its {@code LocalPlayer} parks where it stood.
  *
  * <p>The camera is set through a server console command on purpose. A client-side {@code Minecraft.setCameraEntity}
  * writes a field and sends nothing, so the server would never re-center, no chunks would stream, and this test would
