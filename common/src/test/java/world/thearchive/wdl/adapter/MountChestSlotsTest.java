@@ -146,7 +146,8 @@ class MountChestSlotsTest {
 
     /**
      * A stand-in {@link LocalPlayer}, allocated without running a constructor and given the same {@link Inventory} the
-     * menu is built over. That identity is all {@link ContainerCapture#captureChestSlots} reads a player for.
+     * menu is built over. That identity is all {@link ContainerCapture#captureChestSlots} reads a player for. The
+     * allocator is named rather than imported because Checkstyle bans the {@code sun} packages.
      */
     private static LocalPlayer headlessPlayer() {
         try {
