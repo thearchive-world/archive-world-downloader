@@ -250,8 +250,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are dev's band-neutral keys; each maps to its vanilla rule id here. The fire-spread row is named
-    // for the newer integer radius rule; the boolean doFireTick is this band's equivalent.
+    // The fire-spread row is named for the newer integer radius rule; the boolean doFireTick is this band's equivalent.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
