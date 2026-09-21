@@ -5,11 +5,13 @@ package world.thearchive.wdl.core.export;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static world.thearchive.wdl.testsupport.SaveFolders.worldFolder;
 
 import java.io.IOException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
@@ -18,13 +20,18 @@ import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.SaveProgress;
+import world.thearchive.wdl.testsupport.JulCapture;
 
 /** The MC-free finalize-output orchestration: export zip and resume backup, mode/knob gating, collision. */
 class FinalizeOutputsTest {
+    @RegisterExtension
+    final JulCapture warnings = JulCapture.of(FinalizeOutputs.class);
+
     /** A small finished save folder under a saves directory, returned as the folder path. */
     private static Path saveFolder(Path saves) throws IOException {
         return worldFolder(saves, new byte[200], new byte[300]);
@@ -212,6 +219,7 @@ class FinalizeOutputsTest {
         } finally {
             Files.setPosixFilePermissions(saves, original); // restore so the temporary-directory cleanup can remove it
         }
+        assertInstanceOf(AccessDeniedException.class, warnings.drain("the export zip failed").getThrown());
     }
 
     private static boolean isWritable(Path directory) {
