@@ -5,6 +5,7 @@ package world.thearchive.wdl.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,15 +20,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.function.Predicate;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
+
+import world.thearchive.wdl.testsupport.JulCapture;
 
 /** The band-agnostic config: pure java.util/java.nio parsing, default-on-missing, materialize-on-absent. */
 class WdlConfigTest {
+    @RegisterExtension
+    final JulCapture warnings = JulCapture.of(WdlConfig.class);
+
     @Test
     void parseDefaultsEveryMissingKey() {
         WdlConfig config = WdlConfig.parse(new Properties());
@@ -492,6 +495,7 @@ class WdlConfigTest {
                 .getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
+        warnings.drain("wdl.properties has an invalid value for [overrideGamerules]");
 
         assertTrue(config.worldOutput().overrideGameRules(), "the malformed default-on flag heals to its default");
         assertFalse(config.captureEntities(), "a valid edit alongside the malformed one is preserved, not reset");
@@ -510,6 +514,7 @@ class WdlConfigTest {
         Files.write(file, "recaptureSeconds=not-a-number\n".getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
+        warnings.drain("wdl.properties has an invalid value for [recaptureSeconds]");
 
         assertEquals(15, config.recaptureSeconds(), "a malformed int heals to its default");
         assertTrue(new String(Files.readAllBytes(file), StandardCharsets.UTF_8).contains("recaptureSeconds=15"),
@@ -522,6 +527,7 @@ class WdlConfigTest {
         Files.write(file, "recaptureSeconds=not-a-number\n".getBytes(StandardCharsets.UTF_8));
 
         WdlConfig.load(file); // the heal rewrite goes through the staging-then-atomic-move writer
+        warnings.drain("wdl.properties has an invalid value for [recaptureSeconds]");
 
         assertFalse(Files.exists(directory.resolve("wdl.properties.tmp")),
                 "the atomic-move writer moves its staging sibling away, never leaving a half-written sibling");
@@ -534,30 +540,11 @@ class WdlConfigTest {
         Path unreadable = directory.resolve("wdl.properties");
         Files.createDirectory(unreadable);
 
-        List<LogRecord> records = new ArrayList<>();
-        Logger logger = Logger.getLogger(WdlConfig.class.getName());
-        Handler handler = new Handler() {
-            @Override
-            public void publish(LogRecord record) {
-                records.add(record);
-            }
+        assertSame(WdlConfig.DEFAULTS, WdlConfig.load(unreadable),
+                "an unreadable config falls back to the defaults for this session");
 
-            @Override
-            public void flush() {}
-
-            @Override
-            public void close() {}
-        };
-        logger.addHandler(handler);
-        try {
-            assertSame(WdlConfig.DEFAULTS, WdlConfig.load(unreadable),
-                    "an unreadable config falls back to the defaults for this session");
-        } finally {
-            logger.removeHandler(handler);
-        }
-
-        assertTrue(records.stream().anyMatch(record -> record.getLevel() == Level.WARNING),
-                "the read failure is now logged, not swallowed silently");
+        assertInstanceOf(IOException.class, warnings.drain("wdl.properties could not be read or written").getThrown(),
+                "the read failure is logged with its cause, not swallowed silently");
     }
 
     @Test
@@ -581,6 +568,7 @@ class WdlConfigTest {
         Files.write(file, "captureEntities=\n".getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
+        warnings.drain("wdl.properties has an invalid value for [captureEntities]");
 
         assertTrue(config.captureEntities(),
                 "an empty value is malformed and heals to its default, not a silent false");
