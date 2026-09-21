@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -30,6 +31,8 @@ import java.util.EnumSet;
 import java.util.Set;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -64,6 +67,21 @@ class RestoreOperationTest {
         }
         assertFalse(RestoreOperation.probeLocked(folder)); // released = unlocked again
         drainParkOf(lock);
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void probeParksItsChannelUnderTheLockThisJvmHolds(@TempDir Path work) throws Exception {
+        Path folder = Files.createDirectories(work.resolve("World"));
+        Path lock = Files.write(folder.resolve("session.lock"), new byte[] { 0x2A });
+        try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.WRITE);
+                FileLock held = channel.lock()) {
+            assertTrue(RestoreOperation.probeLocked(folder));
+        }
+        FileChannel parked = RestoreOperation.parkedChannelForTest(RestoreOperation.parkKey(lock));
+        assertNotNull(parked, "a same-JVM holder parks the probe channel rather than closing it");
+        assertTrue(parked.isOpen());
+        warnings.drain("parked a probe channel on " + lock);
     }
 
     @Test
