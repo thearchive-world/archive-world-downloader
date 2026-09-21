@@ -63,7 +63,7 @@ class CoreLogHandlerTest {
     };
 
     // When a test attaches to a live logger, restore it afterward so the global java.util.logging state the
-    // next test sees is unchanged (the DownloadReportStoreTest discipline).
+    // next test sees is unchanged.
     @Nullable
     private Logger attachedTo;
     @Nullable
