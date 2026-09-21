@@ -6,64 +6,30 @@ package world.thearchive.wdl.core.report;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
+import world.thearchive.wdl.testsupport.JulCapture;
 import world.thearchive.wdl.testsupport.ReportFixtures;
 
 class DownloadReportStoreTest {
     private static final Instant FINISHED = Instant.parse("2026-06-22T07:14:05Z");
 
-    private final List<LogRecord> warnings = new ArrayList<>();
-    private Logger logger;
-    private Handler handler;
-    private boolean usedParentHandlers;
-
-    @BeforeEach
-    void attachLogCapture() {
-        logger = Logger.getLogger(DownloadReportStore.class.getName());
-        usedParentHandlers = logger.getUseParentHandlers();
-        logger.setUseParentHandlers(false);
-        handler = new Handler() {
-            @Override
-            public void publish(LogRecord record) {
-                if (record.getLevel().intValue() >= Level.WARNING.intValue()) {
-                    warnings.add(record);
-                }
-            }
-
-            @Override
-            public void flush() {}
-
-            @Override
-            public void close() {}
-        };
-        logger.addHandler(handler);
-    }
-
-    @AfterEach
-    void detachLogCapture() {
-        logger.removeHandler(handler);
-        logger.setUseParentHandlers(usedParentHandlers);
-    }
+    @RegisterExtension
+    final JulCapture warnings = JulCapture.of(DownloadReportStore.class);
 
     private static DownloadIdentity identity() {
         return ReportFixtures.identity("id-1", "survival.thearchive.world", "hi", "My World");
@@ -113,7 +79,8 @@ class DownloadReportStoreTest {
         Files.write(blocker, new byte[] { 1 });
 
         assertDoesNotThrow(() -> new DownloadReportStore().refreshHumanRendering(blocker));
-        assertFalse(warnings.isEmpty(), "a failed rendering write is caught and surfaced, never thrown");
+        assertInstanceOf(IOException.class, warnings.drain("failed to write the download report rendering").getThrown(),
+                "a failed rendering write is caught and surfaced, never thrown");
     }
 
     @Test
@@ -164,7 +131,12 @@ class DownloadReportStoreTest {
         assertDoesNotThrow(() -> store.complete(blocker, identity(), environment(), settings(), FINISHED,
                 new DownloadCounts(1, 1, 0), () -> new SaveChunks(0, Collections.<DimensionChunks>emptyList()),
                 Collections.emptyMap()));
-        assertFalse(warnings.isEmpty(), "a failed report write is caught and surfaced, never thrown");
+        assertInstanceOf(IOException.class,
+                warnings.drain("failed to write the download report start record").getThrown(),
+                "a failed start-record write is caught and surfaced, never thrown");
+        assertInstanceOf(IOException.class,
+                warnings.drain("failed to write the download report completion record").getThrown(),
+                "a failed completion-record write is caught and surfaced, never thrown");
     }
 
     @Test
