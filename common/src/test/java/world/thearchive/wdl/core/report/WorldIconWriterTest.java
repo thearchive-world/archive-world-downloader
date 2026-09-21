@@ -6,16 +6,24 @@ package world.thearchive.wdl.core.report;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
+
+import world.thearchive.wdl.testsupport.JulCapture;
 
 class WorldIconWriterTest {
     private static final byte[] PNG = { (byte) 0x89, 'P', 'N', 'G', 1, 2, 3 };
+
+    @RegisterExtension
+    final JulCapture warnings = JulCapture.of(WorldIconWriter.class);
 
     @Test
     void writesTheBytesToIconPng(@TempDir Path directory) throws IOException {
@@ -38,5 +46,7 @@ class WorldIconWriterTest {
         Path regularFile = directory.resolve("blocker");
         Files.write(regularFile, new byte[] { 1 }); // a regular file where a save directory is expected
         assertDoesNotThrow(() -> WorldIconWriter.write(regularFile, PNG));
+        assertInstanceOf(FileAlreadyExistsException.class,
+                warnings.drain("failed to write the world icon").getThrown());
     }
 }
