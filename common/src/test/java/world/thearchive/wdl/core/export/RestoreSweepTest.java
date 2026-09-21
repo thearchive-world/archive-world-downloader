@@ -5,12 +5,14 @@ package world.thearchive.wdl.core.export;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -18,18 +20,24 @@ import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.logging.LogRecord;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.core.export.RestoreOperation.RestoreSweep;
 import world.thearchive.wdl.core.export.RestoreOperation.RestoreSweep.SweepResult;
+import world.thearchive.wdl.testsupport.JulCapture;
 
 /** The roll-back-only sweep over crafted attempt layouts: the branch table, part cleanup, memo and TTL. */
 class RestoreSweepTest {
     @TempDir
     Path saves;
+
+    @RegisterExtension
+    final JulCapture warnings = JulCapture.of(RestoreOperation.class);
 
     @BeforeEach
     void resetSweepState() {
@@ -60,6 +68,7 @@ class RestoreSweepTest {
             assertFalse(deferred.changedDisk());
             assertTrue(Files.exists(aside.resolve("level.dat"))); // nothing deleted
         }
+        drainParkOf(lock);
     }
 
     @Test
@@ -164,6 +173,7 @@ class RestoreSweepTest {
         }
         // The released lock is a fail-to-pass transition of the aside probe: hasWork re-arms past the TTL.
         assertTrue(RestoreSweep.hasWork(saves));
+        drainParkOf(lock);
 
         // A missing folder is an observed-transition bypass: the folder reappearing re-arms within the TTL.
         RestoreSweep.resetForTest();
@@ -181,6 +191,7 @@ class RestoreSweepTest {
             liveFolder("Ghost", 4); // the folder reappears: a folder-existence flip
             assertTrue(RestoreSweep.hasWork(saves)); // the transition re-arms within the TTL
         }
+        drainParkOf(ghostLock);
     }
 
     @Test
@@ -211,6 +222,7 @@ class RestoreSweepTest {
             Files.setLastModifiedTime(deep, FileTime.fromMillis(nowMs[0] + 12_345L));
             assertFalse(RestoreSweep.hasWork(saves));
         }
+        drainParkOf(lock);
 
         // Correctness preserved: with the lock released, the torn attempt is still swept away, the deep
         // change notwithstanding. Past the TTL the aside probe flips fail-to-pass and re-arms.
@@ -240,6 +252,7 @@ class RestoreSweepTest {
             SweepResult second = RestoreSweep.run(saves);
             assertTrue(second.missingDeferred().isEmpty());
         }
+        drainParkOf(lock);
     }
 
     @Test
@@ -271,6 +284,12 @@ class RestoreSweepTest {
         } finally {
             Files.setPosixFilePermissions(saves, original);
         }
+        int failedMoveBacks = 0;
+        for (LogRecord failedMoveBack : warnings.drainAll("sweep move-back of World failed")) {
+            assertInstanceOf(AccessDeniedException.class, failedMoveBack.getThrown());
+            failedMoveBacks++;
+        }
+        assertEquals(2, failedMoveBacks, "each sweep logs the failed move-back it defers on");
     }
 
     @Test
@@ -367,6 +386,12 @@ class RestoreSweepTest {
         Files.createDirectories(attempt.resolve("install"));
         Files.write(attempt.resolve("attempt.lock"), new byte[0]);
         return attempt;
+    }
+
+    /** Claims the park's record where the probe parked; the Windows arm closes the probe channel and logs nothing. */
+    private void drainParkOf(Path lock) {
+        boolean parked = RestoreOperation.parkedChannelForTest(RestoreOperation.parkKey(lock)) != null;
+        assertEquals(parked ? 1 : 0, warnings.drainAll("parked a probe channel on " + lock).size());
     }
 
     private static void putAside(Path attempt, String folderName) throws IOException {
