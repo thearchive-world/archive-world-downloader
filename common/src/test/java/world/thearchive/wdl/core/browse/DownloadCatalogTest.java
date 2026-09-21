@@ -5,6 +5,7 @@ package world.thearchive.wdl.core.browse;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.core.report.DimensionChunks;
@@ -29,10 +31,14 @@ import world.thearchive.wdl.core.report.DownloadReportStore;
 import world.thearchive.wdl.core.report.ReportEnvironment;
 import world.thearchive.wdl.core.report.SaveChunks;
 import world.thearchive.wdl.core.report.WorldIconWriter;
+import world.thearchive.wdl.testsupport.JulCapture;
 import world.thearchive.wdl.testsupport.ReportFixtures;
 
 class DownloadCatalogTest {
     private static final Instant STARTED = Instant.parse("2026-06-22T07:14:01Z");
+
+    @RegisterExtension
+    final JulCapture warnings = JulCapture.of(DownloadCatalog.class);
 
     @Test
     void excludesPlainVanillaSavesAndListsOnlyWdlManagedFolders(@TempDir Path saves) throws IOException {
@@ -133,6 +139,9 @@ class DownloadCatalogTest {
 
         assertEquals(1, entries.size(), "a folder that fails to read is skipped, not fatal to the whole list");
         assertEquals("healthy-2026-06-22", entries.get(0).folderName());
+        assertInstanceOf(IOException.class,
+                warnings.drain("skipping an unreadable download folder: " + saves.resolve("poison-2026-06-22"))
+                        .getThrown());
     }
 
     @Test

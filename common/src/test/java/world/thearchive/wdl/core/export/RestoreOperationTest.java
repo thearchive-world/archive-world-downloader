@@ -6,6 +6,7 @@ package world.thearchive.wdl.core.export;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -16,8 +17,10 @@ import java.io.UncheckedIOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
@@ -27,7 +30,10 @@ import java.util.EnumSet;
 import java.util.Set;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
+
+import world.thearchive.wdl.testsupport.JulCapture;
 
 /** The guarded replace over a real tainted fixture: probes, per-cause refusals, and the happy path. */
 class RestoreOperationTest {
@@ -35,6 +41,9 @@ class RestoreOperationTest {
     Path saves;
 
     private RestoreOperation currentOp;
+
+    @RegisterExtension
+    final JulCapture warnings = JulCapture.of(RestoreOperation.class);
 
     @Test
     void probeAbsentLockIsUnlockedAndNeverCreates(@TempDir Path work) throws IOException {
@@ -54,6 +63,7 @@ class RestoreOperationTest {
             assertTrue(RestoreOperation.probeLocked(folder));
         }
         assertFalse(RestoreOperation.probeLocked(folder)); // released = unlocked again
+        drainParkOf(lock);
     }
 
     @Test
@@ -77,6 +87,10 @@ class RestoreOperationTest {
             assertTrue(RestoreOperation.probeLocked(folder));
         }
         assertFalse(RestoreOperation.probeLocked(folder)); // both released; the new file reads unlocked
+        if (RestoreOperation.parkedChannelForTest(RestoreOperation.parkKey(lock)) != null) {
+            assertEquals(2, warnings.drainAll("parked a probe channel on " + lock).size());
+            warnings.drain("tombstoned a stale parked channel on " + lock);
+        }
     }
 
     @Test
@@ -94,6 +108,8 @@ class RestoreOperationTest {
         assertSame(winner, RestoreOperation.parkedChannelForTest(key)); // winner preserved, not overwritten
         assertTrue(RestoreOperation.graveyardContainsForTest(loser)); // loser retained, not orphaned
         assertTrue(loser.isOpen()); // loser never closed
+        warnings.drain("parked a probe channel on " + lock);
+        warnings.drain("graveyarded a probe channel on " + lock);
     }
 
     @Test
@@ -197,6 +213,7 @@ class RestoreOperationTest {
         }
         assertFalse(Files.exists(saves.resolve("World-singleplayer.zip"))); // refused pre-snapshot
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
+        drainParkOf(lock);
     }
 
     @Test
@@ -210,6 +227,7 @@ class RestoreOperationTest {
                 phase -> {});
         assertEquals(RestoreOperation.Outcome.SNAPSHOT_FAILED, operation.run().outcome());
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // folder untouched
+        assertEquals("forced", warnings.drain("pre-restore snapshot of World failed").getThrown().getMessage());
     }
 
     @Test
@@ -271,6 +289,7 @@ class RestoreOperationTest {
         assertEquals(RestoreOperation.Outcome.EXTRACT_REFUSED, runOp("World", source));
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // folder untouched
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT))); // attempt cleaned
+        assertInstanceOf(IOException.class, warnings.drain("extract of World.zip refused").getThrown());
     }
 
     @Test
@@ -308,6 +327,8 @@ class RestoreOperationTest {
         // Rolled back: the tainted original is back at the name, attempt directory cleaned.
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
+        assertEquals("forced install-move failure",
+                warnings.drain("install move for World failed").getThrown().getMessage());
     }
 
     @Test
@@ -322,6 +343,8 @@ class RestoreOperationTest {
         assertTrue(Files.exists(saves.resolve("World_(2)/playerdata/u.dat")));
         assertTrue(Files.exists(saves.resolve("World")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
+        assertInstanceOf(FileAlreadyExistsException.class,
+                warnings.drain("install move for World failed").getThrown());
     }
 
     @Test
@@ -389,6 +412,8 @@ class RestoreOperationTest {
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
         assertTrue(result.survivingPaths().isEmpty());
+        assertEquals("forced keep-aside move failure",
+                warnings.drain("keep-aside move for World failed").getThrown().getMessage());
     }
 
     @Test
@@ -402,6 +427,8 @@ class RestoreOperationTest {
         assertEquals(saves.resolve("World_(3)"), result.relocatedTo());
         assertTrue(Files.exists(saves.resolve("World_(3)/playerdata/u.dat")));
         assertArrayEquals(new byte[] { 7 }, Files.readAllBytes(saves.resolve("World_(2)/level.dat")));
+        assertInstanceOf(FileAlreadyExistsException.class,
+                warnings.drain("install move for World failed").getThrown());
     }
 
     @Test
@@ -450,6 +477,9 @@ class RestoreOperationTest {
         assertEquals(ImmutableList.of(aside), result.survivingPaths());
         assertFalse(Files.exists(saves.resolve("World_(2)")));
         assertTrue(RestoreOperation.attemptReferences(saves, "World"));
+        assertInstanceOf(FileAlreadyExistsException.class,
+                warnings.drain("install move for World failed").getThrown());
+        drainParkOf(aside.resolve("session.lock"));
     }
 
     @Test
@@ -465,6 +495,9 @@ class RestoreOperationTest {
         assertEquals(RestoreOperation.Outcome.SWAP_FAILED, result.outcome());
         assertEquals(ImmutableList.of(aside), result.survivingPaths());
         assertTrue(RestoreOperation.attemptReferences(saves, "World"));
+        assertEquals("forced install-move failure",
+                warnings.drain("install move for World failed").getThrown().getMessage());
+        assertInstanceOf(NoSuchFileException.class, warnings.drain("move-back of World failed").getThrown());
     }
 
     @Test
@@ -495,6 +528,12 @@ class RestoreOperationTest {
         currentOp = RestoreOperation.createForTest(saves, name,
                 RestoreSource.find(saves, name).get(), FolderZipper::zip, hook);
         return currentOp;
+    }
+
+    /** Claims the park's record where the probe parked; the Windows arm closes the probe channel and logs nothing. */
+    private void drainParkOf(Path lock) {
+        boolean parked = RestoreOperation.parkedChannelForTest(RestoreOperation.parkKey(lock)) != null;
+        assertEquals(parked ? 1 : 0, warnings.drainAll("parked a probe channel on " + lock).size());
     }
 
     private static RestoreOperation.SnapshotStep failingSnapshot() {
