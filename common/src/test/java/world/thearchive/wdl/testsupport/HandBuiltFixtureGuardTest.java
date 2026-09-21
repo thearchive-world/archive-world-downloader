@@ -48,14 +48,13 @@ class HandBuiltFixtureGuardTest {
      * losing.
      *
      * <p>Matched by regex over the whole file rather than by substring per line, because both narrower forms leak. Any
-     * typed put counts, since a numeric key written at one width reads back at another ({@code getByteOr} accepts an
-     * int tag), and the whitespace class covers an argument list the formatter wrapped at the column limit. The untyped
-     * {@code put} is matched only when its value is a Tag, because the same call on a plain {@code Map} is ordinary
-     * code with nothing to do with a fixture.
+     * typed setter counts, since a numeric key written at one width reads back at another ({@code getByte} accepts any
+     * numeric tag), and the whitespace class covers an argument list the formatter wrapped at the column limit. This
+     * band names every compound write {@code set} plus its type, and has no untyped write to tell apart from an
+     * ordinary {@code Map} call.
      */
     private static final List<Pattern> DECIDING_KEY_WRITES = ImmutableList.of(
-            Pattern.compile("put\\w+\\(\\s*\"(id|Slot|Count)\""),
-            Pattern.compile("put\\(\\s*\"(id|Slot|Count)\"\\s*,\\s*\\w*Tag\\."));
+            Pattern.compile("set\\w+\\(\\s*\"(id|Slot|Count)\""));
 
     private static final String BUILDERS = "BlockEntityFixtures, ItemFixtures or EntityFixtures";
 
