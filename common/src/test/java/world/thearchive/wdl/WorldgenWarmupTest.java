@@ -10,15 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
-import java.util.logging.Logger;
-import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import world.thearchive.wdl.core.WorldType;
+import world.thearchive.wdl.testsupport.JulCapture;
 
 /**
  * The pre-download warmup dispatch: the gate submits a warmup only when the chosen generator needs worldgen (and, on
@@ -35,29 +33,8 @@ class WorldgenWarmupTest {
         }
     }
 
-    private final List<LogRecord> logged = new ArrayList<>();
-    private final Handler capturing = new Handler() {
-        @Override
-        public void publish(LogRecord record) {
-            logged.add(record);
-        }
-
-        @Override
-        public void flush() {}
-
-        @Override
-        public void close() {}
-    };
-
-    @Nullable
-    private Logger attachedTo;
-
-    @AfterEach
-    void detachHandler() {
-        if (attachedTo != null) {
-            attachedTo.removeHandler(capturing);
-        }
-    }
+    @RegisterExtension
+    final JulCapture warnings = JulCapture.of(WorldgenWarmup.class);
 
     @Test
     void screenOpenSubmitsWarmForGeneratedTerrain() {
@@ -72,7 +49,6 @@ class WorldgenWarmupTest {
 
     @Test
     void aFailedWarmIsSwallowedAndLoggedOnce() {
-        attachCapture();
         Runnable throwingWarm = () -> {
             throw new IllegalStateException("reconstruction failed");
         };
@@ -80,22 +56,14 @@ class WorldgenWarmupTest {
         assertDoesNotThrow(() -> WorldgenWarmup.dispatchForScreenOpen(WorldType.DEFAULT, throwingWarm, Runnable::run),
                 "a broken warmup never escapes onto the worker");
 
-        assertEquals(1, logged.size(), "the failure is logged exactly once");
-        assertEquals(Level.WARNING, logged.get(0).getLevel());
-        assertTrue(logged.get(0).getThrown() instanceof IllegalStateException, "the cause is carried into the log");
+        LogRecord logged = warnings.drain("worldgen registry warmup failed");
+        assertEquals(Level.WARNING, logged.getLevel());
+        assertTrue(logged.getThrown() instanceof IllegalStateException, "the cause is carried into the log");
     }
 
     private int submittedAtScreenOpen(WorldType worldType) {
         RecordingExecutor executor = new RecordingExecutor();
         WorldgenWarmup.dispatchForScreenOpen(worldType, () -> {}, executor);
         return executor.tasks.size();
-    }
-
-    private void attachCapture() {
-        capturing.setLevel(Level.ALL);
-        Logger logger = Logger.getLogger("world.thearchive.wdl.WorldgenWarmup");
-        logger.setLevel(Level.ALL);
-        logger.addHandler(capturing);
-        attachedTo = logger;
     }
 }
