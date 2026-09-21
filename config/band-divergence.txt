@@ -668,8 +668,9 @@ common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.jav
 common/src/test/java/world/thearchive/wdl/adapter/MapIdCountsShapeTest.java
 
 # Added, absent from dev: the container-map loss gate. Below 1.13 a filled map's id is the item-level Damage short
-# behind the minecraft:filled_map id gate, so this drives hand-built classic-MCP item NBT to prove the chest-nested and
-# shulker-nested maps collect and remap while a damaged non-map item's Damage field is left untouched.
+# behind the minecraft:filled_map id gate, so this drives classic-MCP item NBT built through ItemFixtures over the
+# bootstrapped registries to prove the chest-nested and shulker-nested maps collect and remap while a damaged non-map
+# item's Damage field is left untouched.
 common/src/test/java/world/thearchive/wdl/adapter/ContainerMapCollectionTest.java
 
 # At 1.11.2 the write-task test reads the written map back through classic CompressedStreamTools rather than NbtIo, over
