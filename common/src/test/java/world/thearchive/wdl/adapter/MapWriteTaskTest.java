@@ -35,7 +35,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class MapWriteTaskTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // sets the game version NbtUtils.addCurrentDataVersion reads
+        TestRegistries.bootstrap(); // sets the game version the data-version stamp reads
     }
 
     private static CaptureLossLog lossLog() {
