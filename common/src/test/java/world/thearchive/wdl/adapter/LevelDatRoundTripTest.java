@@ -24,10 +24,10 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * level.dat round-trip: from a client-like reg ({@code BIOME} + {@code DIMENSION_TYPE}, NO {@code LEVEL_STEM}, just
- * what a multiplayer client syncs), the writer produces a superflat VOID world whose Data tag, written to a real
- * compressed level.dat and read back, preserves seed, the three dimensions and {@code DataVersion}, with the dimensions
- * being flat-void generators.
+ * level.dat round-trip: from a client-like reg (biomes + dimension types, NO dimension generators, just what a
+ * multiplayer client syncs), the writer produces a superflat VOID world whose Data tag, written to a real compressed
+ * level.dat and read back, preserves seed, the three dimensions and {@code DataVersion}, with the dimensions being
+ * flat-void generators.
  */
 class LevelDatRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
@@ -63,7 +63,7 @@ class LevelDatRoundTripTest {
     @Test
     void buildsFromClientRegistryWithoutLevelStem() {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        // Precondition mirrors a real multiplayer client: dimension types + biomes synced, no LEVEL_STEM.
+        // Precondition mirrors a real multiplayer client: dimension types + biomes synced, no dimension generators.
         assertTrue(registries.registry(Registry.LEVEL_STEM_REGISTRY).isEmpty(),
                 "precondition: client-like reg has no LEVEL_STEM");
         assertDoesNotThrow(() -> writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null),
