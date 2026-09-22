@@ -203,8 +203,8 @@ public final class Wdl {
                 Wdl::openSettingsScreen);
         bridge.onClientTickEnd(Wdl::onClientTick);
         bridge.onDisconnect(controller::onDisconnect);
-        // A backend transfer (play-to-configuration re-entry) fires no disconnect hook on either loader, so the
-        // tee raises its own signal and the controller polls it each tick, stopping the download the same way.
+        // Where the version has a configuration phase, a backend transfer re-enters it and fires no disconnect hook, so
+        // the tee raises its own signal and the controller polls it each tick, stopping the download the same way.
         controller.setTransferStopPoll(ConnectionTee::consumeTransferSignal);
         bridge.onServerJoin(controller::onServerJoin);
         bridge.onServerJoin(Wdl::onServerJoin);
