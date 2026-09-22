@@ -79,8 +79,9 @@ class EntityMergeTest {
     }
 
     /**
-     * A villager entity node carrying the trade experience vanilla writes unconditionally (so a client-reconstructed
-     * node carries the client zero here), and the offers holder only when {@code offers} is present.
+     * A villager entity node carrying a trade experience (vanilla, where the version has one, writes it
+     * unconditionally, so a client-reconstructed node carries the client zero), and the offers holder only when
+     * {@code offers} is present.
      */
     private static CompoundTag villager(UUID uuid, @Nullable CompoundTag offers, int xp) {
         CompoundTag tag = EntityFixtures.entity("minecraft:villager", uuid);

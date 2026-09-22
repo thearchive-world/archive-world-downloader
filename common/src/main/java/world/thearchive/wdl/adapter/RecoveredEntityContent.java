@@ -136,8 +136,9 @@ final class RecoveredEntityContent {
     private static boolean carryInto(CompoundTag holder, CompoundTag node) {
         boolean carried = NbtMerge.carryList(holder, node, "Items");
         carried |= NbtMerge.carryCompound(holder, node, "Offers", null);
-        // Xp only rides along with offers: a villager the client never traded with serializes Xp at the client zero,
-        // so carrying it alone would restore a level for a merchant whose trades did not come back.
+        // Xp only rides along with offers: where the version writes Xp, a villager the client never traded with
+        // serializes it at the client zero, so carrying it alone would restore a level for a merchant whose trades did
+        // not come back.
         if (carried) {
             carried |= NbtMerge.carryValue(holder, node, "Xp", new IntTag(0));
         }
