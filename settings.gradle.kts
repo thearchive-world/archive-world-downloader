@@ -19,8 +19,8 @@ pluginManagement {
 
 rootProject.name = "wdl"
 
-// NeoForge is dropped on this band: it does not exist for 1.10.x (NeoForged forked from Forge at 1.20.2), so the
-// second, non-Fabric loader is Forge, built by the Forge island under forge/ (a separate Gradle build that
-// provisions Forge natively through Unimined and reobfuscates natively, no hand-rolled Mojmap -> SRG step). This
-// root builds only common; the Forge jar is produced by forge/gradlew, not from here.
+// NeoForge has no release below 1.20.1, so the second, non-Fabric loader is Forge, built by the Forge island
+// under forge/ (a separate Gradle build that provisions Forge natively through Unimined and reobfuscates
+// natively, no hand-rolled Mojmap -> SRG step). This root builds only common; the Forge jar is produced by
+// forge/gradlew, not from here.
 include("common")
