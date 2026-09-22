@@ -37,10 +37,9 @@ import net.minecraft.tags.TagLoader;
  */
 public final class TestRegistries {
     /**
-     * The stable id of the vanilla data pack ({@code PackLocationInfo("vanilla", ...)} in {@code ServerPacksSource}).
-     * It is the base pack of every default world, selecting exactly it gives the standard vanilla registry set without
-     * the opt-in experimental datapacks
-     * ({@code minecart_improvements}/{@code redstone_experiments}/{@code trade_rebalance}).
+     * The stable id of the vanilla data pack (the id {@code ServerPacksSource} gives it). It is the base pack of every
+     * default world; selecting exactly it gives the standard vanilla registry set without the opt-in experimental
+     * datapacks.
      */
     private static final String VANILLA_PACK_ID = "vanilla";
 

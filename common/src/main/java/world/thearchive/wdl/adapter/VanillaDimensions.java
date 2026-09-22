@@ -59,12 +59,13 @@ final class VanillaDimensions {
     }
 
     /**
-     * Whether a captured chunk in {@code targetDimension} needs synthesized old-generation blending. Only the DEFAULT
-     * noise generator blends terrain against the captured edge, and only in the overworld: blending is a
-     * {@code NoiseBasedChunkGenerator} mechanism, so FLAT (which writes fixed layers and discards the blender) and VOID
-     * (no neighbor terrain) never blend and their output is left untouched; the nether and end are never blended either
-     * (the fix is overworld-only). Keying on {@code targetDimension} (a {@link #forType} result) rather than the raw
-     * level key is what makes a Multiverse overworld under a custom key blend correctly.
+     * Whether a captured chunk in {@code targetDimension} needs synthesized old-generation blending. On a version that
+     * blends old chunks, only the DEFAULT noise generator blends terrain against the captured edge, and only in the
+     * overworld: blending is a {@code NoiseBasedChunkGenerator} mechanism, so FLAT (which writes fixed layers and
+     * discards the blender) and VOID (no neighbor terrain) never blend and their output is left untouched; the nether
+     * and end are never blended either (vanilla marks only overworld chunks for blending). Keying on
+     * {@code targetDimension} (a {@link #forType} result) rather than the raw level key is what makes a Multiverse
+     * overworld under a custom key blend correctly.
      */
     static boolean shouldSynthesizeBlending(WorldType worldType, ResourceKey<Level> targetDimension) {
         return worldType == WorldType.DEFAULT && Level.OVERWORLD.equals(targetDimension);
