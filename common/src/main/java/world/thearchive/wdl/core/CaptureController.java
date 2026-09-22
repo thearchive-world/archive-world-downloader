@@ -207,8 +207,7 @@ public final class CaptureController {
      * off the render thread. Holds only the running download's own coverage, emptied once its save completes, and empty
      * while {@code renderCoverageOverlay} is off: that toggle is read live, on the overlay's own read path, so
      * switching it off hides the highlight without a restart and switching it back on shows the recorded index at once
-     * (the index keeps filling regardless). The id is the live client key, for instance
-     * {@code level.dimension().identifier().toString()}.
+     * (the index keeps filling regardless). The id is the live client's key for the dimension.
      */
     public long[] overlaySavedChunks(WdlConfig live, String dimensionId) {
         if (!live.renderCoverageOverlay()) {
