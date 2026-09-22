@@ -13,10 +13,11 @@ import net.minecraft.nbt.NBTTagCompound;
  *
  * <p>Per-band lectern-book-capture axis: serialize a book placed on a lectern (with the reading page) into the vanilla
  * lectern block-entity {@code "Book"}/{@code "Page"} NBT and merge it into a captured lectern block-entity tag. A
- * lectern's book never reaches the client's persisted {@code LecternBlockEntity} ({@code LecternBlockEntity} overrides
- * neither {@code getUpdatePacket} nor {@code getUpdateTag}, so the chunk packet carries no book and there is no
- * block-entity-data sync of one); it reaches the client only through the open lectern read menu's slot 0. So a captured
- * chunk's lectern is structurally present but book-less until this axis merges in the book lifted from the open menu.
+ * lectern's book never reaches the client's persisted lectern block entity (which overrides neither
+ * {@code getUpdatePacket} nor {@code getUpdateTag}, so the chunk packet carries no book and there is no
+ * block-entity-data sync of one); in ordinary play it reaches the client only through the open lectern read menu's slot
+ * 0. So a captured chunk's lectern is structurally present but book-less until this axis merges in the book lifted from
+ * the open menu.
  *
  * <p>The live step ({@link #captureBook(ItemStack, int)}) serializes the book lifted from the open menu. The pure step
  * ({@link #merge}) sets {@code "Book"}/{@code "Page"} on a copy of an already-captured lectern block-entity tag.
