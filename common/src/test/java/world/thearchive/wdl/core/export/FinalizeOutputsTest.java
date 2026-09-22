@@ -50,8 +50,8 @@ class FinalizeOutputsTest {
     @Test
     void exportOnDotSuffixedRootLandsBesideTheFolderNotInsideIt(@TempDir Path saves) throws IOException {
         Path folder = saveFolder(saves);
-        // The shape the level directory takes below 1.20.5, where it is read through LevelResource.ROOT, whose id
-        // is a bare dot, so the path arrives ending in a dot component.
+        // The shape the level directory takes on the versions that read it through a resource whose id is a bare dot,
+        // so the path arrives ending in a dot component.
         Path dotSuffixed = folder.resolve(".");
 
         String written = FinalizeOutputs.exportZip(dotSuffixed, true, new SaveProgress());

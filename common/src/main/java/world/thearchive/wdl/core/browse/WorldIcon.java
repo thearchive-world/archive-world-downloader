@@ -23,7 +23,7 @@ final class WorldIcon {
      */
     static final int MAX_BYTES = 512 * 1024;
 
-    /** An MC world icon is exactly 64x64, which is also what the view's {@code FaviconTexture} requires. */
+    /** An MC world icon is exactly 64x64, the size the view's icon texture requires where the version checks it. */
     static final int ICON_DIMENSION = 64;
 
     private WorldIcon() {}

@@ -15,12 +15,12 @@ class EntityMenuCapabilityTest {
     }
 
     @Test
-    void chestMinecartIsCapable() { // ContainerEntity
+    void chestMinecartIsCapable() { // a container entity
         assertFalse(EntityMenuCapability.isMenuIncapable(true, true, false, false, false, false, false));
     }
 
     @Test
-    void horseIsCapable() { // HasCustomInventoryScreen
+    void horseIsCapable() { // opens its own inventory screen
         assertFalse(EntityMenuCapability.isMenuIncapable(true, false, true, false, false, false, false));
     }
 
