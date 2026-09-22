@@ -343,7 +343,9 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 # The pinned java_version 17 rejects an unconditional instanceof pattern (holder.get("Xp") instanceof Tag, the
 # expression's own static type; Java 21 accepts it), and CompoundTag.get returns a nullable Tag at every version, so the
 # Xp carry-forward reads it with a null check; the merged Items list is read through getList(key, TAG_COMPOUND), the
-# pre-1.21.5 accessor (getListOrEmpty is 1.21.5 and above).
+# pre-1.21.5 accessor (getListOrEmpty is 1.21.5 and above). Below 1.19 there is no chest boat and the UUID codec is
+# SerializableUUID.CODEC, not UUIDUtil.CODEC, so the class Javadoc names the chest and hopper minecart alone and the
+# codec by that name.
 common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk recurses into a shulker's nested items via

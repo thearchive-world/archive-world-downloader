@@ -18,16 +18,16 @@ import org.slf4j.Logger;
  * {@link ContainerMerge}: that class locates a block entity by its {@code x/y/z} in the {@code "block_entities"} list,
  * this one locates a container holder by its {@code "UUID"} across the {@code "Entities"} tree, each record and every
  * node beneath its {@code "Passengers"} ({@link EntityTreeWalk}). The {@code "Items"} write itself is reused verbatim
- * from {@link ContainerSink#merge} (a chest minecart / boat persists its contents under {@code "Items"} via the exact
- * call the sink makes), so the two classes share the serialize and differ only in the locator.
+ * from {@link ContainerSink#merge} (a chest or hopper minecart persists its contents under {@code "Items"} via the
+ * exact call the sink makes), so the two classes share the serialize and differ only in the locator.
  *
  * <p>The same UUID locator also folds a villager's captured trades ({@link #mergeMerchantStash} and its refold): those
  * set {@code "Offers"} and {@code "Xp"} from a holder the tick already serialized, a plain tag copy with no sink and no
  * per-entry failure isolation, so unlike the item fold they cannot throw and always report zero failed.
  *
  * <p>Portable across the entities-region format: the {@code "Entities"} list, the recursive {@code "Passengers"} list
- * and a per-entity {@code "UUID"} 4-int array ({@code UUIDUtil.CODEC}) are vanilla-stable post-1.16, so only the
- * per-band {@code "Items"} serialization (behind {@link ContainerSink#merge}) differs. The matched node's
+ * and a per-entity {@code "UUID"} 4-int array ({@code SerializableUUID.CODEC}) are vanilla-stable post-1.16, so only
+ * the per-band {@code "Items"} serialization (behind {@link ContainerSink#merge}) differs. The matched node's
  * {@code "Items"} is set in place inside the captured chunk tag, so the merged contents are written by the regular
  * entity write that follows.
  */
