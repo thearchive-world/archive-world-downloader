@@ -26,10 +26,9 @@ import org.slf4j.Logger;
  * per-entry failure isolation, so unlike the item fold they cannot throw and always report zero failed.
  *
  * <p>Portable across the entities-region format: the {@code "Entities"} list, the recursive {@code "Passengers"} list
- * and a per-entity {@code "UUID"} 4-int array ({@code UUIDUtil.CODEC}) are vanilla-stable post-1.16, so only the
- * per-band {@code "Items"} serialization (behind {@link ContainerSink#merge}) differs. The matched node's
- * {@code "Items"} is set in place inside the captured chunk tag, so the merged contents are written by the regular
- * entity write that follows.
+ * and a per-entity {@code "UUID"} 4-int array ({@code UUIDUtil.CODEC}) are vanilla-stable, so only the per-band
+ * {@code "Items"} serialization (behind {@link ContainerSink#merge}) differs. The matched node's {@code "Items"} is set
+ * in place inside the captured chunk tag, so the merged contents are written by the regular entity write that follows.
  */
 final class EntityContainerMerge {
     private static final Logger LOGGER = LogUtils.getLogger();
