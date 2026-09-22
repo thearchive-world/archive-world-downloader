@@ -417,7 +417,9 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 
 # The Java 8 floor cannot bind a pattern variable in a type test, so the carried Xp tag is read with a null check
 # rather than dev's instanceof-Tag pattern. 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag
-# rather than throwing, so the tag-list walks iterate the list instead of indexing it.
+# rather than throwing, so the tag-list walks iterate the list instead of indexing it. Below 1.14 there is no trade
+# experience and no wandering trader, so the class Javadoc names Offers alone, the refold names a villager, and
+# foldOffers anchors the absent Xp to its 1.14 addition.
 common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk recurses into a shulker's nested items via
