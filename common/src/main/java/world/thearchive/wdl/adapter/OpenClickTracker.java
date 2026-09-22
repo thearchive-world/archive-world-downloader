@@ -72,13 +72,13 @@ public final class OpenClickTracker {
      * states what it does and does not settle. Every click that can open a menu must stay in the intent chain: an
      * unlatched menu open still consumes the next latch on resolve, stealing a following container's provenance (an
      * anvil open eating a furnace click binds the anvil's three slots onto the three-slot furnace, a mis-bind), and
-     * menu blocks like the crafting family carry no block entity, so menu-provider presence, not block-entity presence,
-     * is the load-bearing filter. A placement target, door, or lever reports no provider and stays unlatched; a latched
-     * click on one could only supersede real intents. The ender chest is the one vanilla menu-opening block with no
-     * provider (its menu is built in the block's use handler over the per-player ender container), so it is latched by
-     * its block entity; every other {@code openMenu} block either overrides {@code getMenuProvider} or has a
-     * {@code MenuProvider} block entity (verified across 1.21.11). A server GUI opened from a provider-less block falls
-     * into the documented {@link #FRESH_WINDOW_TICKS} leak class instead of the chain.
+     * this band has no unified menu provider to ask, so the filter is a lockable container block entity plus the ender
+     * chest and nothing else: an enchantment table carries a block entity and is not latched either. A placement
+     * target, door, or lever carries no lockable container and stays unlatched; a latched click on one could only
+     * supersede real intents. The crafting family carries no block entity either and is unlatched for the same reason,
+     * so a menu opened from one falls into the documented {@link #FRESH_WINDOW_TICKS} leak class instead of the chain.
+     * The ender chest is latched on its own block entity rather than the lockable-container test, its menu being built
+     * in the block's use handler over the per-player ender container.
      */
     public static void dispatchUseBlock(Player player, Level level, HitResult hit) {
         OpenClickTracker tracker = active;
@@ -196,15 +196,13 @@ public final class OpenClickTracker {
      * client sends exactly one per open it asks for.
      *
      * <p>The signal is drained whether or not it is latched, so a request sent while riding something with no container
-     * cannot sit and seed a later open. The eligible set is deliberately narrower than vanilla's own gate for this
-     * request. Vanilla sends it for anything implementing AbstractHorse, which is three families on this band (the
-     * chest boats, the horses, and the nautiluses); only the container vehicles are latched here, because a chested
-     * mount's menu names its own animal and is recognized without click provenance at all, and a nautilus carries no
-     * chest, so neither has a container this latch could claim. Eligibility deliberately ignores the entity-capture
-     * toggle: the latch is what tells the vehicle's own click-less open apart from an open with no provenance at all,
-     * whatever the toggle. The vehicle is read on the tick the request is OBSERVED, which is not always the tick it was
-     * sent: the send hops to the connection's event loop, so the signal can surface a tick late. The intent carries the
-     * vehicle's network id so the bind can require the same vehicle to still be the one ridden.
+     * cannot sit and seed a later open. Vanilla sends the request only while the player rides an {@code AbstractHorse},
+     * which is never latched here: a chested mount's menu names its own animal and is recognized without click
+     * provenance at all. The container-vehicle arm is kept as the band-shared wiring. Eligibility deliberately ignores
+     * the entity-capture toggle: the latch is what tells the vehicle's own click-less open apart from an open with no
+     * provenance at all, whatever the toggle. The vehicle is read on the tick the request is OBSERVED, which is not
+     * always the tick it was sent: the send hops to the connection's event loop, so the signal can surface a tick late.
+     * The intent carries the vehicle's network id so the bind can require the same vehicle to still be the one ridden.
      */
     void claimOpenInventoryRequest(@Nullable Entity vehicle) {
         if (!openInventoryRequested) {
@@ -218,8 +216,8 @@ public final class OpenClickTracker {
 
     /**
      * Dismiss the pending entity click once the clicked entity became the player's vehicle: the interact ended in
-     * mounting (entering a chest boat, riding up a donkey), which is exclusive with opening a menu, so no open is owed
-     * to that click and leaving it latched would poison the next open. The dismissal covers any click on the now-ridden
+     * mounting (boarding a boat, riding up a donkey), which is exclusive with opening a menu, so no open is owed to
+     * that click and leaving it latched would poison the next open. The dismissal covers any click on the now-ridden
      * vehicle, which is benign: the ridden vehicle's own open is reclaimed click-less by the riding leg. Identity
      * comparison on purpose: the dismissal must fire only for the very entity the click landed on.
      */

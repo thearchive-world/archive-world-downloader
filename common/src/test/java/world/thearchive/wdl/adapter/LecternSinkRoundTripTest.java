@@ -25,20 +25,18 @@ import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for lectern-book capture: the {@link LecternSink} 1.20.4 path ({@code captureBook} -> merge) plus
- * vanilla's own {@code ItemStack.of} read-back (the exact form {@code LecternBlockEntity.loadAdditional} uses) is a
+ * At 1.13.2 lectern-book capture is a documented limit and the merge cases are disabled: lecterns are a 1.14 block
+ * entity, so no captured lectern block-entity tag can be built from a real producer here. The disabled cases check that
+ * the {@link LecternSink} path ({@code captureBook} -> merge) plus vanilla's own {@code ItemStack.of} read-back is a
  * self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity tag under
  * {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field
- * clobbered. Runs for both a signed <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern
- * contents).
+ * clobbered.
  *
  * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
  * neither a live menu nor a {@code Level} is needed. The one client-coupled step (lifting the book from the live open
  * menu's slot 0) is not exercised headless, exactly as for containers.
  *
- * <p>At 1.13.2 the merge cases are disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag
- * can be built from a real producer here, and lectern-book capture is a documented limit at this band. The pure
- * {@link LecternSink#merge} keeps coverage through the re-pointed {@code ChunkFlushPlanTest} and
+ * <p>The pure {@link LecternSink#merge} keeps coverage through the {@code ChunkFlushPlanTest} and
  * {@code AsyncSaveWriterTest} fold-wiring tests, which drive it against a stand-in carrier. {@code captureBook} needs
  * only a book item, so it still runs.
  */
@@ -90,7 +88,7 @@ class LecternSinkRoundTripTest {
     }
 
     private static ItemStack readBackBook(CompoundTag merged) {
-        // vanilla loadAdditional's exact read
+        // vanilla's own item-stack decode
         ItemStack back = ItemStack.of(merged.getCompound("Book"));
         assertTrue(!back.isEmpty(), "the merged Book must decode via vanilla ItemStack.of");
         return back;
