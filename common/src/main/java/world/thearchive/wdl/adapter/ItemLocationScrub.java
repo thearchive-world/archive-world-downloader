@@ -81,9 +81,9 @@ final class ItemLocationScrub {
      * Blank every item-borne coordinate on {@code entity} and, recursively, on its passengers. Walks the direct
      * children name-agnostically (any direct child item compound, any item list), so it reaches the displayed item
      * under either {@code Item} or the lowercase {@code item}, and inventory lists, without hard-coding field names.
-     * Two entity-specific shapes the generic walk cannot reach are handled explicitly: {@code equipment} is a compound
-     * of slot to item, so each value is walked; {@code Passengers} is a list of nested entities, so each is recursed.
-     * Works only on already-serialized entity NBT.
+     * Two entity-specific shapes the generic walk cannot reach are handled explicitly: {@code equipment}, where the
+     * version writes it, is a compound of slot to item, so each value is walked; {@code Passengers} is a list of nested
+     * entities, so each is recursed. Works only on already-serialized entity NBT.
      */
     public static void scrubEntity(CompoundTag entity) {
         for (String key : entity.keySet()) {
