@@ -17,12 +17,12 @@ import org.junit.jupiter.api.Test;
 /**
  * The headless guard for the production packet-state accumulator: inbound entity packet state is keyed by the int
  * entity id (the packet-layer key every post-spawn packet uses), bridged to the save-layer UUID, and held independent
- * of unload (a client removal is DISCARDED and tells you nothing, so there is no eviction at all). Beyond the spawn and
- * synced-data state proven for item frames, the generalization to every non-player type holds the post-spawn packets
- * too: position (so a moving entity re-homes to the chunk it ends in), equipment (merged by slot), passengers, and the
- * leash holder. State is drained one chunk at a time so the main thread can reconstruct and write whole chunks as they
- * leave the keep-hot window. Generic over the spawn/synced/equipment payloads so the bookkeeping is MC-free; the
- * production specialization binds the MC packet types.
+ * of unload (a client removal tells you nothing, so there is no eviction at all). Beyond the spawn and synced-data
+ * state proven for item frames, the generalization to every non-player type holds the post-spawn packets too: position
+ * (so a moving entity re-homes to the chunk it ends in), equipment (merged by slot), passengers, and the leash holder.
+ * State is drained one chunk at a time so the main thread can reconstruct and write whole chunks as they leave the
+ * keep-hot window. Generic over the spawn/synced/equipment payloads so the bookkeeping is MC-free; the production
+ * specialization binds the MC packet types.
  *
  * <p>Every read is scoped to one dimension, which is the other half of the key: chunk positions are shared between
  * dimensions, and the accumulator outlives a dimension change, so a bare chunk key is ambiguous exactly when the
