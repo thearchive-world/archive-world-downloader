@@ -80,9 +80,9 @@ public final class FinalizeOutputs {
 
     /**
      * The save root with any trailing dot component stripped, so the archive is named and placed beside the folder
-     * rather than inside it. Below 1.20.5 the level directory is read through {@code LevelResource.ROOT}, whose id is a
-     * bare dot, so the path arrives ending in a dot that {@code getParent} and {@code getFileName} would otherwise
-     * resolve to the folder itself.
+     * rather than inside it. On some versions the level directory is read through a resource whose id is a bare dot, so
+     * the path arrives ending in a dot that {@code getParent} and {@code getFileName} would otherwise resolve to the
+     * folder itself.
      */
     private static Path saveRoot(Path saveFolder) {
         return saveFolder.normalize();
