@@ -30,7 +30,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class NaturalEquipmentTest {
     @BeforeAll
     static void bootstrap() {
-        // Populates BuiltInRegistries so Items.* / EntityType.* resolve and ItemStack.is works headless.
+        // Populates the built-in registries so Items.* / EntityType.* resolve headless.
         TestRegistries.bootstrap();
     }
 

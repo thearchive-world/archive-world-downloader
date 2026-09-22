@@ -29,7 +29,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class MapDataWriterRoundTripTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // sets the game version NbtUtils.addCurrentDataVersion reads
+        TestRegistries.bootstrap();
     }
 
     @Test
