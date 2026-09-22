@@ -60,7 +60,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * gate, so its single copy is that session's level.dat {@code RootVehicle}. A resume that finishes un-seated rewrites
  * the level.dat with no {@code RootVehicle}, which destroys that copy, and the release is what puts the mount into the
  * world as a standalone entity before that happens. Everything it fails to write is gone for good, including whatever
- * the previous download archived inside a chest boat or a chested animal.
+ * the previous download archived inside a chested mount.
  *
  * <p>Three axes. ROUTING: the position and the dimension must come from the same tag, so the cross-dimension case
  * asserts both the arrival and the absence, since a write that reaches the right folder while also reaching the wrong
@@ -362,8 +362,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
     /**
      * The chunk the mount's position lands in, stated rather than recomputed with production's own formula, which would
-     * agree with whatever formula production used. Not a constant: {@code ChunkPos}'s class initializer reaches a
-     * built-in registry, so touching one before the bootstrap fails the whole class.
+     * agree with whatever formula production used. Not a constant: where the version's {@code ChunkPos} class
+     * initializer reaches a built-in registry, building a {@code ChunkPos} before the bootstrap fails the whole class.
      */
     private static ChunkPos mountChunk() {
         return new ChunkPos(-71, 30);
