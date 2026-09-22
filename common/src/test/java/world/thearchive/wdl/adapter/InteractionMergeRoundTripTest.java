@@ -26,12 +26,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for the band-stable merge write that interaction-prediction capture adds beside the open-time
- * container/lectern path: a jukebox disc under {@code "RecordItem"} (via {@code ItemStack#save}). It is the
- * capture-then-merge round-trip proven against vanilla's own read-back (the exact form the block entity's
- * {@code loadAdditional}/{@code load} uses): the captured content survives serialization, lands on the matching
- * captured block entity under its one key with no other field clobbered, decodes back to the same content, and only the
- * flushed chunk's stash entries drain. Server-free: real {@link ItemStack}s and hand-built chunk tags, no live client
- * and no {@code Level}.
+ * container/lectern path: a jukebox disc under {@code "RecordItem"} (via {@code ItemStack#writeToNBT}). It is the
+ * capture-then-merge round-trip proven against vanilla's own read-back (the exact form the block entity's own read
+ * uses): the captured content survives serialization, lands on the matching captured block entity under its one key
+ * with no other field clobbered, decodes back to the same content, and only the flushed chunk's stash entries drain.
+ * Server-free: real {@link ItemStack}s and hand-built chunk tags, no live client and no {@code Level}.
  */
 class InteractionMergeRoundTripTest {
     @BeforeAll
@@ -54,7 +53,7 @@ class InteractionMergeRoundTripTest {
     }
 
     private static ItemStack readRecordItem(NBTTagCompound jukeboxBlockEntityTag) {
-        // vanilla JukeboxBlockEntity.loadAdditional's exact read
+        // vanilla's exact block-entity read of this key
         ItemStack back = ItemStack.loadItemStackFromNBT(jukeboxBlockEntityTag.getCompoundTag("RecordItem"));
         assertNotNull(back, "the merged RecordItem must decode via vanilla's ItemStack.loadItemStackFromNBT");
         return back;
