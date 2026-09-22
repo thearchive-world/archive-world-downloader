@@ -6,9 +6,9 @@ package world.thearchive.wdl.core.export;
 import java.nio.file.Path;
 
 /**
- * MC's transient world-session lock marker. Every export and size walk skips it: it is not world data, and during a
- * resume backup the {@code LevelStorageAccess} holds an exclusive OS lock on it that is mandatory on Windows, so
- * reading it would fail the walk. Skipping it also keeps the size total matching the export walk.
+ * MC's transient world-session lock marker. Every export and size walk skips it: it is not world data, and on versions
+ * whose open level storage holds an exclusive OS lock on it (mandatory on Windows), reading it during a resume backup
+ * would fail the walk. Skipping it also keeps the size total matching the export walk.
  */
 final class SessionLock {
     private static final String NAME = "session.lock";
