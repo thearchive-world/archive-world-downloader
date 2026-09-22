@@ -341,9 +341,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Captured lectern {@code "Book"}/{@code "Page"} holders keyed by block pos; last-seen-while-open wins. The lectern
-     * axis beside {@link #containerStash}: a book reaches the client only through the open lectern menu's slot 0, so it
-     * is lifted there and merged into its chunk's already-captured lectern block entity (and dropped) just before that
-     * chunk is flushed, by {@link ContainerMerge#mergeLecternChunkStash}.
+     * axis beside {@link #containerStash}: in ordinary play a book reaches the client only through the open lectern
+     * menu's slot 0, so it is lifted there and merged into its chunk's already-captured lectern block entity (and
+     * dropped) just before that chunk is flushed, by {@link ContainerMerge#mergeLecternChunkStash}.
      */
     private final Map<BlockPos, StashHolder> lecternStash = new LinkedHashMap<>();
 
@@ -3067,13 +3067,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
         PlayerTag.stripDeathLocation(raw);
         PlayerTag.stripRespawnPoint(raw);
         if (!config.saveItemCoordinates()) {
-            // The player tag is entity-shaped, so the entity scrub covers the Inventory list and the
-            // equipment compound (offhand and armor live there, not in Inventory, since 1.21.5).
+            // The player tag is entity-shaped, so the entity scrub covers the Inventory list and, where the version
+            // writes one, the equipment compound (offhand and armor live there, not in Inventory).
             ItemLocationScrub.scrubEntity(raw);
         }
-        // On-sight map remap of the carried items: rewrite and serialize each carried map on the captured
-        // copy, once, at finish (never on the live object). Two passes for the two vanilla homes: the
-        // 36-slot Inventory list, then the equipment compound (offhand and armor).
+        // On-sight map remap of the carried items: rewrite and serialize each carried map on the captured copy, once,
+        // at finish (never on the live object). Two passes: the Inventory list, then the equipment compound (offhand
+        // and armor, where the version writes it).
         MapArchive archive = this.mapArchive;
         if (archive != null) {
             archive.remap(raw, "Inventory");
