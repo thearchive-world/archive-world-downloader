@@ -19,6 +19,7 @@
 # Format: gitignore-style per gitignore(5), one path pattern per line, blank lines and # comments ignored.
 # Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
 # a shared reason across several files is repeated per line rather than written once over a group.
+
 # 26.2 harvests the advancement progress through a ClientAdvancements listener, its only public enumeration path;
 # 26.3 made ClientAdvancements.progress() public, so the snapshot copies it directly.
 common/src/main/java/world/thearchive/wdl/adapter/AdvancementSnapshot.java
