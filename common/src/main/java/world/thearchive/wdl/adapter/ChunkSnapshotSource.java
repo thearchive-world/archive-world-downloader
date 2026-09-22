@@ -14,13 +14,12 @@ import net.minecraft.world.level.levelgen.Heightmap;
 /**
  * The captured, immutable snapshot of a single chunk: the seam the {@link ChunkCodec} encodes.
  *
- * <p>Why a seam: every public {@code LevelChunk} constructor needs a {@code Level}, and the codec additionally reads
- * light from {@code level.getChunkSource().getLightEngine()}: so exercising the codec against a real headless
- * {@code LevelChunk} would require standing up the abstract {@code Level}/{@code ChunkSource}/{@code LevelLightEngine},
- * exactly the heavy harness the design avoids. Instead the codec consumes this snapshot. In the live mod the snapshot
- * is captured from a {@code LevelChunk} + its {@code Level} on the client main thread; in tests a synthetic fixture
- * implements it directly, so the headless round-trip genuinely drives the mod's encode slice, while the thin
- * {@code LevelChunk -> snapshot} light-reading adapter is not exercised headless.
+ * <p>Why a seam: every public chunk constructor needs a level, and where the version has a light engine the codec also
+ * reads light through the level's chunk source: so exercising the codec against a real headless chunk would require
+ * standing up an abstract level with its chunk source, exactly the heavy harness the design avoids. Instead the codec
+ * consumes this snapshot. In the live mod the snapshot is captured from a live chunk and its level on the client main
+ * thread; in tests a synthetic fixture implements it directly, so the headless round-trip genuinely drives the mod's
+ * encode slice, while the thin chunk-to-snapshot light-reading adapter is not exercised headless.
  *
  * <p>All accessors must return data already detached from any live game structure (section copies, cloned
  * light/heightmap arrays, block-entity NBT) so nothing mutable crosses to the async IO worker.
