@@ -13,8 +13,10 @@ plugins {
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 dependencies {
-    // JSpecify nullness annotations (@NullMarked, @Nullable). CLASS-retention and compile-only,
-    // so nothing enters the runtime jar; supplied to both main and test compilation.
+    // JSpecify nullness annotations (@NullMarked, @Nullable), supplied to both main and test compilation.
+    // Compile-only, so the annotation classes never reach the runtime jar. They are RUNTIME-retained, so the
+    // compiled classes keep references to them, but nothing at runtime acts on them and the references
+    // are inert.
     val jspecify = libs.findLibrary("jspecify").get()
     compileOnly(jspecify)
     testCompileOnly(jspecify)
