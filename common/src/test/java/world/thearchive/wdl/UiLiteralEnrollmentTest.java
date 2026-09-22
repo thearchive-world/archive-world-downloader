@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Fail-closed guard that new user-facing UI text lands as a translation key, not a hardcoded literal. Every user-facing
- * string is a {@code Component.translatable(...)} keyed under the {@code wdl} namespace; the
- * {@code Component.literal(...)} calls left in the view layer render data or glyphs, never prose, and each is enrolled
- * below with the reason it is not text. This test pins that inventory per file, so a newly hardcoded literal fails the
- * build until it is classified: made a translation key if it is text, or enrolled here with a note if it is data or a
- * glyph. Same fail-closed enrollment shape as {@link PitestAllowlistEnrollmentTest}.
+ * string is a translatable component keyed under the {@code wdl} namespace; the literal components left in the view
+ * layer render data or glyphs, never prose, and each is enrolled below with the reason it is not text. This test pins
+ * that inventory per file, so a newly hardcoded literal fails the build until it is classified: made a translation key
+ * if it is text, or enrolled here with a note if it is data or a glyph. Same fail-closed enrollment shape as
+ * {@link PitestAllowlistEnrollmentTest}.
  */
 class UiLiteralEnrollmentTest {
     private static final String NEEDLE = "Component.literal(";
