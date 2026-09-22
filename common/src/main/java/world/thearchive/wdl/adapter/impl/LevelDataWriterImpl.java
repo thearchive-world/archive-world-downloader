@@ -57,11 +57,10 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * 1.18.2 level.dat writer for the selected generator: the default superflat VOID (all air, built from the client's
- * synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from the
- * reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the real
- * terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
- * server's actual land (the server's seed is not recoverable from a client).
+ * 1.18.2 level.dat writer for the selected generator: the default superflat VOID (all air), or the vanilla DEFAULT/FLAT
+ * presets. All three are built from the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}. The
+ * captured chunks always supply the real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT
+ * are freshly generated and not the server's actual land (the server's seed is not recoverable from a client).
  */
 public final class LevelDataWriterImpl implements LevelDataWriter {
     private static final Logger LOGGER = LogUtils.getLogger();
