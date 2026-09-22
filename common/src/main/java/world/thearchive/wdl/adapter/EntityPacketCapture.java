@@ -55,26 +55,25 @@ import world.thearchive.wdl.core.SendRangeSampler;
  * across several packets ({@code AddEntity} for objects, {@code AddMob} for living entities, {@code AddPainting}, and
  * {@code AddExperienceOrb}), so the spawn payload is the erased {@code Packet} and {@link #createSpawnEntity}
  * dispatches on the concrete type at reconstruct; the newer bands fold every one of these into {@code AddEntity}. The
- * lightning bolt ({@code AddGlobalEntity}, this band only) is deliberately left unread: its entity type is not
- * serializable, so the unified bands never save it either, and reading it would only add sink refusals.
- * {@code SynchedEntityData.DataValue} is the synced-value payload and the equipment slot/stack pair the equipment
- * payload. The reconstruct applies each post-spawn packet the way the client handlers do, so this only has to decode
- * each packet to the same state the client would hold.
+ * lightning bolt ({@code AddGlobalEntity}) is deliberately left unread: its entity type is not serializable, so the
+ * unified bands never save it either, and reading it would only add sink refusals. The synced data values are the
+ * synced-value payload and the equipment slot/stack pair the equipment payload. The reconstruct applies each post-spawn
+ * packet the way the client handlers do, so this only has to decode each packet to the same state the client would
+ * hold.
  *
  * <p>Every accessor used here is public MC API, so this compiles in {@code common} against the un-widened vanilla jar.
  * The one exception is {@code ClientboundMoveEntityPacket}'s entity id, which is {@code protected}; the per-loader tee,
  * where the access widener / transformer applies, reads it and calls {@link #onMove} with it. {@code RemoveEntities} is
- * handled only as a range sample and book cleanup; it never evicts from the accumulator (a client removal is
- * {@code RemovalReason.DISCARDED} and tells nothing about death versus unload, so reconstruction keeps every tracked
- * entity).
+ * handled only as a range sample and book cleanup; it never evicts from the accumulator (a client removal tells nothing
+ * about death versus unload, so reconstruction keeps every tracked entity).
  *
  * <p>{@code Respawn} and {@code Login} are the two inbound packets that announce the world the stream has moved to (the
- * only two that assign the client a level; a configuration re-entry clears it to none), so both are routed to the
- * accumulator's dimension marker and to the sampler, whose id book the rebuilt level invalidates either way. Reading
- * the client's live level here instead would be wrong by a tick: the tee sees the packet on the Netty thread before the
- * main thread applies it, so the entity spawns that follow it on the wire would be stamped with the world the player
- * has left. The marker is advanced first in either branch, because it is the only per-packet state whose loss misfiles
- * data, where the sampler's loses at worst one invalidation.
+ * only two that assign the client a level; where the version has a configuration phase, re-entering it clears the level
+ * to none), so both are routed to the accumulator's dimension marker and to the sampler, whose id book the rebuilt
+ * level invalidates either way. Reading the client's live level here instead would be wrong by a tick: the tee sees the
+ * packet on the Netty thread before the main thread applies it, so the entity spawns that follow it on the wire would
+ * be stamped with the world the player has left. The marker is advanced first in either branch, because it is the only
+ * per-packet state whose loss misfiles data, where the sampler's loses at worst one invalidation.
  *
  * <p>It also carries the connection-scoped publication point. The per-loader inbound tee is installed once per
  * connection and has no reference to the per-download session, so the running capture publishes its accumulator here

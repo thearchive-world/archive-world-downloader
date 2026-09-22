@@ -31,11 +31,11 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the ridden-vehicle RootVehicle capture. A vehicle carrying exactly one player is refused by
- * the entities region (vanilla persists it in the player's own {@code RootVehicle}, not the entities region), so the
+ * The automated guard for the ridden-vehicle {@code RootVehicle} capture. A vehicle carrying exactly one player is
+ * refused by the sink's standalone save check (vanilla persists it in the player's own {@code RootVehicle}), so the
  * chunk path drops it. {@link EntitySink#captureRootVehicle} is the sibling that serializes it anyway, the way
- * {@code ServerPlayer.saveParentVehicle} does with {@code root.save}, and the captured chest-boat contents fold into it
- * by {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone entity path's
+ * vanilla's player save does with {@code root.save}, and the captured container contents fold into it by
+ * {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone entity path's
  * {@code applyMobPersistence} seam: {@code PersistenceRequired} is server-authoritative and arrives false on the
  * client, so a name-tagged mount, and any mount under {@code forceMobPersistence}, keeps the stamp or it despawns once
  * the player dismounts in the downloaded world.
@@ -57,7 +57,7 @@ class EntitySinkRootVehicleTest {
         TestRegistries.bootstrap();
         RiddenVehicleEntity vehicle = new RiddenVehicleEntity();
         assertTrue(vehicle.isVehicle() && vehicle.hasOnePlayerPassenger(),
-                "precondition: a one-player vehicle the entities region refuses");
+                "precondition: a vehicle carrying exactly one player");
 
         assertNull(sink.encodeChunk(ImmutableList.of(vehicle), new ChunkPos(0, 0), false),
                 "the chunk path drops it, exactly the loss the RootVehicle capture fixes");
@@ -89,7 +89,7 @@ class EntitySinkRootVehicleTest {
         probe.put("Items", folded.getList("Items", 10));
         ContainerHelper.loadAllItems(probe, back);
         assertEquals(Items.DIAMOND, back.get(3).getItem(),
-                "the captured chest-boat loot lands at its slot in the mount");
+                "the captured container loot lands at its slot in the mount");
         assertEquals(9, back.get(3).getCount());
     }
 
@@ -129,7 +129,7 @@ class EntitySinkRootVehicleTest {
                         + "un-named mount threads the knob through the same seam the standalone entity path uses");
     }
 
-    /** A headless vehicle double the entities region refuses, standing in for a boat carrying one player. */
+    /** A headless vehicle double the chunk path refuses, standing in for a boat carrying one player. */
     private static final class RiddenVehicleEntity extends Entity {
         private RiddenVehicleEntity() {
             // Below 1.16 Entity.saveWithoutId writes this.dimension.getId(), which the constructor sets only from a

@@ -11,12 +11,11 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * The walk over a serialized entity and its {@code "Passengers"} subtree, the tag-side analogue of
- * {@code Entity.getSelfAndPassengers} and the entity sibling of {@link ItemTreeWalk}. A ridden mount reaches disk as
- * one record holding the whole tree from its root ({@code ServerPlayer.saveParentVehicle} serializes
- * {@code player.getRootVehicle()}), and {@code ServerPlayer.loadAndSpawnParentVehicle} resolves that record per node,
- * so the record is a set of entities rather than one entity and every identity question about it is a per-node
- * question.
+ * The walk over a serialized entity and its {@code "Passengers"} subtree, the tag-side analogue of walking an entity
+ * with its passengers and the entity sibling of {@link ItemTreeWalk}. A ridden mount reaches disk as one record holding
+ * the whole tree from its root (vanilla's player save serializes the root vehicle), and vanilla's player load resolves
+ * that record per node, so the record is a set of entities rather than one entity and every identity question about it
+ * is a per-node question.
  *
  * <p>Identity is the node's own {@code "UUID"} decoded through {@link EntityMerge#readUuid}, never raw tag equality:
  * {@code Entity.saveWithoutId} stores one on every node it recurses into, so a node with no readable UUID is not a tag
