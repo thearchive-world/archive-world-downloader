@@ -180,7 +180,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void anUnknownOverrideIdIsSurfacedNotWritten() {
-        // spawn_mobs is the 1.21.5+ snake_case id; the 1.21.4 rule is doMobSpawning.
+        // spawn_mobs is the 1.21.11+ snake_case id; before that the rule is doMobSpawning.
         LevelDataWriter.LevelData built = build(with("gamerule.spawn_mobs", "true"));
 
         assertTrue(built.gameRules().unknownIds().contains("spawn_mobs"), "the cross-band loss is surfaced");
