@@ -127,11 +127,11 @@ dependencies {
     // never queried. The pinned version supplies only the stable ModMenuApi; the player's own ModMenu runs.
     modCompileOnly("maven.modrinth:modmenu:${property("modmenu_version")}")
 
-    // JourneyMap public API for the source-merged overlay binding (compat/journeymap), compile-only. JourneyMap
-    // ships no Fabric build at 1.15.2, so there is no runtime JourneyMap to query on Fabric and no -fabric-SNAPSHOT
-    // flavor; the plain Mojmap 1.8 API here only satisfies the merged binding's compile and stays inert on Fabric
-    // (the Fabric jar carries no journeymap entrypoint). It is a plain compileOnly, not modCompileOnly, because the
-    // loader-suffixless jar is already Mojmap-named and needs no Loom remap.
+    // JourneyMap public API for the source-merged overlay binding (compat/journeymap), compile-only: the Fabric jar
+    // carries no journeymap entrypoint, so the binding only compiles here and stays inert on Fabric. It is a plain
+    // compileOnly, not modCompileOnly, because the jar is no Fabric mod and is MCP-named, so Loom's remap has nothing
+    // to translate; where the API's BlockPos parameter does not bridge to Mojmap the binding builds MapPolygon
+    // reflectively.
     compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
 
     // JSpecify on the gametest source set so its package-info @NullMarked resolves; compileOnly is not
