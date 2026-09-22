@@ -79,10 +79,10 @@ final class ContainerCapture {
      * is left unattributed: where the player LOOKS is not evidence of what opened, so binding a menu to the crosshair
      * writes its contents into whatever block or entity the view happens to rest on once the slot counts coincide.
      *
-     * <p>A spectator keeps the crosshair, and it is LOAD-BEARING there, not a vestige of the pre-click behavior: a
-     * loader use hook that declines to fire for a spectator leaves the click unobserved, so every container a spectator
-     * opens on that axis would bind nothing without this. The open-time drift the clicked target removes elsewhere is
-     * accepted here, because the alternative on a blind axis is capturing nothing at all.
+     * <p>A spectator keeps the crosshair, and it is LOAD-BEARING there: a loader use hook that declines to fire for a
+     * spectator leaves the click unobserved, so every container a spectator opens on that axis would bind nothing
+     * without this. The open-time drift the clicked target removes elsewhere is accepted here, because the alternative
+     * on a blind axis is capturing nothing at all.
      *
      * <p>Which leg may run, and when, is {@link SpectatorCrosshairFallback}, decided MC-free so both loader
      * configurations are pinned headlessly; this extracts the live booleans it reads.

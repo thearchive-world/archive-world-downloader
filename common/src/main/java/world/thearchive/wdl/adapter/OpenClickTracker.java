@@ -225,8 +225,8 @@ public final class OpenClickTracker {
 
     /**
      * Dismiss the pending entity click once the clicked entity became the player's vehicle: the interact ended in
-     * mounting (entering a chest boat, riding up a donkey), which is exclusive with opening a menu, so no open is owed
-     * to that click and leaving it latched would poison the next open. The dismissal covers any click on the now-ridden
+     * mounting (boarding a boat, riding up a donkey), which is exclusive with opening a menu, so no open is owed to
+     * that click and leaving it latched would poison the next open. The dismissal covers any click on the now-ridden
      * vehicle, which is benign: the ridden vehicle's own open is reclaimed click-less by the riding leg. Identity
      * comparison on purpose: the dismissal must fire only for the very entity the click landed on.
      */
