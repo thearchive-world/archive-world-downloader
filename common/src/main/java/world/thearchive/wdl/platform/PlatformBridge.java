@@ -26,10 +26,9 @@ public interface PlatformBridge {
     void registerDownloadsKeybind(Runnable onOpen);
 
     /**
-     * Add the wdl row to the vanilla pause menu, wired mixin-free through the loader's public screen-init event: a
-     * primary button that reflects capture state, plus a small "..." button that runs {@code onConfig}. The loader
-     * reads {@code primaryLabelKey} and {@code primaryEnabled} once when the pause menu opens (the label is a
-     * {@code wdl} translation key it resolves to a {@code Component}, so the seam stays free of
+     * Add the wdl row to the vanilla pause menu: a primary button that reflects capture state, plus a small "..."
+     * button that runs {@code onConfig}. The loader reads {@code primaryLabelKey} and {@code primaryEnabled} once when
+     * the pause menu opens (the label is a {@code wdl} translation key it resolves, so the seam stays free of
      * {@code net.minecraft.*}), and binds a press to {@code onPrimary}, a state-reading dispatch read again at click so
      * a stale label cannot fire the wrong action.
      */

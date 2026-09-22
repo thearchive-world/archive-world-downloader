@@ -894,7 +894,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         BannerPanelWidget(int x, int y, int width, ITextComponent prose) {
             super(0, x, y, width, BANNER_HEIGHT, prose.getUnformattedText());
             this.prose = prose;
-            this.enabled = false; // decorative and inert, like a vanilla StringWidget
+            this.enabled = false;
         }
 
         @Override
