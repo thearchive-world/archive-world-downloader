@@ -140,10 +140,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
  *
  * <p>Bound to one {@link MultiPlayerLevel}. Each tick (client main thread) it snapshots each loaded chunk of that level
  * once, by walking the render-distance square around the player and reading the client chunk cache directly (no packet
- * Mixin). The codec reads the chunk's server-sent light from the client light engine, gated per chunk on the engine's
- * initial-light-applied bit, so a captured chunk skips vanilla's first-open relight; a chunk whose light has not yet
- * applied falls back to {@code lightCorrect=false} and vanilla relights just that chunk. The whole per-chunk snapshot
- * runs here on the main thread.
+ * Mixin). The whole per-chunk snapshot runs here on the main thread.
  *
  * <p>Captured chunk tags do not accumulate to the end: each tick the flush pump streams every tag that has moved out of
  * the keep-hot window around the player to a background {@link AsyncSaveWriter} and drops it from memory, so the
@@ -1382,12 +1379,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void captureLoadedChunks(Minecraft minecraft, LocalPlayer player, ChunkPos anchor) {
         captureSquareAround(minecraft, player, anchor);
         ChunkPos playerChunk = new ChunkPos(new BlockPos(player));
-        // One square is retained by ClientChunkCache at a time, so once the camera is more than
-        // renderDistance + 3 chunks away the player square lies outside it and this pass returns null
-        // everywhere, costing only the probes. While the two squares still overlap during the handoff it
-        // captures at most a thin trailing ring, already covered by the superset guarantee that keeps this
-        // change unable to see less than the old behavior did. Skipped entirely whenever the camera is the
-        // player, which is every tick of ordinary play.
+        // Where the client chunk cache retains only one square at a time, once the camera is far enough from the player
+        // that the player square lies wholly outside that square, this pass returns null everywhere, costing only the
+        // probes. While the two squares still overlap it captures only the part of the player square the cache still
+        // holds. Skipped entirely whenever the camera is the player, which is every tick of ordinary play.
         if (!playerChunk.equals(anchor)) {
             captureSquareAround(minecraft, player, playerChunk);
         }
@@ -3966,7 +3961,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             mergedContainers += ChunkFlushPlan.landingHolderPositions(snapshot, holders).size();
             // Defer the heavy serialize plus the pure container/lectern fold to the writer thread:
             // the thunk closes over the detached snapshot, the drained holders, and the per-band codec/sinks, all
-            // immutable, so the render thread never runs ChunkSerializer.write. The target dimension is read here on
+            // immutable, so the render thread never runs the chunk serialize. The target dimension is read here on
             // main (submit time), not in the thunk, so a rebind cannot misroute.
             boolean synthesizeBlending = VanillaDimensions.shouldSynthesizeBlending(config.worldOutput().worldType(),
                     targetDimension);

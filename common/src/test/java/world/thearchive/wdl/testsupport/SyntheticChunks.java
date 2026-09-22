@@ -30,7 +30,7 @@ import world.thearchive.wdl.adapter.ChunkSnapshotSource;
  * {@code LevelChunk} cannot avoid, so the round-trip exercises the mod's encode slice.
  */
 public final class SyntheticChunks {
-    /** A standard 1.13.2 overworld column: 0..256, so {@code minSectionY == 0}. */
+    /** A standard overworld column: 0..256, so {@code minSectionY == 0}. */
     public static final int MIN_Y = 0;
     public static final int HEIGHT = 256;
     public static final long GAME_TIME = 1234L;
