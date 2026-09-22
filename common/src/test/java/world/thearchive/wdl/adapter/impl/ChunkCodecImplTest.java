@@ -23,9 +23,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The chunk codec's synthesized {@code blending_data}: an overworld chunk in a terrain-generating world carries the
- * section-bound marker MC's {@code BlendingDataFix} would inject ({@code min_section} -4, {@code max_section} 20 for
- * the -64..320 overworld), so a freshly generated boundary chunk blends against the captured terrain instead of
- * walling; a void or non-overworld chunk carries none, keeping that output byte-identical to a chunk without blending.
+ * section-bound marker ({@code min_section} -4, {@code max_section} 20 for the -64..320 overworld), so a freshly
+ * generated boundary chunk blends against the captured terrain instead of walling; a void or non-overworld chunk
+ * carries none, keeping that output byte-identical to a chunk without blending.
  */
 class ChunkCodecImplTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
