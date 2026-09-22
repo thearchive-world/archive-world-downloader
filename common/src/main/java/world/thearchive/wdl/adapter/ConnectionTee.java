@@ -26,12 +26,10 @@ import org.slf4j.LoggerFactory;
  * the client receives or sends.
  *
  * <p>Anchored on {@code "packet_handler"}, which is added once per connection and never renamed or removed, so a single
- * insertion survives the login to configuration to play handler swaps (the inbound {@code "decoder"} /
- * {@code "inbound_config"} and {@code "bundler"} are torn down and recreated repeatedly across those switches,
- * {@code "packet_handler"} is not). Installed unconditionally at play-join: the capture mechanism is on by default, and
- * the tee no-ops whenever no capture is publishing an accumulator. The anchor also decides the outbound side: a write
- * starts at the pipeline TAIL, so a handler sitting between the encoder and {@code "packet_handler"} sees the packet
- * value object before it is serialized.
+ * insertion survives every handler swap around it. Installed unconditionally at play-join: the capture mechanism is on
+ * by default, and the tee no-ops whenever no capture is publishing an accumulator. The anchor also decides the outbound
+ * side: a write starts at the pipeline TAIL, so a handler sitting between the encoder and {@code "packet_handler"} sees
+ * the packet value object before it is serialized.
  *
  * <p>Runs on the Netty event-loop thread (the world state is applied later, on the main thread), so it treats each
  * packet as the source of truth at tee time and reads only the immutable, fully-materialized packet value objects. It
@@ -45,7 +43,7 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
 
     private static volatile boolean transferSignal;
 
-    /** Netty side: a configuration-phase re-entry was teed; the next controller tick stops the download. */
+    /** Netty side: a backend transfer was teed; the next controller tick stops the download. */
     static void signalTransfer() {
         transferSignal = true;
     }
