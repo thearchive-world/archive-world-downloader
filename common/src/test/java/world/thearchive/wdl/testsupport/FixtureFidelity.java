@@ -109,8 +109,8 @@ public final class FixtureFidelity {
 
     /**
      * Fail unless {@code holderTag}'s {@code "Items"} list is exactly what {@link ContainerHelper#saveAllItems} emits
-     * for the stacks it decodes to. Catches an entry missing {@code "Slot"}, whose {@code ItemStackWithSlot} decode
-     * silently lands every such entry on slot 0.
+     * for the stacks it decodes to. Catches an entry missing {@code "Slot"}, whose decode silently lands every such
+     * entry on slot 0.
      */
     public static void assertItemsHolderShape(CompoundTag holderTag) {
         Tag rawItems = holderTag.get("Items");
@@ -137,7 +137,7 @@ public final class FixtureFidelity {
 
     /**
      * A container wide enough to hold every slot the list names, so the round trip is testing the entries' shape rather
-     * than {@code ItemStackWithSlot.isValidInContainer} dropping an out-of-range one.
+     * than vanilla's read dropping an out-of-range one.
      */
     private static int containerSize(ListTag items) {
         int highest = -1;
