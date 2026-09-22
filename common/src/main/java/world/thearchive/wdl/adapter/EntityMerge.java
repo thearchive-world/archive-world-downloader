@@ -22,10 +22,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <ul>
  * <li>Container contents: a container vehicle's or chested animal's on-disk {@code "Items"}, and a villager's trade
- * {@code "Offers"} and experience {@code "Xp"}, are carried into the matching fresh entity, at any depth of the
- * {@code "Passengers"} tree ({@link EntityTreeWalk}), preferring the non-empty side, so a parked storage minecart, a
- * chested animal pushed into one, or a villager captured through its trade menu, opened in a prior flush, is not wiped
- * by a re-capture that never re-opened it.</li>
+ * {@code "Offers"} and, where the version has trade experience, its {@code "Xp"}, are carried into the matching fresh
+ * entity, at any depth of the {@code "Passengers"} tree ({@link EntityTreeWalk}), preferring the non-empty side, so a
+ * parked storage minecart, a chested animal pushed into one, or a villager captured through its trade menu, opened in a
+ * prior flush, is not wiped by a re-capture that never re-opened it.</li>
  * <li>Absent entities (union): every on-disk entity the fresh capture does not contain is carried forward, so a partial
  * re-flush of a chunk (the entity packet path drains and flushes a chunk repeatedly as frames stream in over time or on
  * a revisit) does not drop the entities a prior flush already saved. UUID-deduped, so an entity present on both sides
@@ -38,17 +38,16 @@ import org.jspecify.annotations.Nullable;
  * The UUID-keyed sibling of {@link ChunkMerge}. The tack a mount wears needs no carry-forward key on either side of the
  * cuts that turn it into synced equipment (1.20.5 for the body, 1.21.5 for the saddle): above them it rides in the
  * equipment every capture re-reads, and below them capture re-derives {@code "SaddleItem"} from the synced saddled flag
- * and slot 1's {@code "ArmorItem"} from the horse's synced armor tier, on every pass, so only {@code "Items"} carries
- * forward.
+ * and slot 1's {@code "ArmorItem"} from the horse's synced armor tier, on every pass.
  */
 final class EntityMerge {
     private EntityMerge() {}
 
     /**
-     * Merge the on-disk entity-chunk into {@code fresh}, in place: carry forward each matching entity's container
-     * {@code "Items"}, then union in every on-disk entity the fresh capture lacks. Returns how many entities received a
-     * carry-forward (a content carry or a union add). A chunk with no {@code "Entities"} list on either side is a
-     * no-op.
+     * Merge the on-disk entity-chunk into {@code fresh}, in place: carry forward each matching entity's
+     * {@code "Items"}, {@code "Offers"} and {@code "Xp"}, then union in every on-disk entity the fresh capture lacks.
+     * Returns how many entities received a carry-forward (a content carry or a union add). A chunk with no
+     * {@code "Entities"} list on either side is a no-op.
      */
     static int merge(NBTTagCompound onDisk, NBTTagCompound fresh) {
         if (!(fresh.getTag("Entities") instanceof NBTTagList) || !(onDisk.getTag("Entities") instanceof NBTTagList)) {
@@ -75,11 +74,11 @@ final class EntityMerge {
                 NBTTagCompound diskNode = diskNodes.get(node.getKey());
                 if (diskNode != null) {
                     // The Offers and Xp carries run for every node but are inert for non-villagers under client
-                    // capture: only AbstractVillager writes Offers, and only server-side, so a client-reconstructed
-                    // disk node never holds it; and villagerXp is never synced, so a client entity always serializes
-                    // Xp at the client zero. The carry therefore fires only for the villager the merchant fold
-                    // injected, matched by UUID. A band that synced villagerXp, or a modded entity carrying these
-                    // keys, would change that.
+                    // capture: only the villager family writes Offers, and the merchant-offer scrub strips any a
+                    // client-side one invents before every fold, so a client-reconstructed disk node never holds them;
+                    // and a version that writes Xp never syncs it, so there a client entity serializes Xp at the client
+                    // zero. The carry therefore fires only for the villager the merchant fold injected, matched by
+                    // UUID. A band that synced Xp, or a modded entity carrying these keys, would change that.
                     boolean carried = NbtMerge.carryList(diskNode, node.getValue(), "Items");
                     carried |= NbtMerge.carryCompound(diskNode, node.getValue(), "Offers", null);
                     carried |= NbtMerge.carryValue(diskNode, node.getValue(), "Xp", new NBTTagInt(0));

@@ -26,8 +26,8 @@ import net.minecraft.nbt.NBTTagList;
  *
  * <p>The career keys go with the offers because the same invention writes them: a client merchant's career is a number
  * it made up to pick a trade table with, not anything the server told it. The profession is left alone, being genuinely
- * synced, as is the trade experience, which a client reports at its own zero and which the carry-forward already treats
- * as absent.
+ * synced, as is the trade experience where the version has one, which a client reports at its own zero and which the
+ * carry-forward already treats as absent.
  */
 final class MerchantOfferScrub {
     private static final String[] CLIENT_INVENTED_KEYS = { "Offers", "Career", "CareerLevel" };
