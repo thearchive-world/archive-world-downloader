@@ -92,7 +92,7 @@ class AsyncSaveWriterTest {
                 () -> {},                  // the level.dat write stand-in
                 (chunksFailed, entityChunksFailed) -> finalized.set(true), // the finalizer stand-in
                 () -> null,                  // outputs: export + size
-                () -> {}, new SaveProgress());                 // the LevelStorageAccess close stand-in
+                () -> {}, new SaveProgress());                 // the level storage close stand-in
 
         writer.submitChunk(Level.OVERWORLD, new ChunkPos(0, 0),
                 () -> codec.encode(SyntheticChunks.full(registries, true), registries, false), ChunkMerge::merge);
