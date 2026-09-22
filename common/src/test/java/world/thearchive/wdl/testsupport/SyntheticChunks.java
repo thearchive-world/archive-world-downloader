@@ -178,7 +178,7 @@ public final class SyntheticChunks {
      * As {@link #full} with {@code lightCorrect=true} and captured light layers, including a below-chunk padding
      * section (sky only, null chunk section), the shape the light engine's padded range produces. Proves the encode
      * slice writes the vanilla {@code BlockLight}/{@code SkyLight}/{@code isLightOn} shape and that a null-section
-     * {@code SectionData} survives write and parse.
+     * entry survives write and parse.
      */
     public static ChunkSnapshotSource fullWithLight() {
         TestRegistries.bootstrap();

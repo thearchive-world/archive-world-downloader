@@ -13,10 +13,9 @@ import org.junit.jupiter.api.Test;
 /**
  * Acceptance test for the headless registry harness.
  *
- * <p>Checks two things: (1) the {@code common} TEST classpath carries {@code net.minecraft.*} classes and the bundled
- * vanilla data (the biome JSONs), and (2) {@link TestRegistries#bootstrap()} populates the static {@code BIOME}
- * registry the chunk codec reads. The assertions exercise that biome lookup and build a {@link LevelChunkSection} the
- * way the codec does.
+ * <p>Checks two things: (1) the {@code common} TEST classpath carries {@code net.minecraft.*} classes, and (2)
+ * {@link TestRegistries#bootstrap()} populates the static {@code BIOME} registry the chunk codec reads. The assertions
+ * exercise that biome lookup and build a {@link LevelChunkSection} the way the codec does.
  */
 class RegistriesSmokeTest {
     @Test

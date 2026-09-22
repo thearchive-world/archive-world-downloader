@@ -54,10 +54,11 @@ final class VanillaDimensions {
     }
 
     /**
-     * Whether a captured chunk in {@code targetDimension} needs synthesized old-generation blending. Only the DEFAULT
-     * generator blends terrain against the captured edge, and only in the overworld, so FLAT and VOID never blend and
-     * the nether and end are never blended either. Keying on {@code targetDimension} (a {@link #forType} result) rather
-     * than the raw dimension is what makes a Multiverse overworld under a custom key blend correctly.
+     * Whether a captured chunk in {@code targetDimension} needs synthesized old-generation blending. On a version that
+     * blends old chunks, only the DEFAULT generator blends terrain against the captured edge, and only in the
+     * overworld, so FLAT and VOID never blend and the nether and end are never blended either. Keying on
+     * {@code targetDimension} (a {@link #forType} result) rather than the raw dimension is what makes a Multiverse
+     * overworld under a custom key blend correctly.
      */
     static boolean shouldSynthesizeBlending(WorldType worldType, DimensionType targetDimension) {
         return worldType == WorldType.DEFAULT && DimensionType.OVERWORLD.equals(targetDimension);
