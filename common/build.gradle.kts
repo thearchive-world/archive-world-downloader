@@ -23,16 +23,14 @@ spotless {
 }
 
 // --- Minecraft toolchain: NeoGradle vanilla, not ModDevGradle Vanilla mode ---
-// NeoForm has no 1.18.x release: NeoForged forked from Forge at 1.20.2, so net.neoforged:neoform starts there,
-// and ModDevGradle Vanilla mode (which resolves that coordinate) cannot target this band. NeoGradle's vanilla
-// plugin builds the same Mojmap (official) Minecraft on Gradle 9 by deriving it from mcp_config 1.18.2 instead,
-// the exact namespace common is written in, with no intermediary remap. The net.minecraft:client distribution
-// carries the shared and server-side classes the codec reads plus the bundled vanilla data pack, and an
-// implementation dependency is inherited by the test source set, so the headless JUnit suite boots the vanilla
-// registries against it with no extra wiring (the analog of MDG Vanilla mode's addModdingDependenciesTo(test)).
-// Parchment is not layered on this band's common: NeoGradle vanilla takes no Parchment coordinate here, so the
-// decompiled Minecraft carries generated parameter names, which WDL never references; fabric keeps its own
-// Loom-layered Parchment separately.
+// NeoForm has no release below 1.20.2, so ModDevGradle Vanilla mode (which resolves the net.neoforged:neoform
+// coordinate) cannot target an older Minecraft. NeoGradle's vanilla plugin builds the same Mojmap (official) Minecraft
+// on Gradle 9 instead, applying Mojang's official mappings to the client jar: the exact namespace common is written in,
+// with no intermediary remap. The net.minecraft:client distribution carries the shared and server-side classes the
+// codec reads plus the bundled vanilla data pack, and an implementation dependency is inherited by the test source set,
+// so the headless JUnit suite boots the vanilla registries against it with no extra wiring (the analog of MDG Vanilla
+// mode's addModdingDependenciesTo(test)). Parchment is not layered on common: NeoGradle vanilla is given no Parchment
+// coordinate, so the decompiled Minecraft carries generated parameter names, which WDL never references.
 dependencies {
     implementation("net.minecraft:client:${property("minecraft_version")}")
 }
