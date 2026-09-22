@@ -43,24 +43,23 @@ import world.thearchive.wdl.core.SendRangeSampler;
 /**
  * The production specialization of {@link EntityPacketAccumulator}, binding the MC packet types and mapping each
  * inbound entity packet to the generic state the main thread reconstructs from: {@code AddEntity} as the spawn payload,
- * {@code SynchedEntityData.DataValue} as the synced-value payload, and the equipment slot/stack pair as the equipment
- * payload. The reconstruct applies each post-spawn packet the way the client handlers do, so this only has to decode
- * each packet to the same state the client would hold.
+ * the synced data values as the synced-value payload, and the equipment slot/stack pair as the equipment payload. The
+ * reconstruct applies each post-spawn packet the way the client handlers do, so this only has to decode each packet to
+ * the same state the client would hold.
  *
  * <p>Every accessor used here is public MC API, so this compiles in {@code common} against the un-widened vanilla jar.
  * The one exception is {@code ClientboundMoveEntityPacket}'s entity id, which is {@code protected}; the per-loader tee,
  * where the access widener / transformer applies, reads it and calls {@link #onMove} with it. {@code RemoveEntities} is
- * handled only as a range sample and book cleanup; it never evicts from the accumulator (a client removal is
- * {@code RemovalReason.DISCARDED} and tells nothing about death versus unload, so reconstruction keeps every tracked
- * entity).
+ * handled only as a range sample and book cleanup; it never evicts from the accumulator (a client removal tells nothing
+ * about death versus unload, so reconstruction keeps every tracked entity).
  *
  * <p>{@code Respawn} and {@code Login} are the two inbound packets that announce the world the stream has moved to (the
- * only two that assign the client a level; a configuration re-entry clears it to none), so both are routed to the
- * accumulator's dimension marker and to the sampler, whose id book the rebuilt level invalidates either way. Reading
- * the client's live level here instead would be wrong by a tick: the tee sees the packet on the Netty thread before the
- * main thread applies it, so the entity spawns that follow it on the wire would be stamped with the world the player
- * has left. The marker is advanced first in either branch, because it is the only per-packet state whose loss misfiles
- * data, where the sampler's loses at worst one invalidation.
+ * only two that assign the client a level; where the version has a configuration phase, re-entering it clears the level
+ * to none), so both are routed to the accumulator's dimension marker and to the sampler, whose id book the rebuilt
+ * level invalidates either way. Reading the client's live level here instead would be wrong by a tick: the tee sees the
+ * packet on the Netty thread before the main thread applies it, so the entity spawns that follow it on the wire would
+ * be stamped with the world the player has left. The marker is advanced first in either branch, because it is the only
+ * per-packet state whose loss misfiles data, where the sampler's loses at worst one invalidation.
  *
  * <p>It also carries the connection-scoped publication point. The per-loader inbound tee is installed once per
  * connection and has no reference to the per-download session, so the running capture publishes its accumulator here
@@ -81,18 +80,18 @@ final class EntityPacketCapture
             EntityTypes.ITEM_FRAME, EntityTypes.GLOW_ITEM_FRAME, EntityTypes.PAINTING, EntityTypes.ARMOR_STAND);
 
     /**
-     * Range-10 types excluded from range sampling, for two reasons. The player-mountables: a riding player raises their
-     * broadcast range to the player's own ({@code TrackedEntity.getEffectiveRange} takes the max over indirect
-     * passengers), and passenger state is not visible at {@code AddEntity} time, so a boosted sample would over-claim
-     * the range. The Display types: category-configured servers commonly track their display category farther than the
-     * decorations' categories (a plugin hologram near the player would over-claim teal until the first decoration takes
-     * over). Only range-10 non-decoration types are otherwise sampled, so this lists only members whose vanilla
-     * {@code clientTrackingRange} is 10: the range-8 mounts (all minecarts, the mule) are never sampled and need no
-     * entry. Re-derive per band from {@code PlayerRideable}, {@code ItemSteerable}, {@code AbstractBoat},
-     * {@code AbstractHorse}, {@code canAddPassenger} overrides, and the Display hierarchy, keeping only the range-10
-     * members; a missing entry over-claims coverage, the failure the measured range exists to prevent. Interaction is
-     * range 10, non-mountable, and absent from vanilla worlds; its real-world use is plugin frameworks that teleport
-     * interaction and display pairs to follow players, the hazard profile that excluded the Displays.
+     * Range-10 types excluded from range sampling. The player-mountables: a riding player raises their broadcast range
+     * to the player's own (vanilla's tracked range takes the max over indirect passengers), and passenger state is not
+     * visible at spawn time, so a boosted sample would over-claim the range. The Display types, where the version has
+     * them: category-configured servers commonly track their display category farther than the decorations' categories
+     * (a plugin hologram near the player would over-claim teal until the first decoration takes over). Only range-10
+     * non-decoration types are otherwise sampled, so this lists only members whose vanilla {@code clientTrackingRange}
+     * is 10: the range-8 mounts (all minecarts, the mule) are never sampled and need no entry. Re-derive per band from
+     * the version's player-rideable, item-steerable, boat and horse types, its {@code canAddPassenger} overrides, and
+     * its Display hierarchy where it has one, keeping only the range-10 members; a missing entry over-claims coverage,
+     * the failure the measured range exists to prevent. Interaction, where the version has it, is range 10,
+     * non-mountable, and absent from vanilla worlds; its real-world use is plugin frameworks that teleport interaction
+     * and display pairs to follow players, the hazard profile that excluded the Displays.
      */
     private static final Set<EntityType<?>> RANGE_SAMPLING_EXCLUSIONS = Set.of(
             EntityTypes.OAK_BOAT, EntityTypes.SPRUCE_BOAT, EntityTypes.BIRCH_BOAT, EntityTypes.JUNGLE_BOAT,
