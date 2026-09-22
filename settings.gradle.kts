@@ -11,11 +11,10 @@ pluginManagement {
 
 rootProject.name = "wdl"
 
-// NeoForge is dropped on this band: it does not exist for 1.13.x (NeoForged forked from Forge at 1.20.2), so the
-// second, non-Fabric loader is Forge, built by a hand-rolled plain-java island under forge/ (a separate Gradle
-// build with no ForgeGradle and no Loom: it compiles against the Mojmap Minecraft plus a Mojmap-named view of the
-// real Forge 1.13.2 universal jar, reobfuscates Mojmap -> SRG by hand, and packages). This root builds only
-// common; the Forge jar is produced by forge/gradlew, not from here.
+// NeoForge has no release below 1.20.1, so the second, non-Fabric loader is Forge, built by a hand-rolled plain-java
+// island under forge/ (a separate Gradle build with no ForgeGradle and no Loom: it compiles against the Mojmap
+// Minecraft plus a Mojmap-named view of the real Forge universal jar forge_version names, reobfuscates Mojmap -> SRG by
+// hand, and packages). This root builds only common; the Forge jar is produced by forge/gradlew, not from here.
 include("common")
 
 // The Mojmap bridge generator (tools/mojmap-bridge) is an included build, not a subproject: its genBridge task
