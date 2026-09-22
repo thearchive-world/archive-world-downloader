@@ -14,11 +14,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Acceptance test for the headless registry harness.
  *
- * <p>Checks two things: (1) the {@code common} TEST classpath carries {@code net.minecraft.*} classes and the bundled
- * vanilla data (the biome JSONs), and (2) {@link TestRegistries#frozen()} reproduces vanilla's {@code WorldLoader}
- * bootstrap closely enough to populate the dynamic {@code BIOME} registry. The assertions exercise the biome lookup the
- * chunk codec relies on, {@code lookupOrThrow(BIOME).getOrThrow(PLAINS)}, and build a {@link LevelChunkSection} from
- * that registry the way the codec does.
+ * <p>Checks two things: (1) the {@code common} TEST classpath carries {@code net.minecraft.*} classes, and (2)
+ * {@link TestRegistries#frozen()} reproduces vanilla's world-load bootstrap closely enough to populate the dynamic
+ * {@code BIOME} registry. The assertions exercise the biome lookup the chunk codec relies on and build a
+ * {@link LevelChunkSection} the way the codec does.
  */
 class RegistriesSmokeTest {
     @Test
@@ -28,7 +27,7 @@ class RegistriesSmokeTest {
         // PLAINS present in the dynamic BIOME registry, else getOrThrow throws.
         assertNotNull(registries.registryOrThrow(Registry.BIOME_REGISTRY).getOrThrow(Biomes.PLAINS));
 
-        // A section builds from the reconstructed registries; below 1.18 the biome axis is per-chunk, not per-section.
+        // A section builds; below 1.18 the biome axis is per-chunk, not per-section.
         assertNotNull(new LevelChunkSection(0));
     }
 }
