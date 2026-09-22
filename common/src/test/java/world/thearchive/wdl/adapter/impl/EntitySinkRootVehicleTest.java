@@ -144,7 +144,7 @@ class EntitySinkRootVehicleTest {
             return new ClientboundAddEntityPacket(this);
         }
 
-        // 1.16.5 has no Entity.shouldBeSaved; a one-player vehicle is refused by the isVehicle and
+        // Entity has no shouldBeSaved() below 1.17; a one-player vehicle is refused by the isVehicle and
         // hasOnePlayerPassenger primitives EntitySinkImpl reproduces that predicate from, forced true here since a
         // real player passenger cannot be built headless.
         @Override

@@ -45,7 +45,7 @@ public final class EntitySinkImpl implements EntitySink {
             Items.LIGHT_GRAY_CARPET, Items.CYAN_CARPET, Items.PURPLE_CARPET, Items.BLUE_CARPET,
             Items.BROWN_CARPET, Items.GREEN_CARPET, Items.RED_CARPET, Items.BLACK_CARPET);
 
-    // 1.16.5 has no Entity.shouldBeSaved(); reproduce its predicate from the primitives it composes: a removed,
+    // Entity has no shouldBeSaved() below 1.17; reproduce its predicate from the primitives it composes: a removed,
     // riding, or single-player-vehicle entity is not written standalone.
     private static boolean shouldSaveEntity(Entity entity) {
         return !entity.removed && !entity.isPassenger()
