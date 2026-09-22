@@ -752,7 +752,7 @@ public final class WdlDownloadsScreen extends Screen {
         BannerPanelWidget(int x, int y, int width, Component prose) {
             super(x, y, width, BANNER_HEIGHT, prose);
             this.prose = prose;
-            this.active = false; // decorative and inert, like a vanilla StringWidget
+            this.active = false;
         }
 
         @Override
