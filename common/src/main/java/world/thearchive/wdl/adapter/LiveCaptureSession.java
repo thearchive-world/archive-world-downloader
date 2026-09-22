@@ -824,9 +824,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private final DownloadReportStore report = new DownloadReportStore();
 
     /**
-     * Accumulates the report's dedup-correct counts over the session: containers at bind time (a double chest as one),
-     * entities at submit, chunks at finish. Touched only on the client main thread, like the rest of capture. The
-     * player count is settled later (it depends on the write succeeding), not through this.
+     * Accumulates the report's dedup-correct counts over the session: containers under a caller-supplied logical id (a
+     * double chest as one), entities by UUID where each is primed or promoted, ahead of the submit that writes the tag,
+     * so an entity dropped at flush stays counted. Touched on the client main thread during capture and again inside
+     * the finish, which a disconnect the player did not initiate delivers on the network IO thread. The player count is
+     * settled later (it depends on the write succeeding).
      */
     private final DownloadCountsBuilder reportCounts = new DownloadCountsBuilder();
 
