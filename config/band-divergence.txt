@@ -627,9 +627,10 @@ common/src/main/java/world/thearchive/wdl/adapter/ConnectionTee.java
 # the map keys).
 common/src/test/java/world/thearchive/wdl/adapter/PlayerProgressSerializerTest.java
 
-# The Forge island's manifest carries loaderVersion [25,) and pins minecraft versionRange [1.13.2] (Forge
-# 1.13.2-25.0.223, the 25.x line for 1.13.2), with ordering NONE on both dependencies because 25.0.223's ModSorter
-# resolves an AFTER edge's target before forge and minecraft are ordering nodes. Absent from dev.
+# The Forge island's manifest carries loaderVersion [25,), Forge 25.x for 1.13.2, versus the [28,) of the 1.14.4 mint
+# parent, and sets ordering NONE on both dependencies where 1.14.4's are AFTER: ModSorter.addDependency in the Forge
+# build forge_version pins puts an AFTER edge on the target's owning mod file, and the loader's own minecraft mod info
+# has none, so Guava's putEdge NPEs. Absent from dev.
 forge/src/main/resources/META-INF/mods.toml
 
 # Absent from dev: the island's own gradle.properties. At 1.13.2 it carries the JVM args alone, the hand-rolled island
