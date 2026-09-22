@@ -25,9 +25,9 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The 1.21.11 world-output writes: the curated safe game rules and the world-open state land in the level.dat Data tag.
- * Noon and clear weather are fixed invariants applied regardless of the world-defaults master, the game-rule master
- * gates the curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it
+ * The world-output writes: the curated safe game rules and the world-open state land in the level.dat Data tag. Noon
+ * and clear weather are fixed invariants applied regardless of the world-defaults master, the game-rule master gates
+ * the curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it
  * against the real {@code GameRules}.
  */
 class LevelDatWorldOutputTest {
@@ -195,7 +195,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void anUnknownOverrideIdIsSurfacedNotWritten() {
-        LevelDataWriter.LevelData built = build(with("gamerule.doMobSpawning", "false")); // a 1.21.4 id
+        LevelDataWriter.LevelData built = build(with("gamerule.doMobSpawning", "false")); // an id this version lacks
 
         assertTrue(built.gameRules().unknownIds().contains("doMobSpawning"), "the cross-band loss is surfaced");
         assertFalse(gameRules(built).get(GameRules.SPAWN_MOBS), "the curated safe set still applies");
