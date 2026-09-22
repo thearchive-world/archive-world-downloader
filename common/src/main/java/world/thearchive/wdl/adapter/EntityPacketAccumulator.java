@@ -29,12 +29,11 @@ import org.slf4j.Logger;
  *
  * <p>Keyed by the integer entity id, the packet-layer key every post-spawn packet carries, and bridged to the UUID, the
  * save-layer key the {@link EntityBuffer} and the report count on ({@code AddEntity} carries both). A
- * {@code RemoveEntities} is deliberately not handled at all: a client removal is {@code RemovalReason.DISCARDED} and
- * tells you nothing about death versus unload, so eviction would defeat holding entities independent of unload. Stale
- * state is instead superseded the only correct way, a fresh {@link #spawn} for a reused id replaces the prior entity
- * wholesale (a new identity, all post-spawn state cleared). The capture one layer up samples {@code RemoveEntities} for
- * the range estimator and drops its book entry, but the accumulator itself must never evict: reconstruction owns every
- * tracked entity until finish.
+ * {@code RemoveEntities} is deliberately not handled at all: a client removal tells you nothing about death versus
+ * unload, so eviction would defeat holding entities independent of unload. Stale state is instead superseded the only
+ * correct way, a fresh {@link #spawn} for a reused id replaces the prior entity wholesale (a new identity, all
+ * post-spawn state cleared). The capture one layer up samples {@code RemoveEntities} for the range estimator and drops
+ * its book entry, but the accumulator itself must never evict: reconstruction owns every tracked entity until finish.
  *
  * <p>A chunk key is dimension-local (the overworld and the nether share the whole position space), so every held entity
  * also carries the dimension it was announced in, taken from {@link #enterDimension}, which the in-stream dimension
