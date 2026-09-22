@@ -108,12 +108,15 @@ public final class WdlConfig {
         return captureContainers;
     }
 
-    /** Whether to capture the player's advancement progress into {@code advancements/<uuid>.json}. */
+    /**
+     * Whether to capture the player's advancement progress into the save's per-player advancements file, where the
+     * Minecraft version has advancements.
+     */
     public boolean captureAdvancements() {
         return captureAdvancements;
     }
 
-    /** Whether to capture the player's statistics into {@code stats/<uuid>.json}. */
+    /** Whether to capture the player's statistics into the save's per-player statistics file. */
     public boolean captureStatistics() {
         return captureStatistics;
     }
