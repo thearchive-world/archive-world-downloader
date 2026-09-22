@@ -43,7 +43,7 @@ class WdlConfigTest {
         assertTrue(config.savePlayerInventory());
         assertTrue(config.savePlayerEnderChest());
         assertFalse(config.saveItemCoordinates(), "item coordinates are blanked by default (scrub on)");
-        assertTrue(config.lockDownloadedMaps(), "downloaded maps are auto-locked by default");
+        assertTrue(config.lockDownloadedMaps(), "map locking is on by default");
         assertFalse(config.forceMobPersistence(), "all-mob persistence is off by default (named mobs persist anyway)");
         assertFalse(config.dumpReceivedFrames(), "the per-frame received dump diagnostic is off by default");
         assertTrue(config.showToasts(), "the job-done toasts are on by default");
