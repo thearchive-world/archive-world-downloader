@@ -370,10 +370,9 @@ class OpenClickIntentTest {
         assertEquals(OTHER_VEHICLE_ID, intent.vehicleId(), "and it names the second vehicle, not the first");
     }
 
-    // --- dismissEntityClick: a use click on an entity that ends in MOUNTING it (entering a chest boat,
-    // riding up a donkey) consumed the interact as a ride, so no menu can ever arrive for it; left
-    // latched it would supersede the next real intent and poison that open. The adapter dismisses it as
-    // soon as the clicked entity becomes the player's vehicle.
+    // --- dismissEntityClick: a use click on an entity that ends in MOUNTING it (boarding a boat, riding up a donkey)
+    // consumed the interact as a ride, so no menu can ever arrive for it; left latched it would supersede the next real
+    // intent and poison that open. The adapter dismisses it as soon as the clicked entity becomes the player's vehicle.
 
     /** A pending click on the entity the player then mounted is dismissed (no open is owed to it). */
     @Test
@@ -450,13 +449,13 @@ class OpenClickIntentTest {
     @Test
     void dismissThenVehicleIntentDoesNotSupersede() {
         OpenClickIntent intent = new OpenClickIntent(WINDOW);
-        intent.recordEntityClick(ENTITY_ID, 0L, false); // the boat-entry click
-        intent.dismissEntityClick(ENTITY_ID); // the boat became the vehicle
+        intent.recordEntityClick(ENTITY_ID, 0L, false); // the boarding click
+        intent.dismissEntityClick(ENTITY_ID); // the boarded entity became the vehicle
 
         intent.recordVehicleOpenIntent(VEHICLE_ID, 5L); // the open-inventory request goes out
 
         assertEquals(OpenClickIntent.Target.VEHICLE, intent.resolve(5L),
-                "no marker was minted, so the boat's own open binds on the first press");
+                "no marker was minted, so the vehicle's own open binds on the first press");
     }
 
     /** A stale resolve consumes the click too, so a following resolve stays NONE (no resurrection). */
