@@ -19,9 +19,9 @@ import org.jspecify.annotations.Nullable;
  * Enumerates the chunk positions already saved in a dimension's {@code region/} folder by reading each region file's
  * location header, for seeding the coverage overlay with a resumed download's prior coverage. A region file's first 4
  * KB is a table of 1024 big-endian location entries (one per chunk in the 32x32 region); a non-zero entry means that
- * chunk has data on disk. This is a raw header read, never a {@code SimpleRegionStorage} open, so it opens no second
- * region handle (the one-writer invariant is untouched) and touches no chunk data. Fail-soft: an unreadable file or
- * directory yields partial coverage rather than aborting.
+ * chunk has data on disk. This is a raw header read, never a region storage open, so it opens no second region handle
+ * (the one-writer invariant is untouched) and touches no chunk data. Fail-soft: an unreadable file or directory yields
+ * partial coverage rather than aborting.
  */
 public final class RegionChunkScan {
     private static final Logger LOGGER = Logger.getLogger(RegionChunkScan.class.getName());
