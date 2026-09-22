@@ -47,12 +47,6 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class EntityRoundTripTest {
     private final EntitySink sink = new EntitySinkImpl();
 
-    /**
-     * Initialize vanilla's static state (versioned constants + built-in registries) so {@code ChunkPos},
-     * {@code DataFixers}, and the region pipeline are usable headless. The pure carrier is itself registry-free; we
-     * reuse the project's memoized bootstrap (not its {@code RegistryAccess}) only so this test is self-sufficient when
-     * run in isolation.
-     */
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.bootstrap();
