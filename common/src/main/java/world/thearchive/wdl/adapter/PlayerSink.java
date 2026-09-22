@@ -9,9 +9,9 @@ import net.minecraft.world.entity.player.Player;
 
 /**
  * Per-band player-serialize axis: serialize the local player into the vanilla {@code "Player"} compound via
- * {@code player.saveWithoutId}, the identical call vanilla's own {@code PlayerDataStorage.save} uses. The capture
- * pipeline routes the local player here rather than through the entity axis ({@link EntitySink}), mirroring vanilla's
- * player/entity-region save split.
+ * {@code player.saveWithoutId}, the identical call vanilla's own player save uses. The capture pipeline routes the
+ * local player here rather than through the entity axis ({@link EntitySink}), mirroring vanilla's player/entity-region
+ * save split.
  *
  * <p>Per-band because the serialize API drifts. The single step is client-coupled (a live {@code Player}); the headless
  * guard is the pure downstream ({@link PlayerTag}, {@link ItemLocationScrub}, the save apply).
