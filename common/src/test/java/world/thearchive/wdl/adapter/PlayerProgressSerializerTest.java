@@ -28,7 +28,7 @@ class PlayerProgressSerializerTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // boots BuiltInRegistries + the Stats statics (side effect only)
+        TestRegistries.frozen(); // boots the built-in registries + the Stats statics (side effect only)
     }
 
     private static JsonObject parse(byte[] json) {
