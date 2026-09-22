@@ -40,10 +40,8 @@ buildscript {
 // 1.16.5 islands) resolves official Mojang mappings for 1.13.2. So the island carries no Loom at all: the root's
 // Fabric-Loom provision remaps the vanilla 1.13.2 jar to Mojmap through the tools/mojmap-bridge mapping and
 // publishes that jar plus its transitive libraries to ../common/build/island-classpath.txt, which this build reads
-// as plain file dependencies. The Forge API the six glue files reference has no Mojmap-named distribution at this
-// band either, so remapForgeApi builds one from the real forge-1.13.2-25.0.223 universal jar (see below). The
-// island stays a separate build with its own wrapper because it runs a different Java toolchain (Java 8) than the
-// Gradle-9 root; two wrappers, one set of coordinates read from the root gradle.properties.
+// as plain file dependencies. The Forge API the six glue files reference has no Mojmap-named distribution for
+// 1.13.2 either, so remapForgeApi builds one from the real Forge universal jar forge_version names (see below).
 plugins {
     java
     // Release publishing. Pinned as a literal because the island is a separate build with no access to the root
@@ -84,9 +82,9 @@ if (islandToolchain != islandTarget) {
 repositories {
     mavenCentral()
     maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
-    // The Forge maven hosts the real forge-1.13.2-25.0.223 universal jar (the loadability-critical API the six glue
-    // files bind) and net.minecraftforge:forgespi, the small mod-info SPI that carries IModInfo. Both are resolved
-    // here rather than stubbed.
+    // The Forge maven hosts the real Forge universal jar forge_version names (the loadability-critical API the six
+    // glue files bind) and net.minecraftforge:forgespi, the small mod-info SPI that carries IModInfo. Both are
+    // resolved here rather than stubbed.
     maven("https://maven.minecraftforge.net/")
 }
 
@@ -117,12 +115,13 @@ sourceSets {
     create("reobftest")
 }
 
-// The real Forge API the six glue files reference, met by a Mojmap-named view of the genuine forge-1.13.2-25.0.223
-// universal jar rather than a hand-rolled stub: the universal's net.minecraftforge.* classes reference Minecraft by
-// 1.13.2 SRG name, so remapForgeApi remaps them SRG -> Mojmap through the bridge's mojmap-srg.tiny (read in reverse)
-// and keeps ONLY the net/minecraftforge/** entries, so the universal's own patched net.minecraft.* classes never
-// shadow the Mojmap Minecraft the island already compiles against. forgespi supplies the mod-info SPI (IModInfo) the
-// universal does not carry; it names no Minecraft, so it needs no remap.
+// The real Forge API the six glue files reference, met by a Mojmap-named view of the genuine Forge universal jar
+// forge_version names rather than a hand-rolled stub: the universal's net.minecraftforge.* classes reference
+// Minecraft by 1.13.2 SRG name, so remapForgeApi remaps them SRG -> Mojmap through the bridge's mojmap-srg.tiny (read
+// in reverse) and keeps only the net/minecraftforge/** entries, which holds the compile view to the Forge API; at this
+// coordinate that is every class the universal carries, since Forge ships its patched Minecraft as installer binary
+// patches rather than in the universal. forgespi supplies the mod-info SPI (IModInfo) the universal does not carry; it
+// names no Minecraft, so it needs no remap.
 val forgeUniversal: Configuration = configurations.create("forgeUniversal") { isTransitive = false }
 
 val forgeApiMappingFile = rootDir.resolve("../tools/mojmap-bridge/build/bridge/mojmap-srg.tiny")

@@ -16,9 +16,9 @@ logoBlur = false
 # Loader floor = gradle.properties forge_version_min (a deliberate value, not the build coordinate); the exact
 # minecraft pin below already locks the band one-to-one, so the upper bound stays open. Forge uses the boolean
 # mandatory key here where NeoForge 20.4 uses type = "required".
-# ordering = "NONE" on both deps: at 25.0.223 ModSorter.addDependency resolves an AFTER edge's target mod node
-# and Guava's putEdge NPEs when "forge"/"minecraft" aren't resolvable ordering nodes this early. NONE skips the
-# edge, which is also correct since a mod doesn't order itself against the game or the loader.
+# ordering = "NONE" on both deps: ModSorter.addDependency in the Forge build forge_version pins puts an AFTER edge
+# on the target's owning mod file, and the loader's own minecraft mod info has none, so Guava's putEdge NPEs. NONE
+# skips the edge, which is also correct since a mod doesn't order itself against the game or the loader.
 [[dependencies.wdl]]
 modId = "forge"
 mandatory = true
