@@ -531,11 +531,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Primed entities the sink refused. An unresolvable leash never lands here (the sink strips it and saves the mob
-     * unleashed), so a refusal means {@code shouldBeSaved} returned false (a live passenger saved nested under its
-     * vehicle, a removed entity, or a player-only vehicle vanilla persists through the player) or {@code save()}
-     * returned false (a non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips.
-     * Reported so the drop is visible; not a loss, and not part of the packet reconciliation residual (a primed entity
-     * has no spawn packet).
+     * unleashed), so a refusal means the entity failed the standalone save check (a live passenger saved nested under
+     * its vehicle, a removed entity, or a player-only vehicle vanilla persists through the player) or its save returned
+     * false (a non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips. Reported so
+     * the drop is visible; not a loss, and not part of the packet reconciliation residual (a primed entity has no spawn
+     * packet).
      */
     private int primeSinkSkips;
 
@@ -1168,16 +1168,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     }
                 }
             }
-            // One shared per-tick budget (bounds the first-tick render-distance burst and the
-            // fast-fly-over: chunk capture plus the on-main entity encode), but the entity pass takes a reserved
-            // half FIRST: the per-tick pass is the only place an entity is savable: once removed it is
-            // RemovalReason.DISCARDED, which vanilla's save path refuses, so an unloaded entity cannot be caught
-            // later, and a missed one is lost, whereas terrain re-captures while still loaded and spills
-            // harmlessly across ticks. The reserve gives entities a floor a heavy new-terrain tick (fast flight
-            // into fresh chunks) cannot starve; a sparse tick returns at once, so
-            // the unused reserve flows to the absolute terrain deadline below. Running before terrain costs only
-            // one tick of latency for an entity in a chunk first-captured this tick (the privacy gate keys on
-            // allCaptured, which persists).
+            // One shared per-tick budget (bounds the first-tick render-distance burst and the fast-fly-over: chunk
+            // capture plus the on-main entity encode), but the entity pass takes a reserved half FIRST: the per-tick
+            // pass is the only place an entity is savable: once removed, vanilla's save path refuses it, so an unloaded
+            // entity cannot be caught later, and a missed one is lost, whereas terrain re-captures while still loaded
+            // and spills harmlessly across ticks. The reserve gives entities a floor a heavy new-terrain tick (fast
+            // flight into fresh chunks) cannot starve; a sparse tick returns at once, so the unused reserve flows to
+            // the absolute terrain deadline below. Running before terrain costs only one tick of latency for an entity
+            // in a chunk first-captured this tick (the privacy gate keys on allCaptured, which persists).
             long budgetNanos = config.encodeBudgetMillis() * 1_000_000L;
             long tickStartNanos = System.nanoTime();
             if (config.captureEntities()) {
@@ -1562,8 +1560,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return;
         }
         for (UUID uuid : primeRefusedEntities) {
-            // Per entity, matching the encode's own isolation: a modded shouldBeSaved can throw, and one that does
-            // must not cost every refusal behind it in the iteration.
+            // Per entity, matching the encode's own isolation: a modded entity's save check can throw, and one that
+            // does must not cost every refusal behind it in the iteration.
             try {
                 Entity entity = entityByUuid(uuid);
                 if (entity == null || !shouldSaveEntity(entity) || capture.tracks(entity.getEntityId())
@@ -2868,14 +2866,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Snapshot a seated player's root vehicle into {@link #rootVehicleTag} before the entity drain, mirroring
-     * {@code ServerPlayer.saveParentVehicle}. Client main thread only (it reads live entity relationships and runs
-     * {@code entity.save} over the live tree), never from a background/overlay read path. The whole fallible body is
-     * per-unit failure-isolated like {@link #encodeSingleEntity}: {@code captureRootVehicle}'s {@code entity.save}
-     * throws a {@code ReportedException} on a codec-rejecting modded or rolled-back entity, which without this catch
-     * would propagate into {@link #finish()} and abort it before the writer finalizes, hanging the writer with the
-     * session lock held. On a throw or a refused save the mount stays on the standard entity paths and the player loads
-     * without a mount; the position anchor still fires.
+     * Snapshot a seated player's root vehicle into {@link #rootVehicleTag} before the entity drain, mirroring vanilla's
+     * player save. Client main thread only (it reads live entity relationships and runs the entity save over the live
+     * tree), never from a background/overlay read path. The whole fallible body is per-unit failure-isolated like
+     * {@link #encodeSingleEntity}: {@code captureRootVehicle}'s entity save throws a {@code ReportedException} on a
+     * modded or rolled-back entity it cannot serialize, which without this catch would propagate into {@link #finish()}
+     * and abort it before the writer finalizes, hanging the writer with the session lock held. On a throw or a refused
+     * save the mount stays on the standard entity paths and the player loads without a mount; the position anchor still
+     * fires.
      */
     private void prepareRootVehicleCapture(EntityPlayerSP player) {
         if (!player.isRiding()) {
@@ -2889,7 +2887,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             Entity root = player.getLowestRidingEntity();
             Entity direct = player.getRidingEntity();
             if (direct == null || root == player || root.getRecursivePassengersByType(EntityPlayer.class).size() != 1) {
-                return; // ServerPlayer.saveParentVehicle's own condition
+                return; // vanilla's player save uses the same condition
             }
             Set<UUID> excluded = new HashSet<>();
             if (!(root instanceof EntityPlayer)) {
@@ -4439,15 +4437,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
             }
             if (!allCaptured.contains(chunkKey)) {
                 if (pass != PromotePass.FINISH) {
-                    // The captured-chunk privacy gate: we never write an entity in a chunk whose terrain we have
-                    // not captured, so hold it and drop it unwritten only at finish, which is the only pass with
-                    // no later one behind it. The dimension's captured positions persist for the whole session
-                    // and are restored by the rebind on a return trip, so a chunk captured on a second visit
-                    // still writes what was held from the first. This cannot grow into an unbounded uncaptured
-                    // tail: vanilla broadcasts an entity only for a chunk already in the client tracking view,
-                    // the same chunks terrain is sent for (ChunkMap.updatePlayer gates on isChunkTracked), so a
-                    // packet arrives for an uncaptured chunk only transiently, while capture is budget-starved
-                    // on a fast flight, and that self-heals once movement slows.
+                    // The captured-chunk privacy gate: we never write an entity in a chunk whose terrain we have not
+                    // captured, so hold it and drop it unwritten only at finish, which is the only pass with no later
+                    // one behind it. The dimension's captured positions persist for the whole session and are restored
+                    // by the rebind on a return trip, so a chunk captured on a second visit still writes what was held
+                    // from the first. This cannot grow into an unbounded uncaptured tail: vanilla broadcasts an entity
+                    // only for a chunk already in the client tracking view, the same chunks terrain is sent for, so a
+                    // packet arrives for an uncaptured chunk only transiently, while capture is budget-starved on a
+                    // fast flight, and that self-heals once movement slows.
                     continue;
                 }
                 droppedUncaptured += capture.dropChunk(liveDimensionId, chunkKey).size();
@@ -4661,7 +4658,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Blank item-borne coordinates on every entity in an encoded entity-chunk tag (and their passengers), per the
-     * item-coordinate knob. Walks the post-1.17 {@code "Entities"} list; {@link ItemLocationScrub#scrubEntity} recurses
+     * item-coordinate knob. Walks the tag's {@code "Entities"} list; {@link ItemLocationScrub#scrubEntity} recurses
      * each entity's own {@code "Passengers"}, so this stays a flat top-level loop. Runs inside the per-chunk try.
      */
     private void scrubEntityItems(NBTTagCompound entityChunkTag) {
@@ -4679,8 +4676,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Remap (and on-sight serialize) the maps of each entity's displayed single {@code "Item"} in an encoded
-     * entity-chunk tag: an item frame's framed map and a dropped item entity's map. Walks the post-1.17
-     * {@code "Entities"} list; entities with no {@code "Item"} are skipped. Runs inside the per-chunk try.
+     * entity-chunk tag: an item frame's framed map and a dropped item entity's map. Walks the tag's {@code "Entities"}
+     * list; entities with no {@code "Item"} are skipped. Runs inside the per-chunk try.
      */
     private void remapEntityItems(NBTTagCompound entityChunkTag, MapArchive archive) {
         if (!(entityChunkTag.getTag("Entities") instanceof NBTTagList)) {
