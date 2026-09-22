@@ -20,8 +20,8 @@ import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for container capture: the {@link ContainerSink} 1.21.11 path ({@code captureItems} -> merge)
- * plus vanilla's own {@code ContainerHelper.loadAllItems} read-back is a self-consistent round-trip: the captured slots
+ * The automated guard for container capture: the {@link ContainerSink} path ({@code captureItems} -> merge) plus
+ * vanilla's own {@code ContainerHelper.loadAllItems} read-back is a self-consistent round-trip: the captured slots
  * survive serialization, land on the block-entity tag under {@code "Items"}, and decode to the same stacks at the same
  * slots, with no other block-entity field clobbered.
  *
