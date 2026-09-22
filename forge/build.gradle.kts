@@ -327,9 +327,9 @@ dependencies {
     compileOnly("net.minecraftforge:forgespi:0.13.0")
     compileOnly("org.apache.maven:maven-artifact:3.6.0")
 
-    // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
-    // shim are null-marked. NullAway itself does not run on this island (it is a Gradle-9 build-logic pass over
-    // common); here the annotations only need to resolve so the marked source compiles.
+    // JSpecify (@NullMarked / @Nullable), compile-only: the source-merged common/ and the shim are null-marked, so
+    // the annotations need only resolve for the marked source to compile. Nothing checks them: the root's nullness
+    // plugin runs annotations-only on a band below Java 21, and this build never loads it.
     compileOnly(jspecify)
 
     // JourneyMap public API for the source-merged binding (compat/journeymap), compile-only, never a runtime
