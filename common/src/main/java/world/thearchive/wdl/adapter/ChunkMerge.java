@@ -44,9 +44,10 @@ import org.jspecify.annotations.Nullable;
  */
 final class ChunkMerge {
     /**
-     * The one block entity whose {@code "Items"} this mod can only ever capture a slot at a time. Written as the
-     * literal vanilla registry key rather than resolved through {@code BuiltInRegistries}, so this file stays a pure
-     * tag operation with no registry or bootstrap dependency; {@code ChunkMergeTest} pins it against the registry.
+     * The one block entity whose {@code "Items"} this mod can only ever capture a slot at a time, where the version has
+     * it. Written as a literal id rather than resolved through the block-entity registry, so this file stays a pure tag
+     * operation with no registry or bootstrap dependency; where the version has the type, {@code ChunkMergeTest} pins
+     * it against the registry.
      */
     static final String CHISELED_BOOKSHELF_ID = "minecraft:chiseled_bookshelf";
 
