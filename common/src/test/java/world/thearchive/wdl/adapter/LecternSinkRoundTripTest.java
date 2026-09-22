@@ -25,12 +25,11 @@ import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for lectern-book capture: the {@link LecternSink} 1.20.4 path ({@code captureBook} -> merge) plus
- * vanilla's own {@code ItemStack.of} read-back (the exact form {@code LecternBlockEntity.loadAdditional} uses) is a
- * self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity tag under
- * {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field
- * clobbered. Runs for both a signed <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern
- * contents).
+ * The automated guard for lectern-book capture: the {@link LecternSink} path ({@code captureBook} -> merge) plus
+ * vanilla's own {@code ItemStack.of} read-back (the exact form the lectern's own read uses) is a self-consistent
+ * round-trip: the captured book survives serialization, lands on the lectern block-entity tag under {@code "Book"} with
+ * the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field clobbered. Runs for
+ * both a signed <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern contents).
  *
  * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
  * neither a live menu nor a {@code Level} is needed. The one client-coupled step (lifting the book from the live open
@@ -83,7 +82,7 @@ class LecternSinkRoundTripTest {
     }
 
     private static ItemStack readBackBook(CompoundTag merged) {
-        // vanilla loadAdditional's exact read
+        // vanilla's exact block-entity read of this key
         ItemStack back = ItemStack.of(merged.getCompound("Book"));
         assertTrue(!back.isEmpty(), "the merged Book must decode via vanilla ItemStack.of");
         return back;
