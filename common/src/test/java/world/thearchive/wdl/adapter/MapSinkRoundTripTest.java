@@ -22,11 +22,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for the per-band map serialize (the 1.21.5 {@code SavedData} to Codec seam): {@code serializeMap}
- * turns a client-shaped {@link MapItemSavedData} into the inner {@code "data"} tag vanilla's own
- * {@code MapItemSavedData.CODEC} reads back to an equal map (the image, dimension, and scale faithful), and the
- * auto-lock snapshot ({@code saved.locked()}) serializes {@code locked=true} over an independent image copy.
- * Server-free by construction: a constructed client map drives it, so neither a live menu nor a {@code Level} is
- * needed; the live {@code getMapData} resolution is not exercised headless.
+ * turns a client-shaped {@link MapItemSavedData} into the inner {@code "data"} tag vanilla reads back to an equal map
+ * (the image, dimension, and scale faithful), and the auto-lock snapshot ({@code saved.locked()}) serializes
+ * {@code locked=true} over an independent image copy. Server-free by construction: a constructed client map drives it,
+ * so neither a live menu nor a {@code Level} is needed; the live {@code getMapData} resolution is not exercised
+ * headless.
  */
 class MapSinkRoundTripTest {
     private static RegistryAccess registries;
