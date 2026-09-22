@@ -17,14 +17,13 @@ import world.thearchive.wdl.core.AtomicFileWrite;
 
 /**
  * Writes the band-agnostic map {@code data/} save surface: wraps a per-band serialized inner {@code "data"} tag (from
- * {@link MapSink#serializeMap}, or the {@code idcounts} tag below) as {@code {data, DataVersion}} via vanilla
- * {@code NbtUtils.addCurrentDataVersion} and gzips it to {@code data/<key>.dat}, the identical envelope vanilla's
- * {@code DimensionDataStorage} writes, both band-stable across the 1.21.5 codec cut. The {@code data/} surface's
- * sibling of {@link RegionChunkWriter}: only the inner {@code data} tag is per-band, this wrapper is not.
+ * {@link MapSink#serializeMap}, or the {@code idcounts} tag below) as {@code {data, DataVersion}} and gzips it to
+ * {@code data/<key>.dat}, the identical envelope vanilla writes for its saved data, band-stable across the 1.21.5 codec
+ * cut. The {@code data/} surface's sibling of {@link RegionChunkWriter}: only the inner {@code data} tag is per-band,
+ * this wrapper is not.
  *
- * <p>The {@code idcounts} inner tag ({@code {map: maxId}}) is band-agnostic too: the 1.21.4 {@code MapIndex} is a
- * structurally different class with no settable {@code "map"}, but the on-disk {@code {map: int}} shape is identical on
- * both bands (fixture-confirmed), so it is hand-built here rather than routed through a per-band sink.
+ * <p>The {@code idcounts} inner tag ({@code {map: maxId}}) is band-agnostic too, so it is hand-built here rather than
+ * routed through a per-band sink.
  */
 final class MapDataWriter {
     private static final String ID_COUNTS_KEY = "idcounts";
@@ -44,9 +43,9 @@ final class MapDataWriter {
 
     /**
      * Wrap {@code dataTag} as {@code {data, DataVersion}} and gzip it to {@code dataDirectory/<key>.dat}, creating the
-     * target's parent first since {@code NbtIo.writeCompressed} opens the file without making parents. The key can name
-     * a subfolder (the 26.x {@code maps/<id>} form), so the parent is the file's own directory, not {@code
-     * dataDirectory}. The same envelope vanilla's {@code DimensionDataStorage} writes for every {@code SavedData}.
+     * target's parent first since opening the file does not make its parents. The key can name a subfolder (a
+     * {@code maps/<id>} key), so the parent is the file's own directory, not {@code dataDirectory}. The same envelope
+     * vanilla writes for every {@code SavedData}.
      */
     public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");
@@ -57,7 +56,7 @@ final class MapDataWriter {
     /**
      * Write {@code dataTag} to {@code dataDirectory/idcounts.dat} through {@link AtomicFileWrite} rather than
      * {@link #write}: losing this file restarts the reopened world's map allocator at id 0, which overwrites archived
-     * map data, and {@code NbtIo.writeCompressed} truncates its destination at open.
+     * map data, and that method truncates the file when it opens it.
      */
     public static void writeIdCounts(Path dataDirectory, Tag dataTag) throws IOException {
         ByteArrayOutputStream staged = new ByteArrayOutputStream();

@@ -3470,9 +3470,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * The {@link MapArchive.ImageResolver}: resolve a session-local map id to its serialized inner data tag, or null if
-     * the client never received its colors (a chest-only or nested map, the imageless case). The imaged map is
-     * auto-locked by default so the archived image is frozen against the void-world repaint. Runs on the main thread
-     * (every {@link MapArchive#archiveIdFor} call is), where the mutable {@code MapItemSavedData} may be read.
+     * the client never received its colors (a chest-only or nested map, the imageless case). Where the version can lock
+     * a map, the imaged map is auto-locked by default so the archived image is frozen against the void-world repaint.
+     * Runs on the main thread (every {@link MapArchive#archiveIdFor} call is), where the mutable
+     * {@code MapItemSavedData} may be read.
      */
     private @Nullable Tag resolveMapImage(int sessionId) {
         MapItemSavedData saved = level().getMapData(MapItem.makeKey(sessionId));
