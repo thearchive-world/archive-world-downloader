@@ -26,9 +26,10 @@ public interface ChunkCodec {
 
     /**
      * Encode an already-captured {@link ChunkSnapshotSource} to the vanilla region-file NBT (the tested slice). When
-     * {@code synthesizeBlending} is set the chunk carries a synthesized {@code blending_data} marker so a freshly
-     * generated neighbor blends against it instead of walling; the caller decides that per the target dimension and
-     * generator (see {@code VanillaDimensions.synthesizeBlending}).
+     * {@code synthesizeBlending} is set, on a version whose world generation blends old chunks, the chunk carries a
+     * synthesized {@code blending_data} marker so a freshly generated neighbor blends against it instead of walling; on
+     * other versions the encode ignores the flag. The caller sets it per the target dimension and generator (see
+     * {@code VanillaDimensions.shouldSynthesizeBlending}).
      */
     CompoundTag encode(ChunkSnapshotSource snapshot, boolean synthesizeBlending);
 }
