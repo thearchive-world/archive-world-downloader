@@ -16,16 +16,13 @@ import org.jspecify.annotations.Nullable;
  * {@link #encodeChunk(List, ChunkPos, boolean)} and the pure {@link #encodeChunk(List, ChunkPos)}), plus
  * {@link #captureRootVehicle(Entity, boolean)}, a single-live gate-bypassing serialize for a seated player's mount. The
  * live step ({@link #encodeChunk(List, ChunkPos, boolean)}) serializes each saveable {@link Entity}; it is
- * client-coupled. The pure step ({@link #encodeChunk(List, ChunkPos)}) builds the
- * {@code {Entities, Position, DataVersion}} envelope from already-serialized entity tags. A serialized-entity
- * {@code NBTTagCompound} is the entity analog of {@link ChunkSnapshotSource}, so the pure step takes a
- * {@code List<NBTTagCompound>}.
- *
- * <p>Pre-1.16 serialize needs no client registries.
+ * client-coupled. The pure step ({@link #encodeChunk(List, ChunkPos)}) wraps already-serialized entity tags in the
+ * {@code Entities} carrier the writer folds into the host chunk. A serialized-entity {@code NBTTagCompound} is the
+ * entity analog of {@link ChunkSnapshotSource}, so the pure step takes a {@code List<NBTTagCompound>}.
  */
 public interface EntitySink {
     /**
-     * Capture {@code entities} (the live client entities sharing one chunk) into the entities-region NBT: keep only
+     * Capture {@code entities} (the live client entities sharing one chunk) into the chunk's entity NBT: keep only
      * those that pass the band's save gate (drops a passenger's standalone entry, removed entities, and player-only
      * vehicles) and serialize each, then delegate to {@link #encodeChunk(List, ChunkPos)}. Returns {@code null} when
      * nothing is saveable, so the empty entity-chunk is skipped rather than written.
@@ -39,8 +36,9 @@ public interface EntitySink {
     NBTTagCompound encodeChunk(List<Entity> entities, ChunkPos pos, boolean forceMobPersistence);
 
     /**
-     * Build the {@code {Entities}} entities-region envelope from already-serialized entity tags (the tested slice):
-     * {@code Entities} is the list verbatim.
+     * Build the {@code Entities} carrier from already-serialized entity tags (the tested slice): the list verbatim
+     * under {@code Entities} and nothing else, since the writer folds it into the host chunk rather than writing it as
+     * a record of its own.
      */
     @Nullable
     NBTTagCompound encodeChunk(List<NBTTagCompound> entityTags, ChunkPos pos);
