@@ -14,20 +14,20 @@ import org.apache.logging.log4j.Logger;
 /**
  * Merges captured open-time container-vehicle items into the matching captured entity tag, keyed by entity
  * {@link UUID}, with per-entry failure isolation that mirrors {@link ContainerMerge}: a merge that throws is logged and
- * skipped so one bad entity can never abort the whole save. It is the {@code entities/}-region sibling of
- * {@link ContainerMerge}: that class locates a block entity by its {@code x/y/z} in the {@code Level.TileEntities}
- * list, this one locates a container holder by its {@code "UUID"} across the {@code "Entities"} tree, each record and
- * every node beneath its {@code "Passengers"} ({@link EntityTreeWalk}). The {@code "Items"} write itself is reused
- * verbatim from {@link ContainerSink#merge} (a chest minecart / boat persists its contents under {@code "Items"} via
- * the exact call the sink makes), so the two classes share the serialize and differ only in the locator.
+ * skipped so one bad entity can never abort the whole save. It is the entity sibling of {@link ContainerMerge}: that
+ * class locates a block entity by its {@code x/y/z} in the {@code Level.TileEntities} list, this one locates a
+ * container holder by its {@code "UUID"} across the {@code "Entities"} tree, each record and every node beneath its
+ * {@code "Passengers"} ({@link EntityTreeWalk}). The {@code "Items"} write itself is reused verbatim from
+ * {@link ContainerSink#merge} (a chest or hopper minecart persists its contents under {@code "Items"} via the exact
+ * call the sink makes), so the two classes share the serialize and differ only in the locator.
  *
  * <p>The same UUID locator also folds a villager's captured trades ({@link #mergeMerchantStash} and its refold): those
- * set {@code "Offers"} and {@code "Xp"} from a holder the tick already serialized, a plain tag copy with no sink and no
- * per-entry failure isolation, so unlike the item fold they cannot throw and always report zero failed.
+ * set {@code "Offers"} from a holder the tick already serialized, a plain tag copy with no sink and no per-entry
+ * failure isolation, so unlike the item fold they cannot throw and always report zero failed.
  *
- * <p>Portable across the entities-region format: the {@code "Entities"} list, the recursive {@code "Passengers"} list
- * and a per-entity {@code "UUID"} long pair ({@code UUIDMost}/{@code UUIDLeast}) are vanilla-stable pre-1.16, so only
- * the per-band {@code "Items"} serialization (behind {@link ContainerSink#merge}) differs. The matched node's
+ * <p>The walk depends only on the {@code "Entities"} list and the recursive {@code "Passengers"} list, the same on
+ * every band, and on each node's {@code "UUID"}, decoded through {@link EntityMerge#readUuid} in the band's own tag
+ * shape; the {@code "Items"} serialization is the band's own behind {@link ContainerSink#merge}. The matched node's
  * {@code "Items"} is set in place inside the captured chunk tag, so the merged contents are written by the regular
  * entity write that follows.
  */
@@ -172,9 +172,9 @@ final class EntityContainerMerge {
     /**
      * Re-fold trades already folded into an earlier write, without draining: for each node in this chunk whose UUID is
      * in {@code folded} and not awaiting a fresher capture in {@code stash}, re-apply the folded holder. The merchant
-     * sibling of {@link #refoldFlushedContainers}, so a wandering trader that crossed entity-chunks carries its trades
-     * to each copy. A node whose menu was reopened is skipped, since {@link #mergeMerchantStash} is about to fold its
-     * fresher capture. Like the merge above it cannot fail and reports zero failed.
+     * sibling of {@link #refoldFlushedContainers}, so a villager that crossed entity-chunks carries its trades to each
+     * copy. A node whose menu was reopened is skipped, since {@link #mergeMerchantStash} is about to fold its fresher
+     * capture. Like the merge above it cannot fail and reports zero failed.
      */
     static MergeTally refoldFlushedMerchants(NBTTagCompound entitiesChunkTag, Map<UUID, NBTTagCompound> folded,
             Map<UUID, NBTTagCompound> stash) {
@@ -204,8 +204,8 @@ final class EntityContainerMerge {
     }
 
     /**
-     * Copy the holder's {@code "Offers"} onto the node, and its {@code "Xp"} when present (a wandering trader has
-     * none).
+     * Copy the holder's {@code "Offers"} onto the node, and its {@code "Xp"} when present (trade experience is a 1.14
+     * addition, so no holder below it carries one).
      */
     private static void foldOffers(NBTTagCompound entityTag, NBTTagCompound holder) {
         if (holder.getTag("Offers") instanceof NBTTagCompound) {
