@@ -40,7 +40,7 @@ import world.thearchive.wdl.adapter.EntitySink;
  * gate-bypassing vehicle serialize.
  */
 public final class EntitySinkImpl implements EntitySink {
-    // 1.12.2 has no Entity.shouldBeSaved(); reproduce its predicate from the primitives it composes: a dead,
+    // Entity has no shouldBeSaved() below 1.17; reproduce its predicate from the primitives it composes: a dead,
     // riding, or single-player-vehicle entity is not written standalone. writeToNBTOptional then repeats the
     // dead/riding half and additionally refuses an entity with no id string (a player), the encode-id gate.
     private static boolean shouldSaveEntity(Entity entity) {

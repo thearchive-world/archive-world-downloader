@@ -3412,7 +3412,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return mapTag;
     }
 
-    // 1.16.5 has no Entity.shouldBeSaved(); reproduce its predicate: a removed, riding, or single-player-vehicle
+    // Entity has no shouldBeSaved() below 1.17; reproduce its predicate: a removed, riding, or single-player-vehicle
     // entity is not written standalone.
     private static boolean shouldSaveEntity(Entity entity) {
         return !entity.isDead && !entity.isRiding()
