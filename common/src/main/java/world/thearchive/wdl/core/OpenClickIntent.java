@@ -104,10 +104,10 @@ public final class OpenClickIntent {
 
     /**
      * Dismiss a pending click on the entity with network id {@code entityId}: the interact ended in MOUNTING that
-     * entity (entering a chest boat, riding up a donkey), which is exclusive with opening a menu, so no open is owed to
-     * the click. Left latched it would supersede the next real intent and poison that open. Entity-precise, touches
-     * nothing else: a pending block click, a vehicle intent, a click on a different entity, and all superseded markers
-     * (they may be owed to genuinely in-flight opens) stay as they are.
+     * entity (boarding a boat, riding up a donkey), which is exclusive with opening a menu, so no open is owed to the
+     * click. Left latched it would supersede the next real intent and poison that open. Entity-precise, touches nothing
+     * else: a pending block click, a vehicle intent, a click on a different entity, and all superseded markers (they
+     * may be owed to genuinely in-flight opens) stay as they are.
      */
     public void dismissEntityClick(int entityId) {
         if (pending == Target.ENTITY && this.entityId == entityId) {
