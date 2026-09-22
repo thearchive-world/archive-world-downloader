@@ -78,8 +78,8 @@ public final class OpenClickTracker {
      * click on one could only supersede real intents. The ender chest is the one vanilla menu-opening block with no
      * provider (its menu is built in the block's use handler over the per-player ender container), so it is latched by
      * its block entity; every other {@code openMenu} block either overrides {@code getMenuProvider} or has a
-     * {@code MenuProvider} block entity (verified across 1.21.11). A server GUI opened from a provider-less block falls
-     * into the documented {@link #FRESH_WINDOW_TICKS} leak class instead of the chain.
+     * {@code MenuProvider} block entity. A server GUI opened from a provider-less block falls into the documented
+     * {@link #FRESH_WINDOW_TICKS} leak class instead of the chain.
      */
     public static void dispatchUseBlock(Player player, Level level, BlockHitResult hit) {
         OpenClickTracker tracker = active;
@@ -191,11 +191,11 @@ public final class OpenClickTracker {
      *
      * <p>The signal is drained whether or not it is latched, so a request sent while riding something with no container
      * cannot sit and seed a later open. The eligible set is deliberately narrower than vanilla's own gate for this
-     * request. Vanilla sends it for anything implementing {@code HasCustomInventoryScreen}, which is three families on
-     * this band (the chest boats, the horses, and the nautiluses); only the container vehicles are latched here,
-     * because a chested mount's menu names its own animal and is recognized without click provenance at all, and a
-     * nautilus carries no chest, so neither has a container this latch could claim. Eligibility deliberately ignores
-     * the entity-capture toggle: the latch is what tells the vehicle's own click-less open apart from an open with no
+     * request. Vanilla sends it for anything implementing {@code HasCustomInventoryScreen}, which is the horses, the
+     * chest boats, and the nautiluses where the version has them; only the container vehicles are latched here, because
+     * a chested mount's menu names its own animal and is recognized without click provenance at all, and a nautilus
+     * carries no chest, so neither has a container this latch could claim. Eligibility deliberately ignores the
+     * entity-capture toggle: the latch is what tells the vehicle's own click-less open apart from an open with no
      * provenance at all, whatever the toggle. The vehicle is read on the tick the request is OBSERVED, which is not
      * always the tick it was sent: the send hops to the connection's event loop, so the signal can surface a tick late.
      * The intent carries the vehicle's network id so the bind can require the same vehicle to still be the one ridden.
@@ -212,8 +212,8 @@ public final class OpenClickTracker {
 
     /**
      * Dismiss the pending entity click once the clicked entity became the player's vehicle: the interact ended in
-     * mounting (entering a chest boat, riding up a donkey), which is exclusive with opening a menu, so no open is owed
-     * to that click and leaving it latched would poison the next open. The dismissal covers any click on the now-ridden
+     * mounting (boarding a boat, riding up a donkey), which is exclusive with opening a menu, so no open is owed to
+     * that click and leaving it latched would poison the next open. The dismissal covers any click on the now-ridden
      * vehicle, which is benign: the ridden vehicle's own open is reclaimed click-less by the riding leg. Identity
      * comparison on purpose: the dismissal must fire only for the very entity the click landed on.
      */

@@ -42,9 +42,9 @@ final class PlayerTag {
 
     /**
      * Apply the strip opt-outs to {@code raw}: when {@code saveInventory} is false, drop {@code "Inventory"},
-     * {@code "SelectedItemSlot"}, and {@code "equipment"} (offhand and armor live there, not in the 36-slot
-     * {@code "Inventory"} list); when {@code saveEnderChest} is false, drop {@code "EnderItems"}. Each removal leaves a
-     * tag vanilla loads (every dropped key is optional).
+     * {@code "SelectedItemSlot"}, and {@code "equipment"} (on versions that write it, offhand and armor live there
+     * rather than in the {@code "Inventory"} list); when {@code saveEnderChest} is false, drop {@code "EnderItems"}.
+     * Each removal leaves a tag vanilla loads (every dropped key is optional).
      */
     static void applyStripKnobs(CompoundTag raw, boolean saveInventory, boolean saveEnderChest) {
         if (!saveInventory) {
@@ -58,9 +58,9 @@ final class PlayerTag {
     }
 
     /**
-     * Unconditional privacy strip: remove both coordinate-bearing real-world location fields, the last death location
-     * and the last explosion-impulse impact position. Both are written by vanilla only when present, so removing them
-     * leaves a valid compound, and there is deliberately no toggle that restores either.
+     * Unconditional privacy strip: remove the coordinate-bearing real-world location fields, the last death location
+     * and the last explosion-impulse impact position, where the version writes them. Vanilla writes each only when
+     * present, so removing them leaves a valid compound, and there is deliberately no toggle that restores either.
      */
     static void stripDeathLocation(CompoundTag raw) {
         raw.remove("LastDeathLocation");
@@ -101,9 +101,9 @@ final class PlayerTag {
 
     /**
      * Overwrite the player tag's {@code "Pos"} and {@code "Rotation"} with the capture anchor, so the saved player
-     * entity lands with the world spawn rather than wherever the client body was parked. Writes the vanilla-verbatim
-     * shapes {@code Vec3.CODEC} and {@code Vec2.CODEC} read back (a three-double list, and a two-float list of yaw then
-     * pitch); a mismatched shape loads silently as the origin.
+     * entity lands with the world spawn rather than wherever the client body was parked. Writes the shapes vanilla
+     * reads back (a three-double list, and a two-float list of yaw then pitch); a mismatched shape loads silently as
+     * the origin.
      */
     static void setPosition(CompoundTag raw, BlockPos pos, float yaw, float pitch) {
         ListTag position = new ListTag();
@@ -119,8 +119,8 @@ final class PlayerTag {
 
     /**
      * Remap a captured ender-chest holder's {@code "Items"} list (the {@link ContainerSink#captureItems} shape) into
-     * the player tag's {@code "EnderItems"} (the same {@code ItemStackWithSlot} element form on this band, so the list
-     * transplants directly). A holder with no {@code "Items"} list leaves the existing {@code "EnderItems"} untouched.
+     * the player tag's {@code "EnderItems"} (the same element form, so the list transplants directly). A holder with no
+     * {@code "Items"} list leaves the existing {@code "EnderItems"} untouched.
      */
     static void setEnderItems(CompoundTag raw, CompoundTag enderHolder) {
         if (enderHolder.get("Items") instanceof ListTag items) {
