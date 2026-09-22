@@ -19,18 +19,18 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The memoized worldgen reconstruction and the cross-thread publication the warm rests on. The load is real (the
- * bundled vanilla data pack on the test classpath); the failing and latching cases substitute a test loader through the
- * reset seam, since the real decode can neither be made to throw nor be stalled mid-flight.
+ * The memoized worldgen reconstruction and the cross-thread publication the warm rests on. The load is real; the
+ * failing and latching cases substitute a test loader through the reset seam, since the real load can neither be made
+ * to throw nor be stalled mid-flight.
  */
 class VanillaWorldgenRegistriesTest {
     private static RegistryAccess.Frozen real;
 
     @BeforeAll
     static void reconstructOnce() {
-        // Bind the vanilla item tags onto BuiltInRegistries first: this MC version's WORLDGEN load decodes the
-        // enchantment registry, whose JSONs resolve item tags (enchantable/*). A connected client always has them
-        // bound; headless it does not, so prime them exactly as a real client would before the reconstruction.
+        // Prime the registries as a connected client has them before the reconstruction: where the version's worldgen
+        // load decodes JSONs that resolve item tags (the data-driven enchantments), a connected client always has those
+        // tags bound and a headless run does not.
         TestRegistries.frozen();
         VanillaWorldgenRegistries.resetForTesting();
         real = VanillaWorldgenRegistries.get();

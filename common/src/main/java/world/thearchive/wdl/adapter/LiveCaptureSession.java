@@ -3738,8 +3738,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         LevelStorageSource.LevelStorageAccess access;
         try {
             // Path containment: assert the resolved level root stays under the saves base before createAccess.
-            // createAccess does no validation (validateAndCreateAccess only checks symlinks on this band) and it
-            // creates the folder plus its session.lock, so the check must run first or an escape touches disk.
+            // createAccess does no validation (validateAndCreateAccess, where the version has it, only checks symlinks)
+            // and it creates the folder plus its session.lock, so the check must run first or an escape touches disk.
             // toRealPath canonicalizes the base so a symlinked saves directory cannot defeat the lexical check.
             Path savesBase = source.getBaseDir().toRealPath();
             Path resolved = savesBase.resolve(saveName).normalize();
