@@ -25,7 +25,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * / {@code DIM-1} / {@code DIM1} rather than a nested {@code dimensions/<ns>/<path>} folder.
  */
 class VanillaDimensionsTest {
-    /** Vanilla bootstrap so the {@code Level} / {@code BuiltinDimensionTypes} static keys initialize. */
+    /** Vanilla bootstrap so the dimension static keys initialize. */
     @BeforeAll
     static void bootstrap() {
         TestRegistries.frozen();

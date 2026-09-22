@@ -18,24 +18,21 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 /**
  * Per-band level.dat axis: build the metadata for a captured world.
  *
- * <p>A multiplayer client cannot recover the server's worldgen ({@code LEVEL_STEM}, {@code WORLD_PRESET} and the noise
- * settings it needs are never synced), so no generator reproduces the server's real land: the captured chunks supply it
- * from their region files, and {@code worldType} only chooses what fills the space around them. The default
- * {@code VOID} leaves it air; {@code DEFAULT} and {@code FLAT} generate fresh terrain there instead. {@code BIOME} and
- * {@code DIMENSION_TYPE} are all that {@code VOID} needs and the client syncs both; the other two are built from
- * reconstructed worldgen registries.
+ * <p>A multiplayer client cannot recover the server's worldgen (its dimension generators and the noise settings they
+ * need are never synced), so no generator reproduces the server's real land: the captured chunks supply it from their
+ * region files, and {@code worldType} only chooses what fills the space around them. The default {@code VOID} leaves it
+ * air; {@code DEFAULT} and {@code FLAT} generate fresh terrain there instead.
  */
 public interface LevelDataWriter {
     /**
-     * Build the world metadata from the client's registries, returning it together with the {@link RegistryAccess} to
-     * use for {@code createTag} / {@code LevelStorageAccess.saveDataTag} (the client reg composed with the derived
-     * {@code LEVEL_STEM}). Fails LOUD if the world-gen settings cannot be fully encoded (which would otherwise yield a
-     * silently-unopenable world).
+     * Build the world metadata, returning it together with the {@link RegistryAccess} the world-gen settings encode
+     * against. Where the version's level.dat carries the world-gen settings, fails LOUD if they cannot be fully encoded
+     * (which would otherwise yield a silently-unopenable world).
      *
-     * <p>{@code worldOutput} drives the band's game-rule writes (the curated safe set with the user's validated
-     * overrides applied on top) and the world-open state (noon, clear weather), both gated on their masters. The
-     * returned {@link LevelData#gameRules()} carries the override diagnostics (an unparseable value dropped, an id
-     * unknown at this band) for the caller to log and surface.
+     * <p>{@code worldOutput} drives the game-rule writes (the curated safe set with the user's validated overrides
+     * applied on top) and the world-open state (noon, clear weather), both gated on their masters. The returned
+     * {@link LevelData#gameRules()} carries the override diagnostics (an unparseable value dropped, an id this
+     * Minecraft version lacks) for the caller to log and surface.
      *
      * <p>{@code worldName} is the world's {@code LevelName} (the download screen's typed name on a new download; the
      * existing name on a resume so the world is not renamed). A null or empty value falls back to the writer's default
@@ -64,10 +61,10 @@ public interface LevelDataWriter {
      * 1.21.10+ vs {@code SpawnX/Y/Z} on 1.21.4), so keeping the call here lets each band own its form while the shared
      * session stays version-agnostic and cherry-pickable.
      *
-     * <p>With a non-null {@code player}: flip {@code GameType}, set the world spawn to the capture dimension +
-     * position, write the captured {@code Difficulty}, and route the captured tag into the {@code "Player"} slot (the
-     * 3-argument {@code saveDataTag}). With {@code null}: today's behavior, no player, default spawn, the void world's
-     * survival default.
+     * <p>With a non-null {@code player}: flip {@code GameType}, set the world spawn to the capture position (and
+     * dimension, where the version's spawn records one), write the captured {@code Difficulty}, and route the captured
+     * tag to the version's home for the local player, the one {@link #readPriorPlayer} reads. With {@code null}: no
+     * player, default spawn, the void world's survival default.
      */
     void save(LevelStorageSource.LevelStorageAccess access, LevelData data, @Nullable CapturedPlayer player);
 
