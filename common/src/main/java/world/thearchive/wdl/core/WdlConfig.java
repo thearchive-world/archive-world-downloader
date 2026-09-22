@@ -143,7 +143,7 @@ public final class WdlConfig {
         return saveItemCoordinates;
     }
 
-    /** Whether captured filled maps are auto-locked ({@code true}, frozen image) or left live ({@code false}). */
+    /** Whether captured maps are locked where the version can ({@code true}) or left live ({@code false}). */
     public boolean lockDownloadedMaps() {
         return lockDownloadedMaps;
     }
