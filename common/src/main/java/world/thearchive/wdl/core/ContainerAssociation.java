@@ -88,8 +88,8 @@ public final class ContainerAssociation {
 
     /**
      * Decide the binding for a freshly-opened lectern menu and remember it. The lectern sibling of {@link #open}: a
-     * {@code LecternMenu} is a fixed 1-slot lectern-specific menu (no double-lectern, no {@code CompoundContainer}), so
-     * a lectern menu of the lectern's own size over a lectern block the open resolved to is a confident single-block
+     * lectern menu is a fixed 1-slot lectern-specific menu (no double-lectern, no {@code CompoundContainer}), so a
+     * lectern menu of the lectern's own size over a lectern block the open resolved to is a confident single-block
      * match. Bind to {@code blockPosKey} only on that confident triple; otherwise drop and clear any prior binding.
      *
      * @param atBlock              the open resolved to a block target (not an entity target, and not an unattributed
@@ -184,8 +184,9 @@ public final class ContainerAssociation {
      * Whether the container-vehicle axis claims a freshly-opened menu at all: the routing precedence the dispatch
      * consults before {@link #openEntityContainer}, kept here so the mis-bind rule is decided MC-free and unit-tested
      * from primitives. A clicked container vehicle is the axis's own target and always claims. The ridden-vehicle leg
-     * exists only for the open-inventory-request flow (a chest boat opens through the vehicle and fires no use event),
-     * so it claims on the POSITIVE signal that flow leaves behind, the recorded vehicle intent, and on nothing else.
+     * exists only for the open-inventory-request flow (where the version has chest boats, a ridden one opens through
+     * the vehicle and fires no use event), so it claims on the POSITIVE signal that flow leaves behind, the recorded
+     * vehicle intent, and on nothing else.
      *
      * <p>The absence of a click is not that signal, and reading it as one claims every open with no provenance while a
      * player rides: an open the client cannot account for, a plugin GUI or a menu opened from a block that seeds no
@@ -209,17 +210,17 @@ public final class ContainerAssociation {
 
     /**
      * Decide the binding for a freshly-opened container-vehicle menu and remember it. The entity sibling of
-     * {@link #open}: a chest minecart, hopper minecart, chest boat, or chest raft is recognized by the player the open
-     * resolving to a container-vehicle entity whose own container size matches the menu's block-slot count. Bind only
-     * on that triple; otherwise drop and clear any prior binding. Unlike the block siblings there is no block pos: the
-     * bind target (the entity UUID) lives in the adapter, so this returns a plain bound/dropped flag and
-     * {@link #boundPos} carries only the "a menu is bound" signal (its long, 0, is unused for {@link BindKind#ENTITY},
-     * as the ender pos is unused by the ender stash). The slot-count match is the same mis-bind guard the block path
-     * uses (a hopper minecart is 5, the chest vehicles are 27).
+     * {@link #open}: a container vehicle's menu is recognized by the open resolving to a container-vehicle entity whose
+     * own container size matches the menu's block-slot count. Bind only on that triple; otherwise drop and clear any
+     * prior binding. Unlike the block siblings there is no block pos: the bind target (the entity UUID) lives in the
+     * adapter, so this returns a plain bound/dropped flag and {@link #boundPos} carries only the "a menu is bound"
+     * signal (its long, 0, is unused for {@link BindKind#ENTITY}, as the ender pos is unused by the ender stash). The
+     * slot-count match is the same mis-bind guard the block path uses (a hopper minecart is 5, the chest vehicles are
+     * 27).
      *
      * @param atEntity                 a bind-candidate entity is present: an entity hit, or the ridden vehicle for a
      *                                 click-less open (the adapter collapses the two)
-     * @param entityIsContainerVehicle the candidate entity is a container vehicle (a {@code ContainerEntity})
+     * @param entityIsContainerVehicle the candidate entity is a container vehicle
      * @param menuSlotCount            the menu's block-slot count (its non-player slots)
      * @param entityContainerSize      the target vehicle's own container size, or 0 if none
      * @return whether the open bound to the entity; {@code false} when it is dropped
