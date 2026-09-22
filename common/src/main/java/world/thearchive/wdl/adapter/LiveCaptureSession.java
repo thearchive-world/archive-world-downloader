@@ -3764,7 +3764,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null;
         }
         try {
-            // level.dat: a superflat VOID world. The version-coupled saveLevelData call lives behind
+            // level.dat for the selected generator. The version-coupled saveLevelData call lives behind
             // LevelDataWriter.save() (its vanilla signature drifts across bands), so this shared session stays
             // cherry-pickable. Built here on the main thread; the writer thread only writes the finished data.
             // At 1.15.2 the level directory is the LevelStorage folder, which roots WorldPaths, the map manifest and
