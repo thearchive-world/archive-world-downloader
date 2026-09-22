@@ -2580,12 +2580,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Everything this finish must read from the live client, taken before the entity drain rather than after it.
-     *
-     * <p>Do not move any of it back behind the drain. The finish can be entered after the client has already torn its
-     * level down, because a disconnect detected on a tick edge cannot reach it until the player is gone, so every read
-     * here is void the moment the field it needs is nulled. Being early does not close that: a client already torn down
-     * when the finish is entered still loses the player record.
+     * Everything this finish must read from the live client, taken before the entity drain rather than after it. Do not
+     * move it behind the entity drain: {@link #prepareRootVehicleCapture} fills the set the drain and the flush consult
+     * to hold the ridden mount and its passengers out of the standalone write and folds the mount's opened contents
+     * into the record; run after the flush it would leave the mount on disk twice on one UUID, and run after the drain
+     * alone it would count the mount as a written entity the flush then drops.
      */
     private void captureLiveClientState(Minecraft minecraft, @Nullable EntityPlayerSP player) {
         if (player != null && minecraft.world == level()) {
