@@ -49,9 +49,9 @@ final class MapDataWriter {
 
     /**
      * Wrap {@code dataTag} as {@code {data}} and gzip it to {@code dataDirectory/<key>.dat}, creating the target's
-     * parent first since {@code CompressedStreamTools.writeCompressed} opens the file without making parents. The key
-     * can name a subfolder, so the parent is the file's own directory. The same envelope vanilla's {@code MapStorage}
-     * writes for a map file, minus the {@code DataVersion} that does not exist below 1.13.
+     * parent first since opening the file does not make its parents. The key can name a subfolder, so the parent is the
+     * file's own directory. The same envelope vanilla's {@code MapStorage} writes for a map file, minus the
+     * {@code DataVersion} that does not exist below 1.13.
      */
     public static void write(Path dataDirectory, String key, NBTBase dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");
