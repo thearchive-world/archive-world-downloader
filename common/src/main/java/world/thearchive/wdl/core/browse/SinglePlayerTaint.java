@@ -26,9 +26,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Directory names, and for point-of-interest the dimension root itself, are band-dependent, so the check tests the
  * union of the known vanilla layouts, which also covers a folder opened by a different MC version than the one running
- * this check. The set tracks vanilla {@code LevelResource.PLAYER_DATA_DIR} and the per-dimension point-of-interest
- * storage across bands, and gains an entry (plus a test) when a future band moves one again. MC-free (plain java.nio)
- * so the check runs on every band.
+ * this check. The set tracks the per-dimension point-of-interest storage across bands, and gains an entry (plus a test)
+ * when a future band moves it again. MC-free (plain java.nio) so the check runs on every band.
  *
  * <p>A present member that cannot be listed is {@link TaintState#UNKNOWN} rather than clean, and {@link #decide} maps
  * that to {@link Decision#CONFIRM}: the clobber-safety gate fails safe on a folder it cannot verify, never silently

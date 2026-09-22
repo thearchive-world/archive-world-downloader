@@ -49,7 +49,7 @@ class ContainerAssociationTest {
                 "a hopper (5 slots) binds when the menu has 5 block slots");
     }
 
-    /** Entity-borne containers (chest minecart/boat) and air both yield a non-block hit -> DROP. */
+    /** Entity-borne containers (a chest minecart) and air both yield a non-block hit -> DROP. */
     @Test
     void dropsWhenNotLookingAtBlock() {
         ContainerAssociation assoc = new ContainerAssociation();
@@ -127,7 +127,7 @@ class ContainerAssociationTest {
         assertEquals(OptionalLong.of(4242L), assoc.boundPos(), "the latest confident open is the live binding");
     }
 
-    // --- openLectern: the lectern sibling. A LecternMenu is a fixed 1-slot lectern-specific menu with no
+    // --- openLectern: the lectern sibling. A lectern menu is a fixed 1-slot lectern-specific menu with no
     // double-lectern, so a lectern menu of the lectern's own size over a lectern BE the player is looking at
     // is a confident single-block match.
 
@@ -306,12 +306,11 @@ class ContainerAssociationTest {
         assertEquals(ContainerAssociation.BindKind.LECTERN, assoc.boundKind());
     }
 
-    // --- openEntityContainer: the entity sibling. A container VEHICLE (chest minecart, hopper minecart,
-    // chest boat, chest raft) is recognized by an entity hit on a ContainerEntity whose own container size
-    // matches the menu's block-slot count. There is no block pos: the bind target (the entity UUID) lives in
-    // the adapter, so this returns a plain bound/dropped flag, and boundPos() carries only the "a menu is
-    // bound" signal (its long, 0, is unused for ENTITY). The bind is a stronger triple than the block path
-    // (entity hit, ContainerEntity, slot-count match), so the mis-bind guard is the part that must be right.
+    // --- openEntityContainer: the entity sibling. A container VEHICLE is recognized by an entity hit on a container
+    // entity whose own container size matches the menu's block-slot count. There is no block pos: the bind target (the
+    // entity UUID) lives in the adapter, so this returns a plain bound/dropped flag, and boundPos() carries only the "a
+    // menu is bound" signal (its long, 0, is unused for ENTITY). The bind is a stronger triple than the block path
+    // (entity hit, container entity, slot-count match), so the mis-bind guard is the part that must be right.
 
     /** A normal vehicle open: looking at a 27-slot container vehicle whose menu has 27 block slots -> BIND. */
     @Test
@@ -351,7 +350,7 @@ class ContainerAssociationTest {
         ContainerAssociation assoc = new ContainerAssociation();
 
         assertFalse(assoc.openEntityContainer(true, false, CHEST, CHEST),
-                "an entity that is not a ContainerEntity must not bind -> DROP");
+                "an entity that is not a container vehicle must not bind -> DROP");
         assertFalse(assoc.boundPos().isPresent());
     }
 
@@ -387,13 +386,13 @@ class ContainerAssociationTest {
         assertFalse(assoc.boundPos().isPresent(), "a dropped vehicle open must not leave the previous binding live");
     }
 
-    // --- shouldClaimVehicleOpen: the routing predicate that decides whether the container-vehicle axis
-    // claims a freshly-opened menu at all (the block axes handle it otherwise). The ridden-vehicle leg
-    // exists only for the open-inventory-request flow (a chest boat opens through the vehicle and fires no use
-    // event), which the tee's observation of that request records as a vehicle intent, so the leg fires on that
-    // intent and on nothing else. Keyed on the absence of a click instead, it claims every open with no
-    // provenance while a player rides: right-click a provider-less shop sign aboard a chest boat, take the
-    // plugin's 27-slot GUI, and the 27 == 27 slot match merges the shop's items into the boat.
+    // --- shouldClaimVehicleOpen: the routing predicate that decides whether the container-vehicle axis claims a
+    // freshly-opened menu at all (the block axes handle it otherwise). The ridden-vehicle leg exists only for the
+    // open-inventory-request flow (where the version has chest boats, a ridden one opens through the vehicle and fires
+    // no use event), which the tee's observation of that request records as a vehicle intent, so the leg fires on that
+    // intent and on nothing else. Keyed on the absence of a click instead, it claims every open with no provenance
+    // while a player rides: right-click a provider-less shop sign aboard such a boat, take the plugin's 27-slot GUI,
+    // and the matching 27-slot counts merge the shop's items into the boat.
 
     /** A looked-at container vehicle (clicked, or the crosshair in spectator) is the axis's own target -> CLAIM. */
     @Test
@@ -406,18 +405,18 @@ class ContainerAssociationTest {
                 "a clicked container vehicle while riding one on a vehicle intent -> CLAIM (either leg suffices)");
     }
 
-    /** An open-inventory request sent while riding a container vehicle is the boat's own menu -> CLAIM. */
+    /** An open-inventory request sent while riding a container vehicle is the vehicle's own menu -> CLAIM. */
     @Test
     void vehicleClaimsInventoryKeyOpenWhileRiding() {
         assertTrue(ContainerAssociation.shouldClaimVehicleOpen(false, true, true),
-                "a vehicle-intent open while riding a chest boat -> the boat's own menu -> CLAIM");
+                "a vehicle-intent open while riding a container vehicle -> its own menu -> CLAIM");
     }
 
     /** An open nothing accounts for is claimed by no one, rider or not -> NO CLAIM. */
     @Test
     void vehicleDoesNotClaimUnattributedOpenWhileRiding() {
         assertFalse(ContainerAssociation.shouldClaimVehicleOpen(false, true, false),
-                "a server-opened GUI aboard a chest boat is not the boat's menu -> NO CLAIM");
+                "a server-opened GUI aboard a container vehicle is not its menu -> NO CLAIM");
     }
 
     /** No vehicle in play at all -> NO CLAIM, whatever seeded the open. */
@@ -631,7 +630,7 @@ class ContainerAssociationTest {
         assertEquals(OptionalLong.empty(), assoc.boundSecondaryPos(), "a MERCHANT bind has no secondary pos");
     }
 
-    // --- openCrafter: the crafter sibling. A CrafterMenu is exclusive to crafter blocks, so menu-plus-block
+    // --- openCrafter: the crafter sibling. A crafter menu is exclusive to crafter blocks, so menu-plus-block
     // plus the crafting-grid size is the confident single-block match. The count compared is the menu's
     // crafting slots alone; the crafter menu's tenth, result-container slot is not the block's.
 
