@@ -28,7 +28,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class MapDataWriterRoundTripTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // sets the game version NbtUtils.addCurrentDataVersion reads
+        TestRegistries.frozen(); // sets the game version the data-version stamp reads
     }
 
     @Test
