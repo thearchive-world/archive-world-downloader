@@ -919,8 +919,8 @@ tasks.named("assemble") {
 //   (a) every class parses (an ASM ClassReader pass over each .class entry); a malformed class is a runtime
 //       failure the reobf pipeline could otherwise ship silently.
 //   (b) no net/minecraft descriptor carrying a jspecify TYPE_USE @Nullable still names a Mojmap class. The
-//       source-merged common is @NullMarked with CLASS-retention @Nullable, so a nullable Minecraft-typed member
-//       ships a RuntimeInvisibleTypeAnnotations entry whose annotated member descriptor tiny-remapper must have
+//       source-merged common is @NullMarked with RUNTIME-retained @Nullable, so a nullable Minecraft-typed member
+//       ships a RuntimeVisibleTypeAnnotations entry whose annotated member descriptor tiny-remapper must have
 //       remapped Mojmap -> SRG. Arm (b) re-extracts the net/minecraft names from each TYPE_USE-annotated member's
 //       descriptor and signature and fails on any that is not a valid 1.13.2 SRG class (the joined.tsrg oracle,
 //       the same set checkReobf validates against). The @Nullable's own descriptor is org.jspecify.*, never
