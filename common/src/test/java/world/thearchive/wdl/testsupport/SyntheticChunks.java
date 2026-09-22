@@ -31,7 +31,7 @@ import world.thearchive.wdl.adapter.ChunkSnapshotSource;
  * {@code LevelChunk} cannot avoid, so the round-trip exercises the mod's encode slice.
  */
 public final class SyntheticChunks {
-    /** A standard 1.21.x overworld column: -64..384, so {@code minSectionY == -4}. */
+    /** A standard overworld column: -64..320 (height 384), so {@code minSectionY == -4}. */
     public static final int MIN_Y = -64;
     public static final int HEIGHT = 384;
     public static final long GAME_TIME = 1234L;
@@ -180,7 +180,7 @@ public final class SyntheticChunks {
      * As {@link #full} with {@code lightCorrect=true} and captured light layers, including a below-chunk padding
      * section (sky only, null chunk section), the shape the light engine's padded range produces. Proves the encode
      * slice writes the vanilla {@code BlockLight}/{@code SkyLight}/{@code isLightOn} shape and that a null-section
-     * {@code SectionData} survives write and parse.
+     * entry survives write and parse.
      */
     public static ChunkSnapshotSource fullWithLight(RegistryAccess registries) {
         PalettedContainerFactory factory = PalettedContainerFactory.create(registries);
