@@ -17,10 +17,10 @@ import world.thearchive.wdl.core.WorldOutputConfig;
  * Per-band level.dat axis: build the metadata for a captured world.
  *
  * <p>A multiplayer client cannot recover the server's worldgen (the server's seed and generator settings are never
- * synced), so the captured world is a <b>superflat VOID</b> world (all air) for overworld/nether/end: the captured
- * chunks supply the real terrain from their region files, and everything un-captured is air rather than mismatched
- * regenerated terrain. At 1.10.2 the generator is stored as a {@code WorldType} plus its options string in
- * {@code level.dat}, so no worldgen registries are needed to write it.
+ * synced), so no generator reproduces the server's real land: the captured chunks supply it from their region files,
+ * and {@code worldType} only chooses what fills the space around them. The default VOID leaves it air; DEFAULT and FLAT
+ * generate fresh terrain there instead. At 1.10.2 the generator is stored as a {@code WorldType} plus its options
+ * string in {@code level.dat}, so no worldgen registries are needed to write it.
  */
 public interface LevelDataWriter {
     /**
