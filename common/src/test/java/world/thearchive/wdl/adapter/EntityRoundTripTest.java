@@ -32,14 +32,14 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The automated guard for entity capture: the {@link EntitySink} pure envelope slice
  * ({@link EntitySink#encodeChunk(List, ChunkPos)} over already-serialized entity tags) plus the {@code entities/}
  * {@link SimpleRegionStorage} ({@link DataFixTypes#ENTITY_CHUNK}) write/read is a self-consistent, vanilla-valid Anvil
- * round-trip: {@code Position} decodes via {@link ChunkPos#CODEC}, the {@code Entities} list survives with each
- * entity's {@code id}, and {@code DataVersion} is stamped.
+ * round-trip: {@code Position} decodes to the chunk position, the {@code Entities} list survives with each entity's
+ * {@code id}, and {@code DataVersion} is stamped.
  *
  * <p>Server-free by construction: hand-built entity tags drive the envelope, so neither a live {@code Entity} nor a
  * {@code Level} is needed. The two client/level-coupled steps are not exercised headless, exactly as for chunks
  * ({@link ChunkRoundTripTest}):
  * <ul>
- * <li>the live {@code entity.save(ValueOutput)} serialization needs a real {@code Entity}; and</li>
+ * <li>the live {@code entity.save} serialization needs a real {@code Entity}; and</li>
  * <li>{@code EntityType.loadEntitiesRecursive} parse-back needs a {@code Level}.</li>
  * </ul>
  * This test proves the on-disk envelope + region IO self-consistency.
@@ -47,12 +47,6 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 class EntityRoundTripTest {
     private final EntitySink sink = new EntitySinkImpl();
 
-    /**
-     * Initialize vanilla's static state (versioned constants + built-in registries) so {@code ChunkPos},
-     * {@code DataFixers}, and the region pipeline are usable headless. The pure envelope is itself registry-free; we
-     * reuse the project's memoized bootstrap (not its {@code RegistryAccess}) only so this test is self-sufficient when
-     * run in isolation.
-     */
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.frozen();
