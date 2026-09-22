@@ -31,10 +31,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * open-time container/lectern path: a jukebox disc under {@code "RecordItem"} (via {@code ItemStack#save}) and beehive
  * occupants under {@code "Bees"} (the pre-component {@code {EntityData, TicksInHive, MinOccupationTicks}} entries below
  * 1.20.5). Each is the capture-then-merge round-trip proven against vanilla's own read-back (the exact form the block
- * entity's {@code loadAdditional}/{@code load} uses): the captured content survives serialization, lands on the
- * matching captured block entity under its one key with no other field clobbered, decodes back to the same content, and
- * only the flushed chunk's stash entries drain. Server-free: real {@link ItemStack}s and hand-built chunk tags, no live
- * client and no {@code Level}.
+ * entity's own read uses): the captured content survives serialization, lands on the matching captured block entity
+ * under its one key with no other field clobbered, decodes back to the same content, and only the flushed chunk's stash
+ * entries drain. Server-free: real {@link ItemStack}s and hand-built chunk tags, no live client and no {@code Level}.
  */
 class InteractionMergeRoundTripTest {
     @BeforeAll
@@ -57,7 +56,7 @@ class InteractionMergeRoundTripTest {
     }
 
     private static ItemStack readRecordItem(CompoundTag jukeboxBlockEntityTag) {
-        // vanilla JukeboxBlockEntity.loadAdditional's exact read
+        // vanilla's exact block-entity read of this key
         ItemStack back = ItemStack.of(jukeboxBlockEntityTag.getCompound("RecordItem"));
         assertTrue(!back.isEmpty(), "the merged RecordItem must decode via vanilla ItemStack.of");
         return back;
