@@ -238,9 +238,9 @@ public final class InteractionCapture {
     sealed interface Candidate permits BookshelfCandidate, HolderCandidate {}
 
     /**
-     * A chiseled-bookshelf insert: the captured {@code ItemStackWithSlot} entry per hit slot (last-seen-wins per slot).
-     * The gate keeps slot {@code n} only when the authoritative {@code SLOT_n_OCCUPIED} bit is set, so several books
-     * loaded into one bookshelf each stand or fall on their own slot.
+     * A chiseled-bookshelf insert: the captured item entry per hit slot (last-seen-wins per slot). The gate keeps slot
+     * {@code n} only when the authoritative {@code SLOT_n_OCCUPIED} bit is set, so several books loaded into one
+     * bookshelf each stand or fall on their own slot.
      */
     record BookshelfCandidate(Map<Integer, CompoundTag> slotEntries) implements Candidate {}
 
@@ -589,10 +589,10 @@ public final class InteractionCapture {
     }
 
     /**
-     * The single {@code ItemStackWithSlot} entry for {@code book} at bookshelf slot {@code slot}, the
-     * {@link BookshelfCandidate} per-slot value: a six-slot serialize via {@link ContainerSink} whose one non-empty
-     * entry carries {@code Slot = slot}, so the gate can assemble surviving slots into an {@code
-     * "Items"} list vanilla reads straight back. An empty book yields an empty compound the gate ignores.
+     * The single item entry for {@code book} at bookshelf slot {@code slot}, the {@link BookshelfCandidate} per-slot
+     * value: a six-slot serialize via {@link ContainerSink} whose one non-empty entry carries {@code Slot = slot}, so
+     * the gate can assemble surviving slots into an {@code "Items"} list vanilla reads straight back. An empty book
+     * yields an empty compound the gate ignores.
      */
     static CompoundTag captureBookSlotEntry(ContainerSink sink, ItemStack book, int slot, RegistryAccess registries) {
         NonNullList<ItemStack> items = NonNullList.withSize(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.size(),
