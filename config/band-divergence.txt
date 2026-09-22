@@ -560,12 +560,12 @@ build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
 # name those appliers, where dev declares the set for common, fabric and neoforge.
 /build.gradle.kts
 
-# NeoForm has no 1.19.4 release (NeoForged forked from Forge at 1.20.2), so common builds on NeoGradle's vanilla plugin
-# (net.neoforged.gradle.vanilla, versioned inline) over the official client mappings, with net.minecraft:client as an
-# implementation dependency and no Parchment layer, where dev builds on ModDevGradle Vanilla mode over a
-# neoform_version. It pulls XaeroPlus's +forge flavor and the loader-suffixless 1.9 JourneyMap API SNAPSHOT from
-# jm.gserv.me; against 1.20.1 it drops the 2.0 generation's -common flavor and maven.blamejared.com, 1.19.4 binding one
-# JourneyMap generation, and its version-stamped comments read 1.19.4.
+# NeoForm has no 1.19.4 release, so common builds on NeoGradle's vanilla plugin (net.neoforged.gradle.vanilla, versioned
+# inline) over the official client mappings, with net.minecraft:client as an implementation dependency and no Parchment
+# layer, where dev builds on ModDevGradle Vanilla mode over a neoform_version. It pulls XaeroPlus's +forge flavor and
+# the loader-suffixless 1.9 JourneyMap API SNAPSHOT from jm.gserv.me; against 1.20.1 it drops the 2.0 generation's
+# -common flavor and maven.blamejared.com, 1.19.4 binding one JourneyMap generation, and its version-stamped comments
+# read 1.19.4.
 common/build.gradle.kts
 
 # 1.19.4 is obfuscated, so the Fabric build applies fabric-loom with layered Mojang plus Parchment mappings, the mod*
