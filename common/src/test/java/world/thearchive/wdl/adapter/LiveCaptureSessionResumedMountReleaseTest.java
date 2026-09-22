@@ -51,11 +51,15 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The one path that carries a previous download's parked mount forward. A mount ridden at the end of a download is
- * written to no entities region at all, because a vehicle with exactly one player passenger fails vanilla's own save
- * gate, so its single copy is that session's level.dat {@code RootVehicle}. A resume that finishes un-seated rewrites
- * the level.dat with no {@code RootVehicle}, which destroys that copy, and the release is what puts the mount into the
- * world as a standalone entity before that happens. Everything it fails to write is gone for good, including whatever
- * the previous download archived inside a chest boat or a chested animal.
+ * written into no region chunk's {@code Level.Entities} at all, so its single copy is that session's level.dat {@code
+ * RootVehicle}. Two mechanisms hold it out, one per capture path: the copy taken live off the client fails the entity
+ * capture's own save gate, which refuses a vehicle with exactly one player passenger (below 1.17 there is no {@code
+ * Entity.shouldBeSaved} for it to defer to), while the copy the packet drain reconstructs carries no player passenger
+ * and passes that gate, so what keeps that one out of the write is the exclusion set {@code prepareRootVehicleCapture}
+ * fills and the drain and the flush both consult. A resume that finishes un-seated rewrites the level.dat with no
+ * {@code RootVehicle}, which destroys that copy, and the release is what puts the mount into the world as a standalone
+ * entity before that happens. Everything it fails to write is gone for good, including whatever the previous download
+ * archived inside a chested animal, which the fixtures stand in for with a container-vehicle tag carrying loot.
  *
  * <p>Three axes. ROUTING: the position and the dimension must come from the same tag, so the cross-dimension case
  * asserts both the arrival and the absence, since a write that reaches the right folder while also reaching the wrong
