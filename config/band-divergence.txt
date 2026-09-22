@@ -402,6 +402,12 @@ common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 # re-flush of a revisited chunk does not drop the entities a prior fold saved there.
 common/src/main/java/world/thearchive/wdl/adapter/RegionChunkWriter.java
 
+# Below 1.17 there is no separate entities/ region: entities live inside the region/ chunk under Level.Entities, so the
+# pure encodeChunk builds a bare Entities carrier the writer folds into the host chunk, with no Position or DataVersion.
+# Only the Javadoc diverges, naming that carrier and the in-chunk target rather than the entities region; the seam's
+# signatures are unchanged.
+common/src/main/java/world/thearchive/wdl/adapter/EntitySink.java
+
 # Below 1.20.5 there is no RegionStorageInfo; instead of supplying one per dimension, this seam opens the
 # vanilla IOWorker directly (openRegionStorage). Below 1.17 (era E3) there is no separate entities/ region:
 # entities live inside the region/ chunk, so the entitiesDirectory/openEntitiesStorage members 1.17.1 (era E2a)

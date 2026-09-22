@@ -17,14 +17,14 @@ import org.jspecify.annotations.Nullable;
  * {@link #encodeChunk(List, ChunkPos, RegistryAccess, boolean)} and the pure {@link #encodeChunk(List, ChunkPos)}),
  * plus {@link #captureRootVehicle(Entity, RegistryAccess, boolean)}, a single-live gate-bypassing serialize for a
  * seated player's mount. The live step ({@link #encodeChunk(List, ChunkPos, RegistryAccess, boolean)}) serializes each
- * saveable {@link Entity}; it is client-coupled. The pure step ({@link #encodeChunk(List, ChunkPos)}) builds the
- * {@code {Entities, Position, DataVersion}} envelope from already-serialized entity tags. A serialized-entity
- * {@link CompoundTag} is the entity analog of {@link ChunkSnapshotSource}, so the pure step takes a
+ * saveable {@link Entity}; it is client-coupled. The pure step ({@link #encodeChunk(List, ChunkPos)}) wraps
+ * already-serialized entity tags in the {@code Entities} carrier the writer folds into the host chunk. A
+ * serialized-entity {@link CompoundTag} is the entity analog of {@link ChunkSnapshotSource}, so the pure step takes a
  * {@code List<CompoundTag>} and needs no {@link RegistryAccess}.
  */
 public interface EntitySink {
     /**
-     * Capture {@code entities} (the live client entities sharing one chunk) into the entities-region NBT: keep only
+     * Capture {@code entities} (the live client entities sharing one chunk) into the chunk's entity NBT: keep only
      * those that pass the band's save gate (drops a passenger's standalone entry, removed entities, and player-only
      * vehicles) and serialize each via {@code entity.save}, whose recursion nests a vehicle's passengers under it, so
      * each entity is written once, then delegate to {@link #encodeChunk(List, ChunkPos)}. Returns {@code null} when
@@ -40,9 +40,9 @@ public interface EntitySink {
             boolean forceMobPersistence);
 
     /**
-     * Build the {@code {Entities, Position, DataVersion}} entities-region envelope from already-serialized entity tags
-     * (the tested slice): {@code Entities} is the list verbatim, {@code Position} encodes {@code pos}, and
-     * {@code DataVersion} is the current data version.
+     * Build the {@code Entities} carrier from already-serialized entity tags (the tested slice): the list verbatim
+     * under {@code Entities} and nothing else, since the writer folds it into the host chunk rather than writing it as
+     * a record of its own.
      */
     @Nullable
     CompoundTag encodeChunk(List<CompoundTag> entityTags, ChunkPos pos);
