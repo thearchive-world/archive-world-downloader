@@ -197,9 +197,9 @@ sourceSets {
 val jspecify = "org.jspecify:jspecify:1.0.0"
 
 dependencies {
-    // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
-    // shim are null-marked, so the annotations need only resolve for the marked source to compile. Nothing checks
-    // them: the root's nullness plugin runs annotations-only on a band below Java 21, and this build never loads it.
+    // JSpecify (@NullMarked / @Nullable), compile-only: the source-merged common/ and the shim are null-marked, so
+    // the annotations need only resolve for the marked source to compile. Nothing checks them: the root's nullness
+    // plugin runs annotations-only on a band below Java 21, and this build never loads it.
     compileOnly(jspecify)
 
     // JourneyMap 1.x API for the source-merged binding (compat/journeymap), compile-only, never a runtime require
@@ -633,8 +633,8 @@ tasks.named("assemble") {
 //   (a) every class parses (an ASM ClassReader pass over each .class entry); a malformed class is a runtime
 //       failure the reobf pipeline could otherwise ship silently.
 //   (b) no net/minecraft descriptor carrying a jspecify TYPE_USE @Nullable names a class outside the pinned
-//       oracle's class set. The source-merged common is @NullMarked with CLASS-retention @Nullable, so a
-//       nullable Minecraft-typed member ships a RuntimeInvisibleTypeAnnotations entry whose annotated member
+//       oracle's class set. The source-merged common is @NullMarked with RUNTIME-retained @Nullable, so a
+//       nullable Minecraft-typed member ships a RuntimeVisibleTypeAnnotations entry whose annotated member
 //       descriptor Unimined's native reobf must have carried through intact. The @Nullable's own descriptor is
 //       org.jspecify.*, never net/minecraft, so the load-bearing name is the annotated member's descriptor.
 //   (c) every func_*/field_*-shaped string literal, whether a compile-time-constant field value or materialized
