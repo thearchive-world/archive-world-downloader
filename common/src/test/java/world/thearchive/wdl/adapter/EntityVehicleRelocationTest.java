@@ -67,8 +67,8 @@ class EntityVehicleRelocationTest {
     private static RegistryAccess.Frozen registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
-    // Instance fields, not constants: ChunkPos's own class initializer reaches a built-in registry, so touching
-    // one before the bootstrap in @BeforeAll fails the whole class with "Not bootstrapped".
+    // Instance fields, not constants: where the version's ChunkPos class initializer reaches a built-in registry,
+    // building a ChunkPos before the bootstrap in @BeforeAll fails the whole class with "Not bootstrapped".
     private final ChunkPos opened = new ChunkPos(0, 0);
     private final ChunkPos drifted = new ChunkPos(1, 0);
 

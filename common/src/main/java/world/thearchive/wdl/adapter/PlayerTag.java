@@ -131,9 +131,9 @@ final class PlayerTag {
     /**
      * Write the seated player's mount as vanilla's {@code "RootVehicle"} record: {@code "Attach"} is the direct
      * vehicle's {@code UUID} (the {@code UUIDUtil.CODEC} four-int array) and {@code "Entity"} is the root vehicle
-     * serialized standalone. Mirrors {@code ServerPlayer.saveParentVehicle}, which
-     * {@code ServerPlayer.loadAndSpawnParentVehicle} reads on a vanilla open (a singleplayer saved player included) to
-     * respawn the vehicle and re-seat the player; an absent record is a clean load that leaves the player standing.
+     * serialized standalone. Mirrors vanilla's player save, whose record its player load reads on open (a singleplayer
+     * saved player included) to respawn the vehicle and re-seat the player; an absent record is a clean load that
+     * leaves the player standing.
      */
     static void setRootVehicle(CompoundTag raw, UUID attach, CompoundTag entityTag) {
         CompoundTag rootVehicle = new CompoundTag();
