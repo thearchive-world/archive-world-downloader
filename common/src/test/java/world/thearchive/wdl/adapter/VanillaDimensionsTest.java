@@ -78,10 +78,10 @@ class VanillaDimensionsTest {
 
     @Test
     void defaultOverworldByTypeBlendsWhereCustomLevelKeyWouldNot() {
-        // A Multiverse overworld arrives under a custom level key (minecraft:worlds/2b2t/2b2t_1) but the vanilla
-        // overworld TYPE. Routing by TYPE lands it on OVERWORLD, so the DEFAULT generator blends its edge; a gate
-        // keyed on the raw level key would not match minecraft:overworld and would wall instead. The call site
-        // (LiveCaptureSession) is what feeds forType's routed key, not the raw key, into this predicate.
+        // A Multiverse overworld can arrive under a custom level key (minecraft:worlds/2b2t/2b2t_1), on a version that
+        // sends one, but with the vanilla overworld TYPE. Routing by TYPE lands it on OVERWORLD, so the blending gate
+        // passes for the DEFAULT generator; a gate keyed on such a raw key would not match minecraft:overworld and
+        // would fail it. The call site feeds forType's routed result, not the raw dimension, into this predicate.
         ResourceKey<Level> routedByType = VanillaDimensions.forType(BuiltinDimensionTypes.OVERWORLD);
         assertEquals(Level.OVERWORLD, routedByType);
         assertTrue(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, routedByType));
@@ -91,7 +91,7 @@ class VanillaDimensionsTest {
     void onlyTheDefaultGeneratorBlendsTheOverworld() {
         assertTrue(VanillaDimensions.shouldSynthesizeBlending(WorldType.DEFAULT, Level.OVERWORLD));
         assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.FLAT, Level.OVERWORLD),
-                "flat writes fixed layers and discards the blender, so its marker would be inert");
+                "flat writes fixed layers, so a blending marker would be inert");
         assertFalse(VanillaDimensions.shouldSynthesizeBlending(WorldType.VOID, Level.OVERWORLD),
                 "a void world has no terrain to blend, so its output stays byte-unchanged");
     }
