@@ -38,8 +38,8 @@ import world.thearchive.wdl.platform.PlatformBridge;
  *
  * <p>The HUD pass runs even behind an open screen, so the overlay self-gates (no player or level, a screen open, or the
  * HUD hidden) rather than relying on the registration to suppress it. It does not yield to the F3 debug screen: that
- * screen draws its own left and right columns and leaves the overlay's space clear, and a lone always-visible debug
- * entry such as the FPS line must not suppress the overlay either.
+ * screen draws its own left and right columns and leaves the overlay's space clear, and, where the version lets a debug
+ * entry stay visible on its own, such an entry must not suppress the overlay either.
  */
 public final class WdlHudOverlay {
     private static final int PADDING = 4;
