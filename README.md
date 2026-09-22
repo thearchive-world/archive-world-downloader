@@ -17,7 +17,7 @@ The terrain you explore is always saved. Alongside it, each behind its own toggl
 - **Containers you open,** with their contents at the moment you open them. A container you never opened is saved empty.
 - **Mobs, item frames, and paintings,** as far as the server sends them to you.
 - **Filled maps you saw,** so they show their picture rather than blank.
-- **Your player data:** inventory, Ender Chest, advancements, and statistics.
+- **Your player data:** inventory, Ender Chest, statistics, and advancements where your Minecraft version has them.
 
 One download covers the overworld, the Nether, and the End. Downloads are named and resumable, and what you get is a normal singleplayer world that opens in the vanilla game with the mod uninstalled.
 
