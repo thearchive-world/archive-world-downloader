@@ -512,9 +512,9 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubEntityBlanksPre1215HandAndArmorItems() {
-        // 1.21.4-shape mob equipment: HandItems/ArmorItems ListTags of item NBT (empty slots are {}), the
-        // pre-1.21.5 home, before equipment moved to the slot-map "equipment" compound. The generic
-        // name-agnostic ListTag walk must reach them, or a captured 1.21.4 mob's held lodestone leaks its target.
+        // Mob equipment as HandItems/ArmorItems ListTags of item NBT (empty slots are {}), the shape a version without
+        // the slot-map "equipment" compound writes. The generic name-agnostic ListTag walk must reach them, or, on such
+        // a version, a captured mob's held item keeps its item-borne coordinates.
         CompoundTag zombie = entity("minecraft:zombie");
         ListTag handItems = new ListTag();
         handItems.add(itemNbt(lodestoneCompass())); // mainhand
