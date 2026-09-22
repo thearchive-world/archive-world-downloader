@@ -68,9 +68,9 @@ import org.slf4j.Logger;
  * runs at a time, so a process singleton is correct.
  *
  * <p>Two of the four writes reuse the open-time {@code "Items"} path (bookshelf, shulker, via {@link ContainerSink});
- * the other two encode directly over {@code RegistryOps(NbtOps)} with no {@code ValueOutput} layer
- * ({@code ItemStack.CODEC} under {@code "RecordItem"}, {@code Occupant.LIST_CODEC} under {@code "bees"}), so they stay
- * byte-identical across the current bands and need no per-band sink (the {@link MapSink} encode discipline).
+ * the other two encode directly over {@code RegistryOps(NbtOps)} ({@code ItemStack.CODEC} under {@code "RecordItem"},
+ * {@code Occupant.LIST_CODEC} under {@code "bees"}), so they stay byte-identical across the current bands and need no
+ * per-band sink (the {@link MapSink} encode discipline).
  */
 public final class InteractionCapture {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -245,9 +245,9 @@ public final class InteractionCapture {
     sealed interface Candidate permits BookshelfCandidate, HolderCandidate {}
 
     /**
-     * A chiseled-bookshelf insert: the captured {@code ItemStackWithSlot} entry per hit slot (last-seen-wins per slot).
-     * The gate keeps slot {@code n} only when the authoritative {@code SLOT_n_OCCUPIED} bit is set, so several books
-     * loaded into one bookshelf each stand or fall on their own slot.
+     * A chiseled-bookshelf insert: the captured item entry per hit slot (last-seen-wins per slot). The gate keeps slot
+     * {@code n} only when the authoritative {@code SLOT_n_OCCUPIED} bit is set, so several books loaded into one
+     * bookshelf each stand or fall on their own slot.
      */
     record BookshelfCandidate(Map<Integer, CompoundTag> slotEntries) implements Candidate {}
 
@@ -589,10 +589,10 @@ public final class InteractionCapture {
     }
 
     /**
-     * The single {@code ItemStackWithSlot} entry for {@code book} at bookshelf slot {@code slot}, the
-     * {@link BookshelfCandidate} per-slot value: a six-slot serialize via {@link ContainerSink} whose one non-empty
-     * entry carries {@code Slot = slot}, so the gate can assemble surviving slots into an {@code
-     * "Items"} list vanilla reads straight back. An empty book yields an empty compound the gate ignores.
+     * The single item entry for {@code book} at bookshelf slot {@code slot}, the {@link BookshelfCandidate} per-slot
+     * value: a six-slot serialize via {@link ContainerSink} whose one non-empty entry carries {@code Slot = slot}, so
+     * the gate can assemble surviving slots into an {@code "Items"} list vanilla reads straight back. An empty book
+     * yields an empty compound the gate ignores.
      */
     static CompoundTag captureBookSlotEntry(ContainerSink sink, ItemStack book, int slot, RegistryAccess registries) {
         NonNullList<ItemStack> items = NonNullList.withSize(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.size(),
