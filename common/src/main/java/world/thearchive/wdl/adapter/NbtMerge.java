@@ -41,7 +41,7 @@ final class NbtMerge {
      * winning for a slot both sides name; true if any on-disk entry was added. The carry-forward for a container whose
      * capture unit is a single slot rather than the whole container, where the fresh list names only the slots this
      * session captured and {@link #carryList}'s all-or-nothing rule would drop the rest. An entry with no
-     * {@code "Slot"} is slot 0, which is what {@code ItemStackWithSlot}'s codec decodes an absent one as.
+     * {@code "Slot"} is slot 0, which is what vanilla's item-list read decodes an absent one as.
      *
      * <p>Not the rule for a container captured from an opened menu, whose fresh list is the whole container and
      * therefore ground truth: a union there would resurrect items the player watched leave.
@@ -80,9 +80,9 @@ final class NbtMerge {
     }
 
     /**
-     * An {@code ItemStackWithSlot} entry's slot index, compared numerically because vanilla's own read is numeric: an
-     * absent key is slot 0, which is what the codec's default decodes it as, and a slot written as any numeric tag must
-     * not read as a distinct slot from the same number written as a byte.
+     * An item entry's slot index, compared numerically because vanilla's own read is numeric: an absent key is slot 0,
+     * which is what that read decodes it as, and a slot written as any numeric tag must not read as a distinct slot
+     * from the same number written as a byte.
      */
     private static int slotOf(CompoundTag entry) {
         return entry.get("Slot") instanceof NumericTag slot ? slot.byteValue() & 0xFF : 0;
