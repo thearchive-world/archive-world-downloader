@@ -28,10 +28,10 @@ public interface LevelDataWriter {
      * bands this takes no client registries: pre-1.16 {@code level.dat} records only the generator name and its
      * options, and the void generator's biome comes from the static biome registry.
      *
-     * <p>{@code worldOutput} drives the band's game-rule writes (the curated safe set with the user's validated
-     * overrides applied on top) and the world-open state (noon, clear weather), both gated on their masters. The
-     * returned {@link LevelData#gameRules()} carries the override diagnostics (an unparseable value dropped, an id
-     * unknown at this band) for the caller to log and surface.
+     * <p>{@code worldOutput} drives the game-rule writes (the curated safe set with the user's validated overrides
+     * applied on top) and the world-open state (noon, clear weather), both gated on their masters. The returned
+     * {@link LevelData#gameRules()} carries the override diagnostics (an unparseable value dropped, an id this
+     * Minecraft version lacks) for the caller to log and surface.
      *
      * <p>{@code worldName} is the world's {@code LevelName} (the download screen's typed name on a new download; the
      * existing name on a resume so the world is not renamed). A null or empty value falls back to the writer's default
