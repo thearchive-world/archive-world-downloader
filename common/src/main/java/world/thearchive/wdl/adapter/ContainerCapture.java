@@ -48,8 +48,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
 final class ContainerCapture {
     private static final Logger LOGGER = LogManager.getLogger(ContainerCapture.class);
 
-    // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the
-    // body-armor. Vanilla names the same 2 as the mount inventory start index.
+    // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the body-armor.
     private static final int SLOT_INVENTORY_START = 2;
 
     // A lectern block entity does not exist at this band (lecterns are a 1.14 block), so the lectern capture path is
@@ -76,10 +75,10 @@ final class ContainerCapture {
      * is left unattributed: where the player LOOKS is not evidence of what opened, so binding a menu to the crosshair
      * writes its contents into whatever block or entity the view happens to rest on once the slot counts coincide.
      *
-     * <p>A spectator keeps the crosshair, and it is LOAD-BEARING there, not a vestige of the pre-click behavior: a
-     * loader use hook that declines to fire for a spectator leaves the click unobserved, so every container a spectator
-     * opens on that axis would bind nothing without this. The open-time drift the clicked target removes elsewhere is
-     * accepted here, because the alternative on a blind axis is capturing nothing at all.
+     * <p>A spectator keeps the crosshair, and it is LOAD-BEARING there: a loader use hook that declines to fire for a
+     * spectator leaves the click unobserved, so every container a spectator opens on that axis would bind nothing
+     * without this. The open-time drift the clicked target removes elsewhere is accepted here, because the alternative
+     * on a blind axis is capturing nothing at all.
      *
      * <p>Which leg may run, and when, is {@link SpectatorCrosshairFallback}, decided MC-free so both loader
      * configurations are pinned headlessly; this extracts the live booleans it reads.

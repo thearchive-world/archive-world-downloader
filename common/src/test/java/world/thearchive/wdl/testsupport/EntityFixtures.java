@@ -63,7 +63,7 @@ public final class EntityFixtures {
         return tag;
     }
 
-    /** A container vehicle at a position, the chest-boat shape whose loss takes a chest of loot with it. */
+    /** A container vehicle at a position, whose loss takes a chest of loot with it. */
     public static NBTTagCompound containerVehicleAt(String id, UUID uuid, double x, double y, double z,
             String... itemIds) {
         NBTTagCompound tag = entityAt(id, uuid, x, y, z);
