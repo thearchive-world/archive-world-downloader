@@ -188,7 +188,7 @@ class PlayerTagTest {
         CompoundTag tag = playerTag(); // EnderItems starts as the empty list saveWithoutId wrote
         NonNullList<ItemStack> ender = NonNullList.withSize(27, ItemStack.EMPTY);
         ender.set(5, new ItemStack(Items.ENDER_PEARL, 9));
-        CompoundTag holder = sink.captureItems(ender, registries); // an "Items" list in ItemStackWithSlot form
+        CompoundTag holder = sink.captureItems(ender, registries); // an "Items" list of slotted entries
 
         PlayerTag.setEnderItems(tag, holder);
 

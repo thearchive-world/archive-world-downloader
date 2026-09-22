@@ -52,16 +52,15 @@ import world.thearchive.wdl.platform.PlatformBridge;
 final class ContainerCapture {
     private static final Logger LOGGER = LoggerFactory.getLogger(ContainerCapture.class);
 
-    // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the
-    // body-armor on every band. Vanilla names the same 2 in AbstractMountInventoryMenu.SLOT_INVENTORY_START
-    // and, on 1.21.4, HorseInventoryMenu.SLOT_HORSE_INVENTORY_START; the first is an instance field and the
-    // second a static one, so those are name references to the invariant rather than a constant to import.
+    // The chest slots in a horse menu start at this menu index: slot 0 is the saddle and slot 1 is the body-armor on
+    // every band. Vanilla's mount menus name the same 2 on some versions only, and never as a constant this code could
+    // import.
     private static final int SLOT_INVENTORY_START = 2;
 
-    // A lectern block entity keeps its book access private and hands it only to the menu it builds, so the
-    // lectern's own container size cannot be read off the live block the way every other block target's can.
-    // This is the size LecternMenu itself checks its container against on construction, which the vanilla
-    // lectern is the only producer of.
+    // Where the version has lecterns, a lectern block entity keeps its book access private and hands it only to the
+    // menu it builds, so the lectern's own container size cannot be read off the live block the way every other block
+    // target's can. This is the size the lectern menu itself checks its container against on construction, which the
+    // vanilla lectern is the only producer of.
     static final int LECTERN_CONTAINER_SIZE = 1;
 
     private final VersionAdapter adapter;
@@ -87,15 +86,12 @@ final class ContainerCapture {
      * is left unattributed: where the player LOOKS is not evidence of what opened, so binding a menu to the crosshair
      * writes its contents into whatever block or entity the view happens to rest on once the slot counts coincide.
      *
-     * <p>A spectator keeps the crosshair, and it is LOAD-BEARING there, not a vestige of the pre-click behavior: a
-     * loader use hook that declines to fire for a spectator leaves the click unobserved, so every container a spectator
-     * opens on that axis would bind nothing without this. Vanilla is not the obstacle (a spectator's use packet still
-     * goes out, built and sent by {@code startPrediction} after {@code MultiPlayerGameMode.performUseItemOn} has
-     * already returned {@code CONSUME}, and the server opens the menu for any clicked block carrying a
-     * {@code MenuProvider}); the loader hook is, so do not delete this branch on the reasoning that the click chain
+     * <p>A spectator keeps the crosshair, and it is LOAD-BEARING there: a loader use hook that declines to fire for a
+     * spectator leaves the click unobserved, so every container a spectator opens on that axis would bind nothing
+     * without this. Vanilla is not the obstacle (a spectator's use packet still goes out, and the server opens a
+     * clicked chest's menu); the loader hook is, so do not delete this branch on the reasoning that the click chain
      * already covers the gamemode. The open-time drift the clicked target removes elsewhere is accepted here, because
-     * the alternative on a blind axis is capturing nothing at all. {@code WdlSpectatorContainerCaptureTest} in the
-     * Fabric gametest tier is the standing proof: it goes red the moment the block leg is removed.
+     * the alternative on a blind axis is capturing nothing at all.
      *
      * <p>Which leg may run, and when, is {@link SpectatorCrosshairFallback}, decided MC-free so both loader
      * configurations are pinned headlessly; this extracts the live booleans it reads.
@@ -214,11 +210,11 @@ final class ContainerCapture {
 
     /**
      * Whether the container-vehicle axis claims this open: either the open target is a container vehicle (right-click a
-     * chest minecart, or sneak-right-click a chest boat while aiming at it) or the open carries a vehicle intent and
-     * the player rides one. The riding case is the press-E open flow: a chest boat opens its menu through
-     * {@code player.getVehicle()} (it is a {@code HasCustomInventoryScreen}, so the inventory key opens it server-side)
-     * and fires no use event, so the clicked target alone misses the way most players open a chest boat; observing the
-     * outgoing request records that flow as its intent. The precedence itself is
+     * chest minecart or, where the version has chest boats, a chest boat the click opens rather than boards) or the
+     * open carries a vehicle intent and the player rides one. The riding case, where the version has chest boats, is
+     * the press-E open flow: a chest boat opens its menu through {@code player.getVehicle()} (the inventory key opens
+     * it server-side) and fires no use event, so the clicked target alone misses the way most players open a chest
+     * boat; observing the outgoing request records that flow as its intent. The precedence itself is
      * {@link ContainerAssociation#shouldClaimVehicleOpen}, decided MC-free; this extracts the live booleans.
      */
     boolean shouldClaimVehicleOpen(LocalPlayer player, @Nullable Entity target, boolean vehicleIntentOpen) {
