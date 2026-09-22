@@ -8,22 +8,20 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
 /**
- * Per-band map-serialize axis: encode a client {@link MapItemSavedData} into the inner {@code "data"} tag of a
- * {@code data/map_<id>.dat} save surface. The one genuinely per-band map piece: the serialize call is the 1.21.5
- * {@code SavedData} to {@code Codec} cut ({@code CODEC.encodeStart} on 1.21.11 vs {@code save(CompoundTag, Provider)}
- * on the &le;1.21.4 band), while the {@code {data, DataVersion}} gzip envelope and the {@code idcounts}
- * {@code {map: maxId}} shape are band-agnostic ({@link MapDataWriter}).
+ * Per-band map-serialize axis: encode a client {@link MapItemSavedData} into the inner {@code "data"} tag of a map's
+ * {@code data/} save file. The serialize call is this axis's per-band piece, and its shape changes across versions,
+ * while the {@code {data, DataVersion}} gzip envelope and the {@code idcounts} {@code {map: maxId}} shape are
+ * band-agnostic ({@link MapDataWriter}).
  *
  * <p>Mirrors {@link PlayerSink}'s lift. The single step is client-coupled (a live {@code MapItemSavedData} resolved
- * from the client's map store); the headless guard is the round-trip re-parse via the band's own
- * {@code MapItemSavedData.CODEC}.
+ * from the client's map store); the headless guard is the round-trip re-parse through the band's own map read.
  */
 public interface MapSink {
     /**
-     * Serialize {@code saved} into the inner {@code "data"} {@link Tag} a {@code data/map_<id>.dat} holds: the vanilla
-     * {@code MapItemSavedData} persistence ({@code colors}/{@code dimension}/{@code scale}/ {@code locked}/...), via
-     * the band's own codec. Lock-agnostic: it encodes whatever map the session hands it, and the auto-lock decision
-     * lives in the session.
+     * Serialize {@code saved} into the inner {@code "data"} {@link Tag} of the map's save file: the vanilla
+     * {@code MapItemSavedData} persistence ({@code colors}/{@code dimension}/{@code scale}/...), via the band's own
+     * serialize call. Lock-agnostic: it encodes whatever map the session hands it, and the auto-lock decision lives in
+     * the session.
      */
     Tag serializeMap(MapItemSavedData saved, RegistryAccess registries);
 }
