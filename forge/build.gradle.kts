@@ -82,9 +82,9 @@ configure<UserDevExtension> {
 dependencies {
     "minecraft"("net.minecraftforge:forge:${band("forge_version")}")
 
-    // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
-    // shim are null-marked. NullAway itself does not run on this island (it is a Gradle-9 build-logic pass over
-    // common + fabric); here the annotations only need to resolve so the marked source compiles.
+    // JSpecify (@NullMarked / @Nullable), compile-only: the source-merged common/ and the shim are null-marked, so
+    // the annotations need only resolve for the marked source to compile. Nothing checks them: the root's nullness
+    // plugin runs annotations-only on a band below Java 21, and this build never loads it.
     compileOnly("org.jspecify:jspecify:1.0.0")
 
     // Compat overlay APIs for the source-merged bindings (compat/xaeroplus, compat/journeymap), compile-only,
