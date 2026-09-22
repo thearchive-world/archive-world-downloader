@@ -39,7 +39,7 @@ class EntityBufferTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // ChunkPos static init needs the vanilla bootstrap (SharedConstants)
+        TestRegistries.bootstrap();
     }
 
     private static CompoundTag tag(String marker) {

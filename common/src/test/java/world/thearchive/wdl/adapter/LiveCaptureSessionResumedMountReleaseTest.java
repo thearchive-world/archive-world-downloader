@@ -374,8 +374,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
 
     /**
      * The chunk the mount's position lands in, stated rather than recomputed with production's own formula, which would
-     * agree with whatever formula production used. Not a constant: {@code ChunkPos}'s class initializer reaches a
-     * built-in registry, so touching one before the bootstrap fails the whole class.
+     * agree with whatever formula production used. Not a constant: where the version's {@code ChunkPos} class
+     * initializer reaches a built-in registry, building a {@code ChunkPos} before the bootstrap fails the whole class.
      */
     private static ChunkPos mountChunk() {
         return new ChunkPos(-71, 30);
