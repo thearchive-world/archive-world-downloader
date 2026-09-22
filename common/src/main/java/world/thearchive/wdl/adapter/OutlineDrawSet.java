@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The outline's cull structure: a sparse map from {@code SectionPos.asLong()} to the rims that fall in that section,
+ * The outline's cull structure: a sparse map from a packed section position to the rims that fall in that section,
  * holding only sections that contain a rim. It is rebuilt on the client tick and read on the render thread, which in
  * vanilla is the same client thread, so it carries no concurrency machinery. The per-frame render iterates the
  * populated sections, frustum-rejects whole sections, and emits only the survivors' rims, so per-frame cost scales with
@@ -42,7 +42,7 @@ public final class OutlineDrawSet {
         sections.computeIfAbsent(sectionKey, key -> new ArrayList<>()).add(rim);
     }
 
-    /** The populated sections keyed by {@code SectionPos.asLong()}, for the per-frame cull to iterate. */
+    /** The populated sections keyed by their packed section position, for the per-frame cull to iterate. */
     public Long2ObjectMap<List<OutlineRim>> sections() {
         return sections;
     }
