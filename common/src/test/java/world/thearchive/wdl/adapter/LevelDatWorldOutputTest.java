@@ -39,11 +39,11 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The 26.1.2 world-output writes, verified through the production save to disk. The 26.x world metadata is split across
- * namespaced save-side files rather than one level.dat: worldgen is {@code data/minecraft/world_gen_settings.dat}, the
- * curated game rules are {@code data/minecraft/game_rules.dat}, and noon is a {@code data/minecraft/world_clocks.dat}
- * payload ({@code setDayTime} is gone). Weather is left unwritten so vanilla opens clear. The game-rule master gates
- * the curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it.
+ * The world-output writes, verified through the production save to disk. The world metadata is split across namespaced
+ * save-side files rather than one level.dat: worldgen is {@code data/minecraft/world_gen_settings.dat}, the curated
+ * game rules are {@code data/minecraft/game_rules.dat}, and noon is a {@code data/minecraft/world_clocks.dat} payload
+ * (no {@code setDayTime}). Weather is left unwritten so vanilla opens clear. The game-rule master gates the curated
+ * set, and the override validation drops a bad value or surfaces an unknown id rather than writing it.
  */
 class LevelDatWorldOutputTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
@@ -249,7 +249,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void anUnknownOverrideIdIsSurfacedNotWritten() throws IOException {
-        Saved saved = save(with("gamerule.doMobSpawning", "false")); // a 1.21.4 id
+        Saved saved = save(with("gamerule.doMobSpawning", "false")); // an id this version lacks
 
         assertTrue(saved.built().gameRuleResolution().unknownIds().contains("doMobSpawning"),
                 "the cross-band loss is surfaced");
