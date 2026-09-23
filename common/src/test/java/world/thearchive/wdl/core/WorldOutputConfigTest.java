@@ -255,12 +255,12 @@ class WorldOutputConfigTest {
     @Test
     void resolveUnknownIdIsSurfacedWhileCuratedSetStillApplies() {
         Properties properties = new Properties();
-        properties.setProperty("gamerule.doMobSpawning", "false"); // a 1.21.4 id, absent at this band
+        properties.setProperty("gamerule.doMobSpawning", "false"); // an id absent from this test's schema
 
         GameRuleResolution resolution = WorldOutputConfig.parse(properties).resolveGameRules(curated(),
                 schema(ruleTypes()));
 
-        assertFalse(resolution.effective().containsKey("doMobSpawning"), "an id absent at this band is not written");
+        assertFalse(resolution.effective().containsKey("doMobSpawning"), "an id the schema lacks is not written");
         assertTrue(resolution.unknownIds().contains("doMobSpawning"), "the cross-band loss is surfaced, not hidden");
         assertEquals("false", resolution.effective().get("spawn_mobs"),
                 "the curated set still applies (masking the loss)");
