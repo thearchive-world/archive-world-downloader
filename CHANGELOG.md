@@ -6,6 +6,12 @@ The release pipeline ships the section whose heading matches the release version
 `<version>` is the mod_version core) as the notes on Modrinth, CurseForge, and the GitHub release. Write each
 version's notes here before tagging; a release with no matching section fails rather than shipping empty notes.
 
+## 1.3.1
+
+### Fixed
+
+- Minecraft 1.13.2: maps crafted in a downloaded world no longer replace the maps the download saved. For a world downloaded with an earlier version, resume the download once before crafting maps in it.
+
 ## 1.3.0
 
 ### Added
