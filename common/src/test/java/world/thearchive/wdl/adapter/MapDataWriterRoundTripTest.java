@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -20,9 +21,9 @@ import org.junit.jupiter.api.io.TempDir;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The band-agnostic {@code data/} writer: a serialized inner {@code "data"} tag wrapped as {@code {data, DataVersion}}
- * and gzipped to {@code data/<key>.dat} round-trips through a real compressed file, the {@code data/} directory is
- * created on demand, the {@code idcounts} inner tag is the band-stable {@code {map: maxId}}, and a failed
+ * The {@code data/} writer: a serialized inner {@code "data"} tag wrapped as {@code {data, DataVersion}} and gzipped to
+ * {@code data/<key>.dat} round-trips through a real compressed file, the {@code data/} directory is created on demand,
+ * the {@code idcounts} file is the uncompressed root {@code {map: maxId}} vanilla 1.13.2 reads, and a failed
  * {@code idcounts} write leaves the id floor already on disk readable. Server-free: hand-built tags drive it (no map
  * type needed), matching the {@link LevelDatRoundTripTest} discipline.
  */
@@ -33,11 +34,10 @@ class MapDataWriterRoundTripTest {
     }
 
     @Test
-    void serializeIdCountsIsTheBandStableMapMaxIdShape() {
+    void serializeIdCountsIsTheRootMapMaxIdShape() {
         CompoundTag idCounts = MapDataWriter.serializeIdCounts(50);
 
-        assertEquals(50, (idCounts.contains("map") ? idCounts.getInt("map") : -1),
-                "idcounts inner data is {map: maxId}");
+        assertEquals(50, (idCounts.contains("map") ? idCounts.getInt("map") : -1), "the idcounts root is {map: maxId}");
     }
 
     @Test
@@ -64,17 +64,23 @@ class MapDataWriterRoundTripTest {
     }
 
     @Test
-    void idCountsRoundTripsUnderTheDataEnvelope(@TempDir Path directory) throws IOException {
+    void idCountsRoundTripsThroughWriteAndRead(@TempDir Path directory) throws IOException {
         Path dataDirectory = directory.resolve("data");
 
         MapDataWriter.writeIdCounts(dataDirectory, MapDataWriter.serializeIdCounts(7));
 
-        CompoundTag envelope;
-        try (InputStream in = Files.newInputStream(dataDirectory.resolve("idcounts.dat"))) {
-            envelope = NbtIo.readCompressed(in);
-        }
-        assertEquals(7, envelope.getCompound("data").contains("map") ? envelope.getCompound("data").getInt("map") : -1,
-                "data/idcounts.dat is {data:{map:7}, DataVersion}");
+        assertEquals(7, MapDataWriter.readIdCounts(dataDirectory),
+                "writeIdCounts and readIdCounts round-trip the map high-water");
+    }
+
+    @Test
+    void aReopenedWorldAllocatesTheNextMapIdAboveTheWrittenHighWater(@TempDir Path directory) throws IOException {
+        Path dataDirectory = directory.resolve("data");
+
+        MapDataWriter.writeIdCounts(dataDirectory, MapDataWriter.serializeIdCounts(7));
+
+        assertEquals(8, vanillaNextMapId(dataDirectory),
+                "vanilla 1.13.2 reads data/idcounts.dat and allocates the next map id above the captured 7");
     }
 
     @Test
@@ -100,5 +106,19 @@ class MapDataWriterRoundTripTest {
         MapDataWriter.writeIdCounts(dataDirectory, MapDataWriter.serializeIdCounts(500));
 
         assertEquals(500, MapDataWriter.readIdCounts(dataDirectory), "reads the map high-water back");
+    }
+
+    /**
+     * The next map id vanilla 1.13.2 allocates in the reopened world, decoded as its {@code DimensionDataStorage}
+     * decodes {@code data/idcounts.dat}: a failed read leaves its counter empty, so the next id is 0.
+     */
+    private static int vanillaNextMapId(Path dataDirectory) {
+        CompoundTag root;
+        try (DataInputStream in = new DataInputStream(Files.newInputStream(dataDirectory.resolve("idcounts.dat")))) {
+            root = NbtIo.read(in);
+        } catch (IOException | RuntimeException e) {
+            return 0;
+        }
+        return (root.contains("map", 99) ? root.getInt("map") : -1) + 1;
     }
 }

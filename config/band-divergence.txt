@@ -515,7 +515,9 @@ common/src/test/java/world/thearchive/wdl/adapter/MapSinkRoundTripTest.java
 
 # Below 1.15 vanilla ItemStack.save shares the live stack's tag compound instead of copying it, so a guard pins that
 # the remap leaves the live stack's map id alone; below 1.16 there is no RegistryAccess, so the test bootstraps vanilla
-# and a map's dimension is the int DimensionType id (the overworld the unnamed field_18954); the id sets are Guava.
+# and a map's dimension is the int DimensionType id (the overworld the unnamed field_18954); the id sets are Guava. At
+# 1.13.2 the idcounts file goes through writeIdCounts, since its uncompressed root form is not the data envelope write()
+# gives a map file.
 common/src/test/java/world/thearchive/wdl/adapter/MapArchiveTest.java
 
 # Below 1.20.5 there is no BundleContents component, so dev's in-place bundle-mutation case is absent; 1.13.2's
@@ -576,9 +578,11 @@ common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 # HorseInventoryMenu constructor taking (inventory, chest, mount, player).
 common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
 
-# Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, and 1.13.2's NbtIo has no File overloads of the
-# compressed forms either, so the compressed write and read go through the OutputStream and InputStream forms; the
-# DataVersion is the literal 1631, 1.13.2's SharedConstants having no getCurrentVersion.
+# Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, and 1.13.2's NbtIo has no File overloads of the compressed
+# forms either, so the compressed map-file write goes through the OutputStream form; the DataVersion is the literal
+# 1631, 1.13.2's SharedConstants having no getCurrentVersion. At 1.13.2 data/idcounts.dat is a root {map: int} written
+# uncompressed with no data wrapper and no DataVersion, the bytes DimensionDataStorage writes and reads, so the idcounts
+# write and read take that form.
 common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
 
 # Below 1.20.3 NbtIo.readCompressed takes an InputStream with no NbtAccounter argument.
@@ -607,7 +611,8 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkFlushPlanTest.java
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this round trip reads and writes through the stream
-# forms.
+# forms. At 1.13.2 the idcounts file is an uncompressed root {map: int}, and one test decodes it as 1.13.2's
+# DimensionDataStorage does.
 common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.java
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the stream forms.

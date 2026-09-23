@@ -4,6 +4,8 @@
 package world.thearchive.wdl.adapter;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -16,17 +18,17 @@ import net.minecraft.nbt.Tag;
 import world.thearchive.wdl.core.AtomicFileWrite;
 
 /**
- * Writes the band-agnostic map {@code data/} save surface: wraps a per-band serialized inner {@code "data"} tag (from
- * {@link MapSink#serializeMap}, or the {@code idcounts} tag below) as {@code {data, DataVersion}} and gzips it to
- * {@code data/<key>.dat}, the identical envelope vanilla writes for its saved data, band-stable across the 1.21.5 codec
- * cut. The {@code data/} surface's sibling of {@link RegionChunkWriter}: only the inner {@code data} tag is per-band,
- * this wrapper is not.
+ * Writes the map {@code data/} save surface. A {@code data/map_<id>.dat} file wraps a per-band serialized inner
+ * {@code "data"} tag (from {@link MapSink#serializeMap}) as {@code {data, DataVersion}} and gzips it, the envelope
+ * vanilla writes for its saved data.
  *
- * <p>The {@code idcounts} inner tag ({@code {map: maxId}}) is band-agnostic too, so it is hand-built here rather than
- * routed through a per-band sink.
+ * <p>The {@code data/idcounts.dat} file is the map allocator's high-water, and at 1.13.2 it is a different on-disk
+ * shape than the map file: a root {@code {map: int}} written UNCOMPRESSED, with no {@code data} wrapper and no
+ * {@code DataVersion}, the bytes vanilla's {@code DimensionDataStorage} writes and reads.
  */
 final class MapDataWriter {
     private static final String ID_COUNTS_KEY = "idcounts";
+    private static final String MAP_KEY = "map";
 
     // The 1.13.2 world data version. Vanilla stamps this literal into every SavedData DataVersion (there is no
     // SharedConstants version accessor at this band), and it is what a 1.13.2 client reads back.
@@ -35,13 +37,13 @@ final class MapDataWriter {
     private MapDataWriter() {}
 
     /**
-     * The band-agnostic {@code idcounts} inner {@code "data"} tag: {@code {map: maxId}}. Written so the reopened
-     * world's map allocator ({@code getNextMapId} = {@code ++lastMapId}, reading this {@code "map"}) issues the next id
-     * above every captured id, imaged or not, so no reopened-world craft is ever aliased to a captured map.
+     * The idcounts root tag {@code {map: maxId}}. Written so the reopened world's allocator
+     * ({@code DimensionDataStorage.getDataFile}, which issues this {@code "map"} plus one) issues the next id above
+     * every captured id, imaged or not, so no reopened-world craft is ever aliased to a captured map.
      */
     public static CompoundTag serializeIdCounts(int maxId) {
         CompoundTag idCounts = new CompoundTag();
-        idCounts.putInt("map", maxId);
+        idCounts.putInt(MAP_KEY, maxId);
         return idCounts;
     }
 
@@ -61,13 +63,15 @@ final class MapDataWriter {
     }
 
     /**
-     * Write {@code dataTag} to {@code dataDirectory/idcounts.dat} through {@link AtomicFileWrite} rather than
-     * {@link #write}: losing this file restarts the reopened world's map allocator at id 0, which overwrites archived
-     * map data, and that method truncates the file when it opens it.
+     * Write the idcounts root tag, uncompressed, to {@code dataDirectory/idcounts.dat} through {@link AtomicFileWrite}.
+     * Losing this file restarts the reopened world's allocator at id 0, which overwrites archived map data, so it is
+     * staged whole and atomically moved rather than truncating the destination at open.
      */
     public static void writeIdCounts(Path dataDirectory, Tag dataTag) throws IOException {
         ByteArrayOutputStream staged = new ByteArrayOutputStream();
-        NbtIo.writeCompressed(envelope(dataTag), staged);
+        DataOutputStream out = new DataOutputStream(staged);
+        NbtIo.write((CompoundTag) dataTag, out);
+        out.flush();
         AtomicFileWrite.write(dataDirectory.resolve(ID_COUNTS_KEY + ".dat"), staged.toByteArray());
     }
 
@@ -81,20 +85,18 @@ final class MapDataWriter {
     /**
      * The {@code map} high-water recorded in an existing {@code data/idcounts.dat}, or -1 when there is none. Off-mode
      * has no manifest to persist the id floor across a resume, so it reconstructs the floor from this file (the only
-     * durable record of an imageless id that sits above the highest imaged {@code map_<n>.dat}). Reads the same
-     * {@code {data:{map:int}}} envelope {@link #serializeIdCounts} writes, band-stable across bands.
+     * durable record of an imageless id that sits above the highest imaged {@code map_<n>.dat}). Reads the uncompressed
+     * root {@code {map: int}} {@link #writeIdCounts} writes.
      */
     public static int readIdCounts(Path dataDirectory) throws IOException {
         Path file = dataDirectory.resolve(ID_COUNTS_KEY + ".dat");
         if (!Files.exists(file)) {
             return -1;
         }
-        // 1.15.2 NbtIo.readCompressed takes an InputStream, not a File.
-        CompoundTag envelope;
+        CompoundTag root;
         try (InputStream input = Files.newInputStream(file)) {
-            envelope = NbtIo.readCompressed(input);
+            root = NbtIo.read(new DataInputStream(input));
         }
-        CompoundTag data = envelope.getCompound("data");
-        return data.contains("map") ? data.getInt("map") : -1;
+        return root.contains(MAP_KEY) ? root.getInt(MAP_KEY) : -1;
     }
 }
