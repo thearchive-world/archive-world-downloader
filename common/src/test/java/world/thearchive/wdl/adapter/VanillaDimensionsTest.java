@@ -54,7 +54,7 @@ class VanillaDimensionsTest {
     @Test
     void overworldVariantTypeMapsToOverworld() {
         // The caves variant is a distinct dimension type but carries the overworld effects id, so it routes to the
-        // overworld: forType classifies by effects, since the 1.18.2 client's type holder carries no registry key.
+        // overworld: forType classifies by effects, since the client's dimension type carries no registry key.
         assertEquals(Level.OVERWORLD, VanillaDimensions.forType(type(DimensionType.OVERWORLD_CAVES_LOCATION)));
     }
 

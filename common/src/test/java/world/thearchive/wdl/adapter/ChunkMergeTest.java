@@ -68,8 +68,8 @@ class ChunkMergeTest {
     }
 
     private static CompoundTag jukeboxWithDisc(int x, int y, int z, String discId) {
-        // At 1.18.2 JukeboxBlockEntity.saveAdditional writes only RecordItem, and only when a disc is present; the
-        // IsPlaying and tick sidecars are 1.19 additions.
+        // JukeboxBlockEntity.save adds only RecordItem to the base block-entity keys, and only when a disc is present;
+        // the IsPlaying and tick sidecars are later additions.
         CompoundTag blockEntity = jukebox(x, y, z);
         blockEntity.put("RecordItem", ItemFixtures.itemTag(discId));
         return blockEntity;
