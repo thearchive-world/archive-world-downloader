@@ -21,9 +21,8 @@ import org.junit.jupiter.api.io.TempDir;
  * The classic-MCP map {@code data/} writer: a serialized inner {@code "data"} tag wrapped as {@code {data}} and gzipped
  * to {@code data/<key>.dat} round-trips through a real compressed file with no {@code DataVersion} (there is none below
  * 1.13), the {@code data/} directory is created on demand, the {@code idcounts} tag is the band's uncompressed root
- * {@code {map: short}}, the branched {@code writeIdCounts}/{@code readIdCounts} round-trip the map high-water, and a
- * failed {@code idcounts} write leaves the id floor already on disk readable. Server-free: hand-built tags drive it (no
- * map type needed), matching the {@link LevelDatRoundTripTest} discipline.
+ * {@code {map: short}}, and a failed {@code idcounts} write leaves the id floor already on disk readable. Server-free:
+ * hand-built tags drive it (no map type needed), matching the {@link LevelDatRoundTripTest} discipline.
  */
 class MapDataWriterRoundTripTest {
     @Test

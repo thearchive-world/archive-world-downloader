@@ -627,8 +627,8 @@ common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
 # At 1.11.2 the NBT round trip is classic CompressedStreamTools rather than NbtIo (writeCompressed for the gzip map
 # file, write and read over data streams for idcounts), the map file's data envelope carries no DataVersion (a 1.13
 # addition), and data/idcounts.dat is a root {map: short} written uncompressed with no data wrapper, the bytes
-# MapStorage's getUniqueDataId and loadIdCounts write and read, so the write, read and serialize are branched together
-# and the resume read never faults on a 1.11.2 file.
+# MapStorage's getUniqueDataId and loadIdCounts write and read, so the idcounts write, read and serialize take that
+# form.
 common/src/main/java/world/thearchive/wdl/adapter/MapDataWriter.java
 
 # At 1.11.2 the compressed NBT round trip is classic CompressedStreamTools.writeCompressed and readCompressed over
@@ -658,13 +658,12 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkFlushPlanTest.java
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
 
 # At 1.11.2 the round trip is classic CompressedStreamTools rather than NbtIo, the map file's data envelope carries no
-# DataVersion (a 1.13 addition), and the idcounts assertions are the uncompressed root {map: short} the branched
-# writeIdCounts and readIdCounts round-trip.
+# DataVersion (a 1.13 addition), and the idcounts assertions are the uncompressed root {map: short}.
 common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.java
 
 # Added, absent from dev: the idcounts byte-check gate. Below 1.13 data/idcounts.dat is a root {map: short} written
 # uncompressed through CompressedStreamTools with no data wrapper and no DataVersion, so this asserts that raw shape
-# against a regression to the 1.13.2 gzip envelope of {data: {map: int}} with a DataVersion.
+# against a regression to a gzip envelope of {data: {map: int}} with a DataVersion.
 common/src/test/java/world/thearchive/wdl/adapter/MapIdCountsShapeTest.java
 
 # Added, absent from dev: the container-map loss gate. Below 1.13 a filled map's id is the item-level Damage short
