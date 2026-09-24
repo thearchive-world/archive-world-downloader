@@ -9,9 +9,9 @@ import net.minecraft.nbt.NBTTagList;
 
 /**
  * Reusable collection of the map ids a serialized item list references, over the shared {@link ItemTreeWalk} that
- * recurses into a shulker box (the {@code BlockEntityTag.Items} list) and a bundle (the {@code Items} list). At this
- * band a filled map's id is the item-level {@code Damage} short (the map's ItemStack metadata) behind the
- * {@code id == "minecraft:filled_map"} identity gate; the pure, headless-tested half of the filled-map enumeration.
+ * recurses into an item's nested {@code BlockEntityTag.Items} and {@code Items} lists. At this band a filled map's id
+ * is the item-level {@code Damage} short (the map's ItemStack metadata) behind the {@code id == "minecraft:filled_map"}
+ * identity gate; the pure, headless-tested half of the filled-map enumeration.
  *
  * <p>Operates only on already-serialized NBT (our own captured copies of the open-time container / vehicle / ender
  * stashes), never on a live {@code ItemStack}. Used both at finish (the stashes) and as the enumeration's automated
@@ -24,8 +24,8 @@ final class MapIdCollector {
 
     /**
      * Add every map id referenced by the items in {@code holder}'s {@code listKey} list (each list element is item NBT,
-     * with or without a leading {@code "Slot"}) into {@code out}, recursing into nested containers and bundles. A
-     * missing or non-list {@code listKey} is a no-op. {@code holder} is not mutated.
+     * with or without a leading {@code "Slot"}) into {@code out}, recursing into nested containers. A missing or
+     * non-list {@code listKey} is a no-op. {@code holder} is not mutated.
      */
     public static void collectFromItemList(NBTTagCompound holder, String listKey, Set<Integer> out) {
         if (holder.getTag(listKey) instanceof NBTTagList) {

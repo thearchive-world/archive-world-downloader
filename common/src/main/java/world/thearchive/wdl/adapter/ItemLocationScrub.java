@@ -9,11 +9,11 @@ import net.minecraft.nbt.NBTTagList;
 
 /**
  * Reusable privacy scrub for item-borne location data: blanks the lodestone-compass target and the flower position
- * carried by a silk-touched beehive item on every item it reaches, recursing into shulker boxes (the item's
- * {@code BlockEntityTag.Items}) and bundles (the item's {@code Items}) over the shared {@link ItemTreeWalk}. Below the
- * 1.20.5 component update an item's data lives in its {@code tag} compound, so the scrub removes the coordinate keys
- * there: the lodestone target ({@code LodestonePos} plus {@code LodestoneDimension}, leaving {@code LodestoneTracked})
- * and, on a beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and each occupant's
+ * carried by a silk-touched beehive item on every item it reaches, recursing into each item's nested
+ * {@code BlockEntityTag.Items} and {@code Items} lists over the shared {@link ItemTreeWalk}. Below the 1.20.5 component
+ * update an item's data lives in its {@code tag} compound, so the scrub removes the coordinate keys there: the
+ * lodestone target ({@code LodestonePos} plus {@code LodestoneDimension}, leaving {@code LodestoneTracked}) and, on a
+ * beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and each occupant's
  * {@code BlockEntityTag.Bees[].EntityData.FlowerPos} (leaving each a valid bee). The pre-component item copies the
  * hive's whole block-entity NBT, so it carries the hive's own top-level flower position too, which the component era
  * drops; both are stripped here.
@@ -46,8 +46,8 @@ final class ItemLocationScrub {
 
     /**
      * Blank every item-borne coordinate on every item in {@code holder}'s {@code listKey} list (each list element is an
-     * item-NBT compound, with or without a leading {@code "Slot"}), recursing into nested containers and bundles. A
-     * missing or non-list {@code listKey} is a no-op. The holder is mutated in place.
+     * item-NBT compound, with or without a leading {@code "Slot"}), recursing into nested containers. A missing or
+     * non-list {@code listKey} is a no-op. The holder is mutated in place.
      */
     public static void scrub(NBTTagCompound holder, String listKey) {
         if (holder.getTag(listKey) instanceof NBTTagList) {
@@ -58,10 +58,10 @@ final class ItemLocationScrub {
 
     /**
      * Blank every item-borne coordinate on every item held by {@code blockEntity}, wherever the block entity stores it
-     * (a decorated pot's {@code item}, a campfire's {@code Items}, and so on), recursing into nested containers and
-     * bundles. Walks the block entity's direct children through {@link ItemTreeWalk}, which acts only on a real item's
-     * {@code tag}, so non-item children (the block entity's own coordinates, its type id) are a no-op. Works for every
-     * block-entity type without a per-type key list.
+     * (a decorated pot's {@code item}, a campfire's {@code Items}, and so on), recursing into nested containers. Walks
+     * the block entity's direct children through {@link ItemTreeWalk}, which acts only on a real item's {@code tag}, so
+     * non-item children (the block entity's own coordinates, its type id) are a no-op. Works for every block-entity
+     * type without a per-type key list.
      */
     public static void scrubBlockEntity(NBTTagCompound blockEntity) {
         for (String key : blockEntity.getKeySet()) {
@@ -117,8 +117,7 @@ final class ItemLocationScrub {
 
     /**
      * Blank every item-borne coordinate on a single serialized item compound ({@code {id, Count, tag}}), recursing into
-     * nested containers and bundles. The single-item entry, for an offer's {@code sell} item, which sits under no list
-     * holder.
+     * nested containers. The single-item entry, for an offer's {@code sell} item, which sits under no list holder.
      */
     public static void scrubItem(NBTTagCompound item) {
         ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
