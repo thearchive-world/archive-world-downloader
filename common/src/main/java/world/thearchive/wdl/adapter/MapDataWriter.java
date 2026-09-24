@@ -17,14 +17,9 @@ import net.minecraft.nbt.Tag;
 import world.thearchive.wdl.core.AtomicFileWrite;
 
 /**
- * Writes the band-agnostic map {@code data/} save surface: wraps a per-band serialized inner {@code "data"} tag (from
+ * Writes the map {@code data/} save surface: wraps a per-band serialized inner {@code "data"} tag (from
  * {@link MapSink#serializeMap}, or the {@code idcounts} tag below) as {@code {data, DataVersion}} and gzips it to
- * {@code data/<key>.dat}, the identical envelope vanilla writes for its saved data, band-stable across the 1.21.5 codec
- * cut. The {@code data/} surface's sibling of {@link RegionChunkWriter}: only the inner {@code data} tag is per-band,
- * this wrapper is not.
- *
- * <p>The {@code idcounts} inner tag ({@code {map: maxId}}) is band-agnostic too, so it is hand-built here rather than
- * routed through a per-band sink.
+ * {@code data/<key>.dat}, the envelope vanilla writes for its saved data.
  */
 final class MapDataWriter {
     private static final String ID_COUNTS_KEY = "idcounts";
@@ -32,9 +27,9 @@ final class MapDataWriter {
     private MapDataWriter() {}
 
     /**
-     * The band-agnostic {@code idcounts} inner {@code "data"} tag: {@code {map: maxId}}. Written so the reopened
-     * world's map allocator ({@code getNextMapId} = {@code ++lastMapId}, reading this {@code "map"}) issues the next id
-     * above every captured id, imaged or not, so no reopened-world craft is ever aliased to a captured map.
+     * The {@code idcounts} inner {@code "data"} tag: {@code {map: maxId}}. Written so the reopened world's map
+     * allocator ({@code getNextMapId} = {@code ++lastMapId}, reading this {@code "map"}) issues the next id above every
+     * captured id, imaged or not, so no reopened-world craft is ever aliased to a captured map.
      */
     public static CompoundTag serializeIdCounts(int maxId) {
         CompoundTag idCounts = new CompoundTag();
@@ -77,8 +72,8 @@ final class MapDataWriter {
     /**
      * The {@code map} high-water recorded in an existing {@code data/idcounts.dat}, or -1 when there is none. Off-mode
      * has no manifest to persist the id floor across a resume, so it reconstructs the floor from this file (the only
-     * durable record of an imageless id that sits above the highest imaged {@code map_<n>.dat}). Reads the same
-     * {@code {data:{map:int}}} envelope {@link #serializeIdCounts} writes, band-stable across bands.
+     * durable record of an imageless id that sits above the highest imaged {@code map_<n>.dat}). Reads the
+     * {@code {data:{map:int}}} envelope {@link #writeIdCounts} writes.
      */
     public static int readIdCounts(Path dataDirectory) throws IOException {
         Path file = dataDirectory.resolve(ID_COUNTS_KEY + ".dat");
