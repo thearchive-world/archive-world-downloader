@@ -3302,7 +3302,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (file == null || !Files.exists(file)) {
             return null;
         }
-        // 1.15.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(file)) {
             NBTTagCompound root = CompressedStreamTools.readCompressed(input);
             return root.getTag("Data") instanceof NBTTagCompound ? (NBTTagCompound) root.getTag("Data") : null;
