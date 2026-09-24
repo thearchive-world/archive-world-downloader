@@ -48,8 +48,7 @@ class ItemTreeWalkTest {
         blockEntityTag.setTag("Items", containerItems);
         NBTTagCompound tag = new NBTTagCompound();
         tag.setTag("BlockEntityTag", blockEntityTag);
-        assertTrue(visitedTags(itemWithTag(tag)).contains(nestedTag),
-                "an item nested in a container item is visited");
+        assertTrue(visitedTags(itemWithTag(tag)).contains(nestedTag), "an item nested in a container item is visited");
     }
 
     @Test
