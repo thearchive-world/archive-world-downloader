@@ -827,7 +827,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
         initGui();
     }
 
-    /** A centered, inert header label: below the 1.19.4 GUI additions there is no vanilla StringWidget. */
+    /** A centered, inert header label. */
     private final class StringLabel extends WidgetButton {
         private final ITextComponent text;
 
@@ -1012,8 +1012,8 @@ public final class WdlDownloadsScreen extends GuiScreen {
         if (this.nameField != null) {
             this.nameField.drawTextBox();
         }
-        // Below the 1.19.4 GUI additions GuiScreen.drawScreen paints only its buttons, so the list is drawn by hand
-        // here, in the same paint order the renderable list gave it on the higher bands.
+        // GuiScreen.drawScreen paints only its buttons and labels, so the list is drawn by hand here, in the same paint
+        // order the renderable list gave it on the higher bands.
         if (listVisible()) {
             this.list.drawScreen(mouseX, mouseY, partialTick);
         }

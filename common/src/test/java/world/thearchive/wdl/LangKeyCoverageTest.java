@@ -86,9 +86,9 @@ class LangKeyCoverageTest {
     private static final Set<String> NOT_TRANSLATION_KEYS = ImmutableSet.of("wdl.properties");
 
     // Strings the higher bands show that this band does not: a button hover-tooltip these screens do not draw, a
-    // screen title (the 1.13.2 GuiScreen predates the 1.14 title Component, so super(title) is dropped), and a
-    // text field's narration message (the 1.13.2 text field widget takes no message). Their en_us strings stay so
-    // the catalog matches the higher bands, but no consumer reaches them on this band.
+    // screen title (GuiScreen predates the 1.14 title Component, so super(title) is dropped), and a text field's
+    // narration message (GuiTextField takes no message). Their en_us strings stay so the catalog matches the
+    // higher bands, but no consumer reaches them on this band.
     private static final Set<String> BAND_DROPPED_KEYS = ImmutableSet.of(
             // No narrator exists below 1.12: neither NarratorChatListener nor ChatType is in this band's Minecraft,
             // and the text-to-speech library they drive is not in its library set, so the downloads list is not
