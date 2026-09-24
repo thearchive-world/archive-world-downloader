@@ -32,7 +32,7 @@ val band = Properties().apply {
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.18.2.
+// Match wdl.java-conventions: the MC version rides as SemVer build metadata.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
@@ -88,10 +88,10 @@ dependencies {
     compileOnly("org.jspecify:jspecify:1.0.0")
 
     // JourneyMap public API for the source-merged binding (compat/journeymap), compile-only, never a runtime
-    // require. FG6 compiles against Mojmap (official mappings); at this band there is no -neoforge-SNAPSHOT
-    // JourneyMap flavor, so this uses the same loader-suffixless 1.9 API coordinate :common resolves. reobfJar
-    // maps WDL's calls to SRG for the shipped Forge jar. No XaeroPlus binding on this band: XaeroPlus ships no
-    // 1.18.x build, so the overlay is dropped as a disclosed limit, matching :common.
+    // require. FG6 compiles against Mojmap (official mappings), the namespace of the loader-suffixless -SNAPSHOT
+    // flavor :common resolves, so this uses the same coordinate. reobfJar maps WDL's calls to SRG for the shipped
+    // Forge jar. No XaeroPlus binding on this band: XaeroPlus ships no 1.17.x build, so the overlay is dropped as
+    // a disclosed limit, matching :common.
     compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
 }
 
