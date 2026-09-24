@@ -3471,8 +3471,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null; // colors never received (imageless): skipped, never fabricated
         }
         Tag mapTag = adapter.mapSink().serializeMap(saved);
-        // 1.16.5 MapItemSavedData has no locked() copy method, and mutating the live client map's locked flag would
-        // freeze its tracking, so the archived lock is set on the serialized tag instead, leaving the live map alone.
+        // MapItemSavedData has no locked() copy method, so the archived lock is set on the serialized tag, leaving the
+        // live client map alone.
         if (config.lockDownloadedMaps() && mapTag instanceof CompoundTag) {
             ((CompoundTag) mapTag).putBoolean("locked", true);
         }
@@ -4883,7 +4883,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (player != null && player.getServerBrand() != null) {
             brand = player.getServerBrand();
         }
-        // 1.16.5 has no server simulation distance (a 1.18 addition), so render distance stands in for the report.
+        // There is no server simulation distance (a 1.18 addition), so render distance stands in for the report.
         return new ReportEnvironment(brand, minecraft.options.renderDistance,
                 DimensionType.getName(targetDimension).toString(), Wdl.mcVersion(), bridge.modVersion());
     }
