@@ -340,8 +340,8 @@ public final class InteractionCapture {
 
     /**
      * The 0-to-5 chiseled-bookshelf slot a hit lands in, or empty when the hit is not on the shelf face. Mirrors
-     * vanilla ChiseledBookShelfBlock.getHitSlot, which is private and takes the block state below 1.21.11: the face is
-     * three columns wide and two rows tall, the top row slots 0 to 2 and the bottom row 3 to 5.
+     * vanilla's private {@code ChiseledBookShelfBlock.getHitSlot}: the face is three columns wide and two rows tall,
+     * the top row slots 0 to 2 and the bottom row 3 to 5.
      */
     private static OptionalInt bookshelfHitSlot(BlockState state, BlockHitResult hit) {
         Direction facing = state.getValue(HorizontalDirectionalBlock.FACING);
