@@ -113,7 +113,7 @@ public final class ItemFixtures {
     /**
      * The tag vanilla writes for {@code stack}, as a lectern's {@code "Book"} or a jukebox's {@code "RecordItem"}
      * carries it: {@code ItemStack#writeToNBT}, the same call every block-entity single-stack field uses (a
-     * {@code {id, Count, tag}} compound with {@code Count} as a byte).
+     * {@code {id, Count, Damage, tag}} compound with {@code Count} as a byte).
      */
     public static NBTTagCompound itemTag(ItemStack stack) {
         return stack.writeToNBT(new NBTTagCompound());
