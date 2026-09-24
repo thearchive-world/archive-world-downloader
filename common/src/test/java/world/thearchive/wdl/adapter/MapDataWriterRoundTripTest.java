@@ -23,11 +23,11 @@ import org.junit.jupiter.api.io.TempDir;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The band-agnostic {@code data/} writer: a serialized inner {@code "data"} tag wrapped as {@code {data, DataVersion}}
- * and gzipped to {@code data/<key>.dat} round-trips through a real compressed file, the {@code data/} directory is
- * created on demand, the {@code idcounts} inner tag is the band-stable {@code {map: maxId}}, and a failed
- * {@code idcounts} write leaves the id floor already on disk readable. Server-free: hand-built tags drive it (no map
- * type needed), matching the {@link LevelDatRoundTripTest} discipline.
+ * The {@code data/} writer: a serialized inner {@code "data"} tag wrapped as {@code {data, DataVersion}} and gzipped to
+ * {@code data/<key>.dat} round-trips through a real compressed file, the {@code data/} directory is created on demand,
+ * the {@code idcounts} inner tag is {@code {map: maxId}}, and a failed {@code idcounts} write leaves the id floor
+ * already on disk readable. Server-free: hand-built tags drive it (no map type needed), matching the
+ * {@link LevelDatRoundTripTest} discipline.
  */
 class MapDataWriterRoundTripTest {
     @BeforeAll
@@ -36,7 +36,7 @@ class MapDataWriterRoundTripTest {
     }
 
     @Test
-    void serializeIdCountsIsTheBandStableMapMaxIdShape() {
+    void serializeIdCountsIsTheMapMaxIdShape() {
         CompoundTag idCounts = MapDataWriter.serializeIdCounts(50);
 
         assertEquals(50, idCounts.getIntOr("map", -1), "idcounts inner data is {map: maxId}");
