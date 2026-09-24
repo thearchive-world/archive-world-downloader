@@ -704,7 +704,7 @@ public final class WdlDownloadsScreen extends Screen {
         init();
     }
 
-    /** A centered, inert header label: below the 1.19.4 GUI additions there is no vanilla StringWidget. */
+    /** A centered, inert header label. */
     private final class StringLabel extends AbstractWidget {
         private final Component text;
 
@@ -887,8 +887,8 @@ public final class WdlDownloadsScreen extends Screen {
         // needs the same, and the higher bands did not).
         this.renderBackground();
         super.render(mouseX, mouseY, partialTick);
-        // Below the 1.19.4 GUI additions Screen.render paints only its buttons, so the list added as a widget is
-        // drawn by hand here, in the same paint order the renderable list gave it on the higher bands.
+        // Screen.render paints only its buttons, so the list added as a widget is drawn by hand here, in the same paint
+        // order the renderable list gave it on the higher bands.
         if (this.list != null && !listCollapsed && !this.entries.isEmpty()) {
             this.list.render(mouseX, mouseY, partialTick);
         }
@@ -1364,8 +1364,8 @@ public final class WdlDownloadsScreen extends Screen {
 
             @Override
             public boolean mouseClicked(double mouseX, double mouseY, int button) {
-                // At 1.20.4 ObjectSelectionList.Entry has no mouseClicked override, so a clicked row returns false
-                // and the list's setFocused-driven selection never fires; later bands override it to return true.
+                // ObjectSelectionList.Entry has no mouseClicked override and AbstractSelectionList.mouseClicked only
+                // focuses a row that consumed the click, so without this a body click never selects its row.
                 DownloadList.this.setSelected(this);
                 return true;
             }
