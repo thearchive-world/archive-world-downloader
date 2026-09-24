@@ -184,8 +184,8 @@ final class ChunkMerge {
      * decides whether the on-disk list is unioned per slot or replaced wholesale. True for the chiseled bookshelf
      * alone: its contents never reach the client (its update tag is empty and it has no menu), so the only evidence of
      * a book is the local player's own insert click, and one capture is one slot. Every other container is captured
-     * from an opened menu or a placed item's own component, which is the whole container and therefore ground truth, so
-     * a fresh list there must replace the on-disk one or an item the player watched leave would come back.
+     * from an opened menu or a placed item, which is the whole container and therefore ground truth, so a fresh list
+     * there must replace the on-disk one or an item the player watched leave would come back.
      */
     private static boolean capturesPerSlot(CompoundTag blockEntity) {
         return CHISELED_BOOKSHELF_ID_TAG.equals(blockEntity.get("id"));
