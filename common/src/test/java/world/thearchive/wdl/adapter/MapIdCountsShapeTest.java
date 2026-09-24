@@ -19,9 +19,9 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * The idcounts byte-check gate: at this band {@code data/idcounts.dat} is the exact shape vanilla's {@code MapStorage}
  * writes, a root {@code {map: short}} written UNCOMPRESSED with no {@code data} wrapper and no {@code DataVersion}. A
- * regression to the parent band's gzip {@code {data:{map:int}, DataVersion}} envelope fails the gzip-magic arm (a) and
- * the root-shape arm (b), which is the archived {@code map_0.dat} overwrite this gate exists to catch: an allocator
- * reading a floor of 0 off the wrong file re-issues captured map ids.
+ * regression to a gzip {@code {data:{map:int}, DataVersion}} envelope fails the gzip-magic arm (a) and the root-shape
+ * arm (b), which is the captured-map overwrite this gate exists to catch: an allocator reading a floor of 0 off the
+ * wrong file re-issues captured map ids.
  */
 class MapIdCountsShapeTest {
     @Test

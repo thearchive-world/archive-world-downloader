@@ -25,10 +25,7 @@ import world.thearchive.wdl.core.AtomicFileWrite;
  * <p>The {@code data/idcounts.dat} file is the map allocator's high-water, and at this band it is a different on-disk
  * shape than the map file: a root {@code {map: short}} written UNCOMPRESSED, with no {@code data} wrapper and no
  * {@code DataVersion}, the exact bytes vanilla's {@code MapStorage.getUniqueDataId}/{@code loadIdCounts} write and
- * read. The write ({@link #writeIdCounts}), the read ({@link #readIdCounts}) and the serialize
- * ({@link #serializeIdCounts}) are branched together: a write-only branch would leave {@code readIdCounts} expecting
- * the 1.13-and-above gzip {@code {data:{map:int}}} envelope, throwing on the 1.10.2 file, restarting the id floor and
- * overwriting archived map data.
+ * read.
  */
 final class MapDataWriter {
     private static final String ID_COUNTS_KEY = "idcounts";
@@ -64,10 +61,9 @@ final class MapDataWriter {
     }
 
     /**
-     * Write the idcounts root tag to {@code dataDirectory/idcounts.dat} through {@link AtomicFileWrite}, UNCOMPRESSED
-     * via the classic MCP {@code CompressedStreamTools.write} (the uncompressed form; {@code writeCompressed} is the
-     * gzip one). Losing this file restarts the reopened world's allocator at id 0, which overwrites archived map data,
-     * so it is staged whole and atomically moved rather than truncating the destination at open.
+     * Write the idcounts root tag, uncompressed, to {@code dataDirectory/idcounts.dat} through {@link AtomicFileWrite}.
+     * Losing this file restarts the reopened world's allocator at id 0, which overwrites archived map data, so it is
+     * staged whole and atomically moved rather than truncating the destination at open.
      */
     public static void writeIdCounts(Path dataDirectory, NBTBase dataTag) throws IOException {
         ByteArrayOutputStream staged = new ByteArrayOutputStream();
@@ -80,9 +76,8 @@ final class MapDataWriter {
     /**
      * The {@code map} high-water recorded in an existing {@code data/idcounts.dat}, or -1 when there is none. Off-mode
      * has no manifest to persist the id floor across a resume, so it reconstructs the floor from this file (the only
-     * durable record of an imageless id that sits above the highest imaged {@code map_<n>.dat}). Reads the same
-     * UNCOMPRESSED root {@code {map: short}} {@link #writeIdCounts} writes, branched in lockstep with the write so the
-     * resume read never faults on the 1.10.2 file.
+     * durable record of an imageless id that sits above the highest imaged {@code map_<n>.dat}). Reads the uncompressed
+     * root {@code {map: short}} {@link #writeIdCounts} writes.
      */
     public static int readIdCounts(Path dataDirectory) throws IOException {
         Path file = dataDirectory.resolve(ID_COUNTS_KEY + ".dat");
