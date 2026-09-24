@@ -25,7 +25,7 @@ public final class MapSinkImpl implements MapSink {
     public Tag serializeMap(MapItemSavedData saved, RegistryAccess registries) {
         // Lift of DimensionDataStorage.encodeUnchecked's inner encode: the RegistryOps the vanilla writer uses
         // (createSerializationContext(NbtOps)) over the band's MapItemSavedData.CODEC, yielding the same inner
-        // "data" tag the band-agnostic MapDataWriter then wraps as {data, DataVersion} and gzips.
+        // "data" tag that MapDataWriter then wraps as {data, DataVersion} and gzips.
         RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
         return MapItemSavedData.CODEC.encodeStart(ops, saved).getOrThrow();
     }
