@@ -719,7 +719,7 @@ public final class WdlDownloadsScreen extends Screen {
         init();
     }
 
-    /** A centered, inert header label: below the 1.19.4 GUI additions there is no vanilla StringWidget. */
+    /** A centered, inert header label. */
     private final class StringLabel extends class_356 {
         private final Component text;
 
@@ -908,8 +908,8 @@ public final class WdlDownloadsScreen extends Screen {
         if (this.nameField != null) {
             this.nameField.renderButton(mouseX, mouseY, partialTick);
         }
-        // Below the 1.19.4 GUI additions Screen.render paints only its buttons, so the list added as a widget is
-        // drawn by hand here, in the same paint order the renderable list gave it on the higher bands.
+        // Screen.render paints only its buttons and labels, so the list added as a widget is drawn by hand here, in the
+        // same paint order the renderable list gave it on the higher bands.
         if (this.list != null && !listCollapsed && !this.entries.isEmpty()) {
             this.list.method_1053(mouseX, mouseY, partialTick);
         }

@@ -231,9 +231,8 @@ public final class WdlSettingsScreen extends Screen {
                 this.defaults.field_1055 = !atDefaults;
             }
         }
-        // Below the 1.19.4 GUI additions Screen.render paints only its buttons, so the list added as a widget is
-        // drawn by hand. It draws before the buttons here, not after as the renderable order on the higher bands:
-        // below 1.20.2 this list fills tiled dirt above and below itself, which is what hides its unclipped row
+        // Screen.render paints only its buttons and labels, so the list added as a widget is drawn by hand. It draws
+        // before the buttons: this list fills tiled dirt above and below itself, which is what hides its unclipped row
         // overflow at the top and bottom edges (it does not scissor), so drawing it first lets that fill hide the
         // overflow while the tab strip and footer buttons paint on top of it. Drawing it after would bury both.
         if (this.list != null) {
