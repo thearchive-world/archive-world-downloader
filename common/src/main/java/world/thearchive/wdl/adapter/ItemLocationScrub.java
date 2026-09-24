@@ -19,9 +19,9 @@ import net.minecraft.nbt.NBTTagList;
  * drops; both are stripped here.
  *
  * <p>Operates only on already-serialized NBT (our own captured copy), never on a live {@code ItemStack}, so it cannot
- * corrupt the player's session. Below the 1.20.5 update it uses the {@code {id, Count, tag}} item shape and the
- * band-stable {@code get}/{@code instanceof}/{@code remove} NBT ops, so this band re-authors the pre-component key
- * paths while the walk and merge discipline are shared.
+ * corrupt the player's session. On this version it uses the {@code {id, Count, Damage, tag}} item shape and the classic
+ * {@code getTag}/{@code instanceof}/{@code removeTag} NBT ops, so this band re-authors the pre-component key paths
+ * while the walk and merge discipline are shared.
  *
  * <p>Reaches items three ways: an item-list holder via {@link #scrub(NBTTagCompound, String)} (the inventory, the ender
  * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(NBTTagCompound)} (a decorated
@@ -116,8 +116,9 @@ final class ItemLocationScrub {
     }
 
     /**
-     * Blank every item-borne coordinate on a single serialized item compound ({@code {id, Count, tag}}), recursing into
-     * nested containers. The single-item entry, for an offer's {@code sell} item, which sits under no list holder.
+     * Blank every item-borne coordinate on a single serialized item compound ({@code {id, Count, Damage, tag}}),
+     * recursing into nested containers. The single-item entry, for an offer's {@code sell} item, which sits under no
+     * list holder.
      */
     public static void scrubItem(NBTTagCompound item) {
         ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
