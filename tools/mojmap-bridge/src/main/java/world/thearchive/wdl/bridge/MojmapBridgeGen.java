@@ -840,13 +840,9 @@ public final class MojmapBridgeGen {
     }
 
     /**
-     * Field-disjointness threshold for the structural veto. Exact structural agreement (superclass
-     * identity + interface arity + field multiset) is not achievable across 1.13.2 -&gt; 1.14.4 because
-     * Minecraft classes are refactored between these versions (BlockState gains AbstractStateHolder,
-     * ListTag gains CollectionTag, fields are hoisted into new bases), so a correct match can share
-     * zero fields. The searge member-id vote with its per-tier margin guard is the primary identity
-     * signal; this veto only rejects a bind where two field-rich classes share literally no field
-     * descriptor, a contradiction no genuine same-class pair produces.
+     * Field-disjointness threshold for the structural veto. Exact structural agreement is not achievable across 1.13.2
+     * -&gt; 1.14.4 because Minecraft classes are refactored between these versions, so a correct match can share zero
+     * fields. This veto only rejects a bind where two field-rich classes share literally no field descriptor.
      */
     private static final int STRUCT_MIN_FIELDS = 4;
 

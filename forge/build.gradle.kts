@@ -100,10 +100,10 @@ val islandMinecraft = files(islandClasspathFile.readLines().filter { it.isNotBla
 
 // The main compile reads a handful of read-only vanilla fields (the connection's channel, the relative-move
 // packet's entity id, the horse menu's animal) that are private or protected at the Minecraft boundary. Forge widens
-// them at runtime through META-INF/accesstransformer.cfg, and the 1.14.4-and-up Forge islands widen them at compile
-// through Architectury Loom's accessTransformer step; this hand-rolled island has no Loom, so widenForCompile applies
-// the same widenings to the Mojmap Minecraft jar directly (translating the SRG access-transformer field coordinates
-// to Mojmap through the bridge). Only the Minecraft jar is widened; the other island libraries pass through unchanged.
+// them at runtime through META-INF/accesstransformer.cfg, but this hand-rolled island has no Loom or ForgeGradle to
+// apply that file at compile, so widenForCompile applies the same widenings to the Mojmap Minecraft jar directly
+// (translating the SRG access-transformer field coordinates to Mojmap through the bridge). Only the Minecraft jar is
+// widened; the other island libraries pass through unchanged.
 val mcJarMarker = "/stripped-minecraft/"
 val strippedMinecraftJar = islandMinecraft.filter { it.path.replace('\\', '/').contains(mcJarMarker) }
 val islandLibraries = islandMinecraft.filter { !it.path.replace('\\', '/').contains(mcJarMarker) }
