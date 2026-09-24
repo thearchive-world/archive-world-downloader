@@ -18,10 +18,10 @@ import net.minecraft.world.level.saveddata.maps.MapId;
  * ({@link world.thearchive.wdl.core.MapManifest}) so the item renders the right picture in the download.
  *
  * <p>Operates only on already-serialized NBT (our own captured copies of the open-time stashes), never on a live
- * {@code ItemStack}, and reads/writes the id through the band-stable {@code MapId.CODEC} (the {@link MapIdCollector}
- * precedent) so it is byte-identical across the 1.21.5 codec cut. The rewrite is <em>not</em> idempotent: a second pass
- * would read an already-written archive id as if it were a session id and re-resolve it, so a holder must be remapped
- * exactly once, at the point it is consumed (the caller's responsibility).
+ * {@code ItemStack}, and reads/writes the id through {@code MapId.CODEC} (the {@link MapIdCollector} precedent) so it
+ * is byte-identical across the 1.21.5 codec cut. The rewrite is <em>not</em> idempotent: a second pass would read an
+ * already-written archive id as if it were a session id and re-resolve it, so a holder must be remapped exactly once,
+ * at the point it is consumed (the caller's responsibility).
  */
 final class MapIdRemap {
     private static final String MAP_ID = "minecraft:map_id";
