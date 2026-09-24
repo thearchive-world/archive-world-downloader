@@ -697,7 +697,7 @@ public final class WdlDownloadsScreen extends Screen {
         init();
     }
 
-    /** A centered, inert header label: below the 1.19.4 GUI additions there is no vanilla StringWidget. */
+    /** A centered, inert header label. */
     private final class StringLabel extends AbstractWidget {
         private final Component text;
 
@@ -1006,9 +1006,9 @@ public final class WdlDownloadsScreen extends Screen {
 
         DownloadList(Minecraft minecraft, int width, int height, int y, int itemHeight) {
             super(minecraft, width, height, y, y + height, itemHeight);
-            // Below 1.20.2 the list fills tiled dirt above and below itself, sized as if width and height were
-            // the screen's; this in-world list passes its own dimensions, so the fill would paint dirt from the
-            // screen top down to the list. The 1.20.2 list rewrite dropped that fill.
+            // The list fills tiled dirt above and below itself, sized as if width and height were the screen's; this
+            // in-world list passes its own dimensions, so the fill would paint dirt from the screen top down to the
+            // list.
             setRenderTopAndBottom(false);
         }
 
@@ -1370,8 +1370,8 @@ public final class WdlDownloadsScreen extends Screen {
 
             @Override
             public boolean mouseClicked(double mouseX, double mouseY, int button) {
-                // At 1.20.4 ObjectSelectionList.Entry has no mouseClicked override, so a clicked row returns false
-                // and the list's setFocused-driven selection never fires; later bands override it to return true.
+                // ObjectSelectionList.Entry has no mouseClicked override and AbstractSelectionList.mouseClicked only
+                // focuses a row that consumed the click, so without this a body click never selects its row.
                 DownloadList.this.setSelected(this);
                 return true;
             }
