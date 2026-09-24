@@ -48,7 +48,7 @@ val band = Properties().apply {
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.13.2.
+// Match wdl.java-conventions: the MC version rides as SemVer build metadata.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
@@ -441,7 +441,7 @@ abstract class CheckSeargeSurface : DefaultTask() {
     // True (the default): this is a positive gate, fails when an offender is found. False: this is the
     // inverted meta-test checkReobfNegative runs, over a fixture that permanently carries one offender by
     // construction; it fails only if the scan does NOT find it (the detector regressed), and otherwise passes
-    // with the offender(s) it found logged as proof the gate fired. Mirrors the 1.13.2 CheckReobf's expectClean.
+    // with the offender(s) it found logged as proof the gate fired.
     @get:Input
     abstract val expectClean: Property<Boolean>
 
