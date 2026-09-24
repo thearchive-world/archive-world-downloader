@@ -28,10 +28,6 @@ import world.thearchive.wdl.core.MapManifest;
  * takes a fresh counter id, but if the same id is later seen with colors (carried, so the server sent them) it upgrades
  * to the content-dedup archive id, so a carried map always renders. The remap rewrite is single-pass: each captured
  * holder is a fresh serialized copy and is remapped exactly once, at the point it is consumed.
- *
- * <p>Band-agnostic: the three hashed fields are read off the serialized inner {@code "data"} tag through the
- * band-stable {@code Codec}/{@code NbtOps} pattern ({@link MapIdCollector}'s precedent), so hashing adds no per-band
- * coupling across the 1.21.5 codec cut. {@code locked} and the centers are excluded from the hash.
  */
 final class MapArchive {
     /** Resolves a session-local map id to its serialized inner data tag, or null if the colors were not received. */
@@ -153,8 +149,8 @@ final class MapArchive {
     }
 
     /**
-     * The content hash of a serialized inner map data tag: SHA-256 over the colors, scale and dimension read
-     * band-agnostically through {@code Codec}/{@code NbtOps}; {@code locked} and the centers are excluded.
+     * The content hash of a serialized inner map data tag: SHA-256 over the colors, scale and dimension read through
+     * {@code Codec}/{@code NbtOps}; {@code locked} and the centers are excluded.
      */
     static String hashOf(Tag dataTag) {
         if (!(dataTag instanceof CompoundTag data)) {

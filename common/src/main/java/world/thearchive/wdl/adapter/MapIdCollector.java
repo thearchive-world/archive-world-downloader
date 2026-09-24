@@ -11,17 +11,17 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.saveddata.maps.MapId;
 
 /**
- * Reusable, band-agnostic collection of the {@code minecraft:map_id}s a serialized item list references: collects the
- * top-level {@code map_id} on each item's components, over the shared {@link ItemTreeWalk} that recurses into a shulker
- * box (the {@code minecraft:container} component) and a bundle (the {@code minecraft:bundle_contents} component). The
- * pure, headless-tested half of the filled-map enumeration: the live {@code ItemStack}/{@code ItemFrame} walk and the
+ * Reusable collection of the {@code minecraft:map_id}s a serialized item list references: collects the top-level
+ * {@code map_id} on each item's components, over the shared {@link ItemTreeWalk} that recurses into a shulker box (the
+ * {@code minecraft:container} component) and a bundle (the {@code minecraft:bundle_contents} component). The pure,
+ * headless-tested half of the filled-map enumeration: the live {@code ItemStack}/{@code ItemFrame} walk and the
  * {@code getMapData} resolution are MC-typed and gate-validated.
  *
  * <p>Operates only on already-serialized NBT (our own captured copies of the open-time container / vehicle / ender
- * stashes), never on a live {@code ItemStack}. Reads the id via the band-stable
- * {@code MapId.CODEC.parse(NbtOps.INSTANCE, ...)} (the {@link EntityMerge} {@code readUuid} precedent) rather than an
- * {@code IntTag} value accessor, whose name drifts across the 1.21.5 codec cut, so it is byte-identical across the era
- * bands. Used both at finish (the stashes) and as the enumeration's automated guard.
+ * stashes), never on a live {@code ItemStack}. Reads the id via {@code MapId.CODEC.parse(NbtOps.INSTANCE, ...)} (the
+ * {@link EntityMerge} {@code readUuid} precedent) rather than an {@code IntTag} value accessor, whose name drifts
+ * across the 1.21.5 codec cut, so it is byte-identical across the era bands. Used both at finish (the stashes) and as
+ * the enumeration's automated guard.
  */
 final class MapIdCollector {
     private static final String MAP_ID = "minecraft:map_id";
