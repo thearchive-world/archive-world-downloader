@@ -26,8 +26,8 @@ public final class BlockEntityFixtures {
     private BlockEntityFixtures() {}
 
     /**
-     * The tag vanilla writes for a freshly placed block entity of type {@code id} at {@code x/y/z}: its metadata, its
-     * {@code components}, and every key its own save writes unconditionally.
+     * The tag vanilla writes for a freshly placed block entity of type {@code id} at {@code x/y/z}: its metadata and
+     * every key its own save writes unconditionally.
      */
     public static CompoundTag blockEntity(String id, int x, int y, int z) {
         return FixtureFidelity.blockEntityShape(id, x, y, z);

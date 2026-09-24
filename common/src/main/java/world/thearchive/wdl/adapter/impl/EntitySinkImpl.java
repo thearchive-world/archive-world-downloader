@@ -109,9 +109,9 @@ public final class EntitySinkImpl implements EntitySink {
      * the stack only if it is a saddle and re-deriving the flag itself.
      *
      * <p>Re-derived from synced state on every capture, so a partial re-flush cannot drop it and {@code EntityMerge}
-     * needs no carry-forward key for it. A renamed or component-bearing saddle saves as a plain one, the accepted
-     * residual: outside an open mount menu the client holds no source for a saddle's components. An existing key is
-     * left alone rather than overwritten, so a stack that did reach slot 0 keeps whatever it carries.
+     * needs no carry-forward key for it. A renamed or tagged saddle saves as a plain one, the accepted residual:
+     * outside an open mount menu the client holds no source for a saddle's tag. An existing key is left alone rather
+     * than overwritten, so a stack that did reach slot 0 keeps whatever it carries.
      */
     static void applySaddleItem(CompoundTag entityTag, boolean saddled) {
         if (saddled && !entityTag.contains("SaddleItem", 10)) {
