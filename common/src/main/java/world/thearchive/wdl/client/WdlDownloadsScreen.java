@@ -972,9 +972,9 @@ public final class WdlDownloadsScreen extends Screen {
 
         DownloadList(Minecraft minecraft, int width, int height, int y, int itemHeight) {
             super(minecraft, width, height, y, y + height, itemHeight);
-            // Below 1.20.2 the list fills tiled dirt above and below itself, sized as if width and height were
-            // the screen's; this in-world list passes its own dimensions, so the fill would paint dirt from the
-            // screen top down to the list. The 1.20.2 list rewrite dropped that fill.
+            // The list fills tiled dirt above and below itself, sized as if width and height were the screen's; this
+            // in-world list passes its own dimensions, so the fill would paint dirt from the screen top down to the
+            // list.
             setRenderTopAndBottom(false);
         }
 
