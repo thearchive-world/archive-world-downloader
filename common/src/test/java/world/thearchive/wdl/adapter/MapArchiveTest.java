@@ -84,7 +84,6 @@ class MapArchiveTest {
         }
     }
 
-    /** Write what the archive streamed plus its finalize idcounts, the on-disk shape a session leaves. */
     private static void writeDataFiles(Path dataDirectory, CollectingSink stream, MapArchive archive) {
         stream.streamed.forEach((id, tag) -> {
             try {
