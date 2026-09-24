@@ -423,8 +423,8 @@ class InteractionStashMergeTest {
     @Test
     void throwingRecognitionIsSwallowedFailSoft() {
         InteractionCapture capture = plainCapture(sink, true);
-        // A pathological component can make the click-time codec encode throw; the recognizer must skip that one
-        // capture rather than letting it escape to the loader event and crash the client mid-download.
+        // The click-time encode can throw; the recognizer must skip that one capture rather than letting it escape to
+        // the loader event and crash the client mid-download.
         assertDoesNotThrow(() -> capture.recordFailSoft(new BlockPos(0, 70, 0), () -> {
             throw new IllegalStateException("encode blew up");
         }));

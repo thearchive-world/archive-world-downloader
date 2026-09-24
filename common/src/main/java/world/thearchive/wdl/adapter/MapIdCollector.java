@@ -9,8 +9,8 @@ import net.minecraft.nbt.ListTag;
 
 /**
  * Reusable collection of the map ids a serialized item list references: collects the top-level {@code "map"} id on each
- * item's tag, over the shared {@link ItemTreeWalk} that recurses into a shulker box (the {@code BlockEntityTag.Items}
- * list) and a bundle (the {@code Items} list). The pure, headless-tested half of the filled-map enumeration: the live
+ * item's tag, over the shared {@link ItemTreeWalk} that recurses into an item's nested {@code BlockEntityTag.Items} and
+ * {@code Items} lists. The pure, headless-tested half of the filled-map enumeration: the live
  * {@code ItemStack}/{@code ItemFrame} walk and the {@code getMapData} resolution are MC-typed and gate-validated.
  *
  * <p>Operates only on already-serialized NBT (our own captured copies of the open-time container / vehicle / ender
@@ -22,8 +22,8 @@ final class MapIdCollector {
 
     /**
      * Add every map id referenced by the items in {@code holder}'s {@code listKey} list (each list element is item NBT,
-     * with or without a leading {@code "Slot"}) into {@code out}, recursing into nested containers and bundles. A
-     * missing or non-list {@code listKey} is a no-op. {@code holder} is not mutated.
+     * with or without a leading {@code "Slot"}) into {@code out}, recursing into nested containers. A missing or
+     * non-list {@code listKey} is a no-op. {@code holder} is not mutated.
      */
     public static void collectFromItemList(CompoundTag holder, String listKey, Set<Integer> out) {
         if (holder.get(listKey) instanceof ListTag) {

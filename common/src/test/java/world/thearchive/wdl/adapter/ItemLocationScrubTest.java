@@ -300,8 +300,7 @@ class ItemLocationScrubTest {
         assertTrue(!targetOf(back.get(0)).isPresent(), "the lodestone target is blanked");
         assertTrue(!targetDimensionOf(back.get(0)).isPresent(),
                 "and so is the dimension it named, which alone still narrows the base to one world");
-        assertNotNull(lodestoneTrackerOf(back.get(0)),
-                "the lodestone_tracker component is kept: the compass stays a valid compass pointing nowhere");
+        assertNotNull(lodestoneTrackerOf(back.get(0)), "LodestoneTracked is kept");
         assertEquals(Items.COMPASS, back.get(0).getItem(), "still a compass");
         assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-lodestone item is untouched");
         assertEquals(3, back.get(1).getCount());
@@ -325,7 +324,7 @@ class ItemLocationScrubTest {
 
         NonNullList<ItemStack> back = readBack(holder, 1);
         ListTag container = containerItemsOf(back.get(0));
-        assertNotNull(container, "the shulker keeps its container component");
+        assertNotNull(container, "the shulker keeps its contents");
         ItemStack nestedInShulker = ItemStack.of(container.getCompound(0));
         assertTrue(!targetOf(nestedInShulker).isPresent(), "a lodestone nested in a shulker box is blanked");
     }
@@ -359,8 +358,7 @@ class ItemLocationScrubTest {
 
         ItemStack back = itemOf(pot);
         assertTrue(!targetOf(back).isPresent(), "the lodestone target under the block entity's item key is blanked");
-        assertNotNull(lodestoneTrackerOf(back),
-                "the lodestone_tracker component is kept: the compass stays a valid compass pointing nowhere");
+        assertNotNull(lodestoneTrackerOf(back), "LodestoneTracked is kept");
         assertEquals(Items.COMPASS, back.getItem(), "still a compass");
     }
 
@@ -381,7 +379,7 @@ class ItemLocationScrubTest {
         CompoundTag potWithShulker = blockEntityWithItem(shulkerHoldingLodestone());
         ItemLocationScrub.scrubBlockEntity(potWithShulker);
         ListTag containerPot = containerItemsOf(itemOf(potWithShulker));
-        assertNotNull(containerPot, "the shulker keeps its container component");
+        assertNotNull(containerPot, "the shulker keeps its contents");
         assertTrue(!targetOf(ItemStack.of(containerPot.getCompound(0))).isPresent(),
                 "a lodestone nested in a shulker stored as the block entity's item is blanked");
     }
@@ -414,7 +412,7 @@ class ItemLocationScrubTest {
         NonNullList<ItemStack> back = readBack(holder, 2);
         assertFalse(hiveFlowerPosPresent(back.get(0)), "the hive's own flower_pos is blanked too");
         ListTag bees = beesOf(back.get(0));
-        assertFalse(bees.isEmpty(), "the bees component is kept");
+        assertFalse(bees.isEmpty(), "the bees are kept");
         assertEquals(1, bees.size(), "the occupant is kept");
         assertFalse(
                 bees.getCompound(0).get(ENTITY_DATA) instanceof CompoundTag
@@ -458,7 +456,7 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrub(holder, "Items");
 
         ListTag container = containerItemsOf(readBack(holder, 1).get(0));
-        assertNotNull(container, "the shulker keeps its container component");
+        assertNotNull(container, "the shulker keeps its contents");
         assertFalse(beeFlowerPresent(ItemStack.of(container.getCompound(0))),
                 "a beehive nested in a shulker box has its bee flower_pos blanked");
     }
@@ -531,7 +529,7 @@ class ItemLocationScrubTest {
         assertTrue(!targetOf(itemFrom(((ListTag) zombie.get("HandItems")).get(0))).isPresent(),
                 "a lodestone in a pre-1.21.5 HandItems mainhand slot is blanked");
         ListTag offhandContainer = containerItemsOf(itemFrom(((ListTag) zombie.get("HandItems")).get(1)));
-        assertNotNull(offhandContainer, "the offhand shulker keeps its container component");
+        assertNotNull(offhandContainer, "the offhand shulker keeps its contents");
         assertTrue(!targetOf(ItemStack.of(offhandContainer.getCompound(0))).isPresent(),
                 "a lodestone nested in a shulker in a pre-1.21.5 HandItems slot is blanked");
         assertTrue(!targetOf(itemFrom(((ListTag) zombie.get("ArmorItems")).get(3))).isPresent(),

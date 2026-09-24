@@ -285,10 +285,9 @@ public final class InteractionCapture {
     }
 
     /**
-     * Run {@code recognition} with per-click failure isolation, mirroring the writer-side merge: the click-time codec
-     * encode can throw on a pathological component whose network form diverges from its persistent form, so isolate it
-     * here rather than letting it escape to the loader event and crash the client mid-download. Skips that one capture
-     * and logs.
+     * Run {@code recognition} with per-click failure isolation, mirroring the writer-side merge: the click-time encode
+     * can throw, so isolate it here rather than letting it escape to the loader event and crash the client
+     * mid-download. Skips that one capture and logs.
      */
     void recordFailSoft(BlockPos pos, Runnable recognition) {
         try {
