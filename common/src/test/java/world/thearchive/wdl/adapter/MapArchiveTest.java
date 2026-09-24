@@ -99,7 +99,7 @@ class MapArchiveTest {
         NBTBase idCounts = archive.idCountsTag();
         if (idCounts != null) {
             try {
-                MapDataWriter.write(dataDirectory, "idcounts", idCounts);
+                MapDataWriter.writeIdCounts(dataDirectory, idCounts);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
