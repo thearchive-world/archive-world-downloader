@@ -30,32 +30,12 @@ import world.thearchive.wdl.core.report.DownloadSession;
  * still reach disk, unleashed, rather than being lost whole. The capture half-fails on purpose. The leash sub-datum is
  * the half the vanilla save codec rejects; the mod strips just that leash and saves the mob around it. The primed cow
  * is put into the exact client state {@code ClientPacketListener.handleEntityLinkPacket} builds for a
- * {@code ClientboundSetEntityLinkPacket} naming an unloaded holder, {@code
- * Leashable.setDelayedLeashHolderId}: the resulting {@code Leashable.LeashData} has neither a resolved holder nor a
- * delayed attachment, the one state {@code Leashable.LeashData.CODEC} throws {@code "Invalid LeashData had no
- * attachment"} on when the prime path encodes the live entity. The production sink detaches that unsavable leash before
- * the encode and restores it after, so {@code Entity.save} succeeds and the cow is written with no leash tag. That same
- * unresolved shape is what ViaBackwards leaves after down-translating the reworked 26.x leash into the 1.21.11 shape,
- * so the induced state is a real client scenario, not a synthetic one.
+ * {@code ClientboundSetEntityLinkPacket} naming an unloaded holder: the resulting {@code Leashable.LeashData} has
+ * neither a resolved holder nor a delayed attachment, the one state {@code Leashable.LeashData.CODEC} throws on when
+ * the prime path encodes the live entity.
  *
- * <p>This is the integration complement to the {@code EntitySinkImpl} leash-degradation unit, which drives the sink
- * directly with a headless entity double. Here the strip is exercised through the whole live path: a real client
- * receiving the leash link, a real capture session priming the loaded cow, and the vanilla Anvil writer, then the
- * produced save is read back off disk. So a green run proves the strip holds end to end, not only in the sink in
- * isolation.
- *
- * <p>The contrast is load-bearing: a clean baseline captures a cow with no leash break, which saves normally with no
- * leash tag. The half-failed run changes the single variable (a leash to an unloaded holder) and the cow still reaches
- * disk with its unsavable leash stripped and no drop surfaced. Without the strip the vanilla codec would reject the
- * encode and the cow would be lost, so a count of one is the whole assertion. The cow is matched client-side by its
- * synced {@link EntityType} (a scoreboard tag would not do, it is server-only and never reaches the client), and
- * natural mob spawning is off so the planted cow is the only one.
- *
- * <p>The mechanism is a 1.21.6+ band floor: the {@link Leashable} interface and the {@code LeashData} codec rejection
- * it rests on do not exist below 1.21.6 (1.20.6 and earlier have no {@code Leashable}). On an earlier band a mob with
- * an unresolved holder already saves unleashed through vanilla itself, so the strip is a no-op there and the axis would
- * need a different fixture, a documented band gap. The behavior it asserts lives in shared {@code common/} and is
- * band-stable; only the vanilla codec rejection the strip guards against is per-band.
+ * <p>The contrast is load-bearing: a clean baseline captures a cow with no leash break. Without the strip the vanilla
+ * codec would reject the encode and the cow would be lost, so a count of one is the whole assertion.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
