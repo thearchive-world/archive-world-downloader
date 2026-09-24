@@ -44,8 +44,6 @@ class PriorPlayerReadRoundTripTest {
 
     private static final UUID PLAYER_UUID = UUID.fromString("11111111-2222-3333-4444-555555555555");
 
-    // Bind the item data components before any fixture builds an ItemStack: at 26.x the components bind in the
-    // resource reload TestRegistries.frozen drives, not in Bootstrap, so an EnderItems stack built first throws.
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.bootstrap();

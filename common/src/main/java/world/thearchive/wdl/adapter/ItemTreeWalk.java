@@ -9,10 +9,10 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * The 1.20.4 walk over a serialized item tree: apply a leaf action to each item's {@code tag} compound, then recurse
- * into the items nested inside a shulker box (the {@code BlockEntityTag.Items} list) and a bundle (the {@code Items}
- * list). Operates only on already-serialized NBT, never a live {@code ItemStack}. Each caller supplies its own per-item
- * leaf action.
+ * The walk over a serialized item tree: apply a leaf action to each item's {@code tag} compound, then recurse into the
+ * items nested inside a shulker box (the {@code BlockEntityTag.Items} list) and into an item-level {@code Items} list,
+ * the bundle shape no vanilla item writes below 1.17, so that branch is inert. Operates only on already-serialized NBT,
+ * never a live {@code ItemStack}. Each caller supplies its own per-item leaf action.
  */
 final class ItemTreeWalk {
     private static final String TAG = "tag";
@@ -52,8 +52,8 @@ final class ItemTreeWalk {
             walkList(shulkerItems, onLeaf);
         }
         if (tag.get(ITEMS) instanceof ListTag) {
-            ListTag bundleItems = (ListTag) tag.get(ITEMS);
-            walkList(bundleItems, onLeaf);
+            ListTag ownItems = (ListTag) tag.get(ITEMS);
+            walkList(ownItems, onLeaf);
         }
     }
 }
