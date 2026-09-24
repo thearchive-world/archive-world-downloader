@@ -27,8 +27,8 @@ final class MapIdRemap {
 
     /**
      * Rewrite every map id referenced by the items in {@code holder}'s {@code listKey} list (each list element is item
-     * NBT, with or without a leading {@code "Slot"}) through {@code resolver}, recursing into nested containers and
-     * bundles. A missing or non-list {@code listKey} is a no-op. {@code holder} is mutated in place.
+     * NBT, with or without a leading {@code "Slot"}) through {@code resolver}, recursing into nested containers. A
+     * missing or non-list {@code listKey} is a no-op. {@code holder} is mutated in place.
      */
     public static void remapFromItemList(NBTTagCompound holder, String listKey, IntUnaryOperator resolver) {
         if (holder.getTag(listKey) instanceof NBTTagList) {
@@ -39,8 +39,8 @@ final class MapIdRemap {
 
     /**
      * Rewrite every map id referenced by a single item compound ({@code {id, Count, Damage, tag}}), recursing into
-     * nested containers and bundles. The entry point for an entity-borne single item (an item frame's {@code "Item"}, a
-     * dropped item entity's {@code "Item"}); {@code item} is mutated in place and must be remapped exactly once.
+     * nested containers. The entry point for an entity-borne single item (an item frame's {@code "Item"}, a dropped
+     * item entity's {@code "Item"}); {@code item} is mutated in place and must be remapped exactly once.
      */
     public static void remapItem(NBTTagCompound item, IntUnaryOperator resolver) {
         ItemTreeWalk.forEachItem(item, nested -> remapMapId(nested, resolver));

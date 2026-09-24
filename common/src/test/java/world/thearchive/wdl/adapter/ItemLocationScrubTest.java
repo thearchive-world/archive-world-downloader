@@ -269,8 +269,7 @@ class ItemLocationScrubTest {
         assertTrue(!targetOf(back[0]).isPresent(), "the lodestone target is blanked");
         assertTrue(!targetDimensionOf(back[0]).isPresent(),
                 "and so is the dimension it named, which alone still narrows the base to one world");
-        assertNotNull(lodestoneTrackerOf(back[0]),
-                "the lodestone_tracker component is kept: the compass stays a valid compass pointing nowhere");
+        assertNotNull(lodestoneTrackerOf(back[0]), "LodestoneTracked is kept");
         assertEquals(Items.COMPASS, back[0].getItem(), "still a compass");
         assertEquals(Items.DIAMOND, back[1].getItem(), "a non-lodestone item is untouched");
         assertEquals(3, back[1].stackSize);
@@ -294,7 +293,7 @@ class ItemLocationScrubTest {
 
         ItemStack[] back = readBack(holder, 1);
         NBTTagList container = containerItemsOf(back[0]);
-        assertNotNull(container, "the carrier keeps its container component");
+        assertNotNull(container, "the carrier keeps its contents");
         ItemStack nested = ItemStack.loadItemStackFromNBT(container.getCompoundTagAt(0));
         assertTrue(!targetOf(nested).isPresent(), "a lodestone nested in a container item is blanked");
     }
@@ -328,8 +327,7 @@ class ItemLocationScrubTest {
 
         ItemStack back = itemOf(pot);
         assertTrue(!targetOf(back).isPresent(), "the lodestone target under the block entity's item key is blanked");
-        assertNotNull(lodestoneTrackerOf(back),
-                "the lodestone_tracker component is kept: the compass stays a valid compass pointing nowhere");
+        assertNotNull(lodestoneTrackerOf(back), "LodestoneTracked is kept");
         assertEquals(Items.COMPASS, back.getItem(), "still a compass");
     }
 
@@ -350,7 +348,7 @@ class ItemLocationScrubTest {
         NBTTagCompound displayed = blockEntityWithItem(containerHoldingLodestone());
         ItemLocationScrub.scrubBlockEntity(displayed);
         NBTTagList nestedItems = containerItemsOf(itemOf(displayed));
-        assertNotNull(nestedItems, "the carrier keeps its container component");
+        assertNotNull(nestedItems, "the carrier keeps its contents");
         assertTrue(!targetOf(ItemStack.loadItemStackFromNBT(nestedItems.getCompoundTagAt(0))).isPresent(),
                 "a lodestone nested in a container item stored as the block entity's item is blanked");
     }
@@ -383,7 +381,7 @@ class ItemLocationScrubTest {
         ItemStack[] back = readBack(holder, 2);
         assertFalse(hiveFlowerPosPresent(back[0]), "the hive's own flower_pos is blanked too");
         NBTTagList bees = beesOf(back[0]);
-        assertFalse(bees.hasNoTags(), "the bees component is kept");
+        assertFalse(bees.hasNoTags(), "the bees are kept");
         assertEquals(1, bees.tagCount(), "the occupant is kept");
         assertFalse(
                 bees.getCompoundTagAt(0).getTag(ENTITY_DATA) instanceof NBTTagCompound
@@ -405,7 +403,7 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrub(holder, "Items");
 
         NBTTagList container = containerItemsOf(readBack(holder, 1)[0]);
-        assertNotNull(container, "the carrier keeps its container component");
+        assertNotNull(container, "the carrier keeps its contents");
         assertFalse(beeFlowerPresent(ItemStack.loadItemStackFromNBT(container.getCompoundTagAt(0))),
                 "a beehive nested in a container item has its bee flower_pos blanked");
     }
@@ -478,7 +476,7 @@ class ItemLocationScrubTest {
         assertTrue(!targetOf(itemFrom(((NBTTagList) zombie.getTag("HandItems")).get(0))).isPresent(),
                 "a lodestone in a HandItems mainhand slot is blanked");
         NBTTagList offhandContainer = containerItemsOf(itemFrom(((NBTTagList) zombie.getTag("HandItems")).get(1)));
-        assertNotNull(offhandContainer, "the offhand carrier keeps its container component");
+        assertNotNull(offhandContainer, "the offhand carrier keeps its contents");
         assertTrue(!targetOf(ItemStack.loadItemStackFromNBT(offhandContainer.getCompoundTagAt(0))).isPresent(),
                 "a lodestone nested in a container item in a HandItems slot is blanked");
         assertTrue(!targetOf(itemFrom(((NBTTagList) zombie.getTag("ArmorItems")).get(3))).isPresent(),

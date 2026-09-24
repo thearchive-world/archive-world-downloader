@@ -24,8 +24,8 @@ final class MapIdCollector {
 
     /**
      * Add every map id referenced by the items in {@code holder}'s {@code listKey} list (each list element is item NBT,
-     * with or without a leading {@code "Slot"}) into {@code out}, recursing into nested containers and bundles. A
-     * missing or non-list {@code listKey} is a no-op. {@code holder} is not mutated.
+     * with or without a leading {@code "Slot"}) into {@code out}, recursing into nested containers. A missing or
+     * non-list {@code listKey} is a no-op. {@code holder} is not mutated.
      */
     public static void collectFromItemList(NBTTagCompound holder, String listKey, Set<Integer> out) {
         if (holder.getTag(listKey) instanceof NBTTagList) {
