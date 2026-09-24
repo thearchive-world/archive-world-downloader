@@ -39,9 +39,8 @@ final class MapDataWriter {
 
     /**
      * Wrap {@code dataTag} as {@code {data, DataVersion}} and gzip it to {@code dataDirectory/<key>.dat}, creating the
-     * target's parent first since opening the file does not make its parents. The key can name a subfolder, so the
-     * parent is the file's own directory, not {@code dataDirectory}. The same envelope vanilla writes for every
-     * {@code SavedData}.
+     * target's parent first since opening the file does not make its parents. The same envelope vanilla writes for
+     * every {@code SavedData}.
      */
     public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");
