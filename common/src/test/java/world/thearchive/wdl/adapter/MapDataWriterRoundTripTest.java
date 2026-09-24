@@ -57,13 +57,13 @@ class MapDataWriterRoundTripTest {
     }
 
     @Test
-    void idCountsRoundTripsThroughTheBranchedReadWrite(@TempDir Path directory) throws IOException {
+    void idCountsRoundTripsThroughWriteAndRead(@TempDir Path directory) throws IOException {
         Path dataDirectory = directory.resolve("data");
 
         MapDataWriter.writeIdCounts(dataDirectory, MapDataWriter.serializeIdCounts(7));
 
         assertEquals(7, MapDataWriter.readIdCounts(dataDirectory),
-                "the branched writeIdCounts/readIdCounts round-trip the map high-water");
+                "writeIdCounts and readIdCounts round-trip the map high-water");
     }
 
     @Test
