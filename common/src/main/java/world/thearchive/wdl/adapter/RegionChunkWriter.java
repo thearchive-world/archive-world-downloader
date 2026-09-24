@@ -186,14 +186,12 @@ final class RegionChunkWriter {
 
     /**
      * Fold this session's captured entities into {@code pos}'s already-written {@code region/} chunk under
-     * {@code Level.Entities} (the 1.16.5 in-chunk entity location), unioning {@code freshEnvelope}'s entities into what
-     * the chunk already holds through the shared {@link EntityMerge#merge}, then writing the chunk back. The host chunk
-     * carries the terrain, so a missing host is a lost fold, never a terrainless chunk: with no on-disk prior the
-     * captured entities are {@link MergeOutcome#FAILED}, logged and counted, rather than synthesized onto a chunk with
-     * no {@code Sections}. Returns {@link MergeOutcome#WRITTEN_RECAPTURED} with the union count when the host already
-     * held entities and {@link MergeOutcome#WRITTEN_NEW} otherwise, so the writer's entity tally reads as it did
-     * against the standalone {@code entities/} store; a read, fold, or write failure isolates the chunk per the
-     * per-chunk discipline, never aborting the drain.
+     * {@code Level.Entities}, unioning {@code freshEnvelope}'s entities into what the chunk already holds through
+     * {@link EntityMerge#merge}, then writing the chunk back. A missing host is a lost fold, never a terrainless chunk:
+     * with no on-disk prior the captured entities are {@link MergeOutcome#FAILED}, logged and counted, rather than
+     * synthesized onto a chunk with no {@code Sections}. Returns {@link MergeOutcome#WRITTEN_RECAPTURED} with the
+     * merge-back count when the host already held entities and {@link MergeOutcome#WRITTEN_NEW} otherwise; a read,
+     * fold, or write failure isolates the chunk, never aborting the drain.
      */
     public static MergeWriteResult foldEntitiesIntoRegion(IOWorker regionStorage, ChunkPos pos,
             CompoundTag freshEnvelope, @Nullable ChunkRewrite afterMerge) {

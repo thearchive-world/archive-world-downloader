@@ -11,8 +11,8 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.IOWorker;
 
 /**
- * Drives a chunk NBT tag through vanilla's real region pipeline ({@link IOWorker}, the async region-file worker below
- * 1.20.6) and back, so the codec round-trip exercises on-disk Anvil write/read rather than an in-memory shortcut.
+ * Drives a chunk NBT tag through vanilla's real region pipeline ({@link IOWorker}, the async region-file worker) and
+ * back, so the codec round-trip exercises on-disk Anvil write/read rather than an in-memory shortcut.
  */
 public final class RegionRoundTrip {
     private RegionRoundTrip() {}
