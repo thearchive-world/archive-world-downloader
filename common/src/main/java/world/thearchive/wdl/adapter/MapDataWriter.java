@@ -17,8 +17,8 @@ import world.thearchive.wdl.core.AtomicFileWrite;
 
 /**
  * Writes the map {@code data/} save surface: wraps a per-band serialized inner {@code "data"} tag (from
- * {@link MapSink#serializeMap}, or the {@code idcounts} tag below) as {@code {data, DataVersion}} and gzips it to
- * {@code data/<key>.dat}, the envelope vanilla writes for its saved data.
+ * {@link MapSink#serializeMap}, or the map id counter's tag below) as {@code {data, DataVersion}} and gzips it to
+ * {@code <key>.dat} in the save's data directory, the envelope vanilla writes for its saved data.
  */
 final class MapDataWriter {
     private static final String ID_COUNTS_KEY = "idcounts";
@@ -26,9 +26,9 @@ final class MapDataWriter {
     private MapDataWriter() {}
 
     /**
-     * The {@code idcounts} inner {@code "data"} tag: {@code {map: maxId}}. Written so the reopened world's map
-     * allocator ({@code getNextMapId} = {@code ++lastMapId}, reading this {@code "map"}) issues the next id above every
-     * captured id, imaged or not, so no reopened-world craft is ever aliased to a captured map.
+     * The map id counter's inner {@code "data"} tag: {@code {map: maxId}}. Written so the reopened world's map
+     * allocator, which hands out this {@code "map"} plus one, issues the next id above every captured id, imaged or
+     * not, so no reopened-world craft is ever aliased to a captured map.
      */
     public static CompoundTag serializeIdCounts(int maxId) {
         CompoundTag idCounts = new CompoundTag();
@@ -38,9 +38,9 @@ final class MapDataWriter {
 
     /**
      * Wrap {@code dataTag} as {@code {data, DataVersion}} and gzip it to {@code dataDirectory/<key>.dat}, creating the
-     * target's parent first since opening the file does not make its parents. The key can name a subfolder (a
-     * {@code maps/<id>} key), so the parent is the file's own directory, not {@code dataDirectory}. The same envelope
-     * vanilla writes for every {@code SavedData}.
+     * target's parent first since opening the file does not make its parents. The key can name a subfolder, so the
+     * parent is the file's own directory, not {@code dataDirectory}. The same envelope vanilla writes for every
+     * {@code SavedData}.
      */
     public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");

@@ -25,9 +25,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The {@code data/} writer: a serialized inner {@code "data"} tag wrapped as {@code {data, DataVersion}} and gzipped to
  * {@code data/<key>.dat} round-trips through a real compressed file, the {@code data/} directory is created on demand,
- * the {@code idcounts} inner tag is {@code {map: maxId}}, and a failed {@code idcounts} write leaves the id floor
- * already on disk readable. Server-free: hand-built tags drive it (no map type needed), matching the
- * {@link LevelDatRoundTripTest} discipline.
+ * the map id counter's inner tag is {@code {map: maxId}}, and a failed counter write leaves the id floor already on
+ * disk readable. Server-free: hand-built tags drive it (no map type needed), matching the {@link LevelDatRoundTripTest}
+ * discipline.
  */
 class MapDataWriterRoundTripTest {
     @BeforeAll
