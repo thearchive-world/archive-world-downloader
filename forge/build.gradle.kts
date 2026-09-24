@@ -52,7 +52,7 @@ val band = Properties().apply {
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.13.2.
+// Match wdl.java-conventions: the MC version rides as SemVer build metadata.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
@@ -115,11 +115,11 @@ unimined.minecraft {
 // itself resolves and extracts it to a stable build/ path via a real Gradle dependency (backed by the ordinary
 // Gradle module cache), independent of Unimined's own provisioning.
 //
-// The artifact is de.oceanlabs.mcp:mcp:<mc>:srg, not the de.oceanlabs.mcp:mcp_config:<mc> the 1.12.2-and-above
-// bands take. mcp_config publishes nothing below 1.12.2 at all: sorted ascending its oldest release is 1.12.2, so
-// 1.12.2 sits exactly on that floor and every band under it, this one and its mint parent alike, takes the older
-// mcp:<mc>:srg line instead. That is a format change as well as a coordinate change, from TSRG to SRG v1; see the
-// grammar note above ExtractSeargeOracle.
+// The artifact is de.oceanlabs.mcp:mcp:<mc>:srg, not the de.oceanlabs.mcp:mcp_config:<mc> the 1.12.2 and 1.13.2 islands
+// read. mcp_config publishes nothing below 1.12.2 at all: sorted ascending its oldest release is 1.12.2, so 1.12.2 sits
+// exactly on that floor and every band under it, this one and its mint parent alike, takes the older mcp:<mc>:srg line
+// instead. That is a format change as well as a coordinate change, from TSRG to SRG v1; see the grammar note above
+// ExtractSeargeOracle.
 val seargeOracle: Configuration = configurations.create("seargeOracle") { isTransitive = false }
 
 // This band's joined.srg parses to exactly these counts under a correct SRG v1 reader: 2980 CL: records, and
@@ -136,7 +136,7 @@ dependencies {
 
 // joined.srg maps obfuscated names to real names one self-contained line at a time, in SRG v1: every line carries
 // its own record type as a prefix and there is no indentation and no scoping anywhere in the file, unlike the
-// TSRG the 1.12.2-and-above bands read, where a class line opens a block of tab-indented member lines beneath it.
+// TSRG the 1.12.2 and 1.13.2 islands read, where a class line opens a block of tab-indented member lines beneath it.
 // The four record types and their columns:
 //
 //   PK: <obfPackage> <realPackage>
@@ -683,7 +683,7 @@ abstract class CheckSeargeSurface : DefaultTask() {
     // True (the default): this is a positive gate, fails when an offender is found. False: this is the
     // inverted meta-test checkReobfNegative runs, over a fixture that permanently carries one offender by
     // construction; it fails only if the scan does NOT find it (the detector regressed), and otherwise passes
-    // with the offender(s) it found logged as proof the gate fired. Mirrors the 1.13.2 CheckReobf's expectClean.
+    // with the offender(s) it found logged as proof the gate fired.
     @get:Input
     abstract val expectClean: Property<Boolean>
 
