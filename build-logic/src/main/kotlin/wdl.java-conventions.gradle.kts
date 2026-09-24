@@ -11,7 +11,6 @@ plugins {
 }
 
 group = providers.gradleProperty("mod_group").get()
-// Carry the MC patch as SemVer build metadata, e.g. 1.0.0-SNAPSHOT+1.21.11
 version = "${providers.gradleProperty("mod_version").get()}+${providers.gradleProperty("minecraft_version").get()}"
 
 repositories {
