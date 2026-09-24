@@ -72,7 +72,7 @@ class SaddleCaptureTest {
                 "vanilla keeps the stack only when it is a saddle, so anything else is silently dropped on load");
         assertEquals(1, loaded.getCount(), "one saddle, the stack a mount wears");
         assertTrue(loaded.getTag() == null,
-                "a plain saddle: the client holds no source for a saddle's components, so none may be invented");
+                "a plain saddle: the client holds no source for a saddle's tag, so none may be invented");
     }
 
     @Test
