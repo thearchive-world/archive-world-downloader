@@ -466,8 +466,7 @@ repositories {
 
 dependencies {
     // JourneyMap public API for the overlay binding (compat/journeymap), compile-only (never a runtime require).
-    // The 1.19.4-1.9 stem (see gradle.properties) publishes no -neoforge-SNAPSHOT flavor, so common pulls the
-    // loader-suffixless -SNAPSHOT flavor; the 1.9 journeymap.client.api surface the binding compiles against is
-    // its own API types, not Minecraft signatures.
+    // common pulls the loader-suffixless -SNAPSHOT flavor of the stem gradle.properties names: its Minecraft
+    // signatures are Mojmap-named, matching the namespace common compiles in.
     compileOnly("info.journeymap:journeymap-api:${property("journeymap_api_coordinate")}-SNAPSHOT")
 }
