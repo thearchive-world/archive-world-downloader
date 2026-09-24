@@ -122,7 +122,7 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public void registerCommands(WdlCommands commands) {
-        // The 1.18.2 client-command API is v1: a static DISPATCHER registered at construction.
+        // The client-command API is v1: a static DISPATCHER registered at construction.
         ClientCommandManager.DISPATCHER.register(
                 wdlCommandTree(commands, ClientCommandManager::literal, ClientCommandManager::argument));
     }
