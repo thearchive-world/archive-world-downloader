@@ -8,11 +8,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 
 /**
- * Reusable, band-agnostic collection of the map ids a serialized item list references: collects the top-level
- * {@code "map"} id on each item's tag, over the shared {@link ItemTreeWalk} that recurses into a shulker box (the
- * {@code BlockEntityTag.Items} list) and a bundle (the {@code Items} list). The pure, headless-tested half of the
- * filled-map enumeration: the live {@code ItemStack}/{@code ItemFrame} walk and the {@code getMapData} resolution are
- * MC-typed and gate-validated.
+ * Reusable collection of the map ids a serialized item list references: collects the top-level {@code "map"} id on each
+ * item's tag, over the shared {@link ItemTreeWalk} that recurses into a shulker box (the {@code BlockEntityTag.Items}
+ * list) and a bundle (the {@code Items} list). The pure, headless-tested half of the filled-map enumeration: the live
+ * {@code ItemStack}/{@code ItemFrame} walk and the {@code getMapData} resolution are MC-typed and gate-validated.
  *
  * <p>Operates only on already-serialized NBT (our own captured copies of the open-time container / vehicle / ender
  * stashes), never on a live {@code ItemStack}. Used both at finish (the stashes) and as the enumeration's automated
