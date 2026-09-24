@@ -27,11 +27,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The headless guard for the merchant-offer capture transform: {@link MerchantOfferCapture#serialize} writes a villager
- * or wandering trader's offers to the vanilla-shaped {@code {Offers:{Recipes:[...]}, Xp}} holder through the vanilla
- * {@code MerchantOffers} codec, and {@link MerchantOfferCapture#scrubAndRemapOffers} runs each offer's {@code sell}
- * item through the same item-location scrub and map-id remap every captured item takes. Real {@link ItemStack}s
- * carrying the components drive the round-trip, so a wrong key leaves the coordinate or the session map id and fails;
- * no live menu or {@code Level} is needed.
+ * or wandering trader's offers to the vanilla-shaped {@code {Offers:{Recipes:[...]}, Xp}} holder through the trade
+ * list's own NBT write, and {@link MerchantOfferCapture#scrubAndRemapOffers} runs each offer's {@code sell} item
+ * through the same item-location scrub and map-id remap every captured item takes. Real {@link ItemStack}s carrying the
+ * tags drive the round-trip, so a wrong key leaves the coordinate or the session map id and fails; no live menu or
+ * {@code Level} is needed.
  */
 class MerchantOfferCaptureTest {
     private static RegistryAccess registries;
