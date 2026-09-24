@@ -51,8 +51,8 @@ final class ItemTreeWalk {
             walkList(shulkerItems, onLeaf);
         }
         if (tag.get(ITEMS) instanceof ListTag) {
-            ListTag bundleItems = (ListTag) tag.get(ITEMS);
-            walkList(bundleItems, onLeaf);
+            ListTag ownItems = (ListTag) tag.get(ITEMS);
+            walkList(ownItems, onLeaf);
         }
     }
 }
