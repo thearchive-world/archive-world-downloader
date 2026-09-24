@@ -35,9 +35,9 @@ public final class BlockEntityFixtures {
 
     /**
      * As {@link #blockEntity} for a block entity the player renamed, so a merge can be shown to leave a real sibling
-     * field alone. At 1.12.2 only a {@link net.minecraft.tileentity.TileEntityLockableLoot} (a chest and the like)
-     * carries an arbitrary name; the raw {@code "CustomName"} JSON key written here is exactly what its
-     * {@code setCustomName} would write, so the fidelity round trip still passes for one.
+     * field alone. A nameable block entity such as a {@link net.minecraft.tileentity.TileEntityLockableLoot} (a chest
+     * and the like) keeps its {@code "CustomName"} as a raw string and writes back the string it read, so the JSON text
+     * written here still passes the fidelity round trip for one.
      */
     public static NBTTagCompound namedBlockEntity(String id, int x, int y, int z, String customName) {
         NBTTagCompound tag = blockEntity(id, x, y, z);

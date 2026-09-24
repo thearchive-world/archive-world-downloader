@@ -34,12 +34,12 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * {@code Level.TileEntities} list's {@code x/y/z}) and sets its {@code "Book"}/{@code "Page"}, touching no other block
  * entity, then drains the merged entry as the chunk is flushed. This is the part that must never mis-target (writing
  * the wrong block's book corrupts the archive), so it is proven headless with hand-built chunk tags (no live client, no
- * {@code Level}).
+ * {@code World}).
  *
- * <p>Disabled at 1.13.2: lecterns are a 1.14 block entity, so no captured lectern block-entity tag can be built here,
- * and lectern-book capture is a documented limit at this band. {@link ContainerMerge#mergeLecternChunkStash} keeps
- * coverage through the re-pointed {@code ChunkFlushPlanTest} and {@code OrphanedContainerSweepTest}, which drive it
- * against a stand-in carrier.
+ * <p>Disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag can be built here, and
+ * lectern-book capture is a documented limit at this band. {@link ContainerMerge#mergeLecternChunkStash} keeps coverage
+ * through the re-pointed {@code ChunkFlushPlanTest} and {@code OrphanedContainerSweepTest}, which drive it against a
+ * stand-in carrier.
  */
 @Disabled("lecterns are a 1.14 block entity, absent at 1.13.2; the save-time lectern-book injection is a documented "
         + "limit with no valid fixture here")

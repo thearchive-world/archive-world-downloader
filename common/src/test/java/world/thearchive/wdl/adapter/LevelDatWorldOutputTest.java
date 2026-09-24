@@ -53,8 +53,8 @@ class LevelDatWorldOutputTest {
         return WorldOutputConfig.parse(properties);
     }
 
-    // At 1.15.2 the generator seed and structure toggle live directly in the Data tag (RandomSeed, MapFeatures),
-    // not in a WorldGenSettings compound (that is 1.16 and later).
+    // The generator seed and structure toggle live directly in the Data tag (RandomSeed, MapFeatures), not in a
+    // WorldGenSettings compound (that is 1.16 and later).
     private NBTTagCompound worldGenTag(LevelDataWriter.LevelData built) {
         return dataTag(built);
     }

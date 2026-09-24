@@ -25,11 +25,11 @@ import net.minecraftforge.fml.relauncher.Side;
 /**
  * Headless vanilla registry bootstrap for plain JUnit tests.
  *
- * <p>There is no game running here. At 1.12.2 the registries the chunk codec and level.dat writer read are the static
- * built-in {@code net.minecraft.util.registry.RegistryNamespaced} tables (blocks, items, biomes), each populated by its
- * own class's static initializer; there is no composite registry-access object at this band. So this only runs the
- * vanilla bootstrap, and a test that needs a block or item reads the static {@code Block.REGISTRY}/{@code
- * Item.REGISTRY} tables directly.
+ * <p>There is no game running here. The registries the chunk codec and level.dat writer read are the static built-in
+ * {@code net.minecraft.util.registry.RegistryNamespaced} tables (blocks, items, biomes), each filled by its own class's
+ * register method ({@code Block.registerBlocks} and the like) when the vanilla bootstrap runs; there is no composite
+ * registry-access object at this band. So this only runs the vanilla bootstrap, and a test that needs a block or item
+ * reads the static {@code Block.REGISTRY}/{@code Item.REGISTRY} tables directly.
  *
  * <p>{@link Bootstrap#register()} is idempotent (guarded by its own {@code alreadyRegistered} flag) but expensive, so
  * it is run once per JVM.

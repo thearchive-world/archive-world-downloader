@@ -25,9 +25,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * level.dat round-trip: the writer produces a superflat VOID world whose Data tag, written to a real compressed
- * level.dat and read back, preserves the seed, {@code DataVersion}, and the flat-void generator name. At 1.12.2 the
- * generator is stored as a {@code WorldType} name plus its options string in the Data tag (the void world uses the
- * {@code flat} preset).
+ * level.dat and read back, preserves the seed, {@code DataVersion}, and the flat-void generator name. The generator is
+ * stored as a {@code WorldType} name plus its options string in the Data tag (the void world uses the {@code flat}
+ * preset).
  */
 class LevelDatRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
@@ -61,7 +61,7 @@ class LevelDatRoundTripTest {
     @Test
     void buildsWithoutWorldgenRegistries() {
         TestRegistries.bootstrap();
-        // At 1.12.2 the writer records only a WorldType and options, so it needs no worldgen registries.
+        // The writer records only a WorldType and options, so it needs no worldgen registries.
         assertDoesNotThrow(() -> writer.buildLevelData(WorldOutputConfig.DEFAULTS, null),
                 "must derive the void generator, not fail");
     }
