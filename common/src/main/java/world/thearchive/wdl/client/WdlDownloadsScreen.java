@@ -1325,8 +1325,8 @@ public final class WdlDownloadsScreen extends Screen {
 
             @Override
             public boolean mouseClicked(double mouseX, double mouseY, int button) {
-                // At 1.20.4 ObjectSelectionList.Entry has no mouseClicked override, so a clicked row returns false
-                // and the list's setFocused-driven selection never fires; later bands override it to return true.
+                // ObjectSelectionList.Entry has no mouseClicked override, so without this a clicked row returns
+                // false and the list's setFocused-driven selection never fires.
                 DownloadList.this.setSelected(this);
                 return true;
             }
