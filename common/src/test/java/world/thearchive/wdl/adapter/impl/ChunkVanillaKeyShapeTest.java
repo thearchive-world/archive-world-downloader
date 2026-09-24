@@ -27,8 +27,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The chunk vanilla-key byte-gate: pins the pre-Flattening numeric shape {@link ChunkCodecImpl} must encode, which a
  * wrong-but-self-consistent encode (a copied 1.13+ {@code DataVersion}, or a palette key) would still pass a purely
- * symmetric round-trip test. Every key asserted here is a real 1.12.2 on-disk key or its explicit absence, both taken
- * from the recon's vanilla {@code AnvilChunkLoader.writeChunkToNBT} key table, not from this band's own naming.
+ * symmetric round-trip test. Every key asserted here is a real on-disk key or its explicit absence in vanilla's
+ * {@code AnvilChunkLoader.saveChunk} and {@code writeChunkToNBT}, not this band's own naming.
  */
 class ChunkVanillaKeyShapeTest {
     private static final int NON_EMPTY_SECTION_Y = 0;

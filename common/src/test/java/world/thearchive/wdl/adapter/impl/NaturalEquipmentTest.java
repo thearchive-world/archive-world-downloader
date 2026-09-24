@@ -21,12 +21,12 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * Pins the 1.12.2 natural-spawn equipment table: an item outside a type's pool in a pickup-fillable slot is a proven
- * loot pickup (persistence restored), an item inside the pool is ambiguous (left alone), the offhand is never inferred,
- * and unknown types are never inferred. There is no {@code EntityType} type-object before 1.13, so a mob is
- * discriminated by its classic {@link net.minecraft.entity.EntityList} registry name, a {@link ResourceLocation}; the
- * drowned (its trident), the wandering trader, and the 1.14 raid-captain ominous-banner carve-out are all absent at
- * this band and are dropped from the table this pins.
+ * Pins the natural-spawn equipment table: an item outside a type's pool in a pickup-fillable slot is taken as a loot
+ * pickup (persistence restored), an item inside the pool is ambiguous (left alone), the offhand is never inferred, and
+ * unknown types are never inferred. There is no {@code EntityType} type-object before 1.13, so a mob is discriminated
+ * by its classic {@link net.minecraft.entity.EntityList} registry name, a {@link ResourceLocation}; the drowned (its
+ * trident), the wandering trader, and the 1.14 raid-captain ominous-banner carve-out are all absent at this band and
+ * are dropped from the table this pins.
  */
 class NaturalEquipmentTest {
     private static final ResourceLocation ZOMBIE = new ResourceLocation("zombie");

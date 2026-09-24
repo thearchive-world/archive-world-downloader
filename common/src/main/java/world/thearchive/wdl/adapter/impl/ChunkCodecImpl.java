@@ -160,10 +160,10 @@ public final class ChunkCodecImpl implements ChunkCodec {
     }
 
     /**
-     * The per-chunk biome ids for the 1.12.2 column: {@code chunk.getBiomeArray()} widened to {@code int}, matching
-     * vanilla {@code AnvilChunkLoader}, which stores the same {@code byte[256]} verbatim under the {@code "Biomes"} key
-     * a 1.12.2 client reads back. Widened (rather than narrowed) here so the shared {@link ChunkSnapshotSource} keeps
-     * one {@code int[]} biome shape across bands; {@link #encode} narrows it back down for the on-disk key.
+     * The per-chunk biome ids for the column: {@code chunk.getBiomeArray()} widened to {@code int}, matching vanilla
+     * {@code AnvilChunkLoader}, which stores the same {@code byte[256]} verbatim under the {@code "Biomes"} key and
+     * reads it back from there. Widened (rather than narrowed) here so the shared {@link ChunkSnapshotSource} keeps one
+     * {@code int[]} biome shape across bands; {@link #encode} narrows it back down for the on-disk key.
      */
     private static int[] columnBiomes(Chunk chunk) {
         byte[] biomes = chunk.getBiomeArray();

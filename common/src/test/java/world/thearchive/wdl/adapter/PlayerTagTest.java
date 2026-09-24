@@ -28,10 +28,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for the band-agnostic {@link PlayerTag} operations on an already-serialized player tag: the strip
  * knob (drop {@code Inventory}/{@code SelectedItemSlot}, which at this band also carries the armor and offhand slots),
- * the death-location strip (a harmless no-op here; neither key exists in a 1.12.2 player tag), the respawn-point strip
- * ({@code SpawnX}/{@code SpawnY}/{@code SpawnZ}/{@code SpawnForced}/{@code Spawns}), the {@code Dimension} write and
- * the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure NBT, so it
- * round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
+ * the death-location strip (a harmless no-op here, since vanilla writes neither of its two keys), the respawn-point
+ * strip ({@code SpawnX}/{@code SpawnY}/{@code SpawnZ}/{@code SpawnForced}/{@code Spawns}), the {@code Dimension} write
+ * and the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure NBT, so
+ * it round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
  */
 class PlayerTagTest {
     private final ContainerSink sink = new ContainerSinkImpl();

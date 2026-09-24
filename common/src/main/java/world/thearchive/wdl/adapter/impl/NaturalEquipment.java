@@ -19,19 +19,18 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
 /**
- * The 1.12.2 natural-spawn equipment table, derived from the 1.13.2 table this band was forked from and reduced to the
- * entity types 1.12.2 registers (the drowned, its trident, and the 1.14 raid ominous banner are dropped), and the pure
- * "was this equipped by a loot pickup" inference.
+ * The natural-spawn equipment table and the pure "was this equipped by a loot pickup" inference.
  *
  * <p>There is no {@code EntityType} type-object before 1.13, so a mob is discriminated by its classic
  * {@code EntityList} registry name ({@link EntityList#getKey(net.minecraft.entity.Entity)}) rather than
  * {@code mob.getType()}; the profile table is keyed by that {@link ResourceLocation}.
  *
  * <p>Vanilla sets the server-only {@code PersistenceRequired} flag when a mob equips a picked-up item
- * ({@code EntityLiving.setItemStackToSlot} plus the drop-chance flag); the client never receives that flag. An equipped
- * item that no natural spawn of the mob's type could carry in that slot therefore proves the pickup ran, hence proves
- * the mob was persistent. The test is scoped to the mainhand and armor slots, the only slots the generic pickup path
- * fills; the offhand is excluded because a mob can hold an unpersisted item there.
+ * ({@code EntityLiving.updateEquipmentIfNeeded}); the client never receives that flag. An equipped item that no natural
+ * spawn of the mob's type could carry in that slot is therefore taken as proof that the pickup ran, hence that the mob
+ * was persistent. A dispenser breaks that inference: it fits armor, an elytra or a skull onto a mob that can pick up
+ * loot, and never sets the flag. The test is scoped to the mainhand and armor slots; the offhand is excluded because a
+ * mob can hold an unpersisted item there.
  */
 final class NaturalEquipment {
     private NaturalEquipment() {}

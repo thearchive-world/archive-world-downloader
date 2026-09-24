@@ -1352,10 +1352,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * "server never sent it" skip.
      */
     private @Nullable Chunk liveChunkAt(ChunkProviderClient chunkSource, ChunkPos pos) {
-        // This band's client chunk source has no status-taking getChunk; getLoadedChunk returns the live loaded
-        // chunk or null. A 1.12.2 client chunk is always full (there is no ProtoChunk or ChunkStatus concept before
-        // 1.13), so no status promotion is needed: the saved chunk's TerrainPopulated and LightPopulated flags carry
-        // the completeness the higher bands' Status string does.
+        // This band's client chunk source has no status-taking getChunk; getLoadedChunk returns the live loaded chunk
+        // or null. A client chunk is always full (there is no ProtoChunk or ChunkStatus concept before 1.13), so no
+        // status promotion is needed: the saved chunk's TerrainPopulated and LightPopulated flags carry the
+        // completeness the higher bands' Status string does.
         Chunk chunk = chunkSource.getLoadedChunk(pos.x, pos.z);
         if (chunk == null || bobbyFilter.isBobbyChunk(chunk)) {
             return null;
@@ -3046,8 +3046,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             gameType = gameMode != null ? gameMode.getCurrentGameType() : GameType.SURVIVAL;
             if (gameType == GameType.SPECTATOR) {
                 // Vanilla applies the saved game type to every opener, so a spectator stamp opens the world in
-                // spectator, and on a world shipped without cheats there is no way back out. At 1.15.2 the client
-                // tracks no mode held before spectating, so fall back to survival.
+                // spectator, and on a world shipped without cheats there is no way back out. The client tracks no mode
+                // held before spectating, so fall back to survival.
                 gameType = GameType.SURVIVAL;
             }
         }
@@ -3398,8 +3398,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null; // colors never received (imageless): skipped, never fabricated
         }
         NBTBase mapTag = adapter.mapSink().serializeMap(saved);
-        // 1.16.5 MapData has no locked() copy method, and mutating the live client map's locked flag would
-        // freeze its tracking, so the archived lock is set on the serialized tag instead, leaving the live map alone.
+        // MapData has no locked flag and never reads the "locked" key set on the serialized tag below.
         if (config.lockDownloadedMaps() && mapTag instanceof NBTTagCompound) {
             ((NBTTagCompound) mapTag).setBoolean("locked", true);
         }
@@ -3690,10 +3689,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null;
         }
         try {
-            // level.dat for the selected generator. The version-coupled saveLevelData call lives behind
-            // LevelDataWriter.save() (its vanilla signature drifts across bands), so this shared session stays
-            // cherry-pickable. Built here on the main thread; the writer thread only writes the finished data.
-            // At 1.15.2 the level directory is the ISaveFormat folder, which roots WorldPaths, the map manifest and
+            // level.dat for the selected generator. The version-coupled saveWorldInfoWithPlayer and saveWorldInfo calls
+            // live behind LevelDataWriter.save() (their vanilla signatures drift across bands), so this shared session
+            // stays cherry-pickable. Built here on the main thread; the writer thread only writes the finished data.
+            // The level directory is the ISaveHandler's world directory, which roots WorldPaths, the map manifest and
             // the export zip.
             Path saveRoot = storage.getWorldDirectory().toPath();
             WorldPaths paths = adapter.worldPaths(saveRoot);
@@ -4819,7 +4818,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (player != null && player.getServerBrand() != null) {
             brand = player.getServerBrand();
         }
-        // 1.16.5 has no server simulation distance (a 1.18 addition), so render distance stands in for the report.
+        // There is no server simulation distance (a 1.18 addition), so render distance stands in for the report.
         return new ReportEnvironment(brand, minecraft.gameSettings.renderDistanceChunks,
                 targetDimension.getName().toString(), Wdl.mcVersion(), bridge.modVersion());
     }

@@ -199,7 +199,7 @@ class EntityVehicleRelocationTest {
     }
 
     /**
-     * The map id the first item of a tag's container contents references (at 1.12.2, the item-level {@code Damage}).
+     * The map id the first item of a tag's container contents references (the item-level {@code Damage}).
      */
     private static int mapIdOf(NBTTagCompound tag) {
         NBTTagList items = (NBTTagList) tag.getTag("Items");

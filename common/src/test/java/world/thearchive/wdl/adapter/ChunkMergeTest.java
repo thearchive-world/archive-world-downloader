@@ -44,8 +44,8 @@ class ChunkMergeTest {
 
     /**
      * A second container type distinct from chest, so a same-position type change can be shown; furnace here. Not
-     * trapped chest: at 1.12.2 the trapped chest hosts the same {@code TileEntityChest} class as a regular chest, so
-     * its saved {@code "id"} is the identical {@code minecraft:chest}, not a distinct type a merge could tell apart.
+     * trapped chest: the trapped chest hosts the same {@code TileEntityChest} class as a regular chest, so its saved
+     * {@code "id"} is the identical {@code minecraft:chest}, not a distinct type a merge could tell apart.
      */
     private static NBTTagCompound furnace(int x, int y, int z, String... itemIds) {
         return container("minecraft:furnace", x, y, z, itemIds);
@@ -80,8 +80,8 @@ class ChunkMergeTest {
     }
 
     private static NBTTagCompound jukeboxWithDisc(int x, int y, int z, String discId) {
-        // At 1.18.2 JukeboxBlockEntity.saveAdditional writes only RecordItem, and only when a disc is present; the
-        // IsPlaying and tick sidecars are 1.19 additions.
+        // BlockJukebox.TileEntityJukebox.writeToNBT adds only RecordItem to the base block-entity keys, and only when a
+        // disc is present; the IsPlaying and tick sidecars are later additions.
         NBTTagCompound blockEntity = jukebox(x, y, z);
         blockEntity.setTag("RecordItem", ItemFixtures.itemTag(discId));
         return blockEntity;

@@ -35,9 +35,9 @@ final class PlayerTag {
 
     /**
      * Apply the strip opt-out to {@code raw}: when {@code saveInventory} is false, drop {@code "Inventory"} and
-     * {@code "SelectedItemSlot"}. At 1.12.2 the 36-slot main inventory, the 4-slot armor and the offhand slot are all
-     * written into the single {@code "Inventory"} list (there is no separate equipment compound), so dropping that one
-     * key already strips armor and offhand too; when {@code saveEnderChest} is false, drop {@code "EnderItems"}. Each
+     * {@code "SelectedItemSlot"}. The 36-slot main inventory, the 4-slot armor and the offhand slot are all written
+     * into the single {@code "Inventory"} list (there is no separate equipment compound), so dropping that one key
+     * already strips armor and offhand too; when {@code saveEnderChest} is false, drop {@code "EnderItems"}. Each
      * removal leaves a tag vanilla loads (every dropped key is optional).
      */
     static void applyStripKnobs(NBTTagCompound raw, boolean saveInventory, boolean saveEnderChest) {

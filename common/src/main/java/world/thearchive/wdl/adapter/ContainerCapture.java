@@ -313,8 +313,8 @@ final class ContainerCapture {
         }
         int size = blockContainer.getSizeInventory();
         NonNullList<ItemStack> items = NonNullList.withSize(size, ItemStack.EMPTY);
-        // 1.12.2 Slot has no container-slot accessor, so the container index is the menu order of the non-player
-        // slots: a client block container adds its slots consecutively in container-index order.
+        // The container index is the menu order of the non-player slots: a client block container adds its slots
+        // consecutively in container-index order.
         int index = 0;
         for (Slot slot : menu.inventorySlots) {
             if (slot.inventory == playerInventory) {
@@ -371,10 +371,8 @@ final class ContainerCapture {
 
     /**
      * Serialize the menu's non-player slots whose container index is in {@code [low, high)} into a 0-based
-     * {@code "Items"} holder (re-based to {@code index - low}) via the per-band {@link ContainerSink}, or {@code null}
-     * when that range is empty this tick. The client's double-chest menu is one {@code InventoryLargeChest(54)} with
-     * contiguous container indices 0..53, so {@code [0, 27)} is the lower-coordinate chest (slots 0-26) and
-     * {@code [27, 54)} the higher-coordinate one, matching vanilla's own large-chest slot order. Kept separate from
+     * {@code "Items"} holder (re-based to {@code index - low}), or {@code null} when that range is empty this tick.
+     * {@code [0, 27)} is the lower-coordinate chest and {@code [27, 54)} the higher-coordinate one. Kept separate from
      * {@link #captureChestSlots} on purpose.
      */
     @Nullable
@@ -382,9 +380,8 @@ final class ContainerCapture {
         IInventory playerInventory = player.inventory;
         NonNullList<ItemStack> items = NonNullList.withSize(high - low, ItemStack.EMPTY);
         boolean any = false;
-        // 1.12.2 Slot has no container-slot accessor, so the container index is the menu order of the non-player
-        // slots. The client double-chest menu is one InventoryLargeChest(54) with contiguous indices 0..53, so menu
-        // order equals the container index.
+        // The container index is the menu order of the non-player slots. The client double-chest menu wraps one
+        // ContainerLocalMenu(54) with contiguous indices 0..53, so menu order equals the container index.
         int index = 0;
         for (Slot slot : menu.inventorySlots) {
             if (slot.inventory == playerInventory) {

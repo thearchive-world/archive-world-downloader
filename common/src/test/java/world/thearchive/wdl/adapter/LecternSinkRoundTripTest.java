@@ -26,18 +26,18 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for lectern-book capture: the {@link LecternSink} path ({@code captureBook} -> merge) plus
- * vanilla's own {@code new ItemStack(NBTTagCompound)} read-back (the exact form {@code TileEntityLectern.readFromNBT}
- * uses) is a self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity
- * tag under {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other
- * block-entity field clobbered. Runs for both a signed <b>written</b> book and an unsigned <b>writable</b> book (both
- * are valid lectern contents).
+ * vanilla's own {@code new ItemStack(NBTTagCompound)} read-back (the exact form
+ * {@code BlockJukebox.TileEntityJukebox.readFromNBT} uses for its record) is a self-consistent round-trip: the captured
+ * book survives serialization, lands on the lectern block-entity tag under {@code "Book"} with the reading
+ * {@code "Page"}, and decodes back to the same book, with no other block-entity field clobbered. Runs for both a signed
+ * <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern contents).
  *
  * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
  * neither a live menu nor a {@code World} is needed. The one client-coupled step (lifting the book from the live open
  * menu's slot 0) is not exercised headless, exactly as for containers.
  *
- * <p>At 1.12.2 the merge cases are disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag
- * can be built from a real producer here, and lectern-book capture is a documented limit at this band. The pure
+ * <p>The merge cases are disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag can be
+ * built from a real producer here, and lectern-book capture is a documented limit at this band. The pure
  * {@link LecternSink#merge} keeps coverage through the re-pointed {@code ChunkFlushPlanTest} and
  * {@code AsyncSaveWriterTest} fold-wiring tests, which drive it against a stand-in carrier. {@code captureBook} needs
  * only a book item, so it still runs.
