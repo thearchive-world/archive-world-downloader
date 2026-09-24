@@ -3332,7 +3332,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (file == null || !Files.exists(file)) {
             return null;
         }
-        // 1.15.2 NbtIo.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(file)) {
             CompoundTag root = NbtIo.readCompressed(input);
             return root.get("Data") instanceof CompoundTag ? (CompoundTag) root.get("Data") : null;

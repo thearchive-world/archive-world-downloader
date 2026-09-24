@@ -55,7 +55,6 @@ final class MapDataWriter {
     public static void write(Path dataDirectory, String key, Tag dataTag) throws IOException {
         Path file = dataDirectory.resolve(key + ".dat");
         Files.createDirectories(file.getParent());
-        // 1.15.2 NbtIo.writeCompressed takes an OutputStream, not a File.
         try (OutputStream out = Files.newOutputStream(file)) {
             NbtIo.writeCompressed(envelope(dataTag), out);
         }
