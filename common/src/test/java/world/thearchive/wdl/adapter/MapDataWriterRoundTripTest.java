@@ -29,8 +29,7 @@ class MapDataWriterRoundTripTest {
     void serializeIdCountsIsTheRootMapShortShape() {
         NBTTagCompound idCounts = MapDataWriter.serializeIdCounts(50);
 
-        assertEquals(50, idCounts.hasKey("map") ? idCounts.getShort("map") : -1,
-                "idcounts root is {map: maxId}");
+        assertEquals(50, idCounts.hasKey("map") ? idCounts.getShort("map") : -1, "idcounts root is {map: maxId}");
         assertEquals(2 /* TAG_Short */, idCounts.getTagId("map"), "map is a short at the root");
     }
 
