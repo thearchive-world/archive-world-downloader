@@ -9,9 +9,7 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
 /**
  * Per-band map-serialize axis: encode a client {@link MapItemSavedData} into the inner {@code "data"} tag of a map's
- * {@code data/} save file. The serialize call is this axis's per-band piece, and its shape changes across versions,
- * while the {@code {data, DataVersion}} gzip envelope and the {@code idcounts} {@code {map: maxId}} shape are
- * band-agnostic ({@link MapDataWriter}).
+ * {@code data/} save file.
  *
  * <p>Mirrors {@link PlayerSink}'s lift. The single step is client-coupled (a live {@code MapItemSavedData} resolved
  * from the client's map store); the headless guard is the round-trip re-parse through the band's own map read.
