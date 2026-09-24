@@ -32,8 +32,8 @@ import world.thearchive.wdl.core.SaveProgress;
  * {@link CompoundTag}. Either way the writer thread is the sole owner of the {@link WdlRegionStorage}s, the one-writer
  * invariant, and the reason only immutable or deferred-immutable work may cross the queue.
  *
- * <p>At this band the store itself needs the single thread: vanilla {@code RegionFileStorage} keeps an unsynchronized
- * region-file cache and does synchronous I/O, so it is not safe to call from more than one thread. The mod's own paths
+ * <p>At this band the store itself needs the single thread: {@link WdlRegionStorage} keeps an unsynchronized
+ * region-file cache and does synchronous I/O, so it is not safe to call from more than one thread. The paths around it
  * need it too. The per-dimension {@link Storages} are unsynchronized and open lazily by get-then-put, so a second
  * writer could open two storages over one directory. The merge, rewrite and entity-fold paths are read-modify-write per
  * {@link ChunkPos} and would lose a merge if interleaved. And the finalize order is fixed.
@@ -41,9 +41,9 @@ import world.thearchive.wdl.core.SaveProgress;
  * <p>{@link #finish()} enqueues an end-of-stream marker; the writer drains the remaining tags, closes each storage
  * (which is what flushes its region files, there being no channel force at this band), runs the {@link LevelDataWrite}
  * and then the {@link Finalizer}, and completes the returned future with the per-target tallies (or the error that
- * aborted it). At 1.14.4 the vanilla {@code LevelStorage} holds no OS lock to release at finish (session.lock is
- * advisory pre-1.16), so there is nothing to close here. The future is completed normally even on failure, so the
- * caller polls it with one branch.
+ * aborted it). The vanilla {@code LevelStorage} holds no OS lock to release at finish (session.lock is advisory
+ * pre-1.16), so there is nothing to close here. The future is completed normally even on failure, so the caller polls
+ * it with one branch.
  */
 final class AsyncSaveWriter {
     private static final Logger LOGGER = LogManager.getLogger(AsyncSaveWriter.class);
@@ -355,8 +355,8 @@ final class AsyncSaveWriter {
      * while the folder is open, and {@code outputs} after the storages have closed (the export zip). {@code preflight}
      * and {@code outputs} are best-effort: a throw from either is caught and logged, never failing the save, so a zip
      * failure can never endanger the openable folder. A {@code levelDataWrite} or {@code finalizer} throw aborts the
-     * save the usual way, except that 1.15.2 vanilla LevelStorage.saveLevelData catches and logs an IO failure rather
-     * than throwing, so a disk-level level.dat write failure is not surfaced here.
+     * save the usual way, except that vanilla's {@code LevelStorage.saveLevelData} catches a level.dat write failure
+     * and prints its stack trace rather than throwing, so a disk-level level.dat write failure is not surfaced here.
      */
     public AsyncSaveWriter(StorageOpener regionOpener, Preflight preflight, LevelDataWrite levelDataWrite,
             Finalizer finalizer, OutputFinalizer outputs, SaveProgress progress) {
@@ -716,13 +716,13 @@ final class AsyncSaveWriter {
                         entityChunksFailed++; // per chunk, as above
                         continue;
                     }
-                    // At 1.15.2 entities live inside the region/ chunk under Level.Entities, so the entity write is a
-                    // fold into the host chunk, not a separate entities/ store. The fold read-merges too: a
-                    // re-captured host carries forward each on-disk vehicle's contents AND every on-disk entity the
-                    // fresh capture lacks (EntityMerge unions, so a partial re-flush adds to rather than overwrites
-                    // the prior set). Counted separately from block containers: a non-zero tally means chunks were
-                    // re-flushed with partial sets. A host chunk that never reached disk is a lost fold (FAILED),
-                    // since an entity cannot live without its terrain at this band.
+                    // Entities live inside the region/ chunk under Level.Entities, so the entity write is a fold into
+                    // the host chunk, not a separate entities/ store. The fold read-merges too: a re-captured host
+                    // carries forward each on-disk vehicle's contents AND every on-disk entity the fresh capture lacks
+                    // (EntityMerge unions, so a partial re-flush adds to rather than overwrites the prior set). Counted
+                    // separately from block containers: a non-zero tally means chunks were re-flushed with partial
+                    // sets. A host chunk that never reached disk is a lost fold (FAILED), since an entity cannot live
+                    // without its terrain at this band.
                     // The after-merge step is what reaches an entity that changed entity-chunk between downloads:
                     // its prior record is in another chunk file, so this chunk's own read-merge has nothing to
                     // carry, and only content banked from the resume scan can fill it.

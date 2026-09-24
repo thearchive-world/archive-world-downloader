@@ -9,10 +9,10 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.core.WorldType;
 
 /**
- * Maps a captured dimension to the vanilla single-player dimension it is written under. At 1.15.2 the dimension key is
- * the {@link DimensionType} itself (the pre-1.16 model, before the level-key rework), so both the captured dimension
- * and the routed target are {@code DimensionType}s and every dimension a capture records is one of the three static
- * vanilla types.
+ * Maps a captured dimension to the vanilla single-player dimension it is written under. The dimension key is the
+ * {@link DimensionType} itself (the pre-1.16 model, before the level-key rework), so both the captured dimension and
+ * the routed target are {@code DimensionType}s and every dimension a capture records is one of the three static vanilla
+ * types.
  *
  * <p>The consequence for two server worlds is ACCEPTED rather than guarded, and it is stated here because this method
  * is where it comes from: worlds routing to one folder share it, so their terrain interleaves and their captured

@@ -309,8 +309,8 @@ final class ContainerCapture {
         }
         int size = blockContainer.getContainerSize();
         NonNullList<ItemStack> items = NonNullList.withSize(size, ItemStack.EMPTY);
-        // 1.16.5 Slot has no getContainerSlot accessor, so the container index is the menu order of the
-        // non-player slots: a client block container adds its slots consecutively in container-index order.
+        // Slot has no getContainerSlot accessor, so the container index is the menu order of the non-player slots: a
+        // client block container adds its slots consecutively in container-index order.
         int index = 0;
         for (Slot slot : menu.slots) {
             if (slot.container == playerInventory) {
@@ -368,21 +368,20 @@ final class ContainerCapture {
     /**
      * Serialize the menu's non-player slots whose container index is in {@code [lo, hi)} into a 0-based {@code "Items"}
      * holder (re-based to {@code index - lo}) via the per-band {@link ContainerSink}, or {@code null} when that range
-     * is empty this tick. The client's double-chest menu is one {@code SimpleContainer(54)} with contiguous container
-     * indices 0..53, so {@code [0, 27)} is the RIGHT chest and {@code [27, 54)} the LEFT (the {@code CompoundContainer}
-     * (RIGHT, LEFT) order). Kept separate from {@link #captureChestSlots} on purpose (see the slot-index note below).
+     * is empty this tick. The client's double-chest menu wraps one {@code SimpleContainer(54)} with contiguous indices
+     * 0..53, so {@code [0, 27)} is the RIGHT chest and {@code [27, 54)} the LEFT (the {@code CompoundContainer} (RIGHT,
+     * LEFT) order). Kept separate from {@link #captureChestSlots} on purpose (see the slot-index note below).
      */
     @Nullable
     CompoundTag captureHalfSlots(AbstractContainerMenu menu, LocalPlayer player, int low, int high) {
         Container playerInventory = player.inventory;
         NonNullList<ItemStack> items = NonNullList.withSize(high - low, ItemStack.EMPTY);
         boolean any = false;
-        // 1.16.5 Slot has no getContainerSlot accessor, so the container index is the menu order of the
-        // non-player slots. The client double-chest menu is one SimpleContainer(54) with contiguous indices
-        // 0..53, so menu order equals the container index; do not unify this lift with captureChestSlots, which
-        // offsets its holder from SLOT_INVENTORY_START into the mount's whole inventory. This one stays 0-based,
-        // a chest block entity really reading its Items from slot zero, so merging the two would push every
-        // double-chest stack two slots up.
+        // Slot has no getContainerSlot accessor, so the container index is the menu order of the non-player slots. The
+        // client double-chest menu wraps one SimpleContainer(54) with contiguous indices 0..53, so menu order equals
+        // the container index; do not unify this lift with captureChestSlots, which offsets its holder from
+        // SLOT_INVENTORY_START into the mount's whole inventory. This one stays 0-based, a chest block entity really
+        // reading its Items from slot zero, so merging the two would push every double-chest stack two slots up.
         int index = 0;
         for (Slot slot : menu.slots) {
             if (slot.container == playerInventory) {

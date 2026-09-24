@@ -58,7 +58,7 @@ class MapArchiveTest {
         CompoundTag data = new CompoundTag();
         data.put("colors", new ByteArrayTag(colors));
         data.putByte("scale", (byte) scale);
-        data.putInt("dimension", dimension.getId()); // at 1.15.2 vanilla writes the map dimension as an int id
+        data.putInt("dimension", dimension.getId()); // vanilla writes the map dimension as an int id
         data.putBoolean("locked", locked);
         data.putInt("xCenter", 0);
         data.putInt("zCenter", 0);
