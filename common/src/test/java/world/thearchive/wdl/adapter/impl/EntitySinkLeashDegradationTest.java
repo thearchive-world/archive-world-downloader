@@ -39,19 +39,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for the prime-path leash degradation. A leashed mob whose leash holder the client never resolved
  * carries a {@link Leashable.LeashData} with a null holder and no delayed attachment; vanilla's {@code LeashData} codec
- * throws on exactly that state (an {@code Objects.requireNonNull} in its encode function), so the live
- * {@code entity.save} throws and the sink drops the whole entity, taking a chested mob's container with it. That
- * unresolved state is what ViaBackwards leaves after down-translating the reworked 26.x leash into the 1.21.11 shape;
- * native fence leashes resolve to a knot and save fine. The sink degrades: strip the unsavable leash and write the
- * entity (and its container) unleashed, mirroring the reconstruct path which leaves an unresolved leash link unset.
- * Because {@code save} recurses into passengers, the strip spans the passenger subtree; a leash the codec can still
- * encode (a resolved holder, or a delayed attachment) is left intact.
- *
- * <p>A real chested {@code Mob} cannot be built headless (its constructor dereferences the {@code Level}, as
- * {@link NamedMobPersistenceTest} notes); a bare {@link Entity} constructor does not, so the double below is a real
- * {@code Entity} that also implements {@link Leashable} and writes an {@code Items} container. It drives the exact
- * failing vanilla code, {@code Leashable.writeLeashData} over a holder-unresolved {@code LeashData}, without a live
- * game.
+ * throws on exactly that state, so the live {@code entity.save} throws and the sink drops the whole entity, taking a
+ * chested mob's container with it. The sink degrades: strip the unsavable leash and write the entity (and its
+ * container) unleashed. Because {@code save} recurses into passengers, the strip spans the passenger subtree.
  */
 class EntitySinkLeashDegradationTest {
     private final EntitySink sink = new EntitySinkImpl();
@@ -164,8 +154,8 @@ class EntitySinkLeashDegradationTest {
     }
 
     /**
-     * A headless client-shaped stand-in for a chested, leashable mob (see the class javadoc): a real {@link Entity}
-     * carrying an {@code Items} container and a {@link Leashable} leash.
+     * A headless client-shaped stand-in for a chested, leashable mob: a real {@link Entity} carrying an {@code Items}
+     * container and a {@link Leashable} leash.
      */
     private static final class ContainerLeashableEntity extends Entity implements Leashable {
         private Leashable.@Nullable LeashData leashData;
