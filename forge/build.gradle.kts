@@ -51,7 +51,7 @@ val band = Properties().apply {
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.13.2.
+// Match wdl.java-conventions: the MC version rides as SemVer build metadata.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
@@ -121,9 +121,7 @@ unimined.minecraft {
 val seargeOracle: Configuration = configurations.create("seargeOracle") { isTransitive = false }
 
 // This band's joined.srg parses to exactly these counts under a correct SRG v1 reader: 3122 CL: records, and
-// 18826 distinct searge member ids (9941 field_* and 8885 func_*). The member figure is corroborated
-// independently by the mapping-coverage measurement recorded in ../gradle.properties, which counts the same
-// 8885 methods and 9941 fields from the 32-1.11 MCP export. Both check tasks assert them; see the note on
+// 18826 distinct searge member ids (9941 field_* and 8885 func_*). Both check tasks assert them; see the note on
 // CheckSeargeSurface.expectedOracleClasses for why an unasserted parse is the silent failure here.
 val seargeOracleClasses = 3122
 val seargeOracleMembers = 18826
@@ -134,7 +132,7 @@ dependencies {
 
 // joined.srg maps obfuscated names to real names one self-contained line at a time, in SRG v1: every line carries
 // its own record type as a prefix and there is no indentation and no scoping anywhere in the file, unlike the
-// TSRG the 1.12.2-and-above bands read, where a class line opens a block of tab-indented member lines beneath it.
+// TSRG the 1.12.2 and 1.13.2 islands read, where a class line opens a block of tab-indented member lines beneath it.
 // The four record types and their columns:
 //
 //   PK: <obfPackage> <realPackage>
@@ -334,10 +332,10 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 // --- Lang catalog conversion (JSON -> .lang) ---
-// MC 1.12.2 loads .lang (key=value), the format Mojang replaced at 1.13. The JSON catalog under
+// The game loads .lang (key=value), the format Mojang replaced at 1.13. The JSON catalog under
 // common/src/main/resources/assets/wdl/lang stays the source of truth (LangFidelityTest/LangKeyCoverageTest/etc.
 // keep reading it, unaffected by this task); this task converts a copy to .lang at package time so the shipped
-// jar carries the format 1.12.2 expects. Uses Gradle's bundled groovy.json.JsonSlurper, no new buildscript
+// jar carries the format the game expects. Uses Gradle's bundled groovy.json.JsonSlurper, no new buildscript
 // dependency; keys are sorted for byte-reproducibility.
 abstract class ConvertLangToProperties : DefaultTask() {
     @get:InputDirectory abstract val jsonDir: DirectoryProperty
@@ -561,12 +559,12 @@ val bundleFastutil = tasks.register<FastutilClosure>("bundleFastutil") {
 
 // --- Ship jar (modJar) + the checkShipJar class-file health gate ---
 // The shipped Forge jar must be the reobf'd, searge-named artifact. Unimined's defaultRemapJar produces that jar
-// natively (the "remapJar" task; the plain `jar` task stays the MCP-named dev jar), so modJar wraps it under the
+// natively (the "remapJar" task; the plain "jar" task stays the MCP-named dev jar), so modJar wraps it under the
 // island's own archive-name convention rather than re-deriving reobf: it sources Unimined's own remapped output,
 // which already carries the token-expanded resources (mcmod.info, accesstransformer.cfg, pack.mcmeta, common
 // assets) since remapJar repackages the "jar" task's own sourceSet output; a direct from(processResources) would
 // only re-add the identical bytes a second time. The one resource this island packages differently from
-// processResources' own output is the lang directory: MC 1.12.2 loads .lang, not the JSON Mojang adopted at
+// processResources' own output is the lang directory: the game loads .lang, not the JSON Mojang adopted at
 // 1.13, so the source lang JSON is excluded here and convertLang's converted .lang output takes its place.
 // Ship the license inside the jar: GPL-3.0 section 4, which LGPL-3.0 section 0 incorporates, asks that every
 // recipient get a copy of the License with the Program, and a mod jar travels on its own far from any listing page
@@ -674,7 +672,7 @@ abstract class CheckSeargeSurface : DefaultTask() {
     // True (the default): this is a positive gate, fails when an offender is found. False: this is the
     // inverted meta-test checkReobfNegative runs, over a fixture that permanently carries one offender by
     // construction; it fails only if the scan does NOT find it (the detector regressed), and otherwise passes
-    // with the offender(s) it found logged as proof the gate fired. Mirrors the 1.13.2 CheckReobf's expectClean.
+    // with the offender(s) it found logged as proof the gate fired.
     @get:Input
     abstract val expectClean: Property<Boolean>
 

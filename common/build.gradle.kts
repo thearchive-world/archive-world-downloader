@@ -25,15 +25,14 @@ spotless {
     }
 }
 
-// --- Minecraft toolchain: loader-less Unimined against classic MCP mappings ---
-// This band predates the Mojmap floor NeoForm/ModDevGradle and NeoGradle vanilla can target, and unlike the
-// 1.13.2 parent it also predates Mojang's own official mappings (Mojang has published none before 1.14.4), so
-// even a hand-composed bridge has nothing to bridge to. The toolchain reaches for the classic pre-Mojmap
-// standard instead: searge (obf->SRG) composed with the MCP project's community names on top.
+// --- Minecraft toolchain: Unimined against classic MCP mappings ---
+// This band predates the Mojmap floor NeoForm/ModDevGradle and NeoGradle vanilla can target, and Mojang's own
+// official mappings too (Mojang has published none before 1.14.4). The toolchain reaches for the classic
+// pre-Mojmap standard instead: searge (obf->SRG) composed with the MCP project's community names on top.
 // Unimined resolves both natively from a single provisioned jar, with no Fabric/Legacy-Fabric intermediary hop
 // and no hand-rolled bridge build. common is written in MCP names, so it compiles against Unimined's provisioned
-// jar with no per-name glue; Unimined's test source set inherits the same jar, so the headless JUnit suite boots
-// the vanilla registries against it.
+// jar with no per-name glue; the test source set is handed the same jar (see the dependencies below), so the
+// headless JUnit suite boots the vanilla registries against it.
 val minecraftVersion = providers.gradleProperty("minecraft_version").get()
 val mcpMappingsChannel = providers.gradleProperty("mcp_mappings_channel").get()
 val mcpMappingsVersion = providers.gradleProperty("mcp_mappings_version").get()
