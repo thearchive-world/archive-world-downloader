@@ -22,11 +22,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * The 1.10.2 natural-spawn equipment table and the pure "was this equipped by a loot pickup" inference.
  *
- * <p>Vanilla sets the server-only {@code PersistenceRequired} flag when a mob equips a picked-up item
- * ({@code EntityLiving.setItemStackToSlot} plus the drop-chance flag); the client never receives that flag. An equipped
- * item that no natural spawn of the mob's type could carry in that slot therefore proves the pickup ran, hence proves
- * the mob was persistent. The test is scoped to the mainhand and armor slots, the only slots the generic pickup path
- * fills; the offhand is excluded because a mob can hold an unpersisted item there.
+ * <p>Vanilla sets the server-only {@code PersistenceRequired} flag when a mob equips a picked-up item; the client never
+ * receives that flag. An equipped item that no natural spawn of the mob's type could carry in that slot therefore
+ * proves the pickup ran, hence proves the mob was persistent. The test is scoped to the mainhand and armor slots, the
+ * only slots the generic pickup path fills; the offhand is excluded because a mob can hold an unpersisted item there.
  */
 final class NaturalEquipment {
     private NaturalEquipment() {}

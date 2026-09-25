@@ -120,7 +120,7 @@ public final class OpenClickTracker {
         // what this recognizes. That covers both the loot containers (chest, hopper, dispenser, dropper, through
         // TileEntityLockableLoot) and the non-loot menu containers (furnace, brewing stand, beacon), where the
         // narrower ILootContainer would have missed the latter and dropped their contents. A provider-less workstation
-        // menu (crafting table, enchanting table, anvil) has no block entity to test here, so it is not latched and
+        // menu (crafting table, anvil) has no block entity to test here, so it is not latched and
         // falls into the documented FRESH_WINDOW_TICKS leak class rather than the intent chain.
         if (level.getTileEntity(pos) instanceof ILockableContainer) {
             return true;

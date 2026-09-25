@@ -21,22 +21,17 @@ import org.jspecify.annotations.Nullable;
  * {@code sell} item, the only full item stack an offer carries, through the item-location scrub and the map-id remap
  * every captured item takes; the {@code buy}/{@code buyB} costs are match predicates, not instance data, so they carry
  * no coordinate or map id and are left alone.
- *
- * <p>The trade list's NBT write is lenient and never rejects an offer on this band, so the per-tick caller's
- * per-villager isolation of a rejecting serialize is inert here. It is kept because the caller is band-stable and the
- * newer bands do reject through their codec.
  */
 final class MerchantOfferCapture {
     private MerchantOfferCapture() {}
 
     /**
-     * Serialize {@code offers} to the {@code "Offers"} holder. The trade list's NBT write does not reject an offer on
-     * this band, so it does not throw (see the class note).
+     * Serialize {@code offers} to the {@code "Offers"} holder.
      *
-     * <p>Below 1.15 vanilla {@code ItemStack.save} puts each offer item's live {@code tag} compound into its output, so
-     * the offers are detached before they are handed on. Without that, the drain-time scrub and map-id remap write into
-     * the merchant's own stacks, and a re-stash on the next tick resolves the rewritten id as a fresh one, burning an
-     * archive id per tick and saving a trade that points at an unimaged map.
+     * <p>Below 1.15 vanilla {@code ItemStack.writeToNBT} puts each offer item's live {@code tag} compound into its
+     * output, so the offers are detached before they are handed on. Without that, the drain-time scrub and map-id remap
+     * write into the merchant's own stacks, and a re-stash on the next tick resolves the rewritten id as a fresh one,
+     * burning an archive id per tick and saving a trade that points at an unimaged map.
      */
     static NBTTagCompound serialize(MerchantRecipeList offers) {
         NBTTagCompound holder = new NBTTagCompound();

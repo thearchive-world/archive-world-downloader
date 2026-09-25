@@ -81,7 +81,7 @@ class ChunkMergeTest {
 
     private static NBTTagCompound jukeboxWithDisc(int x, int y, int z, String discId) {
         // At 1.10.2 TileEntityJukebox.writeToNBT writes only RecordItem, and only when a disc is present; the
-        // IsPlaying and tick sidecars are 1.19 additions.
+        // IsPlaying and tick sidecars are later additions.
         NBTTagCompound blockEntity = jukebox(x, y, z);
         blockEntity.setTag("RecordItem", ItemFixtures.itemTag(discId));
         return blockEntity;
@@ -96,9 +96,8 @@ class ChunkMergeTest {
 
     /**
      * A beehive block entity carrying occupants under {@code "Bees"}, the key {@link ChunkMerge}'s own
-     * {@code CapturedBlockField.BEES} carries forward (vanilla's own {@code BeehiveBlockEntity} persists occupants
-     * under {@code "Bees"} instead, so this shape is not a real producer's output; a chunk tag built from it must go
-     * through {@link BlockEntityFixtures#malformedChunkTagWith}, not the fidelity-checked
+     * {@code CapturedBlockField.BEES} carries forward (this shape is not a real producer's output; a chunk tag built
+     * from it must go through {@link BlockEntityFixtures#malformedChunkTagWith}, not the fidelity-checked
      * {@link BlockEntityFixtures#chunkTagWith}).
      */
     private static NBTTagCompound beehiveWithBees(int x, int y, int z, int beeCount) {

@@ -36,11 +36,11 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * chunk itself.
  *
  * <p>Server-free by construction: hand-built entity tags drive the carrier, so neither a live {@code Entity} nor a
- * {@code Level} is needed. The two client/level-coupled steps are not exercised headless, exactly as for chunks
+ * {@code World} is needed. The two client/level-coupled steps are not exercised headless, exactly as for chunks
  * ({@link ChunkRoundTripTest}):
  * <ul>
- * <li>the live {@code entity.save(NBTTagCompound)} serialization needs a real {@code Entity}; and</li>
- * <li>{@code EntityType.loadEntityRecursive} parse-back needs a {@code Level}.</li>
+ * <li>the live {@code Entity.writeToNBTOptional(NBTTagCompound)} serialization needs a real {@code Entity}; and</li>
+ * <li>{@code AnvilChunkLoader.readWorldEntity} parse-back needs a {@code World}.</li>
  * </ul>
  * This test proves the in-chunk carrier + region IO self-consistency.
  */

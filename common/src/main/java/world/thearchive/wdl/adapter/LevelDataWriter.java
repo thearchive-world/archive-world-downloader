@@ -50,8 +50,7 @@ public interface LevelDataWriter {
      * Write the built {@link LevelData} to {@code storage} via the band-correct vanilla save form, optionally attaching
      * a captured player. This lives on the SPI (not in the shared capture session) because the vanilla signatures drift
      * across bands: at 1.10.2 the write is {@code ISaveHandler.saveWorldInfoWithPlayer(WorldInfo, playerTag)} (or
-     * {@code saveWorldInfo(WorldInfo)} with no player), where the modern bands take a {@code LevelStorageAccess} and a
-     * {@code RegistryAccess}.
+     * {@code saveWorldInfo(WorldInfo)} with no player), where the modern bands take a {@code LevelStorageAccess}.
      *
      * <p>With a non-null {@code player}: flip {@code GameType}, set the world spawn to the capture position, write the
      * captured {@code Difficulty}, and route the captured tag into the {@code "Player"} slot. With {@code null}: no

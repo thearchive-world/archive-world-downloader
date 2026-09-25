@@ -32,11 +32,10 @@ import world.thearchive.wdl.core.SaveProgress;
  * {@link NBTTagCompound}. Either way the writer thread is the sole owner of the {@link WdlRegionStorage}s, the
  * one-writer invariant, and the reason only immutable or deferred-immutable work may cross the queue.
  *
- * <p>At this band the store itself needs the single thread: vanilla {@code RegionFileCache} keeps an unsynchronized
- * region-file cache and does synchronous I/O, so it is not safe to call from more than one thread. The mod's own paths
- * need it too. The per-dimension {@link Storages} are unsynchronized and open lazily by get-then-put, so a second
- * writer could open two storages over one directory. The merge, rewrite and entity-fold paths are read-modify-write per
- * {@link ChunkPos} and would lose a merge if interleaved. And the finalize order is fixed.
+ * <p>The mod's own paths need the single thread. The per-dimension {@link Storages} are unsynchronized and open lazily
+ * by get-then-put, so a second writer could open two storages over one directory. The merge, rewrite and entity-fold
+ * paths are read-modify-write per {@link ChunkPos} and would lose a merge if interleaved. And the finalize order is
+ * fixed.
  *
  * <p>{@link #finish()} enqueues an end-of-stream marker; the writer drains the remaining tags, closes each storage
  * (which is what flushes its region files, there being no channel force at this band), runs the {@link LevelDataWrite}

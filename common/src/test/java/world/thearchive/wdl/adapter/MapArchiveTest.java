@@ -188,7 +188,7 @@ class MapArchiveTest {
     void remappingTheCapturedHolderLeavesTheLiveStackAlone() {
         CollectingSink stream = new CollectingSink();
         MapArchive archive = new MapArchive(MapManifest.empty(), id -> picture(1), stream);
-        // Below 1.15 vanilla ItemStack.save shares the live stack's tag compound instead of copying it, so a
+        // Below 1.15 vanilla ItemStack.writeToNBT shares the live stack's tag compound instead of copying it, so a
         // capture that does not detach hands the remap the player's own held item.
         ItemStack live = filledMap(1988);
         NBTTagCompound holder = holderOf(sink, live);

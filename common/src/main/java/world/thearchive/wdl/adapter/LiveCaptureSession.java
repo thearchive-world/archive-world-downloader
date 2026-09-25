@@ -228,16 +228,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // evaluation depend on -ea; they are safe only because a level() call already ran earlier in the chain,
     // which for reencode means its callers, since it takes its chunk source as a parameter.
     private @Nullable WorldClient level;
-    // The vanilla single-player dimension this capture is laid out under, chosen by the captured
-    // dimension's TYPE so non-standard server level keys (e.g. Multiverse's minecraft:worlds/2b2t/2b2t_1)
-    // still write to the vanilla dimension's own folder, not one derived from the custom level key.
+    // The vanilla single-player dimension this capture is laid out under, chosen by the captured dimension's TYPE.
     // Non-final: rebound on a dimension change to lay the new dimension out under its own folder.
     private DimensionType targetDimension;
-    // The server's OWN key for the dimension being captured, as the id string the packet-side per-dimension
-    // stores share, which on a Multiverse/Paper server is not the vanilla-mapped targetDimension above. It is
-    // the identity the inbound tee stamps each held entity with, so the promote gate compares a held frame
-    // against the world it was announced in rather than against a position set from another world. Rebound on
-    // a dimension change, like targetDimension.
+    // The id of the dimension being captured, as the id string the packet-side per-dimension stores share. It is the
+    // identity the inbound tee stamps each held entity with, so the promote gate compares a held frame against the
+    // world it was announced in rather than against a position set from another world. Rebound on a dimension change,
+    // like targetDimension.
     private String liveDimensionId;
 
     /**
@@ -329,10 +326,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private final Map<BlockPos, StashHolder> containerStash = new LinkedHashMap<>();
 
     /**
-     * Captured lectern {@code "Book"}/{@code "Page"} holders keyed by block pos; last-seen-while-open wins. The lectern
-     * axis beside {@link #containerStash}: in ordinary play a book reaches the client only through the open lectern
-     * menu's slot 0, so it is lifted there and merged into its chunk's already-captured lectern block entity (and
-     * dropped) just before that chunk is flushed, by {@link ContainerMerge#mergeLecternChunkStash}.
+     * Captured lectern {@code "Book"}/{@code "Page"} holders keyed by block pos; last-seen-while-open wins.
      */
     private final Map<BlockPos, StashHolder> lecternStash = new LinkedHashMap<>();
 
@@ -340,7 +334,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * The captured ender-chest {@code "Items"} holder, last-seen-while-open wins. Unlike the block-keyed stashes the
      * ender chest is the player's single global inventory, so one field suffices; it is merged into the captured player
      * tag's {@code "EnderItems"} at {@link #finish()}, not into a chunk block entity (the ender chest reaches the
-     * client only through its open menu, as with the lectern).
+     * client only through its open menu).
      */
     private @Nullable NBTTagCompound enderChestStash;
 
@@ -377,13 +371,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * and, for a placed content-bearing container, the instant the interaction recognizer records it, optimistically
      * before the flush confirms it, the way the open-time stash marks a chest on open and
      * {@link #onBookshelfSlotCaptured} marks a bookshelf slot. So membership tracks contents-stashed-for-save, not the
-     * live stash (which drains mid-session and would otherwise re-show a flushed container's rim). Removal is rare and
-     * each case un-stashes the content it un-marks: a lectern whose book is taken back, and a cell a placement lands
-     * in, whose captured block is being replaced ({@link #onBlockPlacedAt}). Block containers, double-chest halves, and
-     * placed containers enter by block pos key, held per dimension and swapped on a portal like {@link #allCaptured} so
-     * a position in one dimension never dedups another's; borne containers enter by globally-unique entity UUID,
-     * staying session-wide, and every ender chest is derived from {@link #enderChestStash} (one shared capture).
-     * Main-thread only, like the rest of capture; the cross-seam view contract is {@link CapturedContainers}.
+     * live stash (which drains mid-session and would otherwise re-show a flushed container's rim). Removal is rare, and
+     * the one case un-stashes the content it un-marks: a cell a placement lands in, whose captured block is being
+     * replaced ({@link #onBlockPlacedAt}). Block containers, double-chest halves, and placed containers enter by block
+     * pos key, held per dimension and swapped on a portal like {@link #allCaptured} so a position in one dimension
+     * never dedups another's; borne containers enter by globally-unique entity UUID, staying session-wide, and every
+     * ender chest is derived from {@link #enderChestStash} (one shared capture). Main-thread only, like the rest of
+     * capture; the cross-seam view contract is {@link CapturedContainers}.
      */
     private final Map<DimensionType, LongOpenHashSet> capturedBlockKeysByDimension = new LinkedHashMap<>();
     private LongOpenHashSet capturedBlockKeys = new LongOpenHashSet();
@@ -536,12 +530,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int drainAbortDrops;
 
     /**
-     * Primed entities the sink refused. An unresolvable leash never lands here (the sink strips it and saves the mob
-     * unleashed), so a refusal means the entity failed the standalone save check (a live passenger saved nested under
-     * its vehicle, a removed entity, or a player-only vehicle vanilla persists through the player) or its save returned
-     * false (a non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips. Reported so
-     * the drop is visible; not a loss, and not part of the packet reconciliation residual (a primed entity has no spawn
-     * packet).
+     * Primed entities the sink refused. An unresolvable leash never lands here, so a refusal means the entity failed
+     * the standalone save check (a live passenger saved nested under its vehicle, a removed entity, or a player-only
+     * vehicle vanilla persists through the player) or its save returned false (a non-serializable type: a leash knot, a
+     * bobber), which are the non-saves vanilla also skips. Reported so the drop is visible; not a loss, and not part of
+     * the packet reconciliation residual (a primed entity has no spawn packet).
      */
     private int primeSinkSkips;
 
@@ -857,9 +850,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * The construction a headless test can drive: the values the session takes from its {@link WorldClient} arrive
      * directly, so {@code level} may be null and dereferencing it then fails loudly (see {@link #level()}).
      * Package-private because a null level is a test-only state; production always builds through the public
-     * constructor, which derives the same values from the level it binds. {@code liveDimension} is the server's own key
-     * for that level, which the vanilla-mapped {@code targetDimension} equals in every vanilla world and differs from
-     * on a server that names its worlds itself.
+     * constructor, which derives the same values from the level it binds.
      */
     LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config,
             @Nullable WorldClient level, DimensionType targetDimension, DimensionType liveDimension,
@@ -1392,9 +1383,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         ChunkProviderClient chunkSource = level().getChunkProvider();
         ChunkCodec codec = adapter.chunkCodec();
 
-        // The live client dimension id: on a Multiverse/Paper server this is the server's custom id
-        // (e.g. minecraft:worlds/2b2t/2b2t_1), which is what the overlay providers query the overlay under, so
-        // the overlay index keys by this rather than the vanilla-mapped disk key. Same for every chunk this call.
+        // The live client dimension id, which is what the overlay providers query the overlay under, so the overlay
+        // index keys by this rather than the vanilla-mapped disk key. Same for every chunk this call.
         String overlayDimension = level().provider.getDimensionType().getName();
 
         // Nearest-to-player first (by Chebyshev ring), so when the encode budget spills the square across ticks
@@ -1870,10 +1860,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * {@code ClientboundContainerSetContentPacket}), never in the chunk packet, so they are stashed here and merged
      * into their target at {@link #finish()}. Each recognition axis has its own bind leg and its own confidence test,
      * and an open that no leg claims confidently is DROPPED: mis-binding would write the wrong items onto a block or
-     * entity (a corrupt archive) while an empty container is correct. The ender chest, the double chest, the lectern,
-     * the chested animal and the container vehicle each bind through their own leg rather than being dropped; what is
-     * dropped is an open whose target the click chain cannot account for, and any open whose slot count fails its leg's
-     * size guard.
+     * entity (a corrupt archive) while an empty container is correct. The ender chest, the double chest, the chested
+     * animal and the container vehicle each bind through their own leg rather than being dropped; what is dropped is an
+     * open whose target the click chain cannot account for, and any open whose slot count fails its leg's size guard.
      *
      * <p>The binding is decided once when the menu first appears, from the target the player clicked (see
      * {@link ContainerCapture#resolveOpenTarget}, since the live crosshair keeps drifting until the menu freezes the
@@ -2305,13 +2294,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Re-serialize the open merchant's offers (and a villager's trade experience) every tick into
-     * {@link #merchantStash} keyed by the bound villager UUID, last-seen-wins, skipping an empty offers so a re-open
-     * before the offers packet lands never wipes a captured set. Runs outside the slot-keyed change gate (see the
-     * caller). The encode is isolated per villager, the discipline every vanilla-serializer encode over client-held
-     * state needs: a sell item whose codec rejects would otherwise throw out of the client tick every tick the screen
-     * is open, so it is skipped, logged once, and remembered so it is not retried. The captured-set add clears the
-     * outline rim and runs only on a successful encode, so a failed encode is never falsely reported as captured.
+     * Re-serialize the open merchant's offers every tick into {@link #merchantStash} keyed by the bound villager UUID,
+     * last-seen-wins, skipping an empty offers so a re-open before the offers packet lands never wipes a captured set.
+     * Runs outside the slot-keyed change gate (see the caller). The encode is isolated per villager, the discipline
+     * every vanilla-serializer encode over client-held state needs: a sell item that fails to encode would otherwise
+     * throw out of the client tick every tick the screen is open, so it is skipped, logged once, and remembered so it
+     * is not retried. The captured-set add clears the outline rim and runs only on a successful encode, so a failed
+     * encode is never falsely reported as captured.
      */
     private void stashMerchantOffers() {
         UUID uuid = boundEntityUuid;
@@ -2797,8 +2786,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * The captured positions of the dimension a held frame names, or null when this download cannot answer for it. The
-     * stamp is the server's own level key, so it resolves for the three keys a capture lays out under and for nothing
-     * else: a server that names its worlds itself yields an id no folder of ours corresponds to, and there the privacy
+     * stamp resolves for the three keys a capture lays out under and for nothing else, and for any other id the privacy
      * gate's question has no answer rather than the answer no. A dimension that resolves but was never bound captured
      * nothing, which is an empty set rather than an absent one.
      */
@@ -3424,8 +3412,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null; // colors never received (imageless): skipped, never fabricated
         }
         NBTBase mapTag = adapter.mapSink().serializeMap(saved);
-        // 1.10.2 MapData has no locked() copy method, and mutating the live client map's locked flag would
-        // freeze its tracking, so the archived lock is set on the serialized tag instead, leaving the live map alone.
+        // MapData has no locked flag and never reads the "locked" key set on the serialized tag below.
         if (config.lockDownloadedMaps() && mapTag instanceof NBTTagCompound) {
             ((NBTTagCompound) mapTag).setBoolean("locked", true);
         }
@@ -4231,9 +4218,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * The merchant analog of {@link #recordStandaloneFoldedContainers}: retain a copy of each about-to-drain offer
      * holder for a villager written standalone in this chunk, so {@link EntityContainerMerge#refoldFlushedMerchants}
-     * can re-apply it to another chunk copy (a wandering trader that crossed entity-chunks). The copy is marked
-     * prepared, since it is a copy of an already-scrubbed, already-remapped holder the non-idempotent remap must not
-     * re-run.
+     * can re-apply it to another chunk copy. The copy is marked prepared, since it is a copy of an already-scrubbed,
+     * already-remapped holder the non-idempotent remap must not re-run.
      */
     private void recordStandaloneFoldedMerchants(List<NBTTagCompound> tags) {
         for (NBTTagCompound tag : tags) {

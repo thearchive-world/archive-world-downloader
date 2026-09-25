@@ -100,8 +100,7 @@ public final class BlockEntityFixtures {
 
     /**
      * A {@code "Bees"}-shaped list of one occupant per named {@code ticksInHive}, the
-     * {@code {EntityData, TicksInHive, MinOccupationTicks}} entry vanilla's {@code TileEntityBeehive.readFromNBT}
-     * reads.
+     * {@code {EntityData, TicksInHive, MinOccupationTicks}} entry.
      */
     public static NBTTagList bees(int... ticksInHive) {
         NBTTagList list = new NBTTagList();
