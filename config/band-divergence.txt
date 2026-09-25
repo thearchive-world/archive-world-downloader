@@ -20,11 +20,11 @@
 # Every pattern carries a # reason directly above it (checkBandDivergence fails on a pattern without one), so
 # a shared reason across several files is repeated per line rather than written once over a group.
 
-# Below 1.18 the composite test registry access is RegistryAccess.builtin(), plain RegistryAccess rather than
-# RegistryAccess.Frozen, a 1.18 addition that builtinCopy().freeze() returns at 1.18.2 and 1.19 (builtinCopy is gone by
-# 1.19.4); it populates the dimension types (via DimensionType.registerBuiltin) and the biomes and the rest of worldgen
-# from code. There is no layered registry loader or tag-load step (RegistryDataLoader and LayeredRegistryAccess arrive
-# by 1.19.4 and Registry.PendingTags at 1.21.2), and no kept test binds data-driven tags.
+# Below 1.18 the test registry access is RegistryAccess.builtin(), plain RegistryAccess rather than
+# RegistryAccess.Frozen, a 1.18.2 addition that builtinCopy().freeze() returns at 1.18.2 and 1.19 (builtinCopy is gone
+# by 1.19.4); it populates the dimension types (via DimensionType.registerBuiltin) and the biomes and the rest of
+# worldgen from code. There is no layered registry loader or tag-load step (RegistryDataLoader and LayeredRegistryAccess
+# arrive by 1.19.4 and Registry.PendingTags at 1.21.2), and no kept test binds data-driven tags.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
 # 1.16.5's Fabric API registers a key through KeyBindingHelper.registerKeyBinding, where dev's release uses
@@ -228,7 +228,7 @@ common/src/test/java/world/thearchive/wdl/adapter/EntityRoundTripTest.java
 # Constructs GameRules from a Dynamic via the pre-1.21.2 single-argument constructor (the feature-flag-filtered
 # constructor is 1.21.2 and above). Below 1.18 there is no RegistryOps.create, so the ops are built via
 # RegistryWriteOps.create(NbtOps.INSTANCE, registries), and the test registries are plain RegistryAccess
-# (RegistryAccess.Frozen is a 1.18 addition).
+# (RegistryAccess.Frozen is a 1.18.2 addition).
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatWorldOutputTest.java
 
 # The headless entity double overrides hurt(DamageSource, float), the pre-1.21.2 damage entry point (the
@@ -483,7 +483,7 @@ common/src/test/java/world/thearchive/wdl/testsupport/EntityFixtures.java
 # Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
 common/src/test/java/world/thearchive/wdl/adapter/PriorPlayerReadRoundTripTest.java
 
-# Below 1.18 the test registries are plain RegistryAccess (RegistryAccess.Frozen is a 1.18 addition), and below
+# Below 1.18 the test registries are plain RegistryAccess (RegistryAccess.Frozen is a 1.18.2 addition), and below
 # 1.20.3 NbtIo.readCompressed and writeCompressed take a File with no NbtAccounter argument. Java 8 form: no
 # Optional.isEmpty (Java 11), so the no-level-stem assertion negates isPresent.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
@@ -919,8 +919,8 @@ common/src/test/java/world/thearchive/wdl/update/UpdateFixtures.java
 # ImmutableList.of.
 common/src/test/java/world/thearchive/wdl/update/ReleaseIndexTest.java
 
-# Below 1.18 the test registries are plain RegistryAccess via builtin(); RegistryAccess.Frozen and
-# builtinCopy().freeze() are 1.18 additions. Java 8 form: no List.of.
+# Below 1.18 the test registries are plain RegistryAccess via builtin(); RegistryAccess.Frozen is a 1.18.2 addition.
+# Java 8 form: no List.of.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkReencodeFidelityTest.java
 
 # Below 1.18 the test registries are plain RegistryAccess via builtin(), not RegistryAccess.Frozen.
