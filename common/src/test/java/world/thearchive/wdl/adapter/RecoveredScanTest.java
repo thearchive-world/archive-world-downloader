@@ -294,8 +294,6 @@ class RecoveredScanTest {
     }
 
     private static CompoundTag jukeboxWithDisc(int x, int y, int z) {
-        // Vanilla JukeboxBlockEntity.saveAdditional always writes IsPlaying/RecordStartTick/TickCount alongside
-        // a present RecordItem.
         CompoundTag blockEntity = emptyJukebox(x, y, z);
         blockEntity.put("RecordItem", ItemFixtures.itemTag("minecraft:music_disc_cat"));
         blockEntity.putBoolean("IsPlaying", true);

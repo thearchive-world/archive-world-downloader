@@ -512,10 +512,10 @@ public final class InteractionCapture {
     }
 
     /**
-     * Serialize {@code disc} to a holder carrying the jukebox disc ({@code "RecordItem"}) plus the just-started playing
-     * state a fresh insert leaves ({@code "IsPlaying"} true, {@code "RecordStartTick"} and {@code "TickCount"} zero).
-     * Vanilla loadAdditional restores that state, so the saved jukebox plays and emits the note particles; the disc
-     * sound itself cannot resume on load (an MC limitation, it fires only on the insert event).
+     * Serialize {@code disc} to a holder carrying the jukebox disc ({@code "RecordItem"}) plus {@code "IsPlaying"} true
+     * and {@code "RecordStartTick"} and {@code "TickCount"} zero, which vanilla's {@code JukeboxBlockEntity.load}
+     * ignores: it reads only {@code "RecordItem"}, so the saved jukebox holds its disc without playing, and the disc
+     * sound fires only on the insert event.
      */
     static CompoundTag captureRecordItem(ItemStack disc) {
         CompoundTag holder = new CompoundTag();

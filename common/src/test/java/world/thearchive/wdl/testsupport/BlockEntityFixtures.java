@@ -101,8 +101,8 @@ public final class BlockEntityFixtures {
 
     /**
      * A {@code "Bees"}-shaped list of one occupant per named {@code ticksInHive}, the pre-component
-     * {@code {EntityData, TicksInHive, MinOccupationTicks}} entry vanilla's {@code BeehiveBlockEntity.load} reads
-     * (below 1.20.5 there is no {@code Occupant} record to encode through).
+     * {@code {EntityData, TicksInHive, MinOccupationTicks}} entry (below 1.20.5 there is no {@code Occupant} record to
+     * encode through).
      */
     public static ListTag bees(int... ticksInHive) {
         ListTag list = new ListTag();
