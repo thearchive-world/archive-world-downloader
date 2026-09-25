@@ -86,8 +86,8 @@ final class EntityPacketCapture
     private static volatile @Nullable EntityPacketCapture active;
 
     /**
-     * The four static decoration types the covered overlay reports on. A decoration always qualifies for range
-     * sampling, independent of the range-10 rule and the exclusion list.
+     * The static decoration types the covered overlay reports on. A decoration always qualifies for range sampling,
+     * independent of the range-10 rule and the exclusion list.
      */
     private static final Set<EntityType<?>> DECORATION_TYPES = ImmutableSet.of(
             EntityType.ITEM_FRAME, EntityType.PAINTING, EntityType.ARMOR_STAND);
@@ -402,7 +402,7 @@ final class EntityPacketCapture
     /**
      * Apply a relative move ({@code ClientboundMoveEntityPacket}, the common walk update) keyed by the entity id the
      * tee read from the packet's non-public field. A relative move is a short delta in 1/4096 of a block off the last
-     * sent base, so it is resolved against the current accumulated position (vanilla's VecDeltaCodec).
+     * sent base, so it is resolved against the current accumulated position.
      *
      * <p>Vanilla sends a rider rotation but never a position, so a rider's held coordinates stay frozen at where it
      * boarded; a chunk home derived from them would revert the re-home onto its vehicle and split the pair across two

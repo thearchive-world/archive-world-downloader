@@ -233,16 +233,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // evaluation depend on -ea; they are safe only because a level() call already ran earlier in the chain,
     // which for reencode means its callers, since it takes its chunk source as a parameter.
     private @Nullable MultiPlayerLevel level;
-    // The vanilla single-player dimension this capture is laid out under, chosen by the captured
-    // dimension's TYPE so non-standard server level keys (e.g. Multiverse's minecraft:worlds/2b2t/2b2t_1)
-    // still write to the vanilla dimension's own folder, not one derived from the custom level key.
+    // The vanilla single-player dimension this capture is laid out under, chosen by the captured dimension's TYPE.
     // Non-final: rebound on a dimension change to lay the new dimension out under its own folder.
     private DimensionType targetDimension;
-    // The server's OWN key for the dimension being captured, as the id string the packet-side per-dimension
-    // stores share, which on a Multiverse/Paper server is not the vanilla-mapped targetDimension above. It is
-    // the identity the inbound tee stamps each held entity with, so the promote gate compares a held frame
-    // against the world it was announced in rather than against a position set from another world. Rebound on
-    // a dimension change, like targetDimension.
+    // The id of the dimension being captured, as the id string the packet-side per-dimension stores share. It is the
+    // identity the inbound tee stamps each held entity with, so the promote gate compares a held frame against the
+    // world it was announced in rather than against a position set from another world. Rebound on a dimension change,
+    // like targetDimension.
     private String liveDimensionId;
 
     /**
@@ -542,12 +539,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int drainAbortDrops;
 
     /**
-     * Primed entities the sink refused. An unresolvable leash never lands here (the sink strips it and saves the mob
-     * unleashed), so a refusal means the entity failed the standalone save check (a live passenger saved nested under
-     * its vehicle, a removed entity, or a player-only vehicle vanilla persists through the player) or its save returned
-     * false (a non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips. Reported so
-     * the drop is visible; not a loss, and not part of the packet reconciliation residual (a primed entity has no spawn
-     * packet).
+     * Primed entities the sink refused. An unresolvable leash never lands here, so a refusal means the entity failed
+     * the standalone save check (a live passenger saved nested under its vehicle, a removed entity, or a player-only
+     * vehicle vanilla persists through the player) or its save returned false (a non-serializable type: a leash knot, a
+     * bobber), which are the non-saves vanilla also skips. Reported so the drop is visible; not a loss, and not part of
+     * the packet reconciliation residual (a primed entity has no spawn packet).
      */
     private int primeSinkSkips;
 
@@ -865,9 +861,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * The construction a headless test can drive: the values the session takes from its {@link MultiPlayerLevel} arrive
      * directly, so {@code level} may be null and dereferencing it then fails loudly (see {@link #level()}).
      * Package-private because a null level is a test-only state; production always builds through the public
-     * constructor, which derives the same values from the level it binds. {@code liveDimension} is the server's own key
-     * for that level, which the vanilla-mapped {@code targetDimension} equals in every vanilla world and differs from
-     * on a server that names its worlds itself.
+     * constructor, which derives the same values from the level it binds.
      */
     LiveCaptureSession(VersionAdapter adapter, PlatformBridge bridge, WdlConfig config,
             @Nullable MultiPlayerLevel level, DimensionType targetDimension, DimensionType liveDimension,
@@ -1393,9 +1387,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
         ClientChunkCache chunkSource = level().getChunkSource();
         ChunkCodec codec = adapter.chunkCodec();
 
-        // The live client dimension id: on a Multiverse/Paper server this is the server's custom id
-        // (e.g. minecraft:worlds/2b2t/2b2t_1), which is what the overlay providers query the overlay under, so
-        // the overlay index keys by this rather than the vanilla-mapped disk key. Same for every chunk this call.
+        // The live client dimension id, which is what the overlay providers query the overlay under, so the overlay
+        // index keys by this rather than the vanilla-mapped disk key. Same for every chunk this call.
         String overlayDimension = DimensionType.getName(level().getDimension().getType()).toString();
 
         // Nearest-to-player first (by Chebyshev ring), so when the encode budget spills the square across ticks
@@ -2321,7 +2314,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * {@link #merchantStash} keyed by the bound villager UUID, last-seen-wins, skipping an empty offers so a re-open
      * before the offers packet lands never wipes a captured set. Runs outside the slot-keyed change gate (see the
      * caller). The encode is isolated per villager, the discipline every vanilla-serializer encode over client-held
-     * state needs: a sell item whose codec rejects would otherwise throw out of the client tick every tick the screen
+     * state needs: a sell item that fails to encode would otherwise throw out of the client tick every tick the screen
      * is open, so it is skipped, logged once, and remembered so it is not retried. The captured-set add clears the
      * outline rim and runs only on a successful encode, so a failed encode is never falsely reported as captured.
      */
@@ -2350,7 +2343,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Lift the bound lectern's slot-0 book and reading page from the open menu and stash them keyed by block pos,
      * overwriting any earlier capture for the same open menu (last-seen-wins, so a page turn re-stashes the live page).
-     * An empty slot 0 removes any stash entry (mirrors {@code saveAdditional}'s {@code !isEmpty()} guard, and is the
+     * An empty slot 0 removes any stash entry (mirrors {@code save}'s {@code !isEmpty()} guard, and is the
      * take-the-book resurrection guard): client-coupled, so the empty-drop branch is not exercised headless (as with
      * {@code stashContainerItems}).
      */
@@ -2819,8 +2812,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * The captured positions of the dimension a held frame names, or null when this download cannot answer for it. The
-     * stamp is the server's own level key, so it resolves for the three keys a capture lays out under and for nothing
-     * else: a server that names its worlds itself yields an id no folder of ours corresponds to, and there the privacy
+     * stamp resolves for the three keys a capture lays out under and for nothing else, and for any other id the privacy
      * gate's question has no answer rather than the answer no. A dimension that resolves but was never bound captured
      * nothing, which is an empty set rather than an absent one.
      */
@@ -3467,8 +3459,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null; // colors never received (imageless): skipped, never fabricated
         }
         Tag mapTag = adapter.mapSink().serializeMap(saved);
-        // MapItemSavedData has no locked() copy method, and mutating the live client map's locked flag would freeze
-        // its tracking, so the archived lock is set on the serialized tag instead, leaving the live map alone.
+        // MapItemSavedData has no locked() copy method, so the archived lock is set on the serialized tag instead,
+        // leaving the live map alone.
         if (config.lockDownloadedMaps() && mapTag instanceof CompoundTag) {
             ((CompoundTag) mapTag).putBoolean("locked", true);
         }

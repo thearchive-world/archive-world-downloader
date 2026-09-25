@@ -243,9 +243,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
 
     /**
      * The structure tag for a client chunk: {@code {Starts:{}, References:{}}}, exactly what vanilla
-     * {@code packStructureData} emits for empty start/reference maps (client chunks always carry empty ones). Built
-     * directly so we never call {@code StructurePieceSerializationContext.fromLevel(serverLevel)}, which dereferences
-     * {@code level.getServer()} and NPEs on a client.
+     * {@code packStructureData} emits for empty start/reference maps (client chunks always carry empty ones).
      */
     private static CompoundTag emptyStructureData() {
         CompoundTag structures = new CompoundTag();

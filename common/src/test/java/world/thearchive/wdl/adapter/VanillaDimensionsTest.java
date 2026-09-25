@@ -18,9 +18,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The captured dimension is routed to a vanilla single-player folder by its TYPE. The dimension key IS the
- * {@link DimensionType}, so a server whose level keys are non-standard (e.g. Multiverse's
- * {@code minecraft:worlds/2b2t/2b2t_1}) still lands in {@code ./region} / {@code DIM-1} / {@code DIM1} by the vanilla
- * type it carries rather than a nested folder.
+ * {@link DimensionType}, so a server whose worlds are non-standard (e.g. a Multiverse world) still lands in
+ * {@code ./region} / {@code DIM-1} / {@code DIM1} by the vanilla type it carries rather than a nested folder.
  */
 class VanillaDimensionsTest {
     /** Vanilla bootstrap so the built-in {@link DimensionType} static values initialize. */

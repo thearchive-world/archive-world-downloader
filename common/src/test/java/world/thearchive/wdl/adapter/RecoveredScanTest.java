@@ -294,8 +294,6 @@ class RecoveredScanTest {
     }
 
     private static CompoundTag jukeboxWithDisc(int x, int y, int z) {
-        // Vanilla JukeboxBlockEntity.saveAdditional always writes IsPlaying/RecordStartTick/TickCount alongside
-        // a present RecordItem.
         CompoundTag blockEntity = emptyJukebox(x, y, z);
         blockEntity.put("RecordItem", ItemFixtures.itemTag("minecraft:music_disc_cat"));
         blockEntity.putBoolean("IsPlaying", true);
@@ -310,9 +308,8 @@ class RecoveredScanTest {
 
     /**
      * A beehive carrying occupants under {@code "Bees"}, the key {@link ChunkMerge}'s {@code CapturedBlockField.BEES}
-     * (and, transitively, {@link RecoveredScan}) reads; vanilla's own {@code BeehiveBlockEntity} persists occupants
-     * under {@code "Bees"} instead, so this is not a real producer's shape and a chunk built from it must go through
-     * {@link BlockEntityFixtures#malformedChunkTagWith}.
+     * (and, transitively, {@link RecoveredScan}) reads; this is not a real producer's shape and a chunk built from it
+     * must go through {@link BlockEntityFixtures#malformedChunkTagWith}.
      */
     private static CompoundTag beehiveWithBees(int x, int y, int z) {
         CompoundTag blockEntity = emptyBeehive(x, y, z);
