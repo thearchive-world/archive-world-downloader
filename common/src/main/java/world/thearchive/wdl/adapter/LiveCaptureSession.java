@@ -3765,8 +3765,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         try {
             // level.dat for the selected generator. The version-coupled saveDataTag call lives behind
             // LevelDataWriter.save() (its vanilla signature drifts across bands: it drops RegistryAccess at
-            // 26.1.2), so this shared session stays cherry-pickable. Built here on the main thread; the writer
-            // thread only writes the finished data.
+            // 26.1.2), so this shared session stays cherry-pickable. Built here on the main thread.
             // The save root is the level directory, not the overworld storage folder. They are the same path only
             // where the overworld sits at the save root (1.21.11 and earlier); at 26.x DimensionType
             // .getStorageFolder puts every dimension under dimensions/minecraft/<name>, so getDimensionPath here
