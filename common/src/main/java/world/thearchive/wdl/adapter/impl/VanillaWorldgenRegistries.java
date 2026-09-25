@@ -16,8 +16,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Built once from the code-defined builtin registries ({@code RegistryAccess.builtin}) after bootstrap, then
  * memoized: the build is expensive and the built access is stable, so building it once per client session is correct
- * and cheap thereafter. Only the opt-in DEFAULT/FLAT path pays it; the default VOID download uses the synced client
- * registries and never touches this.
+ * and cheap thereafter.
  */
 final class VanillaWorldgenRegistries {
     private static final Supplier<RegistryAccess> defaultLoader = VanillaWorldgenRegistries::load;
