@@ -789,8 +789,8 @@ forge/src/main/java/world/thearchive/wdl/forge/WdlForge.java
 # server posting the same event for its worlds off the client thread.
 forge/src/main/java/world/thearchive/wdl/forge/ForgePlatformBridge.java
 
-# The screen-open warm gate is WorldType.VOID or needsWorldgenReconstruction, where dev's is
-# needsWorldgenReconstruction alone: below 1.19 the void generator reconstructs the vanilla worldgen registries too,
+# The screen-open warm gate is WorldType.VOID or generatesTerrain, where dev's is
+# generatesTerrain alone: below 1.19 the void generator reconstructs the vanilla worldgen registries too,
 # its biome needing a Forge registry name the client's synced biome lacks, so the gate matches the level-data build's
 # own reconstruction branch.
 common/src/main/java/world/thearchive/wdl/WorldgenWarmup.java
