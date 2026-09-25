@@ -56,7 +56,7 @@ public interface LevelDataWriter {
      * Write the built {@link LevelData} to {@code access} via the band-correct vanilla
      * {@code LevelStorageAccess.saveDataTag} form, optionally attaching a captured player. This lives on the SPI (not
      * in the shared capture session) because the vanilla signatures drift across bands (the {@code saveDataTag}
-     * {@code RegistryAccess} argument drops at 26.1.2, and the {@code setSpawn} form differs: {@code RespawnData} on
+     * {@code RegistryAccess} argument drops at 26.1, and the {@code setSpawn} form differs: {@code RespawnData} on
      * 1.21.10+ vs {@code SpawnX/Y/Z} on 1.21.4), so keeping the call here lets each band own its form while the shared
      * session stays version-agnostic and cherry-pickable.
      *
