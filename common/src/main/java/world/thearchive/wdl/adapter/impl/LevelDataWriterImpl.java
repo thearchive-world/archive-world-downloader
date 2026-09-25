@@ -94,7 +94,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // FlatLevelGeneratorSettings rebuilding the void biome trips ForgeRegistryEntry.setRegistryName on a null name.
         // The locally reconstructed vanilla registries carry names, so the void generator builds from them too here; it
         // uses only standard vanilla dimension types and biomes, so nothing server-specific is lost.
-        RegistryAccess registries = worldType == WorldType.VOID || worldType.needsWorldgenReconstruction()
+        RegistryAccess registries = worldType == WorldType.VOID || worldType.generatesTerrain()
                 ? VanillaWorldgenRegistries.get()
                 : clientRegistries;
 
