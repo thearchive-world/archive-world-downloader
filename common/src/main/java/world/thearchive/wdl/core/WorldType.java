@@ -15,13 +15,8 @@ public enum WorldType {
     DEFAULT,
     FLAT;
 
-    /**
-     * Whether this generator needs the vanilla worldgen registries reconstructed client-side (a multiplayer client is
-     * never sent them). {@link #VOID} does not; {@link #DEFAULT} and {@link #FLAT} do. The single source for both the
-     * level-data generator branch and the off-thread warm gate, so the two cannot disagree and silently re-freeze the
-     * render thread.
-     */
-    public boolean needsWorldgenReconstruction() {
+    /** Whether this generator builds terrain between captured chunks, as {@link #DEFAULT} and {@link #FLAT} do. */
+    public boolean generatesTerrain() {
         return this != VOID;
     }
 }
