@@ -95,7 +95,7 @@ final class NbtMerge {
     /**
      * Copy {@code key}'s compound, and its optional {@code sidecarKey}, from {@code disk} when {@code fresh} holds no
      * compound at {@code key}; true if a copy happened. The compound sibling of {@link #carryList}: a lectern's
-     * {@code "Book"}/{@code "Page"} and a jukebox's {@code "RecordItem"}/{@code "ticks_since_song_started"} share it.
+     * {@code "Book"}/{@code "Page"} and a jukebox's {@code "RecordItem"} and its sidecar share it.
      */
     static boolean carryCompound(CompoundTag disk, CompoundTag fresh, String key, @Nullable String sidecarKey) {
         CompoundTag diskCompound = disk.get(key) instanceof CompoundTag ? (CompoundTag) disk.get(key) : null;

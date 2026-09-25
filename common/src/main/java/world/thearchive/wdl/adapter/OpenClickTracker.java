@@ -118,7 +118,7 @@ public final class OpenClickTracker {
     static boolean opensMenuFor(Level level, BlockPos pos, boolean spectator) {
         // This band has no unified MenuProvider (a 1.14 abstraction); the container block entities that open a menu
         // are exactly the lockable-container ones (class_2610, implemented by BaseContainerBlockEntity), which is
-        // what this recognizes. A provider-less workstation menu (crafting table, enchanting table, anvil) has no
+        // what this recognizes. A provider-less workstation menu (crafting table, anvil) has no
         // block entity to test here, so it is not latched and falls into the documented FRESH_WINDOW_TICKS leak
         // class rather than the intent chain, the accepted band ceiling on this recognizer.
         if (level.getBlockEntity(pos) instanceof class_2610) {

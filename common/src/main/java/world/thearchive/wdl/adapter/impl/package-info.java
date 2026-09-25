@@ -7,8 +7,7 @@
  * {@code gradle.properties}; this branch targets 1.13.2). The package is role-named, not version-named, because a
  * branch only ever carries one plug, so the band it serves is recorded here rather than in the path.
  *
- * <p>This plug serves the E2a save shape below the 1.21.2 chunk-serialization cut, where the chunk write is the static
- * {@code ChunkSerializer.write} rather than the {@code SerializableChunkData} record (floor
+ * <p>This plug serves the E2a save shape below the 1.21.2 chunk-serialization cut (floor
  * {@link VersionAdapterImpl#BAND_FLOOR}, which this branch reaches at 1.13.2).
  */
 @NullMarked

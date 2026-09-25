@@ -33,8 +33,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * clobbered.
  *
  * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
- * neither a live menu nor a {@code Level} is needed. The one client-coupled step (lifting the book from the live open
- * menu's slot 0) is not exercised headless, exactly as for containers.
+ * neither a live menu nor a {@code Level} is needed.
  *
  * <p>The pure {@link LecternSink#merge} keeps coverage through the {@code ChunkFlushPlanTest} and
  * {@code AsyncSaveWriterTest} fold-wiring tests, which drive it against a stand-in carrier. {@code captureBook} needs

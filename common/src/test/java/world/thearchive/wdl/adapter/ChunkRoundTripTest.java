@@ -26,8 +26,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for chunk capture: the mod's {@link ChunkCodec#encode(ChunkSnapshotSource, boolean)} slice,
- * written through vanilla's real region pipeline and read back, is self-consistent. Every section's block-state and
- * biome container decodes, {@code OCEAN_FLOOR} is written (a LIVE_WORLD heightmap at this band), and light is
+ * written through vanilla's real region pipeline and read back, is self-consistent. Every section's block-state
+ * container decodes, {@code OCEAN_FLOOR} is written (a LIVE_WORLD heightmap at this band), and light is
  * section-resident with no chunk-level {@code isLightOn} (a 1.14 lighting-engine field absent here). Full game-load
  * validity is not exercised headless.
  */
@@ -107,9 +107,9 @@ class ChunkRoundTripTest {
     }
 
     /**
-     * Serverless self-consistency: every written section's block-state and biome container decodes through the same
-     * vanilla codecs the codec encoded them with. Below 1.21.2 the full {@code ChunkSerializer.read} needs a
-     * {@code ServerLevel} the headless test has none of, so the section containers are decoded directly instead.
+     * Serverless self-consistency: every written section's block-state container decodes through the same vanilla
+     * codecs the codec encoded them with. Below 1.21.2 the full chunk read needs a level the headless test has none of,
+     * so the section containers are decoded directly instead.
      */
     private static void assertSectionsDecode(CompoundTag chunkTag) {
         Registry<Biome> biomeRegistry = Registry.BIOME;

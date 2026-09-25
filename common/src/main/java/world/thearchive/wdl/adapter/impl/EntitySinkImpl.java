@@ -30,9 +30,9 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.EntitySink;
 
 /**
- * 1.13.2 entity sink: a client-safe per-entity serialize ({@code entity.save}), the write half of what vanilla's
- * {@code ChunkSerializer} folds into a chunk's {@code Level.Entities}. There is no separate {@code entities/} region at
- * this band (that is 1.17 and above), so the writer folds this sink's carrier into the region chunk.
+ * 1.13.2 entity sink: a client-safe per-entity serialize ({@code entity.save}), the write half of what vanilla's anvil
+ * chunk loader folds into a chunk's {@code Level.Entities}. There is no separate {@code entities/} region at this band
+ * (that is 1.17 and above), so the writer folds this sink's carrier into the region chunk.
  *
  * <p>Three members (see {@link EntitySink}): {@link #encodeChunk(List, ChunkPos, boolean)} serializes the live client
  * entities, {@link #encodeChunk(List, ChunkPos)} builds the in-chunk {@code Entities} carrier from already-serialized
@@ -61,7 +61,7 @@ public final class EntitySinkImpl implements EntitySink {
      */
     @Override
     public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, boolean forceMobPersistence) {
-        // Lift of EntityStorage.storeEntities' write branch, server-free: entity.save writes the entity NBT
+        // Server-free: entity.save writes the entity NBT
         // straight into a CompoundTag with no ServerLevel touch.
         List<CompoundTag> entityTags = new ArrayList<>();
         for (Entity entity : entities) {
@@ -277,11 +277,10 @@ public final class EntitySinkImpl implements EntitySink {
     /**
      * Restore the server-authoritative {@code PersistenceRequired} the client never receives. Two vanilla mechanisms
      * set it that the capture can reconstruct: the {@code NameTagItem} sets it on any {@link Mob} it renames, and
-     * {@code Mob.setItemSlotAndDropWhenKilled} sets it when a mob equips a picked-up item. A named mob and a mob whose
-     * equipment proves such a pickup (an item impossible for its natural spawn,
-     * {@link NaturalEquipment#wasLootEquipped}) are both stamped unconditionally, since either is a lossless
-     * correctness restoration. With {@code forceMobPersistence} on, every captured {@link Mob} is stamped too. A
-     * non-Mob entity is never touched.
+     * {@code Mob.pickUpItem} sets it when a mob equips a picked-up item. A named mob and a mob whose equipment proves
+     * such a pickup (an item impossible for its natural spawn, {@link NaturalEquipment#wasLootEquipped}) are both
+     * stamped unconditionally, since either is a lossless correctness restoration. With {@code forceMobPersistence} on,
+     * every captured {@link Mob} is stamped too. A non-Mob entity is never touched.
      */
     static void applyMobPersistence(CompoundTag entityTag, boolean isMob, boolean namedMob,
             boolean derivedPickup, boolean forceMobPersistence) {
