@@ -3716,11 +3716,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null;
         }
         try {
-            // level.dat for the selected generator. The version-coupled saveLevelData call lives behind
-            // LevelDataWriter.save() (its vanilla signature drifts across bands), so this shared session stays
-            // cherry-pickable. Built here on the main thread.
-            // At 1.10.2 the level directory is the ISaveFormat folder, which roots WorldPaths, the map manifest and
-            // the export zip.
             Path saveRoot = storage.getWorldDirectory().toPath();
             WorldPaths paths = adapter.worldPaths(saveRoot);
             this.worldPaths = paths;
@@ -3750,6 +3745,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
             } catch (RuntimeException e) {
                 LOGGER.warn("the download report could not be stamped at world-open; the save continues", e);
             }
+            // level.dat for the selected generator. The version-coupled saveWorldInfoWithPlayer and saveWorldInfo calls
+            // live behind LevelDataWriter.save() (their vanilla signatures drift across bands), so this shared session
+            // stays cherry-pickable. Built here on the main thread.
             LevelDataWriter levelDataWriter = adapter.levelDataWriter();
             LevelDataWriter.LevelData levelData = levelDataWriter.buildLevelData(config.worldOutput(),
                     resolveWorldName());
