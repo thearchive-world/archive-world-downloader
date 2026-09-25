@@ -3702,7 +3702,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         try {
             // level.dat for the selected generator. The version-coupled saveWorldInfoWithPlayer and saveWorldInfo calls
             // live behind LevelDataWriter.save() (their vanilla signatures drift across bands), so this shared session
-            // stays cherry-pickable. Built here on the main thread; the writer thread only writes the finished data.
+            // stays cherry-pickable. Built here on the main thread.
             // The level directory is the ISaveHandler's world directory, which roots WorldPaths, the map manifest and
             // the export zip.
             Path saveRoot = storage.getWorldDirectory().toPath();
