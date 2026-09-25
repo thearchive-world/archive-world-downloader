@@ -83,7 +83,7 @@ final class EntityMerge {
             }
         }
         // Union: an on-disk entity the fresh capture does not have is carried forward, so a partial re-flush
-        // adds to rather than overwrites the prior on-disk set (the entity-loss fix). A null-UUID on-disk entity
+        // adds to rather than overwrites the prior on-disk set. A null-UUID on-disk entity
         // (corrupt or foreign-written; we always write a valid one) cannot be deduped, so it is carried forward
         // unconditionally rather than dropped: the contract is over-capture over under-capture, and dropping it
         // would silently lose existing world data. A keyed one is carried only when the fresh set lacks it, matched
