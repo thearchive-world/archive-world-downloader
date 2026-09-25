@@ -620,12 +620,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * The on-sight map archive: the live remap table (the persisted manifest, the session-to-archive resolution, and
      * the streaming gate) that resolves each filled map as it is seen and streams its data through
-     * {@link #streamMapData} at first image, so a map in a container whose chunk flushes mid-roam is captured before
-     * the holder drains rather than lost at finish. Created in {@link #ensureWriter} (where the save path, hence the
-     * manifest, is known) on the main thread before the writer thread starts, so the writer-thread finalizer sees the
-     * reference; the finalizer reads only its idcounts floor, the map files having streamed during capture. The
-     * headless suite binds a caller-built one through {@link #bindWorldOpen}, which reproduces that ordering rather
-     * than resolving anything itself. Stays null only if the world never opened for writing.
+     * {@link #streamMapData} at first image. Created in {@link #ensureWriter} (where the save path, hence the manifest,
+     * is known) on the main thread before the writer thread starts, so the writer-thread finalizer sees the reference;
+     * the finalizer reads only its idcounts floor, the map files having streamed during capture. The headless suite
+     * binds a caller-built one through {@link #bindWorldOpen}, which reproduces that ordering rather than resolving
+     * anything itself. Stays null only if the world never opened for writing.
      */
     private @Nullable MapArchive mapArchive;
 
@@ -2513,10 +2512,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // one; the local spares that handover a null check on the field.
         List<Runnable> mapWrites = new ArrayList<>();
         this.finishMapWrites = mapWrites;
-        // Filled maps are captured on-sight (the live remap table streams each one as it is first imaged): a
-        // container's maps are remapped and serialized in flushBuffer just before the holder drains, and the
-        // still-live sources are handled at finish: the inventory and ender chest in assembleCapturedPlayer, and
-        // the packet-captured item frames / dropped items / container vehicles when their tags drain.
         // Stop the inbound tee before the finish drain so no spawn arrives mid-drain to be left unwritten and
         // uncounted; the drain and the reconciliation then see a settled accumulator.
         deactivatePacketCapture();
@@ -3914,8 +3909,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // room keeps hot for a whole session, so a per-tick pass over it scales with everything opened (with
             // hundreds of shulker-filled chests, one pass made the client tick take tens of milliseconds), while
             // the drain-time prepare costs only the holders actually flushing and still precedes everything
-            // writer-bound. A map in a chest whose chunk flushes mid-roam is thereby captured before it leaves
-            // memory.
+            // writer-bound.
             prepareDrainedItems(containers);
             // Drain and reconcile this chunk's interaction-predicted candidates against the captured snapshot's
             // block-state. The confirmed "Items" (placed shulker, bookshelf books) are scrubbed and map
