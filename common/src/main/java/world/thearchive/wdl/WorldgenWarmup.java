@@ -17,8 +17,7 @@ import world.thearchive.wdl.core.WorldType;
  *
  * <p>Only the manual (screen-open) path warms. The screen opens while connected, so the reconstruction's
  * transitively-read item tags are bound. The auto-download path cannot be warmed pre-join: the reconstruction needs
- * those tags, which a client binds only on server join, and the auto-download itself fires at join, so there is no
- * pre-flush window in which a warmup could complete.
+ * those tags, which a client connected to a remote server binds only on joining it.
  *
  * <p>This helper names no {@code net.minecraft} type, so it logs through java.util.logging to stay MC-free (the same
  * reason core/ does); the loader's {@link CoreLogHandler} bridge forwards the {@code world.thearchive.wdl} namespace to
