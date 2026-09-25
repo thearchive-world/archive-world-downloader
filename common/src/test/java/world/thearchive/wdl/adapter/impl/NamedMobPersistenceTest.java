@@ -30,7 +30,7 @@ class NamedMobPersistenceTest {
         NBTTagCompound knobOff = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOff, true, true, false, false);
         assertTrue(knobOff.getBoolean("PersistenceRequired"),
-                "a captured named mob must persist even with forceMobPersistence off (the unconditional fix)");
+                "a captured named mob must persist even with forceMobPersistence off");
 
         NBTTagCompound knobOn = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOn, true, true, false, true);
