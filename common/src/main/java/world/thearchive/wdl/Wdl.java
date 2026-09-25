@@ -622,7 +622,7 @@ public final class Wdl {
         };
         WdlConfig config = WdlConfig.load(configPath());
         // Manual path: opening the download screen is the player's download intent and precedes the first flush
-        // by seconds, so warm the worldgen reconstruction now when the chosen generator needs it.
+        // by seconds, so the warmup is dispatched here.
         WorldgenWarmup.dispatchForScreenOpen(config.worldOutput().worldType(),
                 adapter.levelDataWriter()::warmWorldgen, warmupWorker);
         minecraft.displayGuiScreen(new WdlDownloadsScreen(minecraft.currentScreen, savesDirectory, loadedWorld, entries,
