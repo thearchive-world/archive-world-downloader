@@ -617,12 +617,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * The on-sight map archive: the live remap table (the persisted manifest, the session-to-archive resolution, and
-     * the streaming gate) that resolves each filled map as it is seen and streams its data through
-     * {@link #streamMapData} at first image. Created in {@link #ensureWriter} (where the save path, hence the manifest,
-     * is known) on the main thread before the writer thread starts, so the writer-thread finalizer sees the reference;
-     * the finalizer reads only its idcounts floor, the map files having streamed during capture. The headless suite
-     * binds a caller-built one through {@link #bindWorldOpen}, which reproduces that ordering rather than resolving
-     * anything itself. Stays null only if the world never opened for writing.
+     * the streaming gate) that resolves each filled map and streams its data through {@link #streamMapData} at first
+     * image. Created in {@link #ensureWriter} (where the save path, hence the manifest, is known) on the main thread
+     * before the writer thread starts, so the writer-thread finalizer sees the reference. The headless suite binds a
+     * caller-built one through {@link #bindWorldOpen}, which reproduces that ordering rather than resolving anything
+     * itself. Stays null only if the world never opened for writing.
      */
     private @Nullable MapArchive mapArchive;
 
@@ -3574,16 +3573,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * The on-sight map stream: hand one first-imaged map's data tag to the writer thread to land as
-     * {@code data/map_<id>.dat}. A map imaged during capture is submitted alone, so it reaches disk at once and a
-     * crashed capture keeps the maps it already saw. One imaged during the finish drain joins {@link #finishMapWrites}
-     * instead, because a display wall can image five figures of them in that one drain and the bar has to advance over
-     * them rather than sit frozen on the chunk phase; a crash inside those few seconds loses an unopenable save anyway,
-     * so nothing durable is traded for the bar. Called on the main thread from the remap paths, which all run behind
-     * {@code ensureWriter}; the write runs on the writer thread, interleaved with the chunk drain and behind a resume's
-     * preflight backup. Whatever write is handed to either arm must catch and count its own failure; see
-     * {@link #mapWriteTask}. Neither arm counts, both absorb a runtime throw, so a write that does not increment the
-     * tally reports a download that lost maps as clean. Package-private so the tally this hands the task stays
-     * testable.
+     * {@code data/map_<id>.dat}. A map imaged during capture is submitted alone as soon as it is imaged, rather than
+     * held for the finish, so once its write has run a crash leaves it in the save. One imaged during the finish drain
+     * joins {@link #finishMapWrites} instead, because a display wall can image five figures of them in that one drain
+     * and the bar has to advance over them rather than sit frozen on the chunk phase; a crash inside those few seconds
+     * loses an unopenable save anyway, so nothing durable is traded for the bar. Called on the main thread from the
+     * remap paths, which all run behind {@code ensureWriter}; the write runs on the writer thread, interleaved with the
+     * chunk drain and behind a resume's preflight backup. Whatever write is handed to either arm must catch and count
+     * its own failure; see {@link #mapWriteTask}. Neither arm counts, both absorb a runtime throw, so a write that does
+     * not increment the tally reports a download that lost maps as clean. Package-private so the tally this hands the
+     * task stays testable.
      */
     void streamMapData(int archiveId, Tag dataTag) {
         AsyncSaveWriter activeWriter = this.writer;
@@ -3806,9 +3805,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     // ensureWriter builds these thunks at the first incremental flush, mid-capture,
                     // before finish() sets the fields, so a snapshot taken here would always be null. The thunks run
                     // on the writer thread strictly after the chunk drain, so the fields set in finish() are visible.
-                    // level.dat is written FIRST, then idcounts (the map files themselves streamed during capture),
-                    // each write caught, so a map IO failure never aborts before level.dat (an unopenable save) or
-                    // fails it.
+                    // level.dat is written FIRST, then idcounts, each write caught, so a map IO failure never aborts
+                    // before level.dat (an unopenable save) or fails it.
                     () -> levelDataWriter.save(storage, levelData, capturedPlayer),
                     (chunksFailed, entityChunksFailed) -> {
                         PlayerProgressWriter.write(saveRoot, capturedProgress);
