@@ -858,7 +858,7 @@ forge/src/main/java/world/thearchive/wdl/forge/WdlForge.java
 # registry revert and of the player it nulls later in that method.
 forge/src/main/java/world/thearchive/wdl/forge/ForgePlatformBridge.java
 
-# The screen-open warm gate is WorldType.VOID or needsWorldgenReconstruction, where dev's is needsWorldgenReconstruction
+# The screen-open warm gate is WorldType.VOID or generatesTerrain, where dev's is generatesTerrain
 # alone: below 1.19 the void generator reconstructs the vanilla worldgen registries too, its biome needing a registry
 # name the client's synced biome lacks, so the gate matches the level-data build's own reconstruction branch.
 common/src/main/java/world/thearchive/wdl/WorldgenWarmup.java
