@@ -164,3 +164,7 @@ common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMount
 # Below 1.21.2 there is no SerializableChunkData, so 1.21.1's copy drops the comment block explaining why its
 # constructor is widened; the entries are 1.21.3's.
 neoforge/src/main/resources/META-INF/accesstransformer.cfg
+
+# Below 1.21.2 the worldgen reconstruction's loader creates any tag it reads on demand, so it needs no tags bound at
+# join, and the class Javadoc drops the auto-download paragraph that 1.21.3 and up carry.
+common/src/main/java/world/thearchive/wdl/WorldgenWarmup.java
