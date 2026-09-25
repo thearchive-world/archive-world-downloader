@@ -13,9 +13,7 @@ import net.minecraft.world.level.saveddata.maps.MapId;
 /**
  * The write half of {@link MapIdCollector}: rewrites every referenced {@code minecraft:map_id} in a serialized item
  * list to a resolver-supplied archive id, recursing into a shulker box (the {@code minecraft:container} component) and
- * a bundle (the {@code minecraft:bundle_contents} component) over the shared {@link ItemTreeWalk}. The session-local id
- * a renumbering server assigns is replaced by the content-stable archive id
- * ({@link world.thearchive.wdl.core.MapManifest}) so the item renders the right picture in the download.
+ * a bundle (the {@code minecraft:bundle_contents} component) over the shared {@link ItemTreeWalk}.
  *
  * <p>Operates only on already-serialized NBT (our own captured copies of the open-time stashes), never on a live
  * {@code ItemStack}, and reads/writes the id through {@code MapId.CODEC} (the {@link MapIdCollector} precedent) so it
