@@ -22,12 +22,11 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
 import world.thearchive.wdl.core.report.DownloadReportStore;
 
 /**
- * Streamed-map crash durability: a captured map's {@code data/map_<id>.dat} lands on disk during capture, not at
- * finalize, so a crashed session keeps the maps it already saw. The run drives a remap-on capture, forces the framed
- * map's chunk to flush by roaming out of the keep-hot window (which captures the frame entity and streams its map),
- * then asserts the mid-capture on-disk state a crash at that point would leave: the map file present under
- * {@code data/} and the pending crash sentinel marking the folder resumable. A second RESUME session then proves the
- * streamed file survives the resume merge with the {@code idcounts} floor intact.
+ * Streamed-map crash durability. The run drives a remap-on capture, forces the framed map's chunk to flush by roaming
+ * out of the keep-hot window (which captures the frame entity and streams its map), then asserts the mid-capture
+ * on-disk state a crash at that point would leave: the map file present under {@code data/} and the pending crash
+ * sentinel marking the folder resumable. A second RESUME session then proves the streamed file survives the resume
+ * merge with the {@code idcounts} floor intact.
  *
  * <p>The interrupt is not injected: as in {@link WdlMapSchemeSignalBeginTest}, the mid-capture, pre-finalize on-disk
  * state is exactly the state a crash would leave behind.
