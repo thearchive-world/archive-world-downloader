@@ -85,9 +85,8 @@ final class VanillaWorldgenRegistries {
         // the load and can be closed once the composite access is built.
         try (CloseableResourceManager resources = new MultiPackResourceManager(PackType.SERVER_DATA, openPacks)) {
             LayeredRegistryAccess<RegistryLayer> layered = RegistryLayer.createRegistryAccess();
-            // Unlike WorldLoader, the STATIC-layer tags are deliberately left unbound: worldgen codecs store tag
-            // references as lazy TagKeys, and this access only builds the presets and encodes WorldGenSettings by
-            // id, never generates terrain, so binding block/item tags would be needless work.
+            // Unlike WorldLoader, this binds no STATIC-layer tags: the loader creates any tag it reads on demand, and
+            // this access never generates terrain, so it needs none bound.
             RegistryAccess.Frozen loadingBase = layered.getAccessForLoading(RegistryLayer.WORLDGEN);
             RegistryAccess.Frozen loaded = RegistryDataLoader.load(resources, loadingBase,
                     RegistryDataLoader.WORLDGEN_REGISTRIES);
