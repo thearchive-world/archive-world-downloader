@@ -74,9 +74,8 @@ final class PlayerTag {
 
     /**
      * Write the canonical {@code "Dimension"} id. The caller passes the by-type-canonicalized capture dimension
-     * ({@code targetDimension}), so a non-standard server level key and a datapack dimension alike already resolve to
-     * one of the three {@link VanillaDimensions#forType} returns. Vanilla reads this back as the integer id
-     * ({@code Entity.readFromNBT}), which is exactly the shape written here.
+     * ({@code targetDimension}), so it is already one of the three {@link VanillaDimensions#forType} returns. Vanilla
+     * reads this back as the integer id ({@code Entity.readFromNBT}), which is exactly the shape written here.
      */
     static void setDimension(NBTTagCompound raw, DimensionType dimension) {
         raw.setInteger("Dimension", dimension.getId());

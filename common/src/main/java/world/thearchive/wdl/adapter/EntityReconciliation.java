@@ -52,7 +52,7 @@ final class EntityReconciliation {
      *                              than a misread key
      * @param sinkSkips             reconstructed entities the sink refused; one of vanilla's own non-saves, not a loss
      * @param createDrops           reconstructed entities dropped because the typed entity could not be created
-     * @param encodeFailures        reconstructed entities lost because {@code entity.save} threw or the envelope came
+     * @param encodeFailures        reconstructed entities lost because the entity's save threw or the envelope came
      *                              back without them
      * @param flushDrops            reconstructed entities lost when a whole entity-chunk threw or nulled out during its
      *                              flush

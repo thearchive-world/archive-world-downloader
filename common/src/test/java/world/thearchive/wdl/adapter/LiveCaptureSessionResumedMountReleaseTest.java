@@ -455,8 +455,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
     /** A prior level.dat player tag: the dimension it finished in, and the mount it was riding if any. */
     private static NBTTagCompound priorPlayerTag(DimensionType dimension, @Nullable NBTTagCompound mount) {
         NBTTagCompound player = new NBTTagCompound();
-        // The band's save keys the player file on its UUID (players/data/<uuid>.dat at 26.x), so a prior written
-        // through it must carry one; a client saveWithoutId always does.
         player.setUniqueId("UUID", PRIOR_PLAYER);
         PlayerTag.setDimension(player, dimension);
         if (mount != null) {

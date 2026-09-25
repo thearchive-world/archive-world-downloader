@@ -18,7 +18,7 @@ import net.minecraft.nbt.NBTTagList;
  * is a per-node question.
  *
  * <p>Identity is the node's own {@code "UUID"} decoded through {@link EntityMerge#readUuid}, never raw tag equality:
- * {@code Entity.saveWithoutId} stores one on every node it recurses into, so a node with no readable UUID is not a tag
+ * {@code Entity.writeToNBT} stores one on every node it recurses into, so a node with no readable UUID is not a tag
  * this mod produced.
  */
 final class EntityTreeWalk {

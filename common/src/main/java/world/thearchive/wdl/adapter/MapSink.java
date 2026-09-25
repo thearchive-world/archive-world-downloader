@@ -17,9 +17,9 @@ import net.minecraft.world.storage.MapData;
 public interface MapSink {
     /**
      * Serialize {@code saved} into the inner {@code "data"} {@link NBTBase} a {@code data/map_<id>.dat} holds: the
-     * vanilla {@code MapData} persistence ({@code colors}/{@code dimension}/{@code scale}/{@code locked}/...), via the
-     * band's own {@code writeToNBT}. Lock-agnostic: it encodes whatever map the session hands it, and the auto-lock
-     * decision lives in the session.
+     * vanilla {@code MapData} persistence ({@code colors}/{@code dimension}/{@code scale}/...), via the band's own
+     * {@code writeToNBT}. Lock-agnostic: it encodes whatever map the session hands it, and the auto-lock decision lives
+     * in the session.
      */
     NBTBase serializeMap(MapData saved);
 }
