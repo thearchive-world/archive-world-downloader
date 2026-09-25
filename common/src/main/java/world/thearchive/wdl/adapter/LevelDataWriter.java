@@ -40,9 +40,9 @@ public interface LevelDataWriter {
     LevelData buildLevelData(WorldOutputConfig worldOutput, @Nullable String worldName);
 
     /**
-     * Reconstruct this band's client-side worldgen ahead of time, off the render thread. The default is a no-op, which
-     * is correct at 1.10.2: the captured VOID/DEFAULT/FLAT world stores only a generator name and options and needs no
-     * worldgen reconstruction, so no band below the 1.16 registry rework overrides this.
+     * Reconstruct this band's client-side worldgen ahead of time, off the render thread. The default is a no-op: the
+     * captured VOID/DEFAULT/FLAT world stores only a generator name and options and needs no worldgen reconstruction,
+     * so no band below the 1.16 registry rework does anything in it.
      */
     default void warmWorldgen() {}
 
