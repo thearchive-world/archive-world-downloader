@@ -550,12 +550,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int drainAbortDrops;
 
     /**
-     * Primed entities the sink refused. An unresolvable leash never lands here (the sink strips it and saves the mob
-     * unleashed), so a refusal means the entity failed the standalone save check (a live passenger saved nested under
-     * its vehicle, a removed entity, or a player-only vehicle vanilla persists through the player) or its save returned
-     * false (a non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips. Reported so
-     * the drop is visible; not a loss, and not part of the packet reconciliation residual (a primed entity has no spawn
-     * packet).
+     * Primed entities the sink refused. An unresolvable leash never lands here, so a refusal means the entity failed
+     * the standalone save check (a live passenger saved nested under its vehicle, a removed entity, or a player-only
+     * vehicle vanilla persists through the player) or its save returned false (a non-serializable type: a leash knot, a
+     * bobber), which are the non-saves vanilla also skips. Reported so the drop is visible; not a loss, and not part of
+     * the packet reconciliation residual (a primed entity has no spawn packet).
      */
     private int primeSinkSkips;
 
