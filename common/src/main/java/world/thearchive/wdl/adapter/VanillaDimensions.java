@@ -15,8 +15,8 @@ import world.thearchive.wdl.core.WorldType;
  * rather than its level key. A server with non-standard level keys (e.g. Multiverse's
  * {@code minecraft:worlds/2b2t/2b2t_1}) still uses a vanilla dimension type, so routing by type lays the save out under
  * the vanilla dimension's own folder rather than one derived from the custom level key. Below the 1.19 registry-sync
- * rework the client's dimension type arrives keyless (an inline Holder.Direct), so the nether and end are recognized by
- * the type's effects id rather than its registry key; above that band the key is available and either signal works.
+ * rework the client's dimension type arrives keyless, so the nether and end are recognized by the type's effects id
+ * rather than its registry key; above that band the key is available and either signal works.
  *
  * <p>The consequence for two server worlds is ACCEPTED rather than guarded, and it is stated here because this method
  * is where it comes from: worlds routing to one folder share it, so their terrain interleaves and their captured
@@ -32,9 +32,8 @@ final class VanillaDimensions {
      * unrecognized type) to {@link Level#OVERWORLD}.
      *
      * <p>Classified by the type's effects id, not its registry key, because below the 1.19 registry-sync rework the
-     * client receives the dimension type inline (a keyless {@code Holder.Direct} decoded through a plain ops), so
-     * {@code dimensionTypeRegistration().unwrapKey()} is empty and no registry key is available. The effects id, which
-     * the inline value still carries, is {@code the_nether} / {@code the_end} for the vanilla nether and end.
+     * client receives the dimension type inline, so no registry key is available. The effects id, which the inline
+     * value still carries, is {@code the_nether} / {@code the_end} for the vanilla nether and end.
      */
     static ResourceKey<Level> forType(@Nullable DimensionType type) {
         if (type == null) {

@@ -111,8 +111,6 @@ class InteractionMergeRoundTripTest {
 
         ContainerMerge.mergeHolderChunkStash(chunkTag, new ChunkPos(jukeboxPos), stash).merged();
 
-        // Vanilla JukeboxBlockEntity.tick spawns the note particles only while IsPlaying is set and a disc is
-        // present, so the captured holder marks the just-inserted disc playing.
         CompoundTag jukeboxBlockEntity = findByPos(
                 chunkTag.getCompound("Level").getList("TileEntities", Tag.TAG_COMPOUND), 10, 70, 20);
         assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"),
