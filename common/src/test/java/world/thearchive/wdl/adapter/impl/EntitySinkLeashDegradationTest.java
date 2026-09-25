@@ -123,7 +123,7 @@ class EntitySinkLeashDegradationTest {
 
         ContainerLeashableEntity mob = new ContainerLeashableEntity();
         CompoundTag leashInput = new CompoundTag();
-        // a delayed attachment the codec can encode, unlike the null-holder leash the unsavable cases carry
+        // a delayed attachment, unlike the null-holder leash the unsavable cases carry
         leashInput.put("leash", NbtUtils.writeBlockPos(new BlockPos(1, 2, 3)));
         mob.readLeashData(leashInput);
         assertTrue(mob.mayBeLeashed() && !mob.isLeashed(), "precondition: holder null, but a savable attachment");
@@ -176,7 +176,7 @@ class EntitySinkLeashDegradationTest {
 
         @Override
         protected void addAdditionalSaveData(CompoundTag tag) {
-            this.writeLeashData(tag, this.leashData); // vanilla default: throws on the unresolved holder
+            this.writeLeashData(tag, this.leashData);
             NonNullList<ItemStack> items = NonNullList.withSize(1, ItemStack.EMPTY);
             items.set(0, new ItemStack(Items.DIAMOND, 3));
             ContainerHelper.saveAllItems(tag, items, TestRegistries.frozen());
