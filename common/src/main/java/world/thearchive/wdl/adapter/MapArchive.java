@@ -19,8 +19,7 @@ import world.thearchive.wdl.core.MapManifest;
 /**
  * The on-sight map archive: the live remap table that resolves a server's session-local map id to a content-stable
  * archive id and streams each received map's data to the injected {@link MapDataSink} at its first imaged sighting, so
- * a crashed capture keeps the maps it already saw. A map in a chest whose chunk flushes mid-roam is captured before the
- * holder drains rather than being lost at finish. It wraps a {@link MapManifest} (the persisted hash-to-id table and
+ * a crashed capture keeps the maps it already saw. It wraps a {@link MapManifest} (the persisted hash-to-id table and
  * the shared monotonic counter), memoizes each session id's resolution, and streams each archive id's data exactly
  * once.
  *
