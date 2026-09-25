@@ -172,8 +172,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
 
     /**
      * The nearest of the sixteen named colors to an arbitrary RGB value. Pre-1.16 {@code Style} carries only a
-     * {@link ChatFormatting} color, not the free RGB {@code TextColor} the shared copy supplies, so an exact color is
-     * quantized to the closest vanilla color by squared distance.
+     * {@link ChatFormatting} color, so an exact color is quantized to the closest vanilla color by squared distance.
      */
     private static ChatFormatting nearestFormatting(int rgb) {
         int red = (rgb >> 16) & 0xFF;
