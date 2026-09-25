@@ -85,8 +85,7 @@ class LevelDatRoundTripTest {
         LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
 
         // Drive the REAL production save (LevelStorageAccess.saveDataTag) rather than a hand-rolled NbtIo write,
-        // so the headless suite guards the band-specific saveDataTag call inside LevelDataWriter.save()
-        // (that call drops its RegistryAccess argument at 26.1.2).
+        // so the headless suite guards the band-specific saveDataTag call inside LevelDataWriter.save().
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("wdltest")) {
             writer.save(access, built, null);
