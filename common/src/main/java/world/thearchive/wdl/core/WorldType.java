@@ -21,7 +21,7 @@ public enum WorldType {
      * {@link #FLAT} do. The single source for both the level-data generator branch and the off-thread warm gate, so the
      * two cannot disagree and silently re-freeze the render thread.
      */
-    public boolean needsWorldgenReconstruction() {
+    public boolean generatesTerrain() {
         return this != VOID;
     }
 }

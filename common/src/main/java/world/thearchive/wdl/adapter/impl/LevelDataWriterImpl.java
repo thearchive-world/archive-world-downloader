@@ -106,7 +106,9 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // the void generator only needs the client's synced biome/dimension-type registries, so it stays on them
         // and its output is unchanged. The dimensions and the encode context must share one registry set (their
         // generator holders must be owned by the registries the encode resolves against), so both derive here.
-        RegistryAccess generatorRegistries = worldType.needsWorldgenReconstruction()
+        // WorldgenWarmup warms off-thread on the same predicate, so widening this condition alone puts a
+        // reconstruction on the render thread.
+        RegistryAccess generatorRegistries = worldType.generatesTerrain()
                 ? VanillaWorldgenRegistries.get()
                 : clientRegistries;
         WorldDimensions.Complete dimensions = bakedDimensions(worldType, generatorRegistries);
