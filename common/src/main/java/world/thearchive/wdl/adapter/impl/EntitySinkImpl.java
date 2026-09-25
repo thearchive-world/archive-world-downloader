@@ -65,11 +65,11 @@ public final class EntitySinkImpl implements EntitySink {
     public @Nullable CompoundTag captureRootVehicle(Entity vehicle, RegistryAccess registries,
             boolean forceMobPersistence) {
         // Vanilla saveParentVehicle serializes the root vehicle via root.save, id-bearing and passenger-recursing,
-        // bypassing shouldBeSaved (a one-player vehicle fails it). A ridden mount that finishes then gets dismounted
-        // in the downloaded world despawns exactly like any other captured mob, so it gets the same server-side
-        // PersistenceRequired restoration the standalone entity path applies via applyMobPersistence (a named mob,
-        // a loot-equipped mob, and every mob under forceMobPersistence). A codec reject throws out of save (leash
-        // gotcha class); the caller isolates it.
+        // bypassing shouldBeSaved (a one-player vehicle fails it). A ridden mount that finishes then gets dismounted in
+        // the downloaded world despawns exactly like any other captured mob, so it gets the same server-side
+        // PersistenceRequired restoration the standalone entity path applies via applyMobPersistence (a named mob, a
+        // loot-equipped mob, and every mob under forceMobPersistence). A codec reject throws out of save; the caller
+        // isolates it.
         CompoundTag tag = new CompoundTag();
         if (!saveDroppingUnsavableLeashes(vehicle, tag)) {
             return null;
@@ -82,15 +82,10 @@ public final class EntitySinkImpl implements EntitySink {
     /**
      * Save the entity, first detaching any leash the client cannot save, swapping in a sanitized copy of any equipment
      * or carried-item stack the client cannot save, and ordering a pet to sit from its synced pose, each on the entity
-     * and its passengers. A leash with neither a resolved holder nor a delayed attachment is what vanilla's
-     * {@link Leashable.LeashData} codec {@code requireNonNulls} on, so {@link Entity#save} throws on it; and because
-     * save recurses into passengers, a passenger's unsavable leash aborts the whole vehicle group, dropping a chested
-     * mob's container with it. Detaching just those unsavable leash links loses only the leash, mirroring the
-     * reconstruct path which leaves an unresolved leash link unset. An item component the disk codec rejects costs
-     * either the entity or the whole field being written, so {@link #sanitizeStacks} repairs the stack up front rather
-     * than recovering from either outcome. Capture runs on the client main thread, so every swap is unobservable, and
-     * each detached leash, swapped stack, and sit order is restored before returning so the live entities are
-     * unchanged.
+     * and its passengers. An item component the disk codec rejects costs either the entity or the whole field being
+     * written, so {@link #sanitizeStacks} repairs the stack up front rather than recovering from either outcome.
+     * Capture runs on the client main thread, so every swap is unobservable, and each detached leash, swapped stack,
+     * and sit order is restored before returning so the live entities are unchanged.
      */
     private static boolean saveDroppingUnsavableLeashes(Entity entity, CompoundTag out) {
         List<DetachedLeash> detached = detachIfUnsavable(entity, null);
@@ -186,8 +181,6 @@ public final class EntitySinkImpl implements EntitySink {
             @Nullable List<DetachedLeash> detached) {
         if (entity instanceof Leashable leashable) {
             Leashable.LeashData leashData = leashable.getLeashData();
-            // Vanilla's LeashData codec requireNonNulls a leash with neither a resolved holder nor a delayed
-            // attachment, so save() throws on exactly that state; a resolvable leash still saves normally
             if (leashData != null && leashData.leashHolder == null && leashData.delayedLeashInfo == null) {
                 List<DetachedLeash> list = detached != null ? detached : new ArrayList<>();
                 list.add(new DetachedLeash(leashable, leashData));
@@ -300,7 +293,7 @@ public final class EntitySinkImpl implements EntitySink {
     @Override
     public @Nullable CompoundTag encodeChunk(List<CompoundTag> entityTags, ChunkPos pos) {
         if (entityTags.isEmpty()) {
-            return null; // skip empty entity-chunks: capture omits them (vanilla writes IOWorker.STORE_EMPTY)
+            return null;
         }
         ListTag entities = new ListTag();
         for (CompoundTag entityTag : entityTags) {
