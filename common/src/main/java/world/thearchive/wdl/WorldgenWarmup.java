@@ -11,10 +11,9 @@ import world.thearchive.wdl.core.WorldType;
 
 /**
  * Pre-download dispatch for the client-side worldgen reconstruction: when the download screen opens, submit the band's
- * warmup to a background worker so the first DEFAULT/FLAT download finds the registries already built instead of
- * decoding them on the render thread. The gate is {@link WorldType#needsWorldgenReconstruction()}, shared with the
- * level-data build so the two cannot drift; dispatch is idempotent through the reconstruction's own memo, so a repeated
- * trigger just hits the cache.
+ * warmup to a background worker so the first download finds the registries already built instead of decoding them on
+ * the render thread. The gate is {@link WorldType#generatesTerrain()}, shared with the level-data build; dispatch is
+ * idempotent through the reconstruction's own memo, so a repeated trigger just hits the cache.
  *
  * <p>Only the manual (screen-open) path warms. The screen opens while connected, so the reconstruction's
  * transitively-read item tags are bound. The auto-download path cannot be warmed pre-join: the reconstruction needs
@@ -31,9 +30,8 @@ final class WorldgenWarmup {
 
     private WorldgenWarmup() {}
 
-    /** Warm when the download screen opens, if the chosen generator needs worldgen. */
     static void dispatchForScreenOpen(WorldType worldType, Runnable warmup, Executor worker) {
-        if (worldType.needsWorldgenReconstruction()) {
+        if (worldType.generatesTerrain()) {
             submit(warmup, worker);
         }
     }
