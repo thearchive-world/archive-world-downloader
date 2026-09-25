@@ -13,8 +13,8 @@ import world.thearchive.wdl.core.WorldType;
  * Pre-download dispatch for the client-side worldgen reconstruction: when the download screen opens, submit the band's
  * warmup to a background worker so the first download finds the registries already built instead of decoding them on
  * the render thread. Below 1.19 every generator reconstructs, including the void default, so the gate here matches the
- * level-data build's own branch exactly so the two cannot drift; dispatch is idempotent through the reconstruction's
- * own memo, so a repeated trigger just hits the cache.
+ * level-data build's own branch exactly; dispatch is idempotent through the reconstruction's own memo, so a repeated
+ * trigger just hits the cache.
  *
  * <p>Only the manual (screen-open) path warms. The screen opens while connected, so the reconstruction's
  * transitively-read item tags are bound. The auto-download path cannot be warmed pre-join: the reconstruction needs
@@ -32,11 +32,10 @@ final class WorldgenWarmup {
 
     private WorldgenWarmup() {}
 
-    /** Warm when the download screen opens, if the chosen generator reconstructs worldgen on this band. */
     static void dispatchForScreenOpen(WorldType worldType, Runnable warmup, Executor worker) {
         // Below 1.19 the void generator also reconstructs, since its biome needs a Forge registry name the client's
         // synced biome lacks, so it warms too. This matches LevelDataWriter's own reconstruction branch exactly.
-        if (worldType == WorldType.VOID || worldType.needsWorldgenReconstruction()) {
+        if (worldType == WorldType.VOID || worldType.generatesTerrain()) {
             submit(warmup, worker);
         }
     }
