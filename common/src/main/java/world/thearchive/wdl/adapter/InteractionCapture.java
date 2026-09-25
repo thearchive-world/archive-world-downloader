@@ -608,9 +608,9 @@ public final class InteractionCapture {
     /**
      * Serialize {@code disc} to a holder carrying the jukebox {@code disc} ({@code "RecordItem"}) plus the just-started
      * playing state a fresh insert leaves ({@code "IsPlaying"} true, {@code "RecordStartTick"} and {@code "TickCount"}
-     * zero). Vanilla {@code loadAdditional} restores that state, so the saved jukebox plays and emits the note
-     * particles; the {@code disc} sound itself cannot resume on load (an MC limitation, it fires only on the insert
-     * event).
+     * zero). Vanilla's {@code JukeboxBlockEntity.load} restores that state, so the saved jukebox plays and emits the
+     * note particles; the {@code disc} sound itself cannot resume on load (an MC limitation, it fires only on the
+     * insert event).
      */
     static CompoundTag captureRecordItem(ItemStack disc) {
         CompoundTag holder = new CompoundTag();

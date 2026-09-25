@@ -10,7 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import world.thearchive.wdl.adapter.LecternSink;
 
 /**
- * 1.19.4 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.CODEC} (mirroring
+ * 1.19.4 lectern sink: serializes a lectern's book via vanilla's own {@code ItemStack.save} (mirroring
  * {@code LecternBlockEntity.saveAdditional}) and merges it into a captured lectern block-entity tag.
  *
  * <p>Two steps (see {@link LecternSink}): {@link #captureBook} serializes the live open menu's slot-0 book and
@@ -20,7 +20,7 @@ import world.thearchive.wdl.adapter.LecternSink;
 public final class LecternSinkImpl implements LecternSink {
     @Override
     public CompoundTag captureBook(ItemStack book, int page, RegistryAccess registries) {
-        // Assumes a non-empty book (ItemStack.CODEC does not encode EMPTY); the caller guards that.
+        // Assumes a non-empty book; the caller guards that.
         CompoundTag tag = new CompoundTag();
         tag.put("Book", book.save(new CompoundTag()));
         tag.putInt("Page", page);
@@ -29,9 +29,8 @@ public final class LecternSinkImpl implements LecternSink {
 
     @Override
     public CompoundTag merge(CompoundTag lecternBlockEntityTag, CompoundTag capturedBookHolder) {
-        // Copy so the captured chunk tag's block entity is replaced wholesale, never mutated in place, and
-        // set only "Book"/"Page": id, x/y/z and every other field are preserved (no clobber). ItemStack.CODEC
-        // serializes a stack to a compound, so the holder's "Book" is a compound.
+        // Copy so the captured chunk tag's block entity is replaced wholesale, never mutated in place, and set only
+        // "Book"/"Page": id, x/y/z and every other field are preserved (no clobber).
         CompoundTag merged = lecternBlockEntityTag.copy();
         merged.put("Book", capturedBookHolder.getCompound("Book"));
         merged.putInt("Page", capturedBookHolder.getInt("Page"));
