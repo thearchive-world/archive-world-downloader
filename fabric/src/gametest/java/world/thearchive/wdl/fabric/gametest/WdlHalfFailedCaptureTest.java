@@ -27,14 +27,13 @@ import world.thearchive.wdl.core.report.DownloadSession;
 
 /**
  * The leash-degradation axis at the capture-integration level: a mob whose leash the client could not resolve must
- * still reach disk, unleashed, rather than being lost whole. The capture half-fails on purpose. The leash sub-datum is
- * the half vanilla cannot save; the mod strips just that leash and saves the mob around it. The primed cow is put into
- * the exact client state {@code ClientPacketListener.handleEntityLinkPacket} builds for a
- * {@code ClientboundSetEntityLinkPacket} naming an unloaded holder: the resulting {@code Leashable.LeashData} has
- * neither a resolved holder nor a delayed attachment, a state {@code Leashable.writeLeashData} writes no leash tag for.
+ * still reach disk, unleashed, rather than being lost whole. The primed cow is put into the exact client state
+ * {@code ClientPacketListener.handleEntityLinkPacket} builds for a {@code ClientboundSetEntityLinkPacket} naming an
+ * unloaded holder: the resulting {@code Leashable.LeashData} has neither a resolved holder nor a delayed attachment, a
+ * state {@code Leashable.writeLeashData} writes no leash tag for.
  *
- * <p>So a mob with an unresolved holder already saves unleashed through vanilla itself and the strip changes nothing in
- * the written tag; the run still pins that outcome.
+ * <p>So a mob with an unresolved holder already saves unleashed through vanilla itself; the run still pins that
+ * outcome.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
@@ -91,9 +90,8 @@ public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
             context.waitFor(client -> findCow(client).isEmpty());
             logs.clear();
 
-            // Half-failed: a fresh cow leashed to a holder the client never loaded carries the leash state the
-            // vanilla save codec rejects. The sink strips just that unsavable leash and saves the mob unleashed
-            // rather than dropping it. The leash is the single changed variable.
+            // Half-failed: a fresh cow leashed to a holder the client never loaded. The leash is the single changed
+            // variable.
             summonCow(server, spawn);
             context.waitFor(client -> findCow(client).isPresent());
             breakLeash(context);
@@ -121,9 +119,8 @@ public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
      *
      * <p>It is the only tier that can assert this end to end: the write is driven from {@code finish()}, which needs a
      * client. The headless suite pins the derivation the flag comes from and both of its arms; what this adds is that
-     * the whole live path from a real capture to the file on disk agrees with it. Only the clean arm is asserted,
-     * because this fixture's half-failure is one the mod recovers from silently by design, and inducing a real loss to
-     * see the partial arm would be a different test.
+     * the whole live path from a real capture to the file on disk agrees with it. Only the clean arm is asserted:
+     * inducing a real loss to see the partial arm would be a different test.
      *
      * <p>The flag sums every capture-loss tally, so this reads wider than the rest of the class: a red here means some
      * tally moved, not necessarily the entity drop the log scrape beside it is about. The message says so, and says
@@ -162,9 +159,8 @@ public class WdlHalfFailedCaptureTest implements FabricClientGameTest {
     }
 
     /**
-     * Put the cow into the client state a leash to an unloaded holder produces, the exact call {@code
-     * ClientPacketListener.handleEntityLinkPacket} makes. The holder id never resolves, so the prime path's encode hits
-     * the codec rejection the sink strips.
+     * Put the cow into the client state a leash to an unloaded holder produces, the exact call
+     * {@code ClientPacketListener.handleEntityLinkPacket} makes.
      */
     private static void breakLeash(ClientGameTestContext context) {
         context.runOnClient(client -> {
