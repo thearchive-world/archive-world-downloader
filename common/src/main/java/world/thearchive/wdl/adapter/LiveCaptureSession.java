@@ -546,12 +546,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int drainAbortDrops;
 
     /**
-     * Primed entities the sink refused. An unresolvable leash never lands here (the sink strips it and saves the mob
-     * unleashed), so a refusal means the entity failed the standalone save check (a live passenger saved nested under
-     * its vehicle, a removed entity, or a player-only vehicle vanilla persists through the player) or its save returned
-     * false (a non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips. Reported so
-     * the drop is visible; not a loss, and not part of the packet reconciliation residual (a primed entity has no spawn
-     * packet).
+     * Primed entities the sink refused. An unresolvable leash never lands here, so a refusal means the entity failed
+     * the standalone save check (a live passenger saved nested under its vehicle, a removed entity, or a player-only
+     * vehicle vanilla persists through the player) or its save returned false (a non-serializable type: a leash knot, a
+     * bobber), which are the non-saves vanilla also skips. Reported so the drop is visible; not a loss, and not part of
+     * the packet reconciliation residual (a primed entity has no spawn packet).
      */
     private int primeSinkSkips;
 
@@ -2326,7 +2325,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * {@link #merchantStash} keyed by the bound villager UUID, last-seen-wins, skipping an empty offers so a re-open
      * before the offers packet lands never wipes a captured set. Runs outside the slot-keyed change gate (see the
      * caller). The encode is isolated per villager, the discipline every vanilla-serializer encode over client-held
-     * state needs: a sell item whose codec rejects would otherwise throw out of the client tick every tick the screen
+     * state needs: a sell item that fails to encode would otherwise throw out of the client tick every tick the screen
      * is open, so it is skipped, logged once, and remembered so it is not retried. The captured-set add clears the
      * outline rim and runs only on a successful encode, so a failed encode is never falsely reported as captured.
      */
@@ -2355,7 +2354,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Lift the bound lectern's slot-0 book and reading page from the open menu and stash them keyed by block pos,
      * overwriting any earlier capture for the same open menu (last-seen-wins, so a page turn re-stashes the live page).
-     * An empty slot 0 removes any stash entry (mirrors {@code saveAdditional}'s {@code !isEmpty()} guard, and is the
+     * An empty slot 0 removes any stash entry (mirrors {@code save}'s {@code !isEmpty()} guard, and is the
      * take-the-book resurrection guard): client-coupled, so the empty-drop branch is not exercised headless (as with
      * {@code stashContainerItems}).
      */
@@ -3471,8 +3470,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             return null; // colors never received (imageless): skipped, never fabricated
         }
         Tag mapTag = adapter.mapSink().serializeMap(saved, registries);
-        // 1.16.5 MapItemSavedData has no locked() copy method, and mutating the live client map's locked flag would
-        // freeze its tracking, so the archived lock is set on the serialized tag instead, leaving the live map alone.
+        // 1.16.5 MapItemSavedData has no locked() copy method, so the archived lock is set on the serialized tag
+        // instead, leaving the live map alone.
         if (config.lockDownloadedMaps() && mapTag instanceof CompoundTag) {
             ((CompoundTag) mapTag).putBoolean("locked", true);
         }

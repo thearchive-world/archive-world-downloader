@@ -59,7 +59,7 @@ public final class EntitySinkImpl implements EntitySink {
     @Override
     public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos, RegistryAccess registries,
             boolean forceMobPersistence) {
-        // Lift of EntityStorage.storeEntities' write branch, server-free: entity.save writes the entity NBT
+        // Server-free: entity.save writes the entity NBT
         // straight into a CompoundTag with no ServerLevel touch.
         List<CompoundTag> entityTags = new ArrayList<>();
         for (Entity entity : entities) {
@@ -323,7 +323,7 @@ public final class EntitySinkImpl implements EntitySink {
     @Override
     public @Nullable CompoundTag encodeChunk(List<CompoundTag> entityTags, ChunkPos pos) {
         if (entityTags.isEmpty()) {
-            return null; // skip empty entity-chunks: capture omits them (vanilla writes IOWorker.STORE_EMPTY)
+            return null;
         }
         ListTag entities = new ListTag();
         for (CompoundTag entityTag : entityTags) {

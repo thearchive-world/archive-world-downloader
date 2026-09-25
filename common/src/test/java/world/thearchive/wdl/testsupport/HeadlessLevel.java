@@ -33,8 +33,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * A do-nothing client-side {@link Level} for headless entity fixtures. Below 1.21.2 the {@code Mob} constructor reads
  * {@code level.getProfilerSupplier()}, so a mob can no longer be built against a null level; this supplies the
- * overworld dimension type and the vanilla registries the constructor and its {@code DamageSources} need, an inactive
- * profiler, a client level data carrying the world clock, and inert stubs for the abstract members no fixture calls.
+ * overworld dimension type and the vanilla registries the constructor needs, an inactive profiler, a client level data
+ * carrying the world clock, and inert stubs for the abstract members no fixture calls.
  */
 public final class HeadlessLevel extends Level {
     private final RegistryAccess registries;
