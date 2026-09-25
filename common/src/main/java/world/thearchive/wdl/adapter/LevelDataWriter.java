@@ -42,14 +42,13 @@ public interface LevelDataWriter {
             @Nullable String worldName);
 
     /**
-     * Reconstruct this band's client-side worldgen registries ahead of time, off the render thread, so the first
-     * {@code DEFAULT}/{@code FLAT} download's {@link #buildLevelData} finds them already built instead of decoding them
-     * synchronously on the client tick. Idempotent and safe to call before any download; the dispatched result is
-     * byte-identical to building on demand.
+     * Reconstruct this band's client-side worldgen registries ahead of time, off the render thread, so
+     * {@link #buildLevelData} finds them already built instead of decoding them synchronously on the client tick.
+     * Idempotent and safe to call before any download; the dispatched result is byte-identical to building on demand.
      *
-     * <p>The default is a no-op: a band whose captured world needs no worldgen reconstruction (VOID-only, or one that
-     * never reaches this cost) inherits it untouched. A band that <b>does</b> reconstruct worldgen must override this
-     * or its first such download silently freezes the render thread again.
+     * <p>The default is a no-op: a band whose captured world needs no worldgen reconstruction inherits it untouched. A
+     * band that <b>does</b> reconstruct worldgen must override this or its first such download silently freezes the
+     * render thread again.
      */
     default void warmWorldgen() {}
 

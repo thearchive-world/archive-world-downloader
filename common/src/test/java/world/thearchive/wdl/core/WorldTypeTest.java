@@ -10,14 +10,13 @@ import org.junit.jupiter.api.Test;
 
 class WorldTypeTest {
     @Test
-    void voidNeedsNoWorldgenReconstruction() {
-        assertFalse(WorldType.VOID.needsWorldgenReconstruction(),
-                "the void generator uses the synced client registries, never the reconstructed worldgen");
+    void voidGeneratesNoTerrain() {
+        assertFalse(WorldType.VOID.generatesTerrain());
     }
 
     @Test
-    void defaultAndFlatNeedWorldgenReconstruction() {
-        assertTrue(WorldType.DEFAULT.needsWorldgenReconstruction());
-        assertTrue(WorldType.FLAT.needsWorldgenReconstruction());
+    void defaultAndFlatGenerateTerrain() {
+        assertTrue(WorldType.DEFAULT.generatesTerrain());
+        assertTrue(WorldType.FLAT.generatesTerrain());
     }
 }
