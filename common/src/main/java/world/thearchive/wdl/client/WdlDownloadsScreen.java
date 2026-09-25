@@ -284,8 +284,8 @@ public final class WdlDownloadsScreen extends Screen {
             this.scheduledProbes.clear();
         }
         setFocused(field);
-        // Below 1.17 the screen's focus does not propagate into the widget (there is no Screen.setInitialFocus at
-        // this band), so the name field takes no cursor and no typing until clicked; focus the EditBox directly.
+        // Below 1.17 the screen's focus does not propagate into the widget, so the name field takes no cursor and no
+        // typing until clicked; focus the EditBox directly.
         field.setFocus(true);
     }
 
