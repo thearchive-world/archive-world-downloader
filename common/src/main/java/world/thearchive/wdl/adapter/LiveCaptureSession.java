@@ -545,12 +545,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int drainAbortDrops;
 
     /**
-     * Primed entities the sink refused. An unresolvable leash never lands here (the sink strips it and saves the mob
-     * unleashed), so a refusal means the entity failed the standalone save check (a live passenger saved nested under
-     * its vehicle, a removed entity, or a player-only vehicle vanilla persists through the player) or its save returned
-     * false (a non-serializable type: a leash knot, a bobber), which are the non-saves vanilla also skips. Reported so
-     * the drop is visible; not a loss, and not part of the packet reconciliation residual (a primed entity has no spawn
-     * packet).
+     * Primed entities the sink refused. An unresolvable leash never lands here, so a refusal means the entity failed
+     * the standalone save check (a live passenger saved nested under its vehicle, a removed entity, or a player-only
+     * vehicle vanilla persists through the player) or its save returned false (a non-serializable type: a leash knot, a
+     * bobber), which are the non-saves vanilla also skips. Reported so the drop is visible; not a loss, and not part of
+     * the packet reconciliation residual (a primed entity has no spawn packet).
      */
     private int primeSinkSkips;
 
@@ -2288,7 +2287,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * {@link #merchantStash} keyed by the bound villager UUID, last-seen-wins, skipping an empty offers so a re-open
      * before the offers packet lands never wipes a captured set. Runs outside the slot-keyed change gate (see the
      * caller). The encode is isolated per villager, the discipline every vanilla-serializer encode over client-held
-     * state needs: a sell item whose codec rejects would otherwise throw out of the client tick every tick the screen
+     * state needs: a sell item that fails to encode would otherwise throw out of the client tick every tick the screen
      * is open, so it is skipped, logged once, and remembered so it is not retried. The captured-set add clears the
      * outline rim and runs only on a successful encode, so a failed encode is never falsely reported as captured.
      */
