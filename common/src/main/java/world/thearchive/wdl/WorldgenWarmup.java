@@ -12,9 +12,8 @@ import world.thearchive.wdl.core.WorldType;
 /**
  * Pre-download dispatch for the client-side worldgen reconstruction: when the download screen opens, submit the band's
  * warmup to a background worker so the first download finds the registries already built instead of decoding them on
- * the render thread. Below 1.19 every generator reconstructs, including the void default, so the gate here matches the
- * level-data build's own branch exactly; dispatch is idempotent through the reconstruction's own memo, so a repeated
- * trigger just hits the cache.
+ * the render thread. Dispatch is idempotent through the reconstruction's own memo, so a repeated trigger just hits the
+ * cache.
  *
  * <p>Only the manual (screen-open) path warms. The screen opens while connected, so the reconstruction's
  * transitively-read item tags are bound. The auto-download path cannot be warmed pre-join: the reconstruction needs
