@@ -106,9 +106,6 @@ public final class RimRendererImpl implements RimRenderer {
         vertex(lines, pose, width, x2, y2, z2, colorArgb);
     }
 
-    // The lines format is POSITION_COLOR_NORMAL_LINE_WIDTH on this band: the width moved from the old global
-    // RenderSystem.lineWidth to a per-vertex element, so every vertex must set it or the buffer rejects the
-    // vertex ("Missing elements in vertex: LineWidth"). The value is the context's resolved effective width.
     private void vertex(VertexConsumer lines, PoseStack.Pose pose, float width, float x, float y, float z,
             int colorArgb) {
         pose.pose().transformPosition(x, y, z, position);
