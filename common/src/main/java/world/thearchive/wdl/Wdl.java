@@ -99,9 +99,7 @@ public final class Wdl {
     // chat by the second join hook and shown as the downloads-screen banner.
     private static final UpdateCheck updateCheck = new UpdateCheck();
 
-    // One-shot daemon for the pre-download worldgen warmup, so the reconstruction decode never blocks the client
-    // tick or JVM exit. Idempotent through the reconstruction memo; a repeat trigger just spawns a thread that
-    // finds the registries already built and exits.
+    // One-shot daemon for the pre-download worldgen warmup, so it never blocks the client tick or JVM exit.
     private static final Executor warmupWorker = daemonWorker("wdl-worldgen-warmup");
 
     // The in-world unsaved-container outline: the tick maintains its draw-set, the per-loader render

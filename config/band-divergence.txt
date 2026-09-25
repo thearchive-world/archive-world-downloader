@@ -860,8 +860,7 @@ forge/src/main/java/world/thearchive/wdl/forge/WdlForge.java
 forge/src/main/java/world/thearchive/wdl/forge/ForgePlatformBridge.java
 
 # Below 1.19 the pre-download warm gate warms the void default alongside DEFAULT and FLAT (from 1.19 up only DEFAULT
-# and FLAT warm); below 1.16 the warm is inert, the level-data writer's warmWorldgen being empty since a pre-1.16
-# level.dat stores only a generator name and its options and reconstructs no worldgen.
+# and FLAT warm); below 1.16 the warm is inert, the level-data writer's warmWorldgen being empty.
 common/src/main/java/world/thearchive/wdl/WorldgenWarmup.java
 
 # Below 1.19 the screen-open warm submits for VOID too, so this test asserts VOID warms, where from 1.19 up the void
