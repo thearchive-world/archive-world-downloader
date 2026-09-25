@@ -28,9 +28,9 @@ import org.jspecify.annotations.Nullable;
  * resume outline read: a crafter's {@code "triggered"} rides along with contents but is not itself content, so a
  * crafter carrying only state must not read as a recovered container.
  *
- * <p>The fields enumerated here are vanilla's own on this band. The carry-forward considers all of them for every block
- * entity in a re-written chunk, so a non-vanilla block entity that happened to use one of these key names could receive
- * a carried value; no vanilla block entity besides the crafter and the brewing stand writes any of the four state keys.
+ * <p>The carry-forward considers every field enumerated here for every block entity in a re-written chunk, so a
+ * non-vanilla block entity that happened to use one of these key names could receive a carried value; no vanilla block
+ * entity besides the crafter and the brewing stand writes any of the four state keys.
  */
 enum CapturedBlockField {
     /** A block container's slots, written by {@link ContainerSink#merge} (chiseled bookshelves included). */
