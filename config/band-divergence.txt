@@ -874,13 +874,12 @@ forge/src/main/java/world/thearchive/wdl/forge/WdlForge.java
 # method.
 forge/src/main/java/world/thearchive/wdl/forge/ForgePlatformBridge.java
 
-# The screen-open warm gate is WorldType.VOID or generatesTerrain, where dev's is generatesTerrain
-# alone: below 1.19 the void generator reconstructs the vanilla worldgen registries too, its biome needing a registry
-# name the client's synced biome lacks, so the gate matches the level-data build's own reconstruction branch.
+# Below 1.19 the pre-download warm gate warms the void default alongside DEFAULT and FLAT (from 1.19 up only DEFAULT
+# and FLAT warm); below 1.16 the warm is inert, the level-data writer's warmWorldgen being empty.
 common/src/main/java/world/thearchive/wdl/WorldgenWarmup.java
 
-# Below 1.19 the void generator reconstructs the vanilla worldgen registries too, so the screen-open warm submits for
-# VOID; this test asserts VOID warms, where dev's asserts the void default uses the synced registries and does not warm.
+# Below 1.19 the screen-open warm submits for VOID too, so this test asserts VOID warms, where from 1.19 up the void
+# default does not warm.
 common/src/test/java/world/thearchive/wdl/WorldgenWarmupTest.java
 
 # Below 1.18 a chunk's block entities are nested under Level.TileEntities rather than the root block_entities, so the
