@@ -18,11 +18,6 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import world.thearchive.wdl.core.WorldType;
 import world.thearchive.wdl.testsupport.JulCapture;
 
-/**
- * The pre-download warmup dispatch: the gate submits a warmup only when the chosen generator needs worldgen (and, on
- * the auto path, only when auto-download is on), and the submitted worker body swallows a failed warmup after logging
- * it once, so a broken reconstruction never escapes onto the daemon and never poisons the download.
- */
 class WorldgenWarmupTest {
     private static final class RecordingExecutor implements Executor {
         private final List<Runnable> tasks = new ArrayList<>();
