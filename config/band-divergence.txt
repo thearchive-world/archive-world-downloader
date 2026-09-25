@@ -976,15 +976,15 @@ common/src/main/java/world/thearchive/wdl/update/ReleaseIndex.java
 # manual bounded read.
 common/src/main/java/world/thearchive/wdl/update/HttpTransport.java
 
-# Below 1.16 there is no RegistryAccess (RegistryAccess.Frozen and builtinCopy().freeze() are 1.18's), so
-# TestRegistries only runs the bootstrap and the fixtures and the encode take no registries.
+# Below 1.16 there is no RegistryAccess (RegistryAccess.Frozen is 1.18.2's), so TestRegistries only runs the bootstrap
+# and the fixtures and the encode take no registries.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkReencodeFidelityTest.java
 
-# Below 1.16 there is no RegistryAccess (RegistryAccess.Frozen is 1.18's), so the session is built with DimensionType
+# Below 1.16 there is no RegistryAccess (RegistryAccess.Frozen is 1.18.2's), so the session is built with DimensionType
 # keys and no registries, and the writer takes no session-lock argument.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionMapTallyTest.java
 
-# Below 1.16 there is no RegistryAccess (RegistryAccess.Frozen is 1.18's), so the session is built with DimensionType
+# Below 1.16 there is no RegistryAccess (RegistryAccess.Frozen is 1.18.2's), so the session is built with DimensionType
 # keys and no registries and captureItems takes none.
 common/src/test/java/world/thearchive/wdl/adapter/RiddenMountContentsFoldTest.java
 
