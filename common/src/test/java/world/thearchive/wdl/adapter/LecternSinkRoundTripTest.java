@@ -29,18 +29,16 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * vanilla's own {@code new ItemStack(NBTTagCompound)} read-back (the exact form
  * {@code BlockJukebox.TileEntityJukebox.readFromNBT} uses for its record) is a self-consistent round-trip: the captured
  * book survives serialization, lands on the lectern block-entity tag under {@code "Book"} with the reading
- * {@code "Page"}, and decodes back to the same book, with no other block-entity field clobbered. Runs for both a signed
- * <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern contents).
+ * {@code "Page"}, and decodes back to the same book, with no other block-entity field clobbered.
  *
  * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
- * neither a live menu nor a {@code World} is needed. The one client-coupled step (lifting the book from the live open
- * menu's slot 0) is not exercised headless, exactly as for containers.
+ * neither a live menu nor a {@code World} is needed.
  *
  * <p>The merge cases are disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag can be
  * built from a real producer here, and lectern-book capture is a documented limit at this band. The pure
- * {@link LecternSink#merge} keeps coverage through the re-pointed {@code ChunkFlushPlanTest} and
- * {@code AsyncSaveWriterTest} fold-wiring tests, which drive it against a stand-in carrier. {@code captureBook} needs
- * only a book item, so it still runs.
+ * {@link LecternSink#merge} keeps coverage through the {@code ChunkFlushPlanTest} and {@code AsyncSaveWriterTest}
+ * fold-wiring tests, which drive it against a stand-in carrier. {@code captureBook} needs only a book item, so it still
+ * runs.
  */
 class LecternSinkRoundTripTest {
     private static final String LECTERN_ABSENT = "lecterns absent at 1.12.2 (1.14 block entity, documented limit)";
@@ -94,7 +92,6 @@ class LecternSinkRoundTripTest {
     }
 
     private static ItemStack readBackBook(NBTTagCompound merged) {
-        // vanilla readFromNBT's exact read
         ItemStack back = new ItemStack(merged.getCompoundTag("Book"));
         assertTrue(!back.isEmpty(), "the merged Book must decode via vanilla's ItemStack(NBTTagCompound)");
         return back;

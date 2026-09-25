@@ -96,9 +96,8 @@ class ChunkMergeTest {
 
     /**
      * A beehive block entity carrying occupants under {@code "Bees"}, the key {@link ChunkMerge}'s own
-     * {@code CapturedBlockField.BEES} carries forward (vanilla's own {@code BeehiveBlockEntity} persists occupants
-     * under {@code "Bees"} instead, so this shape is not a real producer's output; a chunk tag built from it must go
-     * through {@link BlockEntityFixtures#malformedChunkTagWith}, not the fidelity-checked
+     * {@code CapturedBlockField.BEES} carries forward (this shape is not a real producer's output; a chunk tag built
+     * from it must go through {@link BlockEntityFixtures#malformedChunkTagWith}, not the fidelity-checked
      * {@link BlockEntityFixtures#chunkTagWith}).
      */
     private static NBTTagCompound beehiveWithBees(int x, int y, int z, int beeCount) {

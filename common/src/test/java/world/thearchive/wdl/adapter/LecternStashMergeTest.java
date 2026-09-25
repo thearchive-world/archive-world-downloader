@@ -38,8 +38,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  *
  * <p>Disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag can be built here, and
  * lectern-book capture is a documented limit at this band. {@link ContainerMerge#mergeLecternChunkStash} keeps coverage
- * through the re-pointed {@code ChunkFlushPlanTest} and {@code OrphanedContainerSweepTest}, which drive it against a
- * stand-in carrier.
+ * through the {@code ChunkFlushPlanTest} and {@code OrphanedContainerSweepTest}, which drive it against a stand-in
+ * carrier.
  */
 @Disabled("lecterns are a 1.14 block entity, absent at 1.13.2; the save-time lectern-book injection is a documented "
         + "limit with no valid fixture here")

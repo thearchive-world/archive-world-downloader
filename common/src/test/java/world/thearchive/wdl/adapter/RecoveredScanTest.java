@@ -303,8 +303,6 @@ class RecoveredScanTest {
     }
 
     private static NBTTagCompound jukeboxWithDisc(int x, int y, int z) {
-        // Vanilla JukeboxBlockEntity.saveAdditional always writes IsPlaying/RecordStartTick/TickCount alongside
-        // a present RecordItem.
         NBTTagCompound blockEntity = emptyJukebox(x, y, z);
         blockEntity.setTag("RecordItem", ItemFixtures.itemTag("minecraft:record_cat"));
         blockEntity.setBoolean("IsPlaying", true);
@@ -319,9 +317,8 @@ class RecoveredScanTest {
 
     /**
      * A beehive carrying occupants under {@code "Bees"}, the key {@link ChunkMerge}'s {@code CapturedBlockField.BEES}
-     * (and, transitively, {@link RecoveredScan}) reads; vanilla's own {@code BeehiveBlockEntity} persists occupants
-     * under {@code "Bees"} instead, so this is not a real producer's shape and a chunk built from it must go through
-     * {@link BlockEntityFixtures#malformedChunkTagWith}.
+     * (and, transitively, {@link RecoveredScan}) reads; this is not a real producer's shape and a chunk built from it
+     * must go through {@link BlockEntityFixtures#malformedChunkTagWith}.
      */
     private static NBTTagCompound beehiveWithBees(int x, int y, int z) {
         NBTTagCompound blockEntity = emptyBeehive(x, y, z);
