@@ -89,7 +89,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
             @Nullable String worldName) {
         WorldType worldType = worldOutput.worldType();
         // A real generator needs the full vanilla worldgen registries, which a multiplayer client is never sent. The
-        // void generator would otherwise stay on the client's synced biome/dimension-type registries, but below 1.19.3
+        // void generator would otherwise stay on the client's synced biome/dimension-type registries, but below 1.19
         // Forge tags every registry entry with a registry name and never sets one on a client-synced biome, so
         // FlatLevelGeneratorSettings rebuilding the void biome trips ForgeRegistryEntry.setRegistryName on a null name.
         // The locally reconstructed vanilla registries carry names, so the void generator builds from them too here; it
