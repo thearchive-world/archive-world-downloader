@@ -61,9 +61,6 @@ final class VanillaWorldgenRegistries {
     private static RegistryAccess.Frozen load() {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
-        // The STATIC-layer tags stay unbound, which is correct here: worldgen codecs store tag references as lazy
-        // TagKeys, and this access only builds the presets and encodes WorldGenSettings by id, never generates
-        // terrain, so binding block/item tags would be needless.
         return RegistryAccess.builtinCopy().freeze();
     }
 }
