@@ -215,7 +215,7 @@ class EntityResumeContentCarryTest {
         assertEquals("minecraft:emerald", firstSellId(entitiesOnDisk(saveRoot, VILLAGER, opened).get(0)),
                 "guard: the first download saved the trades the player actually saw");
 
-        // A client villager invents a random career and a random trade list the moment anything asks it for its
+        // A client villager invents a random trade list the moment anything asks it for its
         // offers, so a capture can arrive carrying trades that were never on the server. Built here rather than
         // provoked: on a band whose vanilla guards the client-side write, nothing local produces the shape.
         LiveCaptureSession second = session(configDirectory, DownloadMode.RESUME);
