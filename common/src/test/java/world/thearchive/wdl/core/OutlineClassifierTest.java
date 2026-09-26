@@ -141,8 +141,8 @@ class OutlineClassifierTest {
 
     @Test
     void capturedBlockRerimsWhenTheLiveTypeDiffersFromTheRecordedType() {
-        // The stuck-rim bug: a captured barrel broken and replaced by a chest at the same pos must draw the
-        // unsaved rim again, since the chest at that key is uncaptured.
+        // A captured container broken and replaced by one of another type at the same pos must draw the unsaved rim
+        // again, since the new one at that key is uncaptured.
         CapturedContainers captured = capturedType(5L, "minecraft:barrel");
         assertEquals(OutlineClass.UNSAVED, OutlineClassifier.classify(new long[] { 5L }, "minecraft:chest", null,
                 false, captured, RecoveredCoverage.EMPTY));
