@@ -167,11 +167,7 @@ class CarryForwardWiringTest {
         ((Map<BlockPos, StashHolder>) field.get(session)).put(pos, StashHolder.of(holder));
     }
 
-    /**
-     * The lectern half of the placement drop. A lectern captured at a cell and then built over keeps its book keyed to
-     * that position, and the merge gate compares block-entity types, so a lectern placed there would inherit the book
-     * of the one it replaced.
-     */
+    /** The lectern half of the placement drop. */
     @Test
     void aPlacementDropsTheLecternCapturedInThatCell(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
@@ -179,8 +175,7 @@ class CarryForwardWiringTest {
 
         placeBlockAt(session, chest);
 
-        assertEquals(0, lecternStashSize(session),
-                "the lectern the placement built over no longer describes anything at that cell");
+        assertEquals(0, lecternStashSize(session), "the placement emptied the lectern stash");
     }
 
     @SuppressWarnings("unchecked")

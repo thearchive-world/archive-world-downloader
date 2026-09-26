@@ -57,10 +57,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * between two flushes of one session, where the retained in-memory holder supplies the re-fold. That holder does not
  * survive a session boundary, which is the hole these cases cover.
  *
- * <p>Asserted against the bytes under {@code entities/} across every chunk the two downloads could have written,
- * because that is the only place the trade-less second copy is visible: every write succeeds and no tally moves.
- * Deliberately never writes the session's folded maps: a case that seeds them itself passes whether or not a resume can
- * populate them, which is the blind spot {@link MerchantStashMergeTest} has by construction.
+ * <p>Asserted against the bytes across every chunk the two downloads could have written, because that is the only place
+ * the trade-less second copy is visible: every write succeeds and no tally moves. Deliberately never writes the
+ * session's folded maps: a case that seeds them itself passes whether or not a resume can populate them, which is the
+ * blind spot {@link MerchantStashMergeTest} has by construction.
  */
 class EntityResumeContentCarryTest {
     private static final UUID VILLAGER = UUID.fromString("2f6c0f4a-1e88-4d3b-9a52-7c0b6e4d1a93");

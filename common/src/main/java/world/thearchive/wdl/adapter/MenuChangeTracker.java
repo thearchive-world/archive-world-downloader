@@ -10,14 +10,12 @@ import net.minecraft.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Tracks whether an open menu's slot contents (or the lectern's reading page) changed since the last stash, so the
- * per-tick last-seen-wins stash re-serializes only on a real change rather than every tick (a shulker-filled double
- * chest is around fifteen hundred item encodes per pass). The change signal is per-slot stack identity and count: a
- * client-side slot mutation either replaces the slot's stack object (a sync packet's fresh stack, a click prediction's
- * move or split) or changes its count (a prediction's grow or shrink). The signal also carries a small menu-only
- * {@code ContainerData} vector (a crafter's disabled and triggered flags, a brewing stand's brew time and fuel), so a
- * data-only tick like a running brew with no slot movement re-stashes. Main-thread only, reset at bind and close so one
- * open menu never inherits another's snapshot.
+ * Tracks whether an open menu's slot contents changed since the last stash, so the per-tick last-seen-wins stash
+ * re-serializes only on a real change rather than every tick (a shulker-filled double chest is around fifteen hundred
+ * item encodes per pass). The change signal is per-slot stack identity and count: a client-side slot mutation either
+ * replaces the slot's stack object (a sync packet's fresh stack, a click prediction's move or split) or changes its
+ * count (a prediction's grow or shrink). Main-thread only, reset at bind and close so one open menu never inherits
+ * another's snapshot.
  */
 final class MenuChangeTracker {
     static final int[] NO_DATA = new int[0];

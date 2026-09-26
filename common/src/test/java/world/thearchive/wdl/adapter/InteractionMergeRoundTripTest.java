@@ -25,7 +25,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for the band-stable merge write that interaction-prediction capture adds beside the open-time
- * container/lectern path: a jukebox disc under {@code "RecordItem"} (via {@code ItemStack#writeToNBT}). It is the
+ * container path: a jukebox disc under {@code "RecordItem"} (via {@code ItemStack#writeToNBT}). It is the
  * capture-then-merge round-trip proven against vanilla's own read-back (the exact form the block entity's own read
  * uses): the captured content survives serialization, lands on the matching captured block entity under its own keys
  * with no other field clobbered, decodes back to the same content, and only the flushed chunk's stash entries drain.
@@ -99,7 +99,7 @@ class InteractionMergeRoundTripTest {
         NBTTagCompound jukeboxBlockEntity = findByPos(
                 chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70, 20);
         assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"),
-                "the captured jukebox is marked playing so it shows note particles on load");
+                "the captured jukebox's IsPlaying is true");
     }
 
     @Test

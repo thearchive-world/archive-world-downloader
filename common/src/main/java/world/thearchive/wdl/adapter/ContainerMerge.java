@@ -20,9 +20,8 @@ import org.apache.logging.log4j.Logger;
  * with per-entry failure isolation that mirrors {@link RegionChunkWriter}: a merge that throws is logged and skipped so
  * one bad entry can never abort the whole save. Several axes share the {@code x/y/z} locator: {@link #mergeChunkStash}
  * writes container {@code "Items"} plus the whitelisted open-time state keys, {@link #mergeLecternChunkStash} writes
- * lectern {@code "Book"}/{@code "Page"}, and {@link #mergeHolderChunkStash} copies an interaction-predicted holder's
- * own keys onto its block entity. The streaming capture calls each per chunk, just before that chunk is flushed to
- * disk.
+ * {@code "Book"}/{@code "Page"}, and {@link #mergeHolderChunkStash} copies an interaction-predicted holder's own keys
+ * onto its block entity. The streaming capture calls each per chunk, just before that chunk is flushed to disk.
  *
  * <p>Portable across the pre-1.18 chunk format: the {@code Level.TileEntities} list and a block entity's {@code x/y/z}
  * metadata are vanilla-stable there. The block-entity tag is replaced in place inside the captured chunk tag, so the
@@ -47,7 +46,7 @@ final class ContainerMerge {
     }
 
     /**
-     * Copy the open-time state keys present on {@code holder} onto {@code merged} (classic MCP NBT ops): the crafter's
+     * Copy the open-time state keys present on {@code holder} onto {@code merged} (classic MCP NBT ops):
      * {@code disabled_slots}/{@code triggered} and the brewing stand's {@code BrewTime}/{@code Fuel}, read off
      * {@link CapturedBlockField} so the same list drives the chunk carry-forward that has to preserve them across a
      * re-write. Still a whitelist, and still fails closed, so an internal holder key ({@code wdl_block_entity_id}) can
@@ -67,10 +66,9 @@ final class ContainerMerge {
     }
 
     /**
-     * The lectern sibling of {@link #mergeChunkStash}: merge (and drain) just the lectern-book stash entries located in
-     * {@code pos}'s chunk into {@code chunkTag}, setting {@code "Book"}/{@code "Page"} on the matching lectern block
-     * entity. Same {@code x/y/z} locator, per-entry isolation, and drain semantics; a lectern BE and any container BE
-     * are distinct entities, so the two merges never interfere.
+     * The sibling of {@link #mergeChunkStash}: merge (and drain) just the stash entries located in {@code pos}'s chunk
+     * into {@code chunkTag}, setting {@code "Book"}/{@code "Page"} on the matching block entity. Same {@code x/y/z}
+     * locator, per-entry isolation, and drain semantics.
      */
     static MergeTally mergeLecternChunkStash(LecternSink sink, NBTTagCompound chunkTag, ChunkPos pos,
             Map<BlockPos, NBTTagCompound> stash) {

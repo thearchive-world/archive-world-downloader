@@ -147,12 +147,12 @@ final class RegionChunkWriter {
 
     /**
      * Read an already-written chunk, fold detached open-time holders onto its block entities in place, and write it
-     * back: the recovery path for a container or lectern opened in a chunk that had already flushed and left the
-     * keep-hot buffer, so its captured contents never reached the on-disk block entity through the normal per-chunk
-     * drain. The prior chunk carries the terrain and every already-saved container, so {@code rewrite} only adds the
-     * newly-captured contents. Returns how many block entities the fold landed contents on, and zero when there is no
-     * on-disk prior to fold into (the contents are logged as lost rather than synthesized onto a terrainless chunk) or
-     * a read, fold, or write failure isolates the chunk per the per-chunk discipline, never aborting the drain.
+     * back: the recovery path for a container opened in a chunk that had already flushed and left the keep-hot buffer,
+     * so its captured contents never reached the on-disk block entity through the normal per-chunk drain. The prior
+     * chunk carries the terrain and every already-saved container, so {@code rewrite} only adds the newly-captured
+     * contents. Returns how many block entities the fold landed contents on, and zero when there is no on-disk prior to
+     * fold into (the contents are logged as lost rather than synthesized onto a terrainless chunk) or a read, fold, or
+     * write failure isolates the chunk per the per-chunk discipline, never aborting the drain.
      */
     public static int rewriteExisting(WdlRegionStorage storage, ChunkPos pos, ChunkRewrite rewrite) {
         NBTTagCompound onDisk;

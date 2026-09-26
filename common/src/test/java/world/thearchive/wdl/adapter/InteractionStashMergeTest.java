@@ -154,7 +154,7 @@ class InteractionStashMergeTest {
         assertTrue(!InteractionCapture.confirm(Blocks.STONE.getDefaultState(), candidate).isPresent(),
                 "a jukebox prediction against a non-jukebox block discards, it does not throw");
     }
-    // Per-slot gate independence: one slot survives while another is dropped.
+
     // Place-then-open precedence: an opened container supersedes a stale place-time snapshot.
 
     @Test
@@ -255,9 +255,9 @@ class InteractionStashMergeTest {
         assertTrue(bundles.items().isEmpty(), "no captured section covers the pos, so the gate fails closed");
     }
 
-    // Recognition: a right-click on a bookshelf or jukebox records an insert candidate only when the block would
-    // consume it (a book, a playable disc), so a content block placed against that face falls through to a place
-    // capture instead of being dropped.
+    // Recognition: a right-click on a jukebox records an insert candidate only when the block would consume it (a
+    // playable disc), so a content block placed against that face falls through to a place capture instead of being
+    // dropped.
     @Test
     void placedShulkerNotifiesThePlacedContainerSink() {
         long[] sinkPos = { -1L };
@@ -352,8 +352,6 @@ class InteractionStashMergeTest {
     @Test
     void throwingRecognitionIsSwallowedFailSoft() {
         InteractionCapture capture = plainCapture(sink, true);
-        // The click-time encode can throw; the recognizer must skip that one capture rather than letting it escape to
-        // the loader event and crash the client mid-download.
         assertDoesNotThrow(() -> capture.recordFailSoft(new BlockPos(0, 70, 0), () -> {
             throw new IllegalStateException("encode blew up");
         }));

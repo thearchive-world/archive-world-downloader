@@ -49,11 +49,11 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final Logger LOGGER = LogManager.getLogger(AbstractPlatformBridge.class);
 
     // This band's SystemToast has no custom-id class, so these reuse two distinct vanilla toast categories from the
-    // SystemToast.Type enum (which carries only TUTORIAL_HINT and NARRATOR_TOGGLE here), which keep the vanilla
-    // default display time (which the accessibility notification-time multiplier scales). Job-done toasts are always
-    // constructed fresh, never addOrUpdate-reset, so each event surfaces its own toast. Refusals use their own
-    // category so a repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message,
-    // and vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body unwrapped).
+    // SystemToast.Type enum (which carries only TUTORIAL_HINT and NARRATOR_TOGGLE here), which keep the vanilla default
+    // display time. Job-done toasts are always constructed fresh, never addOrUpdate-reset, so each event surfaces its
+    // own toast. Refusals use their own category so a repeated click cannot queue a parade: one refusal on screen or in
+    // the queue is the whole message, and vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body
+    // unwrapped).
     private static final SystemToast.Type TOAST_ID = SystemToast.Type.NARRATOR_TOGGLE;
     private static final SystemToast.Type REFUSAL_TOAST_ID = SystemToast.Type.TUTORIAL_HINT;
 
