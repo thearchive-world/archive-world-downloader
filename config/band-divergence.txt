@@ -637,7 +637,8 @@ common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 # Below 1.17 the hive stores a bee's whole saved tag with only the UUID stripped, so under each EntityData the pass
 # blanks FlowerPos, HivePos, Pos, Leash and Dimension (the entity's own dimension id, written below 1.16), where the
 # component era blanks the flower position alone. Java 8 form: every pattern instanceof over the item, entity,
-# equipment, passenger and bee reads is unbound.
+# equipment, passenger and bee reads is unbound. Below 1.16 there is no lodestone, so the Javadoc names the LodestonePos
+# and LodestoneDimension keys rather than a lodestone target.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument; below 1.16 captureItems takes none either.
