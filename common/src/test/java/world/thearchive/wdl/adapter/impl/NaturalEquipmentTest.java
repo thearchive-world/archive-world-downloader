@@ -61,10 +61,8 @@ class NaturalEquipmentTest {
                 of(Blocks.CARVED_PUMPKIN.asItem())));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.SKELETON, EquipmentSlot.HEAD,
                 of(Blocks.JACK_O_LANTERN.asItem())));
-        // The white-banner head carve-out, exercised on a geared no-armor illager so the carve-out itself decides it
-        // rather than an armor pool. Its raid/patrol captain ominous banner is a 1.14 feature the carve-out
-        // anticipates.
-        assertTrue(NaturalEquipment.isNaturalFor(EntityType.VINDICATOR, EquipmentSlot.HEAD, of(Items.WHITE_BANNER)));
+        // No raid captain wears the ominous banner before 1.14, so a no-armor illager's head banner is not natural.
+        assertFalse(NaturalEquipment.isNaturalFor(EntityType.VINDICATOR, EquipmentSlot.HEAD, of(Items.WHITE_BANNER)));
     }
 
     @Test
