@@ -42,13 +42,12 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The orphaned open-time container and lectern loss: a container or lectern opened in a chunk that had already left the
- * keep-hot buffer is stashed by block pos, but the per-chunk flush only ever drains the still-buffered chunks, and the
- * chunk is never re-buffered (the {@code allCaptured} skip), so its captured contents were silently dropped. The
- * trigger is the normal way a storage base is downloaded: backtracking through chunks already flown past. The fix folds
- * each such residual holder into its on-disk chunk through a writer-thread read-modify-write
- * ({@link AsyncSaveWriter#submitChunkRewrite} over {@link RegionChunkWriter#rewriteExisting}), reusing the
- * {@link ContainerMerge} fold.
+ * The orphaned open-time container loss: a container opened in a chunk that had already left the keep-hot buffer is
+ * stashed by block pos, but the per-chunk flush only ever drains the still-buffered chunks, and the chunk is never
+ * re-buffered (the {@code allCaptured} skip), so its captured contents were silently dropped. The trigger is the normal
+ * way a storage base is downloaded: backtracking through chunks already flown past. The fix folds each such residual
+ * holder into its on-disk chunk through a writer-thread read-modify-write ({@link AsyncSaveWriter#submitChunkRewrite}
+ * over {@link RegionChunkWriter#rewriteExisting}), reusing the {@link ContainerMerge} fold.
  *
  * <p>These headless tests drive the real writer against a real {@link WdlRegionStorage}, the seam the fix lives at: a
  * chunk is flushed to disk carrying an empty container (the flushed-empty orphaned state a backtrack-and-open lands

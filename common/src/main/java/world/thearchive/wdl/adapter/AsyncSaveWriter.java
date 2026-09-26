@@ -463,9 +463,9 @@ final class AsyncSaveWriter {
     /**
      * Enqueue a read-modify-write of {@code dimension}'s already-written {@code region/} chunk at {@code pos} (main
      * thread): the writer reads the on-disk chunk, applies {@code rewrite} to fold detached open-time holders onto its
-     * block entities, and writes it back. The recovery path for a container or lectern opened in a chunk that had
-     * already flushed and left the keep-hot buffer; {@code rewrite} must close over only immutable, detached data the
-     * writer then solely owns (the drained holders, the per-band sinks).
+     * block entities, and writes it back. The recovery path for a container opened in a chunk that had already flushed
+     * and left the keep-hot buffer; {@code rewrite} must close over only immutable, detached data the writer then
+     * solely owns (the drained holders, the per-band sinks).
      */
     public void submitChunkRewrite(DimensionType dimension, ChunkPos pos, RegionChunkWriter.ChunkRewrite rewrite) {
         submitted++;
@@ -861,9 +861,9 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * The writer thread's storages for one target ({@code region/} or {@code entities/}), one per dimension, opened on
-     * that dimension's first task. Both instances are locals of {@link #run}, reachable only from it and from what it
-     * calls on its own thread, so they need no synchronization.
+     * The writer thread's {@code region/} storages, one per dimension, opened on that dimension's first task. The
+     * instance is a local of {@link #run}, reachable only from it and from what it calls on its own thread, so it needs
+     * no synchronization.
      *
      * <p>A failed open is retried on the dimension's next task rather than remembered, because the failure can be of
      * the moment: this project's own Windows gate has shown transient file locks to be real, and a dimension written

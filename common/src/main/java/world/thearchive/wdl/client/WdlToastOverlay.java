@@ -22,14 +22,14 @@ import world.thearchive.wdl.core.BrandColors;
  * {@code GuiAchievement}, which does exist here, is not a substitute, since both of its entry points take a vanilla
  * achievement.
  *
- * <p>The tray reads as a vanilla toast drawn in WDL's own colors. It anchors top-right, where vanilla puts toasts on
- * every band the mod supports, and slides in from the right edge. That anchor is deliberately independent of
- * {@code hudAnchor}: the two surfaces must not be able to collide, and a user moving the HUD must not be able to move
- * notifications on top of it. The panel is always painted, in {@link BrandColors#PANEL} at a fixed opacity, and
- * explicitly does not read {@code hudBackground}. That setting defaults to false, so binding the tray to it would leave
- * notifications as bare text over bright terrain for most users, and would let switching the HUD off silently take the
- * notification surface with it. {@code hudPanelOpacity} is a HUD setting for the same reason and is not consulted
- * either. Text is drawn with a shadow, matching what the HUD does when its own background is on.
+ * <p>The tray reads as a vanilla toast drawn in WDL's own colors. It anchors top-right and slides in from the right
+ * edge. That anchor is deliberately independent of {@code hudAnchor}: the two surfaces must not be able to collide, and
+ * a user moving the HUD must not be able to move notifications on top of it. The panel is always painted, in
+ * {@link BrandColors#PANEL} at a fixed opacity, and explicitly does not read {@code hudBackground}. That setting
+ * defaults to false, so binding the tray to it would leave notifications as bare text over bright terrain for most
+ * users, and would let switching the HUD off silently take the notification surface with it. {@code hudPanelOpacity} is
+ * a HUD setting for the same reason and is not consulted either. Text is drawn with a shadow, matching what the HUD
+ * does when its own background is on.
  *
  * <p>Three toasts are visible at once and the rest queue oldest-first. Each visible slot holds an absolute deadline
  * stamped when it was filled, never a per-render accumulator: this tray is drawn from the HUD pass with no screen open

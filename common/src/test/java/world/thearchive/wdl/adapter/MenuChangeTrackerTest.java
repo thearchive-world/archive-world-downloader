@@ -21,7 +21,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The change-signal guard for {@link MenuChangeTracker}: the per-tick stash gate must fire on the first look at a menu,
  * on a slot's stack being replaced (the sync-packet and click-prediction shape), on an in-place count change (a
- * prediction's grow or shrink), and on a lectern page turn, while an unchanged menu is skipped. Real container-backed
+ * prediction's grow or shrink), and on a page change, while an unchanged menu is skipped. Real container-backed
  * {@link Slot}s drive it, the same objects the live menu exposes.
  */
 class MenuChangeTrackerTest {
@@ -82,7 +82,7 @@ class MenuChangeTrackerTest {
         List<Slot> slots = slotsOver(new InventoryBasic(new TextComponentString(""), 1));
         assertTrue(tracker.changedSince(slots, 2, MenuChangeTracker.NO_DATA));
 
-        assertTrue(tracker.changedSince(slots, 3, MenuChangeTracker.NO_DATA), "a lectern page turn is a change");
+        assertTrue(tracker.changedSince(slots, 3, MenuChangeTracker.NO_DATA), "a page change is a change");
         assertFalse(tracker.changedSince(slots, 3, MenuChangeTracker.NO_DATA));
     }
 

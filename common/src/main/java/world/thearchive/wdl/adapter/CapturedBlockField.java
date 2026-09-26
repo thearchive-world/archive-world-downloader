@@ -26,25 +26,25 @@ import org.jspecify.annotations.Nullable;
  * ({@code wdl_block_entity_id}) can never leak to disk through the open-time write.
  *
  * <p>Content versus state decides {@link #holdsContent}, which is what {@link ChunkMerge#hasCapturedContent} and the
- * resume outline read: a crafter's {@code "triggered"} rides along with contents but is not itself content, so a
- * crafter carrying only state must not read as a recovered container.
+ * resume outline read: a state key rides along with contents but is not itself content, so a block entity carrying only
+ * state must not read as a recovered container.
  *
  * <p>The carry-forward considers every field enumerated here for every block entity in a re-written chunk, so a
  * non-vanilla block entity that happened to use one of these key names could receive a carried value; no vanilla block
- * entity besides the crafter and the brewing stand writes any of the four state keys.
+ * entity besides the brewing stand writes any of the four state keys.
  */
 enum CapturedBlockField {
-    /** A block container's slots, written by {@link ContainerSink#merge} (chiseled bookshelves included). */
+    /** A block container's slots, written by {@link ContainerSink#merge}. */
     ITEMS("Items", null, Shape.LIST),
-    /** A lectern's book and the page it is open at, written by {@link LecternSink#merge}. */
+    /** A {@code "Book"} and its {@code "Page"}, written by {@link LecternSink#merge}. */
     BOOK("Book", "Page", Shape.COMPOUND),
-    /** A jukebox's disc and its playing flag, written by the interaction holder merge. */
+    /** A jukebox's disc, written by the interaction holder merge. */
     RECORD_ITEM("RecordItem", "IsPlaying", Shape.COMPOUND),
-    /** A beehive's occupants, written by the interaction holder merge. */
+    /** A {@code "Bees"} list, written by the interaction holder merge. */
     BEES("Bees", null, Shape.LIST),
-    /** A crafter's disabled input slots; vanilla writes an int array, empty when no slot is disabled. */
+    /** An int array of disabled slot indices, empty when none is disabled. */
     DISABLED_SLOTS("disabled_slots", new NBTTagIntArray(new int[0])),
-    /** Whether a crafter is powered; vanilla writes an int, zero when it is not. */
+    /** An int, zero when unset. */
     TRIGGERED("triggered", new NBTTagInt(0)),
     /** A brewing stand's remaining brew ticks; vanilla writes a short, zero when it is not brewing. */
     BREW_TIME("BrewTime", new NBTTagShort((short) 0)),
@@ -64,9 +64,10 @@ enum CapturedBlockField {
         /** A compound plus an optional sidecar value that only travels with it. */
         COMPOUND,
         /**
-         * A scalar this mod can capture only from an opened menu. Vanilla writes these unconditionally, so a freshly
-         * captured block entity always carries the key at the client's default rather than omitting it, and the
-         * carry-forward has to test against that default rather than against absence.
+         * A value only an opened menu exposes. Vanilla writes the brewing stand's two ({@code BrewTime} and
+         * {@code Fuel}) unconditionally, so a freshly captured brewing stand always carries each at the client's
+         * default rather than omitting it, and the carry-forward has to test against that default rather than against
+         * absence.
          */
         VALUE
     }
