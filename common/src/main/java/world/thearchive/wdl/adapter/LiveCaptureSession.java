@@ -1929,8 +1929,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // The lectern page (a LecternMenu concept) does not exist at this band, so the page dimension of the
             // change key is always the fixed 0.
             int page = 0;
-            // No menu's ContainerData is readable at this band (the brewing stand's brew time and fuel have no
-            // public accessor), so the change gate keys on the slots alone.
+            // Nothing this band's stash serializes is taken from menu progress data, so the change gate keys on the
+            // slots alone.
             int[] data = MenuChangeTracker.NO_DATA;
             if (!stashChangeTracker.changedSince(menu.slots, page, data)) {
                 return; // unchanged since the last stash: last-seen-wins needs no re-serialize this tick
@@ -2171,10 +2171,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void stashContainerItems(AbstractContainerMenu menu, LocalPlayer player, long posKey) {
         CompoundTag holder = containerCapture.captureBlockSlots(menu, player);
         if (holder != null) {
-            // The brewing stand's brew-time and fuel are menu-only ContainerData held in private fields with no
-            // public reader at this band (getBrewingTicks / getFuel are later accessors), so they are not captured
-            // here; the potions, ingredient, and fuel item are captured as ordinary Items, and the timer resumes on
-            // load. Losing the in-progress timer is the accepted band limit.
+            // The brewing stand's in-progress brew time and fuel level are not captured; the potions, ingredient and
+            // fuel item are captured as ordinary Items. Losing the in-progress brew and the fuel charge is the accepted
+            // band limit.
             stashBlockHolder(containerStash, BlockPos.method_10488(posKey), holder);
         }
     }
