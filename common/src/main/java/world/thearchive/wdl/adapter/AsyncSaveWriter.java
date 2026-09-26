@@ -441,7 +441,7 @@ final class AsyncSaveWriter {
 
     private void run() {
         // One storage per dimension, opened on demand: a session that follows the player across a portal writes
-        // each dimension's chunks/entities to its own vanilla folder (overworld region/, nether DIM-1/, ...).
+        // each dimension's chunks/entities to its own vanilla folder.
         Storages regions = new Storages(regionOpener, "region");
         Storages entities = new Storages(entitiesOpener, "entities");
         int chunksNew = 0;
