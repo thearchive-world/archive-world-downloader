@@ -66,10 +66,11 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 # if/instanceof chain instead.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
-# Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
-# ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying. Below 1.20.5 the
-# beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so this field
-# carries that key rather than bees.
+# Below the 1.21 update the RecordItem carry-forward field's sidecar is IsPlaying rather than ticks_since_song_started
+# (a jukebox writes IsPlaying from 1.19.4's tree). Below 1.20.5 the beehive block entity's occupants key is still Bees
+# (capitalized), the pre-lowercasing form, so this field carries that key rather than bees. At 1.18.2 there is no
+# chiseled bookshelf and a jukebox saves no play state (both first in 1.19.4's tree), so the Items and RecordItem
+# comments name neither.
 common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 
 # Below 1.21.2 the entity position wire differs: the absolute-only ClientboundTeleportEntityPacket replaces the
@@ -374,7 +375,8 @@ common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 # Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the
 # raw LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position (carried
 # by a pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and
-# tag.BlockEntityTag.FlowerPos, both scrubbed here.
+# tag.BlockEntityTag.FlowerPos, both scrubbed here. At 1.18.2 there is no allay (first in 1.19) or item display (first
+# in 1.19.4's tree), so the entity examples name neither.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
@@ -695,3 +697,15 @@ forge/build.gradle.kts
 # The catalog carries only the plugins 1.18.2's build applies, so it has no moddev entry (dev's carries loom,
 # moddev and mod-publish-plugin for its fabric and neoforge subprojects); the tool-library entries match dev's.
 gradle/libs.versions.toml
+
+# At 1.18.2 there is no chiseled bookshelf (first in 1.19.4's tree), so the Javadoc names no container captured per
+# slot.
+common/src/main/java/world/thearchive/wdl/adapter/ChunkMerge.java
+
+# At 1.18.2 there is no chiseled bookshelf (first in 1.19.4's tree), so the comment on the matched id does not name it
+# and the slot-mask helper has no Javadoc.
+common/src/main/java/world/thearchive/wdl/adapter/RecoveredScan.java
+
+# At 1.18.2 there is no chiseled bookshelf (first in 1.19.4's tree), so the Javadoc does not say vanilla writes its
+# Items list.
+common/src/test/java/world/thearchive/wdl/adapter/NbtMergeTest.java
