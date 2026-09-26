@@ -143,7 +143,7 @@ class AsyncSaveWriterTest {
                 dimension -> {
                     if (DimensionType.NETHER.equals(dimension)) {
                         netherOpens.incrementAndGet();
-                        throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
+                        throw new UncheckedIOException(new IOException("nether region folder could not be created"));
                     }
                     return storage(region, "chunk");
                 },
@@ -195,7 +195,7 @@ class AsyncSaveWriterTest {
                 dimension -> {
                     if (DimensionType.NETHER.equals(dimension)) {
                         netherOpens.incrementAndGet();
-                        throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
+                        throw new UncheckedIOException(new IOException("nether region folder could not be created"));
                     }
                     return storage(region, "chunk");
                 },
@@ -237,7 +237,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> {
-                    throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
+                    throw new UncheckedIOException(new IOException("nether region folder could not be created"));
                 },
                 () -> {},
                 () -> {},
