@@ -1029,9 +1029,9 @@ class LiveCaptureSessionLossTallyTest {
     }
 
     /**
-     * A mount captured into the player's {@code RootVehicle} reaches disk inside level.dat, so its abandoned frame is
-     * not a loss. The drain's own promote filters that mount out before counting anything; the abort sweep has to
-     * filter it too, or a download that saved the boat reports having lost it.
+     * A mount captured into the player's {@code RootVehicle} reaches disk inside the player record, so its abandoned
+     * frame is not a loss. The drain's own promote filters that mount out before counting anything; the abort sweep has
+     * to filter it too, or a download that saved the boat reports having lost it.
      */
     @Test
     void aMountCapturedIntoTheRootVehicleIsNotCountedAbandoned(@TempDir Path temporary) throws Exception {

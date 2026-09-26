@@ -114,7 +114,7 @@ class LevelDatPlayerRoundTripTest {
     void savesWithNullCapturedPlayerMatchTodaysVoidOutput(@TempDir Path saves) throws IOException {
         CompoundTag data = saveAndReadBack(saves, "noplayer", null);
 
-        assertFalse(data.contains("Player"), "no captured player -> no Player slot");
+        assertFalse(data.contains("Player"), "level.dat carries no Player compound");
         assertEquals(GameType.SURVIVAL.getId(), data.getIntOr("GameType", -99),
                 "the void world stays the default survival");
         assertTrue(data.contains("spawn"), "the default spawn is still written");

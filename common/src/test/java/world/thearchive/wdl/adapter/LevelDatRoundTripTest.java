@@ -33,8 +33,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * level.dat round-trip: from a client-like reg (biomes + dimension types, NO dimension generators, just what a
  * multiplayer client syncs), the writer produces a superflat VOID world whose Data tag, written to a real compressed
- * level.dat and read back, preserves seed, the three dimensions and {@code DataVersion}, with the dimensions being
- * flat-void generators.
+ * level.dat and read back, preserves {@code DataVersion}, and the void seed and three flat dimensions survive in their
+ * own file.
  */
 class LevelDatRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
