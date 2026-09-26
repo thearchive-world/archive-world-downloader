@@ -103,7 +103,7 @@ class LiveCaptureSessionDimensionRebindTest {
 
         assertEquals(Level.NETHER, field(session, "targetDimension"),
                 "the layout follows the entered dimension's type, so a server that names its own worlds still "
-                        + "writes DIM-1 rather than a folder named after the world");
+                        + "writes the vanilla nether folder rather than one named after the world");
         assertEquals("minecraft:worlds/example/example_nether", field(session, "liveDimensionId"),
                 "while the packet-side stores stay keyed by the name entities are announced under, which on that "
                         + "server is not the vanilla one");
