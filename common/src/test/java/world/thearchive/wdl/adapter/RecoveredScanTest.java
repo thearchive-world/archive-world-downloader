@@ -27,10 +27,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The headless guard for the resume recovered-coverage scan: {@link RecoveredScan} reads each on-disk chunk the writer
- * thread carries forward and collects the positions that were already captured in a prior session (a block container
- * with non-empty {@code "Items"}, a lectern with a {@code "Book"}, a jukebox with a {@code "RecordItem"}, or a beehive
- * with {@code "Bees"}), so the outline marks them recovered rather than unsaved. An empty (re-walked, never re-opened)
- * container is not coverage, and a position is coverage only in the dimension it was carried forward in.
+ * thread carries forward and collects the positions that were already captured in a prior session (a non-empty
+ * {@code "Items"}, or a {@code "Book"}, {@code "RecordItem"} or {@code "Bees"} key), so the outline marks them
+ * recovered rather than unsaved. An empty (re-walked, never re-opened) container is not coverage, and a position is
+ * coverage only in the dimension it was carried forward in.
  */
 class RecoveredScanTest {
     private static final UUID CART_A = new UUID(0x1111_1111_1111_1111L, 0x2222_2222_2222_2222L);
@@ -316,9 +316,9 @@ class RecoveredScanTest {
     }
 
     /**
-     * A beehive carrying occupants under {@code "Bees"}, the key {@link ChunkMerge}'s {@code CapturedBlockField.BEES}
-     * (and, transitively, {@link RecoveredScan}) reads; this is not a real producer's shape and a chunk built from it
-     * must go through {@link BlockEntityFixtures#malformedChunkTagWith}.
+     * A block entity carrying a {@code "Bees"} list, the key {@link ChunkMerge}'s {@code CapturedBlockField.BEES} (and,
+     * transitively, {@link RecoveredScan}) reads; this is not a real producer's shape and a chunk built from it must go
+     * through {@link BlockEntityFixtures#malformedChunkTagWith}.
      */
     private static NBTTagCompound beehiveWithBees(int x, int y, int z) {
         NBTTagCompound blockEntity = emptyBeehive(x, y, z);

@@ -27,8 +27,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The headless guard for the save-time villager-trade fold: {@link EntityContainerMerge#mergeMerchantStash} locates a
- * stashed villager inside the captured chunk tag by {@code "UUID"}, sets its {@code "Offers"} and (for a villager)
- * {@code "Xp"} from the holder, then drains the merged entry; {@code refoldFlushedMerchants} re-applies an
+ * stashed villager inside the captured chunk tag by {@code "UUID"}, sets its {@code "Offers"} and, when the holder
+ * carries one, {@code "Xp"} from the holder, then drains the merged entry; {@code refoldFlushedMerchants} re-applies an
  * already-folded holder to another chunk copy so a merchant that crossed entity-chunks carries its trades to each. The
  * merchant sibling of {@link EntityContainerStashMergeTest}, but the fold is a plain tag copy with no sink and no
  * per-node failure isolation, so these cases assert the payload and the drain rather than a lost-item tally.
@@ -93,7 +93,7 @@ class MerchantStashMergeTest {
 
         assertEquals(1, tally.merged(), "only the villager present in this chunk folds");
         assertEquals(0, tally.failed(), "a plain-copy fold never fails");
-        assertEquals(12, node(chunk, UUID_A).getInteger("Xp"), "the experience folds");
+        assertEquals(12, node(chunk, UUID_A).getInteger("Xp"), "the Xp key folds");
         assertEquals("minecraft:emerald", firstSellId(node(chunk, UUID_A)), "the trades fold");
         assertFalse(node(chunk, UUID_B).hasKey("Offers"), "the neighbor villager is untouched");
         assertTrue(stash.isEmpty(), "the merged entry is drained");

@@ -690,7 +690,7 @@ class LiveCaptureSessionLossTallyTest {
         assertFalse(result.failed(), "the drain hit no hard error, so the save was not aborted");
         assertEquals(1, result.chunksWritten(), "a failed book fold loses the book, not the chunk");
         assertEquals(1, losses(session, "blockContainersFailed"),
-                "the lectern saves without its book, so the loss lands in the same tally the chest fold feeds");
+                "the loss lands in the same tally the chest fold feeds");
         assertTrue(session.isPartialSave(0, 0), "and that makes the finish partial rather than clean");
     }
 

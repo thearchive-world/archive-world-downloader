@@ -106,7 +106,7 @@ final class NaturalEquipment {
             return true; // an unknown type is never inferred against
         }
         if (slot == EntityEquipmentSlot.OFFHAND) {
-            return true; // the offhand is outside the inference: a bartering gold ingot sits there unpersisted
+            return true; // the offhand is outside the inference
         }
         if (slot == EntityEquipmentSlot.MAINHAND) {
             return profile.mainhand().contains(item.getItem());

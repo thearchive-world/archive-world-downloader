@@ -179,9 +179,9 @@ class ContainerStashMergeTest {
         assertEquals((byte) 7, mergedBlockEntity.getByte("Fuel"));
         assertFalse(mergedBlockEntity.hasKey("wdl_block_entity_id"), "the internal holder key never reaches disk");
         assertFalse(mergedBlockEntity.hasKey("junk"), "a non-whitelisted holder key never reaches disk");
-        assertFalse(mergedBlockEntity.hasKey("Book"), "a lectern book is content, not open-time state");
+        assertFalse(mergedBlockEntity.hasKey("Book"), "a Book key is content, not open-time state");
         assertFalse(mergedBlockEntity.hasKey("RecordItem"), "and so is a jukebox disc");
-        assertFalse(mergedBlockEntity.hasKey("bees"), "and so are a beehive's occupants");
+        assertFalse(mergedBlockEntity.hasKey("bees"), "and so is a bees key");
     }
 
     @Test

@@ -29,14 +29,6 @@ import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The lectern-merge synergy re-capture unlocks: a lectern placed AFTER its chunk was first captured has no block entity
- * in the snapshot-once tag, so the open-time book stash has nothing to merge onto. Re-capturing the chunk re-encodes
- * its block entities, so the placed lectern's block entity now exists and {@link ContainerMerge#mergeLecternChunkStash}
- * lands the stashed {@code Book}/{@code Page} on it. The book comes only from the stash, never the re-encode (the live
- * client lectern BE never holds a book, so a re-encode can never blank what merge sets), and the merge runs once per
- * chunk at flush, so repeated re-capture before that single flush cannot double-count or blank the contents.
- */
 class LecternRecaptureSynergyTest {
     private static final int LECTERN_X = 4;
     private static final int LECTERN_Y = 65;
@@ -73,13 +65,12 @@ class LecternRecaptureSynergyTest {
         NBTTagList blockEntities = chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10);
         NBTTagCompound lectern = blockEntities.getCompoundTagAt(0);
         ItemStack back = ItemStack.loadItemStackFromNBT(lectern.getCompoundTag("Book"));
-        assertNotNull(back, "the re-captured lectern carries a decodable Book");
+        assertNotNull(back, "the Book decodes to a non-empty stack");
         return back.getTagCompound().getString("title");
     }
 
     @Test
     void withoutRecaptureNothingMergesOntoTheMissingLectern() {
-        // The snapshot-once gap: the chunk was captured before the lectern was placed, so its tag has none.
         NBTTagCompound snapshotOnceTag = codec.encode(SyntheticChunks.full(false), false);
 
         Map<BlockPos, NBTTagCompound> stash = new LinkedHashMap<>();

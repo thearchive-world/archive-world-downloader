@@ -17,8 +17,7 @@ import world.thearchive.wdl.adapter.impl.ItemListNbt;
 
 /**
  * Item NBT built by the writers rather than by hand: {@link ItemListNbt#saveAllItems} for an {@code "Items"} list and
- * {@code ItemStack#writeToNBT} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
- * {@code "RecordItem"}).
+ * {@code ItemStack#writeToNBT} for a single stored stack (a jukebox's {@code "RecordItem"}).
  *
  * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: the writer always emits
  * {@code "Slot"} and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under
@@ -105,14 +104,14 @@ public final class ItemFixtures {
         return entry;
     }
 
-    /** The tag vanilla writes for a single stored stack, as a lectern's {@code "Book"} carries it. */
+    /** The tag vanilla writes for a single stored stack. */
     public static NBTTagCompound itemTag(String itemId) {
         return itemTag(stack(itemId));
     }
 
     /**
-     * The tag vanilla writes for {@code stack}, as a lectern's {@code "Book"} or a jukebox's {@code "RecordItem"}
-     * carries it: {@code ItemStack#writeToNBT}, the same call every block-entity single-stack field uses (a
+     * The tag vanilla writes for {@code stack}, as a jukebox's {@code "RecordItem"} carries it:
+     * {@code ItemStack#writeToNBT}, the same call every block-entity single-stack field uses (a
      * {@code {id, Count, Damage, tag}} compound with {@code Count} as a byte).
      */
     public static NBTTagCompound itemTag(ItemStack stack) {
@@ -121,9 +120,8 @@ public final class ItemFixtures {
 
     /**
      * A written book of {@code pageCount} pages, already marked {@code resolved} so the fixture stands in for a book a
-     * player has opened. The page count is load-bearing wherever a lectern's {@code "Page"} matters: vanilla clamps the
-     * saved page into the book's own page range, so a book with no pages can only ever be on page -1. Each page is a
-     * JSON-encoded text component string, the shape {@code ItemWrittenBook.resolveContents} leaves behind.
+     * player has opened. Each page is a JSON-encoded text component string, the shape
+     * {@code ItemWrittenBook.resolveContents} leaves behind.
      */
     public static ItemStack writtenBook(int pageCount) {
         NBTTagList pages = new NBTTagList();

@@ -99,9 +99,9 @@ final class EntityPacketCapture
 
     /**
      * Diagnostic only (gated by {@code dumpReceivedFrames}, default off): the {@code (blockX blockY blockZ facing)} key
-     * of every item-frame spawn packet received, deduped, matching the key a saved frame's {@code block_pos} and
-     * {@code Facing} yield. Dumped at finish so a missing frame can be checked against what the client actually
-     * received. Empty, and never populated, when the diagnostic is off.
+     * of every item-frame spawn packet received, deduped, matching the key a saved frame's position and {@code Facing}
+     * yield. Dumped at finish so a missing frame can be checked against what the client actually received. Empty, and
+     * never populated, when the diagnostic is off.
      */
     private final Set<String> receivedFrames = ConcurrentHashMap.newKeySet();
 
@@ -201,7 +201,7 @@ final class EntityPacketCapture
                 decodeAngle((byte) add.getYaw()), decodeAngle((byte) add.getPitch()));
         spawn(add.getEntityID(), add.getUniqueId(), chunkKey(add.getX(), add.getZ()), pos, add);
         if (dumpReceivedFrames && add.getType() == SPAWN_OBJECT_ITEM_FRAME) {
-            // Diagnostic key for the received-frame diff: block_pos = floor(spawn pos), Facing = the data int (the
+            // Diagnostic key for the received-frame diff: position = floor(spawn pos), Facing = the data int (the
             // frame's facing index, which is also what it saves). floor recovers the block whether the packet carries
             // the block pos or the entity pos (the offset is in [0,1)).
             receivedFrames.add(MathHelper.floor(add.getX()) + " " + MathHelper.floor(add.getY()) + " "

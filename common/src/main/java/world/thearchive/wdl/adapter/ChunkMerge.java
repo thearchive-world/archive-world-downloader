@@ -40,8 +40,8 @@ import org.jspecify.annotations.Nullable;
  * {@link CapturedBlockField}, the same list the open-time write reads, so a datum this mod writes on one visit cannot
  * be dropped by the next.
  *
- * <p>The preferring-non-empty rule holds only where the fresh list is the whole container, which the chiseled
- * bookshelf's never is; see {@link #capturesPerSlot} for that one and for what replaces the rule there.
+ * <p>The preferring-non-empty rule holds only where the fresh list is the whole container; see
+ * {@link #capturesPerSlot}.
  */
 final class ChunkMerge {
     /**
@@ -129,10 +129,10 @@ final class ChunkMerge {
 
     /**
      * Whether {@code blockEntity}'s on-disk tag holds captured content: a non-empty container ({@code "Items"}), a
-     * lectern book ({@code "Book"}), a jukebox disc ({@code "RecordItem"}), or beehive occupants ({@code "bees"}). The
-     * single definition of prior-captured content, shared with {@link RecoveredScan} so the outline's recovered set and
-     * the carry-forward read one definition of content; both read {@link CapturedBlockField}, so they extend together.
-     * Open-time state alone is not content.
+     * {@code "Book"}, a jukebox disc ({@code "RecordItem"}), or a {@code "Bees"} list. The single definition of
+     * prior-captured content, shared with {@link RecoveredScan} so the outline's recovered set and the carry-forward
+     * read one definition of content; both read {@link CapturedBlockField}, so they extend together. Open-time state
+     * alone is not content.
      *
      * <p>Content on disk is not the same as content the carry-forward will preserve, and this answers only the first
      * question; {@link RecoveredScan} enumerates where the two part.
@@ -190,11 +190,9 @@ final class ChunkMerge {
 
     /**
      * Whether this block entity's captured {@code "Items"} names single slots rather than the whole container, which
-     * decides whether the on-disk list is unioned per slot or replaced wholesale. True for the chiseled bookshelf
-     * alone: its contents never reach the client (its update tag is empty and it has no menu), so the only evidence of
-     * a book is the local player's own insert click, and one capture is one slot. Every other container is captured
-     * from an opened menu or a placed item, which is the whole container and therefore ground truth, so a fresh list
-     * there must replace the on-disk one or an item the player watched leave would come back.
+     * decides whether the on-disk list is unioned per slot or replaced wholesale. Every container is captured from an
+     * opened menu, which is the whole container and therefore ground truth, so a fresh list there must replace the
+     * on-disk one or an item the player watched leave would come back.
      */
     private static boolean capturesPerSlot(NBTTagCompound blockEntity) {
         return CHISELED_BOOKSHELF_ID_TAG.equals(blockEntity.getTag("id"));
@@ -203,9 +201,9 @@ final class ChunkMerge {
     /**
      * The on-disk block entity sharing {@code freshBlockEntity}'s position and type, or null. Position is the
      * {@code x/y/z} {@link NBTTagInt} compare; type is the {@code id}, so a position whose block entity changed type
-     * between two visits (a chest replaced by a barrel at the same spot) is treated as new-and-empty rather than
-     * inheriting the prior type's contents. A fresh block entity missing either its position or its {@code id} matches
-     * nothing, so the carry-forward reaches only positions whose type is confirmed unchanged.
+     * between two visits is treated as new-and-empty rather than inheriting the prior type's contents. A fresh block
+     * entity missing either its position or its {@code id} matches nothing, so the carry-forward reaches only positions
+     * whose type is confirmed unchanged.
      */
     private static @Nullable NBTTagCompound matching(NBTTagList diskBlockEntities, NBTTagCompound freshBlockEntity) {
         NBTBase x = freshBlockEntity.getTag("x");

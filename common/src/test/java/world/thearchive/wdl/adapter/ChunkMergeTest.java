@@ -29,12 +29,11 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
 
 /**
  * The headless guard for the chunk read-merge: {@link ChunkMerge} carries forward every interaction-captured datum (a
- * block container's {@code "Items"}, a lectern's {@code "Book"}/{@code "Page"}, a jukebox disc's {@code "RecordItem"},
- * a beehive's {@code "Bees"}) from the on-disk chunk into a freshly re-captured one, preferring non-empty wherever the
- * write captured nothing of its own there, so a re-walk live-updates the terrain without wiping a chest an earlier
- * write archived, while a container this write captured is left exactly as that capture saw it. Pure
- * {@code NBTTagCompound} in/out, band-agnostic over the pre-1.18 {@code Level.TileEntities} layout, matched by
- * {@code x/y/z}.
+ * block container's {@code "Items"}, {@code "Book"}/{@code "Page"}, a jukebox disc's {@code "RecordItem"},
+ * {@code "Bees"}) from the on-disk chunk into a freshly re-captured one, preferring non-empty wherever the write
+ * captured nothing of its own there, so a re-walk live-updates the terrain without wiping a chest an earlier write
+ * archived, while a container this write captured is left exactly as that capture saw it. Pure {@code NBTTagCompound}
+ * in/out, band-agnostic over the pre-1.18 {@code Level.TileEntities} layout, matched by {@code x/y/z}.
  */
 class ChunkMergeTest {
     private static NBTTagCompound chest(int x, int y, int z, String... itemIds) {
@@ -259,7 +258,7 @@ class ChunkMergeTest {
 
     @Test
     void anEmptyDiskBeesListIsNotCarried() {
-        // present-but-empty "Bees" is vanilla's emptied-hive state, distinct from the key being absent
+        // present-but-empty "Bees" is distinct from the key being absent
         NBTTagCompound onDisk = BlockEntityFixtures.malformedChunkTagWith(beehiveWithBees(2, 64, 2, 0));
         NBTTagCompound fresh = chunkTagWith(beehive(2, 64, 2));
 
@@ -371,7 +370,7 @@ class ChunkMergeTest {
     @Test
     void aChunkWithNoFreshBlockEntitiesDoesNothing() {
         NBTTagCompound onDisk = chunkTagWith(chest(1, 64, 1, "minecraft:diamond"));
-        NBTTagCompound fresh = new NBTTagCompound(); // no block_entities key at all
+        NBTTagCompound fresh = new NBTTagCompound(); // no key at all
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh));
     }
@@ -623,8 +622,7 @@ class ChunkMergeTest {
 
     @Test
     void aBookshelfNotNamedByTheOccupancyMapKeepsEveryOnDiskSlot() {
-        // The unknown-occupancy fallback has to survive a map that names OTHER positions, which is the shape
-        // production builds: one entry per bookshelf in the chunk, nothing for a shelf whose state was unreadable.
+        // The unknown-occupancy fallback has to survive a map that names OTHER positions.
         NBTTagCompound onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
         NBTTagCompound fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
         Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
