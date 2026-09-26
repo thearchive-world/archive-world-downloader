@@ -8,7 +8,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * Per-band player-serialize axis: serialize the local player into the vanilla {@code "Player"} compound via
+ * Per-band player-serialize axis: serialize the local player into vanilla's player record via
  * {@code player.saveWithoutId}, the identical call vanilla's own player save uses. The capture pipeline routes the
  * local player here rather than through the entity axis ({@link EntitySink}), mirroring vanilla's player/entity-region
  * save split.
@@ -18,7 +18,7 @@ import net.minecraft.world.entity.player.Player;
  */
 public interface PlayerSink {
     /**
-     * Serialize {@code player} into a {@code "Player"}-compound tag (no {@code id}): the {@code Entity} super fields
+     * Serialize {@code player} into a player-record tag (no {@code id}): the {@code Entity} super fields
      * ({@code Pos}/{@code Rotation}/{@code UUID}/...) plus {@code Player.addAdditionalSaveData}
      * ({@code Inventory}/{@code SelectedItemSlot}/{@code EnderItems}/ {@code abilities}/...). Server-free.
      */
