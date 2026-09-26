@@ -524,7 +524,8 @@ common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 # is a 1.15 addition, so on 1.14.4 that shape is a foreign or modded item's). Below 1.17 the hive stores a bee's whole
 # saved tag with only the UUID stripped, so under each EntityData the pass blanks FlowerPos, HivePos, Pos, Leash and
 # Dimension (the entity's own dimension id, written below 1.16), where the component era blanks the flower position
-# alone. Java 8 form: every instanceof over the item, entity, equipment, passenger and bee reads is unbound.
+# alone. Java 8 form: every instanceof over the item, entity, equipment, passenger and bee reads is unbound. Below 1.15
+# there is no beehive and below 1.16 no lodestone, so the Javadoc names the scrubbed keys alone.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument; below 1.16 captureItems takes none either.
@@ -535,6 +536,7 @@ common/src/test/java/world/thearchive/wdl/adapter/ContainerMergeRoundTripTest.ja
 common/src/test/java/world/thearchive/wdl/adapter/ContainerRecaptureSynergyTest.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument; below 1.16 captureItems takes none either.
+# Below 1.15 there is no beehive, so the assertion message names the bees key.
 common/src/test/java/world/thearchive/wdl/adapter/ContainerStashMergeTest.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument; below 1.16 captureItems takes none either.

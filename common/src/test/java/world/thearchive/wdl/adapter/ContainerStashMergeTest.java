@@ -182,7 +182,7 @@ class ContainerStashMergeTest {
         assertFalse(mergedBlockEntity.contains("junk"), "a non-whitelisted holder key never reaches disk");
         assertFalse(mergedBlockEntity.contains("Book"), "a lectern book is content, not open-time state");
         assertFalse(mergedBlockEntity.contains("RecordItem"), "and so is a jukebox disc");
-        assertFalse(mergedBlockEntity.contains("bees"), "and so are a beehive's occupants");
+        assertFalse(mergedBlockEntity.contains("bees"), "and a bees key is not open-time state either");
     }
 
     @Test

@@ -8,17 +8,12 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * Reusable privacy scrub for item-borne location data: blanks the lodestone-compass target and the positions the bees
- * stored in a silk-touched beehive item carry, on every item it reaches, recursing into each item's nested
- * {@code BlockEntityTag.Items} and {@code Items} lists over the shared {@link ItemTreeWalk}. Below the 1.20.5 component
- * update an item's data lives in its {@code tag} compound, so the scrub removes the coordinate keys there: the
- * lodestone target ({@code LodestonePos} plus {@code LodestoneDimension}, leaving {@code LodestoneTracked}) and, on a
- * beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and, under each occupant's
- * {@code BlockEntityTag.Bees[].EntityData}, its {@code FlowerPos}, {@code HivePos}, {@code Pos}, {@code Leash} and
- * {@code Dimension}. A creative pick copies the hive's whole block-entity NBT, so the item can carry the hive's own
- * top-level flower position too, which the component era drops, and below 1.17 the hive stores a bee's whole saved tag
- * with only the UUID stripped, so the bee's own position, its home hive, its leash and, below 1.16, its dimension id
- * ride the item beside the flower position. Each occupant stays a bee vanilla loads.
+ * Reusable privacy scrub for item-borne location data: blanks the coordinate keys named below on every item it reaches,
+ * recursing into each item's nested {@code BlockEntityTag.Items} and {@code Items} lists over the shared
+ * {@link ItemTreeWalk}. Below the 1.20.5 component update an item's data lives in its {@code tag} compound, so the
+ * scrub removes the coordinate keys there: {@code LodestonePos} and {@code LodestoneDimension} (leaving
+ * {@code LodestoneTracked}), {@code BlockEntityTag.FlowerPos}, and under each {@code BlockEntityTag.Bees[].EntityData}
+ * its {@code FlowerPos}, {@code HivePos}, {@code Pos}, {@code Leash} and {@code Dimension}.
  *
  * <p>Operates only on already-serialized NBT (our own captured copy), never on a live {@code ItemStack}, so it cannot
  * corrupt the player's session. Below the 1.20.5 update it uses the {@code {id, Count, tag}} item shape and the
@@ -29,9 +24,9 @@ import net.minecraft.nbt.Tag;
  * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)}, and a serialized
  * entity via {@link #scrubEntity(CompoundTag)} (an item frame, mob equipment, a dropped item, and their passengers).
  *
- * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive bee
- * positions named above only. Opaque server NBT whose coordinate leak is speculative is left alone, since blanking a
- * whole unknown subtree would corrupt legitimate items, unlike the single-key removals above.
+ * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the keys named above only. Opaque server NBT
+ * whose coordinate leak is speculative is left alone, since blanking a whole unknown subtree would corrupt legitimate
+ * items, unlike the single-key removals above.
  */
 final class ItemLocationScrub {
     private static final String LODESTONE_POS = "LodestonePos";
@@ -128,7 +123,7 @@ final class ItemLocationScrub {
         ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
     }
 
-    /** Blank the lodestone target and the beehive bee positions on an item's {@code tag}. */
+    /** Blank the item-borne coordinate keys on an item's {@code tag}. */
     private static void scrubItemTag(CompoundTag tag) {
         tag.remove(LODESTONE_POS);
         tag.remove(LODESTONE_DIMENSION);
