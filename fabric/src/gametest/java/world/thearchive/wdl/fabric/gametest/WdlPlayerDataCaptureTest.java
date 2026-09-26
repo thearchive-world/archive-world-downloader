@@ -41,7 +41,7 @@ public class WdlPlayerDataCaptureTest implements FabricClientGameTest {
             List<CompoundTag> inventory = player.getListOrEmpty("Inventory").compoundStream().toList();
             boolean hasDiamond = inventory.stream()
                     .anyMatch(item -> item.getString("id").orElse("").equals("minecraft:diamond"));
-            Check.that(hasDiamond, "the given diamond is absent from the captured Player Inventory: "
+            Check.that(hasDiamond, "the given diamond is absent from the captured player's Inventory: "
                     + inventory.stream().map(item -> item.getString("id").orElse("?")).toList());
         }
     }
