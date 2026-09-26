@@ -3483,8 +3483,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * longer distinguishable from fresh ones, which is the same shared-file consequence a failed manifest write leaves
      * behind. The floor is raised outside that catch on purpose: the counter high-water lives in the manifest, so
      * folding the two reads into one try would let a fault in the floor scan discard a manifest that parsed cleanly,
-     * and the empty manifest that replaced it would restart at 0 and write this download's first map over the prior
-     * download's {@code data/map_0.dat}. Package-private so the tally it feeds stays testable.
+     * and the empty manifest that replaced it would restart at 0 and write this download's first map over the data file
+     * of the prior download's map 0. Package-private so the tally it feeds stays testable.
      */
     MapManifest loadManifest(Path file, Path dataDirectory) {
         MapManifest manifest;
@@ -3503,7 +3503,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * The map archive for this download: on-mode wraps the loaded remap manifest; off-mode keeps the original server
      * ids and reconstructs the idcounts floor from disk (there is no manifest to persist it), seeding past the highest
-     * existing data file and any prior idcounts.dat so a resume never re-issues a captured id.
+     * existing data file and any prior map id counter file so a resume never re-issues a captured id.
      */
     private MapArchive createMapArchive(Path mapIdsFile, Path dataDirectory) {
         if (config.remapMapIds()) {
@@ -3520,8 +3520,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The map-id floor from the existing {@code data/map_<n>.dat} files, or -1 if that read faults. Its own -1 fallback
-     * keeps a fault in this source from discarding the idcounts floor read independently below.
+     * The map-id floor from the existing map data files, or -1 if that read faults. Its own -1 fallback keeps a fault
+     * in this source from discarding the idcounts floor read independently below.
      */
     private static int dataFileFloor(Path dataDirectory) {
         try {
@@ -3533,17 +3533,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The map-id floor from a prior idcounts.dat, or -1 if that read faults. Its own -1 fallback keeps a fault in this
-     * source from discarding the data-file floor read independently above. It can exceed the data-file source, which is
-     * why both are read: an imageless id writes no data file, so a prior download whose highest id was imageless is
-     * recorded here and nowhere else. It only reaches disk at finalize, so a prior download that crashed leaves this
-     * source empty and the data-file scan carrying the floor alone.
+     * The map-id floor from a prior map id counter file, or -1 if that read faults. Its own -1 fallback keeps a fault
+     * in this source from discarding the data-file floor read independently above. It can exceed the data-file source,
+     * which is why both are read: an imageless id writes no data file, so a prior download whose highest id was
+     * imageless is recorded here and nowhere else. It only reaches disk at finalize, so a prior download that crashed
+     * leaves this source empty and the data-file scan carrying the floor alone.
      */
     private static int idCountsFloor(Path dataDirectory) {
         try {
             return MapDataWriter.readIdCounts(dataDirectory);
         } catch (IOException | RuntimeException e) {
-            LOGGER.warn("failed to read the map id floor from idcounts.dat; ignoring that source", e);
+            LOGGER.warn("failed to read the map id floor from the map id counter file; ignoring that source", e);
             return -1;
         }
     }
@@ -3569,17 +3569,17 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * The on-sight map stream: hand one first-imaged map's data tag to the writer thread to land as
-     * {@code data/map_<id>.dat}. A map imaged during capture is submitted alone as soon as it is imaged, rather than
-     * held for the finish, so once its write has run a crash leaves it in the save. One imaged during the finish drain
-     * joins {@link #finishMapWrites} instead, because a display wall can image five figures of them in that one drain
-     * and the bar has to advance over them rather than sit frozen on the chunk phase; a crash inside those few seconds
-     * loses an unopenable save anyway, so nothing durable is traded for the bar. Called on the main thread from the
-     * remap paths, which all run behind {@code ensureWriter}; the write runs on the writer thread, interleaved with the
-     * chunk drain and behind a resume's preflight backup. Whatever write is handed to either arm must catch and count
-     * its own failure; see {@link #mapWriteTask}. Neither arm counts, both absorb a runtime throw, so a write that does
-     * not increment the tally reports a download that lost maps as clean. Package-private so the tally this hands the
-     * task stays testable.
+     * The on-sight map stream: hand one first-imaged map's data tag to the writer thread to land as the map's data
+     * file. A map imaged during capture is submitted alone as soon as it is imaged, rather than held for the finish, so
+     * once its write has run a crash leaves it in the save. One imaged during the finish drain joins
+     * {@link #finishMapWrites} instead, because a display wall can image five figures of them in that one drain and the
+     * bar has to advance over them rather than sit frozen on the chunk phase; a crash inside those few seconds loses an
+     * unopenable save anyway, so nothing durable is traded for the bar. Called on the main thread from the remap paths,
+     * which all run behind {@code ensureWriter}; the write runs on the writer thread, interleaved with the chunk drain
+     * and behind a resume's preflight backup. Whatever write is handed to either arm must catch and count its own
+     * failure; see {@link #mapWriteTask}. Neither arm counts, both absorb a runtime throw, so a write that does not
+     * increment the tally reports a download that lost maps as clean. Package-private so the tally this hands the task
+     * stays testable.
      */
     void streamMapData(int archiveId, Tag dataTag) {
         AsyncSaveWriter activeWriter = this.writer;
@@ -3973,8 +3973,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 // one pos is dropped by the confirm predicate before it can merge. Keep the reconcile on the same
                 // snapshot as the position merge; a live read or a different snapshot here reopens that hole.
                 InteractionCapture.ChunkBundles confirmed = interactionCapture.drainChunk(pos, snapshot);
-                // Drop the open-time-wins losers before the remap, since prepareDrainedItems allocates a map id
-                // and writes map_<id>.dat per holder: remapping a same-pos loser would orphan that file.
+                // Drop the open-time-wins losers before the remap, since prepareDrainedItems allocates a map id and
+                // writes the map's data file per holder: remapping a same-pos loser would orphan that file.
                 Map<BlockPos, CompoundTag> placedItems = ContainerMerge.mergePlaceCandidates(containers,
                         confirmed.items());
                 prepareDrainedItems(placedItems);

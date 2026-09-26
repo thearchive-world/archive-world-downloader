@@ -26,11 +26,11 @@ import world.thearchive.wdl.core.WdlConfig;
  * ({@code LiveCaptureSession.remapEntityItems}) that lifts the framed map's image into {@code data/}.
  *
  * <p>Two framed maps are captured in one run: one whose colors the client received (a real server-side map; its image
- * must be present and well-formed under {@code data/map_*.dat}) and one referencing a map id with no server-side data
- * (its colors are never sent, so it images nothing). Both frames are captured as entities, but only the received map
- * writes an image, so a present image proves the received path reached disk rather than a framed map merely being
- * captured. Field-level pixel fidelity is the unit suite's job ({@code MapArchiveTest}, {@code MapSinkRoundTripTest});
- * this asserts presence, well-formedness, and the {@code idcounts} floor.
+ * must be present and well-formed) and one referencing a map id with no server-side data (its colors are never sent, so
+ * it images nothing). Both frames are captured as entities, but only the received map writes an image, so a present
+ * image proves the received path reached disk rather than a framed map merely being captured. Field-level pixel
+ * fidelity is the unit suite's job ({@code MapArchiveTest}, {@code MapSinkRoundTripTest}); this asserts presence,
+ * well-formedness, and the {@code idcounts} floor.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlFilledMapCaptureTest implements FabricClientGameTest {
@@ -80,7 +80,7 @@ public class WdlFilledMapCaptureTest implements FabricClientGameTest {
                     + "painted color data did not round-trip to disk");
             int capturedId = CaptureReadback.mapDataIds(saveRoot).get(0);
             int idCount = CaptureReadback.idCountsMax(saveRoot)
-                    .orElseThrow(() -> new AssertionError("data/idcounts.dat is missing"));
+                    .orElseThrow(() -> new AssertionError("the map id counter file is missing"));
             Check.that(idCount >= capturedId,
                     "idcounts map id " + idCount + " is below the captured map id " + capturedId);
 

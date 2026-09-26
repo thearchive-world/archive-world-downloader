@@ -50,10 +50,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  *
  * <p>Two boundaries. The tally is pinned from {@code streamMapData} inward: the archive is built here with a stub sink,
  * so nothing in this class would notice if the production wiring stopped handing {@code MapArchive} the session's own
- * {@code streamMapData}. That mutation is caught, but a tier away, by the filled-map gametests that read
- * {@code data/map_*.dat} back off disk. And the loud failure that {@code level()} exists for is unreachable from this
- * tier, because every path to it needs a client, so the nullable field's guarantee rests on review rather than on a
- * test. Closing either here needs the level seam these tests deliberately do without.
+ * {@code streamMapData}. That mutation is caught, but a tier away, by the filled-map gametests that read each map's
+ * data file back off disk. And the loud failure that {@code level()} exists for is unreachable from this tier, because
+ * every path to it needs a client, so the nullable field's guarantee rests on review rather than on a test. Closing
+ * either here needs the level seam these tests deliberately do without.
  */
 class LiveCaptureSessionMapTallyTest {
     @BeforeAll
@@ -299,7 +299,7 @@ class LiveCaptureSessionMapTallyTest {
      * The read sibling of the write above, which degrades to an empty manifest and carries the same consequence for the
      * folder: the download proceeds treating every map it already holds as new. What the degradation must not do is
      * restart the id counter, whose high-water lives in the file that just failed to read: an unseeded counter hands id
-     * 0 to the first map this session images, and that write lands on the prior download's map_0.dat.
+     * 0 to the first map this session images, and that write lands on the data file of the prior download's map 0.
      */
     @Test
     void aManifestReadFailureStillIssuesIdsAboveTheMapFilesTheFolderHolds(@TempDir Path temporary)
@@ -316,7 +316,7 @@ class LiveCaptureSessionMapTallyTest {
 
         assertEquals(4, manifest.highestAssignedId(),
                 "the read degraded to an empty manifest rather than stopping the download, but one seeded so the"
-                        + " reopened world's allocator still clears map_4.dat");
+                        + " reopened world's allocator still clears id 4");
         assertEquals(5, manifest.lookupOrInsert("a-map-this-session-images"),
                 "so the first map this session images takes an id no existing map file holds");
         assertEquals(1, losses(session, "mapManifestReadFailed"),

@@ -18,9 +18,9 @@ import world.thearchive.wdl.core.WdlConfig;
  * Map-id scheme signal, the begin-time crash-resilience pin. {@code MapManifest.schemeMismatch} reads the
  * {@code wdl/map-ids} manifest's presence as the on-disk remap-on marker, its absence being the off-mode signal
  * {@code WdlOffModeMapIdCaptureTest} pins. The manifest's full hash-to-id table is written at finalize, but the
- * presence marker is planted at world-open, before any {@code data/map_<id>.dat}, so a remap-on download interrupted
- * after its map data reaches disk still reads as remap-on rather than falsely as off-scheme on a resume. Without the
- * begin-time plant such a download resumes through a spurious map-id-scheme-mismatch confirm.
+ * presence marker is planted at world-open, before any map data file, so a remap-on download interrupted after its map
+ * data reaches disk still reads as remap-on rather than falsely as off-scheme on a resume. Without the begin-time plant
+ * such a download resumes through a spurious map-id-scheme-mismatch confirm.
  *
  * <p>The interrupt is not injected: the run drives a remap-on capture, forces the first flush (which opens the writer)
  * by roaming out of the keep-hot window, then asserts the manifest is already present while still recording, before any
