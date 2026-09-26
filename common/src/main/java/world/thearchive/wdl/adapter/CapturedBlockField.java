@@ -36,7 +36,7 @@ import org.jspecify.annotations.Nullable;
 enum CapturedBlockField {
     /** A block container's slots, written by {@link ContainerSink#merge}. */
     ITEMS("Items", null, Shape.LIST),
-    /** A lectern's book and the page it is open at, written by {@link LecternSink#merge}. */
+    /** A {@code "Book"} and its {@code "Page"}, written by {@link LecternSink#merge}. */
     BOOK("Book", "Page", Shape.COMPOUND),
     /** A jukebox's disc, written by the interaction holder merge. */
     RECORD_ITEM("RecordItem", "IsPlaying", Shape.COMPOUND),

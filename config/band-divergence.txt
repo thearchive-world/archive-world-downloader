@@ -40,10 +40,10 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 # (Java 21), so Candidate is a plain interface and confirm is an instanceof chain.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
-# Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
-# ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying. Below 1.20.5 the
-# beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so this field
-# carries that key rather than bees.
+# Below the 1.21 update the RecordItem carry-forward field's sidecar is IsPlaying rather than ticks_since_song_started
+# (a jukebox writes IsPlaying from 1.19.4's tree), and below 1.20.5 the beehive occupants key is Bees rather than bees,
+# so the fields carry those keys (below 1.15 there is no beehive, so the Bees key matches only a foreign or modded block
+# entity). Below 1.14 there is no lectern, so the Book field's comment names its keys alone.
 common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 
 # Below 1.21.2 the entity position wire is the absolute-only ClientboundTeleportEntityPacket (no
@@ -307,7 +307,7 @@ common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 # foldEntitiesIntoRegion, the entity fold that unions a captured entity carrier into the host chunk's Level.Entities
 # through EntityMerge and writes the chunk back, and the terrain merge-write preserves the on-disk Level.Entities the
 # fresh terrain tag lacks, so a routine terrain re-flush of a revisited chunk does not drop the entities a prior fold
-# saved there.
+# saved there. Below 1.14 there is no lectern, so the rewrite's Javadoc names the container alone.
 common/src/main/java/world/thearchive/wdl/adapter/RegionChunkWriter.java
 
 # Below 1.20.5 there is no RegionStorageInfo and below 1.15 no IOWorker, so this seam opens the mod's own
@@ -438,7 +438,7 @@ common/src/main/java/world/thearchive/wdl/adapter/MapIdCollector.java
 
 # Below 1.20.5 there is no BundleContents component, so the change signal compares the slot's stack identity and count
 # alone; dev's bundle-contents leg (the DataComponents.BUNDLE_CONTENTS compare and its lastBundles snapshot) is
-# absent.
+# absent. Below 1.14 there is no lectern, so no reading page is named.
 common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
 
 # Below 1.14 there is no MerchantOffers type or offers codec: the offers are the unnamed class_1145, written through
@@ -461,7 +461,8 @@ common/src/test/java/world/thearchive/wdl/adapter/ContainerMergeRoundTripTest.ja
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
 common/src/test/java/world/thearchive/wdl/adapter/ContainerRecaptureSynergyTest.java
 
-# Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
+# Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument. Below 1.14 there is no lectern and below 1.15
+# no beehive, so the assertion messages name the Book and bees keys.
 common/src/test/java/world/thearchive/wdl/adapter/ContainerStashMergeTest.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
@@ -974,7 +975,8 @@ forge/src/main/java/world/thearchive/wdl/forge/ForgeOutlineRegistrar.java
 common/src/test/java/world/thearchive/wdl/adapter/ChunkSectionClampTest.java
 
 # Below 1.18 a chunk's block entities nest under Level.TileEntities, not the flat root block_entities added at 1.18,
-# so the in-session stash merge locates a block entity by x/y/z through the Level compound.
+# so the in-session stash merge locates a block entity by x/y/z through the Level compound. Below 1.14 there is no
+# lectern, so the Javadoc names the Book/Page stash merge without it.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
 
 # 1.13.2's ListTag.get answers an out-of-range index with a sentinel EndTag rather than throwing, so the
@@ -1083,3 +1085,6 @@ build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
 # scripts and generator source) that composes the intermediary-to-Mojmap mapping jar common's Loom toolchain
 # consumes below the Mojmap floor, generated at settings evaluation through that wrapper.
 tools/
+
+# Below 1.14 a map has no locked flag, so the hash Javadoc does not name one.
+common/src/main/java/world/thearchive/wdl/adapter/MapArchive.java
