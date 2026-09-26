@@ -41,8 +41,8 @@ public final class WdlFabricClient implements ClientModInitializer {
             OpenClickTracker.dispatchUseBlock(player, level, hitResult);
             return InteractionResult.PASS;
         });
-        // Observe entity right-clicks so a chest minecart/boat or chested animal opened by aiming at it binds to
-        // the clicked entity rather than the drifting crosshair. Always PASS; no-ops outside a download.
+        // Observe entity right-clicks so a chest minecart or chested animal opened by aiming at it binds to the clicked
+        // entity rather than the drifting crosshair. Always PASS; no-ops outside a download.
         UseEntityCallback.EVENT.register((player, level, hand, entity, entityHitResult) -> {
             OpenClickTracker.dispatchUseEntity(player, level, entity);
             return InteractionResult.PASS;

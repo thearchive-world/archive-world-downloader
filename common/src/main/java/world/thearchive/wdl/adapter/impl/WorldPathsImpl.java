@@ -60,10 +60,9 @@ public final class WorldPathsImpl implements WorldPaths {
         putIfPresent(result, "minecraft:the_end", saveRoot.resolve("DIM1").resolve("region"));
         Path dimensions = saveRoot.resolve("dimensions");
         if (Files.isDirectory(dimensions)) {
-            // dimensions/<namespace>/<path>/region; a ResourceLocation path may nest further, so any
-            // region-file-holding directory named region under the tree is taken, named by its parent's
-            // relative path. The holds-check lets a dimension whose path is literally "region" resolve to
-            // its real region directory one level deeper instead of its own root.
+            // A dimension path may nest, so any region-file-holding directory named region under the tree is taken,
+            // named by its parent's relative path. The holds-check lets a dimension whose path is literally "region"
+            // resolve to its real region directory one level deeper instead of its own root.
             Map<String, Path> custom = new TreeMap<>();
             try {
                 Files.walkFileTree(dimensions, new SimpleFileVisitor<Path>() {

@@ -116,9 +116,9 @@ final class NbtMerge {
      * Copy {@code key}'s tag from {@code disk} when {@code fresh} carries nothing this mod captured, treating
      * {@code clientDefault} as nothing; true if a copy happened. The scalar sibling of {@link #carryList}.
      *
-     * <p>Testing against a default rather than against absence is load-bearing, not defensive. Vanilla writes these
-     * keys unconditionally, and this mod's chunk capture serializes the client's own block entity, so a freshly
-     * captured crafter or brewing stand always carries the key at the client's zero value rather than omitting it. An
+     * <p>Testing against a default rather than against absence is load-bearing, not defensive. Vanilla writes the
+     * brewing stand's keys unconditionally, and this mod's chunk capture serializes the client's own block entity, so a
+     * freshly captured brewing stand always carries the key at the client's zero value rather than omitting it. An
      * absence test would therefore never fire and the carry-forward would be inert.
      *
      * <p>The cost is that a re-open which genuinely captured the default loses to an earlier non-default capture, since

@@ -98,7 +98,7 @@ class InteractionMergeRoundTripTest {
         CompoundTag jukeboxBlockEntity = findByPos(
                 chunkTag.getCompound("Level").getList("TileEntities", 10), 10, 70, 20);
         assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"),
-                "the captured jukebox is marked playing so it shows note particles on load");
+                "the captured jukebox's IsPlaying is true");
     }
 
     @Test

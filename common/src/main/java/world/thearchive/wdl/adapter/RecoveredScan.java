@@ -54,10 +54,8 @@ import world.thearchive.wdl.core.RecoveredCoverage;
  * snapshot is taken only when a scan adds something new, so a resume's many empty chunks cost no copy.
  */
 final class RecoveredScan {
-    // The on-disk block-entity id of a chiseled bookshelf, matched verbatim off the saved tag rather than
-    // through BlockEntityType (whose Mojmap holder is renamed across bands) so the scan stays raw-NBT and needs
-    // no per-band plug. A bookshelf carries its prior-saved slots as a per-slot mask, kept out of the boolean
-    // recovered set so a partially-saved shelf is not marked fully recovered.
+    // The on-disk block-entity id, matched verbatim off the saved tag rather than through BlockEntityType (whose Mojmap
+    // holder is renamed across bands) so the scan stays raw-NBT and needs no per-band plug.
     private static final String CHISELED_BOOKSHELF_ID = "minecraft:chiseled_bookshelf";
     private static final int BOOKSHELF_SLOTS = 6;
 
@@ -145,7 +143,6 @@ final class RecoveredScan {
                 enderRecovered));
     }
 
-    /** The mask of occupied slots a chiseled bookshelf saved on disk (bit n = slot n) from its {@code "Items"}. */
     private static int bookshelfSavedSlotMask(CompoundTag blockEntity) {
         if (!(blockEntity.get("Items") instanceof ListTag)) {
             return 0;
