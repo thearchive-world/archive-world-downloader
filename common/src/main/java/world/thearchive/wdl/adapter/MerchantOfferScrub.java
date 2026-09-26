@@ -13,20 +13,20 @@ import net.minecraft.nbt.ListTag;
  * a player actually saw.
  *
  * <p>A merchant's real offers exist on the server and reach the client only over the open menu channel. Ask a
- * client-side merchant for its offers anyway and it does not answer "none": it assigns itself a random career and
- * generates a full trade list from its profession, on the spot. Ordinary things ask, differing by version: rendering
- * its name, interacting with it, and below 1.21.1, where vanilla added the client-side check, its own entity write. On
- * disk the invention is indistinguishable from a real capture.
+ * client-side merchant for its offers anyway and it does not answer "none": it generates a full trade list from its
+ * profession, on the spot. Ordinary things ask, differing by version: rendering its name, interacting with it, and
+ * below 1.21.1, where vanilla added the client-side check, its own entity write. On disk the invention is
+ * indistinguishable from a real capture.
  *
  * <p>It also silently defeats both carry-forwards. {@link EntityMerge} and {@link RecoveredEntityContent} restore saved
  * trades only into a slot still empty, which is what stops a stale copy overwriting a fresher one; an invented list
  * fills that slot, so a genuine capture already on disk is never carried over it and is lost on the next write of that
  * chunk. Stripping therefore runs before every fold.
  *
- * <p>The career keys go with the offers because the same invention writes them: a client merchant's career is a number
- * it made up to pick a trade table with, not anything the server told it. The profession is left alone, being genuinely
- * synced, as is the trade experience where the version has one, which a client reports at its own zero and which the
- * carry-forward already treats as absent.
+ * <p>Below 1.14, where villagers have careers, the career keys go with the offers because the same invention writes
+ * them: a client merchant's career is a number it made up to pick a trade table with, not anything the server told it.
+ * The profession is left alone, being genuinely synced, as is the trade experience where the version has one, which a
+ * client reports at its own zero and which the carry-forward already treats as absent.
  */
 final class MerchantOfferScrub {
     private static final String[] CLIENT_INVENTED_KEYS = { "Offers", "Career", "CareerLevel" };
