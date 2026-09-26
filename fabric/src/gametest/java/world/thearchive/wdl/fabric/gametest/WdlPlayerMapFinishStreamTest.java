@@ -18,10 +18,10 @@ import world.thearchive.wdl.core.WdlConfig;
 
 /**
  * The finish-time streaming invariant: a filled map held only in the player inventory (no frame, no container, nothing
- * that flushes mid-capture) is remapped only by the finish-time player assembly, so its streamed
- * {@code data/map_<id>.dat} write must be enqueued before the writer's finalize marker. A regression that reorders the
- * finish-time player remap after the writer's {@code finish()} silently drops the map's write (a submit after the
- * marker is discarded with no loss tally), and this run turns red on the missing file.
+ * that flushes mid-capture) is remapped only by the finish-time player assembly, so its streamed write must be enqueued
+ * before the writer's finalize marker. A regression that reorders the finish-time player remap after the writer's
+ * {@code finish()} silently drops the map's write (a submit after the marker is discarded with no loss tally), and this
+ * run turns red on the missing file.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlPlayerMapFinishStreamTest implements FabricClientGameTest {
@@ -56,7 +56,7 @@ public class WdlPlayerMapFinishStreamTest implements FabricClientGameTest {
                     WdlConfig.DEFAULTS, 30);
 
             Check.that(!CaptureReadback.mapDataIds(saveRoot).isEmpty(),
-                    "a player-held map is remapped only at finish; its map_<id>.dat missing means the finish-time "
+                    "a player-held map is remapped only at finish; the map's data file missing means the finish-time "
                             + "remap ran after the writer's finalize marker and was silently dropped");
         }
     }

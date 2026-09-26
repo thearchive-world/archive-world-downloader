@@ -137,8 +137,8 @@ final class MapArchive {
 
     /**
      * The finalize-time idcounts tag, floored at the counter high-water so the reopened world's allocator issues the
-     * next id above every captured id, or null when no id was referenced or seeded this session. The
-     * {@code map_<id>.dat} files themselves stream through the sink at first image.
+     * next id above every captured id, or null when no id was referenced or seeded this session. The maps' data files
+     * themselves stream through the sink at first image.
      */
     public @Nullable Tag idCountsTag() {
         int highWater = remap ? manifest.highestAssignedId() : identityHighWater;
