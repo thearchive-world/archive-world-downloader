@@ -4001,11 +4001,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // target dimension is read here on main (submit time), not in the thunk, so a rebind cannot misroute.
             boolean synthesizeBlending = VanillaDimensions.shouldSynthesizeBlending(config.worldOutput().worldType(),
                     targetDimension);
-            // Blank any item-borne coordinate riding a block entity's own NBT (a compass in a decorated pot or on a
-            // shelf), the one item-borne surface the item-list scrub above never sees. Done here, on the main
-            // thread and only for the chunks draining this pass, so the writer thunk encodes an already-scrubbed
-            // snapshot: the block-entity NBT is our detached copy, and this is the block-entity analogue of the
-            // per-drained-holder prepare, never a per-tick pass over the whole buffer.
+            // Blank any item-borne coordinate riding a block entity's own NBT (a compass in a decorated pot), the one
+            // item-borne surface the item-list scrub above never sees. Done here, on the main thread and only for the
+            // chunks draining this pass, so the writer thunk encodes an already-scrubbed snapshot: the block-entity NBT
+            // is our detached copy, and this is the block-entity analogue of the per-drained-holder prepare, never a
+            // per-tick pass over the whole buffer.
             if (!config.saveItemCoordinates()) {
                 for (CompoundTag blockEntity : snapshot.blockEntities()) {
                     ItemLocationScrub.scrubBlockEntity(blockEntity);

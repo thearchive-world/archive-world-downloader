@@ -25,9 +25,9 @@ import net.minecraft.nbt.Tag;
  * player tag.
  *
  * <p>Reaches items three ways: an item-list holder via {@link #scrub(CompoundTag, String)} (the inventory, the ender
- * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)} (a decorated pot, a
- * shelf), and a serialized entity via {@link #scrubEntity(CompoundTag)} (an item frame, an item display, mob equipment,
- * an allay, a dropped item, and their passengers).
+ * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)} (a decorated pot),
+ * and a serialized entity via {@link #scrubEntity(CompoundTag)} (an item frame, an item display, mob equipment, an
+ * allay, a dropped item, and their passengers).
  *
  * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive bee
  * flower positions only. {@code minecraft:custom_data} and {@code minecraft:map_decorations} are the two named
