@@ -354,10 +354,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Captured container-vehicle {@code "Items"} holders keyed by entity {@link UUID}; last-seen-while-open wins. The
-     * entity sibling of {@link #containerStash}: a chest minecart, hopper minecart, chest boat, or chest raft reaches
-     * the client only through its open menu, so it is lifted there and merged into its entity's tag in the
-     * {@code entities/} region when that entity's chunk flushes (by {@link EntityContainerMerge#mergeEntityStash},
-     * incidentally again at {@link #finish()}), not into a chunk block entity.
+     * entity sibling of {@link #containerStash}: a chest minecart, hopper minecart, or chest boat reaches the client
+     * only through its open menu, so it is lifted there and merged into its entity's tag in the {@code entities/}
+     * region when that entity's chunk flushes (by {@link EntityContainerMerge#mergeEntityStash}, incidentally again at
+     * {@link #finish()}), not into a chunk block entity.
      */
     private final Map<UUID, CompoundTag> entityContainerStash = new LinkedHashMap<>();
     // Captured villager trades by villager UUID, last-seen-wins, mirroring entityContainerStash so the flush's
@@ -3944,11 +3944,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // target dimension is read here on main (submit time), not in the thunk, so a rebind cannot misroute.
             boolean synthesizeBlending = VanillaDimensions.shouldSynthesizeBlending(config.worldOutput().worldType(),
                     targetDimension);
-            // Blank any item-borne coordinate riding a block entity's own NBT (a compass in a decorated pot or on a
-            // shelf), the one item-borne surface the item-list scrub above never sees. Done here, on the main
-            // thread and only for the chunks draining this pass, so the writer thunk encodes an already-scrubbed
-            // snapshot: the block-entity NBT is our detached copy, and this is the block-entity analogue of the
-            // per-drained-holder prepare, never a per-tick pass over the whole buffer.
+            // Blank any item-borne coordinate riding a block entity's own NBT, the one item-borne surface the item-list
+            // scrub above never sees. Done here, on the main thread and only for the chunks draining this pass, so the
+            // writer thunk encodes an already-scrubbed snapshot: the block-entity NBT is our detached copy, and this is
+            // the block-entity analogue of the per-drained-holder prepare, never a per-tick pass over the whole buffer.
             if (!config.saveItemCoordinates()) {
                 for (CompoundTag blockEntity : snapshot.blockEntities()) {
                     ItemLocationScrub.scrubBlockEntity(blockEntity);
