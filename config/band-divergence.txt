@@ -45,8 +45,13 @@ common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
 # 1.21.11's ChunkPos is a class: built with new ChunkPos(BlockPos) or new ChunkPos(long), keyed with toLong and read
 # through the x and z fields; 26.1 made it a record (containing, unpack, pack, x() and z()). And the game-rule
-# resolution accessor is gameRules on 1.21.11's LevelData record, gameRuleResolution on 26.x's.
+# resolution accessor is gameRules on 1.21.11's LevelData record, gameRuleResolution on 26.x's. And through 1.21.11 the
+# map id counter is data/idcounts.dat and a map data/map_<id>.dat; 26.1 moved them to data/minecraft/maps/last_id.dat
+# and data/minecraft/maps/<id>.dat. And through 1.21.11 the player record is in level.dat; 26.1 moved it to
+# players/data/<uuid>.dat.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
+# Through 1.21.11 a map is data/map_<id>.dat; 26.1 moved it to data/minecraft/maps/<id>.dat.
+common/src/main/java/world/thearchive/wdl/adapter/MapArchive.java
 # 1.21.11's ChunkPos is a class, so a chunk is built with new ChunkPos(BlockPos); 26.1 made it a record with
 # ChunkPos.containing.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkFlushPlan.java
@@ -141,7 +146,8 @@ common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionDimensionReb
 common/src/test/java/world/thearchive/wdl/adapter/EntityPacketCaptureTest.java
 # 1.21.11's ChunkPos is a class keyed with toLong (26.1 made it a record keyed with pack()); it keeps the entity type
 # constants on EntityType and its Entity draws its id from a static counter, so the entity double takes a null level;
-# 26.2 moved the constants to EntityTypes and the id onto Level.getNextEntityId, so the double takes HeadlessLevel.
+# 26.2 moved the constants to EntityTypes and the id onto Level.getNextEntityId, so the double takes HeadlessLevel. And
+# through 1.21.11 the player record is in level.dat; 26.1 moved it to players/data/<uuid>.dat.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionLossTallyTest.java
 
 # 1.21.11 keeps the block entity type constants on BlockEntityType; 26.2 moved them to BlockEntityTypes.
@@ -215,14 +221,24 @@ common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 # the connection itself and types the dedicated one TestDedicatedServerConnection.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/MultiplayerFixture.java
 # 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext; fabric-api 0.156.0
-# for 26.2 put the wait on the connection and the fixture exposes it directly.
+# for 26.2 put the wait on the connection and the fixture exposes it directly. And through 1.21.11 the map id counter is
+# data/idcounts.dat; 26.1 moved it to data/minecraft/maps/last_id.dat.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlFramedMapRevisitUnionTest.java
+# Through 1.21.11 the map id counter is data/idcounts.dat and a map data/map_<id>.dat; 26.1 moved them to
+# data/minecraft/maps/last_id.dat and data/minecraft/maps/<id>.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlFilledMapCaptureTest.java
 # 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext; fabric-api 0.156.0
-# for 26.2 put the wait on the connection and the fixture exposes it directly.
+# for 26.2 put the wait on the connection and the fixture exposes it directly. And through 1.21.11 a map is
+# data/map_<id>.dat; 26.1 moved it to data/minecraft/maps/<id>.dat.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapSchemeSignalBeginTest.java
 # 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext; fabric-api 0.156.0
-# for 26.2 put the wait on the connection and the fixture exposes it directly.
+# for 26.2 put the wait on the connection and the fixture exposes it directly. And through 1.21.11 a map is
+# data/map_<id>.dat; 26.1 moved it to data/minecraft/maps/<id>.dat.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapStreamCrashStateTest.java
+# Through 1.21.11 a map is data/map_<id>.dat; 26.1 moved it to data/minecraft/maps/<id>.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOffModeMapIdCaptureTest.java
+# Through 1.21.11 a map is data/map_<id>.dat; 26.1 moved it to data/minecraft/maps/<id>.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPlayerMapFinishStreamTest.java
 # 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext; fabric-api 0.156.0
 # for 26.2 put the wait on the connection and the fixture exposes it directly.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlResumeCaptureTest.java
