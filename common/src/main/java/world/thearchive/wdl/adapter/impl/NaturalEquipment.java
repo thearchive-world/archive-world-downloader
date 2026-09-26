@@ -62,7 +62,7 @@ final class NaturalEquipment {
      * persistence-setting pickup, and a mob that did pick up a pumpkin is the accepted invisible-ambiguous case.
      */
     private static final Set<Item> NATURAL_HEAD_EXTRAS = ImmutableSet.of(
-            Blocks.CARVED_PUMPKIN.asItem(), Blocks.JACK_O_LANTERN.asItem(), Items.WHITE_BANNER);
+            Blocks.CARVED_PUMPKIN.asItem(), Blocks.JACK_O_LANTERN.asItem());
 
     private static final Map<EquipmentSlot, Set<Item>> BASE_ARMOR = ImmutableMap.of(
             EquipmentSlot.HEAD, ImmutableSet.of(Items.LEATHER_HELMET, Items.GOLDEN_HELMET,
