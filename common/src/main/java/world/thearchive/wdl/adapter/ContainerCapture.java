@@ -349,7 +349,7 @@ final class ContainerCapture {
     /**
      * Ride the brewing stand's persisted menu-only state on {@code holder}: vanilla's exact key names and NBT types
      * (BrewTime short, Fuel byte), so the merged block entity loads unchanged. Pure so the key/type contract is
-     * testable headless; the caller reads the live menu's two data values.
+     * testable headless.
      */
     static void putBrewingState(NBTTagCompound holder, int brewingTicks, int fuel) {
         holder.setShort("BrewTime", (short) brewingTicks);
