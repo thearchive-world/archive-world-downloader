@@ -282,7 +282,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * The always-on round-robin floor's work queue over the hot buffer: refilled from {@link #captured}'s keys when
      * drained, so every hot chunk is re-encoded within the configured period. It is the only rung that catches
-     * block-entity-data edits (sign/lectern/banner text), which never mark a chunk unsaved.
+     * block-entity-data edits (sign/banner text), which never mark a chunk unsaved.
      */
     private final ArrayDeque<ChunkPos> floorQueue = new ArrayDeque<>();
 
@@ -325,9 +325,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private final Map<BlockPos, StashHolder> containerStash = new LinkedHashMap<>();
 
-    /**
-     * Captured lectern {@code "Book"}/{@code "Page"} holders keyed by block pos; last-seen-while-open wins.
-     */
     private final Map<BlockPos, StashHolder> lecternStash = new LinkedHashMap<>();
 
     /**
@@ -340,10 +337,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Captured container-vehicle {@code "Items"} holders keyed by entity {@link UUID}; last-seen-while-open wins. The
-     * entity sibling of {@link #containerStash}: a chest minecart, hopper minecart, chest boat, or chest raft reaches
-     * the client only through its open menu, so it is lifted there and merged into its entity's tag in the
-     * {@code entities/} region when that entity's chunk flushes (by {@link EntityContainerMerge#mergeEntityStash},
-     * incidentally again at {@link #finish()}), not into a chunk block entity.
+     * entity sibling of {@link #containerStash}: a chest minecart or hopper minecart reaches the client only through
+     * its open menu, so it is lifted there and merged into its entity's tag when that entity's chunk flushes (by
+     * {@link EntityContainerMerge#mergeEntityStash}, incidentally again at {@link #finish()}), not into a chunk block
+     * entity.
      */
     private final Map<UUID, CompoundTag> entityContainerStash = new LinkedHashMap<>();
     // Captured villager trades by villager UUID, last-seen-wins, mirroring entityContainerStash so the flush's
@@ -369,15 +366,14 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * The standing captured-set the unsaved-container outline reads: which loaded containers had their rich contents
      * captured this session, so their rim clears. Populated at the stash content-gate the {@code stash*} family puts at
      * and, for a placed content-bearing container, the instant the interaction recognizer records it, optimistically
-     * before the flush confirms it, the way the open-time stash marks a chest on open and
-     * {@link #onBookshelfSlotCaptured} marks a bookshelf slot. So membership tracks contents-stashed-for-save, not the
-     * live stash (which drains mid-session and would otherwise re-show a flushed container's rim). Removal is rare, and
-     * the one case un-stashes the content it un-marks: a cell a placement lands in, whose captured block is being
-     * replaced ({@link #onBlockPlacedAt}). Block containers, double-chest halves, and placed containers enter by block
-     * pos key, held per dimension and swapped on a portal like {@link #allCaptured} so a position in one dimension
-     * never dedups another's; borne containers enter by globally-unique entity UUID, staying session-wide, and every
-     * ender chest is derived from {@link #enderChestStash} (one shared capture). Main-thread only, like the rest of
-     * capture; the cross-seam view contract is {@link CapturedContainers}.
+     * before the flush confirms it, the way the open-time stash marks a chest on open. So membership tracks
+     * contents-stashed-for-save, not the live stash (which drains mid-session and would otherwise re-show a flushed
+     * container's rim). Removal is rare, and the one case un-stashes the content it un-marks: a cell a placement lands
+     * in, whose captured block is being replaced ({@link #onBlockPlacedAt}). Block containers, double-chest halves, and
+     * placed containers enter by block pos key, held per dimension and swapped on a portal like {@link #allCaptured} so
+     * a position in one dimension never dedups another's; borne containers enter by globally-unique entity UUID,
+     * staying session-wide, and every ender chest is derived from {@link #enderChestStash} (one shared capture).
+     * Main-thread only, like the rest of capture; the cross-seam view contract is {@link CapturedContainers}.
      */
     private final Map<DimensionType, LongOpenHashSet> capturedBlockKeysByDimension = new LinkedHashMap<>();
     private LongOpenHashSet capturedBlockKeys = new LongOpenHashSet();
@@ -389,10 +385,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // another's, last-recorded-wins on re-open.
     private final Map<DimensionType, Long2ObjectMap<String>> capturedBlockTypesByDimension = new LinkedHashMap<>();
     private Long2ObjectMap<String> capturedBlockTypes = new Long2ObjectOpenHashMap<>();
-    // The chiseled-bookshelf captured-slot masks the outline reads (per pos, bit n = slot n): a bookshelf is
-    // captured one slot at a time, so a whole-block flag in capturedBlockKeys cannot express it. Held per
-    // dimension and swapped on a portal like capturedBlockKeys, OR-updated when the interaction recognizer
-    // records a book insert.
     private final Map<DimensionType, Long2IntOpenHashMap> bookshelfSlotsByDimension = new LinkedHashMap<>();
     private Long2IntOpenHashMap bookshelfSlots = new Long2IntOpenHashMap();
     private final Set<UUID> capturedEntityIds = new HashSet<>();
@@ -646,7 +638,6 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** How many stashed containers were merged into their captured chunk tags (for the saved-world message). */
     private int mergedContainers;
 
-    /** How many stashed lectern books were merged into their captured chunk tags (for the saved-world message). */
     private int mergedLecterns;
 
     /** How many stashed container vehicles were merged into their captured entity tags (for the saved message). */
@@ -749,9 +740,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private int villagerTradesLost;
 
     /**
-     * Predicted interactions (a bookshelf book, a jukebox disc, a placed shulker or beehive) that no chunk flush ever
-     * reached, so nothing of them was written (main thread). Counted at the two whole-buffer drains, the dimension
-     * rebind and the finish, since only what neither reached is unrecoverable.
+     * Predicted interactions (a jukebox disc, a placed shulker) that no chunk flush ever reached, so nothing of them
+     * was written (main thread). Counted at the two whole-buffer drains, the dimension rebind and the finish, since
+     * only what neither reached is unrecoverable.
      */
     private int interactionCapturesLost;
 
@@ -926,7 +917,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         return capturedBlockKeysByDimension.computeIfAbsent(dimension, key -> new LongOpenHashSet());
     }
 
-    /** The outline bookshelf captured-slot masks for {@code dimension}, created empty on first use. */
+    /** The outline captured-slot masks for {@code dimension}, created empty on first use. */
     private Long2IntOpenHashMap bookshelfSlotsFor(DimensionType dimension) {
         return bookshelfSlotsByDimension.computeIfAbsent(dimension, key -> new Long2IntOpenHashMap());
     }
@@ -940,9 +931,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Whether an interaction predicted in {@code chunk} can still reach disk (the interaction recognizer's gate): the
      * chunk is buffered now, has not been captured yet so its first capture is still coming, or is a revisit this mode
      * re-buffers. False for a chunk already written and frozen, where the reconcile gate has no post-interaction
-     * block-state to read and no flush ever drains the candidate. Recording one there clears the outline's rim and
-     * counts a container for content that cannot be written, which tells the player the opposite of the truth; refusing
-     * it leaves the rim armed, which is what a re-visit needs to see.
+     * block-state to read and no flush ever drains the candidate. Recording one there clears the outline's rim for
+     * content that cannot be written, which tells the player the opposite of the truth; refusing it leaves the rim
+     * armed, which is what a re-visit needs to see.
      */
     private boolean isInteractionChunkCapturable(ChunkPos chunk) {
         return captured.containsKey(chunk) || !allCaptured.contains(chunk.toLong())
@@ -953,7 +944,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Count and name every interaction prediction left unwritten, draining the recognizer's stashes: content the player
      * put in the world that no chunk flush ever reached. Runs at the dimension rebind and at finish, the two
      * whole-buffer drains, so what it sees is only what nothing else could rescue. Reported per position because the
-     * aggregate gives no way to learn which shelf or hive is short.
+     * aggregate gives no way to learn which position is short.
      *
      * <p>At the rebind the drain is mandatory rather than merely honest: an old-dimension candidate's position must not
      * carry into the new dimension's shared {@link ChunkPos} space, where a same-type block could take wrong-dimension
@@ -970,21 +961,13 @@ public final class LiveCaptureSession implements CaptureController.Session {
         }
         interactionCapturesLost += dropped.size();
         LOGGER.warn("{} predicted interactions were never written: their chunk was not captured again before the "
-                + "download moved on, so the book, disc or placed container the player put there is missing from "
+                + "download moved on, so the disc or placed container the player put there is missing from "
                 + "the save", dropped.size());
         for (BlockPos pos : dropped) {
             LOGGER.info("predicted interaction at {} was dropped; its content is missing from the save", pos);
         }
     }
 
-    /**
-     * Record an optimistically-captured bookshelf slot (the interaction recognizer's callback): OR the slot into the
-     * outline's per-dimension mask and, when this insert completes every occupied slot, count the bookshelf as one
-     * downloaded container, deduped by pos so re-cycling the same shelf does not double-count. The clicked slot is
-     * empty pre-click, so the full occupancy is the pre-insert mask plus this slot; a bookshelf still missing a slot is
-     * not counted, and {@link #tallyInteractionPositions} skips it at flush so a partly-cycled shelf never counts there
-     * either.
-     */
     private void onBookshelfSlotCaptured(long posKey, int slot, int occupiedBeforeInsert) {
         int capturedMask = bookshelfSlots.get(posKey) | (1 << slot);
         bookshelfSlots.put(posKey, capturedMask);
@@ -996,12 +979,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Record an optimistically-captured placed container (the interaction recognizer's callback): mark its pos captured
-     * this session so the outline clears its rim the moment it is placed, the way {@link #onBookshelfSlotCaptured}
-     * marks a bookshelf slot and the open-time stash marks a chest on open, and record its block-entity type so Gate 2
-     * re-rims the position if a different container later replaces it (the same pairing the open-time stashes make
-     * through {@link #recordBlockType}). The flush reconcile still decides whether the contents reach disk; a placement
-     * that loses its cell to a later block is no longer loaded to rim, so the optimistic mark cannot mis-clear a live
-     * container.
+     * this session so the outline clears its rim the moment it is placed, the way the open-time stash marks a chest on
+     * open, and record its block-entity type so Gate 2 re-rims the position if a different container later replaces it
+     * (the same pairing the open-time stashes make through {@link #recordBlockType}). The flush reconcile still decides
+     * whether the contents reach disk; a placement that loses its cell to a later block is no longer loaded to rim, so
+     * the optimistic mark cannot mis-clear a live container.
      */
     private void onPlacedContainerCaptured(long posKey, String blockTypeId) {
         capturedBlockKeys.add(posKey);
@@ -1108,10 +1090,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (player != null && lastPlayer.get() != player) {
             lastPlayer = new WeakReference<>(player);
             if (openClickTracker != null) {
-                // A respawn builds a fresh LocalPlayer even when the dimension is unchanged, and copies the
-                // old entity id onto it, so object identity is the only signal that one happened. Without
-                // this, dying with a latched click on a barrel and opening a same-size container at the
-                // respawn point inside the window writes it onto the death-site barrel's pos.
+                // A respawn builds a fresh LocalPlayer even when the dimension is unchanged, and copies the old entity
+                // id onto it, so object identity is the only signal that one happened. Without this, dying with a
+                // latched click and opening a same-size container at the respawn point inside the window writes it onto
+                // the death-site pos.
                 openClickTracker.reset();
             }
         }
@@ -1543,8 +1525,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      *
      * <p>It must run before the finish-time packet drain. That drain empties the accumulator, so
      * {@link EntityPacketAccumulator#tracks} then answers false for everything it just promoted, and a second write of
-     * one of those at a different chunk position is the one duplicate the entities region cannot reconcile, each chunk
-     * being merged against its own on-disk copy alone.
+     * one of those at a different chunk position is the one duplicate the region cannot reconcile, each chunk being
+     * merged against its own on-disk copy alone.
      *
      * <p>A still-refused entity is skipped before the encode so the sink skip is not tallied twice. A recovered one
      * leaves its earlier prime-time skip standing, so that diagnostic over-counts; it is a log figure, not an input to
@@ -2089,12 +2071,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * Translate the container-vehicle open signals into primitives for {@link ContainerAssociation#openEntityContainer}
      * and, on a confident bind, store the entity UUID the finish merge keys on. The bind target is the target vehicle,
-     * or, when there is none, the container vehicle the player is riding (the press-E flow: a chest boat opens its menu
-     * via {@code player.getVehicle()}, firing no use event). The UUID is read once here (not re-read per tick): the
-     * bind key is stable, so a minecart that keeps rolling while open still captures correctly and merges into whatever
-     * chunk it ends in. A NULL target vehicle at the bind tick drops the open. A REMOVED one does not: the type test
-     * stays true for an entity already taken out of the world and the clicked reference is held strongly, so a
-     * destroyed chest minecart still binds by UUID and its stash merges onto an entity the save may not carry.
+     * or, when there is none, the container vehicle the player is riding. The UUID is read once here (not re-read per
+     * tick): the bind key is stable, so a minecart that keeps rolling while open still captures correctly and merges
+     * into whatever chunk it ends in. A NULL target vehicle at the bind tick drops the open. A REMOVED one does not:
+     * the type test stays true for an entity already taken out of the world and the clicked reference is held strongly,
+     * so a destroyed chest minecart still binds by UUID and its stash merges onto an entity the save may not carry.
      */
     private void bindOpenedEntityContainer(AbstractContainerMenu menu, LocalPlayer player, @Nullable Entity target) {
         boolean atEntity = false;
@@ -2237,8 +2218,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Serialize the open container-vehicle menu's synthetic block slots (the client's synced vehicle contents) into the
-     * {@link #entityContainerStash} keyed by the bound UUID, last-seen-wins. Reuses the container serialize; the merge
-     * into the entity's tag in the {@code entities/} region happens at {@link #finish()}.
+     * {@link #entityContainerStash} keyed by the bound UUID, last-seen-wins. Reuses the container serialize.
      */
     private void stashEntityContainerItems(AbstractContainerMenu menu, LocalPlayer player) {
         UUID uuid = boundEntityUuid;
@@ -2256,8 +2236,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * Serialize the open chested-animal menu's chest slots (the client's synced chest contents) into the
      * {@link #entityContainerStash} keyed by the bound UUID, last-seen-wins. The chested-animal analog of
      * {@link #stashEntityContainerItems}; it lifts the chest slots only ({@link ContainerCapture#captureChestSlots},
-     * not the saddle/body), and the merge into the animal's tag in the {@code entities/} region happens when its chunk
-     * flushes, through the same {@link EntityContainerMerge#mergeEntityStash} the container vehicles use.
+     * not the saddle/body), and the merge into the animal's tag happens when its chunk flushes, through the same
+     * {@link EntityContainerMerge#mergeEntityStash} the container vehicles use.
      */
     private void stashChestedAnimalItems(AbstractContainerMenu menu, LocalPlayer player) {
         UUID uuid = boundEntityUuid;
@@ -2981,8 +2961,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * position, the dimension, the open-time ender chest, the seated mount and the game mode. Everything else the
      * serialize would have written is lost with it. The mount matters most: a seated one was excluded from the
      * standalone entity write and its loot drained from the stash, so a save without this record loses it and its
-     * contents from both the entities region and the player record. Throwing is the caller's fail-soft contract, and
-     * then this finish writes no player record.
+     * contents from both the region and the player record. Throwing is the caller's fail-soft contract, and then this
+     * finish writes no player record.
      */
     private CapturedPlayer assembleSalvagedPlayer(LocalPlayer player, Minecraft minecraft) {
         return assemblePlayer(player, minecraft, adapter.playerSink().captureInventory(player.inventory));
@@ -3210,8 +3190,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * <p>Routed to the dimension the PRIOR tag records, not to the live {@link #targetDimension}: the position comes
      * from the prior tag too, and this session can finish anywhere, so pairing prior coordinates with the current
      * dimension would write the mount into a folder it was never in and leave the one it was parked in empty. The
-     * writer opens the named dimension's entities storage on demand exactly as it does for a session that follows the
-     * player across a portal, and this submit precedes the end-of-stream marker.
+     * writer opens the named dimension's storage on demand exactly as it does for a session that follows the player
+     * across a portal, and this submit precedes the end-of-stream marker.
      *
      * <p>Fail-soft. Every exit that reaches the release proper and does not write counts, since the mount and its
      * archived contents are then preserved nowhere this method can see. A write the writer thread then declines is
@@ -3768,10 +3748,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
                     // when zipOnFinish is on. The download screen reads each row's size by walking the folder.
                     () -> FinalizeOutputs.exportZip(saveRoot, config.zipOnFinish(), progress),
                     progress);
-            // Observe each carried-forward on-disk chunk for the outline's recovered-coverage scan.
-            // Self-gating: the writer reads the prior chunk only when one exists, so this is a no-op on a fresh
-            // download and runs only on a resume, reusing the writer's own read rather than a second region store.
-            // The entities-store sibling marks a prior-captured container entity recovered by its UUID the same way.
+            // Observe each carried-forward on-disk chunk for the outline's recovered-coverage scan. Self-gating: the
+            // writer reads the prior chunk only when one exists, so this is a no-op on a fresh download and runs only
+            // on a resume, reusing the writer's own read rather than a second region store.
             writer.observeResumeReads(recoveredScan::record);
             // One read, two consumers. The entity read is the only source for a prior record in a chunk file this
             // write is not touching, so it is not gated on the outline the way the block read is.
@@ -3904,10 +3883,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // writer-bound.
             prepareDrainedItems(containers);
             // Drain and reconcile this chunk's interaction-predicted candidates against the captured snapshot's
-            // block-state. The confirmed "Items" (placed shulker, bookshelf books) are scrubbed and map
-            // remapped like the open-time path, then folded into the container bundle behind the open-time-wins
-            // precedence (an opened container at the same pos supersedes a possibly-stale place snapshot). The
-            // jukebox/beehive holders carry to the writer thunk for their own field-copy merge.
+            // block-state. The confirmed "Items" (placed shulker) are scrubbed and map remapped like the open-time
+            // path, then folded into the container bundle behind the open-time-wins precedence (an opened container at
+            // the same pos supersedes a possibly-stale place snapshot). The jukebox holders carry to the writer thunk
+            // for their own field-copy merge.
             final Map<BlockPos, CompoundTag> holders;
             if (interactionCapture != null) {
                 // Placed-shulker durability: drainChunk reconciles each candidate against this snapshot, the very
@@ -3934,17 +3913,16 @@ public final class LiveCaptureSession implements CaptureController.Session {
             mergedContainers += landingContainers.size();
             mergedLecterns += ChunkFlushPlan.landingHolderPositions(snapshot, lecterns).size();
             mergedContainers += ChunkFlushPlan.landingHolderPositions(snapshot, holders).size();
-            // Defer the heavy serialize plus the pure container/lectern fold to the writer thread:
-            // the thunk closes over the detached snapshot, the drained holders, and the per-band codec/sinks, all
-            // immutable, so the render thread never runs the chunk serialize. The target dimension is read here on
-            // main (submit time), not in the thunk, so a rebind cannot misroute.
+            // Defer the heavy serialize plus the pure container fold to the writer thread: the thunk closes over the
+            // detached snapshot, the drained holders, and the per-band codec/sinks, all immutable, so the render thread
+            // never runs the chunk serialize. The target dimension is read here on main (submit time), not in the
+            // thunk, so a rebind cannot misroute.
             boolean synthesizeBlending = VanillaDimensions.shouldSynthesizeBlending(config.worldOutput().worldType(),
                     targetDimension);
-            // Blank any item-borne coordinate riding a block entity's own NBT (a compass in a decorated pot or on a
-            // shelf), the one item-borne surface the item-list scrub above never sees. Done here, on the main
-            // thread and only for the chunks draining this pass, so the writer thunk encodes an already-scrubbed
-            // snapshot: the block-entity NBT is our detached copy, and this is the block-entity analogue of the
-            // per-drained-holder prepare, never a per-tick pass over the whole buffer.
+            // Blank any item-borne coordinate riding a block entity's own NBT, the one item-borne surface the item-list
+            // scrub above never sees. Done here, on the main thread and only for the chunks draining this pass, so the
+            // writer thunk encodes an already-scrubbed snapshot: the block-entity NBT is our detached copy, and this is
+            // the block-entity analogue of the per-drained-holder prepare, never a per-tick pass over the whole buffer.
             if (!config.saveItemCoordinates()) {
                 for (CompoundTag blockEntity : snapshot.blockEntities()) {
                     ItemLocationScrub.scrubBlockEntity(blockEntity);
@@ -4041,19 +4019,19 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Sweep the container and lectern holders still stashed after a whole-buffer drain: the open-time contents of a
-     * container opened in a chunk that had already left the keep-hot buffer. Its chunk is on disk but was never
-     * re-buffered (the {@code allCaptured} skip in {@link #captureLoadedChunks}), so the per-chunk drain never reached
-     * its holder; fold each residual holder into its on-disk chunk through a writer-thread read-modify-write, so
-     * backtracking through an already-flushed base still saves what the player opened. Runs only on a whole-buffer
-     * drain ({@code all}), never per tick, so it adds no per-tick whole-stash pass. Finish and the dimension rebind
-     * always reach it (both call {@link #flushBuffer} directly); the capture-paused drain reaches it only alongside a
-     * non-empty keep-hot buffer, since {@link #pumpFlush} returns early on an empty buffer, so finish is the backstop
-     * that guarantees every residual holder is swept. The rebind drain runs it before the dimension swap under the old
-     * dimension, so a residual holder never crosses a portal into another dimension's {@link ChunkPos} space. The
+     * Sweep the container holders still stashed after a whole-buffer drain: the open-time contents of a container
+     * opened in a chunk that had already left the keep-hot buffer. Its chunk is on disk but was never re-buffered (the
+     * {@code allCaptured} skip in {@link #captureLoadedChunks}), so the per-chunk drain never reached its holder; fold
+     * each residual holder into its on-disk chunk through a writer-thread read-modify-write, so backtracking through an
+     * already-flushed base still saves what the player opened. Runs only on a whole-buffer drain ({@code all}), never
+     * per tick, so it adds no per-tick whole-stash pass. Finish and the dimension rebind always reach it (both call
+     * {@link #flushBuffer} directly); the capture-paused drain reaches it only alongside a non-empty keep-hot buffer,
+     * since {@link #pumpFlush} returns early on an empty buffer, so finish is the backstop that guarantees every
+     * residual holder is swept. The rebind drain runs it before the dimension swap under the old dimension, so a
+     * residual holder never crosses a portal into another dimension's {@link ChunkPos} space. The
      * interaction-prediction candidates are deliberately not swept: their reconcile gate confirms a candidate against
      * the live captured snapshot's block-state, which an orphaned chunk no longer holds, so a candidate cannot be
-     * confirmed off the on-disk chunk (and a placed shulker or beehive is not even present there).
+     * confirmed off the on-disk chunk (and a placed shulker is not even present there).
      */
     private void sweepOrphanedHolders(AsyncSaveWriter activeWriter) {
         if (containerStash.isEmpty() && lecternStash.isEmpty()) {
@@ -4118,11 +4096,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
     }
 
     /**
-     * Stream the accumulated entities: drain each flush-eligible entity-chunk to the {@code entities/} target, the
-     * entity analog of the terrain keep-hot flush, so the buffer stays bounded as the player roams. Driven by
-     * flush-eligibility, not by the terrain buffer, so an entity in an already-flushed chunk still drains. The
-     * {@code allCaptured} privacy gate is enforced at accumulation, so every buffered entity is in a chunk whose
-     * terrain we captured.
+     * Stream the accumulated entities: drain each flush-eligible entity-chunk, the entity analog of the terrain
+     * keep-hot flush, so the buffer stays bounded as the player roams. Driven by flush-eligibility, not by the terrain
+     * buffer, so an entity in an already-flushed chunk still drains. The {@code allCaptured} privacy gate is enforced
+     * at accumulation, so every buffered entity is in a chunk whose terrain we captured.
      */
     private void flushEntityBuffer(AsyncSaveWriter activeWriter, boolean all, int centerX, int centerZ,
             int keepHot) {
@@ -4589,9 +4566,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Scrub and map remap a drained {@code "Items"} holder bundle (the open-time containers and the confirmed
-     * place/insert holders) before it joins the writer-bound submit: a holder can carry a lodestone compass or a filled
-     * map, and an un-remapped map id would collide with an archive id and render the wrong map. Called only on holders
-     * that will merge, never on a still-stashed one, so the non-idempotent remap runs exactly once per holder.
+     * place/insert holders) before it joins the writer-bound submit: a holder can carry a filled map, and an
+     * un-remapped map id would collide with an archive id and render the wrong map. Called only on holders that will
+     * merge, never on a still-stashed one, so the non-idempotent remap runs exactly once per holder.
      */
     private void prepareDrainedItems(Map<BlockPos, CompoundTag> holders) {
         for (Map.Entry<BlockPos, CompoundTag> entry : holders.entrySet()) {
@@ -4623,10 +4600,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Tally each confirmed interaction-prediction merge to the dedup-correct report counter, the way open-time merges
-     * tally, keyed by pos so each container counts once. A placed shulker, a jukebox disc, and a beehive count here at
-     * confirm (flush) time, so their live count lags until the chunk roams out of the hot window. A bookshelf is the
-     * exception: it is counted live at full-cycle ({@link #onBookshelfSlotCaptured}) and skipped here, so a
-     * partly-cycled shelf never counts.
+     * tally, keyed by pos so each container counts once. A placed shulker and a jukebox disc count here at confirm
+     * (flush) time, so their live count lags until the chunk roams out of the hot window.
      */
     private void tallyInteractionMerges(Set<BlockPos> items, Set<BlockPos> holders) {
         tallyInteractionPositions(items);
@@ -4636,7 +4611,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private void tallyInteractionPositions(Set<BlockPos> positions) {
         for (BlockPos pos : positions) {
             if (bookshelfSlots.containsKey(pos.asLong())) {
-                continue; // a bookshelf counts live at full-cycle, never here on the any-slot confirm
+                continue;
             }
             reportCounts.addContainer("i:" + pos.asLong());
         }

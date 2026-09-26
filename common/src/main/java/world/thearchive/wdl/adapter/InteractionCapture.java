@@ -86,7 +86,6 @@ public final class InteractionCapture {
     /** Place-time candidates (shulker), keyed by the derived placed pos. Main-thread only. */
     private final Map<BlockPos, Candidate> placeStash = new LinkedHashMap<>();
 
-    /** Notified the instant a bookshelf book insert is recorded, so the outline marks that slot captured. */
     private final BookshelfSlotSink bookshelfSlotSink;
 
     /** Notified the instant a content-bearing container is placed, so the outline marks its pos captured. */
@@ -95,13 +94,7 @@ public final class InteractionCapture {
     /** Notified with every cell a placement lands in, so the session drops what it captured from the old block. */
     private final PlacementSink placementSink;
 
-    /**
-     * The optimistic-mark callback for the unsaved-container outline: invoked the instant a bookshelf book insert is
-     * recorded, so the session marks that slot captured this session before the flush confirms it, the way the
-     * open-time stash marks a chest captured on open. {@code occupiedMask} is the bookshelf's occupancy before this
-     * insert (the clicked slot is empty pre-click), so the session can tell when the insert completes every occupied
-     * slot and count the bookshelf as a downloaded container.
-     */
+    /** The optimistic-mark callback for the unsaved-container outline. */
     @FunctionalInterface
     interface BookshelfSlotSink {
         void slotCaptured(long posKey, int slot, int occupiedMask);
@@ -177,11 +170,10 @@ public final class InteractionCapture {
      * no download is active or it is not the local player's own client-side interaction (so a future logical-server
      * pass cannot double-fire). The loaders adapt their event to this one call and never cancel the interaction.
      *
-     * <p>A spectator is excluded, because none of this can happen for one: the server's spectator branch opens a menu
-     * from the block state's provider and never runs the block's use handler, so no insert, no page turn and no jukebox
-     * load occurs. Recording a candidate anyway would clear that block's outline rim and add to the report's container
-     * count for content that never reaches disk, which tells the user the opposite of the truth. The guard is inert on
-     * a loader whose hook already declines to fire for a spectator and load-bearing on one whose hook does not.
+     * <p>A spectator is excluded, because none of this can happen for one: the server's spectator branch opens only a
+     * container block entity's menu and never runs the block's use handler, so no insert and no jukebox load occurs.
+     * The guard is inert on a loader whose hook already declines to fire for a spectator and load-bearing on one whose
+     * hook does not.
      */
     public static void dispatchUseBlock(Player player, Level level, InteractionHand hand, HitResult hit) {
         InteractionCapture capture = active;

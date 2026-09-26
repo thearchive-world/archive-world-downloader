@@ -57,9 +57,7 @@ final class NaturalEquipment {
     }
 
     /**
-     * Non-armor head items a spawn may legitimately wear: the Halloween pumpkins (zombie/skeleton) and the raid or
-     * patrol captain ominous banner. The ominous banner is a plain {@link Items#WHITE_BANNER} carrying a pattern, and a
-     * sanitizing server strips that pattern to the bare item, so the match is on the item type. Exempting these for
+     * Non-armor head items a spawn may legitimately wear: the Halloween pumpkins (zombie/skeleton). Exempting these for
      * every type stays free of false positives: no despawn-capable mob acquires them in the head slot through a
      * persistence-setting pickup, and a mob that did pick up a pumpkin is the accepted invisible-ambiguous case.
      */
@@ -104,7 +102,7 @@ final class NaturalEquipment {
             return true; // an unknown type is never inferred against
         }
         if (slot == EquipmentSlot.OFFHAND) {
-            return true; // the offhand is outside the inference: a bartering gold ingot sits there unpersisted
+            return true; // the offhand is outside the inference
         }
         if (slot == EquipmentSlot.MAINHAND) {
             return profile.mainhand().contains(item.getItem());

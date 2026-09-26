@@ -8,15 +8,11 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * Reusable privacy scrub for item-borne location data: blanks the lodestone-compass target and the flower position
- * carried by a silk-touched beehive item on every item it reaches, recursing into each item's nested
- * {@code BlockEntityTag.Items} and {@code Items} lists over the shared {@link ItemTreeWalk}. Below the 1.20.5 component
- * update an item's data lives in its {@code tag} compound, so the scrub removes the coordinate keys there: the
- * lodestone target ({@code LodestonePos} plus {@code LodestoneDimension}, leaving {@code LodestoneTracked}) and, on a
- * beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and each occupant's
- * {@code BlockEntityTag.Bees[].EntityData.FlowerPos} (leaving each a valid bee). The pre-component item copies the
- * hive's whole block-entity NBT, so it carries the hive's own top-level flower position too, which the component era
- * drops; both are stripped here.
+ * Reusable privacy scrub for item-borne location data: blanks the coordinate keys named below on every item it reaches,
+ * recursing into each item's nested {@code BlockEntityTag.Items} and {@code Items} lists over the shared
+ * {@link ItemTreeWalk}. Below the 1.20.5 component update an item's data lives in its {@code tag} compound, so the
+ * scrub removes the coordinate keys there: {@code LodestonePos} and {@code LodestoneDimension} (leaving
+ * {@code LodestoneTracked}), {@code BlockEntityTag.FlowerPos} and {@code BlockEntityTag.Bees[].EntityData.FlowerPos}.
  *
  * <p>Operates only on already-serialized NBT (our own captured copy), never on a live {@code ItemStack}, so it cannot
  * corrupt the player's session. Below the 1.20.5 update it uses the {@code {id, Count, tag}} item shape and the
@@ -24,13 +20,12 @@ import net.minecraft.nbt.Tag;
  * paths while the walk and merge discipline are shared.
  *
  * <p>Reaches items three ways: an item-list holder via {@link #scrub(CompoundTag, String)} (the inventory, the ender
- * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)} (a decorated pot, a
- * shelf), and a serialized entity via {@link #scrubEntity(CompoundTag)} (an item frame, an item display, mob equipment,
- * an allay, a dropped item, and their passengers).
+ * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)}, and a serialized
+ * entity via {@link #scrubEntity(CompoundTag)} (an item frame, mob equipment, a dropped item, and their passengers).
  *
- * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive flower
- * positions only. Opaque server NBT whose coordinate leak is speculative is left alone, since blanking a whole unknown
- * subtree would corrupt legitimate items, unlike the single-key removals above.
+ * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the keys named above only. Opaque server NBT
+ * whose coordinate leak is speculative is left alone, since blanking a whole unknown subtree would corrupt legitimate
+ * items, unlike the single-key removals above.
  */
 final class ItemLocationScrub {
     private static final String LODESTONE_POS = "LodestonePos";
@@ -57,11 +52,10 @@ final class ItemLocationScrub {
     }
 
     /**
-     * Blank every item-borne coordinate on every item held by {@code blockEntity}, wherever the block entity stores it
-     * (a decorated pot's {@code item}, a campfire's {@code Items}, and so on), recursing into nested containers. Walks
-     * the block entity's direct children through {@link ItemTreeWalk}, which acts only on a real item's {@code tag}, so
-     * non-item children (the block entity's own coordinates, its type id) are a no-op. Works for every block-entity
-     * type without a per-type key list.
+     * Blank every item-borne coordinate on every item held by {@code blockEntity}, wherever the block entity stores it,
+     * recursing into nested containers. Walks the block entity's direct children through {@link ItemTreeWalk}, which
+     * acts only on a real item's {@code tag}, so non-item children (the block entity's own coordinates, its type id)
+     * are a no-op. Works for every block-entity type without a per-type key list.
      */
     public static void scrubBlockEntity(CompoundTag blockEntity) {
         for (String key : blockEntity.getAllKeys()) {
@@ -123,7 +117,6 @@ final class ItemLocationScrub {
         ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
     }
 
-    /** Blank the lodestone target and the beehive flower positions on an item's {@code tag}. */
     private static void scrubItemTag(CompoundTag tag) {
         tag.remove(LODESTONE_POS);
         tag.remove(LODESTONE_DIMENSION);

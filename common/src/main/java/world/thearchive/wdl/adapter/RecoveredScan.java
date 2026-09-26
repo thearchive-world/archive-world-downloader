@@ -30,14 +30,13 @@ import world.thearchive.wdl.core.RecoveredCoverage;
  * captured container-entity UUIDs, sharing {@link EntityMerge#hasCapturedContent}. A coverage set tracks what its merge
  * preserves, and {@link #record} marks a position from its on-disk content alone, which leaves three edges on the block
  * side, each a position marked recovered whose next write does not carry it forward. A position whose block-entity type
- * changed since the prior session (a chest replaced by a barrel) is marked recovered even though {@link ChunkMerge}'s
- * id gate then carries nothing forward and writes it new-and-empty; the live {@code capturedBlockTypes} gate re-rims
- * that rare resume case. A container this session captures is written as the capture saw it rather than carried
- * forward, so a recovered container re-opened and found empty saves empty, and its rim comes from the capture, which
- * the outline ranks ahead of recovered. A position a block placement replaced carries nothing: a content-bearing
- * placement re-rims itself through its own optimistic captured mark, while an ordinary one does not, so a plain chest
- * built over a prior-saved container keeps the recovered rim its predecessor earned. The entity set has none of the
- * three.
+ * changed since the prior session is marked recovered even though {@link ChunkMerge}'s id gate then carries nothing
+ * forward and writes it new-and-empty; the live {@code capturedBlockTypes} gate re-rims that rare resume case. A
+ * container this session captures is written as the capture saw it rather than carried forward, so a recovered
+ * container re-opened and found empty saves empty, and its rim comes from the capture, which the outline ranks ahead of
+ * recovered. A position a block placement replaced carries nothing: a content-bearing placement re-rims itself through
+ * its own optimistic captured mark, while an ordinary one does not, so a plain chest built over a prior-saved container
+ * keeps the recovered rim its predecessor earned. The entity set has none of the three.
  *
  * <p>An ender chest never enters the per-position coverage: its contents persist to player data, not the chunk block
  * entity, so {@code hasCapturedContent} cannot see them. Instead the shared ender inventory is a single global fact set
@@ -55,10 +54,8 @@ import world.thearchive.wdl.core.RecoveredCoverage;
  * snapshot is taken only when a scan adds something new, so a resume's many empty chunks cost no copy.
  */
 final class RecoveredScan {
-    // The on-disk block-entity id of a chiseled bookshelf, matched verbatim off the saved tag rather than
-    // through BlockEntityType (whose Mojmap holder is renamed across bands) so the scan stays raw-NBT and needs
-    // no per-band plug. A bookshelf carries its prior-saved slots as a per-slot mask, kept out of the boolean
-    // recovered set so a partially-saved shelf is not marked fully recovered.
+    // The on-disk block-entity id, matched verbatim off the saved tag rather than through BlockEntityType (whose Mojmap
+    // holder is renamed across bands) so the scan stays raw-NBT and needs no per-band plug.
     private static final String CHISELED_BOOKSHELF_ID = "minecraft:chiseled_bookshelf";
     private static final int BOOKSHELF_SLOTS = 6;
 
@@ -144,7 +141,6 @@ final class RecoveredScan {
                 enderRecovered));
     }
 
-    /** The mask of occupied slots a chiseled bookshelf saved on disk (bit n = slot n) from its {@code "Items"}. */
     private static int bookshelfSavedSlotMask(CompoundTag blockEntity) {
         if (!(blockEntity.get("Items") instanceof ListTag)) {
             return 0;

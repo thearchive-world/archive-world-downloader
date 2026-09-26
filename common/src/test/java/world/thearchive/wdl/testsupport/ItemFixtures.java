@@ -18,8 +18,7 @@ import net.minecraft.world.item.Items;
 
 /**
  * Item NBT built by the vanilla writers rather than by hand: {@link ContainerHelper#saveAllItems} for an
- * {@code "Items"} list and {@code ItemStack#save} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
- * {@code "RecordItem"}).
+ * {@code "Items"} list and {@code ItemStack#save} for a single stored stack (a jukebox's {@code "RecordItem"}).
  *
  * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: vanilla always writes {@code "Slot"}
  * and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under test sees
@@ -101,7 +100,7 @@ public final class ItemFixtures {
         return entry;
     }
 
-    /** The tag vanilla writes for a single stored stack, as a lectern's {@code "Book"} carries it. */
+    /** The tag vanilla writes for a single stored stack. */
     public static CompoundTag itemTag(String itemId) {
         return itemTag(stack(itemId));
     }
@@ -116,11 +115,10 @@ public final class ItemFixtures {
     }
 
     /**
-     * A written book of {@code pageCount} pages. The page count is load-bearing wherever a lectern's {@code "Page"}
-     * matters: vanilla clamps the saved page into the book's own page range, so a book with no pages can only ever be
-     * on page -1. Below 1.20.5 a written book has no {@code WrittenBookContent} component; vanilla's own
-     * {@code WrittenBookItem} reads {@code title}/{@code author}/{@code generation}/{@code resolved} and a
-     * {@code "pages"} list of JSON-component strings straight off the item tag.
+     * A written book of {@code pageCount} pages. Below 1.20.5 a written book has no {@code WrittenBookContent}
+     * component; vanilla's own {@code WrittenBookItem} reads
+     * {@code title}/{@code author}/{@code generation}/{@code resolved} and a {@code "pages"} list of JSON-component
+     * strings straight off the item tag.
      */
     public static ItemStack writtenBook(int pageCount) {
         ListTag pages = new ListTag();

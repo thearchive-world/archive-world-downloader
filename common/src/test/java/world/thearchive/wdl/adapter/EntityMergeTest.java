@@ -116,7 +116,7 @@ class EntityMergeTest {
     @Test
     void mergeCarriesOffersForwardWhenFreshVillagerHasNone() {
         CompoundTag disk = entitiesChunk(villager(UUID_A, offersWith("minecraft:emerald"), 27));
-        CompoundTag fresh = entitiesChunk(villager(UUID_A, null, 0)); // reconstructed: no Offers, Xp:0
+        CompoundTag fresh = entitiesChunk(villager(UUID_A, null, 0)); // reconstructed: no Offers
 
         int carried = EntityMerge.merge(disk, fresh);
 
