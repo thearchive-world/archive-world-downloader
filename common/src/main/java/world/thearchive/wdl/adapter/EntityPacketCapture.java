@@ -110,10 +110,10 @@ final class EntityPacketCapture
 
     /**
      * Diagnostic only (gated by {@code dumpReceivedFrames}, default off): the {@code (blockX blockY blockZ facing)} key
-     * of every item-frame spawn packet received, deduped, matching the key a saved frame's {@code block_pos} and
-     * {@code Facing} yield. Dumped at finish so a missing frame can be checked against what the client actually
-     * received (received-but-not-saved would be a capture bug; never-received is the server not sending it). Empty, and
-     * never populated, when the diagnostic is off.
+     * of every item-frame spawn packet received, deduped, matching the key a saved frame's position and {@code Facing}
+     * yield. Dumped at finish so a missing frame can be checked against what the client actually received
+     * (received-but-not-saved would be a capture bug; never-received is the server not sending it). Empty, and never
+     * populated, when the diagnostic is off.
      */
     private final Set<String> receivedFrames = ConcurrentHashMap.newKeySet();
 
@@ -203,9 +203,9 @@ final class EntityPacketCapture
         spawn(add.getId(), add.getUUID(), chunkKey(add.getX(), add.getZ()), pos, add);
         if (dumpReceivedFrames
                 && (add.getType() == EntityType.ITEM_FRAME || add.getType() == EntityType.GLOW_ITEM_FRAME)) {
-            // Diagnostic key for the received-frame diff: block_pos = floor(spawn pos), Facing = the data int
-            // (the frame's get3DDataValue, which is also what it saves). floor recovers the block whether the
-            // packet carries the block pos or the entity pos (the offset is in [0,1)).
+            // Diagnostic key for the received-frame diff: position = floor(spawn pos), Facing = the data int (the
+            // frame's get3DDataValue, which is also what it saves). floor recovers the block whether the packet carries
+            // the block pos or the entity pos (the offset is in [0,1)).
             receivedFrames.add(Mth.floor(add.getX()) + " " + Mth.floor(add.getY()) + " " + Mth.floor(add.getZ())
                     + " " + add.getData());
         }

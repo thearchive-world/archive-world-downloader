@@ -345,7 +345,7 @@ class ChunkMergeTest {
     @Test
     void aChunkWithNoFreshBlockEntitiesDoesNothing() {
         CompoundTag onDisk = chunkTagWith(chest(1, 64, 1, "minecraft:diamond"));
-        CompoundTag fresh = new CompoundTag(); // no block_entities key at all
+        CompoundTag fresh = new CompoundTag(); // no key at all
 
         assertEquals(0, ChunkMerge.merge(onDisk, fresh));
     }
@@ -590,8 +590,7 @@ class ChunkMergeTest {
 
     @Test
     void aBookshelfNotNamedByTheOccupancyMapKeepsEveryOnDiskSlot() {
-        // The unknown-occupancy fallback has to survive a map that names OTHER positions, which is the shape
-        // production builds: one entry per bookshelf in the chunk, nothing for a shelf whose state was unreadable.
+        // The unknown-occupancy fallback has to survive a map that names OTHER positions.
         CompoundTag onDisk = bookshelfChunk(bookshelf(4, 64, 9, 0, 1, 2));
         CompoundTag fresh = bookshelfChunk(bookshelf(4, 64, 9, 3));
         Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();

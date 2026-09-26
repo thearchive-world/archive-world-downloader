@@ -88,11 +88,10 @@ public final class OutlineTracker {
     // so the bulk scan spreads while an incremental walk (a few new chunks a tick) still fills at once.
     private static final int MAX_RESCANS_PER_TICK = 32;
 
-    // A chested animal's bounding box is its full standing height, so rimming the box top would float the rim
-    // far above the chest, which hangs on the flanks at the animal's back. Across the chested equines the chest
-    // top sits near this fraction of the box height (donkey 0.74, mule 0.76, llama 0.70), so the rim box is
-    // capped there. A container vehicle keeps its true box: a boat or minecart is short enough that its top
-    // already meets the chest it carries.
+    // A chested animal's bounding box is its full standing height, so rimming the box top would float the rim far above
+    // the chest, which hangs on the flanks at the animal's back. Across the chested equines the chest top sits near
+    // this fraction of the box height (donkey 0.74, mule 0.76, llama 0.70), so the rim box is capped there. A container
+    // vehicle keeps its true box: a minecart is short enough that its top already meets the chest it carries.
     private static final double CHESTED_RIM_HEIGHT_FRACTION = 0.74;
     private static final double MERCHANT_RIM_HEIGHT_FRACTION = 0.45;
 

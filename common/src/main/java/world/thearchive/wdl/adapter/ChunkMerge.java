@@ -40,8 +40,8 @@ import org.jspecify.annotations.Nullable;
  * {@link CapturedBlockField}, the same list the open-time write reads, so a datum this mod writes on one visit cannot
  * be dropped by the next.
  *
- * <p>The preferring-non-empty rule holds only where the fresh list is the whole container, which the chiseled
- * bookshelf's never is; see {@link #capturesPerSlot} for that one and for what replaces the rule there.
+ * <p>The preferring-non-empty rule holds only where the fresh list is the whole container; see
+ * {@link #capturesPerSlot}.
  */
 final class ChunkMerge {
     /**
@@ -182,11 +182,9 @@ final class ChunkMerge {
 
     /**
      * Whether this block entity's captured {@code "Items"} names single slots rather than the whole container, which
-     * decides whether the on-disk list is unioned per slot or replaced wholesale. True for the chiseled bookshelf
-     * alone: its contents never reach the client (its update tag is empty and it has no menu), so the only evidence of
-     * a book is the local player's own insert click, and one capture is one slot. Every other container is captured
-     * from an opened menu or a placed item, which is the whole container and therefore ground truth, so a fresh list
-     * there must replace the on-disk one or an item the player watched leave would come back.
+     * decides whether the on-disk list is unioned per slot or replaced wholesale. Every container is captured from an
+     * opened menu or a placed item, which is the whole container and therefore ground truth, so a fresh list there must
+     * replace the on-disk one or an item the player watched leave would come back.
      */
     private static boolean capturesPerSlot(CompoundTag blockEntity) {
         return CHISELED_BOOKSHELF_ID_TAG.equals(blockEntity.get("id"));
