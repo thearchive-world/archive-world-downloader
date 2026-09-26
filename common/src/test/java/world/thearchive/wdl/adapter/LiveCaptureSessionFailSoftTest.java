@@ -48,13 +48,12 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * for, and the guard those two pin covers the finish body wholesale, including the steps between the last submit and
  * the end-of-stream marker that no fail-soft wraps.
  *
- * <p>The degradation is deliberate, so the second half here is that it is not silent: a level.dat written with no
- * Player tag has lost the download's inventory, ender chest and game mode, and a verdict that still read clean over
- * that would be the completion record asserting something untrue. Both halves are asserted for each, since neither
- * alone is enough: the counter moved (the verdict sums every term, so a step charged to a sibling counter still reads
- * partial) and the verdict turned partial (a counter no term of the sum reads is a loss nothing reports). The
- * production call sites sit past the client reads, so what this pins is the contract they share and not that they still
- * call it.
+ * <p>The degradation is deliberate, so the second half here is that it is not silent: a save written with no player
+ * record has lost the download's inventory, ender chest and game mode, and a verdict that still read clean over that
+ * would be the completion record asserting something untrue. Both halves are asserted for each, since neither alone is
+ * enough: the counter moved (the verdict sums every term, so a step charged to a sibling counter still reads partial)
+ * and the verdict turned partial (a counter no term of the sum reads is a loss nothing reports). The production call
+ * sites sit past the client reads, so what this pins is the contract they share and not that they still call it.
  */
 class LiveCaptureSessionFailSoftTest {
     @BeforeAll
@@ -134,7 +133,7 @@ class LiveCaptureSessionFailSoftTest {
         });
 
         assertEquals(1, losses(session),
-                "the level.dat is written with no Player tag, so the loss is counted as one");
+                "the save is written with no player record, so the loss is counted as one");
         assertTrue(session.isPartialSave(0, 0), "and that makes the finish partial rather than clean");
     }
 

@@ -55,10 +55,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The one path that carries a previous download's parked mount forward. A mount ridden at the end of a download is
  * written to no entities region at all, because a vehicle with exactly one player passenger fails vanilla's own save
- * gate, so its single copy is that session's level.dat {@code RootVehicle}. A resume that finishes un-seated rewrites
- * the level.dat with no {@code RootVehicle}, which destroys that copy, and the release is what puts the mount into the
- * world as a standalone entity before that happens. Everything it fails to write is gone for good, including whatever
- * the previous download archived inside a chested mount.
+ * gate, so its single copy is the {@code RootVehicle} in that session's player record. A resume that finishes un-seated
+ * rewrites the player record with no {@code RootVehicle}, which destroys that copy, and the release is what puts the
+ * mount into the world as a standalone entity before that happens. Everything it fails to write is gone for good,
+ * including whatever the previous download archived inside a chested mount.
  *
  * <p>Three axes. ROUTING: the position and the dimension must come from the same tag, so the cross-dimension case
  * asserts both the arrival and the absence, since a write that reaches the right folder while also reaching the wrong
@@ -210,9 +210,9 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary, Level.OVERWORLD,
                 DownloadMode.NEW);
-        // A level.dat is present because the target folder is being written over. It belongs to a world this
-        // download is replacing rather than continuing, so reading a mount out of it would put an entity from
-        // some other capture into a save that never held it.
+        // A prior save is present because the target folder is being written over. It belongs to a world this download
+        // is replacing rather than continuing, so reading a mount out of its player would put an entity from some other
+        // capture into a save that never held it.
         writePriorLevelDat(session, save, Level.NETHER, mount());
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
@@ -231,7 +231,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
         writePriorLevelDat(session, save, Level.NETHER, mount());
-        // Still riding the SAME mount at the finish, so this session's own level.dat carries it and releasing
+        // Still riding the SAME mount at the finish, so this session's own player record carries it and releasing
         // it as a standalone entity would write a second copy of a mount that was never dropped.
         seatedOn(session, mount(), MOUNT);
         WorldPaths paths = paths(save);
@@ -250,9 +250,9 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.OVERWORLD);
         writePriorLevelDat(session, save, Level.NETHER, mount());
-        // Rode a donkey in the previous download, rode a boat in this one. The fresh record replaces the prior
-        // one in the Player slot, so the donkey is preserved by nothing unless it is released here, and being
-        // seated on SOMETHING is not the same question as being seated on THAT mount.
+        // Rode a donkey in the previous download, rode a boat in this one. The fresh player record replaces the prior
+        // one, so the donkey is preserved by nothing unless it is released here, and being seated on SOMETHING is not
+        // the same question as being seated on THAT mount.
         seatedOn(session, otherMount(), OTHER_MOUNT);
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
@@ -292,9 +292,9 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, Level.NETHER);
         writePriorLevelDat(session, save, Level.NETHER, mount());
-        // The capture ran and filled the exclusion set, then the whole player assembly threw, so level.dat
-        // takes its no-player arm and carries no RootVehicle at all. The mount is already held back from the
-        // standalone write by that same set, so the release is the only thing left that can save it.
+        // The capture ran and filled the exclusion set, then the whole player assembly threw, so the save takes its
+        // no-player arm and writes no RootVehicle at all. The mount is already held back from the standalone write by
+        // that same set, so the release is the only thing left that can save it.
         Set<UUID> excluded = state(session, "excludedRootVehicleUuids");
         excluded.add(MOUNT);
         WorldPaths paths = paths(save);
@@ -435,7 +435,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return EntityFixtures.entityAt("minecraft:chest_boat", OTHER_MOUNT, 8.5, 64.0, 8.5);
     }
 
-    /** A prior level.dat player tag: the dimension it finished in, and the mount it was riding if any. */
+    /** A prior download's player tag: the dimension it finished in, and the mount it was riding if any. */
     private static CompoundTag priorPlayerTag(ResourceKey<Level> dimension, @Nullable CompoundTag mount) {
         CompoundTag player = new CompoundTag();
         // The band's save keys the player file on its UUID (players/data/<uuid>.dat at 26.x), so a prior written
