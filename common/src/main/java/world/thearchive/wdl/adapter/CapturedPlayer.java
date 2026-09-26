@@ -30,12 +30,12 @@ public final class CapturedPlayer {
      *                   {@code players/data/<uuid>.dat} entry at 26.x)
      * @param spawnPos   the capture block position, written as the world spawn so a non-inheriting opener still lands
      *                   at the base
-     * @param yaw        the capture yaw, for the world spawn
-     * @param pitch      the capture pitch, for the world spawn
-     * @param dimension  the canonical capture dimension, shared by the {@code "Player"} tag and the world spawn
+     * @param yaw        the capture yaw, for a world spawn that records an angle
+     * @param pitch      the capture pitch, for a world spawn that records one
+     * @param dimension  the canonical capture dimension (already in {@code playerTag}), for a spawn that records one
      * @param gameType   the gamemode for the level.dat {@code GameType} (creative by default, the real mode on the
      *                   survival opt-out)
-     * @param difficulty the captured client difficulty for the level.dat {@code Difficulty}
+     * @param difficulty the captured client difficulty, written to level.dat
      */
     CapturedPlayer(NBTTagCompound playerTag, BlockPos spawnPos, float yaw, float pitch, DimensionType dimension,
             GameType gameType, EnumDifficulty difficulty) {
