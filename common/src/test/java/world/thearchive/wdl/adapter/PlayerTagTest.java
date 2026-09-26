@@ -174,8 +174,8 @@ class PlayerTagTest {
 
     @Test
     void dimensionOfRefusesAnyDimensionThisCaptureNeverWrote() {
-        // A resume reads this off a prior level.dat, so a tag from anywhere else must not resolve to a folder
-        // by accident: the overworld is what an unroutable id would collapse onto if this fell back.
+        // A resume reads this off a prior download's player tag, so a tag from anywhere else must not resolve to a
+        // folder by accident: the overworld is what an unroutable id would collapse onto if this fell back.
         CompoundTag tag = playerTag();
         assertNull(PlayerTag.dimensionOf(tag), "a player tag with no Dimension key names no dimension");
         ResourceKey<Level> datapackDimension = ResourceKey.create(Registries.DIMENSION,
@@ -236,7 +236,7 @@ class PlayerTagTest {
         assertFalse(restored,
                 "an un-seated resume restores nothing: a dismounted mount is a normal world entity, not player-state");
         assertFalse(fresh.contains("RootVehicle"),
-                "the Player slot is left without a mount, so no same-UUID collision");
+                "the player record is left without a mount, so no same-UUID collision");
     }
 
     @Test
