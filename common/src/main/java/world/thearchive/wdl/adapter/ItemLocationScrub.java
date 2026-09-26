@@ -24,9 +24,9 @@ import net.minecraft.nbt.Tag;
  * paths while the walk and merge discipline are shared.
  *
  * <p>Reaches items three ways: an item-list holder via {@link #scrub(CompoundTag, String)} (the inventory, the ender
- * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)} (a decorated pot, a
- * shelf), and a serialized entity via {@link #scrubEntity(CompoundTag)} (an item frame, an item display, mob equipment,
- * an allay, a dropped item, and their passengers).
+ * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)} (a decorated pot),
+ * and a serialized entity via {@link #scrubEntity(CompoundTag)} (an item frame, an item display, mob equipment, an
+ * allay, a dropped item, and their passengers).
  *
  * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive flower
  * positions only. Opaque server NBT whose coordinate leak is speculative is left alone, since blanking a whole unknown
