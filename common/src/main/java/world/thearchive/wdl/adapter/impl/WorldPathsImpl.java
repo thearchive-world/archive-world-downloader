@@ -66,9 +66,9 @@ public final class WorldPathsImpl implements WorldPaths {
 
     @Override
     public Path dataDirectory() {
-        // 26.x namespaces every SavedData under data/minecraft, so maps land at data/minecraft/maps/<id>.dat
-        // (vanilla MapId.key() supplies the maps/ leg). Global: the overworld save root, not a per-dimension
-        // folder. Resolve-only; the first writer to reach it creates it.
+        // 26.x namespaces every SavedData under data/minecraft, so maps land at data/minecraft/maps/<id>.dat (vanilla
+        // MapId.key() supplies the maps/ leg). Global: under the save root, not a per-dimension folder. Resolve-only;
+        // the first writer to reach it creates it.
         return saveRoot.resolve("data").resolve("minecraft");
     }
 
@@ -135,7 +135,7 @@ public final class WorldPathsImpl implements WorldPaths {
         return slash < 0 ? relative : relative.substring(0, slash) + ':' + relative.substring(slash + 1);
     }
 
-    /** Vanilla layout: overworld at the save root, Nether=DIM-1, End=DIM1, custom={@code dimensions/<ns>/<path>}. */
+    /** Vanilla layout: every dimension, the overworld included, under {@code dimensions/<ns>/<path>}. */
     private Path dimensionRoot(ResourceKey<Level> dimension) {
         return DimensionType.getStorageFolder(dimension, saveRoot);
     }
