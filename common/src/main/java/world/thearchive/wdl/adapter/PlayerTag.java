@@ -166,7 +166,7 @@ final class PlayerTag {
      * menu-only contents, and the wholesale rewrite of the saved player would drop the prior download's loot. Matched
      * per node on each entity's own {@code UUID}, so a mount switch never grafts contents. A resume that finished
      * un-seated carries nothing: a dismounted mount is a normal world entity, captured by the standalone entity path,
-     * and writing it into the Player slot would wrongly re-seat the player and collide same-UUID with the standalone
+     * and writing it into the player record would wrongly re-seat the player and collide same-UUID with the standalone
      * copy. Returns whether it restored.
      */
     static boolean restorePriorMountContents(CompoundTag priorPlayer, CompoundTag freshRaw) {

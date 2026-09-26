@@ -178,7 +178,7 @@ class EntityVehicleRelocationTest {
         // The map remap is documented non-idempotent: a second pass reads an already-archived id as a session
         // id and re-resolves it, so the mount's map ends up naming a different picture or no file at all. The
         // guard is an identity-keyed set, which means anything that re-copies a retained holder silently
-        // defeats it, and level.dat is where the damage lands.
+        // defeats it, and the player record is where the damage lands.
         LiveCaptureSession session = session(temporary);
         WorldPaths paths = paths(temporary.resolve("save"));
         AsyncSaveWriter writer = saveWriter(paths);
