@@ -69,6 +69,6 @@ class ItemTreeWalkTest {
         CompoundTag components = new CompoundTag();
         components.put("minecraft:sulfur_cube_content", itemWithComponents(nestedComponents));
         assertTrue(visitedComponents(itemWithComponents(components)).contains(nestedComponents),
-                "an item nested in a sulfur cube is visited");
+                "an item nested in a sulfur_cube_content component is visited");
     }
 }
