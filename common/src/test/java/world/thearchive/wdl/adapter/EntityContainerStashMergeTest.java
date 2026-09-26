@@ -31,10 +31,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The automated guard for the save-time entity-container injection: {@link EntityContainerMerge#mergeEntityStash}
- * locates a stashed container vehicle inside the captured {@code entities/} chunk tag by entity {@code "UUID"}
- * (matching the {@code "Entities"} list), sets its {@code "Items"} via {@link ContainerSink#merge}, touches no other
- * entity, then drains the merged entry. This is the part that must never mis-target, so it is proven headless with
- * hand-built entity tags (no live client, no {@code Level}).
+ * locates a stashed container vehicle inside the captured chunk tag by entity {@code "UUID"} (matching the
+ * {@code "Entities"} list), sets its {@code "Items"} via {@link ContainerSink#merge}, touches no other entity, then
+ * drains the merged entry. This is the part that must never mis-target, so it is proven headless with hand-built entity
+ * tags (no live client, no {@code Level}).
  *
  * <p>The {@code "UUID"} decode the merge relies on is total: a missing, odd-length, or wrong-type {@code "UUID"} yields
  * a skipped entity, not a throw. That matters because the merge runs between the chunk flush and
@@ -75,7 +75,7 @@ class EntityContainerStashMergeTest {
         return EntityFixtures.entity(id, uuid);
     }
 
-    /** Build the {@code entities/} chunk envelope via the real sink, so the merge runs against the live shape. */
+    /** Build the chunk envelope via the real sink, so the merge runs against the live shape. */
     private CompoundTag entitiesChunkTag(CompoundTag... entityTags) {
         return entitySink.encodeChunk(ImmutableList.copyOf(entityTags), new ChunkPos(0, 0));
     }

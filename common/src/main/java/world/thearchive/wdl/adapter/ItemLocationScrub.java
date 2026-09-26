@@ -26,9 +26,8 @@ import net.minecraft.nbt.Tag;
  * paths while the walk and merge discipline are shared.
  *
  * <p>Reaches items three ways: an item-list holder via {@link #scrub(CompoundTag, String)} (the inventory, the ender
- * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)} (a decorated pot, a
- * shelf), and a serialized entity via {@link #scrubEntity(CompoundTag)} (an item frame, an item display, mob equipment,
- * an allay, a dropped item, and their passengers).
+ * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(CompoundTag)}, and a serialized
+ * entity via {@link #scrubEntity(CompoundTag)} (an item frame, mob equipment, a dropped item, and their passengers).
  *
  * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive bee
  * positions named above only. Opaque server NBT whose coordinate leak is speculative is left alone, since blanking a
@@ -64,10 +63,10 @@ final class ItemLocationScrub {
 
     /**
      * Blank every item-borne coordinate on every item held by {@code blockEntity}, wherever the block entity stores it
-     * (a decorated pot's {@code item}, a campfire's {@code Items}, and so on), recursing into nested containers. Walks
-     * the block entity's direct children through {@link ItemTreeWalk}, which acts only on a real item's {@code tag}, so
-     * non-item children (the block entity's own coordinates, its type id) are a no-op. Works for every block-entity
-     * type without a per-type key list.
+     * (a campfire's {@code Items}, and so on), recursing into nested containers. Walks the block entity's direct
+     * children through {@link ItemTreeWalk}, which acts only on a real item's {@code tag}, so non-item children (the
+     * block entity's own coordinates, its type id) are a no-op. Works for every block-entity type without a per-type
+     * key list.
      */
     public static void scrubBlockEntity(CompoundTag blockEntity) {
         for (String key : blockEntity.getAllKeys()) {

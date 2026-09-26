@@ -863,9 +863,9 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * The writer thread's storages for one target ({@code region/} or {@code entities/}), one per dimension, opened on
-     * that dimension's first task. Both instances are locals of {@link #run}, reachable only from it and from what it
-     * calls on its own thread, so they need no synchronization.
+     * The writer thread's {@code region/} storages, one per dimension, opened on that dimension's first task. The
+     * instance is a local of {@link #run}, reachable only from it and from what it calls on its own thread, so it needs
+     * no synchronization.
      *
      * <p>A failed open is retried on the dimension's next task rather than remembered, because the failure can be of
      * the moment: this project's own Windows gate has shown transient file locks to be real, and a dimension written
