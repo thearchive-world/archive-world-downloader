@@ -67,9 +67,10 @@ common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 
 # Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
-# ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying. Below 1.20.5 the
-# beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so this field
-# carries that key rather than bees.
+# ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying. Below 1.20.5 the beehive
+# block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so this field carries that key
+# rather than bees. Below 1.20.3 there is no crafter, so the class Javadoc names no crafter, the crafter's keys are
+# given the version they arrive in, and the open-time state is named as the brewing stand's.
 common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 
 # Below 1.21.2 the entity position wire differs: the absolute-only ClientboundTeleportEntityPacket replaces the
@@ -317,7 +318,8 @@ common/src/main/java/world/thearchive/wdl/adapter/MapIdCollector.java
 
 # Below 1.20.5 there is no BundleContents component; a bundle mutates its stack's tag."Items" list in place, so
 # the change signal snapshots a value copy of that tag rather than reference-comparing the (immutable,
-# always-swapped) component.
+# always-swapped) component. Below 1.20.3 there is no crafter, so the menu-only data vector is named as the brewing
+# stand's alone.
 common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
 
 # Below 1.20.5 MerchantOffers has no CODEC, so the offers holder is written via the vanilla
@@ -329,7 +331,8 @@ common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 # Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the
 # raw LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position (carried
 # by a pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and
-# tag.BlockEntityTag.FlowerPos, both scrubbed here.
+# tag.BlockEntityTag.FlowerPos, both scrubbed here. Below 1.20.3 a decorated pot holds no item, so none is named as an
+# item holder.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
@@ -357,7 +360,8 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
 # LodestoneTracked keys vanilla's CompassItem.addLodestoneTags writes, a beehive item's occupants and the hive's
 # own flower position are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and tag.BlockEntityTag.FlowerPos,
 # shulker and bundle contents live under tag.BlockEntityTag.Items and tag.Items, ContainerHelper.loadAllItems
-# takes no registries argument, and DataResult.getOrThrow takes (boolean, Consumer<String>).
+# takes no registries argument, and DataResult.getOrThrow takes (boolean, Consumer<String>). Below 1.20.3 a decorated
+# pot holds no item, so the class Javadoc names only the campfire as a block entity holding one.
 common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk drives hand-built NBT keyed by tag.BlockEntityTag.Items (a
@@ -560,3 +564,9 @@ gradle/gradle-daemon-jvm.properties
 # includes only fabric at the root and builds Forge separately under forge/; the byte-diff runs on that one jar, and a
 # second arm builds the forge/ island twice and byte-diffs its ship jar, which dev's job has no island to compare.
 .github/workflows/reproducibility.yml
+
+# Below 1.20.3 there is no crafter, so the open-time state keys disabled_slots and triggered are named without it.
+common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
+
+# Below 1.20.3 there is no crafter, so the scalar carry-forward's note names the brewing stand's keys alone.
+common/src/main/java/world/thearchive/wdl/adapter/NbtMerge.java

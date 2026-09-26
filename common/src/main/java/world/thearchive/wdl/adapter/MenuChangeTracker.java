@@ -23,9 +23,9 @@ import org.jspecify.annotations.Nullable;
  * slot-resident stack's tag, and the server's matching ack resends no slot; the contents are a mutable {@code "Items"}
  * list, so a value compare of a per-slot snapshot catches an insert or remove). {@code BundleItem} is the only vanilla
  * overrider of the stack-on-stack click hooks, so no other item mutates its contents in a slot. The signal also carries
- * a small menu-only {@code ContainerData} vector (a crafter's disabled and triggered flags, a brewing stand's brew time
- * and fuel), so a data-only tick like a running brew with no slot movement re-stashes. Main-thread only, reset at bind
- * and close so one open menu never inherits another's snapshot.
+ * a small menu-only {@code ContainerData} vector (a brewing stand's brew time and fuel), so a data-only tick like a
+ * running brew with no slot movement re-stashes. Main-thread only, reset at bind and close so one open menu never
+ * inherits another's snapshot.
  */
 final class MenuChangeTracker {
     static final int[] NO_DATA = new int[0];
