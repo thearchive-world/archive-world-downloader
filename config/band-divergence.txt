@@ -422,3 +422,7 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/WdlJourneyMapPlugin.
 # where 1.21.11's passes null; 1.21.8's abstract Level lacks the RespawnData accessors and explode's WeightedList of
 # ExplosionParticleInfo (both 1.21.9) and environmentAttributes (1.21.11), so the stubbed overrides differ.
 common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
+
+# Below 1.21.9 there is no shelf block, so the class Javadoc names the decorated pot alone as a block entity the scrub
+# reaches.
+common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
