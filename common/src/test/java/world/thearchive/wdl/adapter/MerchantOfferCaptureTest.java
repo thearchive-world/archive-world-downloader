@@ -38,9 +38,7 @@ class MerchantOfferCaptureTest {
     }
 
     /**
-     * A lodestone compass whose target is the raw {@code LodestonePos}/{@code LodestoneDimension} keys
-     * {@link ItemLocationScrub} scrubs (below 1.20.5 there is no {@code LodestoneTracker} component; vanilla's own
-     * {@code CompassItem.addLodestoneTags} writes exactly these three keys on the item's {@code tag}).
+     * A compass carrying the raw {@code LodestonePos}/{@code LodestoneDimension} keys {@link ItemLocationScrub} scrubs.
      */
     private static ItemStack lodestoneCompass() {
         ItemStack compass = new ItemStack(Items.COMPASS);
@@ -99,11 +97,11 @@ class MerchantOfferCaptureTest {
     @Test
     void scrubBlanksLodestoneTargetOnSellItem() {
         CompoundTag holder = holderSelling(lodestoneCompass());
-        assertTrue(sellHasLodestoneTarget(holder), "precondition: the sell compass carries a target");
+        assertTrue(sellHasLodestoneTarget(holder), "precondition: the sell compass carries LodestonePos");
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, true, null);
 
-        assertFalse(sellHasLodestoneTarget(holder), "the sell item's lodestone target is blanked");
+        assertFalse(sellHasLodestoneTarget(holder), "the sell item's LodestonePos is blanked");
     }
 
     @Test

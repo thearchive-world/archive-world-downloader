@@ -18,8 +18,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The direct guard for {@link NbtMerge#carryListBySlot}'s write side. Every other case reaches it through a bookshelf
- * carry-forward, where the fresh block entity always carries an {@code "Items"} list because vanilla writes one
- * unconditionally, so nothing there can tell a carry that writes back from one that does not.
+ * carry-forward, where the fresh block entity always carries an {@code "Items"} list, so nothing there can tell a carry
+ * that writes back from one that does not.
  */
 class NbtMergeTest {
     private static final int ALL_SLOTS = ~0;

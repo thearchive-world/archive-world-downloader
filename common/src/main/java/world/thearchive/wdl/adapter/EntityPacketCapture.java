@@ -51,14 +51,14 @@ import world.thearchive.wdl.core.SendRangeSampler;
 /**
  * The production specialization of {@link EntityPacketAccumulator}, binding the MC packet types and mapping each
  * inbound entity packet to the generic state the main thread reconstructs from. This band splits a non-player spawn
- * across several packets ({@code AddEntity} for objects and living display entities, {@code AddMob} for living
- * entities, {@code AddPainting}, and {@code AddExperienceOrb}), so the spawn payload is the erased {@code Packet} and
- * {@link #createSpawnEntity} dispatches on the concrete type at reconstruct; the newer bands fold every one of these
- * into {@code AddEntity} at 1.19 and 1.21.5. The lightning bolt ({@code AddGlobalEntity}) is deliberately left unread:
- * its entity type is not serializable, so the unified bands never save it either, and reading it would only add sink
- * refusals. The synced data values are the synced-value payload and the equipment slot/stack pair the equipment
- * payload. This band has no {@code Entity.recreateFromPacket} (added at 1.17), so the reconstruct builds each hanging
- * entity through its positioned constructor rather than letting the packet fill the facing.
+ * across several packets ({@code AddEntity} for objects, {@code AddMob} for living entities, {@code AddPainting}, and
+ * {@code AddExperienceOrb}), so the spawn payload is the erased {@code Packet} and {@link #createSpawnEntity}
+ * dispatches on the concrete type at reconstruct; the newer bands fold every one of these into {@code AddEntity} at
+ * 1.19 and 1.21.5. The lightning bolt ({@code AddGlobalEntity}) is deliberately left unread: its entity type is not
+ * serializable, so the unified bands never save it either, and reading it would only add sink refusals. The synced data
+ * values are the synced-value payload and the equipment slot/stack pair the equipment payload. This band has no
+ * {@code Entity.recreateFromPacket} (added at 1.17), so the reconstruct builds each hanging entity through its
+ * positioned constructor rather than letting the packet fill the facing.
  *
  * <p>Every accessor used here is public MC API, so this compiles in {@code common} against the un-widened vanilla jar.
  * The one exception is {@code ClientboundMoveEntityPacket}'s entity id, which is {@code protected}; the per-loader tee,
@@ -107,10 +107,10 @@ final class EntityPacketCapture
 
     /**
      * Diagnostic only (gated by {@code dumpReceivedFrames}, default off): the {@code (blockX blockY blockZ facing)} key
-     * of every item-frame spawn packet received, deduped, matching the key a saved frame's {@code block_pos} and
-     * {@code Facing} yield. Dumped at finish so a missing frame can be checked against what the client actually
-     * received (received-but-not-saved would be a capture bug; never-received is the server not sending it). Empty, and
-     * never populated, when the diagnostic is off.
+     * of every item-frame spawn packet received, deduped, matching the key a saved frame's position and {@code Facing}
+     * yield. Dumped at finish so a missing frame can be checked against what the client actually received
+     * (received-but-not-saved would be a capture bug; never-received is the server not sending it). Empty, and never
+     * populated, when the diagnostic is off.
      */
     private final Set<String> receivedFrames = ConcurrentHashMap.newKeySet();
 
@@ -212,9 +212,9 @@ final class EntityPacketCapture
         spawn(add.getId(), add.getUUID(), chunkKey(add.getX(), add.getZ()), pos, add);
         if (dumpReceivedFrames
                 && add.getType() == EntityType.ITEM_FRAME) {
-            // Diagnostic key for the received-frame diff: block_pos = floor(spawn pos), Facing = the data int
-            // (the frame's get3DDataValue, which is also what it saves). floor recovers the block whether the
-            // packet carries the block pos or the entity pos (the offset is in [0,1)).
+            // Diagnostic key for the received-frame diff: position = floor(spawn pos), Facing = the data int (the
+            // frame's get3DDataValue, which is also what it saves). floor recovers the block whether the packet carries
+            // the block pos or the entity pos (the offset is in [0,1)).
             receivedFrames.add(Mth.floor(add.getX()) + " " + Mth.floor(add.getY()) + " " + Mth.floor(add.getZ())
                     + " " + add.getData());
         }
@@ -436,9 +436,9 @@ final class EntityPacketCapture
 
     /**
      * Reconstruct the entity a spawn packet describes, dispatching on the concrete spawn packet the way the vanilla
-     * client's per-packet handlers do: an object or living display from its {@link EntityType}, a mob from its type id,
-     * a painting from its own constructor, an experience orb from its value. The item frame and leash knot are hanging
-     * entities built through their positioned constructors, which set the block pos and facing their save reads; a bare
+     * client's per-packet handlers do: an object from its {@link EntityType}, a mob from its type id, a painting from
+     * its own constructor, an experience orb from its value. The item frame and leash knot are hanging entities built
+     * through their positioned constructors, which set the block pos and facing their save reads; a bare
      * {@code EntityType.create} would leave those null and this band has no {@code Entity.recreateFromPacket} to fill
      * them, so {@code Entity.save} would throw. Null for a packet this does not spawn from, or a type with no factory.
      * The caller applies the identity, position, synced values, and equipment.

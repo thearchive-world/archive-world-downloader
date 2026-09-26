@@ -27,10 +27,10 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The automated guard for the band-agnostic {@link PlayerTag} operations on an already-serialized player tag: the strip
  * knobs (drop {@code Inventory}/{@code SelectedItemSlot}/{@code equipment}/{@code EnderItems}), the unconditional
- * Death-location double strip ({@code LastDeathLocation} + {@code current_explosion_impact_pos}), the respawn-point
- * strip ({@code SpawnX}/{@code SpawnY}/{@code SpawnZ}/{@code SpawnForced}/{@code Spawns}), the {@code Dimension} write
- * and the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure NBT, so
- * it round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
+ * double strip ({@code LastDeathLocation} + {@code current_explosion_impact_pos}), the respawn-point strip
+ * ({@code SpawnX}/{@code SpawnY}/{@code SpawnZ}/{@code SpawnForced}/{@code Spawns}), the {@code Dimension} write and
+ * the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure NBT, so it
+ * round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
  */
 class PlayerTagTest {
     private final ContainerSink sink = new ContainerSinkImpl();
@@ -71,7 +71,7 @@ class PlayerTagTest {
         assertFalse(tag.contains("EnderItems"), "EnderItems dropped");
         assertTrue(tag.contains("Inventory"), "inventory kept when only the ender knob is off");
         assertTrue(tag.contains("SelectedItemSlot"));
-        assertTrue(tag.contains("equipment"), "equipment kept with the inventory it belongs to");
+        assertTrue(tag.contains("equipment"), "equipment kept");
     }
 
     @Test
@@ -92,13 +92,13 @@ class PlayerTagTest {
 
         PlayerTag.stripDeathLocation(tag);
 
-        assertFalse(tag.contains("LastDeathLocation"), "the last death location is removed");
-        assertFalse(tag.contains("current_explosion_impact_pos"), "the explosion-impact coordinate too");
+        assertFalse(tag.contains("LastDeathLocation"), "LastDeathLocation is removed");
+        assertFalse(tag.contains("current_explosion_impact_pos"), "current_explosion_impact_pos too");
 
         // There is no flag on stripDeathLocation, and applying the keep-everything knobs cannot bring them back.
         PlayerTag.applyStripKnobs(tag, true, true);
-        assertFalse(tag.contains("LastDeathLocation"), "no config combination restores the death location");
-        assertFalse(tag.contains("current_explosion_impact_pos"), "nor the explosion-impact coordinate");
+        assertFalse(tag.contains("LastDeathLocation"), "no config combination restores LastDeathLocation");
+        assertFalse(tag.contains("current_explosion_impact_pos"), "nor current_explosion_impact_pos");
         assertTrue(tag.contains("Air"), "the strip leaves the rest of the tag intact");
     }
 

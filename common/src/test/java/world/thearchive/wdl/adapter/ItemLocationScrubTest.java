@@ -45,13 +45,14 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the item-coordinate privacy scrub: {@link ItemLocationScrub} blanks the lodestone target and
- * the positions a beehive item's stored bees carry on every item it reaches, over a serialized item list (the inventory
- * or the ender items), a block entity's own NBT, and a serialized entity (an item frame, mob equipment, an inventory
- * list, passengers), reaching items nested inside a shulker box ({@code tag.BlockEntityTag}), while leaving the
- * scrubbed item valid and every other item untouched. Real {@link ItemStack}s serialized via the production
- * {@link ContainerSink#captureItems} drive the round-trip, so neither a live menu nor a {@code Level} is needed; the
- * scrub key strings are pinned by the assertions (a wrong key leaves the coordinate and fails).
+ * The automated guard for the item-coordinate privacy scrub: {@link ItemLocationScrub} blanks the
+ * {@code LodestonePos}/{@code LodestoneDimension} keys and the positions a beehive item's stored bees carry on every
+ * item it reaches, over a serialized item list (the inventory or the ender items), a block entity's own NBT, and a
+ * serialized entity (an item frame, mob equipment, an inventory list, passengers), reaching items nested inside a
+ * shulker box ({@code tag.BlockEntityTag}), while leaving the scrubbed item valid and every other item untouched. Real
+ * {@link ItemStack}s serialized via the production {@link ContainerSink#captureItems} drive the round-trip, so neither
+ * a live menu nor a {@code Level} is needed; the scrub key strings are pinned by the assertions (a wrong key leaves the
+ * coordinate and fails).
  */
 class ItemLocationScrubTest {
     private static final String LODESTONE_POS = "LodestonePos";
@@ -78,9 +79,7 @@ class ItemLocationScrubTest {
     }
 
     /**
-     * A lodestone compass whose target is the raw {@code LodestonePos}/{@code LodestoneDimension} keys
-     * {@link ItemLocationScrub} scrubs (below 1.20.5 there is no {@code lodestone_tracker} component; vanilla's own
-     * {@code CompassItem.addLodestoneTags} writes exactly these three keys on the item's {@code tag}).
+     * A compass carrying the raw {@code LodestonePos}/{@code LodestoneDimension} keys {@link ItemLocationScrub} scrubs.
      */
     private static ItemStack lodestoneCompass() {
         ItemStack compass = new ItemStack(Items.COMPASS);
@@ -172,13 +171,13 @@ class ItemLocationScrubTest {
         return tag == null ? null : tag.get(LODESTONE_TRACKED);
     }
 
-    /** The lodestone target position, present unless the scrub blanked it (or the item never carried one). */
+    /** The {@code LodestonePos} key, present unless the scrub blanked it (or the item never carried one). */
     private static Optional<Tag> targetOf(ItemStack stack) {
         CompoundTag tag = stack.getTag();
         return tag == null ? Optional.empty() : Optional.ofNullable(tag.get(LODESTONE_POS));
     }
 
-    /** The dimension the lodestone target names, blanked beside the position it is one half of. */
+    /** The {@code LodestoneDimension} key, blanked beside the position it is one half of. */
     private static Optional<Tag> targetDimensionOf(ItemStack stack) {
         CompoundTag tag = stack.getTag();
         return tag == null ? Optional.empty() : Optional.ofNullable(tag.get(LODESTONE_DIMENSION));
@@ -297,12 +296,12 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrub(holder, "Items");
 
         NonNullList<ItemStack> back = readBack(holder, 2);
-        assertTrue(!targetOf(back.get(0)).isPresent(), "the lodestone target is blanked");
+        assertTrue(!targetOf(back.get(0)).isPresent(), "the target is blanked");
         assertTrue(!targetDimensionOf(back.get(0)).isPresent(),
                 "and so is the dimension it named, which alone still narrows the base to one world");
         assertNotNull(lodestoneTrackerOf(back.get(0)), "LodestoneTracked is kept");
         assertEquals(Items.COMPASS, back.get(0).getItem(), "still a compass");
-        assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-lodestone item is untouched");
+        assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-compass item is untouched");
         assertEquals(3, back.get(1).getCount());
     }
 
@@ -313,7 +312,7 @@ class ItemLocationScrubTest {
 
         ItemLocationScrub.scrubItem(item);
 
-        assertTrue(!targetOf(itemFrom(item)).isPresent(), "the single-item scrub blanks the lodestone target");
+        assertTrue(!targetOf(itemFrom(item)).isPresent(), "the single-item scrub blanks the target");
     }
 
     @Test
@@ -326,7 +325,7 @@ class ItemLocationScrubTest {
         ListTag container = containerItemsOf(back.get(0));
         assertNotNull(container, "the shulker keeps its contents");
         ItemStack nestedInShulker = ItemStack.of(container.getCompound(0));
-        assertTrue(!targetOf(nestedInShulker).isPresent(), "a lodestone nested in a shulker box is blanked");
+        assertTrue(!targetOf(nestedInShulker).isPresent(), "a compass nested in a shulker box is blanked");
     }
 
     @Test
@@ -357,7 +356,7 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrubBlockEntity(pot);
 
         ItemStack back = itemOf(pot);
-        assertTrue(!targetOf(back).isPresent(), "the lodestone target under the block entity's item key is blanked");
+        assertTrue(!targetOf(back).isPresent(), "the target under the block entity's item key is blanked");
         assertNotNull(lodestoneTrackerOf(back), "LodestoneTracked is kept");
         assertEquals(Items.COMPASS, back.getItem(), "still a compass");
     }
@@ -369,8 +368,8 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrubBlockEntity(campfire);
 
         NonNullList<ItemStack> back = readBack(campfire, 2);
-        assertTrue(!targetOf(back.get(0)).isPresent(), "a lodestone in the block entity's Items list is blanked");
-        assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-lodestone item is untouched");
+        assertTrue(!targetOf(back.get(0)).isPresent(), "a compass in the block entity's Items list is blanked");
+        assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-compass item is untouched");
         assertEquals(3, back.get(1).getCount());
     }
 
@@ -381,7 +380,7 @@ class ItemLocationScrubTest {
         ListTag containerPot = containerItemsOf(itemOf(potWithShulker));
         assertNotNull(containerPot, "the shulker keeps its contents");
         assertTrue(!targetOf(ItemStack.of(containerPot.getCompound(0))).isPresent(),
-                "a lodestone nested in a shulker stored as the block entity's item is blanked");
+                "a compass nested in a shulker stored as the block entity's item is blanked");
     }
 
     @Test
@@ -512,13 +511,13 @@ class ItemLocationScrubTest {
         CompoundTag zombie = entity("minecraft:zombie");
         ListTag handItems = new ListTag();
         handItems.add(itemNbt(lodestoneCompass())); // mainhand
-        handItems.add(itemNbt(shulkerHoldingLodestone())); // offhand: nested lodestone must also be reached
+        handItems.add(itemNbt(shulkerHoldingLodestone())); // offhand: nested compass must also be reached
         zombie.put("HandItems", handItems);
         ListTag armorItems = new ListTag();
         armorItems.add(new CompoundTag()); // feet, empty as vanilla writes empty slots
         armorItems.add(new CompoundTag()); // legs
         armorItems.add(new CompoundTag()); // chest
-        armorItems.add(itemNbt(lodestoneCompass())); // head slot holding a lodestone compass
+        armorItems.add(itemNbt(lodestoneCompass())); // head slot holding a compass
         zombie.put("ArmorItems", armorItems);
         assertTrue(targetOf(itemFrom(handItems.get(0))).isPresent(),
                 "precondition: the mainhand compass has a target");
@@ -527,13 +526,13 @@ class ItemLocationScrubTest {
         ItemLocationScrub.scrubEntity(zombie);
 
         assertTrue(!targetOf(itemFrom(((ListTag) zombie.get("HandItems")).get(0))).isPresent(),
-                "a lodestone in a pre-1.21.5 HandItems mainhand slot is blanked");
+                "a compass in a pre-1.21.5 HandItems mainhand slot is blanked");
         ListTag offhandContainer = containerItemsOf(itemFrom(((ListTag) zombie.get("HandItems")).get(1)));
         assertNotNull(offhandContainer, "the offhand shulker keeps its contents");
         assertTrue(!targetOf(ItemStack.of(offhandContainer.getCompound(0))).isPresent(),
-                "a lodestone nested in a shulker in a pre-1.21.5 HandItems slot is blanked");
+                "a compass nested in a shulker in a pre-1.21.5 HandItems slot is blanked");
         assertTrue(!targetOf(itemFrom(((ListTag) zombie.get("ArmorItems")).get(3))).isPresent(),
-                "a lodestone in a pre-1.21.5 ArmorItems slot is blanked");
+                "a compass in a pre-1.21.5 ArmorItems slot is blanked");
     }
 
     @Test

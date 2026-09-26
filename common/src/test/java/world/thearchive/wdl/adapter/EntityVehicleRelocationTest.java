@@ -136,7 +136,7 @@ class EntityVehicleRelocationTest {
 
         session.flushEntityChunk(writer, opened);
 
-        // The player catches up with the boat and opens it again: the fresh capture has contents of its own, so
+        // The player catches up with the vehicle and opens it again: the fresh capture has contents of its own, so
         // suppressing this write would drop the newer loot on the floor.
         stashEntityContainer(session, VEHICLE, capturedItems(new ItemStack(Items.EMERALD, 3)));
         bufferEntity(session, VEHICLE, drifted, entity(VEHICLE));
