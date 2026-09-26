@@ -21,12 +21,11 @@ import world.thearchive.wdl.adapter.PlayerSink;
 
 /**
  * 26.1.2 player sink: serializes the local player via vanilla's own {@code player.saveWithoutId} on the
- * codec/{@code ValueOutput} layer (the identical call {@code PlayerDataStorage.save} uses), so the captured
- * {@code "Player"} compound is byte-for-byte what a vanilla {@code playerdata/<uuid>.dat} would hold.
+ * codec/{@code ValueOutput} layer (the identical call {@code PlayerDataStorage.save} uses).
  *
  * <p>The single step is client-coupled (a live {@code Player}), mirroring
- * {@link world.thearchive.wdl.adapter.EntitySink}'s live {@code entity.save} step; the pure downstream (strips, scrub,
- * level.dat apply) carries the headless guard.
+ * {@link world.thearchive.wdl.adapter.EntitySink}'s live {@code entity.save} step; the pure downstream (strips, scrub)
+ * carries the headless guard.
  */
 public final class PlayerSinkImpl implements PlayerSink {
     @Override

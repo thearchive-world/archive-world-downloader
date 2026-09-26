@@ -108,8 +108,8 @@ public class WdlChestedAnimalCaptureTest implements FabricClientGameTest {
      * way vanilla's inventory key requests it, which fires no use event, and the resolve therefore hands the bind an
      * empty target; only the menu's own name for its mount can produce the right animal. Break {@code MountMenuReader}
      * or its install and this goes red, because the mount menu then falls through to the block axis with no block and
-     * drops. The ridden mount saves as the player's {@code RootVehicle} in level.dat rather than into the entities
-     * region, which is where the assertion looks.
+     * drops. The ridden mount saves as the player's {@code RootVehicle}, which is where the assertion looks, rather
+     * than into the entities region.
      *
      * <p>A same-size decoy animal under the crosshair used to sit here as a mis-bind guard. It was retired once the
      * crosshair stopped reaching this bind at all: with the target empty and the animal read from the menu, no

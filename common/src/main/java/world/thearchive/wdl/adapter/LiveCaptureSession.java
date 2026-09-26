@@ -232,8 +232,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // once per live dimension id.
     private final boolean overlayActive;
     private final Set<String> overlaySeededDimensions = new HashSet<>();
-    // What this download targets: a fresh folder (NEW) or an existing wdl-managed one to add to (RESUME). On a
-    // RESUME that does not re-open the ender chest, its prior contents carry forward from the prior level.dat.
+    // What this download targets: a fresh folder (NEW) or an existing wdl-managed one to add to (RESUME). On a RESUME
+    // that does not re-open the ender chest, its prior contents carry forward.
     private final DownloadTarget target;
     // The ClientLevel currently being captured. Non-final: the session follows the player across a portal,
     // rebinding to the new dimension's level, so this advances with targetDimension and allCaptured. Null on a
@@ -2854,8 +2854,8 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * How many of {@code drained} nothing else saved. A mount captured into the player's {@code RootVehicle} is
-     * excluded, the same way {@code promoteChunk} excludes it, because it reaches disk inside level.dat and counting
-     * its abandoned frame would report a loss the download did not take.
+     * excluded, the same way {@code promoteChunk} excludes it, because it reaches disk inside the player record and
+     * counting its abandoned frame would report a loss the download did not take.
      */
     private int abandonedCount(List<? extends PacketEntity<?, ?, ?>> drained) {
         int abandoned = 0;
@@ -3203,9 +3203,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
      * reopening its container: the fresh serialize carries empty menu-only contents, and the wholesale rewrite of the
      * saved player would drop the prior download's folded loot. A resume that finished un-seated carries nothing (see
      * {@link PlayerTag#restorePriorMountContents}): a dismounted mount is a normal world entity, captured by the
-     * standalone entity path, so writing it into the Player slot would wrongly re-seat the player and collide same-UUID
-     * with the standalone copy. Runs as its own RESUME block, ungated by {@link WdlConfig} toggles (the mount is
-     * player-state, independent of the ender, inventory, and capture-entities knobs) and after the fresh
+     * standalone entity path, so writing it into the player record would wrongly re-seat the player and collide
+     * same-UUID with the standalone copy. Runs as its own RESUME block, ungated by {@link WdlConfig} toggles (the mount
+     * is player-state, independent of the ender, inventory, and capture-entities knobs) and after the fresh
      * {@code setRootVehicle}. Scrubs the restored mount's own coordinates per the current knob on the {@code Entity}
      * child (not {@code scrub(raw, key)}, a no-op on a compound, and not {@code scrubEntity(raw)}, which does not
      * descend a {@code RootVehicle} child); the prior session already map-remapped it, so it is not re-remapped.
@@ -3308,7 +3308,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         try {
             ResourceKey<Level> priorDimension = PlayerTag.dimensionOf(priorPlayer);
             if (priorDimension == null) {
-                recordResumedMountLoss("its prior level.dat names no dimension this download writes");
+                recordResumedMountLoss("its prior player tag names no dimension this download writes");
                 return;
             }
             ChunkPos pos = mountEntityChunk(priorEntity);
@@ -3437,10 +3437,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Run a finish-time capture assembly and degrade a throw to a null snapshot (fail-soft): a serialize or scrub bug
-     * in one step then drops that step to absent (the player path opens at the default spawn with no Player tag, taking
-     * the inventory, the ender chest and the game mode with it; the progress path writes no advancement or statistics
-     * file) instead of aborting the save after chunks have committed and leaving a chunks-without-level.dat unopenable
-     * world.
+     * in one step then drops that step to absent (the player path opens at the default spawn with no player record,
+     * taking the inventory, the ender chest and the game mode with it; the progress path writes no advancement or
+     * statistics file) instead of aborting the save after chunks have committed and leaving a chunks-without-level.dat
+     * unopenable world.
      *
      * <p>The degradation is deliberate and stays. What does not is reporting the download that took it as clean, so
      * every degraded step counts toward the partial-finish verdict, and {@code step} names on the line which one it

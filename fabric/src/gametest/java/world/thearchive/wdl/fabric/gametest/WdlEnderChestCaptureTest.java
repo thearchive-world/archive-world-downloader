@@ -25,10 +25,10 @@ import world.thearchive.wdl.core.WdlConfig;
 
 /**
  * Ender-chest container axis: an ender chest binds to the PLAYER's global ender inventory, not the block, so the
- * contents merge into level.dat's {@code Player.EnderItems} rather than a chunk block entity. The client does not know
- * its ender contents until it opens an ender chest (the menu syncs them), so the open is load-bearing: the player's
- * ender inventory is filled server-side, the drive opens the chest to sync and bind it, and the planted item must
- * appear in the captured {@code Player.EnderItems}.
+ * contents merge into {@code EnderItems} rather than a chunk block entity. The client does not know its ender contents
+ * until it opens an ender chest (the menu syncs them), so the open is load-bearing: the player's ender inventory is
+ * filled server-side, the drive opens the chest to sync and bind it, and the planted item must appear in the captured
+ * {@code EnderItems}.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlEnderChestCaptureTest implements FabricClientGameTest {
@@ -72,7 +72,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                     .map(item -> item.getString("id").orElse("?"))
                     .toList();
             Check.that(enderItems.contains("minecraft:diamond"),
-                    "the planted item is absent from the captured Player.EnderItems: " + enderItems);
+                    "the planted item is absent from the captured EnderItems: " + enderItems);
 
             obstructedEnderChestSeedsNothing(context, server, stand);
             enderChestOffBindsNothing(context, server, stand);
@@ -133,8 +133,7 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
      * vanilla's own case of that, its use handler returning before it builds any menu, and the click filter would
      * otherwise latch it because an unobstructed ender chest genuinely does open one. A latched intent no open can
      * consume is taken by the next open that no click accounts for, and because the ender discriminator is checked
-     * ahead of every other block leg, that open binds ENDER and merges into the player tag in level.dat rather than
-     * into a chunk.
+     * ahead of every other block leg, that open binds ENDER and merges into the player tag rather than into a chunk.
      *
      * <p>The unattributed open here is a chest minecart driven through the game mode, which reaches no use hook. Both
      * menus are twenty-seven-slot chest menus, so nothing downstream can separate them; the only thing standing between

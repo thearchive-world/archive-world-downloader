@@ -184,8 +184,8 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
      * The block leg is kept on this loader, but it must still refuse a block a spectator could not have opened. An
      * ender chest is vanilla's one menu-opening block with no menu provider, and the server's spectator branch opens
      * only from the provider, so no ender open a spectator caused can exist. Left unfiltered, an ender chest under the
-     * crosshair claims whatever open does arrive, and an ender bind merges into the player tag in level.dat rather than
-     * into a chunk.
+     * crosshair claims whatever open does arrive, and an ender bind merges into the player tag rather than into a
+     * chunk.
      *
      * <p>The open is the minecart's, driven through the game mode so it reaches no use hook, and the crosshair is
      * parked on the ender chest instead. Both are twenty-seven-slot chest menus, so nothing downstream can separate

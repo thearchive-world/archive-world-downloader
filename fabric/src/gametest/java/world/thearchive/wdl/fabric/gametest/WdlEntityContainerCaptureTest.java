@@ -154,8 +154,8 @@ public class WdlEntityContainerCaptureTest implements FabricClientGameTest {
      * ridden vehicle is the one thing on screen that could plausibly have opened it. Riding a chest boat, the player
      * opens a chest minecart through a path that latches nothing, and both containers hold 27 slots, so the slot-count
      * guard cannot separate them: a claim here writes the minecart's contents into the boat, which is where the boat's
-     * own key-open would have gone. The ridden boat saves as the player's {@code RootVehicle} in level.dat, so that is
-     * where a claim would show up.
+     * own key-open would have gone. The ridden boat saves as the player's {@code RootVehicle}, so that is where a claim
+     * would show up.
      */
     private static UUID captureUnattributedOpenAboardChestBoat(ClientGameTestContext context,
             TestServerContext server, BlockPos stand, Vec3 cartCenter, UUID cartId) {
