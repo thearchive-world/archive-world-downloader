@@ -26,10 +26,9 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The guard against a client-side merchant's own account of its trades reaching the archive. Asked for its offers, a
- * client merchant does not answer "none": it assigns itself a random career and generates a trade list from its
- * profession. Several ordinary things ask, differing by version, and on disk the result is indistinguishable from a
- * real capture. It also blocks the genuine trades already saved from being carried over it, both carry-forwards filling
- * only an empty slot.
+ * client merchant does not answer "none": it generates a trade list from its profession. Several ordinary things ask,
+ * differing by version, and on disk the result is indistinguishable from a real capture. It also blocks the genuine
+ * trades already saved from being carried over it, both carry-forwards filling only an empty slot.
  *
  * <p>The fixtures build that shape directly rather than provoking it, because a band whose vanilla guards the
  * client-side write cannot produce it locally. The keys are the seam, so the cases hold on every band.
