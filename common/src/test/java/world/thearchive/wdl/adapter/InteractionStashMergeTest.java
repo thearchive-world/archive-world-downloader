@@ -39,7 +39,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * before the server acks it, so the gate ({@link InteractionCapture#confirm}) must persist content only when the
  * authoritative synced block-state confirms it and discard a prediction the server never confirmed. The decision is a
  * pure function of a {@link IBlockState} and a {@code Candidate}, so it is proven headless with hand-built block-states
- * and candidates (no live client, no {@code Level}). The server-rejected discard is asserted directly on the pure
+ * and candidates (no live client, no {@code World}). The server-rejected discard is asserted directly on the pure
  * {@code confirm} decision.
  *
  * <p>Also covers the two seams the reconcile leans on headless: reading the authoritative block-state off a captured

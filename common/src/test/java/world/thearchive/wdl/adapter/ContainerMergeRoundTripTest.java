@@ -28,7 +28,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * slots, with no other block-entity field clobbered.
  *
  * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
- * neither a live menu nor a {@code Level} is needed (items, unlike entities, parse back without one). The one
+ * neither a live menu nor a {@code World} is needed (items, unlike entities, parse back without one). The one
  * client-coupled step (reading the live open menu's container slots) is not exercised headless, exactly as for chunks
  * and entities. This test proves the serialize+merge+decode slice.
  */
