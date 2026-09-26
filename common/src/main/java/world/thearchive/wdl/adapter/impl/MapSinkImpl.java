@@ -15,7 +15,7 @@ import world.thearchive.wdl.adapter.MapSink;
  * 26.1.2 map sink: serializes a client {@code MapItemSavedData} via vanilla's own
  * {@code MapItemSavedData.CODEC.encodeStart} (the codec layer of the 1.21.5 {@code SavedData} to {@code Codec} cut, the
  * exact call {@code DimensionDataStorage} makes), so the captured inner {@code "data"} tag is byte-for-byte what a
- * vanilla {@code data/map_<id>.dat} would hold.
+ * vanilla save's map data file would hold.
  *
  * <p>The single step is client-coupled (a live {@code MapItemSavedData}), mirroring {@code ContainerSink}'s lift; the
  * headless round-trip re-parse via the same codec is the automated guard.

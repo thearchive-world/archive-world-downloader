@@ -108,7 +108,7 @@ public class WdlFramedMapRevisitUnionTest implements FabricClientGameTest {
                     "the carried-forward map image is not well-formed");
             int capturedId = CaptureReadback.mapDataIds(saveRoot).get(0);
             int idCount = CaptureReadback.idCountsMax(saveRoot)
-                    .orElseThrow(() -> new AssertionError("data/idcounts.dat is missing"));
+                    .orElseThrow(() -> new AssertionError("the map id counter file is missing"));
             Check.that(idCount >= capturedId,
                     "idcounts map id " + idCount + " is below the captured map id " + capturedId);
 

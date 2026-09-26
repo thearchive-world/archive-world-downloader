@@ -75,7 +75,7 @@ public class WdlMapStreamCrashStateTest implements FabricClientGameTest {
                 streamed = !CaptureReadback.mapDataIds(saveRoot).isEmpty();
             }
             Check.that(streamed,
-                    "the framed map must stream to data/map_<id>.dat mid-capture, before finalize; data/ holds none");
+                    "the framed map must stream to its data file mid-capture, before finalize; data/ holds none");
             Check.that(DownloadFolders.isWdlManaged(saveRoot),
                     "the crash sentinel must mark the mid-capture folder resumable");
             Check.that(Files.exists(DownloadReportStore.pendingFile(saveRoot))
