@@ -80,7 +80,7 @@ class PlayerTagTest {
         assertFalse(tag.contains("EnderItems"), "EnderItems dropped");
         assertTrue(tag.contains("Inventory"), "inventory kept when only the ender knob is off");
         assertTrue(tag.contains("SelectedItemSlot"));
-        assertTrue(tag.contains("equipment"), "equipment kept with the inventory it belongs to");
+        assertTrue(tag.contains("equipment"), "equipment kept");
     }
 
     @Test
