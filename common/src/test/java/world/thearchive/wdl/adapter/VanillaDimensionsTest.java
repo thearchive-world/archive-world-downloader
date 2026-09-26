@@ -21,8 +21,8 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
  * The captured dimension is routed to a vanilla single-player folder by its TYPE, not its level key, so a server whose
- * level keys are non-standard (e.g. Multiverse's {@code minecraft:worlds/2b2t/2b2t_1}) still lands in {@code ./region}
- * / {@code DIM-1} / {@code DIM1} rather than a nested {@code dimensions/<ns>/<path>} folder.
+ * level keys are non-standard (e.g. Multiverse's {@code minecraft:worlds/2b2t/2b2t_1}) still lands in the vanilla
+ * overworld, nether or end folder rather than one named after its level key.
  */
 class VanillaDimensionsTest {
     /** Vanilla bootstrap so the dimension static keys initialize. */

@@ -135,7 +135,7 @@ class AsyncSaveWriterTest {
                 dimension -> {
                     if (Level.NETHER.equals(dimension)) {
                         netherOpens.incrementAndGet();
-                        throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
+                        throw new UncheckedIOException(new IOException("nether region folder could not be created"));
                     }
                     return storage(region, "chunk");
                 },
@@ -191,7 +191,7 @@ class AsyncSaveWriterTest {
                 dimension -> {
                     if (Level.NETHER.equals(dimension)) {
                         netherOpens.incrementAndGet();
-                        throw new UncheckedIOException(new IOException("DIM-1/entities could not be created"));
+                        throw new UncheckedIOException(new IOException("nether entities folder could not be created"));
                     }
                     return storage(entities, "entities");
                 },
@@ -234,7 +234,7 @@ class AsyncSaveWriterTest {
 
         AsyncSaveWriter writer = new AsyncSaveWriter(
                 dimension -> {
-                    throw new UncheckedIOException(new IOException("DIM-1/region could not be created"));
+                    throw new UncheckedIOException(new IOException("nether region folder could not be created"));
                 },
                 dimension -> {
                     throw new AssertionError("no entities were submitted, so the entities storage must not open");
