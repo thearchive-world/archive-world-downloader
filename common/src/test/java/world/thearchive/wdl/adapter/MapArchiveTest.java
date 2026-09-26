@@ -36,7 +36,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
 /**
  * The headless guard for the on-sight map archive: the live remap table ({@link MapManifest} plus the memoized
  * session-to-archive resolution and the on-sight data stream). The renumbering-server idempotency gate is driven
- * entirely here with an injected image resolver, so neither a live {@code Level} nor the {@code getMapData} resolution
+ * entirely here with an injected image resolver, so neither a live {@code World} nor the {@code getMapData} resolution
  * is needed.
  */
 class MapArchiveTest {

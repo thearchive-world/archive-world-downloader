@@ -27,7 +27,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * map id it references, the item-level {@code Damage} short behind the {@code id == "minecraft:filled_map"} identity
  * gate at this band, recursing into a container item's {@code tag.BlockEntityTag.Items} and an item's own
  * {@code tag.Items} the way {@link ItemLocationScrub} does, and skipping non-map items. Real {@link ItemStack}s
- * serialized via the production {@link ContainerSink#captureItems} drive it, so neither a live menu nor a {@code Level}
+ * serialized via the production {@link ContainerSink#captureItems} drive it, so neither a live menu nor a {@code World}
  * is needed; the live {@code getMapData} resolution and the item-frame walk are not exercised headless.
  */
 class MapIdCollectorTest {
