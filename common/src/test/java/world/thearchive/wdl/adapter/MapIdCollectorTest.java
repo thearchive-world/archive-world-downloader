@@ -26,7 +26,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * The headless guard for the pure id-collection: {@link MapIdCollector} walks a serialized item list and collects every
  * map id it references, recursing into nested containers the way {@link ItemLocationScrub} does, and skipping non-map
  * items. Real {@link ItemStack}s serialized via the production {@link ContainerSink#captureItems} drive it, so neither
- * a live menu nor a {@code Level} is needed; the live {@code getMapData} resolution and the item-frame walk are not
+ * a live menu nor a {@code World} is needed; the live {@code getMapData} resolution and the item-frame walk are not
  * exercised headless.
  */
 class MapIdCollectorTest {

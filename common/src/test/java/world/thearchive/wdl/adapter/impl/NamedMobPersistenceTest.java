@@ -13,15 +13,14 @@ import org.junit.jupiter.api.Test;
  * The automated guard for the mob persistence restoration and its {@code forceMobPersistence} extension.
  * {@code PersistenceRequired} is server-authoritative and arrives {@code false} on the client, so a name-tagged
  * pet/villager despawns after the downloaded world is opened. Capture must stamp it back, unconditionally, on every
- * captured named {@code Mob} (vanilla {@code NameTagItem} semantics); likewise on a mob whose equipment proves a loot
- * pickup (an item impossible for its natural spawn); and with {@code forceMobPersistence} on it stamps every captured
- * {@code Mob}, named or not.
+ * captured named {@code EntityLiving} (vanilla {@code ItemNameTag} semantics); likewise on a mob whose equipment proves
+ * a loot pickup (an item impossible for its natural spawn); and with {@code forceMobPersistence} on it stamps every
+ * captured {@code EntityLiving}, named or not.
  *
  * <p>This test pins the on-disk contract directly by driving {@code applyMobPersistence} with the derived flags: the
  * exact NBT key, its boolean type, and which combinations of named / loot-equipped / unnamed mob / non-mob and knob
- * state get the flag written. A real {@code Mob} is constructible headless (its constructor does not dereference a null
- * {@code Level}); the {@code RiddenMountMob} double in {@code EntitySinkRootVehicleTest} exercises the Mob-ness and
- * custom-name derivation through {@code captureRootVehicle}. The loot-equipped scan
+ * state get the flag written. The real {@code EntityPig} mounts in {@code EntitySinkRootVehicleTest} exercise the mob
+ * and custom-name derivation through {@code captureRootVehicle}. The loot-equipped scan
  * ({@link NaturalEquipment#wasLootEquipped}) is not exercised headless.
  */
 class NamedMobPersistenceTest {
@@ -69,11 +68,11 @@ class NamedMobPersistenceTest {
         NBTTagCompound knobOff = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOff, false, false, false, false);
         assertFalse(knobOff.hasKey("PersistenceRequired"),
-                "a non-Mob entity never gets PersistenceRequired set");
+                "a non-mob entity never gets PersistenceRequired set");
 
         NBTTagCompound knobOn = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOn, false, false, false, true);
         assertFalse(knobOn.hasKey("PersistenceRequired"),
-                "forceMobPersistence applies to mobs only; a non-Mob entity is left untouched");
+                "forceMobPersistence applies to mobs only; a non-mob entity is left untouched");
     }
 }

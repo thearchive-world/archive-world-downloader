@@ -29,7 +29,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * capture-then-merge round-trip proven against vanilla's own read-back (the exact form the block entity's own read
  * uses): the captured content survives serialization, lands on the matching captured block entity under its own keys
  * with no other field clobbered, decodes back to the same content, and only the flushed chunk's stash entries drain.
- * Server-free: real {@link ItemStack}s and hand-built chunk tags, no live client and no {@code Level}.
+ * Server-free: real {@link ItemStack}s and hand-built chunk tags, no live client and no {@code World}.
  */
 class InteractionMergeRoundTripTest {
     @BeforeAll

@@ -35,7 +35,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * container's block entity inside the captured chunk tag by {@code BlockPos} (matching the {@code Level.TileEntities}
  * list's {@code x/y/z}) and sets its {@code "Items"}, touching no other block entity, then drains the merged entry as
  * the chunk is flushed. This is the part that must never mis-target (writing the wrong block's items corrupts the
- * archive), so it is proven headless with hand-built chunk tags (no live client, no {@code Level}).
+ * archive), so it is proven headless with hand-built chunk tags (no live client, no {@code World}).
  */
 class ContainerStashMergeTest {
     private final ContainerSink sink = new ContainerSinkImpl();
