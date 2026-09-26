@@ -13,7 +13,7 @@ loom = "1.17.21"
 moddev = "2.0.147"
 spotless = "8.10.2"
 errorprone-plugin = "5.1.1"
-mod-publish-plugin = "2.2.0"
+mod-publish-plugin = "2.2.1"
 
 [plugins]
 loom = { id = "fabric-loom", version.ref = "loom" }
