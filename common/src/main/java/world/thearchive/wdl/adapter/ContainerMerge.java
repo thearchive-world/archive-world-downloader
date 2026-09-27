@@ -66,9 +66,9 @@ final class ContainerMerge {
     }
 
     /**
-     * The sibling of {@link #mergeChunkStash}: merge (and drain) just the stash entries located in {@code pos}'s chunk
-     * into {@code chunkTag}, setting {@code "Book"}/{@code "Page"} on the matching block entity. Same {@code x/y/z}
-     * locator, per-entry isolation, and drain semantics.
+     * The Book/Page sibling of {@link #mergeChunkStash}: merge (and drain) just the stash entries located in
+     * {@code pos}'s chunk into {@code chunkTag}, setting {@code "Book"}/{@code "Page"} on the matching block entity.
+     * Same {@code x/y/z} locator, per-entry isolation, and drain semantics.
      */
     static MergeTally mergeLecternChunkStash(LecternSink sink, NBTTagCompound chunkTag, ChunkPos pos,
             Map<BlockPos, NBTTagCompound> stash) {
