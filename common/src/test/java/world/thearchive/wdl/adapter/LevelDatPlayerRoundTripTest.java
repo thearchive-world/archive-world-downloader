@@ -123,7 +123,7 @@ class LevelDatPlayerRoundTripTest {
             throws IOException {
         NBTTagCompound playerTag = capturedPlayerTag();
         UUID vehicle = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
-        NBTTagCompound vehicleTag = EntityFixtures.entityTag("EntityHorse"); // the id loadEntityRecursive reads
+        NBTTagCompound vehicleTag = EntityFixtures.entityTag("EntityHorse"); // the id readWorldEntity reads
         PlayerTag.setRootVehicle(playerTag, vehicle, vehicleTag);
         CapturedPlayer captured = new CapturedPlayer(playerTag, BlockPos.ORIGIN, 0.0F, 0.0F,
                 DimensionType.OVERWORLD, GameType.CREATIVE, EnumDifficulty.NORMAL);

@@ -11,8 +11,8 @@ import world.thearchive.wdl.platform.PlatformBridge;
 
 /**
  * Rejects Bobby's locally cached chunks from capture. Bobby serves cached {@code FakeChunk} objects through
- * {@code ClientChunkCache.getChunk}, which is exactly where terrain capture and the container-outline scan read; this
- * filter identifies them by class so those reads can treat a cached chunk as an unsent one.
+ * {@code ChunkProviderClient.getLoadedChunk}, which is exactly where terrain capture and the container-outline scan
+ * read; this filter identifies them by class so those reads can treat a cached chunk as an unsent one.
  *
  * <p>Null-object: {@link #INACTIVE} matches nothing, so callers never null-check. Holds no compile-time Bobby
  * reference, the only mention is the class-name string, resolved reflectively.

@@ -13,7 +13,7 @@ import world.thearchive.wdl.adapter.WdlRegionStorage;
 
 /**
  * Drives a chunk NBT tag through vanilla's real region pipeline (the synchronous {@link WdlRegionStorage} over
- * RegionFileStorage at this band) and back, so the codec round-trip exercises on-disk Anvil write/read rather than an
+ * RegionFile at this band) and back, so the codec round-trip exercises on-disk Anvil write/read rather than an
  * in-memory shortcut.
  */
 public final class RegionRoundTrip {

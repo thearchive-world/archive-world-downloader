@@ -34,7 +34,7 @@ class RegistriesSmokeTest {
     void bootstrapsAndBindsVanillaClasses() {
         TestRegistries.bootstrap();
 
-        // NBTTagCompound put/get round-trips the value the NBT codecs read and write.
+        // NBTTagCompound set/get round-trips the value the NBT codecs read and write.
         NBTTagCompound tag = new NBTTagCompound();
         tag.setString("wdl_test_marker", "archive");
         assertEquals("archive", tag.getString("wdl_test_marker"));

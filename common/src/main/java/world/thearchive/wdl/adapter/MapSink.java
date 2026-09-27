@@ -9,7 +9,7 @@ import net.minecraft.world.storage.MapData;
 /**
  * Per-band map-serialize axis: encode a client {@link MapData} into the inner {@code "data"} tag of a map's
  * {@code data/} save file. At this band the serialize is vanilla's own {@code MapData.writeToNBT} (the classic MCP
- * SavedData write).
+ * WorldSavedData write).
  *
  * <p>Mirrors {@link PlayerSink}'s lift. The single step is client-coupled (a live {@code MapData} resolved from the
  * world's map store); the headless guard is the round-trip re-parse via the band's own {@code MapData} persistence.

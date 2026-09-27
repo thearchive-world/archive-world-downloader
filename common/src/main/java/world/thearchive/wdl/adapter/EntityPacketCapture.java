@@ -403,7 +403,7 @@ final class EntityPacketCapture
      * drain batches. A rotation-only update therefore leaves the home alone.
      */
     public void onMove(int id, short xa, short ya, short za, SPacketEntity move) {
-        // This band has no hasPosition/hasRotation accessor; the nested SPacketEntity subclasses are the discriminant.
+        // This band has no hasPosition accessor; the nested SPacketEntity subclasses are the discriminant.
         // S15PacketEntityRelMove (Pos) and S17PacketEntityLookMove (PosRot) carry a position; S16PacketEntityLook
         // (Rot only) and the plain SPacketEntity carry none. S16 and S17 carry a rotation.
         boolean hasPosition = move instanceof SPacketEntity.S15PacketEntityRelMove

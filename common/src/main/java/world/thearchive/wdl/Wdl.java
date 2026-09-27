@@ -121,10 +121,10 @@ public final class Wdl {
     // controller is non-idle (it is left stale once the capture finishes and overwritten by the next start).
     private static @Nullable String activeDownloadName;
 
-    // A screen opened synchronously from a chat command is clobbered on Fabric by ChatScreen's post-dispatch
-    // setScreen(null) (NeoForge patches that close to guard it). Open it on the next client tick instead, after
-    // that close has run. One-shot, last-write-wins; consumed by onClientTick and discarded by the inline
-    // pause-menu open (openDownloadsScreenNow), both on the client main thread.
+    // A screen opened synchronously from a chat command is clobbered by GuiChat's post-dispatch displayGuiScreen(null).
+    // Open it on the next client tick instead, after that close has run. One-shot, last-write-wins; consumed by
+    // onClientTick and discarded by the inline pause-menu open (openDownloadsScreenNow), both on the client main
+    // thread.
     private static @Nullable Runnable pendingScreenOpen;
 
     // The resume/confirm state machine, constructed by initialize() once the controller and bridge are live.
@@ -852,7 +852,7 @@ public final class Wdl {
     }
 
     // The pause-menu primary button's label and enabled-state are resolved once when the pause menu opens, since
-    // PauseScreen is vanilla and we do not own its per-frame tick to refresh them; they can go one open stale
+    // GuiIngameMenu is vanilla and we do not own its per-frame tick to refresh them; they can go one open stale
     // during a drain. onPausePrimary re-reads the state at click, so the action stays correct even when the label
     // does not.
 

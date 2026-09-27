@@ -28,7 +28,7 @@ import world.thearchive.wdl.testsupport.TestRegistries;
  * gate at this band, recursing into a container item's {@code tag.BlockEntityTag.Items} and an item's own
  * {@code tag.Items} the way {@link ItemLocationScrub} does, and skipping non-map items. Real {@link ItemStack}s
  * serialized via the production {@link ContainerSink#captureItems} drive it, so neither a live menu nor a {@code World}
- * is needed; the live {@code getMapData} resolution and the item-frame walk are not exercised headless.
+ * is needed; the live {@code MapStorage.getOrLoadData} resolution and the item-frame walk are not exercised headless.
  */
 class MapIdCollectorTest {
     private final ContainerSink sink = new ContainerSinkImpl();
