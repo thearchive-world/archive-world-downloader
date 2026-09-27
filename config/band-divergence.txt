@@ -924,7 +924,8 @@ common/src/test/java/world/thearchive/wdl/WorldgenWarmupTest.java
 # Below 1.18 a chunk's block entities are nested under Level.TileEntities rather than the root block_entities, so the
 # carry-forward read navigates the Level compound first. Below 1.13 the NBT is classic MCP (NBTTagCompound, NBTTagList,
 # NBTBase, NBTTagInt, NBTTagString, getTag rather than get) and a BlockPos packs through toLong rather than asLong;
-# below 1.11 NBTTagList is not Iterable, so the tag-list walks go through NbtElements.of.
+# below 1.11 NBTTagList is not Iterable, so the tag-list walks go through NbtElements.of. Below 1.11 there is no shulker
+# box, so the carry-forward Javadoc names no container captured from a placed item.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkMerge.java
 
 # Below 1.18 the recovered-container scan reads block entities from Level.TileEntities rather than the root

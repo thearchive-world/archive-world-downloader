@@ -190,9 +190,10 @@ final class ChunkMerge {
 
     /**
      * Whether this block entity's captured {@code "Items"} names single slots rather than the whole container, which
-     * decides whether the on-disk list is unioned per slot or replaced wholesale. Every container is captured from an
-     * opened menu, which is the whole container and therefore ground truth, so a fresh list there must replace the
-     * on-disk one or an item the player watched leave would come back.
+     * decides whether the on-disk list is unioned per slot or replaced wholesale. It tests only for
+     * {@link #CHISELED_BOOKSHELF_ID}, the id of a block this version lacks, so nothing here passes it. Every container
+     * is captured from an opened menu, which is the whole container and therefore ground truth, so a fresh list there
+     * must replace the on-disk one or an item the player watched leave would come back.
      */
     private static boolean capturesPerSlot(NBTTagCompound blockEntity) {
         return CHISELED_BOOKSHELF_ID_TAG.equals(blockEntity.getTag("id"));
