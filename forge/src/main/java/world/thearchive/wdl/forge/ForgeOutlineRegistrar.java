@@ -17,9 +17,9 @@ import world.thearchive.wdl.client.WdlOutlineRenderer;
  * {@code net.minecraftforge.fml.common.eventhandler.EventBus}, which dispatches to {@code @SubscribeEvent}-annotated
  * instance methods discovered by {@link MinecraftForge#EVENT_BUS}{@code .register(Object)} rather than to a lambda
  * (there is no functional {@code addListener} overload at this band), so registration listens on this instance itself.
- * RenderWorldLastEvent exposes neither a frustum nor a matrix stack, so the shared renderer draws every section
- * against the ambient pre-blaze3d model-view and lets the GPU clip. The shared cull owns the Tesselator buffer begin
- * and flush at this band, so nothing is flushed here.
+ * RenderWorldLastEvent exposes neither a frustum nor a matrix stack, so the shared renderer draws every section against
+ * the ambient pre-blaze3d model-view and lets the GPU clip. The shared cull owns the Tessellator buffer begin and flush
+ * at this band, so nothing is flushed here.
  */
 final class ForgeOutlineRegistrar {
     private final RimRenderer rimRenderer = new RimRendererImpl();
