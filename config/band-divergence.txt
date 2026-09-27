@@ -253,10 +253,10 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 # Provider, and ContainerHelper.loadAllItems/saveAllItems take no registries argument.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
 
-# Below 1.19 a captured jukebox carries only RecordItem: vanilla's JukeboxBlockEntity.saveAdditional writes no
-# IsPlaying or tick sidecar (those are 1.19 additions), so the jukebox merge fixtures set only that key. Below 1.20.5
-# a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so these merge
-# fixtures use that key and the beehive fixture goes through the unchecked malformedChunkTagWith instead of the
+# Below 1.19.4 a jukebox block entity saves its disc and no play state: vanilla's JukeboxBlockEntity.saveAdditional
+# writes no IsPlaying or tick sidecar (both first in 1.19.4's tree), so the jukebox merge fixtures set only RecordItem.
+# Below 1.20.5 a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so these
+# merge fixtures use that key and the beehive fixture goes through the unchecked malformedChunkTagWith instead of the
 # fidelity-checked chunkTagWith.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
 
@@ -372,11 +372,11 @@ common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
 # RegistryOps; the per-villager isolation of a rejecting serialize is inert below 1.20.5.
 common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 
-# Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the
-# raw LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position (carried
-# by a pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and
+# Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the raw
+# LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position (carried by a
+# pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and
 # tag.BlockEntityTag.FlowerPos, both scrubbed here. At 1.18.2 there is no allay (first in 1.19) or item display (first
-# in 1.19.4's tree), so the entity examples name neither.
+# in 1.19.4's tree), so the entity examples name neither and the displayed-item walk names only the Item key.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
