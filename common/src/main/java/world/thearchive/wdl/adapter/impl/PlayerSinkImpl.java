@@ -22,8 +22,8 @@ import world.thearchive.wdl.adapter.PlayerSink;
 public final class PlayerSinkImpl implements PlayerSink {
     @Override
     public CompoundTag capturePlayer(Player player) {
-        // saveWithoutId writes the Entity super fields (Pos/Rotation/UUID) plus Player.addAdditionalSaveData
-        // (Inventory/SelectedItemSlot/EnderItems/abilities), with no id.
+        // saveWithoutId writes the Entity super fields (Pos/Rotation/UUIDMost/UUIDLeast) plus
+        // Player.addAdditionalSaveData (Inventory/SelectedItemSlot/EnderItems/abilities), with no id.
         CompoundTag tag = new CompoundTag();
         player.saveWithoutId(tag);
         return tag;

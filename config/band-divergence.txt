@@ -91,7 +91,8 @@ common/src/main/java/world/thearchive/wdl/adapter/LecternSink.java
 common/src/main/java/world/thearchive/wdl/adapter/MapSink.java
 
 # Below 1.16 there is no RegistryAccess, so capturePlayer takes no registries argument. From 1.13.2 through 1.15.2
-# the sink also captures the inventory alone, the salvage source for a finish whose player serialize threw.
+# the sink also captures the inventory alone, the salvage source for a finish whose player serialize threw. Below 1.16
+# an entity saves its UUID as UUIDMost and UUIDLeast, so the Javadoc names those keys.
 common/src/main/java/world/thearchive/wdl/adapter/PlayerSink.java
 
 # Below 1.16 there is no WorldData, LevelStorageSource.LevelStorageAccess, LevelResource or RegistryAccess: a 1.15.2

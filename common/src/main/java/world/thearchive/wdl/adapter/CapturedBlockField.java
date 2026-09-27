@@ -42,9 +42,9 @@ enum CapturedBlockField {
     RECORD_ITEM("RecordItem", "IsPlaying", Shape.COMPOUND),
     /** A beehive's occupants, written by the interaction holder merge. */
     BEES("Bees", null, Shape.LIST),
-    /** An int array of disabled slot indices, empty when none is disabled. */
+    /** The crafter's disabled slots, a key vanilla writes from 1.20.3; an int array, empty when none is. */
     DISABLED_SLOTS("disabled_slots", new IntArrayTag(new int[0])),
-    /** An int, zero when unset. */
+    /** Whether a crafter is powered, a key vanilla writes from 1.20.3; an int, zero when it is not. */
     TRIGGERED("triggered", IntTag.valueOf(0)),
     /** A brewing stand's remaining brew ticks; vanilla writes a short, zero when it is not brewing. */
     BREW_TIME("BrewTime", ShortTag.valueOf((short) 0)),
