@@ -82,7 +82,8 @@ common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
 # Below the 1.21 update a captured jukebox's play state is the IsPlaying note-particle flag rather than the
 # ticks_since_song_started sidecar, so the RecordItem carry-forward field carries IsPlaying. Below 1.20.5 the
 # beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so this field
-# carries that key rather than bees.
+# carries that key rather than bees. Java 8 form: the field list is ImmutableList.copyOf rather than List.of, and the
+# shape dispatch is a switch statement rather than a switch expression.
 common/src/main/java/world/thearchive/wdl/adapter/CapturedBlockField.java
 
 # Below 1.21.2 the entity position wire differs: the absolute-only ClientboundTeleportEntityPacket replaces the
@@ -371,9 +372,9 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 # setLevelAndPosition) and BlockEntity.loadStatic takes no BlockPos.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
 
-# Below 1.19 a captured jukebox carries only RecordItem: vanilla's JukeboxBlockEntity.saveAdditional writes no
-# IsPlaying or tick sidecar (those are 1.19 additions), so the jukebox merge fixtures set only that key. Below 1.20.5
-# a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so these merge
+# Below 1.19.4 a jukebox block entity saves its disc and no play state: vanilla's JukeboxBlockEntity.save writes no
+# IsPlaying or tick sidecar (both first in 1.19.4's tree), so the jukebox merge fixtures set only RecordItem. Below
+# 1.20.5 a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so these merge
 # fixtures use that key and the beehive fixture goes through the unchecked malformedChunkTagWith instead of the
 # fidelity-checked chunkTagWith. Below 1.18 the merge reads the chunk block entities under Level.TileEntities, and
 # fastutil 8.2.1 has no LongSet.of() so the empty set is LongSets.EMPTY_SET.
@@ -536,7 +537,8 @@ common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 # tag.BlockEntityTag.FlowerPos, both scrubbed by the same pass. Below 1.17 the hive stores a bee's whole saved tag
 # with only the UUID stripped, so under each EntityData the pass blanks FlowerPos, HivePos, Pos, Leash and Dimension
 # (the entity's own dimension id, written below 1.16), where the component era blanks the flower position alone.
-# Java 8 form: every pattern instanceof over the item, entity, equipment, passenger and bee reads is unbound.
+# Java 8 form: every pattern instanceof over the item, entity, equipment, passenger and bee reads is unbound. Below 1.17
+# there is no bundle, so the Javadocs name nested containers alone.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
