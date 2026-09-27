@@ -132,8 +132,8 @@ public final class WdlOutlineRenderer {
                 camera.lastTickPosZ + (camera.posZ - camera.lastTickPosZ) * partialTick);
     }
 
-    // Mirrors LevelRenderer.renderHitOutline, minus its projection-scale trick: the rim's surface standoff is the
-    // z-fight guard instead. The depth test is left on so a rim is occluded by nearer terrain.
+    // Mirrors RenderGlobal.drawSelectionBox: the rim's surface standoff is the z-fight guard. The depth test is left on
+    // so a rim is occluded by nearer terrain.
     private static void setupLineState(float lineWidth) {
         GlStateManager.enableBlend();
         GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA,

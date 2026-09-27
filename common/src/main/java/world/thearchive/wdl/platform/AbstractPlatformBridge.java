@@ -248,7 +248,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (lastPrimary != null && widgets.contains(lastPrimary)) {
             return ImmutableList.of();
         }
-        // This band has no Screen width on the call path; the scaled resolution is the same number and is what
+        // This band has no GuiScreen width on the call path; the scaled resolution is the same number and is what
         // the rest of the band reads for screen dimensions.
         GuiButton anchor = lowestColumnButton(widgets, new ScaledResolution(Minecraft.getMinecraft()).getScaledWidth());
         if (anchor == null) {
