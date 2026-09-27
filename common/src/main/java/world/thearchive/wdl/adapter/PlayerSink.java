@@ -9,7 +9,7 @@ import net.minecraft.nbt.NBTTagCompound;
 /**
  * Per-band player-serialize axis: serialize the local player into vanilla's player record via
  * {@code player.writeToNBT(NBTTagCompound)}. The capture pipeline routes the local player here rather than through the
- * entity axis ({@link EntitySink}).
+ * entity axis ({@link EntitySink}), mirroring vanilla, which saves the player apart from the other entities.
  *
  * <p>Per-band because the serialize API drifts. The single step is client-coupled (a live {@code EntityPlayer}); the
  * headless guard is the pure downstream ({@link PlayerTag}, {@link ItemLocationScrub}, the save apply).
@@ -17,7 +17,7 @@ import net.minecraft.nbt.NBTTagCompound;
 public interface PlayerSink {
     /**
      * Serialize {@code player} into a player-record tag (no {@code id}): the {@code Entity} super fields
-     * ({@code Pos}/{@code Rotation}/{@code UUID}/...).
+     * ({@code Pos}/{@code Rotation}/{@code UUIDMost}/{@code UUIDLeast}/...).
      */
     NBTTagCompound capturePlayer(EntityPlayer player);
 }

@@ -1234,7 +1234,7 @@ common/src/main/resources/assets/wdl/lang/*.json
 # the loader's own world-unload signal while the block-state ids a chunk encode reads are still the ones the capture
 # took them against and the local player is still live, and isConnectionClosed, which tells a subscriber which kind of
 # teardown it is being called for; the Javadoc at 1.11.2 names the registry revert the hold protects, 1.13.2's only the
-# player.
+# player. Below 1.12 there is no vanilla toast host, so the toast method's Javadoc names no tray.
 common/src/main/java/world/thearchive/wdl/platform/PlatformBridge.java
 
 # Pins the pause-menu row placement against 1.11.2's GuiButton over the 200-wide column of the 1.11.2 pause screen

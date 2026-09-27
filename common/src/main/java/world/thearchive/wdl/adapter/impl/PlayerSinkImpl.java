@@ -25,8 +25,8 @@ public final class PlayerSinkImpl implements PlayerSink {
      */
     @Override
     public NBTTagCompound capturePlayer(EntityPlayer player) {
-        // writeToNBT writes the Entity super fields (Pos/Rotation/UUID) plus EntityPlayer.writeEntityToNBT
-        // (Inventory/SelectedItemSlot/EnderItems/abilities), with no id.
+        // writeToNBT writes the Entity super fields (Pos/Rotation/UUIDMost/UUIDLeast) plus
+        // EntityPlayer.writeEntityToNBT (Inventory/SelectedItemSlot/EnderItems/abilities), with no id.
         NBTTagCompound tag = new NBTTagCompound();
         player.writeToNBT(tag);
         return tag.copy();
