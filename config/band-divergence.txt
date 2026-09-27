@@ -48,7 +48,8 @@ fabric/src/gametest/
 
 # Below the 1.21.2 chunk-serialization cut vanilla has no SerializableChunkData.SectionData record, so this
 # chunk-snapshot seam defines its own band-stable SectionData carrier for the static-write codec. Below 1.20.5
-# ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update.
+# ChunkStatus is in net.minecraft.world.level.chunk, not the .status subpackage added at that update. Below 1.18 a chunk
+# has no yPos key, so the lowest-section index is not named after one.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkSnapshotSource.java
 
 # Reads the captured section through ChunkSnapshotSource's own SectionData rather than the vanilla
@@ -89,7 +90,9 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 # getLevelPath(LevelResource.ROOT).normalize(), the pre-getLevelDirectory form (normalized because ROOT's bare-dot
 # id would otherwise misplace the export zip). Below 1.20.2 ClientPacketListener has no serverBrand, so the
 # report environment reads the server brand through LocalPlayer.getServerBrand(). Below 1.20 Entity.level is a
-# public field rather than the level() accessor, so the camera-anchor level guard reads camera.level directly.
+# public field rather than the level() accessor, so the camera-anchor level guard reads camera.level directly. Below
+# 1.18 there is no server simulation distance, so the report environment carries the render distance in its place and
+# its Javadoc says so.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 
 # Below 1.21.2 the toast host is Minecraft.getToasts (ToastComponent), not getToastManager. Below 1.20.3
@@ -240,18 +243,19 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 # Provider, and ContainerHelper.loadAllItems/saveAllItems take no registries argument.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
 
-# Below 1.19 a captured jukebox carries only RecordItem: vanilla's JukeboxBlockEntity.saveAdditional writes no
-# IsPlaying or tick sidecar (those are 1.19 additions), so the jukebox merge fixtures set only that key. Below 1.20.5
-# a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so these merge
+# Below 1.19.4 a jukebox block entity saves its disc and no play state: vanilla's JukeboxBlockEntity.save writes no
+# IsPlaying or tick sidecar (both first in 1.19.4's tree), so the jukebox merge fixtures set only RecordItem. Below
+# 1.20.5 a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, so these merge
 # fixtures use that key and the beehive fixture goes through the unchecked malformedChunkTagWith instead of the
 # fidelity-checked chunkTagWith. Below 1.18 the merge reads the chunk block entities under Level.TileEntities, and
 # fastutil 8.2.1 has no LongSet.of() so the empty set is LongSets.EMPTY_SET.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
 
 # Below the 1.21 update a captured jukebox is marked playing via IsPlaying rather than the ticks_since_song_started
-# sidecar, so this round-trip asserts the playing flag. Below 1.20.5 there are no item components: the RecordItem
-# write is ItemStack#save (read back via vanilla's own ItemStack.of) and the beehive occupants are the
-# pre-component {EntityData, TicksInHive, MinOccupationTicks} entries under Bees rather than Occupant.LIST_CODEC.
+# sidecar, so this round-trip asserts the playing flag. Below 1.20.5 there are no item components: the RecordItem write
+# is ItemStack#save (read back via vanilla's own ItemStack.of) and the beehive occupants are the pre-component
+# {EntityData, TicksInHive, MinOccupationTicks} entries under Bees rather than Occupant.LIST_CODEC. Below 1.18 the block
+# entities are read under Level.TileEntities.
 common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
 
 # Below 1.20.5 there is no SimpleRegionStorage or RegionStorageInfo, so the region storage this writer drains against
@@ -672,7 +676,8 @@ forge/src/main/java/world/thearchive/wdl/forge/ForgeOutlineRegistrar.java
 common/src/test/java/world/thearchive/wdl/adapter/ChunkSectionClampTest.java
 
 # Below 1.18 a chunk's block entities nest under Level.TileEntities, not the flat root block_entities added at 1.18,
-# so the in-session stash merge locates a block entity by x/y/z through the Level compound.
+# so the in-session stash merge locates a block entity by x/y/z through the Level compound. LogUtils is a 1.18 addition;
+# below it slf4j LoggerFactory acquires the per-class logger directly.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerMerge.java
 
 # Added below 1.20.5, absent from dev, and carried by every band from 1.11.2 to 1.20.4.
