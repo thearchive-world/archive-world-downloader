@@ -494,7 +494,7 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk recurses into a shulker's nested items via tag.BlockEntityTag.Items
-# and a bundle's via tag.Items, rather than the minecraft:container/minecraft:bundle_contents components.
+# and an item's own Items list via tag.Items, rather than the minecraft:container/minecraft:bundle_contents components.
 common/src/main/java/world/thearchive/wdl/adapter/ItemTreeWalk.java
 
 # Below 1.20.5 a filled map's id is the raw int tag."map", not a minecraft:map_id component, so the remap reads and
@@ -570,8 +570,9 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
 # Java 8 form: no Optional.isEmpty (the empty assertions negate isPresent) and no pattern instanceof.
 common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
 
-# Below 1.20.5 an item is {id, Count, tag}; the walk drives hand-built NBT keyed by tag.BlockEntityTag.Items (a
-# shulker) and tag.Items (a bundle) rather than the component keys, and there is no sulfur cube to recurse into.
+# Below 1.20.5 an item is {id, Count, tag} with no components map, so the test drives the walk with hand-built NBT keyed
+# by tag.BlockEntityTag.Items (a shulker) and tag.Items (an item's own list) and drops the sulfur-cube case, since that
+# walk has no sulfur-cube branch.
 common/src/test/java/world/thearchive/wdl/adapter/ItemTreeWalkTest.java
 
 # Below 1.20.5 there is no WrittenBookContent component; a written book's title/author/generation/resolved and its
@@ -871,7 +872,8 @@ common/src/test/java/world/thearchive/wdl/WorldgenWarmupTest.java
 
 # Below 1.18 a chunk's block entities are nested under Level.TileEntities, not the flat root block_entities added at
 # 1.18, so the carry-forward read navigates the Level compound first. Below 1.15 StringTag has no valueOf factory, so
-# the chiseled-bookshelf id tag is built through the public constructor.
+# the chiseled-bookshelf id tag is built through the public constructor. Below 1.15 there is no beehive, so the content
+# Javadoc names a Bees list rather than beehive occupants.
 common/src/main/java/world/thearchive/wdl/adapter/ChunkMerge.java
 
 # Below 1.18 the recovered-container scan reads block entities from Level.TileEntities, not the flat root
