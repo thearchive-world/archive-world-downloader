@@ -90,7 +90,7 @@ public final class WdlSettingsScreen extends GuiScreen {
     private @Nullable GuiButton defaults;
     private @Nullable SettingsList list;
     // Below 1.19.3 there is no per-widget Tooltip, and a control's tooltip inside the scrolling list clips to the
-    // list scissor, so hovered tooltips are recorded here and drawn screen-side after the list in render.
+    // list scissor, so hovered tooltips are recorded here and drawn screen-side after the list in drawScreen.
     private final List<Map.Entry<Gui, ITextComponent>> hoverTooltips = new ArrayList<>();
 
     public WdlSettingsScreen(@Nullable GuiScreen parent, WdlConfig live, Consumer<WdlConfig> onSave,
@@ -821,7 +821,7 @@ public final class WdlSettingsScreen extends GuiScreen {
             // and a second offset draw gives it the same drop shadow the surrounding button text has.
             if (modified) {
                 int iconColor = BrandColors.opaque(enabled ? BrandColors.WHITE : BrandColors.GRAY);
-                // Quarter-brightness of the foreground, matching vanilla Font's drop-shadow derivation.
+                // Quarter-brightness of the foreground, matching vanilla FontRenderer's drop-shadow derivation.
                 int shadowColor = (iconColor & 0xFCFCFC) >> 2 | (iconColor & 0xFF000000);
                 // Center on the button face, which excludes the one-pixel bottom shadow row of the widget sprite.
                 int iconX = revertX + (REVERT_WIDTH - REVERT_ICON_WIDTH) / 2;
@@ -967,11 +967,10 @@ public final class WdlSettingsScreen extends GuiScreen {
     }
 
     /**
-     * A slider over a descriptor range; its message renders the current value through the option's value key. This band
-     * ships no reusable slider primitive (the vanilla one is bound to a game Option), so the slider is driven on the
-     * button base directly: a press or held drag sets the fraction from the mouse, the handle is drawn in the button
-     * background pass, and a subclass supplies only the value quantization and formatting (int versus tenth-quantized
-     * float).
+     * A slider over a descriptor range; its message renders the current value through the option's value key. The
+     * slider is driven on the button base directly: a press or held drag sets the fraction from the mouse, the handle
+     * is drawn in the button background pass, and a subclass supplies only the value quantization and formatting (int
+     * versus tenth-quantized float).
      */
     private abstract class RangeSlider extends GuiButton {
         final String key;

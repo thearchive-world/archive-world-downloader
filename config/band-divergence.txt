@@ -1339,3 +1339,6 @@ common/src/test/java/world/thearchive/wdl/core/EntityMenuCapabilityTest.java
 
 # Classic-band comments use this version's MCP names.
 common/src/test/java/world/thearchive/wdl/core/browse/TargetResolverTest.java
+
+# Classic-band comments use this version's MCP names.
+common/src/main/java/world/thearchive/wdl/client/WdlKeyBinds.java

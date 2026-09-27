@@ -163,14 +163,14 @@ public final class WdlDownloadsScreen extends GuiScreen {
 
     private @Nullable Runnable pendingTooltip;
 
-    // The capture state init() last built its widgets for; tick() rebuilds when the live state diverges, so a
-    // flip between idle and capturing swaps the whole widget set rather than leaving a stale control on screen.
+    // The capture state initGui() last built its widgets for; updateScreen() rebuilds when the live state diverges, so
+    // a flip between idle and capturing swaps the whole widget set rather than leaving a stale control on screen.
     private CaptureState builtForState = CaptureState.IDLE;
 
     // The on-disk size: a daemon walks each row's folder the first time the row is drawn (so only visible rows
     // are walked, never the whole list at once) and the result fills in its size on the render thread. The dedupe
-    // set and the walked overlay are screen-scoped, so a resize-driven init() rebuild re-binds the fresh rows to
-    // sizes already walked instead of re-walking. removed() closes the scanner; a re-open recreates it.
+    // set and the walked overlay are screen-scoped, so a resize-driven initGui() rebuild re-binds the fresh rows to
+    // sizes already walked instead of re-walking. onGuiClosed() closes the scanner; a re-open recreates it.
     private OnDiskSizeScanner sizeScanner = new OnDiskSizeScanner();
     private final Map<Path, Long> walkedSizes = new HashMap<>();
     private final Set<Path> scheduledWalks = new HashSet<>();
@@ -181,7 +181,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
     private final Set<Path> scheduledProbes = new HashSet<>();
 
     // The wall clock of the last sweep-work probe (never a gameplay-time counter, which pauses with the
-    // game); tick() re-probes at the sweep's own TTL cadence while the screen stays open.
+    // game); updateScreen() re-probes at the sweep's own TTL cadence while the screen stays open.
     private long lastSweepCheckMillis;
 
     public WdlDownloadsScreen(@Nullable GuiScreen parent, Path savesDirectory, @Nullable Path loadedWorld,
@@ -215,7 +215,7 @@ public final class WdlDownloadsScreen extends GuiScreen {
             listCollapsed = false; // /wdl downloads forces the list open; the choice then persists for the session
         }
         // The launch sweep rides the screen open: pending roll-back work under the temporary root is dispatched
-        // from idle here, and the TTL re-check in tick() repeats the probe while the screen stays open.
+        // from idle here, and the TTL re-check in updateScreen() repeats the probe while the screen stays open.
         this.lastSweepCheckMillis = System.currentTimeMillis();
         if (captureState.get() == CaptureState.IDLE
                 && RestoreOperation.RestoreSweep.hasWork(savesDirectory)) {
@@ -818,7 +818,10 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
     }
 
-    /** Request that the running capture stop; {@code tick()} swaps to the saving widget set once the state flips. */
+    /**
+     * Request that the running capture stop; {@code updateScreen()} swaps to the saving widget set once the state
+     * flips.
+     */
     private void stopCapture() {
         this.onStop.run();
     }
@@ -1034,10 +1037,10 @@ public final class WdlDownloadsScreen extends GuiScreen {
         }
         CaptureState state = this.captureState.get();
         if (state != this.builtForState) {
-            // The flip back to idle is the moment disk state changed (a save finished, or a restore or sweep
-            // ended), so the browse model and the caches are refreshed here, not on resize-driven init()
-            // reruns; a completed sweep that never touched the disk skips the re-pull. The availability
-            // cache rides the entries list, so it invalidates on the same re-pull.
+            // The flip back to idle is the moment disk state changed (a save finished, or a restore or sweep ended), so
+            // the browse model and the caches are refreshed here, not on resize-driven initGui() reruns; a completed
+            // sweep that never touched the disk skips the re-pull. The availability cache rides the entries list, so it
+            // invalidates on the same re-pull.
             if (state == CaptureState.IDLE
                     && (this.builtForState != CaptureState.RESTORING || Wdl.lastRestoreChangedDisk())) {
                 this.entries = this.entriesSupplier.get();

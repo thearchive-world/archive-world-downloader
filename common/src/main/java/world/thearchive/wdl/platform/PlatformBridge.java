@@ -96,9 +96,9 @@ public interface PlatformBridge {
 
     /**
      * Whether this loader's block use hook observes a right-click a SPECTATOR made. Vanilla is not what decides this:
-     * the client sends the use packet and the server opens the menu for any clicked block carrying a
-     * {@code MenuProvider} in its SPECTATOR branch, so a spectator's block open is real on every loader. What differs
-     * is whether the loader hands the observation over, and the two loaders differ on it in opposite directions from
+     * the client sends the use packet and the server opens the menu for any clicked block carrying an
+     * {@code IInventory} in its SPECTATOR branch, so a spectator's block open is real on every loader. What differs is
+     * whether the loader hands the observation over, and the two loaders differ on it in opposite directions from
      * {@link #observesSpectatorEntityClick}. Read by the open-container bind: the crosshair fallback exists only to
      * cover the axis the loader is blind on, so on a loader that observes this axis the block leg would fire for
      * nothing but opens the click chain did not account for, where a crosshair is a guess and not provenance.
