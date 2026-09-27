@@ -4840,7 +4840,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 bridge.modVersion());
     }
 
-    /** Read the MC-side environment facts (server brand, simulation distance, dimension, MC + mod version). */
+    /** Read the MC-side environment facts (server brand, render distance, dimension, MC + mod version). */
     private ReportEnvironment buildReportEnvironment(Minecraft minecraft) {
         String brand = "";
         LocalPlayer player = minecraft.player;
