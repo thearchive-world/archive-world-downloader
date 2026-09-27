@@ -84,7 +84,8 @@ common/src/main/java/world/thearchive/wdl/adapter/EntityPacketCapture.java
 # from the hit locally; 1.21.9 made it a public SelectableSlotContainer default taking a Direction. And below 1.21.5
 # DataComponents.BEES holds a List of BeehiveBlockEntity.Occupant; 1.21.5 wrapped it in the Bees record.
 common/src/main/java/world/thearchive/wdl/adapter/InteractionCapture.java
-# Below 1.21.5 CompoundTag lists its keys through getAllKeys, renamed keySet at 1.21.5.
+# Below 1.21.5 CompoundTag lists its keys through getAllKeys, renamed keySet at 1.21.5. Below 1.21.9 there is no shelf
+# block, so the class Javadoc names the decorated pot alone as a block entity the scrub reaches.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 # Below 1.21.5: primitive tag reads, Entity.moveTo not yet snapTo, no Level.getEntity(UUID), a separate orb packet.
 # Below 1.21.9: no ChestBlock.getConnectedBlockPos or three-argument startRiding, GameProfile.getName and getId. Below
