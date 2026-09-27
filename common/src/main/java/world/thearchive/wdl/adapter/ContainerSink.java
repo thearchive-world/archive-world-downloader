@@ -10,8 +10,8 @@ import net.minecraft.util.NonNullList;
 /**
  * Per-band container-capture axis: serialize an open container's items into the vanilla block-entity {@code "Items"}
  * NBT and merge them into a captured block-entity tag. Container contents are world data the client receives only while
- * the player has the container open (via {@code ClientboundContainerSetContentPacket}), never in the chunk packet, so a
- * captured chunk's chest is structurally present but empty until this axis fills it in.
+ * the player has the container open (via {@code SPacketWindowItems}), never in the chunk packet, so a captured chunk's
+ * chest is structurally present but empty until this axis fills it in.
  *
  * <p>The live step ({@link #captureItems(NonNullList)}) serializes the items lifted from the open menu's container
  * slots. The pure step ({@link #merge(NBTTagCompound, NBTTagCompound)}) sets {@code "Items"} on a copy of an

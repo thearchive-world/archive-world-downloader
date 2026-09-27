@@ -37,7 +37,7 @@ class UiLiteralEnrollmentTest {
             Paths.get("../fabric/src/main/java/world/thearchive/wdl"),
             Paths.get("../neoforge/src/main/java/world/thearchive/wdl"));
 
-    // File to number of new TextComponent(...) calls, each one data or a glyph, never user-facing prose.
+    // File to number of new TextComponentString(...) calls, each one data or a glyph, never user-facing prose.
     private static final Map<String, Integer> ACKNOWLEDGED_UI_LITERALS = ImmutableMap.of(
             // the one amber-argument helper every confirm body's data insert (folder, backup or source zip
             // name, snapshot name) routes through

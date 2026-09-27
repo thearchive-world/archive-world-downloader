@@ -73,8 +73,9 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void syncedValuesMergeByKeyWithTheLatestWinning() {
-        // SetEntityData carries a diff keyed by the accessor id; a later value for an accessor overwrites the
-        // earlier (vanilla's assignValues semantics), so a frame whose item changes ends at the latest item.
+        // SPacketEntityMetadata carries a diff keyed by the DataParameter id; a later value for a DataParameter
+        // overwrites the earlier (vanilla's setEntryValues semantics), so a frame whose item changes ends at the latest
+        // item.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "spawn-packet");
         accumulator.recordData(7, 8, "item=apple");
@@ -91,8 +92,8 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void equipmentMergesBySlotWithTheLatestWinning() {
-        // SetEquipment is applied per slot the way the client does (setItemSlot), so a re-equip of one slot
-        // overwrites only that slot; the merge mirrors the synced diff but on its own channel.
+        // SPacketEntityEquipment is applied per slot the way the client does (setItemStackToSlot), so a re-equip of one
+        // slot overwrites only that slot; the merge mirrors the synced diff but on its own channel.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "mob");
         accumulator.recordEquipment(7, 0, "head=helmet");
@@ -109,7 +110,7 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void passengersAreReplacedWholesale() {
-        // SetPassengers is the full passenger list (the client ejects then re-seats), so a later packet replaces
+        // SPacketSetPassengers is the full passenger list (the client ejects then re-seats), so a later packet replaces
         // the prior list rather than merging into it.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "vehicle");
@@ -121,7 +122,7 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void theLeashHolderIsRecordedAndDefaultsToNone() {
-        // SetEntityLink carries the holder int id; absent any link the holder is 0, matching vanilla's
+        // SPacketEntityAttach carries the holder int id; absent any link the holder is 0, matching vanilla's
         // delayedLeashHolderId != 0 has-a-leash convention.
         EntityPacketAccumulator<String, String, String> unleashed = accumulator();
         unleashed.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "mob");
@@ -181,7 +182,7 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void tracksReportsWhetherAnIdHasBeenSpawned() {
-        // The tee gates the per-value SetEntityData merge on this so a non-tracked entity's synced update costs
+        // The tee gates the per-value SPacketEntityMetadata merge on this so a non-tracked entity's synced update costs
         // the Netty thread one lookup, not one per value (the Netty path does almost nothing).
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(7, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "spawn-packet");
@@ -236,11 +237,11 @@ class EntityPacketAccumulatorTest {
 
     @Test
     void aPassengerArrivingAfterItsVehiclesSetPassengersIsNotReHomed() {
-        // SetPassengers can arrive before the rider's AddEntity (out of order on the wire). reHomePassengers
+        // SPacketSetPassengers can arrive before the rider's AddEntity (out of order on the wire). reHomePassengers
         // skips a not-yet-tracked rider id, and the later rider spawn is not retroactively re-homed, so the rider
         // keeps its own chunk and saves standalone instead of nested. No data loss (the rider is still saved);
         // pinned here as the documented edge, not a fix (a retroactive re-home would need a
-        // reverse rider-to-vehicle index for a non-loss case). The in-order spawn-then-SetPassengers case nests,
+        // reverse rider-to-vehicle index for a non-loss case). The in-order spawn-then-SPacketSetPassengers case nests,
         // covered by settingPassengersReHomesTheRidersToTheVehiclesChunk.
         EntityPacketAccumulator<String, String, String> accumulator = accumulator();
         accumulator.spawn(1, UUID_A, CHUNK, new EntityPos(0, 0, 0, 0f, 0f), "vehicle");

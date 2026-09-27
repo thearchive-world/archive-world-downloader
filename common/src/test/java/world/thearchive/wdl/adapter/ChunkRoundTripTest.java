@@ -38,7 +38,7 @@ class ChunkRoundTripTest {
         NBTTagCompound tag = codec.encode(SyntheticChunks.full(true), false);
         NBTTagCompound back = RegionRoundTrip.writeThenRead(directory, new ChunkPos(0, 0), tag);
 
-        // write() stamps DataVersion, and it survives the on-disk region round-trip.
+        // encode() stamps DataVersion, and it survives the on-disk region round-trip.
         assertTrue((tag.hasKey("DataVersion") ? tag.getInteger("DataVersion") : -1) > 0,
                 "codec must stamp a DataVersion");
         assertEquals((tag.hasKey("DataVersion") ? tag.getInteger("DataVersion") : -1),

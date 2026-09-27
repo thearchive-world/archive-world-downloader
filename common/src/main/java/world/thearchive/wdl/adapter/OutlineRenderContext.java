@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * The per-frame inputs the outline cull hands the injected renderer: the line buffer to write edges into, the live view
  * frustum for the section cull, the camera position so the draw is camera-relative, and the effective rim line width.
- * This pre-blaze3d band has no pose stack or buffer source: the buffer is the shared Tesselator's VertexBuffer, begun
+ * This pre-blaze3d band has no pose stack or buffer source: the buffer is the shared Tessellator's VertexBuffer, begun
  * on the POSITION_COLOR line format by the cull before any rim is drawn and flushed after, and the line width is
  * applied once as legacy GL state rather than carried per vertex. The cull reads the band-stable members and passes the
  * whole context to the injected {@link RimRenderer}, which owns the band-and-loader-varying draw.

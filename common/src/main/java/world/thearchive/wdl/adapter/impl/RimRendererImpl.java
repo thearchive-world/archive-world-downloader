@@ -18,8 +18,8 @@ import world.thearchive.wdl.core.RimFace;
  * already holds the camera orientation and the draw subtracts the camera position to reach that view space. The
  * rectangle's two in-plane axes span the block cell and its normal axis planes onto the model shape, lifted a small
  * standoff along the face normal, so the rim frames a recessed model (a chest) at block extent yet never z-fights a
- * flush one. We draw the edges explicitly rather than feed a flat {@code VoxelShape} to a shape renderer, which risks
- * degenerate zero-length edges. The line width is the global GL state the cull sets, not a per-vertex element.
+ * flush one. We draw the edges explicitly rather than feed a flat {@code AxisAlignedBB} to a shape renderer, which
+ * risks degenerate zero-length edges. The line width is the global GL state the cull sets, not a per-vertex element.
  */
 public final class RimRendererImpl implements RimRenderer {
     // A small outward lift of the drawn face along its normal, so the rim clears the model surface it planes
