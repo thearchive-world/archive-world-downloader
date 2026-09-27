@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
 public interface ChunkSnapshotSource {
     ChunkPos chunkPos();
 
-    /** Index of the lowest section (vanilla {@code yPos}); e.g. 0 for a 0..256 overworld. */
+    /** Index of the lowest section; e.g. 0 for a 0..256 overworld. */
     int minSectionY();
 
     /** Game time stamped as {@code LastUpdate}. */

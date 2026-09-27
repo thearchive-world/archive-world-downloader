@@ -115,7 +115,7 @@ public interface PlatformBridge {
      */
     void sendChat(ChatCopy line);
 
-    /** Enqueue a job-done toast on the vanilla system-toast tray (client main thread). */
+    /** Enqueue a job-done toast (client main thread). */
     void sendToast(ToastCopy toast);
 
     /**
