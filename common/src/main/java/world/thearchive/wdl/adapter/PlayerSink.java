@@ -10,7 +10,8 @@ import net.minecraft.world.entity.player.Player;
 /**
  * Per-band player-serialize axis: serialize the local player into vanilla's player record via
  * {@code player.saveWithoutId}, the identical call vanilla's own player save uses. The capture pipeline routes the
- * local player here rather than through the entity axis ({@link EntitySink}).
+ * local player here rather than through the entity axis ({@link EntitySink}), mirroring vanilla, which saves the player
+ * apart from the other entities.
  *
  * <p>Per-band because the serialize API drifts. The single step is client-coupled (a live {@code Player}); the headless
  * guard is the pure downstream ({@link PlayerTag}, {@link ItemLocationScrub}, the save apply).
@@ -18,7 +19,7 @@ import net.minecraft.world.entity.player.Player;
 public interface PlayerSink {
     /**
      * Serialize {@code player} into a player-record tag (no {@code id}): the {@code Entity} super fields
-     * ({@code Pos}/{@code Rotation}/{@code UUID}/...) plus {@code Player.addAdditionalSaveData}
+     * ({@code Pos}/{@code Rotation}/{@code UUIDMost}/{@code UUIDLeast}/...) plus {@code Player.addAdditionalSaveData}
      * ({@code Inventory}/{@code SelectedItemSlot}/{@code EnderItems}/ {@code abilities}/...). Server-free.
      */
     CompoundTag capturePlayer(Player player);
