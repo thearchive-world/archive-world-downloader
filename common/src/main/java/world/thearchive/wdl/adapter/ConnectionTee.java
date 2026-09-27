@@ -112,13 +112,13 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
     /**
      * Observe the one outgoing request that opens a ridden vehicle's own inventory, so the ridden-vehicle bind rests on
      * the client's own act rather than on a sampled key. Vanilla builds and sends this from exactly one place,
-     * {@code LocalPlayer.sendOpenInventory}, called only by the inventory-key branch of
-     * {@code Minecraft.handleKeybinds} and only when the ridden vehicle has a custom inventory screen, so seeing it
+     * {@code EntityPlayerSP.sendHorseInventory}, called only by the inventory-key branch of
+     * {@code Minecraft.processKeyBinds} and only when the ridden vehicle has a custom inventory screen, so seeing it
      * means vanilla has already decided to open the vehicle's menu, once per request.
      *
-     * <p>The packet names the PLAYER, not the vehicle ({@code ServerboundPlayerCommandPacket} is constructed from the
-     * sending entity), and this runs on the Netty event loop where no world state may be read, so it only raises a
-     * signal and {@link OpenClickTracker} stamps the vehicle on the main thread.
+     * <p>The packet names the PLAYER, not the vehicle ({@code CPacketEntityAction} is constructed from the sending
+     * entity), and this runs on the Netty event loop where no world state may be read, so it only raises a signal and
+     * {@link OpenClickTracker} stamps the vehicle on the main thread.
      */
     @Override
     public void write(ChannelHandlerContext context, Object message, ChannelPromise promise) throws Exception {
@@ -131,8 +131,8 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
     }
 
     private void route(Packet<?> packet, EntityPacketCapture capture) {
-        // No inbound packet bundling below 1.19.4, so there is no bundle-scoped SetPassengers pre-scan: every
-        // packet routes directly and SetPassengers arrives as an ordinary in-stream packet, so no ids are named
+        // No inbound packet bundling below 1.19.4, so there is no bundle-scoped SPacketSetPassengers pre-scan: every
+        // packet routes directly and SPacketSetPassengers arrives as an ordinary in-stream packet, so no ids are named
         // ahead of their spawn and bundleNamedIds is always empty here.
         routeOne(packet, capture, IntSets.EMPTY_SET);
     }

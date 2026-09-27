@@ -272,7 +272,7 @@ class LiveCaptureSessionFailSoftTest {
 
     /**
      * The one link no unit above pins: that {@link LiveCaptureSession#finish} routes through the guard at all.
-     * Headless, {@code Minecraft.getInstance()} is null, so the finish body throws on its first client read, which is
+     * Headless, {@code Minecraft.getMinecraft()} is null, so the finish body throws on its first client read, which is
      * the same shape as any other throw on the way to the marker and exercises the whole route. What this cannot pin is
      * the executor the production path passes.
      */

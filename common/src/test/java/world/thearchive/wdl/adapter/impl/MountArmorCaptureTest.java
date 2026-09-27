@@ -260,8 +260,8 @@ class MountArmorCaptureTest {
     }
 
     /**
-     * The synced carpet-color accessor, reached by reflection because it is private and every public route to it runs
-     * through inventory slot 1. The same shape {@code SaddleCaptureTest} uses to reach the mount inventory.
+     * The synced carpet-color DataParameter, reached by reflection because it is private and every public route to it
+     * runs through inventory slot 1. The same shape {@code SaddleCaptureTest} uses to reach the mount inventory.
      */
     private static DataParameter<Integer> colorId() {
         try {

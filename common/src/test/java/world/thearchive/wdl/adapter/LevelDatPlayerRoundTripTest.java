@@ -123,7 +123,7 @@ class LevelDatPlayerRoundTripTest {
             throws IOException {
         NBTTagCompound playerTag = capturedPlayerTag();
         UUID boat = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
-        NBTTagCompound boatTag = EntityFixtures.entityTag("minecraft:chest_boat"); // the id loadEntityRecursive reads
+        NBTTagCompound boatTag = EntityFixtures.entityTag("minecraft:chest_boat"); // the id readWorldEntity reads
         PlayerTag.setRootVehicle(playerTag, boat, boatTag);
         CapturedPlayer captured = new CapturedPlayer(playerTag, BlockPos.ORIGIN, 0.0F, 0.0F,
                 DimensionType.OVERWORLD, GameType.CREATIVE, EnumDifficulty.NORMAL);

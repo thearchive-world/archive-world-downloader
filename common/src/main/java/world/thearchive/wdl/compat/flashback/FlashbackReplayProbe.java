@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Identifies Flashback's replay server, so the activation gate can admit that one local-server case while still
  * refusing a genuine singleplayer or LAN-hosted world. Flashback plays a replay through a real {@code IntegratedServer}
- * subclass installed in {@code Minecraft.getSingleplayerServer()}, so the test is class identity on that object: no
+ * subclass installed in {@code Minecraft.getIntegratedServer()}, so the test is class identity on that object: no
  * vanilla path can produce it, and this is the same test Flashback runs on itself.
  *
  * <p>Detects playback, not installation: Flashback being loaded while an ordinary singleplayer world is open leaves a

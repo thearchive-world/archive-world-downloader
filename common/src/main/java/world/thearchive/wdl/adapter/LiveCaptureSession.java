@@ -151,7 +151,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     // How many chunks past the render-distance capture square to keep buffered before flushing to disk.
     // Containers are opened far inside render distance, so any non-negative margin keeps merge-before-flush
     // correct; +2 just keeps a small band past the capture square so a chunk is not flushed the instant it
-    // leaves it. The buffer is therefore bounded by the (renderDistance + this) square around the player,
+    // leaves it. The buffer is therefore bounded by the (renderDistanceChunks + this) square around the player,
     // independent of how far the capture roams.
     private static final int KEEP_HOT_MARGIN = 2;
 
@@ -603,7 +603,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /** The save's level.dat ({@code <save>/level.dat}); read on a resume to carry the ender chest forward. */
     private @Nullable Path levelDatFile;
 
-    /** {@code containerId} of the menu currently tracked, or {@link #NO_MENU} when none is open. */
+    /** {@code windowId} of the menu currently tracked, or {@link #NO_MENU} when none is open. */
     private int openContainerId = NO_MENU;
 
     /** The background writer draining captured tags to disk; opened lazily on the first chunk to flush. */
@@ -798,9 +798,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
     private @Nullable ReportEnvironment reportEnvironment;
 
     /**
-     * The source server's icon bytes, snapshotted on the main thread in {@link #finish()} (where {@code
-     * getCurrentServer()} is live) and read by the writer thread, the same discipline as {@link #capturedPlayer}. Null
-     * in singleplayer or on a connect that cached no icon, so no icon file is written.
+     * The source server's icon bytes, snapshotted on the main thread in {@link #finish()} (where
+     * {@code getCurrentServerData()} is live) and read by the writer thread, the same discipline as
+     * {@link #capturedPlayer}. Null in singleplayer or on a connect that cached no icon, so no icon file is written.
      */
     private volatile byte @Nullable [] reportIconBytes;
 
@@ -1064,7 +1064,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * The finish-snapshot position anchor: a seated player anchors to its root vehicle's block (a standing-height
      * coordinate over the vehicle's own captured resting floor or water), a standing player to the ordinary camera
-     * anchor. Keyed on {@code isPassenger()}, never on whether a {@code RootVehicle} was written, so a vehicle carrying
+     * anchor. Keyed on {@code isRiding()}, never on whether a {@code RootVehicle} was written, so a vehicle carrying
      * more than one player or a save-refused mount still gets the safe vehicle-block Pos instead of the floored
      * passenger-offset seat coordinate. Pure and package-private so the seated-versus-standing choice is
      * headless-testable; {@link #anchorEntity} stays the live-only camera resolver.
@@ -1117,7 +1117,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
                 if (sweepGeneration != 0) {
                     // The start-window (and every re-arm's) one-shot seed sweep: window-suppressed primes
                     // registered without sampling; replay the book against the current player position.
-                    // Ids gone from the live level are Respawn-race orphans and never sample.
+                    // Ids gone from the live level are SPacketRespawn-race orphans and never sample.
                     String dimensionId = level().provider.getDimensionType().getName();
                     int boundBlocks = capChunks * 16;
                     boolean aborted = false;
@@ -1241,7 +1241,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             lastCoveredCenter = null; // the first tick in the new dimension seeds its disc under its own key
             lastCoveredRadius = 0; // the covered set is per dimension, so it recomputes from its own trail
         });
-        // The cross-dimension jump is not a spurious fast tick; the Respawn already armed the suppression
+        // The cross-dimension jump is not a spurious fast tick; the SPacketRespawn already armed the suppression
         // window in-stream.
         dimensionRebind.registerClear(() -> tickBaselineValid = false);
         dimensionRebind.registerClear(() -> {
@@ -1320,7 +1320,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
     /**
      * The live FULL chunk at {@code pos}, or null if none is loaded or it is a Bobby cached chunk. Bobby swaps a cached
      * {@code FakeChunk} into the {@code ChunkProviderClient} slot the server left empty, and it passes the
-     * {@code getLevel()} canary, so it must be excluded here; treating it as null routes it through the existing
+     * {@code getWorld()} canary, so it must be excluded here; treating it as null routes it through the existing
      * "server never sent it" skip.
      */
     private @Nullable Chunk liveChunkAt(ChunkProviderClient chunkSource, ChunkPos pos) {
@@ -1370,9 +1370,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         for (int i = 0; i < offsets.length; i += 2) {
             ChunkPos pos = new ChunkPos(center.x + offsets[i], center.z + offsets[i + 1]);
             long posKey = ChunkPos.asLong(pos.x, pos.z);
-            // The cheap in-memory checks come before getChunk, so a stationary player in a captured area never
-            // pays a per-tick getChunk: a still-hot chunk is left to the hot re-capture path, and a chunk captured
-            // earlier and since flushed is re-buffered only on revisit, and only when the mode overwrites
+            // The cheap in-memory checks come before getLoadedChunk, so a stationary player in a captured area never
+            // pays a per-tick getLoadedChunk: a still-hot chunk is left to the hot re-capture path, and a chunk
+            // captured earlier and since flushed is re-buffered only on revisit, and only when the mode overwrites
             // revisited areas.
             if (captured.containsKey(pos)) {
                 continue;
@@ -1388,7 +1388,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             if (!hasEncodeBudget()) {
                 break; // out of budget: the rest of the square (still uncaptured) spills to a later tick
             }
-            // Safety canary: capture only ever touches Minecraft.level (WorldClient) chunks, which are never
+            // Safety canary: capture only ever touches Minecraft.world (WorldClient) chunks, which are never
             // persisted, so arming their save state cannot silently suppress a real singleplayer save.
             assert chunk.getWorld() == level : "capture touched a chunk outside the bound WorldClient";
             // The snapshot stands alone in its own try because it is the only statement here whose failure
@@ -1465,7 +1465,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         // result is narrowed to the chunk's own column below, and vanilla keys a saved entity by that column alone.
         AxisAlignedBB bounds = new AxisAlignedBB(pos.getXStart(), -2048, pos.getZStart(),
                 pos.getXEnd() + 1, 2048, pos.getZEnd() + 1);
-        // This band has no two-argument getEntitiesOfClass; the three-argument form takes a predicate, and an
+        // The three-argument form takes a predicate, and an
         // all-pass predicate reproduces the every-entity-in-bounds seed the prime loop wants.
         for (Entity entity : level().getEntitiesWithinAABB(Entity.class, bounds, candidate -> true)) {
             // Under the default recapture config (EVERYWHERE) a revisited chunk re-primes once it leaves the
@@ -1712,7 +1712,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (chunk == null) {
             return; // unreachable given shouldRecapture above; the explicit check narrows nullness
         }
-        // Safety canary: re-capture must only ever touch Minecraft.level (WorldClient) chunks, which are never
+        // Safety canary: re-capture must only ever touch Minecraft.world (WorldClient) chunks, which are never
         // persisted, so re-arming their save state cannot silently suppress a real singleplayer save.
         assert chunk.getWorld() == level : "re-capture touched a chunk outside the bound WorldClient";
         try {
@@ -1832,12 +1832,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Capture an open container's contents. Container items arrive only while the player has the container open (via
-     * {@code ClientboundContainerSetContentPacket}), never in the chunk packet, so they are stashed here and merged
-     * into their target at {@link #finish()}. Each recognition axis has its own bind leg and its own confidence test,
-     * and an open that no leg claims confidently is DROPPED: mis-binding would write the wrong items onto a block or
-     * entity (a corrupt archive) while an empty container is correct. The ender chest, the double chest, the chested
-     * animal and the container vehicle each bind through their own leg rather than being dropped; what is dropped is an
-     * open whose target the click chain cannot account for, and any open whose slot count fails its leg's size guard.
+     * {@code SPacketWindowItems}), never in the chunk packet, so they are stashed here and merged into their target at
+     * {@link #finish()}. Each recognition axis has its own bind leg and its own confidence test, and an open that no
+     * leg claims confidently is DROPPED: mis-binding would write the wrong items onto a block or entity (a corrupt
+     * archive) while an empty container is correct. The ender chest, the double chest, the chested animal and the
+     * container vehicle each bind through their own leg rather than being dropped; what is dropped is an open whose
+     * target the click chain cannot account for, and any open whose slot count fails its leg's size guard.
      *
      * <p>The binding is decided once when the menu first appears, from the target the player clicked (see
      * {@link ContainerCapture#resolveOpenTarget}, since the live crosshair keeps drifting until the menu freezes the
@@ -1956,12 +1956,11 @@ public final class LiveCaptureSession implements CaptureController.Session {
             atBlock = true;
             posKey = target.toLong();
             menuSlotCount = ContainerCapture.countBlockSlots(menu, player);
-            // The client builds the menu from its MenuType with a generic SimpleContainer (never the block's
-            // TileEntity, nor a CompoundContainer for a double chest), so identity can't tie the menu to the
-            // block. Instead bind only when the target block has its own storage container (size > 0,
-            // excludes non-container blocks and ender chests, which are not TileEntityLockable) whose
-            // size matches the menu's block-slot count; the guard drops the rest (a double chest is a 54-slot
-            // menu over a 27-slot half -> mismatch).
+            // The client builds the menu from its MenuType with a generic InventoryBasic (never the block's TileEntity,
+            // nor an InventoryLargeChest for a double chest), so identity can't tie the menu to the block. Instead bind
+            // only when the target block has its own storage container (size > 0, excludes non-container blocks and
+            // ender chests, which are not TileEntityLockable) whose size matches the menu's block-slot count; the guard
+            // drops the rest (a double chest is a 54-slot menu over a 27-slot half -> mismatch).
             if (level().getTileEntity(target) instanceof TileEntityLockable) {
                 TileEntityLockable blockContainer = (TileEntityLockable) level().getTileEntity(target);
                 blockContainerSize = blockContainer.getSizeInventory();
@@ -2838,12 +2837,12 @@ public final class LiveCaptureSession implements CaptureController.Session {
      */
     private void prepareRootVehicleCapture(EntityPlayerSP player) {
         if (!player.isRiding()) {
-            return; // the common fast path; isPassenger is a field read that cannot throw
+            return; // the common fast path; isRiding is a field read that cannot throw
         }
-        // Everything fallible is inside the try, including the vehicle-tree traversals: a modded Entity could
-        // override getVehicle/getRootVehicle/hasExactlyOnePlayerPassenger to throw, and any throw here must not
-        // propagate into finish() and hang the writer. A return inside the try is a normal exit (the catch does
-        // not fire).
+        // Everything fallible is inside the try, including the vehicle-tree traversals: a modded Entity could override
+        // getRidingEntity/getLowestRidingEntity/getRecursivePassengersByType to throw, and any throw here must not
+        // propagate into finish() and hang the writer. A return inside the try is a normal exit (the catch does not
+        // fire).
         try {
             Entity root = player.getLowestRidingEntity();
             Entity direct = player.getRidingEntity();
@@ -2995,10 +2994,10 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (target.mode() == DownloadMode.RESUME) {
             restoreSeatedMountContents(raw);
         }
-        // Creative only when the world-defaults master imposes it (with its openInCreative knob on); with the
-        // master off the world opens in the player's real game mode, matching cheats and time/weather falling
-        // back. Holding a player local does not keep gameMode alive: the teardown nulls it before the level field
-        // this assembly was admitted by, so the survival fallback here is reachable rather than defensive.
+        // Creative only when the world-defaults master imposes it (with its openInCreative knob on); with the master
+        // off the world opens in the player's real game mode, matching cheats and time/weather falling back. Holding a
+        // player local does not keep playerController alive: the teardown nulls it before the world field this assembly
+        // was admitted by, so the survival fallback here is reachable rather than defensive.
         GameType gameType = GameType.CREATIVE;
         if (!config.worldOutput().overrideWorldDefaults() || !config.worldOutput().openInCreative()) {
             PlayerControllerMP gameMode = minecraft.playerController;
@@ -3595,7 +3594,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
 
     /**
      * Bind the three world-open surfaces the map-tally paths read, standing in for the tail of {@link #ensureWriter},
-     * which cannot run headlessly because it resolves the level source through the client singleton. It has no
+     * which cannot run headlessly because it resolves the save loader through the client singleton. It has no
      * production caller and is not an alternative way to open a world: production binds these three in
      * {@code ensureWriter}, which also takes the session lock this one knows nothing about. The writer arrives as a
      * factory rather than an instance so the paths and the archive are published before the writer thread exists, the
@@ -3649,7 +3648,7 @@ public final class LiveCaptureSession implements CaptureController.Session {
             // creates the folder plus its advisory session.lock, so the check must run first or an escape touches
             // disk. toRealPath canonicalizes the base so a symlinked saves directory cannot defeat the lexical check.
             // This band's save format has no saves-root accessor; the saves base is the game directory's saves folder,
-            // the same root it constructs the level source over.
+            // the same root it constructs the save loader over.
             Path savesBase = savesDirectory.toRealPath();
             Path resolved = savesBase.resolve(saveName).normalize();
             // A download folder is a single component directly under saves; requiring the parent to be exactly
@@ -4534,8 +4533,9 @@ public final class LiveCaptureSession implements CaptureController.Session {
         if (entity == null) {
             return null;
         }
-        // This band has no Entity.recreateFromPacket; set the id and uuid from the accumulated identity (the moveTo
-        // below sets position and rotation), which is the identity the reconstructed entity is saved under.
+        // This band has no Entity.recreateFromPacket; set the id and uuid from the accumulated identity (the
+        // setLocationAndAngles below sets position and rotation), which is the identity the reconstructed entity is
+        // saved under.
         entity.setEntityId(frame.id());
         entity.setUniqueId(frame.uuid());
         EntityPos pos = frame.pos();

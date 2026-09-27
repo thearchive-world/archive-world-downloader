@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
  * The gate between the keys the code names and the keys en_us carries, in both directions. {@link LangFidelityTest}
  * holds the 32 locales to en_us and never looks at the code, so without this a key only production names could be
  * absent from every catalog and stay green: MC renders a missing key as the raw key string, and a tooltip behind
- * {@code I18n.exists} renders nothing at all.
+ * {@code I18n.hasKey} renders nothing at all.
  *
  * <p>MC-free: source and resource reads off the module tree, the {@link UiLiteralEnrollmentTest} pattern.
  */

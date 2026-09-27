@@ -22,7 +22,7 @@ import world.thearchive.wdl.adapter.RenderSurface;
  * {@code PoseStack}: draws go through the static {@link Gui} helpers and {@link FontRenderer}, and a tooltip renders
  * through the owning {@link GuiScreen}, the only object that draws one at this version. A HUD draw, which never shows a
  * tooltip, uses the screen-less constructor. The font draws take a {@code String}, so a {@link ITextComponent} is
- * flattened with {@code getString}.
+ * flattened with {@code getUnformattedText}.
  */
 public final class RenderSurfaceImpl implements RenderSurface {
     private final @Nullable GuiScreen screen;
@@ -94,7 +94,7 @@ public final class RenderSurfaceImpl implements RenderSurface {
     @Override
     public void blitFavicon(ResourceLocation icon, int x, int y, int size) {
         Minecraft.getMinecraft().getTextureManager().bindTexture(icon);
-        // A selected list row leaves the shader color at black (the AbstractSelectionList highlight sets it and
+        // A selected list row leaves the shader color at black (the GuiSlot highlight sets it and
         // never resets it), and the blit does not set its own, so without this reset the selected row's icon
         // multiplies to black. Vanilla's own world-selection list resets to white here for the same reason.
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);

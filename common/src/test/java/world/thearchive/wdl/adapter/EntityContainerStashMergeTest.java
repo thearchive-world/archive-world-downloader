@@ -65,7 +65,7 @@ class EntityContainerStashMergeTest {
     }
 
     /**
-     * A serialized container-vehicle tag: an {@code id}, the {@code "UUID"} via {@code putUUID}, no items.
+     * A serialized container-vehicle tag: an {@code id}, the {@code "UUID"} via {@code setUniqueId}, no items.
      */
     private static NBTTagCompound entityTag(String id, UUID uuid) {
         return EntityFixtures.entity(id, uuid);

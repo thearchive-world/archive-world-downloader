@@ -881,6 +881,7 @@ common/src/main/java/world/thearchive/wdl/adapter/RecoveredScan.java
 
 # com.mojang.logging.LogUtils is a 1.18 addition and slf4j a 1.17 one, so at 1.12.2 the per-class logger is acquired
 # through log4j2's LogManager directly.
+# Classic-band comments use this version's MCP names.
 common/src/main/java/world/thearchive/wdl/adapter/EntityPacketAccumulator.java
 
 # com.mojang.logging.LogUtils is a 1.18 addition and slf4j a 1.17 one, so at 1.12.2 the per-class logger is acquired
@@ -897,10 +898,12 @@ common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
 
 # com.mojang.logging.LogUtils is a 1.18 addition and slf4j a 1.17 one, so at 1.12.2 the per-class logger is acquired
 # through log4j2's LogManager directly.
+# Classic-band comments use this version's MCP names.
 common/src/main/java/world/thearchive/wdl/compat/bobby/BobbyChunkFilter.java
 
 # com.mojang.logging.LogUtils is a 1.18 addition and slf4j a 1.17 one, so at 1.12.2 the per-class logger is acquired
 # through log4j2's LogManager directly.
+# Classic-band comments use this version's MCP names.
 common/src/main/java/world/thearchive/wdl/compat/flashback/FlashbackReplayProbe.java
 
 # JsonParser.parseString is a gson 2.8.6 static, absent from the gson 2.8.0 Minecraft 1.12.2 bundles, so the release
@@ -979,6 +982,7 @@ common/src/test/java/world/thearchive/wdl/core/ReadyLatchTest.java
 
 # Below 1.17 the Java floor is 8, which has no List.of or Set.of collection factories (Java 9), so the derived-prefix
 # list and the empty undeclared-key set use Guava ImmutableList.of and ImmutableSet.of.
+# Classic-band comments use this version's MCP names.
 common/src/test/java/world/thearchive/wdl/core/SettingsLangTest.java
 
 # Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the expected tab-id list is a
@@ -1126,6 +1130,7 @@ common/src/main/java/world/thearchive/wdl/platform/WdlMultilineToast.java
 # never reach (two button tooltips, two screen titles, a text field's message) sit in BAND_DROPPED_KEYS with their en_us
 # strings kept so the catalog matches dev's. The file also carries the Java 8 forms the test tree uses throughout (Guava
 # immutable collections, Paths.get).
+# Classic-band comments use this version's MCP names.
 common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
 
 # Added, absent from dev and 1.13.2: the boot smoke test of the bootsmoke source set common/build.gradle.kts declares at
@@ -1319,3 +1324,18 @@ gradle/wrapper/gradle-wrapper.properties
 # gates where dev uploads its jars ungated; against 1.13.2's the root and island builds each retry once after wiping the
 # .gradle/unimined caches when a build fails before compileJava, the FG3 provision failing cold and passing warm.
 .github/workflows/ci.yml
+
+# Classic-band comments use this version's MCP names.
+common/src/main/java/world/thearchive/wdl/adapter/CapturedProgress.java
+
+# Classic-band comments use this version's MCP names.
+common/src/test/java/de/johni0702/minecraft/bobby/FakeChunk.java
+
+# Classic-band comments use this version's MCP names.
+common/src/test/java/world/thearchive/wdl/adapter/EntityPacketAccumulatorTest.java
+
+# Classic-band comments use this version's MCP names.
+common/src/test/java/world/thearchive/wdl/core/EntityMenuCapabilityTest.java
+
+# Classic-band comments use this version's MCP names.
+common/src/test/java/world/thearchive/wdl/core/browse/TargetResolverTest.java
