@@ -27,17 +27,15 @@ public final class ChunkRectangleReducer {
         return (int) (packed >> 32);
     }
 
-    /** Row-RLE then vertical coalescing of equal x-runs. Returns inclusive rectangles, 4 ints each. */
+    /** Returns inclusive rectangles, 4 ints each. */
     public static int[] reduce(long[] chunkPositions) {
         if (chunkPositions.length == 0) {
             return new int[0];
         }
-        // Bucket by z-row, collect x-runs per row, then merge a run downward while an identical run continues.
         Map<Integer, TreeSet<Integer>> rows = new TreeMap<>();
         for (long packed : chunkPositions) {
             rows.computeIfAbsent(chunkZ(packed), key -> new TreeSet<>()).add(chunkX(packed));
         }
-        // rowRuns: z -> list of [minX, maxX]
         Map<Integer, List<int[]>> rowRuns = new TreeMap<>();
         for (Map.Entry<Integer, TreeSet<Integer>> entry : rows.entrySet()) {
             List<int[]> runs = new ArrayList<>();
@@ -59,7 +57,6 @@ public final class ChunkRectangleReducer {
             }
             rowRuns.put(entry.getKey(), runs);
         }
-        // Greedy vertical coalescing: extend a run downward through consecutive z-rows that carry the same run.
         List<int[]> rectangles = new ArrayList<>();
         Map<Integer, boolean[]> consumed = new HashMap<>();
         List<Map.Entry<Integer, List<int[]>>> rowEntries = new ArrayList<>(rowRuns.entrySet());
@@ -108,14 +105,13 @@ public final class ChunkRectangleReducer {
 
     /**
      * Coarsen the coverage into two DISJOINT coarse tone rectangle sets, each with at most {@code maxCellsPerTone}
-     * rectangles, for the pathological fragmented tail. Both tone sets are needed here because the classification is
-     * cross-tone: a grid cell draws covered when every one of its {@code cell*cell} chunk slots is saved and more than
-     * half of them are covered, suspect when it holds any saved-not-covered chunk and did not draw covered, and nothing
-     * otherwise. Requiring a full cell for the covered hue keeps it off not-fully-saved ground; taking the covered
-     * majority rather than demanding every slot be covered keeps a mostly-covered but fragmented cell from flipping to
-     * suspect, while an even split still errs toward suspect. The two branches are exclusive per cell, so the sets
-     * never overlap; a per-tone single-set grid would double-paint a mixed cell, so the two tones must be coarsened
-     * together, not by two independent calls.
+     * rectangles. Both tone sets are needed here because the classification is cross-tone: a grid cell draws covered
+     * when every one of its {@code cell*cell} chunk slots is saved and more than half of them are covered, suspect when
+     * it holds any saved-not-covered chunk and did not draw covered, and nothing otherwise. Requiring a full cell for
+     * the covered hue keeps it off not-fully-saved ground; taking the covered majority rather than demanding every slot
+     * be covered keeps a mostly-covered but fragmented cell from flipping to suspect, while an even split still errs
+     * toward suspect. The two branches are exclusive per cell, so the sets never overlap; a per-tone single-set grid
+     * would double-paint a mixed cell, so the two tones must be coarsened together, not by two independent calls.
      */
     public static ToneRectangles coarsenTones(long[] saved, long[] covered, int maxCellsPerTone) {
         int cap = Math.max(1, maxCellsPerTone);
@@ -135,7 +131,7 @@ public final class ChunkRectangleReducer {
         int perAxis = Math.max(1, (int) Math.floor(Math.sqrt(cap)));
         int cell = Math.max(1, (int) Math.ceil((double) Math.max(maxX - minX + 1, maxZ - minZ + 1) / perAxis));
         LongOpenHashSet coveredSet = new LongOpenHashSet(covered);
-        Map<Long, int[]> counts = new HashMap<>(); // cellKey -> {savedCount, coveredInSaved}
+        Map<Long, int[]> counts = new HashMap<>();
         for (long chunkPos : saved) {
             int cx = (chunkX(chunkPos) - minX) / cell;
             int cz = (chunkZ(chunkPos) - minZ) / cell;
