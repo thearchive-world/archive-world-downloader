@@ -80,8 +80,7 @@ class RiddenMountContentsFoldTest {
 
         NBTTagCompound expected = EntityFixtures.entity("minecraft:mule", MOUNT);
         expected.setTag("Items", capturedItems(new ItemStack(Items.DIAMOND, 5)).getTagList("Items", 10));
-        assertEquals(expected, folded,
-                "a mount standing on its own folds to the tag it always did, key for key");
+        assertEquals(expected, folded, "a mount standing on its own folds to the tag it always did, key for key");
     }
 
     @Test

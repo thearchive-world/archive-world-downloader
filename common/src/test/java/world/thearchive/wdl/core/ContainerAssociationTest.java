@@ -566,8 +566,7 @@ class ContainerAssociationTest {
     void doubleChestDropsOnZeroCombinedSize() {
         ContainerAssociation assoc = new ContainerAssociation();
 
-        assertFalse(assoc.openDoubleChest(true, true, POS, PARTNER_POS, 0, 0),
-                "a combined size of 0 -> DROP");
+        assertFalse(assoc.openDoubleChest(true, true, POS, PARTNER_POS, 0, 0), "a combined size of 0 -> DROP");
         assertFalse(assoc.boundPos().isPresent());
     }
 
