@@ -25,11 +25,11 @@ public final class CaptureStatus {
     }
 
     /**
-     * A count shortened to at most five glyphs for the compact HUD, where a full grouped count would not fit: exact
-     * below ten thousand, then k, M, and B, carrying one decimal until the whole reaches a hundred of that unit.
-     * Separator-free below ten thousand (a locale-independent thousands comma reads as a decimal mark in the
-     * comma-decimal locales, so a bare four-digit count is unambiguous where a grouped one is not); the only mark that
-     * survives is the one-digit decimal point, which no thousands grouping can be mistaken for.
+     * A count shortened to at most five glyphs below ten trillion: exact below ten thousand, then k, M, and B, carrying
+     * one decimal until the whole reaches a hundred of that unit. Separator-free below ten thousand (a
+     * locale-independent thousands comma reads as a decimal mark in the comma-decimal locales, so a bare four-digit
+     * count is unambiguous where a grouped one is not); the only mark that survives is the one-digit decimal point,
+     * which no thousands grouping can be mistaken for.
      */
     public static String compactCount(long count) {
         if (count < 10_000) {

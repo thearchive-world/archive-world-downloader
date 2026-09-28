@@ -15,17 +15,12 @@ import java.util.Properties;
 /**
  * The config model: one ordered descriptor list from which the documented template, the parse and validation, the
  * defaults, the download-report diff, and a complete key-to-string projection are all derived, so an option is spelled
- * out once rather than in five parallel places. The typed value objects ({@link WdlConfig} and its nested holders) keep
- * their fields and accessors; only the model's expression is centralized here. Package-private; the settings menu
- * widens the descriptor when it consumes the option set.
+ * out once rather than in five parallel places.
  *
  * <p>Two orderings are preserved because they genuinely differ: {@link #OPTIONS} is in template (file) order, so
  * {@link #renderDefaultTemplate} is a straight in-order walk, while {@link #REPORT_ORDER} is the reportable
  * {@link WdlConfig} scalar keys in value-object field order. The sparse {@code gamerule.*} overrides are not a
  * descriptor row: they are a dynamic map handled as literal preamble bytes, a harvested map, and a projection append.
- *
- * <p>{@link #option(String)} is public so the settings menu can read each option's value shape and default;
- * {@link #OPTIONS} and the parse, template, and report members stay package-private to their producers.
  */
 public final class ConfigSchema {
     private ConfigSchema() {}
@@ -413,8 +408,9 @@ public final class ConfigSchema {
             "allowCommands", "skipVoidChunks", "autoDownload", "worldType", "worldSeed", "generateFeatures");
 
     /**
-     * Read every option, defaulting any key that is missing or present-but-unparseable to its descriptor default
-     * (recording the latter in {@code malformed} so the file self-heals). Never fails.
+     * Read every option, defaulting to its descriptor default any key that is missing, whose present value its type
+     * rejects, or whose {@link ConfigType#LONG} value is blank, and recording the key of each rejected value in
+     * {@code malformed} so the file self-heals. Never fails.
      */
     static ConfigValues read(Properties properties, List<String> malformed) {
         Map<String, Object> values = new LinkedHashMap<>();
@@ -444,9 +440,8 @@ public final class ConfigSchema {
 
     /**
      * The documented config file rendered with {@code config}'s live values: the same preambles and key order as the
-     * default template, each option carrying its value, then any {@code gamerule.<id>} override appended. The
-     * settings-menu commit writes this so an in-mod Save keeps the file's comments rather than degrading it to a bare
-     * {@code key=value} dump; a commit of an unchanged config reproduces the default template byte for byte.
+     * default template, each option carrying its value, then any {@code gamerule.<id>} override appended. A default
+     * config renders as the default template byte for byte.
      */
     public static String renderConfigFile(WdlConfig config) {
         Map<String, String> values = project(config);
@@ -479,8 +474,7 @@ public final class ConfigSchema {
 
     /**
      * The reportable {@link WdlConfig} scalars that differ from {@code baseline}, each by its key, in field order.
-     * Excludes the nested HUD, outline, world-output, and marker-hue options, exactly as the download report does; the
-     * caller appends the world-output diff.
+     * Excludes the HUD, outline, coverage-overlay and world-output options.
      */
     static Map<String, String> reportDiff(WdlConfig config, WdlConfig baseline) {
         return diffByOrder(REPORT_ORDER, config, baseline);
