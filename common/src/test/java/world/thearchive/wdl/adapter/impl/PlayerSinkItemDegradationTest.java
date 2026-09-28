@@ -81,8 +81,7 @@ class PlayerSinkItemDegradationTest {
         CompoundTag captured = sink.capturePlayer(player, registries);
 
         ItemStack savedBow = capturedInventorySlot(registries, captured, OFFHAND_SLOT);
-        assertFalse(savedBow.isEmpty(),
-                "the repaired bow reached the captured NBT, not silently dropped");
+        assertFalse(savedBow.isEmpty(), "the repaired bow reached the captured NBT, not silently dropped");
         assertSavable(registries, savedBow, "the captured bow is savable (repaired)");
         assertFalse(capturedInventorySlot(registries, captured, HEAD_SLOT).isEmpty(),
                 "the worn helmet lands too, so the rejected stack costs only its own entry");
