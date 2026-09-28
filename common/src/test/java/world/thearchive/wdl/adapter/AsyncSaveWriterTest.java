@@ -900,8 +900,7 @@ class AsyncSaveWriterTest {
         assertNotNull(onDisk, "the scan handed the prior on-disk region chunk to the observer");
         CompoundTag vehicle = onDisk.getCompound("Level").getList("Entities", 10).getCompound(0);
         assertNotNull(vehicle.get("UUID"), "the prior container entity kept its UUID");
-        assertFalse(vehicle.getList("Items", 10).isEmpty(),
-                "the prior container entity carries the captured Items");
+        assertFalse(vehicle.getList("Items", 10).isEmpty(), "the prior container entity carries the captured Items");
     }
 
     /**
