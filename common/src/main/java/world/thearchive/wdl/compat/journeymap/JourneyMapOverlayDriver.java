@@ -45,7 +45,7 @@ public final class JourneyMapOverlayDriver {
 
     private static final String MOD_ID = "wdl";
 
-    // A sentinel below every real generation (a sum of two non-negative version counters), so the first tick and
+    // A sentinel below every real generation (a sum of non-negative counters), so the first tick and
     // every forced re-assert compare unequal and rebuild.
     private static final long NO_GENERATION = -1L;
 
