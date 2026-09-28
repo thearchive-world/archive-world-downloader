@@ -4,10 +4,7 @@
 package world.thearchive.wdl.core;
 
 /**
- * A live snapshot of capture progress, read by the status command and HUD. MC-free (plain ints) so it crosses the
- * {@link CaptureController.Session} seam without leaking an MC type. The entity tally is the live per-UUID count
- * accumulated during capture, dedup-correct (each entity counted once by UUID), not the finish-time entity-chunk region
- * tags.
+ * A snapshot of capture progress. The entity tally counts each entity once, by UUID.
  */
 public final class CaptureCounts {
     /** No capture in progress. */
