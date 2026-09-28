@@ -3,10 +3,6 @@
 
 package world.thearchive.wdl.core;
 
-/**
- * MC-free status formatting helpers shared by the chat copy, the toast copy, and the rendered HUD overlay: the two
- * elapsed shapes and the shortened count, all headless-testable.
- */
 public final class CaptureStatus {
     private CaptureStatus() {}
 
@@ -18,7 +14,7 @@ public final class CaptureStatus {
 
     /**
      * The elapsed time of a finished download: minutes and seconds under an hour, hours from one hour on, unlike the
-     * uncapped-minutes HUD {@link #elapsed}.
+     * uncapped-minutes {@link #elapsed}.
      */
     static String completionElapsed(long millis) {
         ElapsedTime time = ElapsedTime.ofMillis(millis);
