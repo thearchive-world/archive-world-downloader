@@ -86,8 +86,7 @@ class EntityRoundTripTest {
         assertTrue((tag.contains("DataVersion") ? tag.getInt("DataVersion") : -1) > 0,
                 "must stamp a current DataVersion");
         int[] position = tag.getIntArray("Position");
-        assertEquals(pos, new ChunkPos(position[0], position[1]),
-                "Position must encode the chunk pos as [x, z]");
+        assertEquals(pos, new ChunkPos(position[0], position[1]), "Position must encode the chunk pos as [x, z]");
 
         ListTag entities = tag.getList("Entities", Tag.TAG_COMPOUND);
         assertEquals(2, entities.size(), "both entity tags must be retained in the Entities list");
