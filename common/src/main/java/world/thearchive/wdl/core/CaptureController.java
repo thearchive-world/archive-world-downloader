@@ -11,10 +11,9 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The version-agnostic capture orchestrator: a small state machine driving {@code IDLE -> RECORDING -> SAVING -> IDLE}.
- * It imports no {@code net.minecraft.*} type (CI-enforced): the MC-typed work (snapshotting loaded chunks, writing the
- * region files and level.dat) lives behind the {@link Session} seam, whose implementation the loader/adapter layer
- * supplies.
+ * The capture orchestrator: a small state machine driving {@code IDLE -> RECORDING -> SAVING -> IDLE}. The MC-typed
+ * work (snapshotting loaded chunks, writing the region files and level.dat) lives behind the {@link Session} seam,
+ * whose implementation the loader/adapter layer supplies.
  *
  * <p>Threading: {@link #tick()} runs on the client main thread, and so does the whole per-chunk snapshot inside
  * {@code Session.captureTick()}; only immutable tags cross to the async IO worker. This controller holds no locks and
@@ -35,12 +34,11 @@ import org.jspecify.annotations.Nullable;
 public final class CaptureController {
     /**
      * The window the frozen counts and elapsed timer stay readable after a save completes, comfortably past the longest
-     * configurable HUD done linger plus its fade, so the overlay never reads a blanked snapshot mid-linger. The overlay
-     * applies its own (shorter) configured linger to decide when to stop drawing.
+     * configurable HUD done linger plus its fade, so the overlay never reads a blanked snapshot mid-linger.
      */
     private static final long DONE_LINGER_HOLD_MILLIS = 60_000L;
 
-    /** The MC-typed capture work, abstracted so the controller stays MC-free. */
+    /** The MC-typed capture work. */
     public interface Session {
         /** Snapshot any newly-eligible loaded chunks (called once per client tick while recording). */
         void captureTick();
@@ -77,19 +75,18 @@ public final class CaptureController {
         /** Let the background writer read the loader's registries again, once the rebuild is over. */
         default void releaseWriterEncoding() {}
 
-        /** Live progress so far, as MC-free counts (read for the status command and HUD). */
+        /** Live progress so far. */
         CaptureCounts counts();
 
         /**
-         * The live captured-set: which loaded containers had their contents captured this session, read by the
-         * unsaved-container outline to decide which still carry a rim. Same-thread read, no snapshot.
+         * The live captured-set: which containers had their contents captured this session. Same-thread read, no
+         * snapshot.
          */
         CapturedContainers capturedContainers();
 
         /**
-         * The prior-session recovered coverage the resume scan has published, read by the outline so a re-arriving
-         * prior-captured container settles to the recovered hue rather than unsaved. Empty on a fresh download;
-         * published by the writer thread as one atomic reference swap, read here.
+         * The prior-session recovered coverage the resume scan has published. Empty on a fresh download; published by
+         * the writer thread as one atomic reference swap, read here.
          */
         RecoveredCoverage recoveredCoverage();
 
@@ -99,7 +96,7 @@ public final class CaptureController {
          */
         CaptureToggles latchedToggles();
 
-        /** The current finalization phase while the background save drains, for the HUD bar. */
+        /** The current finalization phase while the background save drains. */
         SaveStage saveStage();
 
         /** The current finalization phase's fraction in {@code [0, 1]}; 0 unless a save is draining. */
@@ -179,8 +176,7 @@ public final class CaptureController {
 
     /**
      * The live captured-set while recording, {@link CapturedContainers#EMPTY} otherwise. Unlike the counts it is not
-     * held through saving: the unsaved-container rims are a live to-do list that stops the moment the capture ends and
-     * the drain begins, so the outline reads an empty set once idle.
+     * held through saving.
      */
     public CapturedContainers capturedContainers() {
         if (state == CaptureState.RECORDING && session != null) {
@@ -250,9 +246,6 @@ public final class CaptureController {
         return coveredChunks;
     }
 
-    /**
-     * The estimator holds one running max per dimension, fed by the sampler-gated feeds.
-     */
     public SendRangeEstimator sendRange() {
         return sendRange;
     }
@@ -279,7 +272,7 @@ public final class CaptureController {
         return 0L;
     }
 
-    /** The finalization phase while saving; {@link SaveStage#NONE} otherwise (no bar during capture or idle). */
+    /** The finalization phase while saving; {@link SaveStage#NONE} otherwise. */
     public SaveStage saveStage() {
         return state == CaptureState.SAVING && session != null ? session.saveStage() : SaveStage.NONE;
     }
@@ -292,7 +285,7 @@ public final class CaptureController {
     /**
      * Milliseconds since the last save completed, while the controller is idle within the done-linger hold;
      * {@linkplain OptionalLong#empty() empty} while recording or saving, before any save has completed, or once past
-     * the hold. The overlay reads this to draw and fade the done frame.
+     * the hold.
      */
     public OptionalLong doneElapsedMillis() {
         if (!isWithinDoneHold()) {
@@ -321,7 +314,7 @@ public final class CaptureController {
             startMillis = clockMillis.getAsLong();
             frozenCounts = CaptureCounts.EMPTY;
             frozenElapsedMillis = 0L;
-            hasCompletedSave = false; // a fresh capture clears any lingering done frame
+            hasCompletedSave = false;
         }
     }
 
