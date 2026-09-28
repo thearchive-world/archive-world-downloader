@@ -45,8 +45,7 @@ class AtomicFileWriteTest {
         // A directory where the staged sibling belongs, so the write fails before it can reach the target.
         Files.createDirectory(directory.resolve("target.bin.tmp"));
 
-        assertThrows(IOException.class,
-                () -> AtomicFileWrite.write(file, "lost".getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IOException.class, () -> AtomicFileWrite.write(file, "lost".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals("kept", new String(Files.readAllBytes(file), StandardCharsets.UTF_8),
                 "a write that failed before the move never reached the file it was replacing");

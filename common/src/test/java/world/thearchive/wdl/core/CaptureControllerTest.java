@@ -452,8 +452,7 @@ class CaptureControllerTest {
         long[] painted = controller.overlayCoveredChunks(entities(true), "minecraft:overworld");
         Arrays.sort(covered);
         Arrays.sort(painted);
-        assertArrayEquals(covered, painted,
-                "once the range is calibrated the covered set draws, not the saved mirror");
+        assertArrayEquals(covered, painted, "once the range is calibrated the covered set draws, not the saved mirror");
     }
 
     @Test
