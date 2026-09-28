@@ -4,19 +4,16 @@
 package world.thearchive.wdl.core;
 
 /**
- * The mod's fixed brand and semantic colors. Every surface that paints chrome or a status color, the download screen,
- * the rendered HUD, the in-world container outline, and the coverage overlay, reads these named tokens rather than
- * hard-coding a hue, so the identity lives in one place. The accent, text-on-surface, and semantic-state roles are
- * fixed (not user-themeable) for cross-surface cohesion and contrast safety; pick a role before adding a color, and do
- * not let two roles share a hue.
+ * The mod's fixed brand and semantic colors. The accent, text-on-surface, and semantic-state roles are fixed (not
+ * user-themeable) for cross-surface cohesion and contrast safety; pick a role before adding a color, and do not let two
+ * roles share a hue.
  *
- * <p>Each token is RGB only: {@link #opaque(int)} forces the {@code 0xFF} alpha. Version-agnostic core: imports no
- * {@code net.minecraft.*} type and stays Java-8-clean. The choosable overlay marker hues live in {@link MarkerHue}.
+ * <p>Each token is RGB only: {@link #opaque(int)} forces the {@code 0xFF} alpha. The choosable overlay marker hues live
+ * in {@link MarkerHue}.
  */
 public final class BrandColors {
     /**
-     * Brand and hot/active accent: HUD progress fill, chat highlights, screen chrome, toasts, headings. Also the value
-     * the themeable {@link MarkerHue#AMBER} suspect-chunk default opens on.
+     * Brand and hot/active accent. Also the value the themeable {@link MarkerHue#AMBER} suspect-chunk default opens on.
      */
     public static final int AMBER = 0xFFB84C;
 
