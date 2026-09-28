@@ -86,8 +86,7 @@ class LevelDatCuratedGameRulesTest {
                 "spawn_wandering_traders", "spawn_patrols");
         for (String id : SettingsLayout.GAME_RULE_ORDER) {
             if (!byId.containsKey(id)) {
-                assertTrue(absentAtThisBand.contains(id),
-                        id + " is laid out but has no curated rule at this band");
+                assertTrue(absentAtThisBand.contains(id), id + " is laid out but has no curated rule at this band");
             }
         }
     }

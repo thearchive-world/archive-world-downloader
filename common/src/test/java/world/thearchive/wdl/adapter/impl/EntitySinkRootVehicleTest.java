@@ -108,8 +108,7 @@ class EntitySinkRootVehicleTest {
         NBTTagCompound probe = new NBTTagCompound();
         probe.setTag("Items", folded.getTagList("Items", 10));
         ItemListNbt.loadAllItems(probe, back);
-        assertEquals(Items.DIAMOND, back[3].getItem(),
-                "the captured container loot lands at its slot in the mount");
+        assertEquals(Items.DIAMOND, back[3].getItem(), "the captured container loot lands at its slot in the mount");
         assertEquals(9, back[3].stackSize);
     }
 

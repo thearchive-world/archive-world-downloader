@@ -118,10 +118,8 @@ class LevelDatWorldOutputTest {
     void gameRuleMasterOffLeavesVanillaDefaults() {
         GameRules rules = gameRules(build(with("overrideGamerules", "false")));
 
-        assertTrue(rules.getBoolean("doMobSpawning"),
-                "master off: the vanilla default (mobs spawn) stands");
-        assertFalse(rules.getBoolean("keepInventory"),
-                "master off: keep-inventory stays at its vanilla default");
+        assertTrue(rules.getBoolean("doMobSpawning"), "master off: the vanilla default (mobs spawn) stands");
+        assertFalse(rules.getBoolean("keepInventory"), "master off: keep-inventory stays at its vanilla default");
     }
 
     @Test
@@ -177,8 +175,7 @@ class LevelDatWorldOutputTest {
         LevelDataWriter.LevelData built = build(with("gamerule.keepInventory", "banana"));
 
         assertTrue(built.gameRules().droppedInvalidValues().contains("keepInventory"), "the typo is surfaced");
-        assertTrue(gameRules(built).getBoolean("keepInventory"),
-                "the curated value stands; the typo is not written");
+        assertTrue(gameRules(built).getBoolean("keepInventory"), "the curated value stands; the typo is not written");
     }
 
     @Test

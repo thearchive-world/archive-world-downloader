@@ -109,8 +109,7 @@ class EntityContainerStashMergeTest {
 
         NBTTagList entities = chunkTag.getTagList("Entities", 10);
         NBTTagCompound mergedEntity = findByUuid(entities, UUID_A);
-        assertEquals("MinecartChest", mergedEntity.getString("id"),
-                "the id is preserved (no clobber)");
+        assertEquals("MinecartChest", mergedEntity.getString("id"), "the id is preserved (no clobber)");
         ItemStack[] back = new ItemStack[27];
         ItemListNbt.loadAllItems(mergedEntity, back);
         assertEquals(Items.EMERALD, back[2].getItem(), "the chest minecart gains exactly the captured stack");

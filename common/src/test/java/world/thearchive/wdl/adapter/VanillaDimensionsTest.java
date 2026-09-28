@@ -56,8 +56,7 @@ class VanillaDimensionsTest {
         // plain id string, and reading it back wrong sends a write into another dimension's folder.
         for (DimensionType routed : ImmutableList.of(DimensionType.OVERWORLD, DimensionType.NETHER,
                 DimensionType.THE_END)) {
-            assertEquals(routed, VanillaDimensions.forId(routed.getName()),
-                    routed + " must survive the id round trip");
+            assertEquals(routed, VanillaDimensions.forId(routed.getName()), routed + " must survive the id round trip");
         }
     }
 

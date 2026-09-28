@@ -260,8 +260,7 @@ class ItemLocationScrubTest {
         NBTTagCompound holder = holderOf(lodestoneCompass(), new ItemStack(Items.DIAMOND, 3));
         ItemStack[] before = readBack(holder, 2);
         assertTrue(targetOf(before[0]).isPresent(), "precondition: the fixture compass has a target");
-        assertTrue(targetDimensionOf(before[0]).isPresent(),
-                "precondition: and names the dimension that target is in");
+        assertTrue(targetDimensionOf(before[0]).isPresent(), "precondition: and names the dimension that target is in");
 
         ItemLocationScrub.scrub(holder, "Items");
 
@@ -467,8 +466,7 @@ class ItemLocationScrubTest {
         armorItems.appendTag(new NBTTagCompound()); // chest
         armorItems.appendTag(itemNbt(lodestoneCompass())); // head slot holding a lodestone compass
         zombie.setTag("ArmorItems", armorItems);
-        assertTrue(targetOf(itemFrom(handItems.get(0))).isPresent(),
-                "precondition: the mainhand compass has a target");
+        assertTrue(targetOf(itemFrom(handItems.get(0))).isPresent(), "precondition: the mainhand compass has a target");
         assertTrue(targetOf(itemFrom(armorItems.get(3))).isPresent(), "precondition: the armor compass has a target");
 
         ItemLocationScrub.scrubEntity(zombie);

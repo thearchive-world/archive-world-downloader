@@ -46,8 +46,7 @@ class NamedMobPersistenceTest {
 
         NBTTagCompound knobOn = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOn, true, false, true, true);
-        assertTrue(knobOn.getBoolean("PersistenceRequired"),
-                "a loot-equipped mob persists with the force knob on too");
+        assertTrue(knobOn.getBoolean("PersistenceRequired"), "a loot-equipped mob persists with the force knob on too");
     }
 
     @Test
@@ -67,8 +66,7 @@ class NamedMobPersistenceTest {
     void nonMobIsNeverTouched() {
         NBTTagCompound knobOff = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOff, false, false, false, false);
-        assertFalse(knobOff.hasKey("PersistenceRequired"),
-                "a non-mob entity never gets PersistenceRequired set");
+        assertFalse(knobOff.hasKey("PersistenceRequired"), "a non-mob entity never gets PersistenceRequired set");
 
         NBTTagCompound knobOn = new NBTTagCompound();
         EntitySinkImpl.applyMobPersistence(knobOn, false, false, false, true);
