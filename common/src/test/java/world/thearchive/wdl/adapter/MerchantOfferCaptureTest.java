@@ -87,8 +87,7 @@ class MerchantOfferCaptureTest {
         CompoundTag holder = MerchantOfferCapture.serialize(offering(new ItemStack(Items.DIAMOND)), 42, true,
                 registries);
 
-        assertEquals(1, holder.getCompound("Offers").getList("Recipes", 10).size(),
-                "one offer under Recipes");
+        assertEquals(1, holder.getCompound("Offers").getList("Recipes", 10).size(), "one offer under Recipes");
         assertEquals(42, holder.getInt("Xp"), "the villager's experience rides alongside");
     }
 
