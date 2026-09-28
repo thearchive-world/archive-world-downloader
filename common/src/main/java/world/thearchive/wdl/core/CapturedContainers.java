@@ -24,11 +24,11 @@ import org.jspecify.annotations.Nullable;
  * the classifier's hot per-tick {@link #containsBlock} test over every loaded container neither boxes its key nor
  * allocates.
  *
- * <p>Construct one per read, as {@link CaptureController.Session#capturedContainers()} does, and do not cache it. The
- * collection members wrap the session's live sets unmodifiable rather than copying them (read and capture share the one
- * client thread), so they track later mutation, but the {@code boolean} ender flag is taken by value at construction. A
- * held instance would see the collections move on while the ender flag stays frozen; a fresh view each read keeps every
- * member consistent, for the cost of a few short-lived wrappers.
+ * <p>Construct one per read, and do not cache it. The collection members wrap the session's live sets unmodifiable
+ * rather than copying them (read and capture share the one client thread), so they track later mutation, but the
+ * {@code boolean} ender flag is taken by value at construction. A held instance would see the collections move on while
+ * the ender flag stays frozen; a fresh view each read keeps every member consistent, for the cost of a few short-lived
+ * wrappers.
  */
 public final class CapturedContainers {
     /** No container captured this session: every membership query is false. */
