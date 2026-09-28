@@ -109,10 +109,8 @@ class CoveredChunkIndexTest {
         CoveredChunkIndex index = new CoveredChunkIndex();
         index.addDisc("minecraft:overworld", 0, 0, 0);
         index.addDisc("minecraft:worlds/2b2t/2b2t_1", 5, 0, 0);
-        assertArrayEquals(new long[] { RegionMath.chunkAsLong(0, 0) },
-                index.snapshot("minecraft:overworld"));
-        assertArrayEquals(new long[] { RegionMath.chunkAsLong(5, 0) },
-                index.snapshot("minecraft:worlds/2b2t/2b2t_1"));
+        assertArrayEquals(new long[] { RegionMath.chunkAsLong(0, 0) }, index.snapshot("minecraft:overworld"));
+        assertArrayEquals(new long[] { RegionMath.chunkAsLong(5, 0) }, index.snapshot("minecraft:worlds/2b2t/2b2t_1"));
     }
 
     @Test
@@ -190,8 +188,7 @@ class CoveredChunkIndexTest {
         index.recompute("minecraft:overworld", 2);
         long[] covered = index.snapshot("minecraft:overworld");
         assertTrue(contains(covered, RegionMath.chunkAsLong(0, 0)), "the trail disc must be covered");
-        assertTrue(contains(covered, RegionMath.chunkAsLong(100, 100)),
-                "the resume seed must survive the rebuild");
+        assertTrue(contains(covered, RegionMath.chunkAsLong(100, 100)), "the resume seed must survive the rebuild");
     }
 
     @Test
