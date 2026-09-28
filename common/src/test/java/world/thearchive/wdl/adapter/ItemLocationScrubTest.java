@@ -329,8 +329,7 @@ class ItemLocationScrubTest {
         Bees bees = back.get(0).get(DataComponents.BEES);
         assertNotNull(bees, "the bees component is kept");
         assertEquals(1, bees.bees().size(), "the occupant is kept");
-        assertFalse(bees.bees().get(0).entityData().contains("flower_pos"),
-                "the bee flower_pos is blanked");
+        assertFalse(bees.bees().get(0).entityData().contains("flower_pos"), "the bee flower_pos is blanked");
         assertEquals(Items.BEEHIVE, back.get(0).getItem(), "still a beehive");
         assertEquals(Items.DIAMOND, back.get(1).getItem(), "a non-beehive item is untouched");
     }
