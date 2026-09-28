@@ -43,8 +43,7 @@ class NeoForgeServiceResolutionTest {
         VersionAdapter adapter = ServiceLoader.load(VersionAdapter.class, Wdl.class.getClassLoader())
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("No VersionAdapter service resolved on NeoForge"));
-        assertInstanceOf(VersionAdapterImpl.class, adapter,
-                "VersionAdapter must resolve to the 1.21.11 band adapter");
+        assertInstanceOf(VersionAdapterImpl.class, adapter, "VersionAdapter must resolve to the 1.21.11 band adapter");
     }
 
     @Test
