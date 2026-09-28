@@ -47,10 +47,8 @@ class OverlayHighlightsTest {
     void eachToneResolvesToItsOwnLiveHue() {
         int covered = MarkerHue.TEAL.rgb();
         int suspect = MarkerHue.AMBER.rgb();
-        assertEquals(ALPHA | covered,
-                OverlayHighlights.toneColor(OverlayHighlights.COVERED, covered, suspect, ALPHA));
-        assertEquals(ALPHA | suspect,
-                OverlayHighlights.toneColor(OverlayHighlights.SUSPECT, covered, suspect, ALPHA));
+        assertEquals(ALPHA | covered, OverlayHighlights.toneColor(OverlayHighlights.COVERED, covered, suspect, ALPHA));
+        assertEquals(ALPHA | suspect, OverlayHighlights.toneColor(OverlayHighlights.SUSPECT, covered, suspect, ALPHA));
     }
 
     @Test
