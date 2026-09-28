@@ -10,12 +10,9 @@ import java.util.OptionalInt;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The composed copy of one download chat line: a wdl.chat translation key whose en_us pattern is the line template,
- * plus the ordered arguments filling its slots. Each argument is a literal value or a keyed sub-pattern with one
- * insert, carries its {@link BrandColors} tint or empty to inherit the line's, and may carry a click affordance the
- * platform bridge renders with the raw target as hover text. Every line wears the three-tone treatment the banner and
- * toast established (ivory line template, amber inserted values, teal links) except the save-failure line, which is
- * wholly rust. MC-free so every decision is headless-testable against the shipped lang file.
+ * The composed copy of one chat line: a translation key whose pattern is the line template, plus the ordered arguments
+ * filling its slots. Each argument is a literal value or a keyed sub-pattern with one insert, carries its
+ * {@link BrandColors} tint or empty to inherit the line's, and may carry a click affordance.
  */
 public final class ChatCopy {
     /**
@@ -278,9 +275,7 @@ public final class ChatCopy {
 
     /**
      * The flow-channel refusal for a name occupied by a file or a folder that is not a wdl download; {@code folderName}
-     * is the filesystem-reported spelling, carried for the copy to name. {@code suggestRename} selects the variant that
-     * adds the name-choosing advice, shown on the name-entry surfaces (a typed name or quick start, where the player
-     * has something to change); the row and chip surfaces pass false, since nothing there involves choosing a name.
+     * is carried for the copy to name. {@code suggestRename} selects the variant that adds the name-choosing advice.
      */
     public static ChatCopy refuseOccupant(String folderName, boolean suggestRename) {
         List<Argument> arguments = new ArrayList<>();
