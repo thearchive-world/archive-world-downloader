@@ -68,8 +68,7 @@ class LevelDatCuratedGameRulesTest {
         Set<String> absentAtThisBand = Set.of("spread_vines", "spawn_wardens");
         for (String id : SettingsLayout.GAME_RULE_ORDER) {
             if (!byId.containsKey(id)) {
-                assertTrue(absentAtThisBand.contains(id),
-                        id + " is laid out but has no curated rule at this band");
+                assertTrue(absentAtThisBand.contains(id), id + " is laid out but has no curated rule at this band");
             }
         }
     }
