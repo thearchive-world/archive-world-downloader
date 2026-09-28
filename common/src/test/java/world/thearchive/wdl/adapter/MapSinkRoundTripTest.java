@@ -57,8 +57,7 @@ class MapSinkRoundTripTest {
         assertArrayEquals(map.colors, back.colors, "the 128x128 image survives the serialize");
         assertEquals(map.d, back.d, "the dimension survives");
         assertEquals(map.scale, back.scale, "the scale survives");
-        assertFalse(data.hasKey("locked"),
-                "map locking is a 1.14 addition, so no locked key is written at this band");
+        assertFalse(data.hasKey("locked"), "map locking is a 1.14 addition, so no locked key is written at this band");
     }
 
     @Test

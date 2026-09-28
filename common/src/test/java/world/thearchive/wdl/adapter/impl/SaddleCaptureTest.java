@@ -79,8 +79,7 @@ class SaddleCaptureTest {
 
         assertNotNull(chunk, "precondition: the horse is written at all");
         NBTTagCompound saved = chunk.getTagList("Entities", 10).getCompoundTagAt(0);
-        assertFalse(saved.hasKey("SaddleItem"),
-                "an unsaddled mount must not be given a saddle it never wore");
+        assertFalse(saved.hasKey("SaddleItem"), "an unsaddled mount must not be given a saddle it never wore");
     }
 
     /**

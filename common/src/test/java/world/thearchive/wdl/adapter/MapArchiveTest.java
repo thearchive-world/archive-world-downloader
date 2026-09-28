@@ -197,8 +197,7 @@ class MapArchiveTest {
 
         assertEquals(ImmutableSet.of(archive.archiveIdFor(1988)), collect(holder),
                 "the captured holder carries the archive id");
-        assertEquals(1988, live.getMetadata(),
-                "the live stack keeps the server's map id, so a held map still renders");
+        assertEquals(1988, live.getMetadata(), "the live stack keeps the server's map id, so a held map still renders");
     }
 
     @Test

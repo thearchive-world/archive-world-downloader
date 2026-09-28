@@ -240,8 +240,7 @@ class PlayerTagTest {
 
         assertFalse(restored,
                 "an un-seated resume restores nothing: a dismounted mount is a normal world entity, not player-state");
-        assertFalse(fresh.hasKey("RootVehicle"),
-                "the Player slot is left without a mount, so no same-UUID collision");
+        assertFalse(fresh.hasKey("RootVehicle"), "the Player slot is left without a mount, so no same-UUID collision");
     }
 
     @Test
