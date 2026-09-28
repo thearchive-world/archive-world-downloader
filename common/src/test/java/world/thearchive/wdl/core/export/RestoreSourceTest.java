@@ -136,8 +136,7 @@ class RestoreSourceTest {
         zip("World-pre-resume.zip", "World/level.dat", LEVEL, "World/Playerdata/u.dat", LEVEL,
                 "World/wdl/download.jsonl", record("2026-04-01T10:00:00Z"));
         // The newer backup is content-tainted, so the older export still wins.
-        assertEquals("World.zip",
-                RestoreSource.find(saves, "World").get().zip().getFileName().toString());
+        assertEquals("World.zip", RestoreSource.find(saves, "World").get().zip().getFileName().toString());
     }
 
     @Test
@@ -157,8 +156,7 @@ class RestoreSourceTest {
         cleanZip("World-pre-resume.zip", "World", "2026-03-01T10:00:00Z");
         // Freshen the OLD copy's mtime (the re-copied-from-cloud shape): recorded finish must still win.
         Files.setLastModifiedTime(older, FileTime.from(Instant.now()));
-        assertEquals("World-pre-resume.zip",
-                RestoreSource.find(saves, "World").get().zip().getFileName().toString());
+        assertEquals("World-pre-resume.zip", RestoreSource.find(saves, "World").get().zip().getFileName().toString());
     }
 
     @Test
@@ -307,8 +305,7 @@ class RestoreSourceTest {
         Path backup = cleanZip("World-pre-resume.zip", "World", "2026-03-01T10:00:00Z");
         Files.setLastModifiedTime(export, FileTime.from(Instant.parse("2026-03-01T10:00:00Z")));
         Files.setLastModifiedTime(backup, FileTime.from(Instant.parse("2026-03-02T10:00:00Z")));
-        assertEquals("World-pre-resume.zip",
-                RestoreSource.find(saves, "World").get().zip().getFileName().toString());
+        assertEquals("World-pre-resume.zip", RestoreSource.find(saves, "World").get().zip().getFileName().toString());
     }
 
     @Test
