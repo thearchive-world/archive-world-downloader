@@ -243,8 +243,7 @@ class LevelDatWorldOutputTest {
 
         assertTrue(saved.built().gameRuleResolution().droppedInvalidValues().contains("keep_inventory"),
                 "the typo is surfaced");
-        assertTrue(gameRules(saved).get(GameRules.KEEP_INVENTORY),
-                "the curated value stands; the typo is not written");
+        assertTrue(gameRules(saved).get(GameRules.KEEP_INVENTORY), "the curated value stands; the typo is not written");
     }
 
     @Test
