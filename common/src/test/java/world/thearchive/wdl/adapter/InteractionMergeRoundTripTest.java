@@ -100,8 +100,7 @@ class InteractionMergeRoundTripTest {
         // present, so the captured holder marks the just-inserted disc playing.
         CompoundTag jukeboxBlockEntity = findByPos(
                 chunkTag.getCompound("Level").getList("TileEntities", 10), 10, 70, 20);
-        assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"),
-                "the captured jukebox is marked playing");
+        assertTrue(jukeboxBlockEntity.getBoolean("IsPlaying"), "the captured jukebox is marked playing");
     }
 
     @Test

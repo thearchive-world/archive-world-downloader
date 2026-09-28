@@ -133,8 +133,7 @@ class LiveCaptureSessionFailSoftTest {
             throw new IllegalStateException("player serialize/scrub blew up");
         });
 
-        assertEquals(1, losses(session),
-                "the level.dat is written with no Player tag, so the loss is counted as one");
+        assertEquals(1, losses(session), "the level.dat is written with no Player tag, so the loss is counted as one");
         assertTrue(session.isPartialSave(0, 0), "and that makes the finish partial rather than clean");
     }
 
