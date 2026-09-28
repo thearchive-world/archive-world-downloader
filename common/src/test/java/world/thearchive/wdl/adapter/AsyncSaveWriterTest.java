@@ -888,8 +888,7 @@ class AsyncSaveWriterTest {
         assertNotNull(onDisk, "the scan handed the prior on-disk region chunk to the observer");
         NBTTagCompound vehicle = onDisk.getCompoundTag("Level").getTagList("Entities", 10).getCompoundTagAt(0);
         assertEquals(cart, EntityMerge.readUuid(vehicle), "the prior container entity kept its UUID");
-        assertFalse(vehicle.getTagList("Items", 10).isEmpty(),
-                "the prior container entity carries the captured Items");
+        assertFalse(vehicle.getTagList("Items", 10).isEmpty(), "the prior container entity carries the captured Items");
     }
 
     /**
