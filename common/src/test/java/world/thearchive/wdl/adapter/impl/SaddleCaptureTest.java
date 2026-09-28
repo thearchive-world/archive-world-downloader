@@ -85,8 +85,7 @@ class SaddleCaptureTest {
 
         assertNotNull(chunk, "precondition: the horse is written at all");
         CompoundTag saved = chunk.getList("Entities", Tag.TAG_COMPOUND).getCompound(0);
-        assertFalse(saved.contains("SaddleItem"),
-                "an unsaddled mount must not be given a saddle it never wore");
+        assertFalse(saved.contains("SaddleItem"), "an unsaddled mount must not be given a saddle it never wore");
     }
 
     /**

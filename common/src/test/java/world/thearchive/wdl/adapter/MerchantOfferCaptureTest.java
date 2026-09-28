@@ -90,8 +90,7 @@ class MerchantOfferCaptureTest {
         CompoundTag holder = MerchantOfferCapture.serialize(offering(new ItemStack(Items.DIAMOND)), 42, true,
                 registries);
 
-        assertEquals(1, holder.getCompound("Offers").getList("Recipes", 10).size(),
-                "one offer under Recipes");
+        assertEquals(1, holder.getCompound("Offers").getList("Recipes", 10).size(), "one offer under Recipes");
         assertEquals(42, holder.getInt("Xp"), "the villager's experience rides alongside");
     }
 
@@ -128,8 +127,7 @@ class MerchantOfferCaptureTest {
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, false, archive);
 
-        assertNotEquals(7, sellItemTag(holder).getInt("map"),
-                "the session map id was rewritten to an archive id");
+        assertNotEquals(7, sellItemTag(holder).getInt("map"), "the session map id was rewritten to an archive id");
     }
 
     @Test
