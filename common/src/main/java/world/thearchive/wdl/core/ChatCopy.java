@@ -124,8 +124,7 @@ public final class ChatCopy {
     }
 
     /**
-     * The start refusal when no usable name was given (bare {@code /wdl start}, a name that sanitizes to nothing, or an
-     * implicit start with no server name to fall back on), pointing at {@code /wdl start <name>}.
+     * The start refusal when no usable name was given, pointing at {@code /wdl start <name>}.
      */
     public static ChatCopy startNeedsName() {
         return ivoryLine("wdl.chat.start_needs_name", new ArrayList<>());
