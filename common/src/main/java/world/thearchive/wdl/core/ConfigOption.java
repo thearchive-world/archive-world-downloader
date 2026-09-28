@@ -10,8 +10,7 @@ import org.jspecify.annotations.Nullable;
  * One config option's descriptor: its key, value {@link ConfigType}, canonical default string, optional numeric range,
  * the enum parser for an {@link ConfigType#ENUM} option, the read accessor off a live {@link WdlConfig}, and the exact
  * template bytes that precede its {@code key=value} line. The single source the template, parse, defaults, projection,
- * and report all derive from. The settings menu reads the value shape through the public accessors below to map each
- * option to an editing widget.
+ * and report all derive from.
  *
  * <p>The range is stored as a {@code double} pair holding either integer or float bounds (both are exactly
  * representable), so one range representation serves both numeric types. An unbounded integer carries the full
@@ -42,17 +41,17 @@ public final class ConfigOption {
         this.losesDataOnDisable = losesDataOnDisable;
     }
 
-    /** The wdl.properties key, the settings row's binding and its {@code gamerule.*}-free identity. */
+    /** The wdl.properties key. */
     public String key() {
         return key;
     }
 
-    /** The value shape, which the settings menu maps to an editing widget. */
+    /** The value shape. */
     public ConfigType type() {
         return type;
     }
 
-    /** The canonical default string, the row's revert-to-default target. */
+    /** The canonical default string. */
     public String defaultValue() {
         return defaultValue;
     }
