@@ -455,6 +455,32 @@ class CaptureControllerTest {
     }
 
     @Test
+    void aSavedChunkOrCoveredDiscMovesTheOverlayGeneration() {
+        CaptureController controller = controller();
+        long initial = controller.overlayGeneration();
+
+        controller.savedChunks().add("minecraft:overworld", 42L);
+        long afterSaved = controller.overlayGeneration();
+        controller.coveredChunks().addDisc("minecraft:overworld", 0, 0, 1);
+
+        assertTrue(afterSaved > initial, "a saved chunk moves the generation");
+        assertTrue(controller.overlayGeneration() > afterSaved, "a covered disc moves the generation");
+    }
+
+    @Test
+    void aSettingsCommitMovesTheOverlayGeneration() {
+        CaptureController controller = controller();
+        controller.start(FakeSession::new);
+        controller.savedChunks().add("minecraft:overworld", 42L);
+        long before = controller.overlayGeneration();
+
+        controller.onSettingsCommitted();
+
+        assertTrue(controller.overlayGeneration() > before,
+                "an overlay toggle or color edit leaves both indexes untouched, so the commit itself must move it");
+    }
+
+    @Test
     void savedChunksIsStableAndNonNull() {
         CaptureController controller = controller();
         SavedChunkIndex index = controller.savedChunks();
