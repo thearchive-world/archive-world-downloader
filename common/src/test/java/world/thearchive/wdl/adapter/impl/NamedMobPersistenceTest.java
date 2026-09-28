@@ -68,8 +68,7 @@ class NamedMobPersistenceTest {
     void nonMobIsNeverTouched() {
         CompoundTag knobOff = new CompoundTag();
         EntitySinkImpl.applyMobPersistence(knobOff, false, false, false, false);
-        assertFalse(knobOff.contains("PersistenceRequired"),
-                "a non-Mob entity never gets PersistenceRequired set");
+        assertFalse(knobOff.contains("PersistenceRequired"), "a non-Mob entity never gets PersistenceRequired set");
 
         CompoundTag knobOn = new CompoundTag();
         EntitySinkImpl.applyMobPersistence(knobOn, false, false, false, true);
