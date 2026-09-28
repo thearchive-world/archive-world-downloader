@@ -10,13 +10,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The closed classification of a config value's type. Each constant owns both directions: {@link #parse} turns a raw
- * string into a typed value (recording a present-but-unparseable value in {@code malformed} and returning {@code null}
- * so the caller falls back to the descriptor default, clamping a ranged number in range), and {@link #format} renders a
- * typed value back to its canonical string. A settings menu maps each constant to an editing widget. Package-private.
+ * string into a typed value (recording in {@code malformed} the key of a present value it rejects and returning
+ * {@code null}, clamping a finite ranged number in range), and {@link #format} renders a typed value back to its
+ * canonical string.
  *
- * <p>Failure contract: a present value that does not parse records {@link ConfigOption#key} and returns {@code null};
- * an out-of-range number clamps and is not malformed; a {@link #LONG} accepts any text and a blank one returns
- * {@code null} to take the default.
+ * <p>Failure contract: a present value that does not parse, or a {@link #FLOAT} that parses to NaN or an infinity,
+ * records {@link ConfigOption#key} and returns {@code null}; an {@link #INTEGER} or {@link #FLOAT} otherwise outside
+ * the option's range clamps and is not malformed; a {@link #LONG} accepts any text, and a blank one returns
+ * {@code null} without being recorded.
  */
 public enum ConfigType {
     BOOLEAN {
