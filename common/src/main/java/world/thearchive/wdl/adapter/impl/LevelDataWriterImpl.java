@@ -245,7 +245,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         if (!Files.exists(levelDatFile)) {
             return null;
         }
-        // 1.10.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(levelDatFile)) {
             NBTTagCompound root = CompressedStreamTools.readCompressed(input);
             if (!root.hasKey("Data", 10)) {
