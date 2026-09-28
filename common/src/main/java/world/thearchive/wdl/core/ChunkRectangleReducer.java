@@ -12,9 +12,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Reduces a set of chunk positions (packed as {@code ChunkPos.asLong}) to a small list of chunk-space rectangles, so a
- * downstream area union stays cheap even when a real download holds thousands of chunks. MC-free and Java-8-clean:
- * decode is a bit operation, not a {@code ChunkPos} call.
+ * Reduces a set of chunk positions, each packed with x in the low 32 bits and z in the high 32 bits, to a small list of
+ * chunk-space rectangles, so a downstream area union stays cheap even when a real download holds thousands of chunks.
  */
 public final class ChunkRectangleReducer {
     private ChunkRectangleReducer() {}
