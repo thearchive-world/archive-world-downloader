@@ -47,8 +47,7 @@ class NamedMobPersistenceTest {
 
         CompoundTag knobOn = new CompoundTag();
         EntitySinkImpl.applyMobPersistence(knobOn, true, false, true, true);
-        assertTrue(knobOn.getBoolean("PersistenceRequired"),
-                "a loot-equipped mob persists with the force knob on too");
+        assertTrue(knobOn.getBoolean("PersistenceRequired"), "a loot-equipped mob persists with the force knob on too");
     }
 
     @Test
