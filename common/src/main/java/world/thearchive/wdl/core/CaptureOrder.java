@@ -27,16 +27,16 @@ public final class CaptureOrder {
         int side = 2 * radius + 1;
         int[] out = new int[2 * side * side];
         int i = 0;
-        out[i++] = 0; // the center ring
+        out[i++] = 0;
         out[i++] = 0;
         for (int ring = 1; ring <= radius; ring++) {
-            for (int dx = -ring; dx <= ring; dx++) { // the top and bottom rows of this ring
+            for (int dx = -ring; dx <= ring; dx++) {
                 out[i++] = dx;
                 out[i++] = -ring;
                 out[i++] = dx;
                 out[i++] = ring;
             }
-            for (int dz = -(ring - 1); dz <= ring - 1; dz++) { // the left and right columns (rows excluded)
+            for (int dz = -(ring - 1); dz <= ring - 1; dz++) {
                 out[i++] = -ring;
                 out[i++] = dz;
                 out[i++] = ring;

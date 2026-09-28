@@ -21,9 +21,8 @@ import java.util.Properties;
  *
  * <p>Two orderings are preserved because they genuinely differ: {@link #OPTIONS} is in template (file) order, so
  * {@link #renderDefaultTemplate} is a straight in-order walk, while {@link #REPORT_ORDER} is the reportable
- * {@link WdlConfig} scalar keys in value-object field order, which the download report pins. The sparse
- * {@code gamerule.*} overrides are not a descriptor row: they are a dynamic map handled as literal preamble bytes, a
- * harvested map, and a projection append.
+ * {@link WdlConfig} scalar keys in value-object field order. The sparse {@code gamerule.*} overrides are not a
+ * descriptor row: they are a dynamic map handled as literal preamble bytes, a harvested map, and a projection append.
  *
  * <p>{@link #option(String)} is public so the settings menu can read each option's value shape and default;
  * {@link #OPTIONS} and the parse, template, and report members stay package-private to their producers.
@@ -490,7 +489,7 @@ public final class ConfigSchema {
     /**
      * The world-output scalars that differ from {@code baseline}, each by its key, in field order. The sparse
      * {@code gamerule.*} overrides are not diffable scalars (an override is inherently a change, with no per-rule
-     * default to diff against), so they are excluded here and reported through the override list instead.
+     * default to diff against), so they are excluded here.
      */
     static Map<String, String> worldOutputDiff(WdlConfig config, WdlConfig baseline) {
         return diffByOrder(WORLD_OUTPUT_REPORT_ORDER, config, baseline);
