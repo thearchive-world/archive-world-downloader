@@ -23,7 +23,7 @@ public final class BrandColors {
     /** Primary text on a dark surface, fixed for contrast against the dark HUD panel tint. */
     public static final int IVORY = 0xF0EAD6;
 
-    /** Pure white, matching vanilla button-label text, for active-on-widget marks. */
+    /** Pure white, for active-on-widget marks. */
     public static final int WHITE = 0xFFFFFF;
 
     /** Secondary text, subtitle, and inactive chrome. */
