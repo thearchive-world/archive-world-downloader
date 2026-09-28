@@ -466,8 +466,7 @@ class ItemLocationScrubTest {
         armorItems.appendTag(new NBTTagCompound()); // chest
         armorItems.appendTag(itemNbt(lodestoneCompass())); // head slot holding a lodestone compass
         zombie.setTag("ArmorItems", armorItems);
-        assertTrue(targetOf(itemFrom(handItems.get(0))).isPresent(),
-                "precondition: the mainhand compass has a target");
+        assertTrue(targetOf(itemFrom(handItems.get(0))).isPresent(), "precondition: the mainhand compass has a target");
         assertTrue(targetOf(itemFrom(armorItems.get(3))).isPresent(), "precondition: the armor compass has a target");
 
         ItemLocationScrub.scrubEntity(zombie);
