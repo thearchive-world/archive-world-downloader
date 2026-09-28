@@ -152,8 +152,8 @@ public final class ChunkRectangleReducer {
             int[] rectangle = { rx0, rz0, rx0 + cell - 1, rz0 + cell - 1 };
             int savedCount = entry.getValue()[0];
             int coveredCount = entry.getValue()[1];
-            // The else is load-bearing: a covered-majority cell also satisfies the suspect test, so splitting
-            // these into separate ifs would double-paint the cell into both tone sets.
+            // The else is load-bearing: a covered-majority cell with any uncovered slot also satisfies the suspect
+            // test, so splitting these into separate ifs would double-paint the cell into both tone sets.
             if (savedCount == full && (long) coveredCount * 2 > full) {
                 coveredRectangles.add(rectangle);
             } else if (savedCount > coveredCount) {

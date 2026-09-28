@@ -15,14 +15,8 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A read-only view of the session's captured-set, read by the outline classifier to decide which loaded containers
- * still carry a rim. It mirrors {@link CaptureCounts} as an encapsulation boundary across the
- * {@link CaptureController.Session} seam: MC-free (primitive fastutil collections, a {@code Set}, a {@code boolean})
- * and Java-8-clean. The members are the identities a container can match: a block pos key, a borne-entity {@link UUID},
- * the single global ender flag (one ender capture clears every ender chest's rim), a chiseled-bookshelf per-slot
- * captured mask, and the recorded block-entity type per captured pos. The block keys are a primitive {@code LongSet} so
- * the classifier's hot per-tick {@link #containsBlock} test over every loaded container neither boxes its key nor
- * allocates.
+ * A read-only view of the session's captured-set. The block keys are a primitive {@code LongSet} so the per-tick
+ * {@link #containsBlock} test neither boxes its key nor allocates.
  *
  * <p>Construct one per read, and do not cache it. The collection members wrap the session's live sets unmodifiable
  * rather than copying them (read and capture share the one client thread), so they track later mutation, but the
@@ -64,20 +58,19 @@ public final class CapturedContainers {
         return entityIds.contains(entityId);
     }
 
-    /** Whether any ender chest was opened this session (the shared ender inventory is captured once). */
+    /** Whether the ender-chest contents were captured this session. */
     public boolean enderCaptured() {
         return enderCaptured;
     }
 
-    /** The mask of slots captured this session for the chiseled bookshelf at this pos (bit n = slot n), 0 if none. */
+    /** The mask of slots captured this session for the block at this pos (bit n = slot n), 0 if none. */
     public int bookshelfCapturedSlots(long posKey) {
         return bookshelfCapturedSlots.get(posKey);
     }
 
     /**
-     * The block-entity registry id recorded when the container at this packed pos was captured, or {@code null} if none
-     * is recorded. The outline compares it against the live block-entity type to detect a same-position block
-     * replacement (Gate 2): a mismatch means the captured container is gone and its rim returns.
+     * The block-entity type id recorded when the container at this packed pos was captured, or {@code null} if none is
+     * recorded.
      */
     @Nullable
     String capturedBlockType(long posKey) {

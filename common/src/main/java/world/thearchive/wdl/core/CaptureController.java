@@ -15,21 +15,16 @@ import org.jspecify.annotations.Nullable;
  * work (snapshotting loaded chunks, writing the region files and level.dat) lives behind the {@link Session} seam,
  * whose implementation the loader/adapter layer supplies.
  *
- * <p>Threading: {@link #tick()} runs on the client main thread, and so does the whole per-chunk snapshot inside
- * {@code Session.captureTick()}; only immutable tags cross to the async IO worker. This controller holds no locks and
- * must only ever be touched from that one thread.
+ * <p>Threading: the client main thread drives {@link #tick()}, and the controller holds no locks. Apart from its
+ * volatile fields and the three overlay stores, which are safe from any thread, it is written for that one thread and
+ * marshals nothing itself: {@link #onDisconnect} runs on whatever thread delivers the disconnect, and the stop, the
+ * finish and any re-poll the finish makes inline run there with it.
  *
- * <p>The save is asynchronous: {@link Session#finish()} only <em>begins</em> the background write and returns at once
- * (so the keybind/command never freezes), and the controller stays {@link CaptureState#SAVING} until the write reports
- * done, then returns to {@link CaptureState#IDLE}. A second capture cannot start until then. {@link #tick()} polls
- * {@link Session#isSaveComplete()} on the main thread, but the tick is not the only route out of
- * {@link CaptureState#SAVING}: the session also re-polls this controller when its write completes (see
- * {@link Session#finish()}).
- *
- * <p>For the HUD the controller carries three time-aware reads past the live session's teardown: the counts freeze at
- * {@code /wdl stop} and hold through the save and a post-save done linger; the elapsed timer freezes the same way; and
- * {@link #doneElapsedMillis()} reports time since the save completed so the overlay can draw the done frame and fade it
- * out.
+ * <p>The save is asynchronous: {@link Session#finish()} returns without waiting for the background write, and the
+ * controller stays {@link CaptureState#SAVING} until the write reports done, then returns to {@link CaptureState#IDLE}.
+ * A second capture cannot start until then. {@link #tick()} polls {@link Session#isSaveComplete()}, but the tick is not
+ * the only route out of {@link CaptureState#SAVING}: the session also re-polls this controller when its write completes
+ * (see {@link Session#finish()}).
  */
 public final class CaptureController {
     /**
@@ -45,30 +40,29 @@ public final class CaptureController {
 
         /**
          * Begin the asynchronous save (write level.dat, drain and close the region storage, report the saved world).
-         * Returns immediately.
+         * Returns without waiting for the write.
          *
          * <p>An implementation must arrange for the controller to be re-polled once the background write completes, and
          * may not rely on the controller's per-tick poll alone: the tick can stay suspended for arbitrarily long while
          * the rest of the client keeps running, which would strand the save in {@link CaptureState#SAVING} forever.
          * That re-poll may run synchronously inside this call (a finish with nothing to write does exactly that), so it
-         * must be idempotent against the polls that follow. It must also reach the controller on the one thread every
-         * other call to it uses (see the threading note above), so a write that completes off that thread marshals the
-         * re-poll back to it.
+         * must be idempotent against the polls that follow. A re-poll for a write that completes off the client main
+         * thread must be marshaled to it (see the threading note above).
          */
         void finish();
 
         /**
-         * Polled on the client main thread while saving, on the tick and again on the session's own completion re-poll:
-         * {@code true} once the background write has finished (success or failure). The session surfaces its own
-         * outcome message on completion.
+         * Polled while saving, on the tick and again on the session's own completion re-poll: {@code true} once the
+         * background write has finished (success or failure). The session surfaces its own outcome message on
+         * completion.
          */
         boolean isSaveComplete();
 
         /**
-         * Hold the background writer off the loader's registries, and wait for any read already under way to finish. A
-         * loader can rebuild those registries in place at either edge of a connection, and a write encoded across a
-         * rebuild loses its blocks, so this is taken on a connection edge. Default no-op, because a session with no
-         * background write of its own has nothing to hold.
+         * Hold the background writer off the loader's registries, and wait, for a bounded time, for any read already
+         * under way to finish. A loader can rebuild those registries in place at either edge of a connection, and a
+         * write encoded across a rebuild loses its blocks, so this is taken on a connection edge. Default no-op,
+         * because a session with no background write of its own has nothing to hold.
          */
         default void holdWriterEncoding() {}
 
@@ -99,7 +93,7 @@ public final class CaptureController {
         /** The current finalization phase while the background save drains. */
         SaveStage saveStage();
 
-        /** The current finalization phase's fraction in {@code [0, 1]}; 0 unless a save is draining. */
+        /** The current finalization phase's fraction in {@code [0, 1]}. */
         float saveProgress();
     }
 
@@ -107,41 +101,34 @@ public final class CaptureController {
 
     private final LongSupplier clockMillis;
 
-    // Volatile because a map mod's off-thread overlay supplier gates on this through Wdl.state() while the
-    // client thread writes it. A stale RECORDING is harmless, the indexes only ever hold the current download's
-    // own coverage and are cleared once its save completes, so the worst it can redraw is what that download was
-    // already drawing; a stale IDLE would hide the overlay for a whole download with nothing to correct it.
+    // Volatile because a map overlay may read it off the client thread while the client thread writes it: a stale IDLE
+    // would hide that overlay for a whole download with nothing to correct it.
     private volatile CaptureState state = CaptureState.IDLE;
     private @Nullable Session session;
 
     /**
-     * The session whose writer is held off the loader's registries, released by the first tick that is not the finish's
-     * own re-entrant one.
+     * The session whose writer is held off the loader's registries, released by the first tick that finds no finish
+     * under way.
      */
     private volatile @Nullable Session encodeHeld;
 
     /** Set while {@link #stop()} is inside {@link Session#finish()}; that call's own poll must not release the hold. */
     private volatile boolean finishing;
 
-    // The running session's latched capture toggles, republished here because the session reference itself is
-    // client-thread-only while the overlay reads run off-thread. Null exactly when no session is set.
+    // The running session's latched capture toggles, republished here because the session reference itself is not
+    // volatile, and an overlay may read these off the client thread. Null exactly when no session is set.
     private volatile @Nullable CaptureToggles latchedToggles;
 
-    // The three overlay stores are owned here, on the singleton that outlives individual sessions, so the
-    // off-render-thread overlay reads a stably published reference. The live session writes to them.
+    // The three overlay stores are owned here, on the singleton that outlives individual sessions, so an overlay
+    // reading off the client thread sees a stably published reference. The live session writes to them.
     private final SavedChunkIndex savedChunks = new SavedChunkIndex();
     private final CoveredChunkIndex coveredChunks = new CoveredChunkIndex();
     private final SendRangeEstimator sendRange = new SendRangeEstimator();
 
-    // The backend-transfer stop signal, polled first each recording tick so no tick ever rebinds the re-entered
-    // world as a portal trip or recomputes at a stale radius. A field with a never-fire default rather than a
-    // constructor parameter: the adapter layer wires the real poll at startup, and the controller stays MC-free.
+    // The backend-transfer stop signal, polled first each recording tick so that once it is raised no tick rebinds the
+    // re-entered world as a portal trip or recomputes at a stale radius.
     private BooleanSupplier transferStopPoll = () -> false;
 
-    // The frozen counts held through SAVING and the done linger (the live session is gone during the
-    // save). Armed at stop() and re-armed with the written totals once the save completes, read by counts()
-    // while not recording, cleared at the next start() or once the controller has been idle past the hold
-    // window.
     private CaptureCounts frozenCounts = CaptureCounts.EMPTY;
     private long startMillis;
     private long frozenElapsedMillis;
@@ -161,8 +148,8 @@ public final class CaptureController {
     }
 
     /**
-     * Capture counts for the status command and HUD: live while recording, the stop-time frozen snapshot through
-     * saving, the written totals through the done linger, {@link CaptureCounts#EMPTY} when idle and past the linger.
+     * Capture counts: live while recording, the stop-time frozen snapshot through saving, the final totals through the
+     * done-linger hold, {@link CaptureCounts#EMPTY} when idle and past it.
      */
     public CaptureCounts counts() {
         if (state == CaptureState.RECORDING && session != null) {
@@ -190,7 +177,7 @@ public final class CaptureController {
      * running download latched at start, or {@code live} alone when nothing is running, since then no latched set
      * exists and the settings are the only answer there is. The conjunction is what keeps a mid-download edit from
      * stranding a marker: switching an axis on cannot draw for an axis this download is not capturing, and switching
-     * one off still hides its markers at once.
+     * one off hides its markers from the next read on.
      */
     public CaptureToggles aidToggles(WdlConfig live) {
         CaptureToggles liveToggles = CaptureToggles.from(live);
@@ -199,11 +186,11 @@ public final class CaptureController {
     }
 
     /**
-     * The saved chunk-position longs for a dimension, snapshotted thread-safely for the coverage overlay, which reads
-     * off the render thread. Holds only the running download's own coverage, emptied once its save completes, and empty
-     * while {@code renderCoverageOverlay} is off: that toggle is read live, on the overlay's own read path, so
-     * switching it off hides the highlight without a restart and switching it back on shows the recorded index at once
-     * (the index keeps filling regardless). The id is the live client's key for the dimension.
+     * The saved chunk-position longs for a dimension, snapshotted thread-safely so the coverage overlay may read them
+     * off the client thread. Holds only the running download's own coverage, emptied once its save completes, and empty
+     * while {@code renderCoverageOverlay} is off: that toggle is read live, on each call, so switching it needs no
+     * restart, and the first read after switching it back on returns the whole recorded index (the index keeps filling
+     * regardless). The id is the live client's key for the dimension.
      */
     public long[] overlaySavedChunks(WdlConfig live, String dimensionId) {
         if (!live.renderCoverageOverlay()) {
@@ -213,15 +200,14 @@ public final class CaptureController {
     }
 
     /**
-     * The covered chunk-position longs for a dimension: the saved chunks the recording path brought within entity send
-     * range, which the two-tone overlay draws in the covered hue while the rest of the saved set draws the suspect hue.
+     * The covered chunk-position longs for a dimension. They are not limited to saved chunks, so a reader intersects
+     * them with {@link #overlaySavedChunks}: a saved chunk found here is covered, and any other saved chunk is suspect.
      * Gated on the same live {@code renderCoverageOverlay} toggle and read the same thread-safe way as
      * {@link #overlaySavedChunks}; each is its own independent synchronized snapshot, so a chunk may transiently appear
-     * in one and not the other for a single refresh. When {@link #aidToggles} reports entity capture off this download
-     * is adding no entity, so nothing draws covered; this is checked first and short-circuits the cold-start mirror
-     * below, which only applies while entity capture is on. Until the send range has been measured for the dimension
-     * the covered read mirrors the saved set, so the overlay draws single-tone rather than flashing a spurious suspect
-     * boundary at a not-yet-known range.
+     * in one and not the other for a single refresh. When {@link #aidToggles} reports entity capture off, the read is
+     * empty; this is checked first and short-circuits the cold-start mirror below, which only applies while entity
+     * capture is on. Until the send range has been measured for the dimension the covered read mirrors the saved set,
+     * so the overlay draws single-tone rather than flashing a spurious suspect boundary at a not-yet-known range.
      */
     public long[] overlayCoveredChunks(WdlConfig live, String dimensionId) {
         if (!live.renderCoverageOverlay()) {
@@ -236,12 +222,10 @@ public final class CaptureController {
         return coveredChunks.snapshot(dimensionId);
     }
 
-    /** The saved-chunk-position index for the coverage overlay; snapshotted off-thread by the supplier. */
     public SavedChunkIndex savedChunks() {
         return savedChunks;
     }
 
-    /** The covered-chunk-position index for the two-tone overlay; snapshotted off-thread by the supplier. */
     public CoveredChunkIndex coveredChunks() {
         return coveredChunks;
     }
@@ -259,8 +243,8 @@ public final class CaptureController {
     }
 
     /**
-     * The capture's elapsed wall-clock time: counting up while recording, frozen at the {@code /wdl stop} duration
-     * through saving and the done linger, 0 when idle and past the linger.
+     * The capture's elapsed wall-clock time: counting up while recording, frozen at its stop-time value through saving
+     * and the done-linger hold, 0 when idle and past it.
      */
     public long elapsedMillis() {
         if (state == CaptureState.RECORDING) {
@@ -295,8 +279,8 @@ public final class CaptureController {
     }
 
     /**
-     * Wire the backend-transfer stop signal, polled at the top of each recording tick; a true read stops the download
-     * exactly like a disconnect. Wired once at startup by the adapter layer; the default never fires.
+     * Wire the backend-transfer stop signal, polled at the top of each recording tick; a true read stops the download.
+     * The default never fires.
      */
     public void setTransferStopPoll(BooleanSupplier transferStopPoll) {
         this.transferStopPoll = transferStopPoll;
@@ -319,16 +303,17 @@ public final class CaptureController {
     }
 
     /**
-     * The controller's poll (main thread): capture eligible chunks while recording, or (while saving) poll the
-     * background write and return to idle once it has completed, stamping the done-linger start. Called once per client
-     * tick and also as the session's completion-poke target, so it can run off the tick and re-entrantly from inside
-     * {@link #stop()}; the null-session and state guards keep it idempotent.
+     * The controller's poll: capture eligible chunks while recording, or (while saving) poll the background write and
+     * return to idle once it has completed, stamping the done-linger start. Called once per client tick and also as the
+     * session's completion-poke target, so it can run off the tick and re-entrantly from inside {@link #stop()}; the
+     * null-session and state guards keep it idempotent.
      */
     public void tick() {
         // Ahead of every guard below, including the null-session one: the session that was held may already have been
-        // dropped, and the writer it owns still has to be let go. A tick cannot begin until the client's own teardown
-        // has returned, which is what makes this the safe side of the rebuild; a re-entrant tick from inside the
-        // finish is not, so it is excluded rather than allowed to release early.
+        // dropped, and the writer it owns still has to be let go. Where the disconnect arrives inside the client's own
+        // teardown, a tick cannot begin until that teardown has returned, which is what makes this the safe side of the
+        // rebuild; a re-entrant tick from inside the finish is not, so it is excluded rather than allowed to release
+        // early.
         Session held = encodeHeld;
         if (held != null && !finishing) {
             encodeHeld = null;
@@ -338,14 +323,14 @@ public final class CaptureController {
             return;
         }
         if (state == CaptureState.RECORDING && transferStopPoll.getAsBoolean()) {
-            stop(); // a backend transfer behaves exactly like a disconnect, and the capture does not follow it across
+            stop();
             return;
         }
         if (state == CaptureState.RECORDING) {
             session.captureTick();
         } else if (state == CaptureState.SAVING && session.isSaveComplete()) {
-            // The save drain grows the counts past the stop-time freeze (chunk-prime entity snapshots and
-            // promoted packet frames), so the done linger must show the written totals, not the stop figures.
+            // The save drain can grow the counts past the stop-time freeze, so the done linger must show the final
+            // totals, not the stop figures.
             frozenCounts = session.counts();
             session = null;
             latchedToggles = null;
@@ -362,7 +347,7 @@ public final class CaptureController {
     }
 
     /**
-     * Begin saving the world to disk (no-op unless recording); the write drains asynchronously.
+     * Stop recording and finish saving the world to disk (no-op unless recording); the write drains asynchronously.
      *
      * <p>{@link Session#finish()} may re-poll this controller synchronously, re-entering {@link #tick()} from inside
      * this call: on a finish that completes at once, the state is already {@link CaptureState#IDLE} and the session
@@ -372,13 +357,12 @@ public final class CaptureController {
         if (state == CaptureState.RECORDING) {
             finishing = true;
             Session active = Objects.requireNonNull(session, "session is set whenever state is RECORDING");
-            // Snapshot the counts and elapsed time before finish() tears the live session down, so the HUD
-            // keeps showing the stop-time figures through the save and the done linger.
+            // Snapshot the counts and elapsed time before finish() tears the live session down.
             frozenCounts = active.counts();
             frozenElapsedMillis = Math.max(0L, clockMillis.getAsLong() - startMillis);
             state = CaptureState.SAVING;
             try {
-                active.finish(); // returns at once, but may already have re-entered tick() and reached IDLE
+                active.finish(); // does not wait for the write, but may already have re-entered tick() and reached IDLE
             } finally {
                 finishing = false;
             }
@@ -386,17 +370,17 @@ public final class CaptureController {
     }
 
     /**
-     * Hold the writer, then flush. The hold comes first and is taken whatever the state, because the save the
-     * disconnect has to protect is often one already running: stopping a download and then leaving the server is a
-     * routine order, and a stop that already moved the state out of recording makes the flush below a no-op while
-     * leaving a full drain to encode straight through the registry rebuild a loader can run on the way out.
+     * Hold the writer, then flush. The hold comes first and is taken while saving as well as while recording, because
+     * the save the disconnect has to protect is often one already running: stopping a download and then leaving the
+     * server is a routine order, and a stop that already moved the state out of recording makes the flush below a no-op
+     * while leaving a full drain to encode straight through the registry rebuild a loader can run on the way out.
      */
     public void onDisconnect() {
         holdWriterEncoding();
         stop();
     }
 
-    /** Joining rebuilds the registries too, so the hold is taken for a save still draining from the last server. */
+    /** Joining can rebuild the registries too, so the hold is taken for a save still draining from the last server. */
     public void onServerJoin() {
         holdWriterEncoding();
     }
@@ -411,9 +395,9 @@ public final class CaptureController {
 
     /**
      * Flip an idle controller into the session-less {@link CaptureState#RESTORING} state, so no capture can start while
-     * a restore worker runs. Main-thread only, like every controller call, so the check and the flip are one
-     * uninterrupted step. Returns false and changes nothing when the controller is not idle: a running capture, a
-     * draining save, or another restore is never disturbed.
+     * a restore worker runs. Main-thread only, so the check and the flip are one uninterrupted step. Returns false and
+     * changes nothing when the controller is not idle: a running capture, a draining save, or another restore is never
+     * disturbed.
      */
     public boolean tryBeginRestoring() {
         if (state != CaptureState.IDLE) {
