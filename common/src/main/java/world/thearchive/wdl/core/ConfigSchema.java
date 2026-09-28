@@ -61,9 +61,9 @@ public final class ConfigSchema {
             + "# current regardless.\n";
 
     private static final String ENCODE_BUDGET_MILLIS_PREAMBLE = ""
-            + "# Max milliseconds per tick (1 to 10) spent encoding chunks/entities, so loading a fresh area\n"
-            + "# or flying fast never stutters the frame; the rest spills to later ticks (the download lags\n"
-            + "# exploration by a few ticks). Higher catches up faster but costs more per frame; lower is\n"
+            + "# Max milliseconds per tick (1 to 10) the download spends on chunks and entities, so loading a\n"
+            + "# fresh area or flying fast never stutters the frame; the rest spills to later ticks (the download\n"
+            + "# lags exploration by a few ticks). Higher catches up faster but costs more per frame; lower is\n"
             + "# smoother but lags more behind you.\n";
 
     private static final String OPEN_IN_CREATIVE_PREAMBLE = ""
@@ -86,8 +86,8 @@ public final class ConfigSchema {
             + "# a lodestone compass's target and the flower positions a silk-touched beehive remembers,\n"
             + "# wherever the item sits: in your inventory, your Ender Chest, any container you open, a block\n"
             + "# that displays an item, or an entity that holds one, including items nested inside Shulker\n"
-            + "# Boxes. Set true to keep them pointing at their locations; on a version with neither, the\n"
-            + "# settings menu leaves the row out.\n";
+            + "# Boxes, where your Minecraft version has them. Set true to keep them pointing at their\n"
+            + "# locations; on a version with neither, the settings menu leaves the row out.\n";
 
     private static final String LOCK_DOWNLOADED_MAPS_PREAMBLE = ""
             + "\n"
