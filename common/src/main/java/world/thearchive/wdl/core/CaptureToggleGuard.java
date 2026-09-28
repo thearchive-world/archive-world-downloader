@@ -4,11 +4,10 @@
 package world.thearchive.wdl.core;
 
 /**
- * The consequence-naming guard a settings change warrants. Because the screen commits silently on close, a
- * download-harming edit is confirmed at the moment of the change rather than at close. {@link #CAPTURE} is the hard
- * data-loss confirm for turning either of the two core capture toggles off; {@link #RECAPTURE} is the milder staleness
- * confirm for reducing the recapture mode's freshness (a multi-state transition, see {@link #whenReducingRecapture});
- * {@link #NONE} is every benign change, which takes no confirm so over-confirming never trains click-through.
+ * The consequence-naming guard a settings change warrants. {@link #CAPTURE} is the hard data-loss confirm for turning
+ * either of the two core capture toggles off; {@link #RECAPTURE} is the milder staleness confirm for reducing the
+ * recapture mode's freshness (a multi-state transition, see {@link #whenReducingRecapture}); {@link #NONE} is every
+ * benign change, which takes no confirm so over-confirming never trains click-through.
  */
 public enum CaptureToggleGuard {
     NONE,
