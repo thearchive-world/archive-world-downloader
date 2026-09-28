@@ -66,8 +66,7 @@ class RiddenMountContentsFoldTest {
 
         assertEquals(1, items(passengerOf(folded)).tagCount(),
                 "the mule whose chest the player opened carries what the open captured, nested or not");
-        assertFalse(folded.hasKey("Items"),
-                "and the minecart it was pushed under carries no contents of its own");
+        assertFalse(folded.hasKey("Items"), "and the minecart it was pushed under carries no contents of its own");
     }
 
     @Test

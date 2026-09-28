@@ -49,8 +49,7 @@ class ChunkSkyLightCaptureTest {
         NBTTagCompound section = captureAndEncodeOneSection(DimensionType.OVERWORLD, true);
         byte[] skyLight = section.getByteArray("SkyLight");
 
-        assertArrayEquals(filled(SKY_FILL), skyLight,
-                "an overworld section's SkyLight must be the live sky layer");
+        assertArrayEquals(filled(SKY_FILL), skyLight, "an overworld section's SkyLight must be the live sky layer");
         assertFalse(Arrays.equals(filled((byte) 0), skyLight),
                 "an overworld section's SkyLight must not be the zero-filled layer, which darkens the chunk for good");
         assertArrayEquals(filled(BLOCK_FILL), section.getByteArray("BlockLight"),

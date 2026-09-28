@@ -82,8 +82,7 @@ class ContainerTypeGateMergeTest {
         NBTTagCompound furnace = findByPos(chunkTag.getCompoundTag("Level").getTagList("TileEntities", 10), 10, 70,
                 20);
         assertFalse(furnace.getTagList("Items", 10).hasNoTags(), "the furnace gains its captured contents");
-        assertFalse(furnace.hasKey("wdl_block_entity_id"),
-                "the type marker rides only on the holder, never onto disk");
+        assertFalse(furnace.hasKey("wdl_block_entity_id"), "the type marker rides only on the holder, never onto disk");
     }
 
     @Test

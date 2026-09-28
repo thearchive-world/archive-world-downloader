@@ -178,8 +178,7 @@ class RecoveredScanTest {
                 "the first mask is published");
 
         scan.record(DimensionType.OVERWORLD, bookshelfChunk(bookshelf(40, 64, 40, 0)));
-        assertSame(afterFirst, scan.coverage(DimensionType.OVERWORLD),
-                "re-recording the same mask does not republish");
+        assertSame(afterFirst, scan.coverage(DimensionType.OVERWORLD), "re-recording the same mask does not republish");
     }
 
     @Test
