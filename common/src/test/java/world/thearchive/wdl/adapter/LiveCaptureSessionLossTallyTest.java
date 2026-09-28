@@ -637,8 +637,7 @@ class LiveCaptureSessionLossTallyTest {
 
         CompoundTag folded = session.foldRidingVehicleContents(entity(VEHICLE));
 
-        assertNotNull(folded.get("Items"),
-                "the contents the player opened are folded into the tag the mount saves as");
+        assertNotNull(folded.get("Items"), "the contents the player opened are folded into the tag the mount saves as");
         assertEquals(1, ((ListTag) folded.get("Items")).size(), "carrying the one stack that was stashed");
         assertEquals(0, losses(session, "entityContainersFailed"), "and a fold that worked counts no loss");
         assertFalse(session.isPartialSave(0, 0), "so the finish reads clean");
