@@ -16,7 +16,7 @@ public enum CaptureToggleGuard {
 
     /**
      * The confirm warranted by turning the boolean toggle {@code key} off: a hard {@link #CAPTURE} confirm when
-     * disabling the option destroys already-captured data ({@link ConfigOption#losesDataOnDisable()}), else
+     * disabling the option leaves a kind of data out of the download ({@link ConfigOption#losesDataOnDisable()}), else
      * {@link #NONE}. The recapture mode is not a boolean toggle; its milder {@link #RECAPTURE} reduction confirm is
      * decided by {@link #whenReducingRecapture}.
      */
@@ -39,8 +39,7 @@ public enum CaptureToggleGuard {
 
     /**
      * Whether either of the two core capture kinds (entities, containers) is off, so the download will be missing that
-     * data. Drives the passive "capture partially disabled" indicator on the settings screen and at the download
-     * action; recapture is excluded, since turning it off loses no data (see {@link #RECAPTURE}). Chunk capture is a
+     * data. Recapture is excluded, since turning it off loses no data (see {@link #RECAPTURE}). Chunk capture is a
      * no-knob invariant, so it is never a factor here.
      */
     public static boolean isCapturePartiallyDisabled(WdlConfig config) {
