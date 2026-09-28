@@ -1238,8 +1238,7 @@ class AsyncSaveWriterTest {
         }
         assertEquals(0, result.chunksWritten(), "the half-merged tag was not written");
         assertEquals(1, result.chunksFailed(), "and the capture that went nowhere is counted lost");
-        assertEquals(1, finalizedChunksFailed.get(),
-                "so the completion record cannot stamp this download clean");
+        assertEquals(1, finalizedChunksFailed.get(), "so the completion record cannot stamp this download clean");
     }
 
     /** A chunk snapshot carrying an empty chest block entity at each of {@code chests}. */

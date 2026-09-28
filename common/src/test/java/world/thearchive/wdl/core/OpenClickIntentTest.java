@@ -292,8 +292,7 @@ class OpenClickIntentTest {
 
         intent.clear();
 
-        assertEquals(OpenClickIntent.Target.NONE, intent.resolve(5L),
-                "a cleared vehicle intent must not seed an open");
+        assertEquals(OpenClickIntent.Target.NONE, intent.resolve(5L), "a cleared vehicle intent must not seed an open");
     }
 
     /** A vehicle intent older than the window is stale: its open never arrived -> NONE. */
@@ -441,8 +440,7 @@ class OpenClickIntentTest {
 
         assertEquals(OpenClickIntent.Target.SUPERSEDED, intent.resolve(1L),
                 "the overwritten block click's marker still poisons its one open");
-        assertEquals(OpenClickIntent.Target.NONE, intent.resolve(1L),
-                "the dismissed entity click itself is gone");
+        assertEquals(OpenClickIntent.Target.NONE, intent.resolve(1L), "the dismissed entity click itself is gone");
     }
 
     /** The mount-then-open-vehicle flow: the entry click is dismissed, so press-E binds cleanly. */
