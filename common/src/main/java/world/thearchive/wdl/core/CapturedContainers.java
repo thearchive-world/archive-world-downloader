@@ -48,7 +48,7 @@ public final class CapturedContainers {
         this.blockTypes = Long2ObjectMaps.unmodifiable(blockTypes);
     }
 
-    /** Whether the block at this packed {@code BlockPos.asLong()} had its contents captured this session. */
+    /** Whether the block at this packed position had its contents captured this session. */
     public boolean containsBlock(long blockKey) {
         return blockKeys.contains(blockKey);
     }
