@@ -84,8 +84,7 @@ class MerchantOfferCaptureTest {
     void serializeRoundTripsOffersUnderRecipes() {
         CompoundTag holder = MerchantOfferCapture.serialize(offering(new ItemStack(Items.DIAMOND)));
 
-        assertEquals(1, holder.getCompound("Offers").getList("Recipes", 10).size(),
-                "one offer under Recipes");
+        assertEquals(1, holder.getCompound("Offers").getList("Recipes", 10).size(), "one offer under Recipes");
         assertFalse(holder.contains("Xp"),
                 "no trade-experience key: trade experience is a 1.14 addition, absent at this band");
     }
@@ -123,8 +122,7 @@ class MerchantOfferCaptureTest {
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, false, archive);
 
-        assertNotEquals(7, sellItemTag(holder).getInt("map"),
-                "the session map id was rewritten to an archive id");
+        assertNotEquals(7, sellItemTag(holder).getInt("map"), "the session map id was rewritten to an archive id");
     }
 
     @Test
