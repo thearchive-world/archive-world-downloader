@@ -72,8 +72,7 @@ class RiddenMountContentsFoldTest {
 
         assertEquals(1, items(passengerOf(folded)).size(),
                 "the mule whose chest the player opened carries what the open captured, nested or not");
-        assertFalse(folded.contains("Items"),
-                "and the minecart it was pushed under carries no contents of its own");
+        assertFalse(folded.contains("Items"), "and the minecart it was pushed under carries no contents of its own");
     }
 
     @Test
@@ -85,8 +84,7 @@ class RiddenMountContentsFoldTest {
 
         CompoundTag expected = EntityFixtures.entity("minecraft:mule", MOUNT);
         expected.put("Items", capturedItems(new ItemStack(Items.DIAMOND, 5)).getListOrEmpty("Items"));
-        assertEquals(expected, folded,
-                "a mount standing on its own folds to the tag it always did, key for key");
+        assertEquals(expected, folded, "a mount standing on its own folds to the tag it always did, key for key");
     }
 
     @Test
