@@ -119,8 +119,7 @@ class TargetResolverTest {
 
     @Test
     void anIllegalCharacterInsideTheNameIsStripped() {
-        assertEquals("Hypixel Skyblock",
-                TargetResolver.resolveNew("Hypixel: Skyblock", DATE, false).folderName());
+        assertEquals("Hypixel Skyblock", TargetResolver.resolveNew("Hypixel: Skyblock", DATE, false).folderName());
     }
 
     @Test
@@ -146,8 +145,7 @@ class TargetResolverTest {
     void pathTraversalIsContainedToTheSavesDirectory(@TempDir Path saves) {
         DownloadTarget target = TargetResolver.resolveNew("../../etc/passwd", DATE, true);
         Path resolved = saves.resolve(target.folderName()).normalize();
-        assertTrue(resolved.startsWith(saves.normalize()),
-                "the derived folder must stay inside the saves directory");
+        assertTrue(resolved.startsWith(saves.normalize()), "the derived folder must stay inside the saves directory");
     }
 
     @Test
@@ -189,8 +187,7 @@ class TargetResolverTest {
 
     @Test
     void classifyTargetReturnsNewForAnAbsentFolder(@TempDir Path saves) {
-        assertEquals(TargetClassification.NEW,
-                TargetResolver.classifyTarget("brand-new-2026-06-22", saves, null));
+        assertEquals(TargetClassification.NEW, TargetResolver.classifyTarget("brand-new-2026-06-22", saves, null));
     }
 
     @Test
