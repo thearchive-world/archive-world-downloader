@@ -828,6 +828,7 @@ public final class Wdl {
             }
         }
         currentConfig = WdlConfig.load(file);
+        controller.onSettingsCommitted();
     }
 
     // The pause-menu primary button's label and enabled-state are resolved once when the pause menu opens, since
@@ -1017,9 +1018,9 @@ public final class Wdl {
         return controller.overlayCoveredChunks(currentConfig, dimensionId);
     }
 
-    /** A monotonic overlay-data generation, bumped whenever any saved/covered set changes; poll to detect edits. */
+    /** A monotonic overlay generation; see {@link CaptureController#overlayGeneration}. */
     public static long overlayGeneration() {
-        return controller.savedChunks().version() + controller.coveredChunks().version();
+        return controller.overlayGeneration();
     }
 
     /** The unsaved-container outline draw-set, read by the per-loader render registrar each frame. */
