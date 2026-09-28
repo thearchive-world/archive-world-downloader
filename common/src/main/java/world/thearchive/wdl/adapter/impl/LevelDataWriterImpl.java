@@ -270,7 +270,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         if (!Files.exists(levelDatFile)) {
             return null;
         }
-        // 1.15.2 NbtIo.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(levelDatFile)) {
             CompoundTag root = NbtIo.readCompressed(input);
             return root.get("Data") instanceof CompoundTag
