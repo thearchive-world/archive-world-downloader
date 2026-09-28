@@ -179,8 +179,7 @@ class RestoreOperationTest {
         // NOT_TAINTED: a clean managed folder refuses honestly.
         taintedWorldWithCleanExport("World2");
         deleteRecursively(saves.resolve("World2/playerdata"));
-        assertEquals(RestoreOperation.Outcome.NOT_TAINTED,
-                runOp("World2", RestoreSource.find(saves, "World2").get()));
+        assertEquals(RestoreOperation.Outcome.NOT_TAINTED, runOp("World2", RestoreSource.find(saves, "World2").get()));
         // SOURCE_CHANGED: metadata mismatch after pinning.
         taintedWorldWithCleanExport("World3");
         RestoreSource pinned = RestoreSource.find(saves, "World3").get();
@@ -266,8 +265,7 @@ class RestoreOperationTest {
         taintedWorldWithCleanExport("World");
         Path occupied = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-1");
         write(occupied.resolve("marker"), 5);
-        assertEquals(RestoreOperation.Outcome.RESTORED,
-                runOp("World", RestoreSource.find(saves, "World").get()));
+        assertEquals(RestoreOperation.Outcome.RESTORED, runOp("World", RestoreSource.find(saves, "World").get()));
         // The occupied first counter name survives untouched; the op staged under the next and cleaned it.
         assertArrayEquals(new byte[] { 5 }, Files.readAllBytes(occupied.resolve("marker")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-2")));
@@ -361,8 +359,7 @@ class RestoreOperationTest {
         assertTrue(Files.exists(saves.resolve("World_(2)/playerdata/u.dat")));
         assertTrue(Files.exists(saves.resolve("World")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
-        assertInstanceOf(FileAlreadyExistsException.class,
-                warnings.drain("install move for World failed").getThrown());
+        assertInstanceOf(FileAlreadyExistsException.class, warnings.drain("install move for World failed").getThrown());
     }
 
     @Test
@@ -445,8 +442,7 @@ class RestoreOperationTest {
         assertEquals(saves.resolve("World_(3)"), result.relocatedTo());
         assertTrue(Files.exists(saves.resolve("World_(3)/playerdata/u.dat")));
         assertArrayEquals(new byte[] { 7 }, Files.readAllBytes(saves.resolve("World_(2)/level.dat")));
-        assertInstanceOf(FileAlreadyExistsException.class,
-                warnings.drain("install move for World failed").getThrown());
+        assertInstanceOf(FileAlreadyExistsException.class, warnings.drain("install move for World failed").getThrown());
     }
 
     @Test
@@ -495,8 +491,7 @@ class RestoreOperationTest {
         assertEquals(List.of(aside), result.survivingPaths());
         assertFalse(Files.exists(saves.resolve("World_(2)")));
         assertTrue(RestoreOperation.attemptReferences(saves, "World"));
-        assertInstanceOf(FileAlreadyExistsException.class,
-                warnings.drain("install move for World failed").getThrown());
+        assertInstanceOf(FileAlreadyExistsException.class, warnings.drain("install move for World failed").getThrown());
         drainParkOf(aside.resolve("session.lock"));
     }
 
