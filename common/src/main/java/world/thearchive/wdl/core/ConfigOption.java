@@ -13,8 +13,7 @@ import org.jspecify.annotations.Nullable;
  * and report all derive from.
  *
  * <p>The range is stored as a {@code double} pair holding either integer or float bounds (both are exactly
- * representable), so one range representation serves both numeric types. An unbounded integer carries the full
- * {@code int} range, which makes its clamp an identity.
+ * representable), so one range representation serves both numeric types.
  */
 public final class ConfigOption {
     final String key;
@@ -56,17 +55,17 @@ public final class ConfigOption {
         return defaultValue;
     }
 
-    /** The inclusive lower bound of a ranged numeric option (the full type range when unbounded). */
+    /** The inclusive lower bound of a ranged numeric option. */
     public double min() {
         return min;
     }
 
-    /** The inclusive upper bound of a ranged numeric option (the full type range when unbounded). */
+    /** The inclusive upper bound of a ranged numeric option. */
     public double max() {
         return max;
     }
 
-    /** Whether disabling this toggle destroys already-captured data, so the settings menu confirms the change. */
+    /** Whether disabling this toggle leaves a kind of data out of the download. */
     boolean losesDataOnDisable() {
         return losesDataOnDisable;
     }
@@ -76,7 +75,7 @@ public final class ConfigOption {
         return new ConfigOption(key, ConfigType.BOOLEAN, defaultValue, 0, 0, null, accessor, preamble, false);
     }
 
-    /** A boolean option whose disabling destroys already-captured data, so the menu confirms the change. */
+    /** A boolean option whose disabling leaves a kind of data out of the download. */
     static ConfigOption dataLossBoolean(String key, String defaultValue, Function<WdlConfig, Object> accessor,
             String preamble) {
         return new ConfigOption(key, ConfigType.BOOLEAN, defaultValue, 0, 0, null, accessor, preamble, true);
