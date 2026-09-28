@@ -334,8 +334,7 @@ class ChunkMergeTest {
         int mergeBacks = ChunkMerge.merge(onDisk, fresh);
 
         assertEquals(1, mergeBacks, "the chest must carry forward, proving merge ran its real path");
-        assertFalse(fresh.getBoolean("isLightOn"),
-                "on-disk isLightOn must not carry onto a gate-false fresh chunk");
+        assertFalse(fresh.getBoolean("isLightOn"), "on-disk isLightOn must not carry onto a gate-false fresh chunk");
         assertTrue(fresh.getList("sections", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
                 .noneMatch(section -> section.contains("BlockLight", Tag.TAG_BYTE_ARRAY)
                         || section.contains("SkyLight", Tag.TAG_BYTE_ARRAY)),
@@ -615,8 +614,7 @@ class ChunkMergeTest {
                 "a block entity whose every field is its own capture is not a carry-forward");
 
         CompoundTag merged = findByPos(fresh, 6, 64, 6);
-        assertEquals((short) 180, merged.getShort("BrewTime"),
-                "the fresh non-default capture stands");
+        assertEquals((short) 180, merged.getShort("BrewTime"), "the fresh non-default capture stands");
         assertEquals((byte) 7, (merged.contains("Fuel") ? merged.getByte("Fuel") : (byte) -1),
                 "and so does the value it captured beside it");
     }
