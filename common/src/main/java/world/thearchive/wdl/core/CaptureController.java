@@ -5,6 +5,7 @@ package world.thearchive.wdl.core;
 
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -125,6 +126,8 @@ public final class CaptureController {
     private final CoveredChunkIndex coveredChunks = new CoveredChunkIndex();
     private final SendRangeEstimator sendRange = new SendRangeEstimator();
 
+    private final AtomicLong settingsCommits = new AtomicLong();
+
     // The backend-transfer stop signal, polled first each recording tick so that once it is raised no tick rebinds the
     // re-entered world as a portal trip or recomputes at a stale radius.
     private BooleanSupplier transferStopPoll = () -> false;
@@ -220,6 +223,20 @@ public final class CaptureController {
             return savedChunks.snapshot(dimensionId);
         }
         return coveredChunks.snapshot(dimensionId);
+    }
+
+    /**
+     * A monotonic overlay generation: it moves whenever the coverage of the saved or the covered chunk index changes
+     * and on every {@link #onSettingsCommitted}, so an overlay that rebuilds only when it moves also redraws after a
+     * settings edit, which leaves both indexes untouched.
+     */
+    public long overlayGeneration() {
+        return savedChunks.version() + coveredChunks.version() + settingsCommits.get();
+    }
+
+    /** Record a settings commit, moving {@link #overlayGeneration}. */
+    public void onSettingsCommitted() {
+        settingsCommits.incrementAndGet();
     }
 
     public SavedChunkIndex savedChunks() {
