@@ -19,8 +19,7 @@ class MapHashTest {
 
     @Test
     void sameContentProducesSameHash() {
-        assertEquals(MapHash.of(colors(7), 0, "minecraft:overworld"),
-                MapHash.of(colors(7), 0, "minecraft:overworld"));
+        assertEquals(MapHash.of(colors(7), 0, "minecraft:overworld"), MapHash.of(colors(7), 0, "minecraft:overworld"));
     }
 
     @Test

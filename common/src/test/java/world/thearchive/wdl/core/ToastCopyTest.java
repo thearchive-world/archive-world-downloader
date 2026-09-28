@@ -232,8 +232,7 @@ class ToastCopyTest {
         ToastCopy toast = ToastCopy.restoreRefusedSwapFailed(".wdl-restore-work/base-1/aside/base");
 
         assertEquals("Restore blocked", requireKey(toast.titleKey()));
-        assertEquals("The restore could not finish. Kept files: .wdl-restore-work/base-1/aside/base",
-                resolve(toast));
+        assertEquals("The restore could not finish. Kept files: .wdl-restore-work/base-1/aside/base", resolve(toast));
         assertEquals(OptionalInt.of(BrandColors.RUST), toast.bodyColor());
         assertEquals(OptionalInt.empty(), toast.arguments().get(0).color(), "the paths inherit the rust");
         assertTrue(toast.refusal());

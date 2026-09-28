@@ -132,8 +132,7 @@ class LiveCaptureSessionFailSoftTest {
             throw new IllegalStateException("player serialize/scrub blew up");
         });
 
-        assertEquals(1, losses(session),
-                "the save is written with no player record, so the loss is counted as one");
+        assertEquals(1, losses(session), "the save is written with no player record, so the loss is counted as one");
         assertTrue(session.isPartialSave(0, 0), "and that makes the finish partial rather than clean");
     }
 
