@@ -136,8 +136,7 @@ public final class CoveredChunkIndex {
     }
 
     /**
-     * Drop every dimension's coverage and trail (called at capture start and stop, so the overlay has no covered tone
-     * when idle and a later recompute cannot resurrect a previous session's path).
+     * Drop every dimension's coverage and trail.
      */
     public synchronized void clear() {
         version++;
@@ -148,9 +147,7 @@ public final class CoveredChunkIndex {
     }
 
     /**
-     * Monotonic, bumped as the first statement of every coverage mutator (before any early return), read by the
-     * JourneyMap driver to skip an unchanged rebuild. A redundant bump on a no-op mutation is fine: it only costs one
-     * wasted rebuild, and it keeps the counter strictly monotonic.
+     * Monotonic, bumped as the first statement of every coverage mutator (before any early return).
      */
     public synchronized long version() {
         return version;
