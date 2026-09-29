@@ -7,26 +7,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * The choosable overlay marker hues: the only meaning-bearing overlay markers take a user-chosen hue, so a viewer with
- * a color-vision deficiency can cycle any marker to a distinct alternative without a separate global theme. Four brand
- * defaults ({@link #RED}, {@link #VIOLET}, {@link #TEAL}, {@link #AMBER}) sit on two surfaces that never draw together,
- * the in-world container outline and the map coverage overlay, and each role's row also offers the curated Okabe-Ito
- * alternatives ({@link #YELLOW}, {@link #BLUE}, {@link #REDDISH_PURPLE}, {@link #WHITE}). The full eight-hue Okabe-Ito
- * set is deliberately not re-expanded: its near-duplicates of the brand hues are dropped, and {@code WHITE} stands in
- * for the unusable black slot on dark overlay surfaces. {@link #YELLOW} is the one alternative that is itself a
- * near-duplicate, of {@link #AMBER} under red-green deficiency, so {@link #presetCycle} drops it from any row that
- * offers {@code AMBER} rather than dropping it from the palette outright.
- *
- * <p>{@link #TEAL} and {@link #AMBER} carry the same value as the like-named {@link BrandColors} token: the fixed
- * chrome accent and the themeable marker default are separate roles that happen to share a hue, so the overlay opens
- * on-brand and the chrome stays fixed wherever the user takes the marker.
- *
- * <p>Config stores the chosen constant directly; consumers read {@link #rgb()} at the draw site, with no RGB round-trip
- * through the file. The value is RGB only ({@code 0xFF} alpha is forced when drawn). Version-agnostic core: imports no
- * {@code net.minecraft.*} type and stays Java-8-clean. The fixed brand and semantic chrome lives in
- * {@link BrandColors}.
- */
 public enum MarkerHue {
     RED(0xDE0000, Surface.OUTLINE),
     VIOLET(0x8A5CFF, Surface.OUTLINE),
@@ -37,10 +17,6 @@ public enum MarkerHue {
     REDDISH_PURPLE(0xCC79A7, Surface.SHARED),
     WHITE(0xFFFFFF, Surface.SHARED);
 
-    /**
-     * Which drawn surface a hue is the brand default for, or {@link #SHARED} for an alternative that belongs to no
-     * role. Only roles on the same surface can be confused for each other, so this is what a cycle excludes.
-     */
     private enum Surface {
         OUTLINE,
         OVERLAY,
@@ -55,7 +31,7 @@ public enum MarkerHue {
         this.surface = surface;
     }
 
-    /** This hue's RGB value (alpha is forced to {@code 0xFF} at the draw site). */
+    /** This hue's RGB value. */
     public int rgb() {
         return rgb;
     }
