@@ -34,9 +34,6 @@ public final class MapManifest {
     private static final String WDL_SUBFOLDER = "wdl";
     private static final String MANIFEST_FILE = "map-ids";
     private static final String DATA_SUBFOLDER = "data";
-    // Two on-disk map-data layouts the resume floor must recognize band-independently: the flat form names files
-    // map_<n>.dat directly in the data directory, and the namespaced form puts them in a maps/ subfolder as <n>.dat,
-    // one level under the data/minecraft namespace directory.
     private static final String FLAT_MAP_PREFIX = "map_";
     private static final String MAPS_SUBFOLDER = "maps";
     private static final String NAMESPACE_SUBFOLDER = "minecraft";
@@ -98,7 +95,6 @@ public final class MapManifest {
         return nextArchiveId++;
     }
 
-    /** The next archive id this manifest would hand out (the counter high-water, persisted in the header). */
     int nextArchiveId() {
         return nextArchiveId;
     }
@@ -108,7 +104,6 @@ public final class MapManifest {
         return nextArchiveId - 1;
     }
 
-    /** The number of imaged maps with a recorded hash (imageless allocations are not counted). */
     int size() {
         return idByHash.size();
     }
@@ -210,7 +205,7 @@ public final class MapManifest {
         }
         String[] fields = line.split(SEPARATOR, -1);
         if (fields.length != 2 || fields[0].isEmpty()) {
-            return; // a torn or malformed line is skipped (crash-tolerant)
+            return;
         }
         try {
             idByHash.put(fields[0], Integer.parseInt(fields[1].trim()));
