@@ -9,12 +9,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongSupplier;
 
 /**
- * The sample gatekeeper for the send-range estimator: the never-moved never-ridden position book, the
- * anomaly-suppression window, the two-flag camera hold, the 16-block haircut, and the start-window sweep generations. A
- * sample commits only for ids that never moved and never rode; a never-moved entry's registered position is current by
- * construction, which closes every stale-position hazard (boarding freezes, passenger-boosted vehicles, fork teleports,
- * drift) without position tracking or quarantine releases. Registration is never gated by the sampling gates, and no
- * registration path ever clears a bit.
+ * {@link #registerArrival} and {@link #registerSeed} never check {@link #suppressed}, and neither clears an entry's
+ * moved or ridden bit.
  */
 public final class SendRangeSampler {
     public static final int NO_SAMPLE = -1;
@@ -81,10 +77,9 @@ public final class SendRangeSampler {
     }
 
     /**
-     * Netty side: an absolute position, teleport, or sync. Compares against the registered anchor; within the epsilon
-     * it is a vanilla same-position reminder and inert. An unknown id gets a bits-only moved entry (a teleport teed
-     * before the prime registers would otherwise leave a stale anchor with clear bits); a known entry without a
-     * position is conservatively marked moved.
+     * Compares against the registered anchor; within the epsilon it is inert. An unknown id gets a bits-only moved
+     * entry (otherwise a teleport seen before {@link #registerSeed} would leave a stale anchor with clear bits); a
+     * known entry without a position is conservatively marked moved.
      */
     public void markMovedAbsolute(int id, double x, double z) {
         book.compute(id, (key, entry) -> {
@@ -178,10 +173,9 @@ public final class SendRangeSampler {
     }
 
     /**
-     * Main side, the gate-arm step at the top of every capture tick, before the sweep and the prime loop. Arms the
-     * window on a fast tick, mirrors the applied camera state into flag B both directions, and consumes flag A only
-     * after the applied state has been attached across a full tick boundary (the generation observed before the
-     * boundary is cleared, so a detach queued mid-consume is never eaten).
+     * Arms the window on a fast tick, records {@code detachedApplied}, and consumes the camera latch only after the
+     * camera has stayed attached across a full tick boundary (the generation observed before the boundary is cleared,
+     * so a latch raised after that observation is never eaten).
      */
     public void gateArmTick(double displacementBlocks, boolean detachedApplied) {
         if (displacementBlocks > FAST_TICK_BLOCKS) {
@@ -195,7 +189,7 @@ public final class SendRangeSampler {
         cameraDetachedApplied = detachedApplied;
     }
 
-    /** Whether the anomaly window or the camera hold is armed; while true no feed commits a sample. */
+    /** Whether feeds are blocked: the anomaly window is open, the camera is recorded detached or a latch unconsumed. */
     public boolean suppressed() {
         if (nanos.getAsLong() < windowDeadline) {
             return true;
@@ -203,7 +197,7 @@ public final class SendRangeSampler {
         return cameraDetachedApplied || cameraLatchGeneration.get() != cameraConsumedGeneration;
     }
 
-    /** Main side: the arm generation the due sweep would consume, or 0 when none is due or it is not quiet. */
+    /** The arm generation a sweep would consume, or 0 when all armings are swept or {@link #suppressed} is true. */
     public int sweepBeginGeneration() {
         int generation = sweepArmGeneration.get();
         if (generation == sweptGeneration || suppressed()) {
@@ -219,7 +213,7 @@ public final class SendRangeSampler {
                 .toArray();
     }
 
-    /** Main side: mark the arming consumed; a mid-sweep re-arm leaves the generations unequal. */
+    /** Record {@code generation} as swept; a re-arm during the sweep leaves the arm and swept generations unequal. */
     public void sweepComplete(int generation) {
         sweptGeneration = generation;
     }
