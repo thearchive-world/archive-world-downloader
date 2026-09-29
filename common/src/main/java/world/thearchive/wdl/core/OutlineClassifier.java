@@ -6,14 +6,6 @@ package world.thearchive.wdl.core;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The pure three-way outline classifier. Given a pre-paired logical container (its one or two block pos keys, its
- * borne-entity id if any, and whether it is an ender chest) plus the session captured-set and the prior-session
- * recovered-set, it decides whether the container draws no rim (captured this session), the recovered hue, or the
- * unsaved hue, in that precedence. The any-position rule makes a multi-block container one entry: a double chest
- * classifies captured (or recovered) when EITHER half matches. MC-free and Java-8-clean; the per-frame face geometry is
- * the separate rule of {@link RimFace}, not selected here.
- */
 public final class OutlineClassifier {
     private OutlineClassifier() {}
 
@@ -79,11 +71,6 @@ public final class OutlineClassifier {
         return false;
     }
 
-    /**
-     * Whether the type recorded for a captured block position still matches the live block-entity type there (Gate 2).
-     * A captured key with no recorded type falls back to bare membership, so the gate only ever adds precision and
-     * never re-rims a validly captured container.
-     */
     private static boolean capturedTypeMatches(CapturedContainers captured, long blockKey,
             @Nullable String liveTypeId) {
         String recorded = captured.capturedBlockType(blockKey);
