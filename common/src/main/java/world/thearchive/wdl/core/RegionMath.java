@@ -16,7 +16,6 @@ import org.jspecify.annotations.Nullable;
  * region (chunk -1 -> region -1, local 31).
  */
 final class RegionMath {
-    /** A region file spans this many chunks on each axis. */
     private static final int CHUNKS_PER_REGION_EDGE = 32;
 
     private RegionMath() {}
@@ -31,7 +30,6 @@ final class RegionMath {
         return Math.floorDiv(chunkZ, CHUNKS_PER_REGION_EDGE);
     }
 
-    /** The Anvil region file name (e.g. {@code r.0.-1.mca}) for the region containing this chunk. */
     public static String regionFileName(int chunkX, int chunkZ) {
         return "r." + regionX(chunkX) + "." + regionZ(chunkZ) + ".mca";
     }
@@ -67,10 +65,6 @@ final class RegionMath {
         return (int) (chunkKey >> 32);
     }
 
-    /**
-     * The {@code {regionX, regionZ}} encoded in an {@code r.<rx>.<rz>.mca} file name, or {@code null} if the name is
-     * not that shape. Inverse of {@link #regionFileName}.
-     */
     public static int @Nullable [] regionFileCoordinates(String fileName) {
         String[] parts = fileName.split("\\.");
         if (parts.length != 4 || !parts[0].equals("r") || !parts[3].equals("mca")) {
@@ -83,11 +77,6 @@ final class RegionMath {
         }
     }
 
-    /**
-     * The {@link #chunkAsLong} key for the chunk in offset-table slot {@code offsetIndex} (a {@code 0..1023} header
-     * index) of the region at {@code (regionX, regionZ)}. Inverse of {@link #offsetIndex} composed with
-     * {@link #chunkAsLong}.
-     */
     public static long chunkKeyAt(int regionX, int regionZ, int offsetIndex) {
         int chunkX = regionX * CHUNKS_PER_REGION_EDGE + offsetIndex % CHUNKS_PER_REGION_EDGE;
         int chunkZ = regionZ * CHUNKS_PER_REGION_EDGE + offsetIndex / CHUNKS_PER_REGION_EDGE;
