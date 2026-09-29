@@ -13,9 +13,6 @@ import java.security.NoSuchAlgorithmException;
  * {@code lockDownloadedMaps} knob rather than identity, and WDL hardcodes the centers, so two captures of the same
  * picture hash equal across sessions and servers. That stable identity is what lets {@link MapManifest} keep a map's
  * archive id fixed against a server that renumbers session-local ids.
- *
- * <p>Pure and MC-free: the colors, scale and dimension are read off the serialized inner {@code "data"} tag by the
- * adapter and passed here as plain values, so hashing adds no per-band coupling.
  */
 public final class MapHash {
     private static final char[] HEX = "0123456789abcdef".toCharArray();
