@@ -6,11 +6,11 @@ package world.thearchive.wdl.core;
 import java.util.OptionalLong;
 
 /**
- * The container-association guard: decides which block a freshly-opened container menu belongs to. The open-screen
- * packet carries no block position, so the adapter resolves a target for the open and feeds this guard the resulting
- * primitives; the guard binds only on a high-confidence single-block match and drops every uncertain case. Mis-binding
- * is the one failure that corrupts the archive (the wrong block's items), so the rule is deliberately conservative: it
- * prefers capturing nothing to capturing the wrong block.
+ * The container-association guard: decides which block or entity a freshly-opened container menu belongs to. The
+ * open-screen packet carries no block position, so the adapter resolves a target for the open and feeds this guard the
+ * resulting primitives; the guard binds only on a high-confidence match and drops every uncertain case. A mis-bind
+ * archives one container's items as another's, so the rule is deliberately conservative: it prefers capturing nothing
+ * to capturing the wrong container.
  *
  * <p>MC-free by construction: it names no {@code net.minecraft.*} type (CI-enforced by
  * {@code :common:checkCoreImports}) and works only on a packed {@code BlockPos} long plus slot counts and a flag, so it
@@ -19,23 +19,15 @@ import java.util.OptionalLong;
  * It is a tiny state machine: a confident {@link #open} binds, a close or an uncertain open unbinds, and
  * {@link #boundPos} reflects the live binding.
  *
- * <p>The {@code at*} parameters name the open's resolved target, which outside spectator is the block or entity the
- * player clicked. Nothing here reads or implies the live crosshair; that reaches this guard only through the narrowed
- * spectator branch of {@code ContainerCapture.resolveOpenTarget}. Read the resolved target as the contract everywhere
- * below: a leg that says "the clicked block" would exclude the spectator branch, which does reach these legs.
- *
- * <p>Every {@code open*} leg takes a slot count off the menu and the size of the container the open's contents are
- * lifted from, and binds only where the two agree. The count is a required parameter of each leg rather than a property
- * some legs happen to test, so a new leg, or a menu type peeled off into its own leg, cannot be added without deciding
- * what its count is compared against. Which container supplies the size is per leg and is not always the target block's
- * own: the double-chest leg sums both halves, the chested-animal leg takes the animal's chest and counts only the
- * menu's chest slots, the crafter leg takes the crafting grid and excludes the menu's result slot, and the ender leg
- * takes the player's global ender inventory, since an ender chest has no container of its own. Where the size is not
- * readable from the live world at all, the caller passes the invariant the vanilla menu itself checks on construction,
- * which is a fact about that menu type rather than a sentinel; the lectern leg is the only one that does so. The
- * merchant leg is the sole exception to the size-count rule, owner-ruled: {@link #openMerchant} has no size to match,
- * since a merchant's offers come from a list rather than a slotted container, so it discriminates on the menu type and
- * the clicked-villager identity alone.
+ * <p>Every {@code open*} leg but the merchant's takes a slot count off the menu and a container size, and binds only
+ * where the two agree. The count is a required parameter of each such leg rather than a property some legs happen to
+ * test, so a new leg, or a menu type peeled off into its own leg, cannot be added without deciding what its count is
+ * compared against. Which container supplies the size is per leg and is not always the target block's own: the
+ * double-chest leg sums both halves, the chested-animal leg takes the animal's chest and counts only the menu's chest
+ * slots, the crafter leg takes the crafting grid and excludes the menu's result slot, and the ender leg takes the
+ * player's global ender inventory, since an ender chest has no container of its own. The merchant leg is the sole
+ * exception to the size-count rule: {@link #openMerchant} has no size to match, since a merchant's offers come from a
+ * list rather than a slotted container, so it discriminates only on the menu type and the entity the open resolved to.
  */
 public final class ContainerAssociation {
     /** Which recognition axis bound the live menu. */
@@ -176,12 +168,9 @@ public final class ContainerAssociation {
     }
 
     /**
-     * Whether the container-vehicle axis claims a freshly-opened menu at all: the routing precedence the dispatch
-     * consults before {@link #openEntityContainer}, kept here so the mis-bind rule is decided MC-free and unit-tested
-     * from primitives. A clicked container vehicle is the axis's own target and always claims. The ridden-vehicle leg
-     * exists only for the open-inventory-request flow (where the version has chest boats, a ridden one opens through
-     * the vehicle and fires no use event), so it claims on the POSITIVE signal that flow leaves behind, the recorded
-     * vehicle intent, and on nothing else.
+     * Whether the container-vehicle axis claims a freshly-opened menu at all. A targeted container vehicle is the
+     * axis's own target and always claims. The ridden-vehicle leg claims only on the positive signal an open-inventory
+     * request leaves behind, the recorded vehicle intent, and on nothing else.
      *
      * <p>The absence of a click is not that signal, and reading it as one claims every open with no provenance while a
      * player rides: an open the client cannot account for, a plugin GUI or a menu opened from a block that seeds no
@@ -203,13 +192,10 @@ public final class ContainerAssociation {
 
     /**
      * Decide the binding for a freshly-opened container-vehicle menu and remember it. The entity sibling of
-     * {@link #open}: a container vehicle's menu is recognized by the open resolving to a container-vehicle entity whose
-     * own container size matches the menu's block-slot count. Bind only on that triple; otherwise drop and clear any
-     * prior binding. Unlike the block siblings there is no block pos: the bind target (the entity UUID) lives in the
-     * adapter, so this returns a plain bound/dropped flag and {@link #boundPos} carries only the "a menu is bound"
-     * signal (its long, 0, is unused for {@link BindKind#ENTITY}, as the ender pos is unused by the ender stash). The
-     * slot-count match is the same mis-bind guard the block path uses (a hopper minecart is 5, the chest vehicles are
-     * 27).
+     * {@link #open}: a container vehicle's menu is recognized by a container-vehicle entity, the one the open resolved
+     * to or else the ridden one, whose own container size matches the menu's block-slot count. Bind only on that
+     * triple; otherwise drop and clear any prior binding. Unlike the block siblings there is no block pos: the bind
+     * target (the entity UUID) lives in the adapter, so this returns a plain bound/dropped flag.
      *
      * @param atEntity                 a bind-candidate entity is present: an entity hit, or the ridden vehicle for a
      *                                 click-less open (the adapter collapses the two)
@@ -315,8 +301,8 @@ public final class ContainerAssociation {
             long partnerPosKey, int menuSlotCount, int combinedContainerSize) {
         if (atBlock && combinedContainerSize > 0 && menuSlotCount == combinedContainerSize) {
             bound = true;
-            boundPosKey = atRightHalf ? targetPosKey : partnerPosKey; // first half = RIGHT
-            boundSecondaryPosKey = atRightHalf ? partnerPosKey : targetPosKey; // second half = LEFT
+            boundPosKey = atRightHalf ? targetPosKey : partnerPosKey;
+            boundSecondaryPosKey = atRightHalf ? partnerPosKey : targetPosKey;
             boundKind = BindKind.DOUBLE_CHEST;
             return true;
         }
@@ -325,16 +311,15 @@ public final class ContainerAssociation {
     }
 
     /**
-     * The second-half block pos key the live double-chest menu is bound to (the LEFT-typed half, menu slots
-     * {@code n/2..n}), or empty if none is open, it was dropped, or the binding is not a double chest. Only meaningful
-     * for {@link BindKind#DOUBLE_CHEST}; {@link #boundPos} carries the first/RIGHT half.
+     * The second-half block pos key the live double-chest menu is bound to (menu slots {@code n/2..n}), or empty if
+     * none is open, it was dropped, or the binding is not a double chest. {@link #boundPos} carries the first half.
      */
     public OptionalLong boundSecondaryPos() {
         return bound && boundKind == BindKind.DOUBLE_CHEST ? OptionalLong.of(boundSecondaryPosKey)
                 : OptionalLong.empty();
     }
 
-    /** The block pos key the currently-open menu is bound to, or empty if none is open / it was dropped. */
+    /** The pos key the live menu is bound to (0 for an entity bind), or empty if none is bound. */
     public OptionalLong boundPos() {
         return bound ? OptionalLong.of(boundPosKey) : OptionalLong.empty();
     }
@@ -344,7 +329,7 @@ public final class ContainerAssociation {
         return boundKind;
     }
 
-    /** The menu closed (or a different one is about to open): clear any binding. */
+    /** Clear any binding. */
     public void close() {
         bound = false;
     }
