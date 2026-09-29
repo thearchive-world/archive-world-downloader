@@ -7,10 +7,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * The typed result of one {@link ConfigSchema#read} pass: every option's parsed value keyed by its config key. The
- * typed value objects ({@link WdlConfig}, {@link HudConfig}, {@link OutlineConfig}, {@link WorldOutputConfig})
- * construct their fields from it. Package-private. A key absent from a read is a programming error, so a getter for a
- * missing key fails fast rather than returning a wrong-typed default.
+ * The typed result of one {@link ConfigSchema#read} pass: every option's parsed value keyed by its config key. A key
+ * absent from a read is a programming error, so a getter for a missing key fails fast rather than returning a
+ * wrong-typed default.
  */
 final class ConfigValues {
     private final Map<String, Object> values;
