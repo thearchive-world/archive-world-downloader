@@ -42,7 +42,6 @@ public final class RecoveredCoverage {
         this.enderRecovered = enderRecovered;
     }
 
-    /** Whether the block at this packed {@code BlockPos.asLong()} was captured in a prior session. */
     public boolean contains(long blockKey) {
         return blockKeys.contains(blockKey);
     }
