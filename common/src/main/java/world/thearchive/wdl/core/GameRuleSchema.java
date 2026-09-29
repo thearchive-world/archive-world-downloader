@@ -10,6 +10,5 @@ public interface GameRuleSchema {
     /** Whether a rule with this id exists (and is enabled) at the running band. */
     boolean hasRule(String id);
 
-    /** Whether {@code rawValue} parses to the type the rule {@code id} expects at this band. */
     boolean acceptsValue(String id, String rawValue);
 }
