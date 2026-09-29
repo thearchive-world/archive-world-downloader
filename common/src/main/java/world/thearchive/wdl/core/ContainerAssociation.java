@@ -12,11 +12,7 @@ import java.util.OptionalLong;
  * archives one container's items as another's, so the rule is deliberately conservative: it prefers capturing nothing
  * to capturing the wrong container.
  *
- * <p>MC-free by construction: it names no {@code net.minecraft.*} type (CI-enforced by
- * {@code :common:checkCoreImports}) and works only on a packed {@code BlockPos} long plus slot counts and a flag, so it
- * unit-tests with hand-fed events and ports byte-identically across era-bands. The live extraction of these signals
- * (the clicked target, the menu's block-slot count, the block's container size) is MC-typed and lives in the adapter.
- * It is a tiny state machine: a confident {@link #open} binds, a close or an uncertain open unbinds, and
+ * <p>It is a tiny state machine: a confident {@link #open} binds, a close or an uncertain open unbinds, and
  * {@link #boundPos} reflects the live binding.
  *
  * <p>Every {@code open*} leg but the merchant's takes a slot count off the menu and a container size, and binds only
@@ -52,13 +48,6 @@ public final class ContainerAssociation {
      * only when the resolved block's own single-block storage container has the same number of slots as the menu;
      * otherwise drop and clear any prior binding.
      *
-     * <p>Why slot counts and not container identity: the client builds a container menu from its {@code MenuType} with
-     * a generic {@code SimpleContainer} (it never sees the block's real {@code BlockEntity} or, for a double chest, the
-     * {@code CompoundContainer}), so the only reliable client signal that the menu belongs to this one block is that
-     * its block-slot count matches the block's own container size. A double chest is a 54-slot menu over a 27-slot
-     * block half -> mismatch -> dropped. A block with no storage (a non-container block, or an ender chest whose
-     * contents are per-player) reports {@code blockContainerSize == 0} -> dropped.
-     *
      * @param atBlock            the open resolved to a block target (not an entity target, and not an unattributed
      *                           open)
      * @param blockPosKey        the packed position of that block
@@ -78,10 +67,9 @@ public final class ContainerAssociation {
     }
 
     /**
-     * Decide the binding for a freshly-opened lectern menu and remember it. The lectern sibling of {@link #open}: a
-     * lectern menu is a fixed 1-slot lectern-specific menu (no double-lectern, no {@code CompoundContainer}), so a
-     * lectern menu of the lectern's own size over a lectern block the open resolved to is a confident single-block
-     * match. Bind to {@code blockPosKey} only on that confident triple; otherwise drop and clear any prior binding.
+     * Decide the binding for a freshly-opened lectern menu and remember it. Bind to {@code blockPosKey} only when the
+     * open resolved to a lectern block and the menu's slot count equals the lectern's container size; otherwise drop
+     * and clear any prior binding.
      *
      * @param atBlock              the open resolved to a block target (not an entity target, and not an unattributed
      *                             open)
@@ -135,13 +123,12 @@ public final class ContainerAssociation {
 
     /**
      * Decide the binding for a freshly-opened ender-chest menu and remember it. The ender sibling of {@link #open}: an
-     * ender chest reports {@code blockContainerSize == 0} (its block entity is not a {@code BaseContainerBlockEntity}),
-     * so the size-match {@link #open} can never bind it. An ender chest and a single chest are both a chest menu, so
-     * the menu type alone is ambiguous; the target block's block entity being an ender chest is the discriminator, and
-     * the menu's slot count must match the player's own ender inventory. Bind to {@code blockPosKey} only on that
-     * confident quad; otherwise drop and clear any prior binding. (The bound contents are the player's global ender
-     * inventory, so the pos only signals which block the open resolved to; the stash merges into the player tag, not
-     * this block.)
+     * ender chest reports {@code blockContainerSize == 0} (its block entity holds no container), so the size-match
+     * {@link #open} can never bind it. An ender chest and a single chest are both a chest menu, so the menu type alone
+     * is ambiguous; the target block's block entity being an ender chest is the discriminator, and the menu's slot
+     * count must match the player's own ender inventory. Bind to {@code blockPosKey} only on that confident quad;
+     * otherwise drop and clear any prior binding. (The bound contents are the player's global ender inventory, so the
+     * pos only signals which block the open resolved to; the stash merges into the player tag, not this block.)
      *
      * @param atBlock            the open resolved to a block target (not an entity target, and not an unattributed
      *                           open)
@@ -218,16 +205,12 @@ public final class ContainerAssociation {
     }
 
     /**
-     * Decide the binding for a freshly-opened chested-animal (horse) menu and remember it. The chested-animal sibling
-     * of {@link #openEntityContainer}: a donkey, mule, llama, or trader llama is recognized by the open resolving to
-     * (or the player riding) an {@code AbstractChestedHorse} whose own chest size matches the menu's CHEST-slot count.
-     * Bind only on that quad; otherwise drop and clear any prior binding. Like the entity sibling there is no block
-     * pos: the bind target (the entity UUID) lives in the adapter, so this returns a plain bound/dropped flag and
-     * {@link #boundPos} carries only the "a menu is bound" signal (its long, 0, is unused for
-     * {@link BindKind#CHESTED_ANIMAL}). It earns its own kind rather than reusing {@link BindKind#ENTITY} because the
-     * chest-only lift differs from the block/vehicle lift and the stash dispatches by kind. The
-     * {@code menuChestSlotCount == entityChestSize} match is the same mis-bind guard the block and vehicle paths use; a
-     * chestless donkey or plain horse/camel reports {@code entityChestSize == 0} and drops.
+     * Decide the binding for a freshly-opened chested-animal menu and remember it. The chested-animal sibling of
+     * {@link #openEntityContainer}: bind only when a chested animal was identified for the menu and its own chest size
+     * matches the menu's chest-slot count; otherwise drop and clear any prior binding. Like the entity sibling there is
+     * no block pos: the bind target (the entity UUID) lives in the adapter, so this returns a plain bound/dropped flag.
+     * It earns its own kind rather than reusing {@link BindKind#ENTITY} because the chest-only lift differs from the
+     * block/vehicle lift and the stash dispatches by kind.
      *
      * @param atAnimal              a chested animal was identified for this menu. The caller passes a constant true:
      *                              the animal comes from the MENU itself, so neither this flag nor the next is derived
@@ -252,10 +235,9 @@ public final class ContainerAssociation {
     /**
      * Decide the binding for a freshly-opened merchant menu and remember it. An identity-discriminated leg with no size
      * guard: a merchant menu's offers come from a list, not a slotted container, so unlike every other leg there is no
-     * size to match. The confidence comes instead from the menu type ({@code MerchantMenu} is villager-exclusive in
-     * vanilla) plus the click-tracked villager the adapter resolves. Both flags are true at the one call site; they are
-     * parameters so the negatives stay unit-testable here. Like the entity legs there is no block pos: the bind target
-     * (the villager UUID) lives in the adapter, so {@link #boundPos} carries only the "a menu is bound" signal.
+     * size to match. The confidence comes instead from the menu type plus the merchant entity the open resolved to.
+     * {@code menuIsMerchant} is true at the one call site; it is a parameter so the negative stays unit-testable here.
+     * Like the entity legs there is no block pos: the bind target (the merchant's UUID) lives in the adapter.
      *
      * @param atVillager     the open resolved to a merchant entity target
      * @param menuIsMerchant the open menu is a merchant menu
@@ -274,18 +256,15 @@ public final class ContainerAssociation {
 
     /**
      * Decide the binding for a freshly-opened, 54-slot double-chest menu and remember it. The double-chest sibling of
-     * {@link #open}: a large chest opens a 54-slot menu over a {@code CompoundContainer} of two 27-slot chest halves,
-     * which the single-block {@link #open} drops on the 54-vs-27 size mismatch (it would mis-merge a 54 menu into a 27
-     * block half). Bind only when the open resolved to a double-chest half, the partner resolved to a chest, and the
-     * menu's block-slot count equals the SUM of both halves' container sizes (the size-match guard, summed: 54 == 27 +
-     * 27); otherwise drop and clear any prior binding.
+     * {@link #open}: a large chest opens a 54-slot menu over its two 27-slot halves, which the single-block
+     * {@link #open} drops on the 54-vs-27 size mismatch (it would mis-merge a 54 menu into a 27 block half). Bind only
+     * when the open resolved to a double-chest half, the partner resolved to a chest, and the menu's block-slot count
+     * equals the SUM of both halves' container sizes (the size-match guard, summed: 54 == 27 + 27); otherwise drop and
+     * clear any prior binding.
      *
      * <p>The two halves are stored in MENU-SLOT order so the stash can split the 54 menu slots 27/27 onto the right two
-     * positions. The {@code CompoundContainer} is always {@code (RIGHT, LEFT)}, so menu slots {@code 0..n/2} belong to
-     * the RIGHT-typed half: {@link #boundPos} is set to the first/RIGHT half and {@link #boundSecondaryPos} to the
-     * second/LEFT half, independent of which half the open resolved to. The adapter passes which target half is the
-     * RIGHT one via {@code atRightHalf}, so the load-bearing left/right ordering is decided here, MC-free and
-     * unit-testable.
+     * positions: {@link #boundPos} is set to the half holding menu slots {@code 0..n/2} and {@link #boundSecondaryPos}
+     * to the other half, independent of which half the open resolved to.
      *
      * @param atBlock               the open resolved to a block target (not an entity target, and not an unattributed
      *                              open)
