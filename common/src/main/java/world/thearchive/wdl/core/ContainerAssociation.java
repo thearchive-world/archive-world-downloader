@@ -38,7 +38,7 @@ import java.util.OptionalLong;
  * the clicked-villager identity alone.
  */
 public final class ContainerAssociation {
-    /** Which recognition axis bound the live menu, so the stash-time dispatch need not re-derive it. */
+    /** Which recognition axis bound the live menu. */
     public enum BindKind {
         CONTAINER,
         ENDER,
@@ -112,12 +112,11 @@ public final class ContainerAssociation {
     }
 
     /**
-     * Decide the binding for a freshly-opened crafter menu and remember it. The crafter sibling of
-     * {@link #openLectern}: a crafter menu is exclusive to crafter blocks, so menu-plus-block plus the crafting-grid
-     * size is a confident single-block match. The count compared here is the menu's crafting slots alone, not its
-     * non-player slots: the crafter menu carries a tenth, result-container slot, which is also why {@link #open} can
-     * never bind it. Bind to {@code blockPosKey} only on that confident quad; otherwise drop and clear any prior
-     * binding.
+     * Decide the binding for a freshly-opened crafter menu and remember it. The count compared here is the menu's
+     * crafting slots alone, not its non-player slots: the crafter menu carries a tenth, result-container slot, which is
+     * also why {@link #open} can never bind it. Bind to {@code blockPosKey} only when the menu is a crafter menu, the
+     * open resolved to a crafter block, and the crafting-slot count equals the crafter's container size; otherwise drop
+     * and clear any prior binding.
      *
      * @param atBlock               the open resolved to a block target (not an entity target, and not an unattributed
      *                              open)
@@ -224,7 +223,7 @@ public final class ContainerAssociation {
         if (atEntity && entityIsContainerVehicle && entityContainerSize > 0
                 && menuSlotCount == entityContainerSize) {
             bound = true;
-            boundPosKey = 0L; // unused for ENTITY; the bind target (UUID) is the adapter's
+            boundPosKey = 0L;
             boundKind = BindKind.ENTITY;
             return true;
         }
@@ -256,7 +255,7 @@ public final class ContainerAssociation {
             int entityChestSize) {
         if (atAnimal && entityIsChestedAnimal && entityChestSize > 0 && menuChestSlotCount == entityChestSize) {
             bound = true;
-            boundPosKey = 0L; // unused for CHESTED_ANIMAL; the bind target (UUID) is the adapter's
+            boundPosKey = 0L;
             boundKind = BindKind.CHESTED_ANIMAL;
             return true;
         }
@@ -279,7 +278,7 @@ public final class ContainerAssociation {
     public boolean openMerchant(boolean atVillager, boolean menuIsMerchant) {
         if (atVillager && menuIsMerchant) {
             bound = true;
-            boundPosKey = 0L; // unused for MERCHANT; the bind target (UUID) is the adapter's
+            boundPosKey = 0L;
             boundKind = BindKind.MERCHANT;
             return true;
         }
