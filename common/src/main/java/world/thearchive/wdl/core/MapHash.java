@@ -7,23 +7,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-/**
- * The content identity of a filled map: a wide SHA-256 over the 16384 color bytes, the scale, and the dimension key.
- * {@code locked}, {@code xCenter} and {@code zCenter} are deliberately excluded: lock state follows the
- * {@code lockDownloadedMaps} knob rather than identity, and WDL hardcodes the centers, so two captures of the same
- * picture hash equal across sessions and servers. That stable identity is what lets {@link MapManifest} keep a map's
- * archive id fixed against a server that renumbers session-local ids.
- */
 public final class MapHash {
     private static final char[] HEX = "0123456789abcdef".toCharArray();
 
     private MapHash() {}
 
     /**
-     * The lowercase 64-character SHA-256 hex of {@code colors} + {@code scale} + {@code dimension}. The three inputs
-     * are framed at fixed offsets (the colors are fixed-width, the scale is four bytes, the dimension is terminal), so
-     * no two distinct field tuples share a digest. SHA-256 is mandated on every JVM, so its absence is unreachable and
-     * surfaces as an {@link IllegalStateException}.
+     * The lowercase 64-character SHA-256 hex of {@code colors} + {@code scale} + {@code dimension}. SHA-256 is mandated
+     * on every JVM, so its absence is unreachable and surfaces as an {@link IllegalStateException}.
      */
     public static String of(byte[] colors, int scale, String dimension) {
         MessageDigest digest = sha256();
