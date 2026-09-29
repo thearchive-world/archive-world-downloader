@@ -21,13 +21,11 @@ import java.util.UUID;
  * Java-8-clean.
  */
 public final class RecoveredCoverage {
-    /** No prior-session coverage (a fresh download): every query is false. */
+    /** No prior-session coverage. */
     public static final RecoveredCoverage EMPTY = new RecoveredCoverage(LongSets.EMPTY_SET);
 
     /**
-     * No per-position coverage but the shared player ender inventory was already saved by a prior download: the default
-     * a dimension gets on a resume that carries the ender inventory forward, so every ender chest reads no-rim even
-     * where no chunk recovered. The ender fact is global and cross-dimension.
+     * No per-position coverage but the shared player ender inventory was already saved by a prior download.
      */
     public static final RecoveredCoverage ENDER_ONLY = new RecoveredCoverage(LongSets.EMPTY_SET, Long2IntMaps.EMPTY_MAP,
             Collections.emptySet(), true);
@@ -54,23 +52,14 @@ public final class RecoveredCoverage {
         return blockKeys.contains(blockKey);
     }
 
-    /** Whether the container entity with this id had its contents captured in a prior session. */
     public boolean containsEntity(UUID entityId) {
         return entityIds.contains(entityId);
     }
 
-    /** The mask of slots a prior session saved for the chiseled bookshelf at this pos (bit n = slot n), 0 if none. */
     public int bookshelfSavedSlots(long posKey) {
         return bookshelfSavedSlots.get(posKey);
     }
 
-    /**
-     * Whether a prior download already saved the shared player ender inventory, so this resume carries it forward and
-     * every ender chest is done without reopening one. One global fact (the inventory lives in player data, not any
-     * ender-chest block), so the classifier folds it into the no-rim short-circuit alongside the captured-this-session
-     * ender flag, not the recovered hue: an ender chest has no per-position content to mark recovered, and painting one
-     * recovered would claim a per-block restore that does not exist.
-     */
     public boolean enderRecovered() {
         return enderRecovered;
     }
