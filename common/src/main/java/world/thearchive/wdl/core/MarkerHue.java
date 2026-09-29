@@ -37,16 +37,12 @@ public enum MarkerHue {
     }
 
     /**
-     * The preset cycle a marker row steps: the row's own brand default first, then the curated Okabe-Ito alternatives,
-     * then the brand defaults of the other surface. Deliberately not {@link #values()}, which would step the sibling
-     * role's brand default, the one hue guaranteed to read as the other role on the same surface. This keeps the two
-     * roles' defaults apart; it does not make them unable to collide, since the rest of the steps are shared and a row
-     * can still be pointed at whatever the sibling currently holds. The other surface's defaults are offered because
-     * those roles never appear in the same view.
+     * The preset cycle a marker row steps: the brand default passed in first, then the {@code SHARED} hues, then the
+     * other surface's two brand defaults. Deliberately not {@link #values()}, which would step the other brand default
+     * on the same surface.
      *
-     * <p>A cycle offering {@link #AMBER} drops {@link #YELLOW}: under red-green deficiency the two sit close enough
-     * that a row naming both, without showing either, offers no distinction a viewer can act on. Pass a role's brand
-     * default.
+     * <p>A cycle offering {@link #AMBER} drops {@link #YELLOW}. Pass {@link #RED}, {@link #VIOLET}, {@link #TEAL} or
+     * {@link #AMBER}.
      */
     public static List<MarkerHue> presetCycle(MarkerHue brandDefault) {
         List<MarkerHue> cycle = new ArrayList<>();
