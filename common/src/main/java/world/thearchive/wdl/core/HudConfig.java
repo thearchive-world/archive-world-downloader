@@ -32,12 +32,12 @@ public final class HudConfig {
         this.doneLingerSeconds = doneLingerSeconds;
     }
 
-    /** Master: whether the rendered overlay is drawn at all (default on); when off, the chat line stands. */
+    /** Master: whether the rendered overlay is drawn at all (default on). */
     public boolean showHud() {
         return showHud;
     }
 
-    /** Which screen corner or edge the overlay anchors to (default a top corner). */
+    /** Which screen position the overlay anchors to. */
     public HudAnchor anchor() {
         return anchor;
     }
@@ -52,7 +52,7 @@ public final class HudConfig {
         return offsetY;
     }
 
-    /** Whether the detailed layout is the default (the peek key overrides this live). */
+    /** Whether the detailed layout is the default. */
     public boolean detailed() {
         return detailed;
     }
