@@ -15,10 +15,6 @@ import java.util.function.LongSupplier;
  * construction, which closes every stale-position hazard (boarding freezes, passenger-boosted vehicles, fork teleports,
  * drift) without position tracking or quarantine releases. Registration is never gated by the sampling gates, and no
  * registration path ever clears a bit.
- *
- * Thread contract: the book is a concurrent map with immutable entries, every mutation a whole-entry replace.
- * Cross-thread scalars are volatile or generation counters; see each field. The clock is injected so the unit tests own
- * time.
  */
 public final class SendRangeSampler {
     public static final int NO_SAMPLE = -1;
@@ -56,9 +52,7 @@ public final class SendRangeSampler {
     private int previousLatchGeneration;
 
     /**
-     * The over-claim ceiling in blocks for a send-range sample: a distance beyond the render distance (floored at 2
-     * chunks) cannot be a genuine server send range, so the sampling feeds discard it. One formula for every feed, so
-     * the ceiling never drifts between the arrival, removal, and prime paths.
+     * The over-claim ceiling in blocks for a send-range sample.
      */
     public static int plausibleMaxBlocks(int renderDistanceChunks) {
         return Math.max(renderDistanceChunks, 2) * 16;
@@ -68,7 +62,7 @@ public final class SendRangeSampler {
         this.nanos = nanos;
         this.cameraDetachedApplied = cameraDetachedAtStart;
         this.prevDetached = cameraDetachedAtStart;
-        armWindow(); // capture start is itself an anomaly: a teleport landing just before start predates the sampler
+        armWindow();
     }
 
     /** Netty side: the id appeared anywhere in a {@code SetPassengers} packet; permanently feed-3-ineligible. */
@@ -78,7 +72,7 @@ public final class SendRangeSampler {
                 : new Entry(entry.hasPosition, entry.x, entry.z, entry.moved, true));
     }
 
-    /** Netty side: a relative move; a nonzero delta marks the id moved, known or not; zero deltas are inert. */
+    /** A nonzero delta marks the id moved, known or not; zero deltas are inert. */
     public void markMovedRelative(int id, boolean nonzeroDelta) {
         if (!nonzeroDelta) {
             return;
@@ -109,7 +103,6 @@ public final class SendRangeSampler {
         });
     }
 
-    /** Netty side: a teleport carrying relative flags has no absolute to compare; treat as moved. */
     public void markMovedRelativeTeleport(int id) {
         markMoved(id);
     }
@@ -120,14 +113,12 @@ public final class SendRangeSampler {
                 : new Entry(entry.hasPosition, entry.x, entry.z, true, entry.ridden));
     }
 
-    /** Netty side: a spawn is definitionally the fresh codec base, so it overwrites the anchor; bits survive. */
     public void registerArrival(int id, double x, double z) {
         book.compute(id, (key, entry) -> entry == null
                 ? new Entry(true, x, z, false, false)
                 : new Entry(true, x, z, entry.moved, entry.ridden));
     }
 
-    /** Main side: a prime registration fills a missing anchor only ({@code putIfAbsent} shape); bits survive. */
     public void registerSeed(int id, double x, double z) {
         book.compute(id, (key, entry) -> {
             if (entry == null) {
@@ -140,7 +131,6 @@ public final class SendRangeSampler {
         });
     }
 
-    /** Netty side, feed 1: suppression-gated, no haircut (arrivals fire at or inside the edge). */
     public int arrivalSample(double playerX, double playerZ, double entityX, double entityZ) {
         if (suppressed()) {
             return NO_SAMPLE;
@@ -148,10 +138,6 @@ public final class SendRangeSampler {
         return distance(playerX, playerZ, entityX, entityZ);
     }
 
-    /**
-     * Netty side, feed 3: samples only a both-bits-clear anchored entry, haircut applied; the entry is dropped either
-     * way (the entity is gone client-side).
-     */
     public int removalSample(int id, double playerX, double playerZ) {
         Entry entry = book.remove(id);
         if (entry == null || !entry.hasPosition || entry.moved || entry.ridden || suppressed()) {
@@ -161,7 +147,6 @@ public final class SendRangeSampler {
         return distanceBlocks > 0 ? distanceBlocks : NO_SAMPLE;
     }
 
-    /** Main side, feed 2 and the sweep: same gate as removals but the entry is kept. */
     public int seedSample(int id, double playerX, double playerZ) {
         Entry entry = book.get(id);
         if (entry == null || !entry.hasPosition || entry.moved || entry.ridden || suppressed()) {
@@ -173,7 +158,7 @@ public final class SendRangeSampler {
 
     private void armWindow() {
         windowDeadline = nanos.getAsLong() + WINDOW_NANOS;
-        sweepArmGeneration.incrementAndGet(); // every arming re-arms the pending sweep, uniformly
+        sweepArmGeneration.incrementAndGet();
     }
 
     /** Netty side: a teed {@code PlayerPosition} or Respawn packet. */
@@ -227,7 +212,6 @@ public final class SendRangeSampler {
         return generation;
     }
 
-    /** Main side: bits-clear anchored entries, the sweep's candidate set. */
     public int[] sweepIds() {
         return book.entrySet().stream()
                 .filter(entry -> entry.getValue().hasPosition && !entry.getValue().moved && !entry.getValue().ridden)
