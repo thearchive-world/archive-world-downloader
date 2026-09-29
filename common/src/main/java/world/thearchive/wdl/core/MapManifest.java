@@ -165,8 +165,8 @@ public final class MapManifest {
             return -1;
         }
         try {
-            // fields[0] is the write-only schema stamp: on load it is only sign-checked as a validity gate,
-            // its value unused (a forward-compat marker, like a DataVersion).
+            // fields[0] is the write-only schema stamp: on load it is only sign-checked as a validity gate, its value
+            // unused.
             if (Integer.parseInt(fields[0].trim()) < 0) {
                 return -1;
             }
