@@ -41,8 +41,7 @@ public final class SaveProgress {
         return (float) phaseDone / (float) phaseTotal;
     }
 
-    // Write done and total before the stage: a reader that observes the new stage then sees this phase's counts,
-    // not the prior phase's, so the bar never shows a stale fraction under the relabeled phase.
+    // Write done and total before the stage: a reader that observes the new stage then sees no earlier phase's counts.
     private void publish(SaveStage phase, long phaseDone, long phaseTotal) {
         this.done = phaseDone;
         this.total = phaseTotal;
