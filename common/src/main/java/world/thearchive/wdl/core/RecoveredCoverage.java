@@ -12,13 +12,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * The immutable prior-session coverage read by the outline classifier to mark a re-arriving container recovered rather
- * than unsaved: the block pos keys and the container-entity {@link UUID}s a prior download session captured and merged
- * back. The worker-thread coverage scan publishes a fresh instance to the main thread as one atomic reference swap, so
- * an instance is never mutated after it is built. The block keys are a primitive {@code LongSet} so the classifier's
- * hot per-tick {@link #contains} test neither boxes nor allocates; the entity ids are a flat {@code Set} because a UUID
- * is globally unique and cannot collide across dimensions, the same split {@link CapturedContainers} draws. MC-free and
- * Java-8-clean.
+ * The block keys are a primitive {@code LongSet} so {@link OutlineClassifier}'s {@link #contains} test neither boxes
+ * nor allocates.
  */
 public final class RecoveredCoverage {
     /** No prior-session coverage. */
