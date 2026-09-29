@@ -4,11 +4,9 @@
 package world.thearchive.wdl.core;
 
 /**
- * The HUD-overlay side of the config: the master on/off toggle, anchor, offset, the compact/detailed default, the
- * peek-key mode, the optional panel and its opacity, and the done-linger hold. A nested value object composed onto
- * {@link WdlConfig}, constructed from a schema read via {@link #from(ConfigValues)}, so the parse, clamping, and
- * defaults live in {@link ConfigSchema} rather than here. MC-free and headless-testable; the keybind itself is a loader
- * concern, not a stored key.
+ * The HUD-overlay side of the config. A nested value object composed onto {@link WdlConfig}, constructed from a schema
+ * read via {@link #from(ConfigValues)}, so the parse, clamping, and defaults live in {@link ConfigSchema} rather than
+ * here.
  */
 public final class HudConfig {
     private final boolean showHud;
@@ -79,7 +77,6 @@ public final class HudConfig {
         return doneLingerSeconds;
     }
 
-    /** The HUD fields drawn from a completed schema read. */
     static HudConfig from(ConfigValues values) {
         return new HudConfig(
                 values.booleanValue("showHud"),
