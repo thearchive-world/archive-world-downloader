@@ -61,7 +61,6 @@ public final class SendRangeSampler {
         armWindow();
     }
 
-    /** Netty side: the id appeared anywhere in a {@code SetPassengers} packet; permanently feed-3-ineligible. */
     public void markRidden(int id) {
         book.compute(id, (key, entry) -> entry == null
                 ? new Entry(false, 0.0, 0.0, false, true)
@@ -156,18 +155,16 @@ public final class SendRangeSampler {
         sweepArmGeneration.incrementAndGet();
     }
 
-    /** Netty side: a teed {@code PlayerPosition} or Respawn packet. */
     public void onAnomalyPacket() {
         armWindow();
     }
 
-    /** Netty side: a teed Respawn additionally invalidates every held id. */
     public void onRespawn() {
         book.clear();
         armWindow();
     }
 
-    /** Netty side: any {@code SetCamera} latches flag A; the id is deliberately not read. */
+    /** Bumps the camera latch generation; {@link #suppressed} stays true until {@link #gateArmTick} consumes it. */
     public void onSetCamera() {
         cameraLatchGeneration.incrementAndGet();
     }
