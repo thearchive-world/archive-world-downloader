@@ -68,9 +68,8 @@ public final class ContainerAssociation {
      * contents are per-player) reports {@code blockContainerSize == 0} -> dropped.
      *
      * @param atBlock            the open resolved to a block target (not an entity target, and not an unattributed
-     *                           open). False for a chest minecart or boat (an entity target) and for an open no click
-     *                           accounts for
-     * @param blockPosKey        the packed {@code BlockPos.asLong()} of that block
+     *                           open)
+     * @param blockPosKey        the packed position of that block
      * @param menuSlotCount      the menu's block-slot count (its non-player slots)
      * @param blockContainerSize the target block's own container size, or 0 if it has no block storage
      * @return the bound pos key, or {@link OptionalLong#empty()} when the open is dropped
@@ -94,12 +93,10 @@ public final class ContainerAssociation {
      *
      * @param atBlock              the open resolved to a block target (not an entity target, and not an unattributed
      *                             open)
-     * @param blockPosKey          the packed {@code BlockPos.asLong()} of that block
+     * @param blockPosKey          the packed position of that block
      * @param blockIsLectern       the target block's block entity is a lectern
-     * @param menuSlotCount        the menu's block-slot count (its non-player slots), 1 for a real lectern open
-     * @param lecternContainerSize the lectern's own container size. A lectern block entity exposes its book access only
-     *                             to the menu it builds, so the caller passes the size the vanilla lectern menu checks
-     *                             its container against on construction
+     * @param menuSlotCount        the menu's block-slot count (its non-player slots)
+     * @param lecternContainerSize the lectern's own container size
      * @return the bound pos key, or {@link OptionalLong#empty()} when the open is dropped
      */
     public OptionalLong openLectern(boolean atBlock, long blockPosKey, boolean blockIsLectern,
@@ -124,7 +121,7 @@ public final class ContainerAssociation {
      *
      * @param atBlock               the open resolved to a block target (not an entity target, and not an unattributed
      *                              open)
-     * @param blockPosKey           the packed {@code BlockPos.asLong()} of that block
+     * @param blockPosKey           the packed position of that block
      * @param menuIsCrafter         the open menu is a crafter menu
      * @param blockIsCrafter        the target block's block entity is a crafter
      * @param menuCraftingSlotCount the menu's crafting-grid slot count (the slots backed by its own crafting container,
@@ -157,14 +154,13 @@ public final class ContainerAssociation {
      *
      * @param atBlock            the open resolved to a block target (not an entity target, and not an unattributed
      *                           open)
-     * @param blockPosKey        the packed {@code BlockPos.asLong()} of that block
+     * @param blockPosKey        the packed position of that block
      * @param menuIsChest        the open menu is a chest menu. True at the live call site; the false case exists only
      *                           so the negative is unit-testable
      * @param blockIsEnderChest  the target block's block entity is an ender chest
      * @param menuSlotCount      the menu's block-slot count (its non-player slots)
-     * @param enderContainerSize the player's own ender-inventory size. The contents are lifted from the MENU, as on
-     *                           every other leg: the client's ender container is never synced, so only its size is
-     *                           trustworthy client-side, and that size is what the server built this menu over
+     * @param enderContainerSize the player's own ender-inventory size. The contents are lifted from the MENU: the
+     *                           client's ender container is never synced, so only its size is trustworthy client-side
      * @return the bound pos key, or {@link OptionalLong#empty()} when the open is dropped
      */
     public OptionalLong openEnderChest(boolean atBlock, long blockPosKey, boolean menuIsChest,
@@ -198,9 +194,7 @@ public final class ContainerAssociation {
      * @param ridingContainerVehicle   the player's current vehicle is a container vehicle
      * @param vehicleIntentOpen        an open-inventory request was latched while riding a container vehicle and that
      *                                 same vehicle is still ridden. Note what this does not assert: that this menu is
-     *                                 the one that request asked for. Pairing a latch with an open rests on the intent
-     *                                 chain's one-open-per-action assumption, which does not hold when a seeding action
-     *                                 produces no open
+     *                                 the one that request asked for
      * @return whether the vehicle axis claims the open; {@code false} routes it to the block axes
      */
     public static boolean shouldClaimVehicleOpen(boolean targetIsContainerVehicle, boolean ridingContainerVehicle,
@@ -253,9 +247,9 @@ public final class ContainerAssociation {
      * @param atAnimal              a chested animal was identified for this menu. The caller passes a constant true:
      *                              the animal comes from the MENU itself, so neither this flag nor the next is derived
      *                              from a resolved target or a ridden vehicle
-     * @param entityIsChestedAnimal that entity is a chested animal (an {@code AbstractChestedHorse})
-     * @param menuChestSlotCount    the open menu's chest-slot count (its non-player slots past the saddle/body)
-     * @param entityChestSize       the animal's own chest size ({@code getInventoryColumns() * 3}), or 0 if none
+     * @param entityIsChestedAnimal that entity is a chested animal
+     * @param menuChestSlotCount    the open menu's chest-slot count
+     * @param entityChestSize       the animal's own chest size, or 0 if none
      * @return whether the open bound to the animal; {@code false} when it is dropped
      */
     public boolean openChestedAnimal(boolean atAnimal, boolean entityIsChestedAnimal, int menuChestSlotCount,
@@ -278,9 +272,9 @@ public final class ContainerAssociation {
      * parameters so the negatives stay unit-testable here. Like the entity legs there is no block pos: the bind target
      * (the villager UUID) lives in the adapter, so {@link #boundPos} carries only the "a menu is bound" signal.
      *
-     * @param atVillager     the open resolved to an {@code AbstractVillager} target
-     * @param menuIsMerchant the open menu is a {@code MerchantMenu}
-     * @return whether the open bound to the villager; {@code false} when it is dropped
+     * @param atVillager     the open resolved to a merchant entity target
+     * @param menuIsMerchant the open menu is a merchant menu
+     * @return whether the open bound to the merchant; {@code false} when it is dropped
      */
     public boolean openMerchant(boolean atVillager, boolean menuIsMerchant) {
         if (atVillager && menuIsMerchant) {
@@ -310,10 +304,9 @@ public final class ContainerAssociation {
      *
      * @param atBlock               the open resolved to a block target (not an entity target, and not an unattributed
      *                              open)
-     * @param atRightHalf           the target half is the RIGHT-typed chest (so it is the first half, slots
-     *                              {@code 0..n/2}); false when the target half is the LEFT-typed chest
-     * @param targetPosKey          the packed {@code BlockPos.asLong()} of the target half
-     * @param partnerPosKey         the packed {@code BlockPos.asLong()} of the other (connected) half
+     * @param atRightHalf           the target half holds menu slots {@code 0..n/2}; false when it holds the other half
+     * @param targetPosKey          the packed position of the target half
+     * @param partnerPosKey         the packed position of the other (connected) half
      * @param menuSlotCount         the menu's block-slot count (its non-player slots), 54 for a real double open
      * @param combinedContainerSize the sum of both halves' container sizes, or less if the partner did not resolve to a
      *                              chest
