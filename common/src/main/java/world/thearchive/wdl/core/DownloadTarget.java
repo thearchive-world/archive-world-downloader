@@ -8,10 +8,6 @@ import org.jspecify.annotations.Nullable;
 /**
  * The resolved target of a download: the save-folder name, the user-facing world name, and whether it is a fresh
  * download or a resume. The folder name is used verbatim.
- *
- * <p>{@code worldName} is the name written into a new world's level.dat: the resolved folder name, which carries the
- * {@code -YYYY-MM-DD} suffix when it is enabled. On a resume the session preserves the existing world's name rather
- * than using this.
  */
 public final class DownloadTarget {
     /**
