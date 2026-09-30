@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class ChunkRectangleReducerTest {
     private static long at(int x, int z) {
-        return ((long) x & 0xFFFFFFFFL) | ((long) z & 0xFFFFFFFFL) << 32; // ChunkPos.asLong
+        return ((long) x & 0xFFFFFFFFL) | ((long) z & 0xFFFFFFFFL) << 32;
     }
 
     @Test
@@ -25,11 +25,11 @@ class ChunkRectangleReducerTest {
     void aContiguousRowReducesToOneRectangle() {
         long[] row = { at(0, 0), at(1, 0), at(2, 0) };
         int[] rectangles = ChunkRectangleReducer.reduce(row);
-        assertEquals(4, rectangles.length); // one rectangle
-        assertEquals(0, rectangles[0]); // minX
-        assertEquals(0, rectangles[1]); // minZ
-        assertEquals(2, rectangles[2]); // maxX
-        assertEquals(0, rectangles[3]); // maxZ
+        assertEquals(4, rectangles.length);
+        assertEquals(0, rectangles[0]);
+        assertEquals(0, rectangles[1]);
+        assertEquals(2, rectangles[2]);
+        assertEquals(0, rectangles[3]);
     }
 
     @Test
@@ -50,10 +50,9 @@ class ChunkRectangleReducerTest {
         int i = 0;
         for (int x = 0; x < 20; x++) {
             for (int z = 0; z < 20; z++) {
-                confetti[i++] = at(x * 7, z * 7); // spread so each is its own fine rectangle
+                confetti[i++] = at(x * 7, z * 7);
             }
         }
-        // covered = every other, but none forms a fully-saved cell at this spread, so covered stays empty.
         ChunkRectangleReducer.ToneRectangles tones = ChunkRectangleReducer.coarsenTones(confetti, new long[0], 16);
         assertTrue(tones.covered.length / 4 <= 16, "covered coarse count within the ceiling");
         assertTrue(tones.suspect.length / 4 <= 16, "suspect coarse count within the ceiling");
@@ -61,8 +60,6 @@ class ChunkRectangleReducerTest {
 
     @Test
     void coarsenTonesClassifiesFullCoveredAndSuspectCellsDisjointly() {
-        // A solid 4x4 chunk block; the left half is covered, the right half suspect. With cap 4 -> perAxis 2,
-        // cell = 2, so the four 2x2 cells are all fully saved: the two left cells covered, the two right suspect.
         long[] saved = new long[16];
         long[] covered = new long[8];
         int savedIndex = 0;
@@ -90,8 +87,6 @@ class ChunkRectangleReducerTest {
 
     @Test
     void coarsenTonesDrawsFullySavedCoveredMajorityCellCovered() {
-        // One fully-saved 4x4 cell (cap 1) with nine of sixteen chunks covered: a covered majority draws covered,
-        // so a mostly-covered but fragmented cell does not flip to suspect.
         long[] saved = new long[16];
         long[] covered = new long[9];
         int savedIndex = 0;
@@ -112,7 +107,6 @@ class ChunkRectangleReducerTest {
 
     @Test
     void coarsenTonesDrawsFullySavedSuspectMajorityCellSuspect() {
-        // The same cell with only seven of sixteen covered: a suspect majority draws suspect, not covered.
         long[] saved = new long[16];
         long[] covered = new long[7];
         int savedIndex = 0;
@@ -133,7 +127,6 @@ class ChunkRectangleReducerTest {
 
     @Test
     void coarsenTonesDrawsAnEvenlySplitFullCellSuspect() {
-        // Exactly eight of sixteen covered: an even split is not a covered majority, so the cell errs to suspect.
         long[] saved = new long[16];
         long[] covered = new long[8];
         int savedIndex = 0;
@@ -154,8 +147,6 @@ class ChunkRectangleReducerTest {
 
     @Test
     void coarsenTonesKeepsCoveredOffPartiallySavedCell() {
-        // A cell missing one saved chunk (15 of 16) but a covered majority among the saved (10 covered, 5 suspect)
-        // must draw suspect, never covered: the covered hue requires a full cell so it never paints the unsaved slot.
         long[] saved = new long[15];
         long[] covered = new long[10];
         int savedIndex = 0;
@@ -163,7 +154,7 @@ class ChunkRectangleReducerTest {
         for (int x = 0; x < 4; x++) {
             for (int z = 0; z < 4; z++) {
                 if (x == 3 && z == 3) {
-                    continue; // leave one slot unsaved so the cell is not fully saved
+                    continue;
                 }
                 long pos = at(x, z);
                 saved[savedIndex++] = pos;
@@ -179,17 +170,12 @@ class ChunkRectangleReducerTest {
 
     @Test
     void reduceCoalescesThreeRowTallRunIntoOneRectangle() {
-        // A one-wide column three rows tall must coalesce into a single tall rectangle. Two rows cannot tell a
-        // downward scan from an upward one; three rows pin that the vertical walk advances through every row.
         long[] column = { at(5, 0), at(5, 1), at(5, 2) };
         assertArrayEquals(new int[] { 5, 0, 5, 2 }, ChunkRectangleReducer.reduce(column));
     }
 
     @Test
     void reduceCoalescesTheMatchingRunWhenTheLowerRowHasSeveralRuns() {
-        // The upper row's single run must coalesce with the identical run in the lower row, not with whichever run
-        // happens to be first there. The lower row's leading run sits at a different x, so a first-run shortcut
-        // would consume it by mistake and drop its own rectangle.
         long[] chunks = { at(5, 0), at(6, 0), at(0, 1), at(1, 1), at(5, 1), at(6, 1) };
         int[] expected = { 0, 1, 1, 1, 5, 0, 6, 1 };
         assertArrayEquals(expected, normalized(ChunkRectangleReducer.reduce(chunks)));
@@ -205,11 +191,6 @@ class ChunkRectangleReducerTest {
 
     @Test
     void coarsenTonesPlacesCellsByExactCoordinatesOffOriginWiderThanTall() {
-        // Off-origin, x-extent dominant. Off-origin makes subtracting the minimum distinguishable from adding it,
-        // and an x-wider-than-tall extent puts the x span in control of the cell size; the exact rectangle corners
-        // then pin the cell size and each cell's placement, not merely the cell count. Eight wide by two tall over
-        // cap 4 gives per-axis 2 and cell 4, so the strip splits into two 4-wide cells, each partly saved (eight of
-        // sixteen slots), so both draw suspect and none covered.
         long[] saved = new long[16];
         int savedIndex = 0;
         for (int x = -20; x <= -13; x++) {
@@ -225,8 +206,6 @@ class ChunkRectangleReducerTest {
 
     @Test
     void coarsenTonesPlacesCellsByExactCoordinatesOffOriginTallerThanWide() {
-        // The mirror of the x-dominant case: a taller-than-wide extent puts the z span in control of the cell size,
-        // so the z-axis arithmetic is exercised as the deciding term rather than the one Math.max discards.
         long[] saved = new long[16];
         int savedIndex = 0;
         for (int x = -6; x <= -5; x++) {
@@ -242,9 +221,6 @@ class ChunkRectangleReducerTest {
 
     @Test
     void coarsenTonesDrawsNothingForFullyCoveredButPartiallySavedCell() {
-        // Every saved chunk in the cell is covered, but the cell is not fully saved, so it is neither a covered cell
-        // (which demands a full cell) nor a suspect cell (which demands a saved-not-covered chunk): it draws nothing.
-        // The suspect test is a strict inequality, so an equal saved and covered count must not tip into suspect.
         long[] saved = { at(0, 0), at(0, 1), at(1, 0) };
         long[] covered = { at(0, 0), at(0, 1), at(1, 0) };
         ChunkRectangleReducer.ToneRectangles tones = ChunkRectangleReducer.coarsenTones(saved, covered, 1);

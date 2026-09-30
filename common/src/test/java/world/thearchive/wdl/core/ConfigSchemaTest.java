@@ -23,16 +23,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * The single-source config descriptor: the byte-identical golden template, the schema-derived defaults, the complete
- * projection, and the report ordering. The golden literal is the permanent guard that the descriptor renders the
- * documented file exactly; a deliberate template change updates this literal on purpose.
- */
 class ConfigSchemaTest {
-    /**
-     * The exact bytes {@link WdlConfig#load} materializes on first run, with the version line derived from
-     * {@link WdlConfig#CONFIG_VERSION} so a schema-version bump cannot silently desync the golden.
-     */
     static final String GOLDEN_TEMPLATE = ""
             + "# Archive World Downloader configuration.\n"
             + "# Edit and save; changes apply on the next download (no client restart needed).\n"
@@ -407,8 +398,8 @@ class ConfigSchemaTest {
         properties.setProperty("worldType", "DEFAULT");
         properties.setProperty("worldSeed", "42");
         properties.setProperty("generateFeatures", "true");
-        properties.setProperty("overlayCoveredColor", "BLUE"); // a WdlConfig scalar that is not reported
-        properties.setProperty("hudDetailed", "true"); // a HUD option that is not reported
+        properties.setProperty("overlayCoveredColor", "BLUE");
+        properties.setProperty("hudDetailed", "true");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -426,12 +417,6 @@ class ConfigSchemaTest {
         assertFalse(changed.containsKey("hudDetailed"), "HUD options are never in the report");
     }
 
-    /**
-     * Per descriptor key, one valid value that differs from that option's default. Ranged numbers are picked in range
-     * so the clamp keeps them off the default rather than snapping back onto it, and enums pick a real other constant.
-     * {@link #nonDefaultValuesCoverEveryDescriptorKey} pins this map complete, so a newly added option cannot silently
-     * skip the flip-one-key backstop below.
-     */
     private static final Map<String, String> NON_DEFAULT_VALUES = Collections.unmodifiableMap(nonDefaultValues());
 
     private static Map<String, String> nonDefaultValues() {
