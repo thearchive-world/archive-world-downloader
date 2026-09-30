@@ -10,22 +10,22 @@ import org.junit.jupiter.api.Test;
 class EntityMenuCapabilityTest {
     // args order: vanillaNamespace, container, customScreen, abstractVillager, villager, baby, nitwit
     @Test
-    void pigIsIncapable() { // vanilla, none of the three families
+    void pigIsIncapable() {
         assertTrue(EntityMenuCapability.isMenuIncapable(true, false, false, false, false, false, false));
     }
 
     @Test
-    void chestMinecartIsCapable() { // a container entity
+    void chestMinecartIsCapable() {
         assertFalse(EntityMenuCapability.isMenuIncapable(true, true, false, false, false, false, false));
     }
 
     @Test
-    void horseIsCapable() { // opens its own inventory screen
+    void horseIsCapable() {
         assertFalse(EntityMenuCapability.isMenuIncapable(true, false, true, false, false, false, false));
     }
 
     @Test
-    void wanderingTraderIsCapable() { // AbstractVillager, not Villager
+    void wanderingTraderIsCapable() {
         assertFalse(EntityMenuCapability.isMenuIncapable(true, false, false, true, false, false, false));
     }
 
@@ -45,7 +45,7 @@ class EntityMenuCapabilityTest {
     }
 
     @Test
-    void moddedMobIsCapable() { // non-minecraft namespace, unprovable
+    void moddedMobIsCapable() {
         assertFalse(EntityMenuCapability.isMenuIncapable(false, false, false, false, false, false, false));
     }
 
