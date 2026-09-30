@@ -3,11 +3,6 @@
 
 package world.thearchive.wdl.core;
 
-/**
- * A fixed-width sample window over elapsed nanos: accumulate samples, report the average and max once the window fills,
- * then reset. Holds no clock of its own; the caller supplies each elapsed sample and owns the log line, so one
- * accumulator serves callers whose reported payloads differ.
- */
 public final class TimingWindow {
     private final int windowSize;
     private long count;
