@@ -60,9 +60,9 @@ class MapManifestTest {
     @Test
     void anImagelessIdNeverAliasesAnImagedId() {
         MapManifest manifest = MapManifest.empty();
-        int imaged = manifest.lookupOrInsert(HASH_P); // 0
-        int imageless = manifest.allocateImageless(); // 1, no hash recorded
-        int imagedAgain = manifest.lookupOrInsert(HASH_Q); // 2
+        int imaged = manifest.lookupOrInsert(HASH_P);
+        int imageless = manifest.allocateImageless();
+        int imagedAgain = manifest.lookupOrInsert(HASH_Q);
         assertNotEquals(imaged, imageless);
         assertNotEquals(imageless, imagedAgain);
         assertEquals(1, imageless);
@@ -76,7 +76,7 @@ class MapManifestTest {
         MapManifest written = MapManifest.empty();
         written.lookupOrInsert(HASH_P);
         written.lookupOrInsert(HASH_Q);
-        written.allocateImageless(); // advances the counter to 3 with no entry
+        written.allocateImageless();
         written.save(file);
 
         MapManifest read = MapManifest.load(file);
@@ -96,7 +96,7 @@ class MapManifestTest {
         sessionA.save(fileA);
 
         MapManifest sessionB = MapManifest.load(fileA);
-        sessionB.lookupOrInsert(HASH_Q); // re-seen in a different order, must not renumber
+        sessionB.lookupOrInsert(HASH_Q);
         sessionB.lookupOrInsert(HASH_P);
         sessionB.save(fileB);
 
@@ -129,19 +129,18 @@ class MapManifestTest {
         Files.createDirectories(directory);
         Files.write(directory.resolve("map_3.dat"), new byte[0]);
         Files.write(directory.resolve("map_10.dat"), new byte[0]);
-        Files.write(directory.resolve("idcounts.dat"), new byte[0]); // not a map file
+        Files.write(directory.resolve("idcounts.dat"), new byte[0]);
         assertEquals(10, MapManifest.highestDataFileId(directory));
         assertEquals(-1, MapManifest.highestDataFileId(directory.resolve("absent")));
     }
 
     @Test
     void highestDataFileIdScansThe26xNamespacedMapsSubfolder(@TempDir Path directory) throws IOException {
-        // The 26.x layout puts map data in a maps/ subfolder as bare <n>.dat, alongside the maps/last_id.dat index.
         Path maps = directory.resolve("maps");
         Files.createDirectories(maps);
         Files.write(maps.resolve("5.dat"), new byte[0]);
         Files.write(maps.resolve("12.dat"), new byte[0]);
-        Files.write(maps.resolve("last_id.dat"), new byte[0]); // the index, not a map-data file
+        Files.write(maps.resolve("last_id.dat"), new byte[0]);
         assertEquals(12, MapManifest.highestDataFileId(directory));
     }
 
@@ -152,9 +151,8 @@ class MapManifestTest {
         Path file = directory.resolve("wdl").resolve("map-ids");
 
         MapManifest stale = MapManifest.empty();
-        stale.lookupOrInsert(HASH_P); // counter -> 1
+        stale.lookupOrInsert(HASH_P);
         stale.save(file);
-        // A crash wrote data/map_7.dat after the (now stale) manifest's last rewrite.
         Files.write(data.resolve("map_7.dat"), new byte[0]);
 
         MapManifest resumed = MapManifest.load(file);
@@ -170,9 +168,9 @@ class MapManifestTest {
 
         MapManifest manifest = MapManifest.empty();
         manifest.lookupOrInsert(HASH_P);
-        manifest.allocateImageless(); // counter -> 2, but the imageless id wrote no data file
+        manifest.allocateImageless();
         manifest.save(file);
-        Files.write(data.resolve("map_0.dat"), new byte[0]); // only the imaged id has a data file
+        Files.write(data.resolve("map_0.dat"), new byte[0]);
 
         MapManifest resumed = MapManifest.load(file);
         resumed.raiseCounterAbove(MapManifest.highestDataFileId(data));
@@ -182,7 +180,7 @@ class MapManifestTest {
     @Test
     void anEmptyFileGivesAnEmptyManifest(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("map-ids");
-        Files.write(file, new byte[0]); // a zero-byte file, e.g. a torn write that got the create but no content
+        Files.write(file, new byte[0]);
         MapManifest manifest = MapManifest.load(file);
         assertEquals(0, manifest.size());
         assertEquals(0, manifest.nextArchiveId());
@@ -190,8 +188,6 @@ class MapManifestTest {
 
     @Test
     void aZeroCounterHeaderStillKeepsItsEntries(@TempDir Path directory) throws IOException {
-        // 0 is a valid high-water (a fresh manifest saves "1\t0"); only a negative or unparseable counter
-        // discards the file, so a well-formed zero-counter header must still surface any recorded entry.
         Path file = directory.resolve("map-ids");
         Files.write(file, ("1\t0\n" + HASH_P + "\t7").getBytes(StandardCharsets.UTF_8));
         MapManifest manifest = MapManifest.load(file);
@@ -217,10 +213,6 @@ class MapManifestTest {
 
     @Test
     void aNegativeSchemaFieldDiscardsTheFile(@TempDir Path directory) throws IOException {
-        // The schema field must be non-negative; a negative value is corrupt (it collides with the parse-error
-        // sentinel), so the file is discarded whole: neither the counter beside it nor its entries are read. The
-        // entry line and the size assertion are what separate the discard from a counter of 0 read off a
-        // well-formed header, which would leave nextArchiveId 0 too but keep the entry.
         Path file = directory.resolve("map-ids");
         Files.write(file, ("-1\t5\n" + HASH_P + "\t2").getBytes(StandardCharsets.UTF_8));
         MapManifest manifest = MapManifest.load(file);
@@ -230,9 +222,6 @@ class MapManifestTest {
 
     @Test
     void aZeroSchemaFieldIsWellFormedAndItsCounterIsRead(@TempDir Path directory) throws IOException {
-        // Zero is a non-negative (well-formed) schema field, so the header's counter is read; only a negative or
-        // unparseable schema marks the file corrupt. There is no schema-version equality check today, so any
-        // non-negative schema is accepted (a version bump would add a migrator; see the SCHEMA_VERSION contract).
         Path file = directory.resolve("map-ids");
         Files.write(file, "0\t5".getBytes(StandardCharsets.UTF_8));
         assertEquals(5, MapManifest.load(file).nextArchiveId());
@@ -247,8 +236,6 @@ class MapManifestTest {
 
     @Test
     void savingReordersEntriesByIdRegardlessOfLoadOrder(@TempDir Path directory) throws IOException {
-        // Entries read out of id order (a hand-edited or differently-written file) are rewritten lowest-id-first,
-        // so the on-disk form is canonical and a re-save stays byte-stable no matter the load order.
         Path in = directory.resolve("in").resolve("map-ids");
         Files.createDirectories(in.getParent());
         Files.write(in, ("1\t2\n" + HASH_Q + "\t1\n" + HASH_P + "\t0").getBytes(StandardCharsets.UTF_8));
@@ -264,8 +251,8 @@ class MapManifestTest {
     @Test
     void highestDataFileIdIgnoresNonMapAndNonNumericFiles(@TempDir Path directory) throws IOException {
         Files.createDirectories(directory);
-        Files.write(directory.resolve("idcounts.dat"), new byte[0]); // no map_ prefix
-        Files.write(directory.resolve("map_notanumber.dat"), new byte[0]); // map_ prefix, non-numeric id
+        Files.write(directory.resolve("idcounts.dat"), new byte[0]);
+        Files.write(directory.resolve("map_notanumber.dat"), new byte[0]);
         Files.write(directory.resolve("scratch.txt"), new byte[0]);
         assertEquals(-1, MapManifest.highestDataFileId(directory),
                 "a directory with no numeric map_<n>.dat file has no highest id");
@@ -285,15 +272,12 @@ class MapManifestTest {
     void schemeMismatchNeedsImagedDataAndModeDifference(@TempDir Path directory) throws IOException {
         Path saveFolder = directory.resolve("world");
         Path data = saveFolder.resolve("data");
-        // No imaged map data yet: never a mismatch, whatever the knob says.
         assertFalse(MapManifest.schemeMismatch(saveFolder, true));
         assertFalse(MapManifest.schemeMismatch(saveFolder, false));
-        // An imaged map data file with no manifest is original-id mode: matches off, mismatches on.
         Files.createDirectories(data);
         Files.createFile(data.resolve("map_0.dat"));
         assertFalse(MapManifest.schemeMismatch(saveFolder, false));
         assertTrue(MapManifest.schemeMismatch(saveFolder, true));
-        // Adding a manifest makes it remapped mode: matches on, mismatches off.
         Files.createDirectories(MapManifest.pathIn(saveFolder).getParent());
         MapManifest.empty().save(MapManifest.pathIn(saveFolder));
         assertTrue(MapManifest.schemeMismatch(saveFolder, false));
