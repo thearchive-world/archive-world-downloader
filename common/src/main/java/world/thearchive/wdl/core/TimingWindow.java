@@ -13,7 +13,7 @@ public final class TimingWindow {
         this.windowSize = windowSize;
     }
 
-    /** Fold one sample in; returns true when the window has just filled and is due to be reported and reset. */
+    /** Fold one sample in; returns true when the window is full. */
     public boolean record(long elapsedNanos) {
         count++;
         totalNanos += elapsedNanos;
