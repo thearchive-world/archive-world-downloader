@@ -151,9 +151,8 @@ public final class SettingsDraft {
     }
 
     /**
-     * Whether game rule {@code id}'s staged value differs from {@code curatedValue}, gating its revert row. Keyed off
-     * the value, not off override presence: a hand-written override harvested equal to the curated value is present but
-     * not a modification, so it must not show the revert affordance.
+     * Whether game rule {@code id}'s staged value differs from {@code curatedValue}. Keyed off the value, not off
+     * override presence: an override equal to the curated value is present but not a modification.
      */
     public boolean isGameRuleModified(String id, String curatedValue) {
         return !gameRuleValue(id, curatedValue).equals(curatedValue);
