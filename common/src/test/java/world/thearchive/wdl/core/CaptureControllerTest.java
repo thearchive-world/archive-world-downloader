@@ -16,20 +16,6 @@ import java.util.Properties;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/**
- * The capture state machine, unit-tested MC-free: Idle -> Recording -> Saving -> Idle, capture only while recording,
- * and auto-save on disconnect. The MC-typed capture work is a {@link CaptureController.Session} fake here, so the
- * orchestration is verified without a running game.
- *
- * <p>The save is asynchronous: {@code finish()} only <em>begins</em> the background write, and the controller stays
- * {@code SAVING} until the write reports done. Two routes lead out of it in production: the per-tick
- * {@code isSaveComplete()} poll, and the session's own re-poll once its write completes, which may re-enter
- * {@code tick()} from inside {@code stop()}. The fake here models the tick route, with a {@link FakeSession#saveDone}
- * toggle the test flips to signal completion; one test subclasses it to take the re-poll route.
- *
- * <p>Wall-clock-dependent behavior (the elapsed timer and the post-save done linger) is driven by a controllable clock
- * so the assertions are deterministic.
- */
 class CaptureControllerTest {
     private final long[] now = { 0L };
 
@@ -40,7 +26,7 @@ class CaptureControllerTest {
     private static class FakeSession implements CaptureController.Session {
         int captures;
         int finishes;
-        boolean saveDone; // the test flips this true to signal the background save has completed
+        boolean saveDone;
         CaptureCounts counts = CaptureCounts.EMPTY;
         CapturedContainers capturedContainers = CapturedContainers.EMPTY;
         RecoveredCoverage recoveredCoverage = RecoveredCoverage.EMPTY;
@@ -68,7 +54,7 @@ class CaptureControllerTest {
 
         @Override
         public void finish() {
-            finishes++; // begins the async save; the fake completes only when saveDone is flipped
+            finishes++;
         }
 
         @Override
@@ -124,7 +110,7 @@ class CaptureControllerTest {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
 
-        controller.tick(); // idle: nothing captured
+        controller.tick();
         assertEquals(0, session.captures);
 
         controller.start(() -> session);
@@ -144,11 +130,11 @@ class CaptureControllerTest {
         assertEquals(1, session.finishes, "stop begins the background save");
         assertEquals(CaptureState.SAVING, controller.state(), "the keybind/command returns while the write runs");
 
-        controller.tick(); // the save has not signaled completion yet
+        controller.tick();
         assertEquals(CaptureState.SAVING, controller.state(), "still saving while the background write is in flight");
 
         session.saveDone = true;
-        controller.tick(); // the next tick observes completion on the main thread
+        controller.tick();
 
         assertEquals(CaptureState.IDLE, controller.state(), "returns to idle once the write completes");
     }
@@ -157,7 +143,7 @@ class CaptureControllerTest {
     void anAlreadyFinishedSaveReturnsToIdleOnTheVeryNextTick() {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
-        session.saveDone = true; // a save already complete when finish() is called
+        session.saveDone = true;
         controller.start(() -> session);
 
         controller.stop();
@@ -173,17 +159,17 @@ class CaptureControllerTest {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
         controller.start(() -> session);
-        controller.stop(); // begins the async save; state is SAVING
+        controller.stop();
         assertEquals(CaptureState.SAVING, controller.state());
-        session.saveDone = true; // the background write has completed
+        session.saveDone = true;
 
-        controller.tick(); // the poke arrives (poke == controller::tick)
+        controller.tick();
         assertEquals(CaptureState.IDLE, controller.state());
         assertEquals(1, session.finishes);
 
-        controller.tick(); // the retained tick fallback arrives after the poke already transitioned
+        controller.tick();
         assertEquals(CaptureState.IDLE, controller.state());
-        assertEquals(1, session.finishes); // still one finish, no double transition
+        assertEquals(1, session.finishes);
     }
 
     @Test
@@ -191,7 +177,7 @@ class CaptureControllerTest {
         CaptureController controller = controller();
         FakeSession first = new FakeSession();
         controller.start(() -> first);
-        controller.stop(); // now SAVING, the write still in flight
+        controller.stop();
 
         controller.start(() -> {
             throw new AssertionError("must not start a second session while a save is in flight");
@@ -207,7 +193,7 @@ class CaptureControllerTest {
         first.saveDone = true;
         controller.start(() -> first);
         controller.stop();
-        controller.tick(); // drains to IDLE
+        controller.tick();
 
         FakeSession second = new FakeSession();
         controller.start(() -> second);
@@ -270,7 +256,7 @@ class CaptureControllerTest {
         CaptureController controller = controller();
         controller.setTransferStopPoll(() -> true);
 
-        controller.tick(); // no session: must be a no-op, not a crash
+        controller.tick();
 
         assertEquals(CaptureState.IDLE, controller.state());
     }
@@ -392,8 +378,6 @@ class CaptureControllerTest {
         controller.coveredChunks().recompute("minecraft:overworld", 1);
         controller.sendRange().observe("minecraft:overworld", 64);
 
-        // The gated read short-circuits before it reaches savedChunks, so the covered index is the one whose
-        // emptiness would make the assertion below vacuous; guard on it and not on the saved set.
         assertTrue(controller.coveredChunks().snapshot("minecraft:overworld").length > 0,
                 "the covered index must be populated, or the assertion below would prove nothing");
         assertEquals(0, controller.overlayCoveredChunks(entities(true), "minecraft:overworld").length,
@@ -521,8 +505,6 @@ class CaptureControllerTest {
         controller.start(() -> session);
 
         controller.stop();
-        // The finish drain can be the first flush for the dimension, so the resume overlay seed is queued behind
-        // it and repopulates the indexes on the writer thread at some point after stop returns.
         controller.savedChunks().add("minecraft:overworld", 42L);
         controller.coveredChunks().recordTrail("minecraft:overworld", 4, 4, 8);
         controller.coveredChunks().recompute("minecraft:overworld", 1);
@@ -598,15 +580,15 @@ class CaptureControllerTest {
         session.counts = new CaptureCounts(5, 2, 3);
         controller.start(() -> session);
 
-        controller.stop(); // snapshot the stop-time counts before the live session is torn down
-        session.counts = new CaptureCounts(5, 2, 9); // the save drain grows the figures past the freeze
+        controller.stop();
+        session.counts = new CaptureCounts(5, 2, 9);
 
         assertEquals(5, controller.counts().chunks(), "frozen through saving");
         assertEquals(2, controller.counts().containers());
         assertEquals(3, controller.counts().entities());
 
         session.saveDone = true;
-        controller.tick(); // -> IDLE, the done linger begins
+        controller.tick();
 
         assertEquals(5, controller.counts().chunks(), "the done linger shows the written totals");
         assertEquals(9, controller.counts().entities());
@@ -620,7 +602,7 @@ class CaptureControllerTest {
         session.saveDone = true;
         controller.start(() -> session);
         controller.stop();
-        controller.tick(); // -> IDLE, done linger begins at now=0
+        controller.tick();
 
         now[0] = 5_000L;
         assertEquals(5, controller.counts().chunks(), "still held a few seconds into the linger");
@@ -637,7 +619,7 @@ class CaptureControllerTest {
         first.saveDone = true;
         controller.start(() -> first);
         controller.stop();
-        controller.tick(); // -> IDLE, done linger holding (5,2,3)
+        controller.tick();
 
         FakeSession second = new FakeSession();
         second.counts = new CaptureCounts(1, 0, 0);
@@ -669,13 +651,13 @@ class CaptureControllerTest {
         controller.start(() -> session);
 
         now[0] = 6_000L;
-        controller.stop(); // freezes the 5s capture duration
+        controller.stop();
 
         now[0] = 30_000L;
         assertEquals(5_000L, controller.elapsedMillis(), "the timer holds the capture duration through saving");
 
         session.saveDone = true;
-        controller.tick(); // -> IDLE done linger
+        controller.tick();
         now[0] = 31_000L;
         assertEquals(5_000L, controller.elapsedMillis(), "and through the done linger");
 
@@ -687,7 +669,7 @@ class CaptureControllerTest {
     void saveStageIsNoneAndProgressZeroUnlessSaving() {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
-        session.saveStage = SaveStage.WRITING_MAPS; // a session value that must not leak outside SAVING
+        session.saveStage = SaveStage.WRITING_MAPS;
         session.saveProgress = 0.5f;
 
         assertEquals(SaveStage.NONE, controller.saveStage(), "none while idle");
@@ -706,13 +688,13 @@ class CaptureControllerTest {
 
         session.saveStage = SaveStage.COMPRESSING;
         session.saveProgress = 0.75f;
-        controller.stop(); // -> SAVING
+        controller.stop();
 
         assertEquals(SaveStage.COMPRESSING, controller.saveStage());
         assertEquals(0.75f, controller.saveProgress());
 
         session.saveDone = true;
-        controller.tick(); // -> IDLE
+        controller.tick();
         assertEquals(SaveStage.NONE, controller.saveStage(), "no bar once the save completes");
         assertEquals(0.0f, controller.saveProgress());
     }
@@ -729,7 +711,7 @@ class CaptureControllerTest {
 
         session.saveDone = true;
         now[0] = 10_000L;
-        controller.tick(); // save completes at now=10_000
+        controller.tick();
 
         now[0] = 12_500L;
         assertTrue(controller.doneElapsedMillis().isPresent(), "present once the save completes");
@@ -741,14 +723,12 @@ class CaptureControllerTest {
 
     @Test
     void restoringFlipIsAtomicFromIdleOnly() {
-        CaptureController controller = controller(); // the shipped test factory
+        CaptureController controller = controller();
         assertTrue(controller.tryBeginRestoring());
         assertEquals(CaptureState.RESTORING, controller.state());
-        assertFalse(controller.tryBeginRestoring()); // second flip refused
-        // Capture start refuses while RESTORING (the shipped IDLE guard covers it).
+        assertFalse(controller.tryBeginRestoring());
         controller.start(FakeSession::new);
         assertEquals(CaptureState.RESTORING, controller.state());
-        // stop/onDisconnect are RECORDING-guarded no-ops.
         controller.stop();
         controller.onDisconnect();
         assertEquals(CaptureState.RESTORING, controller.state());
@@ -764,7 +744,7 @@ class CaptureControllerTest {
         assertFalse(controller.tryBeginRestoring(), "a running capture is never disturbed by a restore");
         assertEquals(CaptureState.RECORDING, controller.state());
 
-        controller.endRestoring(); // a stray end is a no-op outside RESTORING
+        controller.endRestoring();
         assertEquals(CaptureState.RECORDING, controller.state());
     }
 
@@ -775,27 +755,21 @@ class CaptureControllerTest {
         session.saveDone = true;
         controller.start(() -> session);
         controller.stop();
-        controller.tick(); // save completes at now = 0
+        controller.tick();
 
-        now[0] = 60_000L; // exactly the 60s DONE_LINGER_HOLD_MILLIS: the boundary itself is still within the hold
+        now[0] = 60_000L; // exactly the 60s DONE_LINGER_HOLD_MILLIS
         assertTrue(controller.doneElapsedMillis().isPresent(), "the done frame still reads at the exact boundary");
 
         now[0] = 60_001L;
         assertFalse(controller.doneElapsedMillis().isPresent(), "and is gone one millisecond past it");
     }
 
-    /**
-     * Stopping a download and then leaving the server is a routine order, and it is the order the first version of this
-     * guard missed: by the time the disconnect arrives the state has already left recording, so the flush is a no-op,
-     * while a full drain is still encoding against registries a loader can rebuild on the way out. The hold has to be
-     * taken on the disconnect whatever the state.
-     */
     @Test
     void disconnectHoldsTheWriterEvenWhenTheSaveIsAlreadyRunning() {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
         controller.start(() -> session);
-        controller.stop(); // the player stopped the download first; the state is now SAVING
+        controller.stop();
         assertEquals(CaptureState.SAVING, controller.state());
         assertEquals(0, session.holds, "stopping alone rebuilds nothing, so nothing is held");
 
@@ -821,7 +795,6 @@ class CaptureControllerTest {
         assertEquals(1, session.releases, "the first tick after the finish releases it");
     }
 
-    /** Joining rebuilds the registries too, so the hold is taken for a save still draining from the previous server. */
     @Test
     void joiningHoldsTheWriterStillDrainingFromTheLastServer() {
         CaptureController controller = controller();
@@ -834,10 +807,6 @@ class CaptureControllerTest {
         assertEquals(1, session.holds, "the join edge holds the still-draining writer");
     }
 
-    /**
-     * A finish with nothing to write completes inside {@code finish()} and re-polls the controller from there, as the
-     * live session does.
-     */
     @Test
     void aPollReenteringFromInsideTheFinishLeavesTheHoldForTheNextTick() {
         CaptureController controller = controller();
