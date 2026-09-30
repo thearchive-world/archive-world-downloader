@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
-/** The HUD config block: defaults, enum and integer parsing, range clamping, and malformed self-heal flags. */
 class HudConfigTest {
     @Test
     void showHudDefaultsOnAndParsesOff() {
