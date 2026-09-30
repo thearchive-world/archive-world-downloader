@@ -13,17 +13,9 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * The pure three-way outline classifier: captured this session draws no rim, a prior-session-recovered container draws
- * the recovered hue, and an as-yet-unsaved container draws the unsaved hue, in that precedence. The any-position rule
- * makes one logical container, even a two-half double chest, classify as one entry. A captured block position stays
- * captured only while its live block-entity type still matches the recorded type (Gate 2): a same-position replacement
- * re-rims it.
- */
 class OutlineClassifierTest {
     private static final UUID CART = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
 
-    /** A captured-set holding one block key at {@code posKey} with {@code typeId} recorded for it. */
     private static CapturedContainers capturedType(long posKey, String typeId) {
         Long2ObjectMap<String> types = new Long2ObjectOpenHashMap<>();
         types.put(posKey, typeId);
@@ -46,8 +38,6 @@ class OutlineClassifierTest {
 
     @Test
     void enderChestNoRimWhenRestoredOnResume() {
-        // On a resume of a world whose ender inventory a prior download already saved, every ender chest is done
-        // without reopening one, so it draws no rim, the same as captured this session, not the recovered hue.
         RecoveredCoverage restored = RecoveredCoverage.ENDER_ONLY;
         assertEquals(OutlineClass.CAPTURED, OutlineClassifier.classify(new long[] { 9L }, null, null, true,
                 CapturedContainers.EMPTY, restored));
@@ -61,8 +51,6 @@ class OutlineClassifierTest {
 
     @Test
     void enderRecoveredDoesNotRimNonEnderContainers() {
-        // The ender-recovered fact is ender-only: a non-ender block whose position is not covered stays unsaved
-        // even while the shared ender inventory is restored.
         assertEquals(OutlineClass.UNSAVED, OutlineClassifier.classify(new long[] { 9L }, null, null, false,
                 CapturedContainers.EMPTY, RecoveredCoverage.ENDER_ONLY));
     }
@@ -141,8 +129,6 @@ class OutlineClassifierTest {
 
     @Test
     void capturedBlockRerimsWhenTheLiveTypeDiffersFromTheRecordedType() {
-        // A captured container broken and replaced by one of another type at the same pos must draw the unsaved rim
-        // again, since the new one at that key is uncaptured.
         CapturedContainers captured = capturedType(5L, "minecraft:barrel");
         assertEquals(OutlineClass.UNSAVED, OutlineClassifier.classify(new long[] { 5L }, "minecraft:chest", null,
                 false, captured, RecoveredCoverage.EMPTY));
@@ -158,8 +144,6 @@ class OutlineClassifierTest {
 
     @Test
     void capturedBlockWithNoRecordedTypeFallsBackToBareMembership() {
-        // A captured key with no recorded type stays captured regardless of live type, so the gate only ever
-        // adds precision and never re-rims a validly captured container.
         CapturedContainers captured = new CapturedContainers(LongSet.of(5L), Set.of(), false);
         assertEquals(OutlineClass.CAPTURED, OutlineClassifier.classify(new long[] { 5L }, "minecraft:chest", null,
                 false, captured, RecoveredCoverage.EMPTY));
@@ -192,23 +176,16 @@ class OutlineClassifierTest {
 
     @Test
     void bookshelfRecoveredWhenThisSessionAddedToTheSavedShelf() {
-        // An insert into a prior-saved shelf leaves every occupied slot in the save, because the two masks are
-        // unioned there rather than replaced. Warning the player off a shelf whose books are all on disk names a
-        // risk that does not exist and points at no action that would clear it.
         assertEquals(OutlineClass.RECOVERED, OutlineClassifier.classifyBookshelf(0b111, 0b001, 0b111));
     }
 
     @Test
     void bookshelfRecoveredWhenAnInsertWasRemovedAgain() {
-        // Insert-then-remove leaves slot 0 empty with a stale captured bit, and the shelf is still fully covered
-        // by what a prior session saved, so it stays violet.
         assertEquals(OutlineClass.RECOVERED, OutlineClassifier.classifyBookshelf(0b110, 0b001, 0b111));
     }
 
     @Test
     void bookshelfUnsavedWhenOneSlotIsCoveredByNeitherMask() {
-        // The case the union rule still has to warn about: slot 2 is occupied and neither captured this session
-        // nor saved before, so part of the shelf really is missing from the copy on disk.
         assertEquals(OutlineClass.UNSAVED, OutlineClassifier.classifyBookshelf(0b111, 0b001, 0b011));
     }
 
