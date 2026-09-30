@@ -7,10 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins the one home-of-record color identity by exact hex, so a drifted token is caught here rather than on a surface.
- * RGB-only: consumers force {@code 0xFF} alpha at the draw site.
- */
 class BrandColorsTest {
     @Test
     void brandColorsMatchTheirHex() {
@@ -28,7 +24,6 @@ class BrandColorsTest {
 
     @Test
     void brandColorsAreRgbOnly() {
-        // No alpha byte baked into the token: every value sits within 0xFFFFFF.
         assertEquals(0, BrandColors.AMBER & ~0xFFFFFF);
         assertEquals(0, BrandColors.IVORY & ~0xFFFFFF);
         assertEquals(0, BrandColors.TEAL & ~0xFFFFFF);
