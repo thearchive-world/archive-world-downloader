@@ -7,20 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-/**
- *
- * <p>The decision is a freshness window plus take-once: a click older than the window is stale (the open it would have
- * seeded never arrived), and a click is consumed by the first open that resolves it (so one click can seed at most one
- * bind). A later click on a DIFFERENT target overwrites an earlier unconsumed one (last-click-wins) and leaves a
- * superseded marker: the overwritten click's own open may still be in flight, and pairing it with the latched click
- * would bind the wrong block (the first open would claim the second click's target), so each marker poisons exactly one
- * later open into SUPERSEDED, which binds nothing at all. All inputs are primitives (a packed
- * {@code BlockPos.toLong()}, an entity id, and a tick), so the whole decision is verified with hand-fed ticks and no
- * running game; the clicked entity reference for an ENTITY intent lives in the adapter, the way
- * {@link ContainerAssociation} keeps the bound entity UUID there.
- */
 class OpenClickIntentTest {
-    private static final long POS = 1234567L; // an opaque packed BlockPos.toLong()
+    private static final long POS = 1234567L;
     private static final long OTHER_POS = 7654321L;
     private static final int ENTITY_ID = 42;
     private static final int OTHER_ENTITY_ID = 43;
