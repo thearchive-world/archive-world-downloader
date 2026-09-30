@@ -9,11 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * The pure re-capture decisions, unit-tested MC-free: which buffered chunks sit in the always-fresh edit zone around
- * the player, how many chunks the always-on round-robin floor refreshes per tick to cover the whole hot set within the
- * configured period, and the eligibility a candidate must meet to be re-encoded.
- */
 class RecapturePolicyTest {
     @Test
     void theEditZoneIsTheChebyshevSquareOfTheGivenRadiusAroundTheCenter() {
@@ -25,9 +20,7 @@ class RecapturePolicyTest {
 
     @Test
     void theFloorSliceCoversTheWholeHotSetWithinTheRefreshPeriod() {
-        // rd16 hot square (renderDistance + KEEP_HOT_MARGIN=2): (2*18+1)^2 = 1369 chunks.
         assertEquals(5, RecapturePolicy.floorSliceSize(1369, 15, 20), "ceil(1369 / (15*20)) = 5");
-        // rd32 hot square: (2*34+1)^2 = 4761 chunks.
         assertEquals(16, RecapturePolicy.floorSliceSize(4761, 15, 20), "ceil(4761 / (15*20)) = 16");
     }
 
@@ -39,7 +32,6 @@ class RecapturePolicyTest {
 
     @Test
     void theFloorSliceNeverDividesByZeroWhenThePeriodIsDegenerate() {
-        // A hand-edited recaptureSeconds <= 0 must not divide by zero; clamp the period to one tick.
         assertEquals(5, RecapturePolicy.floorSliceSize(100, 0, 20), "period clamped to 1s -> ceil(100/20) = 5");
         assertEquals(5, RecapturePolicy.floorSliceSize(100, -7, 20), "a negative period clamps the same way");
     }
