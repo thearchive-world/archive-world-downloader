@@ -15,10 +15,6 @@ import it.unimi.dsi.fastutil.longs.LongSets;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * The immutable prior-session coverage the outline classifier reads: block keys, per-bookshelf saved slots, and
- * recovered container-entity UUIDs.
- */
 class RecoveredCoverageTest {
     @Test
     void emptyContainsNothing() {
