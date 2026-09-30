@@ -10,11 +10,6 @@ import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/**
- * The pure nearest-first capture ordering, unit-tested MC-free: under a per-tick encode budget the render-distance
- * square must be filled from the player outward (by Chebyshev ring), so a budget that spills to later ticks does not
- * leave one side of the player perpetually unfilled.
- */
 class CaptureOrderTest {
     private static int chebyshev(int dx, int dz) {
         return Math.max(Math.abs(dx), Math.abs(dz));
