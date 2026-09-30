@@ -10,11 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * The origin tag on a resolved download target: the shipped three-argument constructor keeps minting SCREEN-origin
- * targets, the wither re-tags an immutable copy without touching the resolved fields, and the refusal-channel rule
- * routes only the screen's refusals to the toast (the command and keybind flows answer in chat).
- */
 class DownloadTargetTest {
     @Test
     void threeArgumentConstructorDefaultsToScreenOrigin() {
