@@ -21,12 +21,6 @@ import java.util.Map;
 import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
 
-/**
- * The download chat copy is MC-free and unit-tested headless: the line templates are wdl.chat translation keys resolved
- * here against the shipped en_us lang file, the three-tone treatment (ivory line template, amber inserted values, teal
- * link) rides the composed keys and arguments, and the click affordances carry their raw targets for the platform
- * bridge to render.
- */
 class ChatCopyTest {
     private static final Map<String, String> LANG = Collections.unmodifiableMap(loadLang());
 
@@ -335,7 +329,6 @@ class ChatCopyTest {
         assertEquals(1, clickableCount(line));
     }
 
-    /** Resolves a composed line to its en_us copy, failing on any key the lang file does not carry. */
     private static String resolve(ChatCopy line) {
         List<String> resolvedArguments = new ArrayList<>();
         for (ChatCopy.Argument argument : line.arguments()) {
