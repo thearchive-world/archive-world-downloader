@@ -26,7 +26,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.testsupport.JulCapture;
 
-/** The band-agnostic config: pure java.util/java.nio parsing, default-on-missing, materialize-on-absent. */
 class WdlConfigTest {
     @RegisterExtension
     final JulCapture warnings = JulCapture.of(WdlConfig.class);
@@ -91,7 +90,7 @@ class WdlConfigTest {
     @Test
     void aStaleRecaptureBooleanSelfHealsToEverywhere() {
         Properties properties = new Properties();
-        properties.setProperty("recaptureChunks", "true"); // a leftover from the retired boolean, not a valid mode
+        properties.setProperty("recaptureChunks", "true");
 
         assertEquals(RecaptureMode.EVERYWHERE, WdlConfig.parse(properties).recaptureChunks(),
                 "a stale boolean value fails the enum parse and heals to the default, not to a silent OFF");
@@ -141,7 +140,6 @@ class WdlConfigTest {
         assertEquals(RecaptureMode.EVERYWHERE, first.recaptureChunks());
         assertEquals(15, first.recaptureSeconds());
 
-        // The written template must parse back to the same values.
         WdlConfig reloaded = WdlConfig.load(file);
         assertEquals(first.captureEntities(), reloaded.captureEntities());
         assertEquals(first.captureContainers(), reloaded.captureContainers());
@@ -159,7 +157,7 @@ class WdlConfigTest {
     @Test
     void changedFromReportsOnlyTheChangedLeafByItsKey() {
         Properties properties = new Properties();
-        properties.setProperty("saveItemCoordinates", "true"); // the default is false
+        properties.setProperty("saveItemCoordinates", "true");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -170,7 +168,7 @@ class WdlConfigTest {
     @Test
     void changedFromReportsForceMobPersistenceWhenEnabled() {
         Properties properties = new Properties();
-        properties.setProperty("forceMobPersistence", "true"); // the default is false
+        properties.setProperty("forceMobPersistence", "true");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -181,7 +179,7 @@ class WdlConfigTest {
     @Test
     void changedFromReportsShowToastsWhenDisabled() {
         Properties properties = new Properties();
-        properties.setProperty("showToasts", "false"); // the default is true
+        properties.setProperty("showToasts", "false");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -192,9 +190,9 @@ class WdlConfigTest {
     @Test
     void changedFromReportsChangedWorldOutputGenerationFields() {
         Properties properties = new Properties();
-        properties.setProperty("worldType", "DEFAULT"); // default VOID
-        properties.setProperty("worldSeed", "42"); // default 0
-        properties.setProperty("generateFeatures", "true"); // default false
+        properties.setProperty("worldType", "DEFAULT");
+        properties.setProperty("worldSeed", "42");
+        properties.setProperty("generateFeatures", "true");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -206,7 +204,7 @@ class WdlConfigTest {
     @Test
     void changedFromReportsChangedWorldOutputFlag() {
         Properties properties = new Properties();
-        properties.setProperty("skipVoidChunks", "true"); // the default is false
+        properties.setProperty("skipVoidChunks", "true");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -217,7 +215,7 @@ class WdlConfigTest {
     @Test
     void changedFromReportsWorldOutputAllowCommandsOff() {
         Properties properties = new Properties();
-        properties.setProperty("allowCommands", "false"); // the default is true
+        properties.setProperty("allowCommands", "false");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -228,8 +226,8 @@ class WdlConfigTest {
     @Test
     void changedFromExcludesTheGameRuleOverrideList() {
         Properties properties = new Properties();
-        properties.setProperty("skipVoidChunks", "true"); // a scalar flag, default false
-        properties.setProperty("gamerule.spawn_mobs", "true"); // an override: a change by nature, not a diffable scalar
+        properties.setProperty("skipVoidChunks", "true");
+        properties.setProperty("gamerule.spawn_mobs", "true");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -266,7 +264,6 @@ class WdlConfigTest {
         }
     }
 
-    // The default-on scalar booleans that share one parse, heal, report, and materialize shape below.
     private static final List<DefaultOnBoolean> DEFAULT_ON_SCALAR_BOOLEANS = ImmutableList.of(
             new DefaultOnBoolean("checkForUpdates", WdlConfig::checkForUpdates),
             new DefaultOnBoolean("showChatMessages", WdlConfig::showChatMessages),
@@ -298,7 +295,7 @@ class WdlConfigTest {
     void parseHealsEachMalformedScalarBooleanToItsDefault() {
         for (DefaultOnBoolean toggle : DEFAULT_ON_SCALAR_BOOLEANS) {
             Properties properties = new Properties();
-            properties.setProperty(toggle.key(), "ture"); // a typo silently disabling a default-on flag
+            properties.setProperty(toggle.key(), "ture");
 
             assertTrue(toggle.getter().test(WdlConfig.parse(properties)),
                     toggle.key() + " heals to its default, not a silent false");
@@ -334,9 +331,9 @@ class WdlConfigTest {
     @Test
     void changedFromListsEachDifferingLeafByKeyInDeclarationOrder() {
         Properties properties = new Properties();
-        properties.setProperty("captureEntities", "false"); // default true
-        properties.setProperty("captureContainers", "false"); // default true
-        properties.setProperty("recaptureSeconds", "30"); // default 15
+        properties.setProperty("captureEntities", "false");
+        properties.setProperty("captureContainers", "false");
+        properties.setProperty("recaptureSeconds", "30");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -380,7 +377,7 @@ class WdlConfigTest {
     @Test
     void changedFromIgnoresTheConfigVersionMetadata() {
         Properties properties = new Properties();
-        properties.setProperty("configVersion", "99"); // metadata, not a user setting
+        properties.setProperty("configVersion", "99");
 
         assertTrue(WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS).isEmpty(),
                 "the schema version is metadata and never shows up in the settings diff");
@@ -414,7 +411,7 @@ class WdlConfigTest {
     @Test
     void changedFromIncludesWorldOutputChange() {
         Properties properties = new Properties();
-        properties.setProperty("autoDownload", "true"); // default false
+        properties.setProperty("autoDownload", "true");
 
         Map<String, String> changed = WdlConfig.parse(properties).changedFrom(WdlConfig.DEFAULTS);
 
@@ -433,8 +430,8 @@ class WdlConfigTest {
     @Test
     void nonDefaultSettingsListsScalarChangesAndEveryConfiguredGameRuleOverride() {
         Properties properties = new Properties();
-        properties.setProperty("autoDownload", "true"); // a scalar change
-        properties.setProperty("gamerule.spawn_mobs", "true"); // a configured override, always a non-default setting
+        properties.setProperty("autoDownload", "true");
+        properties.setProperty("gamerule.spawn_mobs", "true");
 
         Map<String, String> settings = WdlConfig.parse(properties).nonDefaultSettings();
 
@@ -473,7 +470,7 @@ class WdlConfigTest {
     @Test
     void parseHealsMalformedTopLevelBooleanToItsDefault() {
         Properties properties = new Properties();
-        properties.setProperty("captureEntities", "ture"); // a typo; the default is true
+        properties.setProperty("captureEntities", "ture");
 
         assertTrue(WdlConfig.parse(properties).captureEntities(),
                 "a malformed default-on flag heals to its default, not a silent false");
@@ -482,7 +479,7 @@ class WdlConfigTest {
     @Test
     void parseHealsMalformedWorldOutputBooleanToItsDefault() {
         Properties properties = new Properties();
-        properties.setProperty("overrideGamerules", "ture"); // the sharp edge: a typo disabling a default-on flag
+        properties.setProperty("overrideGamerules", "ture");
 
         assertTrue(WdlConfig.parse(properties).worldOutput().overrideGameRules(),
                 "a malformed default-on flag heals to its default, not a silent false");
@@ -526,7 +523,7 @@ class WdlConfigTest {
         Path file = directory.resolve("wdl.properties");
         Files.write(file, "recaptureSeconds=not-a-number\n".getBytes(StandardCharsets.UTF_8));
 
-        WdlConfig.load(file); // the heal rewrite goes through the staging-then-atomic-move writer
+        WdlConfig.load(file);
         warnings.drain("wdl.properties has an invalid value for [recaptureSeconds]");
 
         assertFalse(Files.exists(directory.resolve("wdl.properties.tmp")),
@@ -535,8 +532,6 @@ class WdlConfigTest {
 
     @Test
     void loadLogsAndFallsBackWhenTheFileCannotBeRead(@TempDir Path directory) throws IOException {
-        // A directory where the config file is expected: an open-for-read of it throws IOException, standing in
-        // for the transient read lock (antivirus, backup, cloud sync) the fail-soft path silently swallowed.
         Path unreadable = directory.resolve("wdl.properties");
         Files.createDirectory(unreadable);
 
@@ -564,7 +559,6 @@ class WdlConfigTest {
     @Test
     void loadHealsAnEmptyBooleanValue(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("wdl.properties");
-        // present but empty: not a boolean literal
         Files.write(file, "captureEntities=\n".getBytes(StandardCharsets.UTF_8));
 
         WdlConfig config = WdlConfig.load(file);
@@ -602,9 +596,6 @@ class WdlConfigTest {
 
     @Test
     void loadIgnoresRetiredKeysWithoutRewriting(@TempDir Path directory) throws IOException {
-        // A config written by an older mod version still carries the retired captureChunks and saveNamePrefix
-        // keys. Both are unknown now, so they are ignored rather than treated as malformed, and the file that
-        // every real user upgrades with is left byte-for-byte untouched (no spurious heal-rewrite).
         Path file = directory.resolve("wdl.properties");
         String original = "captureChunks=false\nsaveNamePrefix=museum\ncaptureEntities=false\n";
         Files.write(file, original.getBytes(StandardCharsets.UTF_8));
