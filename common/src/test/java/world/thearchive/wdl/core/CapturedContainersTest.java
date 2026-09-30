@@ -18,7 +18,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** The immutable captured-set view the outline classifier reads: block keys, entity ids, and the ender flag. */
 class CapturedContainersTest {
     private static final UUID PRESENT = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ABSENT = UUID.fromString("00000000-0000-0000-0000-000000000002");
