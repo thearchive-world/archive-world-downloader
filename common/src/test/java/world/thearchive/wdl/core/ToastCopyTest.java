@@ -24,11 +24,6 @@ import java.util.Map;
 import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
 
-/**
- * The job-done toast copy is MC-free and unit-tested headless: the title and two-line body are wdl.toast translation
- * keys resolved here against the shipped en_us lang file, with the folder and zip destination variants, the
- * amber-over-default completion tint, the wholly-rust error tint, and the {@code showToasts} gate.
- */
 class ToastCopyTest {
     private static final Map<String, String> LANG = Collections.unmodifiableMap(loadLang());
 
@@ -324,7 +319,6 @@ class ToastCopyTest {
         return toast;
     }
 
-    /** Resolves a composed toast body to its en_us copy, failing on any key the lang file does not carry. */
     private static String resolve(ToastCopy toast) {
         Object[] resolvedArguments = new Object[toast.arguments().size()];
         int slot = 0;
