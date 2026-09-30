@@ -796,10 +796,6 @@ class CaptureControllerTest {
         assertEquals(1, session.releases, "the first tick after the finish releases it");
     }
 
-    /**
-     * The join edge takes the hold too. On this band it arrives only once the loader has already rebuilt, so what this
-     * pins is that the wiring reaches a session the state has left recording, not any coverage it buys here.
-     */
     @Test
     void joiningHoldsTheWriterStillDrainingFromTheLastServer() {
         CaptureController controller = controller();
@@ -812,11 +808,6 @@ class CaptureControllerTest {
         assertEquals(1, session.holds, "the join edge holds the still-draining writer");
     }
 
-    /**
-     * On this band the loader's own disconnect callback arrives after the wiring has already flushed the download at
-     * the level-teardown edge. A second disconnect must find the download already finished rather than starting a
-     * second one.
-     */
     @Test
     void aSecondDisconnectAfterTheFirstFinishedFinishesNothingFurther() {
         CaptureController controller = controller();
