@@ -11,17 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.OptionalLong;
 import org.junit.jupiter.api.Test;
 
-/**
- *
- * <p>The binding rule is a slot-count match (not container identity): the client builds a container menu with a generic
- * {@code InventoryBasic}, never the block's block entity, so the only reliable client signal that the menu belongs to
- * one block is that its block-slot count equals the block's own container size. A double chest is a 54-slot menu over a
- * 27-slot half -> mismatch -> drop; a block with no storage (non-container, or an ender chest whose contents are
- * per-player) reports size 0 -> drop. All inputs are primitives, so the whole decision is verified with hand-fed events
- * and no running game.
- */
 class ContainerAssociationTest {
-    private static final long POS = 1234567L; // an opaque packed BlockPos.toLong()
+    private static final long POS = 1234567L;
     private static final int CHEST = 27;
     private static final int LECTERN = 1;
     private static final int ENDER = 27;
@@ -182,11 +173,6 @@ class ContainerAssociationTest {
         assertFalse(assoc.boundPos().isPresent(), "after close there is no lectern binding");
     }
 
-    // --- openEnderChest: the ender sibling. An ender chest reports container size 0 (its BE is not a
-    // TileEntityLockable), so the size-match open() can never bind it; it needs its own predicate. An ender chest and a
-    // single chest are BOTH a 27-slot ContainerChest, so the menu type cannot tell them apart: the looked-at block's BE
-    // being an ender chest is the discriminator.
-
     @Test
     void enderBindsOnTheConfidentTriple() {
         ContainerAssociation assoc = new ContainerAssociation();
@@ -253,9 +239,6 @@ class ContainerAssociationTest {
         assertEquals(OptionalLong.empty(), decision);
         assertFalse(assoc.boundPos().isPresent(), "a dropped ender open must not leave the previous binding live");
     }
-
-    // --- bind kind: ender and normal chests are both ContainerChest, so the stash-time dispatch must consult
-    // the remembered bind kind, not the menu type.
 
     @Test
     void containerOpenRemembersTheContainerKind() {
@@ -368,13 +351,6 @@ class ContainerAssociationTest {
                 "a vehicle intent with no container vehicle anywhere -> NO CLAIM");
     }
 
-    // --- openChestedAnimal: the chested-animal sibling. A donkey/mule/llama is recognized by the player
-    // looking at (or riding) an AbstractChestHorse whose own chest size matches the menu's CHEST-slot count.
-    // Like the entity sibling there is no block pos: the bind target (the entity UUID) lives in the adapter, so
-    // this returns a plain bound/dropped flag and boundPos() carries only the "a menu is bound" signal. It earns
-    // its own kind (not ENTITY) because the chest-only lift differs from captureBlockSlots and the stash
-    // dispatches by kind. The chest size is the live size (getInventoryColumns()*3), so a 15-slot donkey and a
-    // 3-slot strength-1 llama both bind; the slot-count match is the mis-bind guard.
     private static final int DONKEY_CHEST = 15;
 
     @Test
@@ -412,7 +388,7 @@ class ContainerAssociationTest {
         ContainerAssociation assoc = new ContainerAssociation();
 
         assertFalse(assoc.openChestedAnimal(true, false, DONKEY_CHEST, DONKEY_CHEST),
-                "an entity that is not an AbstractChestedHorse must not bind -> DROP");
+                "an entity that is not an AbstractChestHorse must not bind -> DROP");
         assertFalse(assoc.boundPos().isPresent());
     }
 
@@ -446,14 +422,7 @@ class ContainerAssociationTest {
                 "a dropped chested-animal open must not leave the previous binding live");
     }
 
-    // --- openDoubleChest: the double-chest sibling. A large chest opens a 54-slot ContainerChest over an
-    // InventoryLargeChest of two 27-slot chest halves, which the single-block guard drops on the 54-vs-27 mismatch.
-    // This predicate recognizes the genuine double open and stores the two halves in MENU-SLOT order so the stash can
-    // split the 54 menu slots 27/27 onto the right two block positions. The InventoryLargeChest is always (RIGHT,
-    // LEFT), so menu slots 0..n/2 are the RIGHT-typed half: boundPos = the first/RIGHT half, boundSecondaryPos = the
-    // second/LEFT half. The adapter feeds a single atRightHalf primitive, so the load-bearing left/right ordering is
-    // decided here and is unit-testable both look directions.
-    private static final long PARTNER_POS = 7654321L; // the other half's packed BlockPos.toLong()
+    private static final long PARTNER_POS = 7654321L;
     private static final int DOUBLE = 54;
 
     @Test
@@ -600,12 +569,6 @@ class ContainerAssociationTest {
         association.openCrafter(true, 43L, true, false, CRAFTER, CRAFTER);
         assertTrue(!association.boundPos().isPresent());
     }
-
-    // --- openMerchant: the merchant sibling. A ContainerMerchant is villager-exclusive in vanilla, and its offers
-    // come from a list rather than a slotted container, so unlike every other leg there is no size to match: the
-    // confidence is the menu type plus the clicked-villager identity the adapter resolves. Like the entity legs
-    // there is no block pos (the bind target, the villager UUID, lives in the adapter), so boundPos() carries only
-    // the "a menu is bound" signal. Owner-ruled identity-only leg with no size guard.
 
     @Test
     void merchantBindsOnVillagerAndMerchantMenu() {

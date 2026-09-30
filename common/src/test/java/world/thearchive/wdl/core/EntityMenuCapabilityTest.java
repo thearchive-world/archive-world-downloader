@@ -30,7 +30,7 @@ class EntityMenuCapabilityTest {
     }
 
     @Test
-    void employedVillagerIsCapable() { // EntityVillager, not baby, not nitwit
+    void employedVillagerIsCapable() {
         assertFalse(EntityMenuCapability.isMenuIncapable(true, false, false, true, true, false, false));
     }
 
@@ -50,12 +50,12 @@ class EntityMenuCapabilityTest {
     }
 
     @Test
-    void moddedBabyVillagerIsCapable() { // non-minecraft namespace EntityVillager subclass, unprovable
+    void moddedBabyVillagerIsCapable() {
         assertFalse(EntityMenuCapability.isMenuIncapable(false, false, false, true, true, true, false));
     }
 
     @Test
-    void moddedNitwitVillagerIsCapable() { // non-minecraft namespace EntityVillager subclass, unprovable
+    void moddedNitwitVillagerIsCapable() {
         assertFalse(EntityMenuCapability.isMenuIncapable(false, false, false, true, true, false, true));
     }
 }
