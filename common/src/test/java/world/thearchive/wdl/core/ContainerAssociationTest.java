@@ -142,7 +142,6 @@ class ContainerAssociationTest {
         assertEquals(OptionalLong.of(POS), assoc.boundPos(), "the binding must persist for later stashing");
     }
 
-    /** No block hit (entity hit or miss) -> DROP. */
     @Test
     void lecternDropsWhenNotLookingAtBlock() {
         ContainerAssociation assoc = new ContainerAssociation();
@@ -172,7 +171,6 @@ class ContainerAssociationTest {
         assertFalse(assoc.boundPos().isPresent());
     }
 
-    /** A zero-sized pair must not bind on the equality alone: the size floor is what rejects it. */
     @Test
     void lecternDropsWhenNeitherSideReportsSlots() {
         ContainerAssociation assoc = new ContainerAssociation();
@@ -223,7 +221,6 @@ class ContainerAssociationTest {
         assertEquals(ContainerAssociation.BindKind.ENDER, assoc.boundKind(), "the bind kind is ENDER");
     }
 
-    /** No block hit (entity hit or miss) -> DROP. */
     @Test
     void enderDropsWhenNotLookingAtBlock() {
         ContainerAssociation assoc = new ContainerAssociation();
@@ -266,7 +263,6 @@ class ContainerAssociationTest {
         assertFalse(assoc.boundPos().isPresent());
     }
 
-    /** A zero-sized pair must not bind on the equality alone: the size floor is what rejects it. */
     @Test
     void enderDropsWhenNeitherSideReportsSlots() {
         ContainerAssociation assoc = new ContainerAssociation();
@@ -643,7 +639,6 @@ class ContainerAssociationTest {
         assertEquals(ContainerAssociation.BindKind.CRAFTER, association.boundKind());
     }
 
-    /** No block hit (entity hit or miss) -> DROP. */
     @Test
     void crafterOpenDropsWithoutBlockHit() {
         ContainerAssociation association = new ContainerAssociation();
@@ -674,7 +669,6 @@ class ContainerAssociationTest {
         assertTrue(!association.openCrafter(true, 42L, true, true, CRAFTER + 1, CRAFTER).isPresent());
     }
 
-    /** A zero-sized pair must not bind on the equality alone: the size floor is what rejects it. */
     @Test
     void crafterOpenDropsWhenNeitherSideReportsSlots() {
         ContainerAssociation association = new ContainerAssociation();
