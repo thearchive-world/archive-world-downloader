@@ -1030,8 +1030,8 @@ common/src/test/java/world/thearchive/wdl/core/ChatCopyTest.java
 common/src/test/java/world/thearchive/wdl/core/ConfigSchemaTest.java
 
 # Below 1.17 the Java floor is 8, where Optional has no isEmpty (Java 11), so the crafter-drop assertions negate
-# isPresent instead; the packed-position comments name the classic BlockPos.toLong rather than asLong, and below 1.11
-# the chested-mount comments and case names describe a donkey or mule chest read off the mount, there being no llama.
+# isPresent instead; below 1.11 there is neither a llama nor a chested-horse class, so the chested-mount cases name
+# neither.
 common/src/test/java/world/thearchive/wdl/core/ContainerAssociationTest.java
 
 # Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the expected drain order is a
@@ -1273,11 +1273,6 @@ common/src/test/java/world/thearchive/wdl/adapter/SectionKeyTest.java
 # StashHolder, whose compressed round trip is CompressedStreamTools; below 1.11 the holder's block-entity id is the
 # unnamespaced Chest.
 common/src/test/java/world/thearchive/wdl/adapter/StashHolderTest.java
-
-# The MC-free core test names the classic accessor in its prose: below 1.13 a packed position is BlockPos.toLong()
-# rather than the core-package BlockPos.asLong() from 1.13 up, so the Javadoc and the opaque-packed-key comment say
-# toLong().
-common/src/test/java/world/thearchive/wdl/core/OpenClickIntentTest.java
 
 # Every locale carries an added wdl.screen.downloads.proceed_action entry, right after restore_action, that no band from
 # 1.13.2 up has: vanilla's gui.proceed key is a 1.13 addition, so below it the resume-confirm Continue button reads a
