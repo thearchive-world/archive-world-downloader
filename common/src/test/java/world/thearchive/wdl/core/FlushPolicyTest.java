@@ -9,11 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * The pure keep-hot flush decision, unit-tested MC-free: a captured chunk is flushed to disk (and dropped from the
- * in-memory buffer) once it is farther than the keep-hot radius from the player, measured as the square (Chebyshev)
- * chunk distance that matches the square render-distance capture region.
- */
 class FlushPolicyTest {
     @Test
     void aChunkInsideTheKeepHotRadiusIsNotEligible() {
@@ -38,8 +33,6 @@ class FlushPolicyTest {
 
     @Test
     void distanceSubtractsTheCoordinatesOnEachAxisNotAdds() {
-        // Distinct non-zero endpoints on both axes so a + in place of - changes the max on each: the correct
-        // max(|5-2|, |3-1|) = 3, while adding either pair gives max(7, 2) or max(3, 4), never 3.
         assertEquals(3, FlushPolicy.chunkDistance(5, 3, 2, 1));
     }
 }
