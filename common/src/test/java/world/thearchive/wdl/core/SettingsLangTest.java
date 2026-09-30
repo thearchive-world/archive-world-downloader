@@ -28,10 +28,6 @@ import org.junit.jupiter.api.Test;
  * is a silent failure in game (a tooltip renders only under {@code I18n.hasKey}, so a typo shows nothing at all). This
  * pins the whole derived-key surface against the shipped en_us so the build fails instead. MC-free: the keys derive
  * from core, resolved against the lang file on the test classpath (the {@code ChatCopyTest} pattern).
- *
- * <p>Both directions are asserted, and the second one is an obligation to {@code LangKeyCoverageTest} rather than a
- * convenience: that guard skips these prefixes because this test owns them, so without the converse a key added or
- * outliving its producer under one of them would be checked by nothing at all.
  */
 class SettingsLangTest {
     private static final Map<String, String> LANG = Collections.unmodifiableMap(loadLang());
@@ -83,8 +79,6 @@ class SettingsLangTest {
                 keys.add(SettingsLayout.optionValueKey(option.key()));
             }
             if (option.type() == ConfigType.ENUM) {
-                // A cycle row renders every constant through wdl.settings.value.<name>, so a constant added
-                // without its label key draws the raw key in game. Locale parity cannot see an en_us-wide gap.
                 Enum<?> current = (Enum<?>) option.accessor.apply(WdlConfig.DEFAULTS);
                 for (Object constant : current.getDeclaringClass().getEnumConstants()) {
                     keys.add(SettingsLayout.valueLabelKey((Enum<?>) constant));
@@ -94,8 +88,6 @@ class SettingsLangTest {
                 keys.add(SettingsLayout.confirmMessageKey(option.key()));
             }
         }
-        // Confirm-dialog frame keys are shared, not derived per option, and the recapture reduction confirm
-        // carries per-target bodies (an enum-transition confirm, not a boolean-disable one driven above).
         for (String frame : new String[] { "wdl.settings.confirm.capture", "wdl.settings.confirm.recapture" }) {
             keys.add(frame + ".title");
             keys.add(frame + ".confirm");
