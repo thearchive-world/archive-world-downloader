@@ -41,22 +41,6 @@ public final class SpectatorCrosshairFallback {
 
     private SpectatorCrosshairFallback() {}
 
-    /**
-     * Decide the axis for one unattributed open. Returns {@link Axis#NONE} for every case the crosshair must not seed,
-     * which the caller treats as an open that binds nothing.
-     *
-     * @param spectator                 the local player is in spectator mode
-     * @param loaderObservesBlockClick  this loader's use hook fires for a spectator's block right-click
-     * @param loaderObservesEntityClick this loader's use hook fires for a spectator's entity right-click
-     * @param crosshairOnBlock          the live hit result is a block hit
-     * @param crosshairOnEntity         the live hit result is an entity hit
-     * @param blockOpensForSpectator    that block's state reports a menu provider, vanilla's own rule for what a
-     *                                  spectator's click can open. Meaningless unless {@code spectator} and
-     *                                  {@code crosshairOnBlock} are both set, and callers are expected to withhold it
-     *                                  otherwise rather than compute it: reading it costs a mod-overridable block
-     *                                  lookup that no other case needs
-     * @return the axis the caller may read the crosshair on
-     */
     public static Axis axisFor(boolean spectator, boolean loaderObservesBlockClick,
             boolean loaderObservesEntityClick, boolean crosshairOnBlock, boolean crosshairOnEntity,
             boolean blockOpensForSpectator) {
