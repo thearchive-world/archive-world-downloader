@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-/** The MC-free status formatting helpers: the two elapsed shapes and the shortened count. */
 class CaptureStatusTest {
     @Test
     void elapsedFormatsAsMinutesAndZeroPaddedSeconds() {
