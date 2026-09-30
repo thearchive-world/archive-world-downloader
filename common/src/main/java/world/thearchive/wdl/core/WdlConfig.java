@@ -15,18 +15,10 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * The band-agnostic, hand-editable mod config (wdl.properties). MC-free (java.util/java.nio only) so the core owns it
- * on every band with no per-loader config API. {@link #load(Path)} materializes a documented default file on first run;
- * the per-key comments are written from a template because {@code Properties.store} cannot emit them. The template,
- * parse, defaults, and report diff are all derived from one descriptor list ({@link ConfigSchema}); the typed fields
- * and accessors below stay hand-written.
- */
 public final class WdlConfig {
     /** The config schema version; bump it and add a migrator when a key's name or value shape changes. */
     static final int CONFIG_VERSION = 1;
 
-    /** The schema-derived defaults: what an empty {@code Properties} parses to, so every default has one source. */
     public static final WdlConfig DEFAULTS = parse(new Properties());
 
     private static final Logger LOGGER = Logger.getLogger(WdlConfig.class.getName());
@@ -108,164 +100,116 @@ public final class WdlConfig {
         return captureContainers;
     }
 
-    /**
-     * Whether to capture the player's advancement progress into the save's per-player advancements file, where the
-     * Minecraft version has advancements.
-     */
     public boolean captureAdvancements() {
         return captureAdvancements;
     }
 
-    /** Whether to capture the player's statistics into the save's per-player statistics file. */
     public boolean captureStatistics() {
         return captureStatistics;
     }
 
-    /** How current the download keeps the world as the player records (snapshot-once, nearby-only, or on revisit). */
     public RecaptureMode recaptureChunks() {
         return recaptureChunks;
     }
 
-    /** How often (seconds) the whole set of nearby buffered chunks is refreshed while recording. */
     public int recaptureSeconds() {
         return recaptureSeconds;
     }
 
-    /** Whether to write the captured inventory (and selected slot) into the download. */
     public boolean savePlayerInventory() {
         return savePlayerInventory;
     }
 
-    /** Whether to write the captured ender-chest contents (captured open-time) into the download. */
     public boolean savePlayerEnderChest() {
         return savePlayerEnderChest;
     }
 
-    /** Whether to keep item-borne coordinates ({@code true}) or blank them for privacy ({@code false}). */
     public boolean saveItemCoordinates() {
         return saveItemCoordinates;
     }
 
-    /** Whether captured maps are locked where the version can ({@code true}) or left live ({@code false}). */
     public boolean lockDownloadedMaps() {
         return lockDownloadedMaps;
     }
 
-    /**
-     * Whether captured filled maps are re-keyed to stable archive ids ({@code true}) or keep the original server ids
-     * ({@code false}).
-     */
     public boolean remapMapIds() {
         return remapMapIds;
     }
 
-    /** Max milliseconds per tick spent encoding chunks/entities; the rest spills to later ticks (smoothness knob). */
     public int encodeBudgetMillis() {
         return encodeBudgetMillis;
     }
 
-    /** Whether to stamp {@code PersistenceRequired} on every captured mob ({@code true}) or only named ones. */
     public boolean forceMobPersistence() {
         return forceMobPersistence;
     }
 
-    /** Diagnostic (default off): dump every received item frame's position to {@code wdl/received-item-frames.txt}. */
     public boolean dumpReceivedFrames() {
         return dumpReceivedFrames;
     }
 
-    /** Whether a finished download is also zipped to {@code <folder>.zip} beside the folder (default on). */
     public boolean zipOnFinish() {
         return zipOnFinish;
     }
 
-    /**
-     * Whether a resume first zips the existing folder to {@code <folder>-pre-resume.zip} before merging (default on).
-     */
     public boolean zipOnResume() {
         return zipOnResume;
     }
 
-    /** Whether a new download's resolved name is decorated with a {@code -YYYY-MM-DD} suffix (default on). */
     public boolean appendDateSuffix() {
         return appendDateSuffix;
     }
 
-    /** Whether resuming into an existing folder asks for confirmation first, or continues silently (default on). */
     public boolean confirmResume() {
         return confirmResume;
     }
 
-    /**
-     * Whether resuming into a folder opened in singleplayer is blocked; off downgrades to a per-attempt confirm
-     * (default on).
-     */
     public boolean blockTaintedResume() {
         return blockTaintedResume;
     }
 
-    /** Whether the job-done toasts (download complete, download error) are shown (default on). */
     public boolean showToasts() {
         return showToasts;
     }
 
-    /** Whether the once-per-launch newer-release check runs at all; off means zero requests (default on). */
     public boolean checkForUpdates() {
         return checkForUpdates;
     }
 
-    /** Whether the mod's chat notices (the update-available line) are shown; in-screen notices ignore it. */
     public boolean showChatMessages() {
         return showChatMessages;
     }
 
-    /** Whether the saved-chunk coverage overlay draws while recording; the master over the two tone hues. */
     public boolean renderCoverageOverlay() {
         return renderCoverageOverlay;
     }
 
-    /** The covered-chunk overlay hue; the overlay packs a fixed alpha onto its {@code rgb()}. */
     public MarkerHue overlayCoveredColor() {
         return overlayCoveredColor;
     }
 
-    /** The suspect-chunk overlay hue, for terrain saved without its decorations in send range. */
     public MarkerHue overlaySuspectColor() {
         return overlaySuspectColor;
     }
 
-    /** The world-output options (game-rule overrides, world-open defaults, and the two capture knobs). */
     public WorldOutputConfig worldOutput() {
         return worldOutput;
     }
 
-    /** The HUD-overlay options (anchor, offset, layout, peek mode, panel, linger, tint). */
     public HudConfig hud() {
         return hud;
     }
 
-    /** The unsaved-container outline options (master toggle, render distance, the two state hues). */
     public OutlineConfig outline() {
         return outline;
     }
 
-    /**
-     * The capture-time settings diffed against {@code baseline}: only the leaves that differ, keyed by their config
-     * key, in declaration order. Values render via the locale-independent {@code toString} of the JDK types, so the
-     * diff is stable on any machine. With no change the map is empty.
-     */
     Map<String, String> changedFrom(WdlConfig baseline) {
         Map<String, String> changed = ConfigSchema.reportDiff(this, baseline);
         changed.putAll(ConfigSchema.worldOutputDiff(this, baseline));
         return changed;
     }
 
-    /**
-     * The settings to show in the download report: every scalar field that differs from {@link #DEFAULTS}, plus each
-     * configured game-rule override by its {@code gamerule.<id>} key. An override is inherently a non-default setting
-     * (the model has no per-rule default), so it is listed here rather than diffed by {@link #changedFrom(WdlConfig)}.
-     * With a pristine config the map is empty.
-     */
     public Map<String, String> nonDefaultSettings() {
         Map<String, String> settings = changedFrom(DEFAULTS);
         for (Map.Entry<String, String> override : worldOutput.gameRuleOverrides().entrySet()) {
@@ -274,12 +218,6 @@ public final class WdlConfig {
         return settings;
     }
 
-    /**
-     * The config schema version stamped in {@code properties}, or the current {@link #CONFIG_VERSION} when the key is
-     * absent (a hand-deleted version line is treated as current, since no migrator exists yet). This is file-format
-     * metadata read outside the schema, not a user setting, so it never appears in {@link #changedFrom(WdlConfig)} and
-     * a bad value keeps its silent fallback rather than self-healing.
-     */
     static int configVersion(Properties properties) {
         String raw = properties.getProperty("configVersion");
         if (raw != null) {
@@ -297,12 +235,6 @@ public final class WdlConfig {
         return parse(properties, new ArrayList<>());
     }
 
-    /**
-     * As {@link #parse(Properties)}, but recording into {@code malformed} the key of any typed scalar whose present
-     * value does not parse to its type (a non-boolean for a flag, a non-integer for a count), so {@link #load(Path)}
-     * can self-heal the file. A missing key keeps its default and is not malformed, and the sparse {@code gamerule.*}
-     * overrides are raw strings validated per band at write time, not here.
-     */
     static WdlConfig parse(Properties properties, List<String> malformed) {
         ConfigValues values = ConfigSchema.read(properties, malformed);
         return new WdlConfig(
@@ -338,10 +270,7 @@ public final class WdlConfig {
 
     /**
      * Load the config at {@code file}, or materialize the documented default file (and return {@link #DEFAULTS}) if it
-     * is absent. A file holding a malformed typed value (a non-boolean for a flag, a non-integer for a count) has only
-     * that key healed to its default, every other valid setting kept (including any {@code gamerule.*} override), and
-     * the healed result is written back, rather than silently parsed as the wrong thing. Falls back to
-     * {@link #DEFAULTS} if the file cannot be read or written, so a broken or unwritable config never stops the mod.
+     * is absent. Falls back to {@link #DEFAULTS} if the file cannot be read or written.
      */
     public static WdlConfig load(Path file) {
         try {
