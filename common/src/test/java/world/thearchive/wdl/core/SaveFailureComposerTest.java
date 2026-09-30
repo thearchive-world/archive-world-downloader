@@ -19,19 +19,11 @@ import java.util.Collections;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * The save-failure reason is MC-free and unit-tested headless: the JDK filesystem exceptions whose message is a bare
- * path with no reason are named by a wdl category key so the surfaced text never reads as a lone path, while a
- * genuinely message-bearing exception keeps its message verbatim, and odd input falls back rather than throwing. Each
- * category key is checked to resolve in the shipped en_us lang file.
- */
 class SaveFailureComposerTest {
     private static final Map<String, String> LANG = Collections.unmodifiableMap(loadLang());
 
     @Test
     void accessDeniedNamesTheCategoryNotJustThePath() {
-        // AccessDeniedException(path) has a null reason, so getMessage() is the bare path: the exact case the
-        // player must not be shown alone.
         SaveFailureReason reason = SaveFailureComposer
                 .describe(new AccessDeniedException("C:\\Users\\bob\\saves\\My World"));
 
@@ -47,8 +39,6 @@ class SaveFailureComposerTest {
 
     @Test
     void fileSystemExceptionWithReasonLeadsWithTheReason() {
-        // A reason-bearing FileSystemException reports getMessage() as "path: reason" (path first); the
-        // surfaced text is the reason alone, not the path-first message.
         SaveFailureReason reason = SaveFailureComposer.describe(
                 new FileSystemException("C:\\saves\\w", null, "No space left on device"));
 
