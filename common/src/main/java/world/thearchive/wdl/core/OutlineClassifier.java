@@ -63,6 +63,10 @@ public final class OutlineClassifier {
         return false;
     }
 
+    /**
+     * A captured key with no recorded type falls back to bare membership, so the gate only ever adds precision and
+     * never re-rims a validly captured container.
+     */
     private static boolean capturedTypeMatches(CapturedContainers captured, long blockKey,
             @Nullable String liveTypeId) {
         String recorded = captured.capturedBlockType(blockKey);

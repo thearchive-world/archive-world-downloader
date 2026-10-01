@@ -117,6 +117,11 @@ public final class MapManifest {
         return new MapManifest(idByHash, counter);
     }
 
+    /**
+     * The highest map-data file id under {@code dataDirectory}, across both on-disk layouts, or -1 if there are none:
+     * the flat {@code map_<n>.dat} directly in the directory, and the namespaced {@code maps/<n>.dat} subfolder form.
+     * Recognizing both keeps the resume id floor band-independent.
+     */
     public static int highestDataFileId(Path dataDirectory) throws IOException {
         int flat = highestMatching(dataDirectory, FLAT_MAP_PREFIX);
         int namespaced = highestMatching(dataDirectory.resolve(MAPS_SUBFOLDER), "");
@@ -199,7 +204,7 @@ public final class MapManifest {
         try {
             return Integer.parseInt(digits);
         } catch (NumberFormatException e) {
-            return -1;
+            return -1; // a non-numeric stem, such as the maps/last_id.dat index, is not a map-data file
         }
     }
 }
