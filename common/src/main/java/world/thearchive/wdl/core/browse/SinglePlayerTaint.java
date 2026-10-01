@@ -18,20 +18,9 @@ import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Whether a wdl-managed save folder has ever been opened in singleplayer, a sticky property WDL uses to refuse (or
- * confirm) resuming into it. The integrated server writes server-only artifacts a downloaded folder cannot otherwise
- * hold: the pre-26 player-data directory, and, from 1.14 onward, the point-of-interest directory for each loaded
- * dimension. WDL opens only the region and entities storages, never point-of-interest, so a non-empty member of the set
- * means singleplayer touched the folder.
- *
- * <p>Directory names, and for point-of-interest the dimension root itself, are band-dependent, so the check tests the
- * union of the known vanilla layouts, which also covers a folder opened by a different MC version than the one running
- * this check. The set tracks the per-dimension point-of-interest storage across bands, and gains an entry (plus a test)
- * when a future band moves it again. MC-free (plain java.nio) so the check runs on every band.
- *
- * <p>A present member that cannot be listed is {@link TaintState#UNKNOWN} rather than clean, and {@link #decide} maps
- * that to {@link Decision#CONFIRM}: the clobber-safety gate fails safe on a folder it cannot verify, never silently
- * allows the resume.
+ * A present member that cannot be listed is {@link TaintState#UNKNOWN} rather than clean, and {@link #decide} maps that
+ * to {@link Decision#CONFIRM}: the clobber-safety gate fails safe on a folder it cannot verify, never silently allows
+ * the resume.
  */
 public final class SinglePlayerTaint {
     /**
@@ -43,39 +32,21 @@ public final class SinglePlayerTaint {
     private static final List<String> PLAYER_DATA_DIRECTORIES = Collections
             .unmodifiableList(Arrays.asList("playerdata"));
 
-    /**
-     * Dimension-root-relative point-of-interest directories: the save root plus the vanilla nether and end roots.
-     * Datapack dimensions (dimensions/&lt;namespace&gt;/&lt;id&gt;/poi) are enumerated live in {@link #classify} and
-     * matched positionally in {@link #entryPathIsServerArtifact}; point-of-interest data is resolved per dimension by
-     * the server's chunk map and is server-written only, and WDL opens only the region and entities storages, never
-     * point-of-interest, so the check is safe to add. On pre-1.14 bands the directory never exists, so the check is
-     * inert there with no band branch.
-     *
-     * <p>From 1.21.2 the chunk-load path prefetches this storage, so the directory appears on any singleplayer load
-     * rather than only once a point-of-interest block is stored. That is what lets 26.x carry no player-data member.
-     */
     private static final List<String> FIXED_POI_DIRECTORIES = Collections
             .unmodifiableList(Arrays.asList("poi", "DIM-1/poi", "DIM1/poi"));
 
-    /** The gate outcome for a resume/recover into a possibly-tainted folder. */
     public enum Decision {
         ALLOW,
         CONFIRM,
         REFUSE
     }
 
-    /**
-     * A folder's singleplayer-history verdict: {@code CLEAN} (no server-only artifact), {@code TAINTED} (a non-empty
-     * server-only-artifact directory, player data or point-of-interest), or {@code UNKNOWN} when a present directory
-     * could not be listed.
-     */
     public enum TaintState {
         CLEAN,
         TAINTED,
         UNKNOWN
     }
 
-    /** The observed state of a candidate artifact directory; the seam that makes the unreadable branch testable. */
     interface DirectoryProbe {
         Presence presence(Path directory);
     }
@@ -90,16 +61,13 @@ public final class SinglePlayerTaint {
 
     private SinglePlayerTaint() {}
 
-    /**
-     * Whether {@code saveFolder} is definitely tainted (a non-empty server-only-artifact member of any known layout).
-     */
     public static boolean isTainted(Path saveFolder) {
         return classify(saveFolder) == TaintState.TAINTED;
     }
 
     /**
      * Classify {@code saveFolder}: {@code TAINTED} on any non-empty server-only-artifact member, {@code UNKNOWN} when a
-     * present member could not be listed (so the gate can fail safe), else {@code CLEAN}.
+     * present member could not be listed, else {@code CLEAN}.
      */
     public static TaintState classify(Path saveFolder) {
         return classify(saveFolder, filesystemProbe);
@@ -127,10 +95,6 @@ public final class SinglePlayerTaint {
         return unreadable ? TaintState.UNKNOWN : TaintState.CLEAN;
     }
 
-    /**
-     * The bounded two-level enumeration under dimensions/: dimensions/&lt;namespace&gt;/&lt;id&gt;/poi for each id
-     * directory, or {@code null} when the tree could not be listed.
-     */
     private static @Nullable List<String> datapackPoiDirectories(Path saveFolder) {
         Path dimensions = saveFolder.resolve("dimensions");
         if (!Files.isDirectory(dimensions)) {
@@ -156,11 +120,6 @@ public final class SinglePlayerTaint {
         return result;
     }
 
-    /**
-     * The gate outcome: a clean folder is allowed; a tainted one is refused when blocking, else confirmed; an unknown
-     * (unreadable) folder is never allowed, always confirmed, so a folder that cannot be verified clean still prompts
-     * rather than clobbering silently.
-     */
     public static Decision decide(TaintState state, boolean blockTaintedResume) {
         if (state == TaintState.CLEAN) {
             return Decision.ALLOW;
@@ -181,15 +140,6 @@ public final class SinglePlayerTaint {
         }
     }
 
-    /**
-     * Whether a root-stripped, slash-separated zip entry path names content inside a server-only-artifact directory at
-     * its pinned position, compared case-insensitively. The zip-side twin of {@link #classify}: shares the member set
-     * and the positional rules, so folder and zip agree on what clean means.
-     *
-     * <p>The live probe resolves fixed names through the filesystem, so a POSIX hand-re-cased {@code Playerdata/}
-     * escapes it, matching the shipped probe; this matcher is lexically case-insensitive instead, since the zip-scan
-     * specification's case rules apply only here.
-     */
     public static boolean entryPathIsServerArtifact(String rootRelativePath) {
         String lower = rootRelativePath.toLowerCase(Locale.ROOT);
         for (String member : PLAYER_DATA_DIRECTORIES) {
@@ -202,7 +152,6 @@ public final class SinglePlayerTaint {
                 return true;
             }
         }
-        // dimensions/<namespace>/<id>/poi/... : four leading segments with poi fourth.
         String[] segments = lower.split("/", 5);
         return segments.length >= 5 && segments[0].equals("dimensions") && segments[3].equals("poi");
     }
