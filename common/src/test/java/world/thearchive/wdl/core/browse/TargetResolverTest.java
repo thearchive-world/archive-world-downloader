@@ -51,10 +51,6 @@ class TargetResolverTest {
 
     @Test
     void aReservedWindowsDeviceNameIsDefusedInAnyCase() {
-        // Windows refuses CON/PRN/AUX/NUL/COM1-9/LPT1-9 as a folder basename, case-insensitively. Without the defusing
-        // suffix the UI accepts the name (hasUsableName is true) and the download then dies at getSaveLoader with a
-        // generic save failure; with it the folder the user gets matches what they typed as closely as the filesystem
-        // allows.
         assertEquals("CON_", TargetResolver.sanitize("CON"));
         assertEquals("PRN_", TargetResolver.sanitize("PRN"));
         assertEquals("AUX_", TargetResolver.sanitize("AUX"));

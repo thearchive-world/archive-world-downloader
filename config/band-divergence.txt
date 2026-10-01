@@ -1330,7 +1330,4 @@ common/src/test/java/de/johni0702/minecraft/bobby/FakeChunk.java
 common/src/test/java/world/thearchive/wdl/adapter/EntityPacketAccumulatorTest.java
 
 # Classic-band comments use this version's MCP names.
-common/src/test/java/world/thearchive/wdl/core/browse/TargetResolverTest.java
-
-# Classic-band comments use this version's MCP names.
 common/src/main/java/world/thearchive/wdl/client/WdlKeyBinds.java
