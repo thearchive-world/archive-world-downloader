@@ -58,7 +58,7 @@ public final class SendRangeSampler {
         this.nanos = nanos;
         this.cameraDetachedApplied = cameraDetachedAtStart;
         this.prevDetached = cameraDetachedAtStart;
-        armWindow();
+        armWindow(); // capture start is itself an anomaly: a teleport landing just before start predates the sampler
     }
 
     public void markRidden(int id) {
