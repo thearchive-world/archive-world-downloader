@@ -12,6 +12,10 @@ public final class SpectatorCrosshairFallback {
 
     private SpectatorCrosshairFallback() {}
 
+    /**
+     * @param blockOpensForSpectator Meaningless unless {@code spectator} and {@code crosshairOnBlock} are both set, and
+     *                               callers are expected to withhold it otherwise rather than compute it
+     */
     public static Axis axisFor(boolean spectator, boolean loaderObservesBlockClick,
             boolean loaderObservesEntityClick, boolean crosshairOnBlock, boolean crosshairOnEntity,
             boolean blockOpensForSpectator) {
