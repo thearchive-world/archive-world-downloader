@@ -98,6 +98,7 @@ public final class MapManifest {
         return idByHash.size();
     }
 
+    /** Load the manifest at {@code file} (absent gives an empty manifest). */
     public static MapManifest load(Path file) throws IOException {
         if (!Files.exists(file)) {
             return empty();
@@ -141,6 +142,11 @@ public final class MapManifest {
         }
     }
 
+    /**
+     * Whether resuming into {@code saveFolder} would mix map-id schemes: it holds map data whose scheme (archive ids
+     * when a manifest is present, original ids otherwise) differs from {@code remapMapIds}. A folder with no map data
+     * never mismatches. An IO failure reads as no mismatch.
+     */
     public static boolean schemeMismatch(Path saveFolder, boolean remapMapIds) {
         try {
             Path data = saveFolder.resolve(DATA_SUBFOLDER);
