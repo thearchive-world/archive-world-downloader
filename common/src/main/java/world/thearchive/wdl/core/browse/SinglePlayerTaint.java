@@ -24,10 +24,8 @@ import org.jspecify.annotations.Nullable;
  */
 public final class SinglePlayerTaint {
     /**
-     * The relative player-data directory, {@code playerdata} on 1.21.x and earlier. The 26.x layout
-     * {@code players/data} is not a member: {@code PrimaryLevelData.createTag} writes no player compound there, so WDL
-     * writes that file itself. Neither member is redundant, since point-of-interest does not exist before 1.14 and
-     * player data is unusable from 26.x, so dropping either blinds a band.
+     * Neither member is redundant, since point-of-interest does not exist on the oldest versions and player data is
+     * unusable on the newest, so dropping either blinds a band.
      */
     private static final List<String> PLAYER_DATA_DIRECTORIES = Collections
             .unmodifiableList(Arrays.asList("playerdata"));
