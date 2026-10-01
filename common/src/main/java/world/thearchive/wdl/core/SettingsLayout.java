@@ -46,6 +46,10 @@ public final class SettingsLayout {
             "fire_spread_radius_around_player", "spread_vines", "spawn_wandering_traders", "spawn_patrols",
             "spawn_wardens"));
 
+    /**
+     * This lives beside {@link #TABS} rather than being read off it because a section's master is not always its
+     * template-first option and not every section has one, so the mapping is carried explicitly.
+     */
     static final Map<String, String> ROW_MASTER = buildRowMaster();
 
     static final Map<String, Set<String>> ROW_REQUIRED_MOD = buildRowRequiredMod();
