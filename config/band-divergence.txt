@@ -982,7 +982,6 @@ common/src/test/java/world/thearchive/wdl/core/ReadyLatchTest.java
 
 # Below 1.17 the Java floor is 8, which has no List.of or Set.of collection factories (Java 9), so the derived-prefix
 # list and the empty undeclared-key set use Guava ImmutableList.of and ImmutableSet.of.
-# Classic-band comments use this version's MCP names.
 common/src/test/java/world/thearchive/wdl/core/SettingsLangTest.java
 
 # Below 1.17 the Java floor is 8, which has no List.of collection factory (Java 9), so the expected tab-id list is a

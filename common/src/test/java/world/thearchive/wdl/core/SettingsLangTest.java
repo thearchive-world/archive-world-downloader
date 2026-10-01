@@ -21,14 +21,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
-/**
- * A completeness guard over the derived {@code wdl.settings.*} keys the settings screen resolves. Every tab and section
- * caption, every option label and its help tooltip, every curated game-rule label, and every guarded toggle's confirm
- * body is looked up by a key derived from the layout, the descriptor, and the toggle guard, so a missing or renamed key
- * is a silent failure in game (a tooltip renders only under {@code I18n.hasKey}, so a typo shows nothing at all). This
- * pins the whole derived-key surface against the shipped en_us so the build fails instead. MC-free: the keys derive
- * from core, resolved against the lang file on the test classpath (the {@code ChatCopyTest} pattern).
- */
 class SettingsLangTest {
     private static final Map<String, String> LANG = Collections.unmodifiableMap(loadLang());
 
