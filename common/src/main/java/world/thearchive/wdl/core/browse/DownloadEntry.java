@@ -7,13 +7,6 @@ import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.core.report.DownloadCounts;
 
-/**
- * One row of the download screen: a wdl-managed download read from disk, MC-free. The summary ({@link #counts}) is
- * present for a {@link DownloadHealth#COMPLETE} or {@link DownloadHealth#PARTIAL} download (a
- * {@link DownloadHealth#RECOVERABLE} one has none); the row's size is not held here, since the screen walks the folder
- * on open. {@link #iconBytes} is the validated icon or null. {@link #currentlyLoaded} marks the currently-open world,
- * which is refused as a target.
- */
 public final class DownloadEntry {
     private final String folderName;
     private final String worldName;
@@ -41,17 +34,15 @@ public final class DownloadEntry {
         this.tainted = tainted;
     }
 
-    /** The on-disk save-folder name (used verbatim as a resume target, and shown in the row tooltip). */
     public String folderName() {
         return folderName;
     }
 
-    /** The world's full level.dat name (the dated name), prefilled into the field when the row is picked. */
     public String worldName() {
         return worldName;
     }
 
-    /** The row label: the world name with any trailing date suffix stripped for a clean display. */
+    /** The world name with any trailing date suffix stripped. */
     public String displayName() {
         return displayName;
     }
@@ -65,9 +56,7 @@ public final class DownloadEntry {
     }
 
     /**
-     * The capture summary, or null for a recoverable download (no trustworthy summary); on a resumed row
-     * ({@link #isChunksOnly()}) it carries the cumulative chunk total with its entity and container counts not
-     * applicable.
+     * The capture summary, or null for a recoverable download.
      */
     public @Nullable DownloadCounts counts() {
         return counts;
@@ -78,17 +67,14 @@ public final class DownloadEntry {
         return iconBytes;
     }
 
-    /** Whether this is the currently-loaded world, refused as a download target. */
     public boolean isCurrentlyLoaded() {
         return currentlyLoaded;
     }
 
-    /** Whether the row shows the cumulative in-save chunk total only, with entities and containers not applicable. */
     public boolean isChunksOnly() {
         return chunksOnly;
     }
 
-    /** Whether this download was opened in singleplayer, so resuming into it is refused (or confirmed). */
     public boolean isTainted() {
         return tainted;
     }
