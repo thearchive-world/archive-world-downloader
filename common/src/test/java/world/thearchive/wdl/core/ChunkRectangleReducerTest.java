@@ -170,12 +170,16 @@ class ChunkRectangleReducerTest {
 
     @Test
     void reduceCoalescesThreeRowTallRunIntoOneRectangle() {
+        // Two rows cannot tell a downward scan from an upward one; three rows pin that the vertical walk advances
+        // through every row.
         long[] column = { at(5, 0), at(5, 1), at(5, 2) };
         assertArrayEquals(new int[] { 5, 0, 5, 2 }, ChunkRectangleReducer.reduce(column));
     }
 
     @Test
     void reduceCoalescesTheMatchingRunWhenTheLowerRowHasSeveralRuns() {
+        // The lower row's leading run sits at a different x, so a first-run shortcut would consume it by mistake and
+        // drop its own rectangle.
         long[] chunks = { at(5, 0), at(6, 0), at(0, 1), at(1, 1), at(5, 1), at(6, 1) };
         int[] expected = { 0, 1, 1, 1, 5, 0, 6, 1 };
         assertArrayEquals(expected, normalized(ChunkRectangleReducer.reduce(chunks)));
