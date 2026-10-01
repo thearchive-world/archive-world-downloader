@@ -38,6 +38,8 @@ class MapHashTest {
 
     @Test
     void everyScaleByteFeedsTheDigestNotJustTheLowOne() {
+        // Vary each upper byte in isolation: a dropped update or a flipped shift direction on any of them would leave
+        // the digest unchanged.
         byte[] colors = colors(3);
         String base = MapHash.of(colors, 0, "minecraft:overworld");
         assertNotEquals(base, MapHash.of(colors, 1 << 24, "minecraft:overworld"), "byte 3 (>>>24) must be mixed in");
