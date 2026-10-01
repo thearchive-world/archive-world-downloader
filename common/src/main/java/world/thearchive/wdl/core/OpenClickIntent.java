@@ -7,8 +7,9 @@ import java.util.ArrayDeque;
 
 /**
  * A click older than the window is stale, and a taken intent is consumed, so it seeds at most one bind. A later intent
- * on a different target overwrites an earlier unconsumed one (last-intent-wins) and leaves a superseded marker. Each
- * marker poisons at most one later open into {@link Target#SUPERSEDED}, which must bind nothing, not even the
+ * on a different target overwrites an earlier unconsumed one (last-intent-wins) and leaves a superseded marker: pairing
+ * the overwritten intent's open with the latch could bind its menu's contents to the second target (a corrupt archive).
+ * Each marker poisons at most one later open into {@link Target#SUPERSEDED}, which must bind nothing, not even the
  * crosshair; markers age out with the same window. Re-recording the same target refreshes the pending intent's tick and
  * mints no marker.
  *
@@ -58,6 +59,12 @@ public final class OpenClickIntent {
         this.clickTick = tick;
     }
 
+    /**
+     * Dismiss a pending click on the entity with network id {@code entityId}. Left latched, a menu-capable click could
+     * supersede the next real intent and poison that open. Entity-precise, touches nothing else: a pending block click,
+     * a vehicle intent, a click on a different entity, and all superseded markers (they may be owed to genuinely
+     * in-flight opens) stay as they are.
+     */
     public void dismissEntityClick(int entityId) {
         if (pending == Target.ENTITY && this.entityId == entityId) {
             pending = Target.NONE;
@@ -74,8 +81,8 @@ public final class OpenClickIntent {
     /**
      * Take the pending intent (a click or a vehicle open) if it is fresh at {@code nowTick}, returning its kind; a
      * stale or absent intent returns {@link Target#NONE}. A fresh superseded marker takes precedence and returns
-     * {@link Target#SUPERSEDED} without touching the pending intent. Otherwise consumes the intent, so it seeds at most
-     * one open and a stale one cannot resurrect.
+     * {@link Target#SUPERSEDED} without touching the pending intent: the latch may still be owed to a later open.
+     * Otherwise consumes the intent, so it seeds at most one open and a stale one cannot resurrect.
      */
     public Target resolve(long nowTick) {
         while (!supersededClickTicks.isEmpty() && nowTick - supersededClickTicks.peekFirst() > windowTicks) {
