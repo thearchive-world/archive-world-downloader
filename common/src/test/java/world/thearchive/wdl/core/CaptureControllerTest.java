@@ -669,7 +669,7 @@ class CaptureControllerTest {
     void saveStageIsNoneAndProgressZeroUnlessSaving() {
         CaptureController controller = controller();
         FakeSession session = new FakeSession();
-        session.saveStage = SaveStage.WRITING_MAPS;
+        session.saveStage = SaveStage.WRITING_MAPS; // a session value that must not leak outside SAVING
         session.saveProgress = 0.5f;
 
         assertEquals(SaveStage.NONE, controller.saveStage(), "none while idle");
