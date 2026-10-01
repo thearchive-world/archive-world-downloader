@@ -20,8 +20,7 @@ public final class TargetResolver {
     private static final Pattern illegalChars = Pattern.compile("[\\x00-\\x1f<>:\"|?*]");
     private static final Pattern leadingDotsOrSpaces = Pattern.compile("^[.\\s]+");
     private static final Pattern trailingDotsOrSpaces = Pattern.compile("[.\\s]+$");
-    // Windows refuses these device names as a basename, case-insensitively, judged by the stem before the
-    // first dot; without the defusing underscore the name passes hasUsableName and then dies at createAccess.
+    // Windows can refuse these device names as a basename; without the defusing underscore hasUsableName accepts them.
     // The superscript digits one, two, and three parse as their COM/LPT device too, per the Win32 naming rules.
     private static final Pattern reservedDeviceStem = Pattern
             .compile("(?i)^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?=$|\\.)");
