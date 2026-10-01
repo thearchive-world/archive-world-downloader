@@ -101,6 +101,7 @@ public final class ToastCopy {
                 statsArguments(chunks, elapsedMillis, destination), false);
     }
 
+    /** Unlike the job-done toasts a refusal is not gated by {@code showToasts}. */
     public static ToastCopy refuseTainted() {
         return new ToastCopy("wdl.refuse.tainted.title", "wdl.refuse.tainted.body",
                 OptionalInt.of(BrandColors.RUST), new ArrayList<>(), true);
@@ -139,6 +140,7 @@ public final class ToastCopy {
         return refusal("wdl.refuse.join_multiplayer.body");
     }
 
+    /** Not gated by {@code showToasts}. */
     public static ToastCopy restored(String folderName) {
         List<Argument> arguments = new ArrayList<>();
         arguments.add(amber(folderName));
