@@ -33,6 +33,7 @@ class FlushPolicyTest {
 
     @Test
     void distanceSubtractsTheCoordinatesOnEachAxisNotAdds() {
+        // Distinct non-zero endpoints on both axes so a + in place of - changes the max on each.
         assertEquals(3, FlushPolicy.chunkDistance(5, 3, 2, 1));
     }
 }
