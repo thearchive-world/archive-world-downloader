@@ -15,11 +15,6 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.report.DownloadReportStore;
 
-/**
- * Folder-level operations over the wdl-managed downloads in the saves directory, beside the richer
- * {@link DownloadCatalog} (which builds full rows): recognize a managed folder and validate-and-resolve a typed
- * {@code /wdl resume} name into a target. MC-free and Java-8-clean, using java.nio reads only.
- */
 public final class DownloadFolders {
     private DownloadFolders() {}
 
@@ -45,9 +40,8 @@ public final class DownloadFolders {
     }
 
     /**
-     * The names of the wdl-managed folders under {@code savesDirectory}, sorted, for the {@code /wdl resume} tab-
-     * completion. Cheap by design: it tests only the wdl-managed predicate per folder, reading no report record or
-     * icon. An empty list when the directory does not exist.
+     * The names of the wdl-managed folders under {@code savesDirectory}, sorted. An empty list when the directory does
+     * not exist.
      */
     public static List<String> listManaged(Path savesDirectory) throws IOException {
         List<String> names = new ArrayList<>();
