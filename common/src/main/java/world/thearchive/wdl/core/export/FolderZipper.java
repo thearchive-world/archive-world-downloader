@@ -91,8 +91,6 @@ final class FolderZipper {
     private static void deleteQuietly(Path file) {
         try {
             Files.deleteIfExists(file);
-        } catch (IOException ignored) {
-            // Best-effort cleanup of the temporary file; nothing more to do if even the delete fails
-        }
+        } catch (IOException ignored) {}
     }
 }
