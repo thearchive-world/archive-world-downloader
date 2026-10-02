@@ -46,20 +46,6 @@ import world.thearchive.wdl.core.browse.DownloadFolders;
 import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 import world.thearchive.wdl.core.browse.SinglePlayerTaint.TaintState;
 
-/**
- * The guarded replace of a tainted download folder from its pinned clean export. One run re-proves the preconditions on
- * the worker (managed folder, tainted, source unchanged, not the loaded world, not locked), optionally snapshots the
- * folder beside itself first, extracts the export into a per-attempt staging directory under
- * {@code saves/.wdl-restore-work/}, and swaps the extracted copy in with atomic moves, keeping the original as a
- * kept-aside until the install is in place.
- *
- * <p>{@link #run()} never throws (Throwable-inclusive) and always yields a {@link Result}; every phase is preceded by
- * an abort check so a quitting client backs out instead of racing the shutdown. A restore whose world already swapped
- * in but whose leftovers could not be removed still reports success, as {@link Outcome#RESTORED_WITH_REMNANTS}; a later
- * sweep owns whatever stayed behind. A rollback that finds the folder's name occupied again never overwrites the
- * occupant: the kept-aside original moves to the next free visible sibling ({@link Outcome#RELOCATED}) or, under a live
- * session or a failed move, stays staged for the sweep.
- */
 public final class RestoreOperation {
     private static final Logger LOGGER = Logger.getLogger(RestoreOperation.class.getName());
 
@@ -72,30 +58,20 @@ public final class RestoreOperation {
     private static final int RETRY_ATTEMPTS = 5;
     private static final long RETRY_DELAY_MS = 200;
 
-    /** Usable-space floor under which an extract failure reads as a full disk rather than a refusal. */
     static final long DISK_FULL_FLOOR_BYTES = 16L * 1024 * 1024;
 
-    // POSIX park store: JVM-lifetime strong references so the channel cleaner can never close a parked
-    // channel (a GC-closed channel drops the process's locks on the file, empirically reproduced).
-    // Keyed by the lock file's real path: probeLocked re-probes THROUGH an already-parked channel
-    // (tryLock on it again; release-never-close on success) instead of opening and parking a new
-    // descriptor per occurrence, so periodic re-probing never accumulates descriptors.
-    // The parked value carries the file's fileKey (device+inode identity) captured at park time. A
-    // parked channel is inode-bound while its key is path-bound: if the file at the key path is
-    // replaced (a restore swap recreates session.lock, an attempt-counter reuse), a later probe would
-    // re-probe the DEAD inode and could answer unlocked over a live lock on the new file. On consult
-    // the current file's fileKey is compared; a mismatch tombstones the stale entry (never closing it,
-    // which could drop a live holder's POSIX lock on the moved inode) and falls through to a fresh open.
+    // POSIX park store: JVM-lifetime strong references so the channel cleaner can never close a parked channel (a
+    // GC-closed channel drops the process's locks on the file). probeLocked re-probes THROUGH an already-parked channel
+    // instead of opening and parking a new descriptor per occurrence, so periodic re-probing never accumulates
+    // descriptors.
     private static final ConcurrentMap<Path, ParkedChannel> parkedChannels = new ConcurrentHashMap<>();
 
-    // Tombstoned parked channels: a stale entry lands here, strongly referenced so the cleaner never
-    // GC-closes it (which would drop a live holder's POSIX lock on the moved inode) and never closed by
-    // us. The queue exists only to keep the reference; nothing reads it back.
+    // Tombstoned parked channels: a stale entry lands here, strongly referenced so the cleaner never GC-closes it
+    // (which would drop a live holder's POSIX lock on the moved inode). The queue exists only to keep the reference.
     private static final Queue<FileChannel> graveyard = new ConcurrentLinkedQueue<FileChannel>();
     private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
 
-    // The never-published sentinel: a handler seeds the loaded world before dispatch, so a volatile
-    // still holding this refuses rather than guessing that no world is loaded.
+    // The never-published sentinel: a volatile still holding this refuses rather than guessing that no world is loaded.
     private static final Path UNPUBLISHED = Paths.get(".wdl-unpublished-loaded-world");
 
     private final Path savesDirectory;
@@ -106,31 +82,21 @@ public final class RestoreOperation {
     private final PhaseHook phaseHook;
     private volatile boolean aborted;
     private volatile boolean swapWindow;
-    // What an unexpected crash reports depends on how far the run got: before the swap the download
-    // folder is untouched, inside the swap it may be mid-rename, and past the install move the
-    // restore itself already landed.
     private Outcome crashOutcome = Outcome.EXTRACT_REFUSED;
     private final AtomicReference<Path> publishedLoadedWorld = new AtomicReference<Path>(UNPUBLISHED);
 
-    /** The pre-replace snapshot write, injectable so a test can force its failure. */
     interface SnapshotStep {
         void snapshot(Path folder, Path zipTarget) throws IOException;
     }
 
-    /** The phase-boundary hook a test injects; production wires a no-op. */
     interface PhaseHook {
         void at(Phase phase);
     }
 
-    /**
-     * The hook points. The abort flag is re-checked immediately after every hook return, and a hook that throws
-     * unchecked reads as a failure of the step at its point.
-     */
     enum Phase {
         EXTRACT_START, BEFORE_ASIDE_MOVE, BETWEEN_MOVES, AFTER_INSTALL_MOVE
     }
 
-    /** Per-cause refusal/failure/success result the completion poll consumes. */
     public enum Outcome {
         RESTORED, RESTORED_WITH_REMNANTS, NOT_MANAGED, NOT_TAINTED, TAINT_UNKNOWN,
         FOLDER_MISSING, FILE_OCCUPANT, SOURCE_CHANGED, WORLD_IN_USE, SNAPSHOT_FAILED, DISK_FULL,
@@ -164,10 +130,6 @@ public final class RestoreOperation {
             return outcome;
         }
 
-        /**
-         * The kept-aside paths a failure notice names; empty when nothing stays staged, which covers a plain success
-         * and a RELOCATED move alike (the relocated sibling is reported by {@code relocatedTo}).
-         */
         public List<Path> survivingPaths() {
             return survivingPaths;
         }
@@ -193,7 +155,6 @@ public final class RestoreOperation {
         return ZipName.nextFreeSinglePlayer(savesDirectory, folderName).getFileName().toString();
     }
 
-    /** Immutable inputs pinned at confirm time. */
     public static RestoreOperation create(Path savesDirectory, String folderName,
             RestoreSource pinnedSource, boolean snapshotFirst) {
         return new RestoreOperation(savesDirectory, folderName, pinnedSource, snapshotFirst,
@@ -204,12 +165,11 @@ public final class RestoreOperation {
             RestoreSource pinnedSource, SnapshotStep snapshotStep, PhaseHook phaseHook) {
         RestoreOperation operation = new RestoreOperation(savesDirectory, folderName, pinnedSource, true,
                 snapshotStep, phaseHook);
-        // Seeded as the dispatching handler would, so a test exercises the phases past the volatile.
         operation.publishLoadedWorld(null);
         return operation;
     }
 
-    /** Runs on the worker thread; never throws (Throwable-inclusive); always yields a Result. */
+    /** Never throws (Throwable-inclusive); always yields a Result. */
     public Result run() {
         try {
             return replace();
@@ -219,21 +179,19 @@ public final class RestoreOperation {
         }
     }
 
-    /** The shutdown hook's abort flag; checked between phases and between retry attempts. */
+    /** The abort flag; checked between phases and between retry attempts. */
     public void abort() {
         aborted = true;
     }
 
     /**
      * True from the pre-swap probe through the two renames, including the refusal and rollback cleanup on those arms,
-     * until the swap block's finally clears it ahead of the post-swap aside probe. This is the shutdown hook's
-     * bounded-join window.
+     * until the swap block's finally clears it ahead of the post-swap aside probe.
      */
     public boolean inSwapWindow() {
         return swapWindow;
     }
 
-    /** The volatile the client tick seeds and republishes; consulted only for saves/&lt;folder&gt; probes. */
     public void publishLoadedWorld(@Nullable Path loadedWorldRoot) {
         publishedLoadedWorld.set(loadedWorldRoot);
     }
@@ -283,7 +241,6 @@ public final class RestoreOperation {
         }
     }
 
-    /** The phases that own the attempt directory: extract, swap, aside delete, cleanup. */
     private Result replaceThroughAttempt(Path folder, Path temporaryRoot, Path attempt,
             FileChannel attemptLock) throws IOException {
         if (aborted) {
@@ -325,7 +282,6 @@ public final class RestoreOperation {
                 }
                 retriedMove(folder, asideFolder);
             } catch (IOException | RuntimeException e) {
-                // The folder never left its name, so no move-back is owed, only the attempt teardown.
                 LOGGER.log(Level.WARNING, "keep-aside move for " + folderName + " failed", e);
                 cleanUpAttempt(attemptLock, attempt, temporaryRoot);
                 return new Result(Outcome.SWAP_FAILED);
@@ -351,7 +307,7 @@ public final class RestoreOperation {
         crashOutcome = Outcome.RESTORED_WITH_REMNANTS;
         phaseHook.at(Phase.AFTER_INSTALL_MOVE);
         if (aborted) {
-            // The quit path: the restored world is in place, the leftovers are the next sweep's.
+            // The quit path: the restored world is in place.
             return new Result(Outcome.RESTORED_WITH_REMNANTS);
         }
         if (probeLocked(asideFolder)) {
@@ -367,7 +323,6 @@ public final class RestoreOperation {
         if (aborted) {
             return new Result(Outcome.RESTORED_WITH_REMNANTS);
         }
-        // Close before delete: Windows cannot remove a file with an open handle.
         closeQuietly(attemptLock);
         try {
             deleteRecursively(attempt);
@@ -379,12 +334,6 @@ public final class RestoreOperation {
         return new Result(Outcome.RESTORED);
     }
 
-    /**
-     * The pre-install rollback: the kept-aside goes back to the folder's name, then the attempt is torn down and the
-     * failure reported per its cause. A present move-back target (something recreated the name mid-swap) takes the
-     * terminal disposition instead; on the quit path both the disposition and the teardown are deferred to the next
-     * launch's sweep.
-     */
     private Result rollBack(Path folder, Path asideFolder, Path temporaryRoot, Path attempt,
             FileChannel attemptLock, Outcome rolledBackOutcome) {
         try {
@@ -411,18 +360,12 @@ public final class RestoreOperation {
         return Result.relocated(sibling);
     }
 
-    /**
-     * The kept-aside terminal disposition: probe first (a locked aside defers to a later sweep, never a relocation
-     * under a live session), then a SUCCESSFUL relocation to the next-free visible sibling cleans the attempt
-     * directory; a failed relocation leaves the attempt for the next sweep, never cleaning over a surviving aside.
-     * Returns the relocated folder or null (deferred).
-     */
     private static @Nullable Path disposeKeptAside(Path attempt, Path savesDirectory, String folderName) {
         Path aside = attempt.resolve(ASIDE).resolve(folderName);
         if (probeLocked(aside)) {
             return null;
         }
-        Path sibling = nextFreeFolder(savesDirectory, folderName); // <folder>_(2), _(3) ... never overwrite
+        Path sibling = nextFreeFolder(savesDirectory, folderName);
         try {
             Files.move(aside, sibling);
         } catch (IOException e) {
@@ -432,19 +375,15 @@ public final class RestoreOperation {
         return sibling;
     }
 
-    /** The next free visible sibling directory, folderName_(2) then _(3) and so on, never overwriting. */
     private static Path nextFreeFolder(Path savesDirectory, String folderName) {
         for (int counter = 2;; counter++) {
             Path candidate = savesDirectory.resolve(folderName + "_(" + counter + ")");
-            // Link-following existence, unlike retriedMove's NOFOLLOW check: a symlink at the candidate name
-            // counts as occupied, so the relocation never targets a name a link already claims.
             if (!Files.exists(candidate)) {
                 return candidate;
             }
         }
     }
 
-    /** The pinned refusal order: managed split, taint, source identity, loaded world, folder probe. */
     private @Nullable Outcome checkPreconditions(Path folder) {
         if (!DownloadFolders.isWdlManaged(folder)) {
             if (!Files.exists(folder)) {
@@ -482,15 +421,10 @@ public final class RestoreOperation {
         try {
             return Files.exists(loadedWorld) && Files.isSameFile(folder, loadedWorld);
         } catch (IOException e) {
-            return true; // an unverifiable identity refuses, matching the probe's fail-soft answer
+            return true;
         }
     }
 
-    /**
-     * The next free attempt directory under the temporary root, created: {@code folderName}-1, then -2 on collision. A
-     * vanished temporary root (another instance emptied and removed it between our create calls) is re-created and the
-     * same name retried.
-     */
     private Path createAttemptDirectory(Path temporaryRoot) throws IOException {
         Files.createDirectories(temporaryRoot);
         int counter = 1;
@@ -506,11 +440,8 @@ public final class RestoreOperation {
     }
 
     /**
-     * A move with bounded retry for transient holds (an indexer or scanner briefly pinning the tree): atomic when the
-     * filesystem supports it, up to {@link #RETRY_ATTEMPTS} tries with {@link #RETRY_DELAY_MS} sleeps, giving up early
-     * on abort. A present target fails immediately as {@link FileAlreadyExistsException}, probed explicitly because a
-     * POSIX atomic rename would replace an empty target directory silently: the occupant is a branch decision for the
-     * caller, never a transient.
+     * A present target fails immediately as {@link FileAlreadyExistsException}, probed explicitly because a POSIX
+     * atomic rename would replace an empty target directory silently.
      */
     private void retriedMove(Path source, Path target) throws IOException {
         for (int attempt = 1;; attempt++) {
@@ -545,8 +476,7 @@ public final class RestoreOperation {
     }
 
     /**
-     * One point-in-time folder-open probe; an absent lock file is unlocked (vanilla {@code isLocked} semantics). WRITE
-     * only, never CREATE: the probe must never mutate the folder it judges. Shared with the sweep.
+     * WRITE only, never CREATE: the probe must never mutate the folder it judges.
      */
     static boolean probeLocked(Path folder) {
         Path lockFile = folder.resolve("session.lock");
@@ -554,9 +484,8 @@ public final class RestoreOperation {
         ParkedChannel parked = parkedChannels.get(key);
         if (parked != null) {
             if (isStaleParked(parked, currentFileKey(lockFile))) {
-                // The file at the key path was replaced since we parked: the parked channel holds the
-                // dead inode and would answer over a live lock on the new file. Tombstone it (never
-                // close: that could drop a live holder's POSIX lock on the moved inode) and re-open.
+                // The file at the key path was replaced since we parked: the parked channel holds the dead inode and
+                // would answer over a live lock on the new file.
                 parkedChannels.remove(key, parked);
                 graveyard.add(parked.channel);
                 LOGGER.warning("tombstoned a stale parked channel on " + lockFile + " (file replaced)");
@@ -577,10 +506,10 @@ public final class RestoreOperation {
             return false;
         } catch (NoSuchFileException e) {
             closeQuietly(channel);
-            return false; // a file that does not exist cannot be locked (vanilla isLocked semantics)
+            return false;
         } catch (OverlappingFileLockException e) {
-            // Same-JVM holder. POSIX: park the channel forever (closing ANY channel on the file would
-            // drop the holder's lock at the OS level). Windows: locks are per handle, close normally.
+            // POSIX: park the channel forever (closing ANY channel on the file would drop the holder's lock at the OS
+            // level).
             if (WINDOWS) {
                 closeQuietly(channel);
             } else if (channel != null) {
@@ -589,16 +518,10 @@ public final class RestoreOperation {
             return true;
         } catch (IOException e) {
             closeQuietly(channel);
-            return true; // any other failure means locked (fail-soft refusal)
+            return true;
         }
     }
 
-    /**
-     * Parks a freshly opened probe channel for the key, or, when a concurrent probe already parked one, keeps that
-     * winner and retains ours in the never-closed graveyard instead. The park is a compare-and-set so a lost race never
-     * overwrites the live winner, and the loser is retained rather than closed: closing any channel on the file could
-     * drop a live holder's POSIX lock on the inode.
-     */
     static void parkProbeChannel(Path key, FileChannel channel, Path lockFile) {
         ParkedChannel existing = parkedChannels.putIfAbsent(key, new ParkedChannel(channel, currentFileKey(lockFile)));
         if (existing == null) {
@@ -609,7 +532,6 @@ public final class RestoreOperation {
         }
     }
 
-    /** A parked probe channel paired with the {@code fileKey} of the file it was opened on (may be null). */
     private static final class ParkedChannel {
         private final FileChannel channel;
         private final @Nullable Object fileKey;
@@ -620,12 +542,6 @@ public final class RestoreOperation {
         }
     }
 
-    /**
-     * Whether a parked entry no longer identifies the file now at its key path. Only a definite mismatch of two known
-     * {@code fileKeys} is stale; a null on either side (a filesystem that reports none, a vanished file) leaves the
-     * stale check impossible, so the conservative answer is not-stale and the existing re-probe-through behavior
-     * stands.
-     */
     private static boolean isStaleParked(ParkedChannel parked, @Nullable Object currentFileKey) {
         return parked.fileKey != null && currentFileKey != null && !parked.fileKey.equals(currentFileKey);
     }
@@ -634,7 +550,7 @@ public final class RestoreOperation {
         try {
             return Files.readAttributes(lockFile, BasicFileAttributes.class).fileKey();
         } catch (IOException e) {
-            return null; // unreadable or absent: identity is unknowable, keep the current behavior
+            return null;
         }
     }
 
@@ -644,10 +560,10 @@ public final class RestoreOperation {
             if (lock == null) {
                 return true;
             }
-            lock.release(); // release, never close: the parked channel serves every later probe
+            lock.release();
             return false;
         } catch (OverlappingFileLockException e) {
-            return true; // the same-JVM holder still holds it
+            return true;
         } catch (IOException e) {
             LOGGER.log(Level.WARNING, "re-probe through the parked channel on " + lockFile + " failed", e);
             return true;
@@ -662,21 +578,18 @@ public final class RestoreOperation {
         }
     }
 
-    /** Test-only: the channel currently parked for the key, or null when none is parked. */
     static @Nullable FileChannel parkedChannelForTest(Path key) {
         ParkedChannel parked = parkedChannels.get(key);
         return parked == null ? null : parked.channel;
     }
 
-    /** Test-only: whether the channel is retained in the never-closed graveyard. */
     static boolean graveyardContainsForTest(FileChannel channel) {
         return graveyard.contains(channel);
     }
 
     /**
      * Whether any attempt under the saves directory's temporary root stages {@code folderName} in its aside or install
-     * directory, child names compared case-insensitively. An unreadable scan reports false after one warning: the
-     * caller fails open.
+     * directory, child names compared case-insensitively. An unreadable scan reports false after one warning.
      */
     public static boolean attemptReferences(Path savesDirectory, String folderName) {
         Path temporaryRoot = savesDirectory.resolve(TEMPORARY_ROOT);
@@ -712,7 +625,6 @@ public final class RestoreOperation {
         return false;
     }
 
-    /** The extract-failure split: a nearly-full staging filesystem reads as a full disk, else a refusal. */
     static Outcome extractFailureOutcome(long usableBytes) {
         return usableBytes < DISK_FULL_FLOOR_BYTES ? Outcome.DISK_FULL : Outcome.EXTRACT_REFUSED;
     }
@@ -721,11 +633,10 @@ public final class RestoreOperation {
         try {
             return Files.getFileStore(temporaryRoot).getUsableSpace();
         } catch (IOException e) {
-            return Long.MAX_VALUE; // unknowable space cannot prove a full disk; report the refusal
+            return Long.MAX_VALUE;
         }
     }
 
-    /** Best-effort attempt teardown on a refusal or failure exit: close the lock first, then delete. */
     private static void cleanUpAttempt(FileChannel attemptLock, Path attempt, Path temporaryRoot) {
         closeQuietly(attemptLock);
         try {
@@ -790,22 +701,10 @@ public final class RestoreOperation {
         }
     }
 
-    /**
-     * The roll-back-only sweep of torn restore attempts left under the saves temporary root, plus the age-gated cleanup
-     * of orphaned export {@code .part} files. It lives beside the operation because one file owns the attempt-directory
-     * layout. {@link #hasWork} is a main-thread-cheap dispatch predicate (a signature memo with a TTL and per-attempt
-     * blocker kinds; it may probe session locks but never opens attempt.lock and never takes the RESTORING flip);
-     * {@link #run} is the mutating pass a worker thread performs under that flip.
-     *
-     * <p>The sweep only ever rolls a torn attempt back toward its pre-restore state or disposes an unreachable
-     * kept-aside; it never installs a clean export (an interrupted restore is re-driven by the operation, not completed
-     * here) and never overwrites a live world folder.
-     */
     public static final class RestoreSweep {
         /** The memo staleness window: past it, {@code hasWork} re-evaluates the per-attempt blocker kinds. */
         public static final long TTL_MS = 5 * 60_000;
 
-        /** The shared per-attempt dispatch ceiling; a blocked attempt waits for relaunch past it. */
         static final int MAX_DISPATCHES = 8;
 
         private static final long HOUR_MS = 60L * 60_000;
@@ -813,30 +712,19 @@ public final class RestoreOperation {
         private static final String PART_SUFFIX = ".part";
         private static final String PART_STATE_PREFIX = "part:";
 
-        /** Injectable wall clock; production reads the system clock, a test drives it deterministically. */
         static LongSupplier clock = System::currentTimeMillis;
 
         private static final Runnable NO_RUN_START_BARRIER = () -> {};
 
-        // A test-only barrier the sweep worker awaits once as it starts, so a client gametest can park the sweep
-        // and hold the single-flight RESTORING flip while it observes the screen. Production leaves the no-op
-        // default in place; resetForTest restores it.
         private static volatile Runnable runStartBarrier = NO_RUN_START_BARRIER;
 
-        // Refreshed only by a completed run(); hasWork (main thread) reads it, run() (worker) publishes it.
         private static volatile @Nullable Memo memo;
 
-        // Missing-folder notices already surfaced this session, keyed by attempt identity, so the notice
-        // stays non-repeating per attempt per session across successive sweeps.
         private static final Set<String> reportedMissing = Collections
                 .newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
         private RestoreSweep() {}
 
-        /**
-         * Drops the memo, the missing-folder notice set, the injected clock, and the run-start barrier back to
-         * production.
-         */
         public static void resetForTest() {
             memo = null;
             reportedMissing.clear();
@@ -844,20 +732,14 @@ public final class RestoreOperation {
             runStartBarrier = NO_RUN_START_BARRIER;
         }
 
-        /**
-         * Installs the barrier the next {@link #run(Path)} awaits as it starts, the seam a client gametest uses to park
-         * the sweep worker and hold the single-flight RESTORING flip while it drives the screen.
-         */
         public static void runStartBarrierForTest(Runnable barrier) {
             runStartBarrier = barrier;
         }
 
-        /** The blocker that keeps a swept attempt (or a spared part) around, driving {@code hasWork} past the TTL. */
         enum Kind {
             PROBE_SHAPED, IO_FAILURE, AGE_SHAPED
         }
 
-        /** The notices a completed sweep surfaces, plus whether it touched the disk at all. */
         public static final class SweepResult {
             private final boolean changedDisk;
             private final List<Path> movedBack;
@@ -872,37 +754,23 @@ public final class RestoreOperation {
                 this.missingDeferred = Collections.unmodifiableList(new ArrayList<Path>(missingDeferred));
             }
 
-            /** Whether this run mutated the disk; the caller re-pulls its entry list only when true. */
             public boolean changedDisk() {
                 return changedDisk;
             }
 
-            /** Kept-asides moved back to their original folder names. */
             public List<Path> movedBack() {
                 return movedBack;
             }
 
-            /** Kept-asides relocated to visible siblings because the original name was reoccupied. */
             public List<Path> relocated() {
                 return relocated;
             }
 
-            /** Attempts whose deferral (a locked aside over a missing folder) leaves the folder absent. */
             public List<Path> missingDeferred() {
                 return missingDeferred;
             }
         }
 
-        /**
-         * Whether a mutating sweep should be dispatched. Main-thread-cheap: a per-attempt-directory signature (each
-         * attempt's own mtime and which of aside, install, and attempt.lock exist inside it, never its world-tree
-         * contents), the export part-name set, and the per-attempt folder-existence bits, compared against the last
-         * completed run's memo. A changed layout re-arms immediately; an unchanged layout stays quiet until the TTL,
-         * past which the per-attempt blocker kinds decide (a probe-shaped block dispatches only on a fail-to-pass flip
-         * of its aside session lock, an io-failure block dispatches while its bound remains, an age-shaped part
-         * dispatches once it crosses the hour). This never opens attempt.lock and never takes the RESTORING flip; it
-         * may open session locks.
-         */
         public static boolean hasWork(Path savesDirectory) {
             long now = clock.getAsLong();
             Path temporaryRoot = savesDirectory.resolve(TEMPORARY_ROOT);
@@ -918,12 +786,6 @@ public final class RestoreOperation {
             return anyKindDispatches(savesDirectory, temporaryRoot, current, now);
         }
 
-        /**
-         * The mutating sweep: per attempt under the temporary root, take attempt.lock (a held lock means a live
-         * attempt, skipped this pass) and branch on whether the aside, the install, and the live folder exist, rolling
-         * the torn attempt back or disposing the kept-aside; then delete orphaned export parts older than an hour.
-         * Refreshes the memo from the resulting layout.
-         */
         public static SweepResult run(Path savesDirectory) {
             runStartBarrier.run();
             long now = clock.getAsLong();
@@ -960,16 +822,12 @@ public final class RestoreOperation {
                 try {
                     lockChannel = FileChannel.open(attempt.resolve(ATTEMPT_LOCK), StandardOpenOption.WRITE);
                 } catch (NoSuchFileException e) {
-                    // No attempt.lock file: a crash in the gap between creating the attempt directory and its
-                    // attempt.lock left a lockless orphan that would otherwise pin the temporary root indefinitely.
-                    // Reap it once it is safely past the brief create-before-lock window, age-gated so a live
-                    // instance's just-created directory is never removed.
                     sweepLocklessAttempt(attempt, attemptNamePath.toString(), now, states, changed);
                     return;
                 }
                 FileLock lock = lockChannel.tryLock();
                 if (lock == null) {
-                    return; // a live attempt holds the lock (cross-process); never processed this pass
+                    return;
                 }
                 processLocked(savesDirectory, attempt, attemptNamePath.toString(), prior, states,
                         movedBack, relocated, missingDeferred, changed, lockChannel);
@@ -991,11 +849,9 @@ public final class RestoreOperation {
                 return;
             }
             if (Files.isDirectory(attempt.resolve(ASIDE)) || Files.isDirectory(attempt.resolve(INSTALL))) {
-                // A lockless attempt is only ever reaped when truly empty. Today's layout creates
-                // attempt.lock before aside and install, so a lockless directory holds no world copy; a foreign
-                // or future layout with an aside created before its lock could, and that aside/<folder> is
-                // a real world copy. Never deleteRecursively it without a move-back: leave it for a future
-                // sweep and account for it so hasWork does not re-dispatch every TTL.
+                // Today's layout creates attempt.lock before aside and install, so a lockless directory holds no world
+                // copy; a foreign or future layout with an aside created before its lock could, and that aside/<folder>
+                // is a real world copy. Account for it so hasWork does not re-dispatch every TTL.
                 LOGGER.log(Level.INFO,
                         "sweep left a lockless attempt holding a world copy in place: " + attempt);
                 states.put(attemptName, new AttemptState(Kind.AGE_SHAPED, 0, false));
@@ -1015,7 +871,6 @@ public final class RestoreOperation {
                 FileChannel lockChannel) throws IOException {
             Path asideChild = firstChild(attempt.resolve(ASIDE));
             if (asideChild == null) {
-                // No kept-aside to preserve: an install-only leftover or an empty attempt. Delete it.
                 closeAndDeleteAttempt(lockChannel, attempt);
                 changed[0] = true;
                 return;
@@ -1029,7 +884,6 @@ public final class RestoreOperation {
             boolean folderPresent = Files.exists(folder);
 
             if (probeLocked(asideChild)) {
-                // A live session travels with the kept-aside: defer, never touching it.
                 if (!folderPresent) {
                     recordMissingDeferred(attempt, folder, missingDeferred);
                 }
@@ -1042,13 +896,11 @@ public final class RestoreOperation {
                 return;
             }
             if (firstChild(attempt.resolve(INSTALL)) != null) {
-                // The name was reoccupied while the install was still staged: never overwrite it, relocate.
                 relocateAside(savesDirectory, attempt, folderName, asideChild, prior, attemptName, states,
                         relocated, changed, lockChannel);
                 return;
             }
             try {
-                // The install already landed at the folder; the aside is the stale original, delete it.
                 deleteRecursively(asideChild);
                 closeAndDeleteAttempt(lockChannel, attempt);
                 changed[0] = true;
@@ -1071,8 +923,6 @@ public final class RestoreOperation {
                 }
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "sweep move-back of " + folderName + " failed", e);
-                // A failed move-back leaves the folder absent under a permanent blocker: name it once, so
-                // a vanished download folder is never a silent state even when the aside stays recoverable.
                 recordMissingDeferred(attempt, folder, missingDeferred);
                 states.put(attemptName, deferState(Kind.IO_FAILURE, prior, attemptName, false));
                 return;
@@ -1087,8 +937,6 @@ public final class RestoreOperation {
                 FileChannel lockChannel) throws IOException {
             Path sibling = disposeKeptAside(attempt, savesDirectory, folderName);
             if (sibling == null) {
-                // Deferred: either a lock reappeared on the aside or the relocation move failed. A still
-                // locked aside is probe-shaped, a failed move is io-failure; re-probe to classify.
                 boolean locked = probeLocked(asideChild);
                 Kind kind = locked ? Kind.PROBE_SHAPED : Kind.IO_FAILURE;
                 states.put(attemptName, deferState(kind, prior, attemptName, locked));
@@ -1116,7 +964,6 @@ public final class RestoreOperation {
                         continue;
                     }
                     if (now - lastModifiedMillis(entry, now) < HOUR_MS) {
-                        // A fresh part is spared; it becomes dispatchable once its mtime crosses the hour.
                         states.put(PART_STATE_PREFIX + name, new AttemptState(Kind.AGE_SHAPED, 0, false));
                         continue;
                     }
@@ -1148,7 +995,7 @@ public final class RestoreOperation {
                 }
                 AttemptState state = current.attempts.get(attemptNamePath.toString());
                 if (state == null) {
-                    return true; // an attempt the last run did not account for is unexplained work
+                    return true;
                 }
                 String folderName = attemptFolderName(attempt);
                 boolean folderMissing = folderName == null || !Files.exists(savesDirectory.resolve(folderName));
@@ -1157,7 +1004,7 @@ public final class RestoreOperation {
                     Path aside = folderName == null ? null : attempt.resolve(ASIDE).resolve(folderName);
                     boolean nowLocked = aside != null && probeLocked(aside);
                     if (state.asideLocked && !nowLocked && withinBound) {
-                        return true; // the aside session lock flipped from held to free
+                        return true;
                     }
                 } else if (state.kind == Kind.IO_FAILURE && withinBound) {
                     return true;
@@ -1186,7 +1033,7 @@ public final class RestoreOperation {
                     AttemptState state = current.attempts.get(PART_STATE_PREFIX + name);
                     if (state != null && state.kind == Kind.IO_FAILURE
                             && state.dispatches >= MAX_DISPATCHES) {
-                        continue; // this part's delete bound has drained; wait for relaunch
+                        continue;
                     }
                     return true;
                 }
@@ -1242,14 +1089,6 @@ public final class RestoreOperation {
             return new Signature(attemptLayout.toString(), listPartNames(savesDirectory), folderBits);
         }
 
-        /**
-         * The attempt-directory-bounded fingerprint: the attempt's own mtime plus which of aside, install, and
-         * attempt.lock exist directly inside it, never its world-tree contents. The deep contents of a torn
-         * aside/&lt;folder&gt; or install/&lt;folder&gt; never change once the attempt is created (extract writes
-         * install once, then it is swapped away or left torn untouched; an aside is moved wholesale, never edited in
-         * place), so recursing them would stat tens of thousands of dead-weight files on the main thread to detect a
-         * change that cannot happen.
-         */
         private static String attemptFingerprint(Path attempt) {
             StringBuilder fingerprint = new StringBuilder();
             fingerprint.append(lastModifiedMillis(attempt, 0L)).append(':');
@@ -1360,13 +1199,13 @@ public final class RestoreOperation {
                 FileTime mtime = Files.getLastModifiedTime(file);
                 return mtime.toMillis();
             } catch (IOException e) {
-                return fallbackNow; // an unreadable mtime reads as fresh, sparing the entry rather than deleting
+                return fallbackNow;
             }
         }
 
         private static boolean sweepMoveBack(Path source, Path target) throws IOException {
             if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-                return false; // the name reappeared; the caller takes the occupied disposition
+                return false;
             }
             try {
                 Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
@@ -1377,11 +1216,10 @@ public final class RestoreOperation {
         }
 
         private static void closeAndDeleteAttempt(FileChannel lockChannel, Path attempt) throws IOException {
-            closeQuietly(lockChannel); // close before delete: Windows cannot remove a file with an open handle
+            closeQuietly(lockChannel);
             deleteRecursively(attempt);
         }
 
-        /** The last completed run's layout snapshot with the per-attempt blocker states and its clock stamp. */
         private static final class Memo {
             private final Path savesDirectory;
             private final Signature signature;
@@ -1396,7 +1234,6 @@ public final class RestoreOperation {
             }
         }
 
-        /** A blocked attempt (or spared part): its kind, consumed dispatch count, and last probe result. */
         private static final class AttemptState {
             private final Kind kind;
             private final int dispatches;
@@ -1409,7 +1246,6 @@ public final class RestoreOperation {
             }
         }
 
-        /** The value-compared layout fingerprint: the per-attempt layout, the part-name set, the folder bits. */
         private static final class Signature {
             private final String attemptLayout;
             private final Set<String> partNames;
