@@ -19,24 +19,9 @@ import java.util.zip.ZipFile;
 
 import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 
-/**
- * The verified extractor mirroring {@link FolderZipper}: extracts the zip's {@code folderName} tree so that
- * {@code targetParent.resolve(folderName)} is the extracted world. Two passes over one open zip session: a validation
- * pass proving the contract first (root identity, no duplicate entry names once lowercased and trailing-slash
- * normalized, no file entry path-prefixing another entry, every file entry contained under the target folder, no entry
- * naming a server-only artifact per {@link SinglePlayerTaint#entryPathIsServerArtifact}, and the exact-case file
- * entries {@code folder/level.dat} and {@code folder/wdl/download.jsonl} present), then the extract pass, so any
- * violation throws {@link IOException} before a byte lands. Extraction materializes file entries only, skipping
- * session.lock and wdl/download.pending; directory entries never materialize, parents come from file entries. The
- * caller owns the pre-open re-stat of the source and the cleanup of a partial tree when a mid-extract failure
- * propagates.
- */
 final class FolderUnzipper {
     private FolderUnzipper() {}
 
-    // Per-entry uncompressed ceiling: a single save file (a region .mca, level.dat) runs to tens of MB at
-    // most, so this sits far above any legitimate entry yet aborts a decompression-bomb entry before it can
-    // fill the staging disk. A throw here lands pre-swap, so the world is never corrupted.
     static final long MAX_ENTRY_BYTES = 512L * 1024 * 1024;
 
     static void extract(Path zip, String folderName, Path targetParent) throws IOException {
@@ -55,8 +40,7 @@ final class FolderUnzipper {
                 String name = entry.getName();
                 String rootRelative = name.substring(folderName.length() + 1);
                 if (rootRelative.equals("session.lock") || rootRelative.equals("wdl/download.pending")) {
-                    // The lock is transient, and a restored world must read as its last recorded health,
-                    // never as a RECOVERABLE crash.
+                    // A restored world must read as its last recorded health, never as a RECOVERABLE crash.
                     continue;
                 }
                 if (entry.getSize() > maxEntryBytes || entry.getCompressedSize() > maxEntryBytes) {
@@ -94,10 +78,7 @@ final class FolderUnzipper {
             if (rootEnd < 0 || !folderName.equals(name.substring(0, rootEnd))) {
                 throw new IOException("entry outside the folder root: " + name);
             }
-            // Windows Path.normalize treats backslash as a separator, so a POSIX extract keeps a crafted
-            // World/..\evil as a literal name that the startsWith check accepts. Fold backslash to slash for
-            // this check only, leaving name intact so a legal backslash in a filename still passes, matching
-            // the discovery-side containment.
+            // A POSIX extract keeps a crafted World/..\evil as a literal name that the startsWith check accepts.
             for (String segment : name.replace('\\', '/').split("/")) {
                 if (segment.equals("..")) {
                     throw new IOException("path containment: " + name);
@@ -126,10 +107,7 @@ final class FolderUnzipper {
         }
         for (String fileName : fileNames) {
             String lower = fileName.toLowerCase(Locale.ROOT);
-            // Membership test over every proper segment prefix, never sorted adjacency: characters like
-            // '-' sort below '/', so a sibling such as x-old sits between x and x/y in sorted order and
-            // hides the collision from an adjacency scan. Directory entries are harmless prefixes and
-            // stay out of the set.
+            // Directory entries are harmless prefixes and stay out of the set.
             for (int cut = lower.indexOf('/'); cut >= 0; cut = lower.indexOf('/', cut + 1)) {
                 if (normalizedFileNames.contains(lower.substring(0, cut))) {
                     throw new IOException("file prefix collision: " + fileName);
@@ -151,7 +129,7 @@ final class FolderUnzipper {
 
     /**
      * Counts uncompressed bytes delivered and fails the read past the cap, whatever size the central directory claims,
-     * so a lying or absent (-1) size never lets a decompression bomb through the copy.
+     * so a lying size never lets a decompression bomb through the copy.
      */
     private static final class CappedInputStream extends FilterInputStream {
         private final long maxBytes;
