@@ -10,7 +10,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.junit.jupiter.api.Test;
 
-/** The one exclusion set both the export zip and the size total consult, so the two never drift apart. */
 class SaveWalkTest {
     private static final Path ROOT = Paths.get("saves", "world");
 
@@ -28,7 +27,6 @@ class SaveWalkTest {
         // A prefix-only or suffix-only name is real data, not the zipper's staging file, so it stays in the walk.
         assertFalse(SaveWalk.isExcluded(ROOT, ROOT.resolve("wdl-export-notes.txt")));
         assertFalse(SaveWalk.isExcluded(ROOT, ROOT.resolve("data.part")));
-        // The sentinel is skipped only at its exact wdl subpath, never a bare top-level download.pending.
         assertFalse(SaveWalk.isExcluded(ROOT, ROOT.resolve("download.pending")));
     }
 }
