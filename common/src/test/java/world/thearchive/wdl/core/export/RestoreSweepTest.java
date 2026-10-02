@@ -31,7 +31,6 @@ import world.thearchive.wdl.core.export.RestoreOperation.RestoreSweep;
 import world.thearchive.wdl.core.export.RestoreOperation.RestoreSweep.SweepResult;
 import world.thearchive.wdl.testsupport.JulCapture;
 
-/** The roll-back-only sweep over crafted attempt layouts: the branch table, part cleanup, memo and TTL. */
 class RestoreSweepTest {
     @TempDir
     Path saves;
@@ -47,17 +46,16 @@ class RestoreSweepTest {
     @Test
     void installAbsentDeletesUnlockedAsideOnly() throws IOException {
         Path attempt = craftAttempt("World-1");
-        putAside(attempt, "World"); // aside present, install absent
-        liveFolder("World", 9); // folder present: the install already landed
+        putAside(attempt, "World");
+        liveFolder("World", 9);
         SweepResult result = RestoreSweep.run(saves);
         assertTrue(result.changedDisk());
         assertTrue(result.movedBack().isEmpty());
         assertTrue(result.relocated().isEmpty());
         assertTrue(result.missingDeferred().isEmpty());
-        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT))); // aside and attempt gone
-        assertEquals(9, Files.readAllBytes(saves.resolve("World/level.dat"))[0]); // live folder untouched
+        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
+        assertEquals(9, Files.readAllBytes(saves.resolve("World/level.dat"))[0]);
 
-        // With the aside's session.lock HELD, the attempt is skipped and nothing is deleted.
         Path locked = craftAttempt("World-1");
         putAside(locked, "World");
         Path aside = locked.resolve("aside").resolve("World");
@@ -66,7 +64,7 @@ class RestoreSweepTest {
                 FileLock held = channel.lock()) {
             SweepResult deferred = RestoreSweep.run(saves);
             assertFalse(deferred.changedDisk());
-            assertTrue(Files.exists(aside.resolve("level.dat"))); // nothing deleted
+            assertTrue(Files.exists(aside.resolve("level.dat")));
         }
         drainParkOf(lock);
     }
@@ -76,14 +74,13 @@ class RestoreSweepTest {
         Path attempt = craftAttempt("World-1");
         putAside(attempt, "World");
         putInstall(attempt, "World");
-        // folder missing: an unlocked aside rolls back to the folder name.
         SweepResult result = RestoreSweep.run(saves);
         assertTrue(result.changedDisk());
         assertEquals(List.of(saves.resolve("World")), result.movedBack());
         assertTrue(result.relocated().isEmpty());
         assertTrue(result.missingDeferred().isEmpty());
-        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // aside moved back
-        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT))); // attempt cleaned
+        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
+        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
     }
 
     @Test
@@ -91,23 +88,23 @@ class RestoreSweepTest {
         Path attempt = craftAttempt("World-1");
         putAside(attempt, "World");
         putInstall(attempt, "World");
-        liveFolder("World", 5); // the name was reoccupied while the install was still staged
+        liveFolder("World", 5);
         SweepResult result = RestoreSweep.run(saves);
         assertTrue(result.changedDisk());
         assertEquals(List.of(saves.resolve("World_(2)")), result.relocated());
         assertTrue(result.movedBack().isEmpty());
-        assertTrue(Files.exists(saves.resolve("World_(2)/playerdata/u.dat"))); // aside relocated
-        assertEquals(5, Files.readAllBytes(saves.resolve("World/level.dat"))[0]); // occupant untouched
+        assertTrue(Files.exists(saves.resolve("World_(2)/playerdata/u.dat")));
+        assertEquals(5, Files.readAllBytes(saves.resolve("World/level.dat"))[0]);
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
     }
 
     @Test
     void noAsideDeletesTheAttemptAndEmptyRootGoes() throws IOException {
         Path attempt = craftAttempt("World-1");
-        putInstall(attempt, "World"); // install only, no aside to preserve
+        putInstall(attempt, "World");
         SweepResult result = RestoreSweep.run(saves);
         assertTrue(result.changedDisk());
-        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT))); // attempt and empty root gone
+        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
     }
 
     @Test
@@ -115,19 +112,17 @@ class RestoreSweepTest {
         Path attempt = craftAttempt("World-1");
         putAside(attempt, "World");
         putInstall(attempt, "World");
-        // folder missing: an unlocked attempt WOULD move the aside back; the held attempt.lock forbids it.
         try (FileChannel channel = FileChannel.open(attempt.resolve("attempt.lock"), StandardOpenOption.WRITE);
                 FileLock held = channel.lock()) {
-            assertTrue(RestoreSweep.hasWork(saves)); // hasWork may be true
+            assertTrue(RestoreSweep.hasWork(saves));
             SweepResult result = RestoreSweep.run(saves);
             assertFalse(result.changedDisk());
             assertTrue(result.movedBack().isEmpty());
             assertTrue(result.missingDeferred().isEmpty());
         }
-        // The attempt survives untouched: both stagings still present, no branch fired.
         assertTrue(Files.exists(attempt.resolve("aside").resolve("World").resolve("level.dat")));
         assertTrue(Files.exists(attempt.resolve("install").resolve("World").resolve("level.dat")));
-        assertFalse(Files.exists(saves.resolve("World"))); // no move-back happened
+        assertFalse(Files.exists(saves.resolve("World")));
     }
 
     @Test
@@ -140,8 +135,8 @@ class RestoreSweepTest {
         Files.setLastModifiedTime(fresh, FileTime.fromMillis(nowMs[0] - 5L * 60_000));
         SweepResult result = RestoreSweep.run(saves);
         assertTrue(result.changedDisk());
-        assertFalse(Files.exists(stale)); // older than an hour: deleted
-        assertTrue(Files.exists(fresh)); // fresh: spared
+        assertFalse(Files.exists(stale));
+        assertTrue(Files.exists(fresh));
     }
 
     @Test
@@ -149,10 +144,8 @@ class RestoreSweepTest {
         long[] nowMs = { 100_000_000L };
         RestoreSweep.clock = () -> nowMs[0];
 
-        // An empty temporary root is no work.
         assertFalse(RestoreSweep.hasWork(saves));
 
-        // A deferred locked aside over a present folder with no install is a pure probe-shaped block.
         Path attempt = craftAttempt("World-1");
         putAside(attempt, "World");
         liveFolder("World", 9);
@@ -160,18 +153,17 @@ class RestoreSweepTest {
         Path lock = Files.write(aside.resolve("session.lock"), new byte[] { 0x2A });
         try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.WRITE);
                 FileLock held = channel.lock()) {
-            assertTrue(RestoreSweep.hasWork(saves)); // the layout changed: work
+            assertTrue(RestoreSweep.hasWork(saves));
 
             SweepResult deferred = RestoreSweep.run(saves);
             assertFalse(deferred.changedDisk());
-            assertTrue(Files.exists(aside.resolve("level.dat"))); // deferred, untouched
-            assertFalse(RestoreSweep.hasWork(saves)); // signature unchanged, within the TTL: quiet
+            assertTrue(Files.exists(aside.resolve("level.dat")));
+            assertFalse(RestoreSweep.hasWork(saves));
 
-            // Past the TTL while still locked: the probe re-run stays failed, no fail-to-pass, still quiet.
+            // Past the TTL while still locked: no fail-to-pass, still quiet.
             nowMs[0] += RestoreSweep.TTL_MS + 1;
             assertFalse(RestoreSweep.hasWork(saves));
         }
-        // The released lock is a fail-to-pass transition of the aside probe: hasWork re-arms past the TTL.
         assertTrue(RestoreSweep.hasWork(saves));
         drainParkOf(lock);
 
@@ -187,9 +179,9 @@ class RestoreSweepTest {
                 FileLock held = channel.lock()) {
             SweepResult ghostDeferred = RestoreSweep.run(saves);
             assertEquals(List.of(saves.resolve("Ghost")), ghostDeferred.missingDeferred());
-            assertFalse(RestoreSweep.hasWork(saves)); // within the TTL, unchanged: quiet
-            liveFolder("Ghost", 4); // the folder reappears: a folder-existence flip
-            assertTrue(RestoreSweep.hasWork(saves)); // the transition re-arms within the TTL
+            assertFalse(RestoreSweep.hasWork(saves));
+            liveFolder("Ghost", 4);
+            assertTrue(RestoreSweep.hasWork(saves));
         }
         drainParkOf(ghostLock);
     }
@@ -199,9 +191,6 @@ class RestoreSweepTest {
         long[] nowMs = { 100_000_000L };
         RestoreSweep.clock = () -> nowMs[0];
 
-        // A torn attempt whose aside holds a DEEPLY-NESTED world file, with its session.lock held so the
-        // sweep defers and the attempt persists (the memo is stamped over it). The bounded signature reads
-        // the attempt-directory level only, so the world tree's deep contents are outside it by construction.
         Path attempt = craftAttempt("World-1");
         putAside(attempt, "World");
         liveFolder("World", 9);
@@ -211,26 +200,22 @@ class RestoreSweepTest {
         Path lock = Files.write(aside.resolve("session.lock"), new byte[] { 0x2A });
         try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.WRITE);
                 FileLock held = channel.lock()) {
-            assertTrue(RestoreSweep.hasWork(saves)); // the torn attempt is detected as work
-            SweepResult deferred = RestoreSweep.run(saves); // locked aside: deferred, the memo is stamped
+            assertTrue(RestoreSweep.hasWork(saves));
+            SweepResult deferred = RestoreSweep.run(saves);
             assertFalse(deferred.changedDisk());
-            assertFalse(RestoreSweep.hasWork(saves)); // signature stamped, within the TTL: quiet
+            assertFalse(RestoreSweep.hasWork(saves));
 
-            // Mutate a deeply-nested file's content and mtime. A deep walk would alter the signature and
-            // re-arm within the TTL; the attempt-directory-bounded signature does not descend, so it is invariant.
             Files.write(deep, new byte[] { 2, 2, 2 });
             Files.setLastModifiedTime(deep, FileTime.fromMillis(nowMs[0] + 12_345L));
             assertFalse(RestoreSweep.hasWork(saves));
         }
         drainParkOf(lock);
 
-        // Correctness preserved: with the lock released, the torn attempt is still swept away, the deep
-        // change notwithstanding. Past the TTL the aside probe flips fail-to-pass and re-arms.
         nowMs[0] += RestoreSweep.TTL_MS + 1;
         assertTrue(RestoreSweep.hasWork(saves));
         SweepResult swept = RestoreSweep.run(saves);
         assertTrue(swept.changedDisk());
-        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT))); // attempt swept away
+        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
         assertEquals(9, Files.readAllBytes(saves.resolve("World/level.dat"))[0]);
     }
 
@@ -239,7 +224,6 @@ class RestoreSweepTest {
         Path attempt = craftAttempt("World-1");
         putAside(attempt, "World");
         putInstall(attempt, "World");
-        // aside locked + install present + folder missing: the deferral leaves saves/World absent.
         Path aside = attempt.resolve("aside").resolve("World");
         Path lock = Files.write(aside.resolve("session.lock"), new byte[] { 0x2A });
         try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.WRITE);
@@ -247,8 +231,7 @@ class RestoreSweepTest {
             SweepResult first = RestoreSweep.run(saves);
             assertEquals(List.of(saves.resolve("World")), first.missingDeferred());
             assertFalse(first.changedDisk());
-            assertFalse(Files.exists(saves.resolve("World"))); // still missing (deferred)
-            // Non-repeating per attempt per session: a second sweep does not re-name it.
+            assertFalse(Files.exists(saves.resolve("World")));
             SweepResult second = RestoreSweep.run(saves);
             assertTrue(second.missingDeferred().isEmpty());
         }
@@ -260,8 +243,6 @@ class RestoreSweepTest {
         Path attempt = craftAttempt("World-1");
         putAside(attempt, "World");
         putInstall(attempt, "World");
-        // aside unlocked + install present + folder missing: the move-back would roll the aside back,
-        // but a read-only saves directory fails the rename, so the deferral leaves saves/World absent.
         Set<PosixFilePermission> original;
         try {
             original = Files.getPosixFilePermissions(saves);
@@ -277,7 +258,7 @@ class RestoreSweepTest {
             SweepResult first = RestoreSweep.run(saves);
             assertEquals(List.of(saves.resolve("World")), first.missingDeferred());
             assertFalse(first.changedDisk());
-            assertFalse(Files.exists(saves.resolve("World"))); // still missing (move-back failed, deferred)
+            assertFalse(Files.exists(saves.resolve("World")));
             SweepResult second = RestoreSweep.run(saves);
             assertTrue(second.missingDeferred().isEmpty());
         } finally {
@@ -293,14 +274,12 @@ class RestoreSweepTest {
 
     @Test
     void sweepNeverTouchesTheLiveFolder() throws IOException {
-        // The install-absent delete branch never rewrites the restored live folder.
         Path deleteBranch = craftAttempt("World-1");
         putAside(deleteBranch, "World");
         liveFolder("World", 9);
         RestoreSweep.run(saves);
         assertEquals(9, Files.readAllBytes(saves.resolve("World/level.dat"))[0]);
 
-        // The occupied-relocate branch never overwrites the occupant.
         Path relocateBranch = craftAttempt("Other-1");
         putAside(relocateBranch, "Other");
         putInstall(relocateBranch, "Other");
@@ -309,73 +288,67 @@ class RestoreSweepTest {
         assertEquals(5, Files.readAllBytes(saves.resolve("Other/level.dat"))[0]);
         assertTrue(Files.exists(saves.resolve("Other_(2)")));
 
-        // The move-back branch is the only pinned mutation of a folder name: the aside's bytes land there.
         Path moveBackBranch = craftAttempt("Third-1");
         putAside(moveBackBranch, "Third");
         putInstall(moveBackBranch, "Third");
         SweepResult result = RestoreSweep.run(saves);
         assertEquals(List.of(saves.resolve("Third")), result.movedBack());
-        assertEquals(3, Files.readAllBytes(saves.resolve("Third/level.dat"))[0]); // the aside's bytes
+        assertEquals(3, Files.readAllBytes(saves.resolve("Third/level.dat"))[0]);
     }
 
     @Test
     void locklessOrphanPastThresholdIsSwept() throws IOException {
         long[] nowMs = { 10_000_000L };
         RestoreSweep.clock = () -> nowMs[0];
-        // A crash in the gap between creating the attempt directory and its attempt.lock: a lockless orphan.
         Path orphan = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-1");
         Files.createDirectories(orphan);
         Files.setLastModifiedTime(orphan, FileTime.fromMillis(nowMs[0] - 65L * 60_000));
         SweepResult result = RestoreSweep.run(saves);
         assertTrue(result.changedDisk());
-        assertFalse(Files.exists(orphan)); // past the create-before-lock window: reaped
-        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT))); // emptied root removed
+        assertFalse(Files.exists(orphan));
+        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
     }
 
     @Test
     void locklessOrphanWithinTheWindowIsSpared() throws IOException {
         long[] nowMs = { 10_000_000L };
         RestoreSweep.clock = () -> nowMs[0];
-        // A live instance's just-created directory, still inside the brief create-before-lock window.
         Path fresh = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-1");
         Files.createDirectories(fresh);
         Files.setLastModifiedTime(fresh, FileTime.fromMillis(nowMs[0] - 5L * 60_000));
         SweepResult result = RestoreSweep.run(saves);
         assertFalse(result.changedDisk());
-        assertTrue(Files.exists(fresh)); // spared: a live instance may still be about to take the lock
+        assertTrue(Files.exists(fresh));
     }
 
     @Test
     void locklessAttemptHoldingWorldCopyIsNeverReaped() throws IOException {
         long[] nowMs = { 10_000_000L };
         RestoreSweep.clock = () -> nowMs[0];
-        // A lockless attempt directory (no attempt.lock) that, unlike today's create-lock-before-aside layout,
-        // holds an aside world copy. Aged well past the reap threshold: the age gate alone would delete it
-        // and destroy the only copy of the original download. The guard must refuse.
+        // A lockless attempt directory (no attempt.lock) that, unlike today's create-lock-before-aside layout, holds an
+        // aside world copy. Aged past the reap threshold: the age gate alone would delete it.
         Path attempt = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-1");
         Files.createDirectories(attempt);
         write(attempt.resolve("aside").resolve("World").resolve("level.dat"), 3);
         write(attempt.resolve("aside").resolve("World").resolve("playerdata/u.dat"), 7);
         Files.setLastModifiedTime(attempt, FileTime.fromMillis(nowMs[0] - 65L * 60_000));
         SweepResult result = RestoreSweep.run(saves);
-        // without the guard the age gate deletes the attempt; the sweep must report no disk change
         assertFalse(result.changedDisk());
         assertTrue(Files.exists(attempt.resolve("aside").resolve("World").resolve("level.dat")));
-        assertTrue(Files.exists(attempt)); // left for a future sweep, never reaped
+        assertTrue(Files.exists(attempt));
     }
 
     @Test
     void tornAttemptWithLockFileIsProcessedRegardlessOfAge() throws IOException {
         long[] nowMs = { 10_000_000L };
         RestoreSweep.clock = () -> nowMs[0];
-        Path attempt = craftAttempt("World-1"); // an unheld attempt.lock file present: a torn attempt
+        Path attempt = craftAttempt("World-1");
         putAside(attempt, "World");
         putInstall(attempt, "World");
         Files.setLastModifiedTime(attempt, FileTime.fromMillis(nowMs[0] - 65L * 60_000));
-        // Folder missing: the normal torn roll-back owns it, never the lockless age gate.
         SweepResult result = RestoreSweep.run(saves);
         assertEquals(List.of(saves.resolve("World")), result.movedBack());
-        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // aside rolled back, not deleted
+        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
     }
 
@@ -387,7 +360,6 @@ class RestoreSweepTest {
         return attempt;
     }
 
-    /** Claims the park's record where the probe parked; the Windows arm closes the probe channel and logs nothing. */
     private void drainParkOf(Path lock) {
         boolean parked = RestoreOperation.parkedChannelForTest(RestoreOperation.parkKey(lock)) != null;
         assertEquals(parked ? 1 : 0, warnings.drainAll("parked a probe channel on " + lock).size());
