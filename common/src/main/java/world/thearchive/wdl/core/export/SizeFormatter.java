@@ -57,6 +57,7 @@ public final class SizeFormatter {
     }
 
     private static String trim(double value, int decimals) {
+        // Locale.ROOT, so the number reads the same whatever the default locale.
         String text = String.format(Locale.ROOT, "%." + decimals + "f", value);
         if (text.indexOf('.') >= 0) {
             text = text.replaceAll("0+$", "").replaceAll("\\.$", "");
