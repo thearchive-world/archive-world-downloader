@@ -344,7 +344,7 @@ public final class RestoreOperation {
             cleanUpAttempt(attemptLock, attempt, temporaryRoot);
             return new Result(rolledBackOutcome);
         } catch (FileAlreadyExistsException e) {
-            // The name is occupied again; the disposition below owns the kept-aside.
+            // The name is occupied again.
         } catch (IOException e) {
             LOGGER.log(Level.WARNING, "move-back of " + folderName + " failed", e);
             return Result.swapFailed(asideFolder);
@@ -652,7 +652,7 @@ public final class RestoreOperation {
         try {
             Files.deleteIfExists(temporaryRoot);
         } catch (DirectoryNotEmptyException e) {
-            // Another instance's attempt still lives under the root; that owner removes it later.
+            // Another entry still lives under the root.
         } catch (IOException e) {
             LOGGER.log(Level.FINE, "temporary root removal failed", e);
         }
@@ -832,7 +832,7 @@ public final class RestoreOperation {
                 processLocked(savesDirectory, attempt, attemptNamePath.toString(), prior, states,
                         movedBack, relocated, missingDeferred, changed, lockChannel);
             } catch (OverlappingFileLockException e) {
-                // A live attempt in this same JVM holds the lock; skip it exactly as the null case does.
+                // This JVM already holds the lock; skip it exactly as the null case does.
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "sweep failed to process attempt " + attempt, e);
             } finally {
