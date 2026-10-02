@@ -7,10 +7,7 @@ import java.io.File;
 import java.nio.file.Path;
 
 /**
- * The files an export or size walk skips, kept in one place so the archive and the size total that drives the
- * compressing bar cover the same bytes. The session lock is transient and held under an exclusive OS lock, the crash
- * sentinel would plant a false crash signal in a backup, and a {@code wdl-export-*.part} is the zipper's own staging
- * file, one of which a crashed run can leave inside a save tree.
+ * The crash sentinel would plant a false crash signal in a backup.
  */
 final class SaveWalk {
     static final String TEMPORARY_PREFIX = "wdl-export-";
@@ -19,7 +16,6 @@ final class SaveWalk {
 
     private SaveWalk() {}
 
-    /** Whether {@code file}, reached under {@code root}, is skipped by both the export zip and the size total. */
     static boolean isExcluded(Path root, Path file) {
         return SessionLock.matches(file) || isTemporaryArtifact(file) || isPendingSentinel(root, file);
     }
