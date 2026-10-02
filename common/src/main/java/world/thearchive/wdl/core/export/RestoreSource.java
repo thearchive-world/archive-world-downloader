@@ -31,29 +31,11 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.core.browse.SinglePlayerTaint;
 import world.thearchive.wdl.core.report.StrictReportReader;
 
-/**
- * The clean-source discovery scan for a tainted-folder restore: the newest qualifying zip in the saves directory whose
- * name belongs to the download folder's export family. A candidate qualifies only by passing seven fail-closed rules in
- * order: its file name matches the family grammar exactly; every entry is rooted at the folder name with no dotdot
- * segment on any slash or backslash boundary; no duplicate entry names once lowercased and trailing-slash normalized;
- * no file entry path-prefixes another entry; the exact-case file {@code folder/level.dat} exists; no entry path names a
- * server-only artifact per {@link SinglePlayerTaint#entryPathIsServerArtifact}; and the exact-case record
- * folder/wdl/download.jsonl stays within {@link #MAX_RECORD_BYTES} uncompressed and yields a parseable newest
- * {@code finishedAt}. Qualifying candidates order by recorded finish, newest first, with the file modification time
- * breaking ties.
- *
- * <p>The scan never throws: a failure judging one candidate excludes that candidate, each exclusion logged with the
- * candidate name and failing rule at FINE, and a harness-level failure logs one WARN and reports no source.
- */
 public final class RestoreSource {
     private static final Logger LOGGER = Logger.getLogger(RestoreSource.class.getName());
 
-    /** Uncompressed cap on the record entry read: an at-cap record reads, an over-cap record excludes. */
     static final long MAX_RECORD_BYTES = 8L * 1024 * 1024;
 
-    // Ceiling on the central-directory entry count judged per candidate, read cheaply from the count field
-    // without iterating. A multi-dimension world exports at most tens of thousands of files, so this is far
-    // above any real export yet stops a family-named zip-bomb from freezing the gate thread with O(N) work.
     static final int MAX_ENTRIES = 1_000_000;
 
     private final Path zip;
@@ -109,10 +91,6 @@ public final class RestoreSource {
         }
     }
 
-    /**
-     * Re-stat the pinned source before it is opened: still a regular file with the same size and modification time.
-     * Metadata equality only; an unreadable stat is false.
-     */
     public static boolean stillIdentical(RestoreSource pinned) {
         try {
             return Files.isRegularFile(pinned.zip) && Files.size(pinned.zip) == pinned.size
@@ -122,9 +100,7 @@ public final class RestoreSource {
         }
     }
 
-    /** The directory's regular files whose names match the export family grammar exactly, never by prefix. */
     private static List<Path> familyCandidates(Path savesDirectory, String folderName) throws IOException {
-        // <folder>.zip | <folder>_(N).zip | <folder>-pre-resume[_(N)].zip | <folder>-singleplayer[_(N)].zip
         Pattern family = Pattern.compile(Pattern.quote(folderName)
                 + "(?:(?:" + ZipName.PRE_RESUME_SUFFIX + "|" + ZipName.SINGLEPLAYER_SUFFIX
                 + ")?(?:_\\((?:[2-9]|[1-9][0-9]+)\\))?)\\.zip");
@@ -143,7 +119,7 @@ public final class RestoreSource {
         return result;
     }
 
-    /** One zip session per candidate; any throw, including from close, excludes only this candidate. */
+    /** Any throw excludes only this candidate. */
     private static @Nullable RestoreSource judge(Path zip, String folderName) {
         try (ZipFile zipFile = new ZipFile(zip.toFile())) {
             return judge(zipFile, zip, folderName);
@@ -153,10 +129,6 @@ public final class RestoreSource {
         }
     }
 
-    /**
-     * Apply the seven rules reading only from the one open zip session; null when the candidate is excluded, each
-     * exclusion logged at FINE with the failing rule.
-     */
     static @Nullable RestoreSource judge(ZipFile zipFile, Path zip, String folderName) throws IOException {
         return judge(zipFile, zip, folderName, MAX_ENTRIES);
     }
@@ -180,9 +152,7 @@ public final class RestoreSource {
             if (rootEnd < 0 || !folderName.equals(name.substring(0, rootEnd))) {
                 return excluded(zip, "root identity");
             }
-            // Windows Path.normalize treats backslash as a separator, so extract would refuse a crafted
-            // World/..\evil that a slash-only split accepts. Fold backslash to slash for this check only,
-            // leaving name itself intact so a legal backslash in a filename still passes.
+            // Extract would refuse a crafted World/..\evil that a slash-only split accepts.
             for (String segment : name.replace('\\', '/').split("/")) {
                 if (segment.equals("..")) {
                     return excluded(zip, "path containment");
@@ -208,10 +178,7 @@ public final class RestoreSource {
         }
         for (String fileName : fileNames) {
             String lower = fileName.toLowerCase(Locale.ROOT);
-            // Membership test over every proper segment prefix, never sorted adjacency: characters like
-            // '-' sort below '/', so a sibling such as x-old sits between x and x/y in sorted order and
-            // hides the collision from an adjacency scan. Directory entries are harmless prefixes and
-            // stay out of the set.
+            // Directory entries are harmless prefixes and stay out of the set.
             for (int cut = lower.indexOf('/'); cut >= 0; cut = lower.indexOf('/', cut + 1)) {
                 if (normalizedFileNames.contains(lower.substring(0, cut))) {
                     return excluded(zip, "file prefix collision");
@@ -250,7 +217,7 @@ public final class RestoreSource {
 
     /**
      * Counts uncompressed bytes delivered and fails the read past {@code MAX_RECORD_BYTES}, whatever sizes the central
-     * directory claims, so a lying or absent size never lets a decompression bomb through.
+     * directory claims, so a lying size never lets a decompression bomb through.
      */
     private static final class CappedInputStream extends FilterInputStream {
         private long delivered;
