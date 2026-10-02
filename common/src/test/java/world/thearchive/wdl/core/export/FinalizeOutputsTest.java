@@ -99,7 +99,7 @@ class FinalizeOutputsTest {
     @Test
     void exportReportsTheCollisionSuffixedZipFileName(@TempDir Path saves) throws IOException {
         Path folder = saveFolder(saves);
-        Files.write(saves.resolve("world.zip"), new byte[] { 42 }); // a prior export
+        Files.write(saves.resolve("world.zip"), new byte[] { 42 });
 
         assertEquals("world_(2).zip", FinalizeOutputs.exportZip(folder, true, new SaveProgress()),
                 "the reported name is the disambiguated one, not the bare stem");
@@ -115,7 +115,7 @@ class FinalizeOutputsTest {
     @Test
     void exportNeverOverwritesAnExistingZip(@TempDir Path saves) throws IOException {
         Path folder = saveFolder(saves);
-        Files.write(saves.resolve("world.zip"), new byte[] { 42 }); // a prior export
+        Files.write(saves.resolve("world.zip"), new byte[] { 42 });
 
         FinalizeOutputs.exportZip(folder, true, new SaveProgress());
 
