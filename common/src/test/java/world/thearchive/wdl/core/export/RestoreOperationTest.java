@@ -303,7 +303,7 @@ class RestoreOperationTest {
         Files.write(source.zip(), bytes);
         Files.setLastModifiedTime(source.zip(), source.mtime());
         assertEquals(RestoreOperation.Outcome.EXTRACT_REFUSED, runOp("World", source));
-        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // folder untouched
+        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT))); // attempt cleaned
         assertInstanceOf(IOException.class, warnings.drain("extract of World.zip refused").getThrown());
     }
