@@ -231,7 +231,7 @@ class RestoreSweepTest {
         SweepResult swept = RestoreSweep.run(saves);
         assertTrue(swept.changedDisk());
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT))); // attempt swept away
-        assertEquals(9, Files.readAllBytes(saves.resolve("World/level.dat"))[0]); // live folder untouched
+        assertEquals(9, Files.readAllBytes(saves.resolve("World/level.dat"))[0]);
     }
 
     @Test
@@ -278,7 +278,6 @@ class RestoreSweepTest {
             assertEquals(List.of(saves.resolve("World")), first.missingDeferred());
             assertFalse(first.changedDisk());
             assertFalse(Files.exists(saves.resolve("World"))); // still missing (move-back failed, deferred)
-            // Non-repeating per attempt per session: a second sweep does not re-name it.
             SweepResult second = RestoreSweep.run(saves);
             assertTrue(second.missingDeferred().isEmpty());
         } finally {
