@@ -14,7 +14,6 @@ import java.util.OptionalLong;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** The MC-free on-disk folder byte-size walk the download screen uses to size each row. */
 class FolderSizeTest {
     @Test
     void sumsEveryRegularFileAcrossSubdirectories(@TempDir Path folder) throws IOException {
@@ -41,7 +40,7 @@ class FolderSizeTest {
     @Test
     void excludesTheTransientSessionLock(@TempDir Path folder) throws IOException {
         Files.write(folder.resolve("level.dat"), new byte[100]);
-        Files.write(folder.resolve("session.lock"), new byte[3]); // transient lock marker, not world data
+        Files.write(folder.resolve("session.lock"), new byte[3]);
 
         OptionalLong size = FolderSize.onDiskSize(folder);
 
@@ -53,8 +52,6 @@ class FolderSizeTest {
     @Test
     void excludesTheExportStagingPartFile(@TempDir Path folder) throws IOException {
         Files.write(folder.resolve("level.dat"), new byte[100]);
-        // A crashed export can leave its wdl-export-*.part staging file in the save; the size total skips it so it
-        // matches what the export zip walks, and the compressing bar can reach full.
         Files.write(folder.resolve("wdl-export-abc123.part"), new byte[500]);
 
         OptionalLong size = FolderSize.onDiskSize(folder);
