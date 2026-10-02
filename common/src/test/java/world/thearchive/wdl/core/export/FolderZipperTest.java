@@ -27,7 +27,6 @@ import java.util.zip.ZipFile;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** The MC-free java.util.zip folder zipper: the export/backup artifact, fail-soft over the openable folder. */
 class FolderZipperTest {
     @Test
     void zipsEveryFileUnderTheFolderNameAndReturnsTheWalkedByteTotal(@TempDir Path saves) throws IOException {
@@ -87,7 +86,6 @@ class FolderZipperTest {
     void excludesTheTransientSessionLockFromTheArchiveAndTheByteTotal(@TempDir Path saves) throws IOException {
         Path folder = Files.createDirectories(saves.resolve("world"));
         Files.write(folder.resolve("level.dat"), new byte[] { 1, 2, 3 });
-        // MC's transient session-lock marker, held under an exclusive OS lock during a resume backup.
         Files.write(folder.resolve("session.lock"), new byte[] { 9, 9, 9 });
         Path target = saves.resolve("world.zip");
 
@@ -107,8 +105,7 @@ class FolderZipperTest {
         Files.write(folder.resolve("level.dat"), new byte[] { 1, 2, 3 });
         Path wdl = Files.createDirectories(folder.resolve("wdl"));
         Files.write(wdl.resolve("download.md"), new byte[] { 4, 4 });
-        // The crash sentinel is written before the pre-resume backup by design (the crash marker must precede
-        // any modification), so without this exclusion a hand-unzipped backup would carry a false crash signal.
+        // Without this exclusion a hand-unzipped backup would carry a false crash signal.
         Files.write(wdl.resolve("download.pending"), new byte[] { 9 });
         Path target = saves.resolve("world.zip");
 
@@ -125,7 +122,6 @@ class FolderZipperTest {
     void excludesStaleExportPartFileFromTheArchiveAndTheByteTotal(@TempDir Path saves) throws IOException {
         Path folder = Files.createDirectories(saves.resolve("world"));
         Files.write(folder.resolve("level.dat"), new byte[] { 1, 2, 3 });
-        // An export staging file left inside a save by an earlier run; it must never be archived back into a new zip.
         Files.write(folder.resolve("wdl-export-abc123.part"), new byte[500]);
         Path target = saves.resolve("world.zip");
 
