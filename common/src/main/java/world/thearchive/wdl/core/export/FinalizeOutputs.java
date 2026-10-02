@@ -13,22 +13,6 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.SaveProgress;
 
-/**
- * The MC-free orchestration of a download's finalize-time zip outputs, so the knob and mode decisions stay
- * headless-testable while the adapter runs these on the writer thread.
- *
- * <ul>
- * <li>{@link #backupBeforeResume} takes the pre-merge safety copy: on a {@link DownloadMode#RESUME} (only), and only
- * when {@code zipOnResume} is on, it zips the existing folder to its next free pre-resume name before the merge
- * modifies it in place.</li>
- * <li>{@link #exportZip} writes the finish-time export zip {@code <folder>.zip} when {@code zipOnFinish} is on. The
- * folder's on-disk size is deliberately not recorded at finish: the download screen reads each row's size by walking
- * the folder on open, so the size always reflects the disk.</li>
- * </ul>
- *
- * <p>Fail-soft: a failing zip is cleaned up by {@link FolderZipper} and only ever reads the openable folder, so it is
- * caught and surfaced here, never propagated to fail the save.
- */
 public final class FinalizeOutputs {
     private static final Logger LOGGER = Logger.getLogger(FinalizeOutputs.class.getName());
 
