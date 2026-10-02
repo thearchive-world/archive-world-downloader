@@ -38,7 +38,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.testsupport.JulCapture;
 
-/** The guarded replace over a real tainted fixture: probes, per-cause refusals, and the happy path. */
 class RestoreOperationTest {
     @TempDir
     Path saves;
@@ -52,7 +51,7 @@ class RestoreOperationTest {
     void probeAbsentLockIsUnlockedAndNeverCreates(@TempDir Path work) throws IOException {
         Path folder = Files.createDirectories(work.resolve("World"));
         assertFalse(RestoreOperation.probeLocked(folder));
-        assertFalse(Files.exists(folder.resolve("session.lock"))); // WRITE-no-CREATE: probe never mutates
+        assertFalse(Files.exists(folder.resolve("session.lock")));
     }
 
     @Test
@@ -61,11 +60,9 @@ class RestoreOperationTest {
         Path lock = Files.write(folder.resolve("session.lock"), new byte[] { 0x2A });
         try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.WRITE);
                 FileLock held = channel.lock()) {
-            // Same-JVM overlap throws OverlappingFileLockException inside the probe; the probe parks the
-            // channel (POSIX) or closes it (Windows) and reports locked either way.
             assertTrue(RestoreOperation.probeLocked(folder));
         }
-        assertFalse(RestoreOperation.probeLocked(folder)); // released = unlocked again
+        assertFalse(RestoreOperation.probeLocked(folder));
         drainParkOf(lock);
     }
 
@@ -90,21 +87,19 @@ class RestoreOperationTest {
         Path lock = Files.write(folder.resolve("session.lock"), new byte[] { 0x2A });
         Assumptions.assumeTrue(Files.readAttributes(lock, BasicFileAttributes.class).fileKey() != null,
                 "this filesystem reports no fileKey; stale-parked detection is unavailable");
-        // Park a probe channel via a same-JVM overlap on the original inode.
         try (FileChannel original = FileChannel.open(lock, StandardOpenOption.WRITE);
                 FileLock held = original.lock()) {
             assertTrue(RestoreOperation.probeLocked(folder));
         }
-        // Replace the file at the key path. The parked channel still pins the old inode (it is never
-        // closed), so the recreated file necessarily takes a fresh inode and thus a different fileKey.
+        // The parked channel still pins the old inode, so the recreated file necessarily takes a fresh inode and thus a
+        // different fileKey.
         Files.delete(lock);
         Files.write(lock, new byte[] { 0x2A });
-        // A live same-JVM lock on the NEW file: the stale parked channel must not shadow it.
         try (FileChannel replacement = FileChannel.open(lock, StandardOpenOption.WRITE);
                 FileLock heldNew = replacement.lock()) {
             assertTrue(RestoreOperation.probeLocked(folder));
         }
-        assertFalse(RestoreOperation.probeLocked(folder)); // both released; the new file reads unlocked
+        assertFalse(RestoreOperation.probeLocked(folder));
         if (RestoreOperation.parkedChannelForTest(RestoreOperation.parkKey(lock)) != null) {
             assertEquals(2, warnings.drainAll("parked a probe channel on " + lock).size());
             warnings.drain("tombstoned a stale parked channel on " + lock);
@@ -116,16 +111,13 @@ class RestoreOperationTest {
         Path folder = Files.createDirectories(work.resolve("World"));
         Path lock = Files.write(folder.resolve("session.lock"), new byte[] { 0x2A });
         Path key = RestoreOperation.parkKey(lock);
-        // Two probes race to park a channel on the same lock key. The first wins the compare-and-set; the
-        // second must not overwrite it (that would orphan a live channel the JVM could GC-close, dropping
-        // a live POSIX lock) but retain its own channel in the never-closed graveyard.
         FileChannel winner = FileChannel.open(lock, StandardOpenOption.WRITE);
         FileChannel loser = FileChannel.open(lock, StandardOpenOption.WRITE);
         RestoreOperation.parkProbeChannel(key, winner, lock);
         RestoreOperation.parkProbeChannel(key, loser, lock);
-        assertSame(winner, RestoreOperation.parkedChannelForTest(key)); // winner preserved, not overwritten
-        assertTrue(RestoreOperation.graveyardContainsForTest(loser)); // loser retained, not orphaned
-        assertTrue(loser.isOpen()); // loser never closed
+        assertSame(winner, RestoreOperation.parkedChannelForTest(key));
+        assertTrue(RestoreOperation.graveyardContainsForTest(loser));
+        assertTrue(loser.isOpen());
         warnings.drain("parked a probe channel on " + lock);
         warnings.drain("graveyarded a probe channel on " + lock);
     }
@@ -138,12 +130,9 @@ class RestoreOperationTest {
         operation.publishLoadedWorld(null);
         RestoreOperation.Result result = operation.run();
         assertEquals(RestoreOperation.Outcome.RESTORED, result.outcome());
-        // The folder is the clean copy now (twin bytes), the taint is gone.
         assertEquals(9, Files.readAllBytes(saves.resolve("World/level.dat"))[0]);
         assertFalse(Files.exists(saves.resolve("World/playerdata")));
-        // The singleplayer snapshot exists and contains the taint.
         assertTrue(Files.exists(saves.resolve("World-singleplayer.zip")));
-        // The attempt directory and the emptied temporary root are gone (guarded-owner removal).
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
     }
 
@@ -152,7 +141,7 @@ class RestoreOperationTest {
         taintedWorldWithCleanExport("World");
         assertEquals(RestoreOperation.Outcome.RESTORED, runOp("World", RestoreSource.find(saves, "World").get()));
         assertTrue(Files.exists(saves.resolve("World-singleplayer.zip")));
-        write(saves.resolve("World/playerdata/u.dat"), 3); // opened in singleplayer again
+        write(saves.resolve("World/playerdata/u.dat"), 3);
 
         String advertised = RestoreOperation.nextSnapshotName(saves, "World");
         assertEquals(RestoreOperation.Outcome.RESTORED, runOp("World", RestoreSource.find(saves, "World").get()));
@@ -167,25 +156,20 @@ class RestoreOperationTest {
     void preconditionsRefusePerCause() throws IOException {
         taintedWorldWithCleanExport("World");
         RestoreSource source = RestoreSource.find(saves, "World").get();
-        // NOT_MANAGED: strip wdl/ after pinning (the swapped-occupant backstop).
         deleteRecursively(saves.resolve("World/wdl"));
         assertEquals(RestoreOperation.Outcome.NOT_MANAGED, runOp("World", source));
-        // FOLDER_MISSING vs FILE_OCCUPANT split on what exists at the name.
         deleteRecursively(saves.resolve("World"));
         assertEquals(RestoreOperation.Outcome.FOLDER_MISSING, runOp("World", source));
         Files.write(saves.resolve("World"), new byte[] { 1 });
         assertEquals(RestoreOperation.Outcome.FILE_OCCUPANT, runOp("World", source));
         Files.delete(saves.resolve("World"));
-        // NOT_TAINTED: a clean managed folder refuses honestly.
         taintedWorldWithCleanExport("World2");
         deleteRecursively(saves.resolve("World2/playerdata"));
         assertEquals(RestoreOperation.Outcome.NOT_TAINTED, runOp("World2", RestoreSource.find(saves, "World2").get()));
-        // SOURCE_CHANGED: metadata mismatch after pinning.
         taintedWorldWithCleanExport("World3");
         RestoreSource pinned = RestoreSource.find(saves, "World3").get();
         Files.write(saves.resolve("World3.zip"), new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 });
         assertEquals(RestoreOperation.Outcome.SOURCE_CHANGED, runOp("World3", pinned));
-        // WORLD_IN_USE: the published loaded world matches (filesystem identity, so the resolved path).
         taintedWorldWithCleanExport("World4");
         RestoreOperation operation = RestoreOperation.create(saves, "World4",
                 RestoreSource.find(saves, "World4").get(), true);
@@ -216,7 +200,7 @@ class RestoreOperationTest {
         } finally {
             Files.setPosixFilePermissions(dimensions, original);
         }
-        assertEquals(1, Files.readAllBytes(saves.resolve("World/level.dat"))[0]); // refused, untouched
+        assertEquals(1, Files.readAllBytes(saves.resolve("World/level.dat"))[0]);
     }
 
     @Test
@@ -228,7 +212,7 @@ class RestoreOperationTest {
                 FileLock held = channel.lock()) {
             assertEquals(RestoreOperation.Outcome.WORLD_IN_USE, runOp("World", source));
         }
-        assertFalse(Files.exists(saves.resolve("World-singleplayer.zip"))); // refused pre-snapshot
+        assertFalse(Files.exists(saves.resolve("World-singleplayer.zip")));
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
         drainParkOf(lock);
     }
@@ -237,13 +221,10 @@ class RestoreOperationTest {
     void snapshotFailureAbortsBeforeAnyMutation() throws IOException {
         taintedWorldWithCleanExport("World");
         RestoreSource source = RestoreSource.find(saves, "World").get();
-        // Forcing a real zip-write failure is platform-dependent (read-only directories behave
-        // differently across filesystems), so the test forces it through the injectable snapshot seam;
-        // production wires FolderZipper.
         RestoreOperation operation = RestoreOperation.createForTest(saves, "World", source, failingSnapshot(),
                 phase -> {});
         assertEquals(RestoreOperation.Outcome.SNAPSHOT_FAILED, operation.run().outcome());
-        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // folder untouched
+        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
         assertEquals("forced", warnings.drain("pre-restore snapshot of World failed").getThrown().getMessage());
     }
 
@@ -266,7 +247,6 @@ class RestoreOperationTest {
         Path occupied = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-1");
         write(occupied.resolve("marker"), 5);
         assertEquals(RestoreOperation.Outcome.RESTORED, runOp("World", RestoreSource.find(saves, "World").get()));
-        // The occupied first counter name survives untouched; the op staged under the next and cleaned it.
         assertArrayEquals(new byte[] { 5 }, Files.readAllBytes(occupied.resolve("marker")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-2")));
         assertEquals(9, Files.readAllBytes(saves.resolve("World/level.dat"))[0]);
@@ -277,9 +257,8 @@ class RestoreOperationTest {
         taintedWorldWithCleanExport("World");
         RestoreOperation operation = RestoreOperation.create(saves, "World",
                 RestoreSource.find(saves, "World").get(), true);
-        // The handler seeds the volatile before dispatch; a bare unpublished volatile must refuse.
         assertEquals(RestoreOperation.Outcome.WORLD_IN_USE, operation.run().outcome());
-        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // refused before any change
+        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
     }
 
     @Test
@@ -294,8 +273,6 @@ class RestoreOperationTest {
     void sameStatForgedSourceRefusesAtExtractAndCleansUp() throws IOException {
         taintedWorldWithCleanExport("World");
         RestoreSource source = RestoreSource.find(saves, "World").get();
-        // Corrupt the pinned zip in place, same byte size, and restore the pinned mtime: both metadata
-        // re-stats pass, so the refusal must come from the verified extract itself.
         byte[] bytes = Files.readAllBytes(source.zip());
         for (int index = 45; index < 100 && index < bytes.length; index++) {
             bytes[index] = 0;
@@ -304,7 +281,7 @@ class RestoreOperationTest {
         Files.setLastModifiedTime(source.zip(), source.mtime());
         assertEquals(RestoreOperation.Outcome.EXTRACT_REFUSED, runOp("World", source));
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
-        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT))); // attempt cleaned
+        assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
         assertInstanceOf(IOException.class, warnings.drain("extract of World.zip refused").getThrown());
     }
 
@@ -323,15 +300,15 @@ class RestoreOperationTest {
 
     @Test
     void attemptReferencesSeesAsideAndInstallStagingCaseInsensitively() throws IOException {
-        assertFalse(RestoreOperation.attemptReferences(saves, "World")); // no temporary root at all
+        assertFalse(RestoreOperation.attemptReferences(saves, "World"));
         Path attempt = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("Other-1");
         Files.createDirectories(attempt.resolve("aside").resolve("world"));
-        assertTrue(RestoreOperation.attemptReferences(saves, "World")); // aside child, re-cased
-        assertFalse(RestoreOperation.attemptReferences(saves, "Region")); // unrelated name
+        assertTrue(RestoreOperation.attemptReferences(saves, "World"));
+        assertFalse(RestoreOperation.attemptReferences(saves, "Region"));
         deleteRecursively(saves.resolve(RestoreOperation.TEMPORARY_ROOT));
         Files.createDirectories(saves.resolve(RestoreOperation.TEMPORARY_ROOT)
                 .resolve("Other-1").resolve("install").resolve("WORLD"));
-        assertTrue(RestoreOperation.attemptReferences(saves, "World")); // install child counts too
+        assertTrue(RestoreOperation.attemptReferences(saves, "World"));
     }
 
     @Test
@@ -340,7 +317,6 @@ class RestoreOperationTest {
         RestoreOperation operation = opWithMoveHook("World", failInstallMoveOnce());
         RestoreOperation.Result result = operation.run();
         assertEquals(RestoreOperation.Outcome.SWAP_FAILED, result.outcome());
-        // Rolled back: the tainted original is back at the name, attempt directory cleaned.
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
         assertEquals("forced install-move failure",
@@ -350,12 +326,10 @@ class RestoreOperationTest {
     @Test
     void occupiedMoveBackTargetTakesTheTerminalDisposition() throws IOException {
         taintedWorldWithCleanExport("World");
-        // Between the renames, something recreates saves/World (vanilla's lock acquisition shape).
         RestoreOperation operation = opWithMoveHook("World",
                 betweenMoves(() -> Files.createDirectories(saves.resolve("World"))));
         RestoreOperation.Result result = operation.run();
         assertEquals(RestoreOperation.Outcome.RELOCATED, result.outcome());
-        // The aside was relocated to the next-free visible sibling; the occupant stays untouched.
         assertTrue(Files.exists(saves.resolve("World_(2)/playerdata/u.dat")));
         assertTrue(Files.exists(saves.resolve("World")));
         assertFalse(Files.exists(saves.resolve(RestoreOperation.TEMPORARY_ROOT)));
@@ -367,26 +341,22 @@ class RestoreOperationTest {
         taintedWorldWithCleanExport("World");
         RestoreOperation operation = opWithMoveHook("World", abortDuringExtract());
         assertEquals(RestoreOperation.Outcome.ABORTED, operation.run().outcome());
-        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat"))); // untouched
+        assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
     }
 
     @Test
     void quitPathNeverTakesTheTerminalDispositionOrTheCleanups() throws IOException {
         taintedWorldWithCleanExport("World");
-        // Abort observed right after the install move: aside delete and attempt cleanup are skipped,
-        // the aside is left for the next launch's sweep, and the outcome reports the restore.
         RestoreOperation operation = opWithMoveHook("World", abortAfterInstallMove());
         RestoreOperation.Result result = operation.run();
         assertEquals(RestoreOperation.Outcome.RESTORED_WITH_REMNANTS, result.outcome());
-        assertTrue(Files.exists(saves.resolve("World/level.dat"))); // install landed
-        // The aside survives inside the attempt directory.
+        assertTrue(Files.exists(saves.resolve("World/level.dat")));
         assertTrue(RestoreOperation.attemptReferences(saves, "World"));
     }
 
     @Test
     void abortWithRecreatedTargetLeavesTheAttemptIntact() throws IOException {
         taintedWorldWithCleanExport("World");
-        // A quit while the name is occupied again: no relocation, no cleanup, the sweep owns it all.
         RestoreOperation operation = opWithMoveHook("World", betweenMoves(() -> {
             currentOp.abort();
             Files.createDirectories(saves.resolve("World"));
@@ -401,7 +371,6 @@ class RestoreOperationTest {
         taintedWorldWithCleanExport("World");
         RestoreOperation operation = opWithMoveHook("World", betweenMoves(() -> currentOp.abort()));
         assertEquals(RestoreOperation.Outcome.ABORTED, operation.run().outcome());
-        // Backed out: the tainted original is back at its name; the attempt stays for the sweep.
         assertTrue(Files.exists(saves.resolve("World/playerdata/u.dat")));
     }
 
@@ -434,7 +403,7 @@ class RestoreOperationTest {
     @Test
     void relocationSkipsOccupiedSiblingsAndReportsTheTarget() throws IOException {
         taintedWorldWithCleanExport("World");
-        write(saves.resolve("World_(2)/level.dat"), 7); // an occupied sibling the relocation must skip
+        write(saves.resolve("World_(2)/level.dat"), 7);
         RestoreOperation operation = opWithMoveHook("World",
                 betweenMoves(() -> Files.createDirectories(saves.resolve("World"))));
         RestoreOperation.Result result = operation.run();
@@ -451,11 +420,10 @@ class RestoreOperationTest {
         Path aside = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-1")
                 .resolve("aside").resolve("World");
         FileChannel[] holder = new FileChannel[1];
-        // The lock is held through this array for the same reason the sibling probe tests hold theirs in a
-        // try-with-resources local: on a Java-8 toolchain sun.nio.ch.FileLockTable keeps only a weak reference,
-        // so a discarded FileLock can be collected mid-test, the probe's same-JVM OverlappingFileLockException
-        // never fires, and the operation relocates over a lock that is still held at the OS level. From JDK 9 the
-        // table also holds the lock strongly, which is why this only ever failed on the Java-8 bands.
+        // The lock is held through this array: on a Java-8 toolchain sun.nio.ch.FileLockTable keeps only a weak
+        // reference, so a discarded FileLock can be collected mid-test, the probe's same-JVM
+        // OverlappingFileLockException never fires, and the operation relocates over a lock that is still held at the
+        // OS level.
         FileLock[] heldLock = new FileLock[1];
         Throwable[] setUpFailure = new Throwable[1];
         RestoreOperation operation = opWithMoveHook("World", betweenMoves(() -> {
@@ -480,13 +448,9 @@ class RestoreOperationTest {
                 holder[0].close();
             }
         }
-        // run() swallows whatever a hook throws, so a lock this hook failed to take leaves the aside
-        // genuinely unlocked and the disposition then correctly relocates it. Report that cause instead of
-        // the outcome it produces, which reads as a disposition bug that is not there.
         if (setUpFailure[0] != null) {
             fail("the hook never took the aside session lock", setUpFailure[0]);
         }
-        // Never a relocation under a live session: the disposition defers and the notice names the aside.
         assertEquals(RestoreOperation.Outcome.SWAP_FAILED, result.outcome());
         assertEquals(List.of(aside), result.survivingPaths());
         assertFalse(Files.exists(saves.resolve("World_(2)")));
@@ -501,7 +465,7 @@ class RestoreOperationTest {
         Path aside = saves.resolve(RestoreOperation.TEMPORARY_ROOT).resolve("World-1")
                 .resolve("aside").resolve("World");
         RestoreOperation operation = opWithMoveHook("World", betweenMoves(() -> {
-            deleteRecursively(aside); // the aside vanishes out from under the rollback
+            deleteRecursively(aside);
             throw new IllegalStateException("forced install-move failure");
         }));
         RestoreOperation.Result result = operation.run();
@@ -543,7 +507,6 @@ class RestoreOperationTest {
         return currentOp;
     }
 
-    /** Claims the park's record where the probe parked; the Windows arm closes the probe channel and logs nothing. */
     private void drainParkOf(Path lock) {
         boolean parked = RestoreOperation.parkedChannelForTest(RestoreOperation.parkKey(lock)) != null;
         assertEquals(parked ? 1 : 0, warnings.drainAll("parked a probe channel on " + lock).size());
@@ -555,7 +518,6 @@ class RestoreOperationTest {
         };
     }
 
-    /** A hook body that may touch the filesystem; the wrapper rethrows its {@code IOException} unchecked. */
     private interface IoAction {
         void run() throws IOException;
     }
@@ -573,7 +535,6 @@ class RestoreOperationTest {
     }
 
     private RestoreOperation.PhaseHook failInstallMoveOnce() {
-        // Throwing at BETWEEN_MOVES makes the install move's first attempt fail.
         boolean[] fired = { false };
         return phase -> {
             if (phase == RestoreOperation.Phase.BETWEEN_MOVES && !fired[0]) {
@@ -607,7 +568,6 @@ class RestoreOperationTest {
         };
     }
 
-    /** A managed, tainted world folder with one clean export zip beside it. Returns the folder. */
     private Path taintedWorldWithCleanExport(String name) throws IOException {
         Path folder = saves.resolve(name);
         write(folder.resolve("level.dat"), 1);
@@ -615,7 +575,6 @@ class RestoreOperationTest {
         write(folder.resolve("wdl/download.jsonl"),
                 "{\"finishedAt\":\"2026-03-01T10:00:00Z\"}\n".getBytes(StandardCharsets.UTF_8));
         write(folder.resolve("playerdata/u.dat"), 3); // the taint
-        // The clean export: zip the folder WITHOUT the taint (build a twin and FolderZipper it).
         Path twin = saves.resolve(".twin").resolve(name);
         write(twin.resolve("level.dat"), 9);
         write(twin.resolve("region/r.0.0.mca"), 8);
@@ -626,12 +585,10 @@ class RestoreOperationTest {
         return folder;
     }
 
-    /** Creates parents and writes the single byte {@code contentByte} at file. */
     private static void write(Path file, int contentByte) throws IOException {
         write(file, new byte[] { (byte) contentByte });
     }
 
-    /** Creates parents and writes content at file. */
     private static void write(Path file, byte[] content) throws IOException {
         Files.createDirectories(file.getParent());
         Files.write(file, content);
