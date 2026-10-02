@@ -18,27 +18,16 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
- * Zips a save folder into a single artifact (the export, or the resume backup) with {@code java.util.zip} over a
- * {@code java.nio} walk, no new dependency. MC-free and band-agnostic. Entries are rooted at the folder name
- * ({@code <folder>/level.dat} ...), so unzipping reproduces the save folder.
- *
- * <p>Fail-soft over the openable folder: the folder is only read, never modified. The zip is written to a temporary
- * {@code .part} file in the same directory and atomically moved into place only on success, so the final name never
- * appears as a half-written, valid-looking artifact; any failure deletes the temporary file and surfaces the error.
- * {@link #zip} returns the on-disk byte total it walked.
+ * The zip is written to a temporary {@code .part} file in the same directory and atomically moved into place only on
+ * success, so the final name never appears as a half-written, valid-looking artifact.
  */
 final class FolderZipper {
     private FolderZipper() {}
 
-    /** Zip {@code sourceFolder} into {@code target}; returns the walked on-disk byte total. */
     public static long zip(Path sourceFolder, Path target) throws IOException {
         return zip(sourceFolder, target, bytes -> {});
     }
 
-    /**
-     * Zip {@code sourceFolder} into {@code target}, reporting the cumulative archived byte total to {@code
-     * onBytesZipped} after each file so a caller can drive a live progress fraction; returns the walked total.
-     */
     public static long zip(Path sourceFolder, Path target, LongConsumer onBytesZipped) throws IOException {
         Path directory = target.getParent();
         Path temporaryFile = Files.createTempFile(directory, SaveWalk.TEMPORARY_PREFIX, SaveWalk.TEMPORARY_SUFFIX);
@@ -53,8 +42,6 @@ final class FolderZipper {
     }
 
     private static long writeZip(Path sourceFolder, Path temporaryFile, LongConsumer onBytesZipped) throws IOException {
-        // Root every entry at the folder name (<folder>/level.dat ...) so unzipping reproduces the save folder.
-        // Derived from the folder itself rather than its parent, which is null for a filesystem root.
         Path folderName = sourceFolder.getFileName();
         final String top = folderName == null ? "" : folderName.toString();
         final long[] total = { 0 };

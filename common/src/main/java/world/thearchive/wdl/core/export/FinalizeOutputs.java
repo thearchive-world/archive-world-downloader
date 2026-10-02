@@ -23,7 +23,6 @@ public final class FinalizeOutputs {
         return ZipName.nextFreeBackup(savesDirectory, folderName).getFileName().toString();
     }
 
-    /** Zip the existing folder to its next free pre-resume name before a resume merges into it. */
     public static void backupBeforeResume(Path saveFolder, DownloadMode mode, boolean zipOnResume) {
         if (!zipOnResume || mode != DownloadMode.RESUME) {
             return;
@@ -38,11 +37,7 @@ public final class FinalizeOutputs {
     }
 
     /**
-     * Write the finish-time export zip {@code <folder>.zip} when enabled; a no-op when the knob is off. Returns the
-     * written zip's filename, or null when none was written (knob off, or the zip failed). Drives {@code progress}
-     * through the {@link SaveProgress#compressing} phase so the HUD bar advances over the folder's on-disk byte total
-     * as each file is archived. The byte total is the pre-zip folder size; a folder whose size cannot be read reports a
-     * zero-total phase, which shows no fraction.
+     * Returns the written zip's filename, or null when none was written (knob off, or the zip failed).
      */
     public static @Nullable String exportZip(Path saveFolder, boolean zipOnFinish, SaveProgress progress) {
         if (!zipOnFinish) {
@@ -64,21 +59,17 @@ public final class FinalizeOutputs {
 
     /**
      * The save root with any trailing dot component stripped, so the archive is named and placed beside the folder
-     * rather than inside it. On some versions the level directory is read through a resource whose id is a bare dot, so
-     * the path arrives ending in a dot that {@code getParent} and {@code getFileName} would otherwise resolve to the
-     * folder itself.
+     * rather than inside it.
      */
     private static Path saveRoot(Path saveFolder) {
         return saveFolder.normalize();
     }
 
-    /** The saves directory the zips land in (beside the folder); never null for a {@code saves/<folder>} path. */
     private static Path savesDirectory(Path saveFolder) {
         Path parent = saveFolder.getParent();
         return parent != null ? parent : saveFolder;
     }
 
-    /** The download's folder name, the base the zip names derive from (already sanitized and contained). */
     private static String folderName(Path saveFolder) {
         Path name = saveFolder.getFileName();
         return name != null ? name.toString() : saveFolder.toString();
