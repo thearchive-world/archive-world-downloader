@@ -27,12 +27,10 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.SaveProgress;
 import world.thearchive.wdl.testsupport.JulCapture;
 
-/** The MC-free finalize-output orchestration: export zip and resume backup, mode/knob gating, collision. */
 class FinalizeOutputsTest {
     @RegisterExtension
     final JulCapture warnings = JulCapture.of(FinalizeOutputs.class);
 
-    /** A small finished save folder under a saves directory, returned as the folder path. */
     private static Path saveFolder(Path saves) throws IOException {
         return worldFolder(saves, new byte[200], new byte[300]);
     }
@@ -50,8 +48,6 @@ class FinalizeOutputsTest {
     @Test
     void exportOnDotSuffixedRootLandsBesideTheFolderNotInsideIt(@TempDir Path saves) throws IOException {
         Path folder = saveFolder(saves);
-        // The shape the level directory takes on the versions that read it through a resource whose id is a bare dot,
-        // so the path arrives ending in a dot component.
         Path dotSuffixed = folder.resolve(".");
 
         String written = FinalizeOutputs.exportZip(dotSuffixed, true, new SaveProgress());
@@ -68,8 +64,6 @@ class FinalizeOutputsTest {
     @Test
     void compressingReachesFullWithStaleStagingFileInTheFolder(@TempDir Path saves) throws IOException {
         Path folder = saveFolder(saves);
-        // A leftover staging file from an earlier run; the zip skips it, so the size denominator must skip it too or
-        // the compressing bar never reaches full.
         Files.write(folder.resolve("wdl-export-stale.part"), new byte[10_000]);
         SaveProgress progress = new SaveProgress();
 
@@ -183,8 +177,8 @@ class FinalizeOutputsTest {
 
     @Test
     void theSessionLockIsNeverExported(@TempDir Path saves) throws IOException {
-        Path folder = saveFolder(saves); // level.dat(200) + region/r.0.0.mca(300)
-        Files.write(folder.resolve("session.lock"), new byte[3]); // the transient, resume-time OS-locked marker
+        Path folder = saveFolder(saves);
+        Files.write(folder.resolve("session.lock"), new byte[3]);
 
         FinalizeOutputs.exportZip(folder, true, new SaveProgress());
 
@@ -217,7 +211,7 @@ class FinalizeOutputsTest {
             assertFalse(Files.exists(saves.resolve("world.zip")), "the failed export left no artifact");
             assertTrue(Files.exists(folder.resolve("level.dat")), "the openable folder stays intact");
         } finally {
-            Files.setPosixFilePermissions(saves, original); // restore so the temporary-directory cleanup can remove it
+            Files.setPosixFilePermissions(saves, original);
         }
         assertInstanceOf(AccessDeniedException.class, warnings.drain("the export zip failed").getThrown());
     }
