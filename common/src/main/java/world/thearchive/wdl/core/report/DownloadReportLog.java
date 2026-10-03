@@ -99,7 +99,7 @@ public final class DownloadReportLog {
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
 
-    /** The sessions for one download folder, resolving its {@code wdl/} record and sentinel (the screen reads this). */
+    /** The sessions for one download folder, resolving its {@code wdl/} record and sentinel. */
     public static List<DownloadSession> readDownloads(Path saveRoot) throws IOException {
         return readDownloads(DownloadReportStore.machineFile(saveRoot), DownloadReportStore.pendingFile(saveRoot));
     }
