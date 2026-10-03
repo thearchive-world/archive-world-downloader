@@ -145,7 +145,7 @@ class DownloadReportLogTest {
                 settings(), FINISHED, new DownloadCounts(1, 1, 0), new SaveChunks(1, ImmutableList.of()),
                 Collections.emptyMap()));
         Files.write(jsonl, "{\"v\":1,\"id\":\"b\"".getBytes(StandardCharsets.UTF_8),
-                StandardOpenOption.APPEND); // a half-written crash tail, no newline
+                StandardOpenOption.APPEND);
 
         List<DownloadSession> downloads = DownloadReportLog.readDownloads(jsonl, null);
         assertEquals(1, downloads.size(), "the torn trailing line is skipped, the good record stands");
