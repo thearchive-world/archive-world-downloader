@@ -25,7 +25,7 @@ public final class DownloadCountsBuilder {
         return containers.size();
     }
 
-    /** The live dedup-correct entity count, read by the HUD each frame without allocating a snapshot. */
+    /** The live dedup-correct entity count. */
     public int entityCount() {
         return entities.size();
     }
