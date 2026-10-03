@@ -196,8 +196,7 @@ class DownloadReportLogTest {
         assertEquals(2, read.dimensions().size());
         assertEquals("minecraft:the_nether", read.dimensions().get(1).dimensionName());
         assertEquals(200, read.dimensions().get(1).chunks());
-        // One session dimension proves the sd. entries did not leak into the d. parse, and the settings
-        // round-trip proves they did not leak into the s. parse either.
+        // One session dimension proves the sd. entries did not leak into the d. parse.
         assertEquals(1, session.counts().dimensions().size());
         assertEquals(settings(), session.settings());
     }
