@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import org.junit.jupiter.api.Test;
 
-/** Hostile server text: strip section codes, flatten to one line, neutralize markdown; mod text untouched. */
 class ReportTextTest {
     private static final char SECTION = '§';
 
@@ -21,14 +20,14 @@ class ReportTextTest {
 
     @Test
     void stripsTheCodeCaseInsensitively() {
-        assertEquals("X", ReportText.stripFormatCodes(SECTION + "CX")); // the game renders §C like §c
+        assertEquals("X", ReportText.stripFormatCodes(SECTION + "CX"));
     }
 
     @Test
     void keepsLoneSectionSignNotFollowedByValidCode() {
         assertEquals("100" + SECTION + " off", ReportText.stripFormatCodes("100" + SECTION + " off"));
         assertEquals("ends" + SECTION, ReportText.stripFormatCodes("ends" + SECTION));
-        assertEquals(SECTION + "z", ReportText.stripFormatCodes(SECTION + "z")); // z is not a format code
+        assertEquals(SECTION + "z", ReportText.stripFormatCodes(SECTION + "z"));
     }
 
     @Test
@@ -38,7 +37,6 @@ class ReportTextTest {
 
     @Test
     void escapesTheInlineDangerousMetacharacters() {
-        // Links/images (via the brackets), emphasis, inline code, autolinks/HTML, and strikethrough
         assertEquals("\\[link\\](http://x)", ReportText.escapeMarkdown("[link](http://x)"));
         assertEquals("\\*b\\* \\_i\\_ \\`c\\` \\<x> \\~s\\~", ReportText.escapeMarkdown("*b* _i_ `c` <x> ~s~"));
         assertEquals("a\\\\b", ReportText.escapeMarkdown("a\\b"));
@@ -46,8 +44,6 @@ class ReportTextTest {
 
     @Test
     void leavesStartOfLineOnlyMetacharactersCleanMidLine() {
-        // A hash, hyphen, period, plus, or angle-close is only special at the start of a line, and the value
-        // is always rendered mid-line after a label, so escaping them would only add noise
         assertEquals("v26.1.2 - rc#3 (final) > go", ReportText.escapeMarkdown("v26.1.2 - rc#3 (final) > go"));
     }
 

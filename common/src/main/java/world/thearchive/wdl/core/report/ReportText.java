@@ -3,17 +3,9 @@
 
 package world.thearchive.wdl.core.report;
 
-/**
- * Hardens server-controlled text for the human rendering. The server address and MOTD are server-controlled, so a
- * hostile server could otherwise smuggle markup (links, images, headings) or extra report lines into the document.
- * {@link #escapeServerText(String)} strips the game's own section-sign format codes, flattens the value to a single
- * line, and neutralizes Markdown metacharacters. Mod-generated copy is never passed through here, so it renders as
- * authored.
- */
 final class ReportText {
     private static final char SECTION_SIGN = '§';
 
-    /** The vanilla single-character format codes: colors 0-9 / a-f, styles k-o, and reset r (case-blind). */
     private static final String FORMAT_CODES = "0123456789abcdefklmnor";
 
     // The metacharacters that are dangerous inline: link/image brackets, emphasis, inline code, autolink/HTML
@@ -24,15 +16,10 @@ final class ReportText {
 
     private ReportText() {}
 
-    /** Strip section codes, flatten to one line, and escape Markdown, in that order. */
     static String escapeServerText(String raw) {
         return escapeMarkdown(oneLine(stripFormatCodes(raw)));
     }
 
-    /**
-     * Drop a section sign only when it is followed by a valid format code, matching how the game consumes the pair
-     * while rendering; a lone section sign (at end, or before a non-code character) is left.
-     */
     static String stripFormatCodes(String raw) {
         StringBuilder out = new StringBuilder(raw.length());
         int i = 0;
@@ -49,7 +36,6 @@ final class ReportText {
         return out.toString();
     }
 
-    /** Replace every run of whitespace or control characters with a single space and trim the ends. */
     static String oneLine(String raw) {
         StringBuilder out = new StringBuilder(raw.length());
         boolean pendingSpace = false;
@@ -70,7 +56,6 @@ final class ReportText {
         return out.toString();
     }
 
-    /** Backslash-escape every Markdown metacharacter so server text cannot inject markup. */
     static String escapeMarkdown(String raw) {
         StringBuilder out = new StringBuilder(raw.length());
         for (int i = 0; i < raw.length(); i++) {
