@@ -19,22 +19,6 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * Drives one download's report lifecycle into a {@code wdl/} subfolder of the save folder. {@link #begin} writes only
- * the {@code download.pending} sentinel (the begin-time record: identity, settings, environment) before the save
- * begins; {@link #refreshHumanRendering} then regenerates the human {@code download.md}, a separate step so the writer
- * thread's pre-resume backup can archive the prior session's rendering first; {@link #complete} appends the
- * consolidated completed line to {@code download.jsonl}, deletes the sentinel, and regenerates the rendering from the
- * read model.
- *
- * <p>The completion write is idempotent and at-most-once: it is reachable from the clean-finish path and again from a
- * fallback handler, but writes at most one completed line per download id. The latch is set after the durable append
- * and before the sentinel delete, so a delete failure cannot let a second append through; a stale sentinel left by a
- * crash between the two is reconciled away by id on read. Every write is fail-soft: a report write that fails is caught
- * and logged, never thrown, so it can never corrupt the openable save. One instance backs one download; the methods are
- * {@code synchronized} because completion can be driven from the writer thread and the main thread (serialized by the
- * save future).
- */
 public final class DownloadReportStore {
     static final String SUBFOLDER = "wdl";
     static final String MACHINE_FILE = "download.jsonl";
@@ -43,7 +27,6 @@ public final class DownloadReportStore {
 
     private static final Logger LOGGER = Logger.getLogger(DownloadReportStore.class.getName());
 
-    /** Download ids whose completed line this session has written, so a second call is a no-op. */
     private final Set<String> completed = new HashSet<>();
 
     /** Write the pending sentinel (the begin-time record) only; the rendering refresh is a separate step. */
@@ -115,7 +98,6 @@ public final class DownloadReportStore {
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
     }
 
-    /** The report files live in a {@code wdl/} subfolder of the save root, kept apart from the vanilla files. */
     private static Path reportFile(Path saveRoot, String fileName) {
         return saveRoot.resolve(SUBFOLDER).resolve(fileName);
     }

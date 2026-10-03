@@ -16,23 +16,12 @@ import java.util.StringJoiner;
 
 import world.thearchive.wdl.core.ElapsedTime;
 
-/**
- * Renders the most recent download as the rich human-readable Markdown report: a titled header with the finish times,
- * duration, and status, then Server / Summary / Software / Settings sections, plus a Downloads history table once a
- * save holds more than one completed download. Server-controlled text (the title source, address, MOTD, and server
- * brand) is passed through {@link ReportText#escapeServerText(String)} so a hostile server cannot inject markup or
- * extra report lines; mod-generated copy (labels, the image tag, the footer) is written as authored. The machine record
- * stays ISO-8601 UTC; this rendering shows the completion instant in local, UTC, and epoch form, so its timestamps are
- * timezone-dependent by design. The injected {@code zone} and {@code locale} make the local form deterministic for
- * tests.
- */
 final class DownloadReportFormatter {
     private static final DateTimeFormatter utcTime = DateTimeFormatter
             .ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'", Locale.ROOT).withZone(ZoneOffset.UTC);
 
     private DownloadReportFormatter() {}
 
-    /** Render the most recent of {@code downloads} as the rich report; empty input renders nothing. */
     static String render(List<DownloadSession> downloads, boolean iconPresent, ZoneId zone,
             Locale locale) {
         if (downloads.isEmpty()) {
@@ -61,7 +50,6 @@ final class DownloadReportFormatter {
         DownloadIdentity identity = session.identity();
         String titleSource = identity.sourceName().isEmpty() ? identity.sourceAddress() : identity.sourceName();
         if (titleSource.isEmpty() && !identity.sourceKind().isEmpty()) {
-            // Mod-authored copy, so it does not go through escapeServerText, which is for untrusted server text.
             out.append("# Download report: Unidentified source\n\n");
         } else {
             out.append("# Download report: ").append(ReportText.escapeServerText(titleSource)).append("\n\n");
@@ -143,7 +131,6 @@ final class DownloadReportFormatter {
                 out.append("- **Chunks**: ").append(tieredSave.total()).append('\n');
             }
         } else {
-            // Interrupted: no completion counts, only the begin-time dimension the pending record holds.
             ReportEnvironment environment = session.environment();
             out.append("- **Dimensions**: 1\n");
             if (environment != null) {
@@ -163,10 +150,6 @@ final class DownloadReportFormatter {
         }
     }
 
-    /**
-     * The completed downloads as one table row each, oldest first; absent below two rows. One pass, so the null checks
-     * gate row inclusion directly rather than re-checking a prefiltered list.
-     */
     private static void appendHistory(StringBuilder out, List<DownloadSession> newestFirst,
             DateTimeFormatter localTime) {
         List<String> rows = new ArrayList<>();
@@ -175,7 +158,7 @@ final class DownloadReportFormatter {
             Instant finishedAt = session.finishedAt();
             DownloadCounts counts = session.counts();
             if (finishedAt == null || counts == null) {
-                continue; // interrupted, or a completed record missing its completion data
+                continue;
             }
             rows.add("| " + localTime.format(finishedAt) + " | "
                     + formatDuration(session.identity().startedAt(), finishedAt) + " | " + counts.chunks()
