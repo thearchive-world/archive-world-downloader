@@ -9,11 +9,6 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
 
-/**
- * The strict finished-timestamp read for restore-source discovery: the newest parseable {@code finishedAt} across a
- * download report log, or empty. Deliberately stricter than the report screen's lenient parser, which EPOCH-defaults a
- * bad timestamp; discovery must EXCLUDE such a candidate, never order it at the epoch.
- */
 public final class StrictReportReader {
     private static final String KEY = "\"finishedAt\":\"";
 
