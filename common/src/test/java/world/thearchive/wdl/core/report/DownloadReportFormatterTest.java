@@ -221,7 +221,6 @@ class DownloadReportFormatterTest {
         assertTrue(md.startsWith("# Download report: Unidentified source"), "the marker names the source");
     }
 
-    // A nameless server still falls back to its address, so the marker must not swallow that branch.
     @Test
     void anEmptyNameStillFallsBackToTheAddress() {
         DownloadIdentity identity = new DownloadIdentity("a", STARTED, "Terbin", "uuid",
@@ -262,8 +261,6 @@ class DownloadReportFormatterTest {
 
     @Test
     void undercountedSaveTotalHidesTheInSaveTier() {
-        // A partially failed scan can undercount below the session's own chunks; a cumulative line smaller
-        // than the session line would contradict the report, so the tier gates on exceeding, not differing.
         DownloadIdentity identity = ReportFixtures.identity("a", "survival.thearchive.world", "", "");
         DownloadSession session = new DownloadSession(identity, Collections.<String, String>emptyMap(),
                 environment(), true, true, STARTED.plusSeconds(4),
@@ -311,9 +308,6 @@ class DownloadReportFormatterTest {
 
     @Test
     void historySkipsCompletedRecordMissingItsCompletionData() {
-        // Only constructible directly (readRecord never yields complete with null completion data): the
-        // row-inclusion checks exist because the fields are nullable on DownloadSession, and this test keeps
-        // them exercised (without them the render NPEs on localTime.format).
         DownloadSession damaged = new DownloadSession(
                 new DownloadIdentity("x", STARTED.plusSeconds(50), "Steve", "",
                         "survival.thearchive.world", "", "", "Fabric", "1", "", ""),

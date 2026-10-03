@@ -31,7 +31,6 @@ class StrictReportReaderTest {
 
     @Test
     void unparseableTimestampIsSkippedNotEpochDefaulted() throws IOException {
-        // The lenient shipped parser would EPOCH-default this; strict skips the line.
         Optional<Instant> latest = read("{\"finishedAt\":\"not-a-time\"}\n");
         assertFalse(latest.isPresent());
     }
