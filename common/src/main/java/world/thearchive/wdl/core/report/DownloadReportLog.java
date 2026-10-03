@@ -19,25 +19,9 @@ import java.util.Set;
 import java.util.logging.Logger;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The append-only machine record: one compact JSON object per completed download in {@code download.jsonl}, carrying
- * the identity, the settings diff, the server/software environment, the frozen counts, the finish instant, and the
- * clean-finish status. A separate {@code download.pending} sentinel holds the begin-time record of an unfinished
- * download; its presence with no matching completed line marks an interrupted download. Reading is crash-tolerant: a
- * torn trailing line is skipped silently (a half-written last line is expected after a JVM crash), and a malformed line
- * elsewhere is warned and skipped.
- *
- * <p>The version sits first on every line so it is readable by reading one line, not the whole document. The core stays
- * MC-free and dependency-free, so the one diagnostic uses {@code java.util.logging} (the JDK logger) rather than the MC
- * slf4j logger the adapter layers use.
- */
 public final class DownloadReportLog {
     private static final Logger LOGGER = Logger.getLogger(DownloadReportLog.class.getName());
 
-    /**
-     * A bump marks a new on-disk shape; a migrator plus a round-trip test are added only for a non-read-compatible
-     * change. The format is unreleased, so it starts at version 1.
-     */
     static final int SCHEMA_VERSION = 1;
 
     private static final String KEY_VERSION = "v";
@@ -51,18 +35,11 @@ public final class DownloadReportLog {
 
     private DownloadReportLog() {}
 
-    /** The begin-time record written into the pending sentinel: identity, environment, settings. */
     public static String pendingLine(DownloadIdentity identity, @Nullable ReportEnvironment environment,
             Map<String, String> settings) {
         return Json.writeObject(beginFields(identity, environment, settings));
     }
 
-    /**
-     * One completed download: the begin-time record plus the frozen session counts, the frozen in-save chunk totals
-     * ({@code saveChunks} with the {@code sd.} per-dimension breakdown), and what it lost, as the {@code l.} per-axis
-     * counts plus the status they decide. The status is derived here rather than passed alongside them, so a record
-     * cannot claim a clean finish while listing a loss.
-     */
     public static String completedLine(DownloadIdentity identity, @Nullable ReportEnvironment environment,
             Map<String, String> settings, Instant finishedAt, DownloadCounts counts, SaveChunks saveChunks,
             Map<String, Integer> losses) {
@@ -113,7 +90,6 @@ public final class DownloadReportLog {
         return fields;
     }
 
-    /** Append one line (newline-terminated), creating the file and its parent directory if absent. */
     public static void append(Path machineFile, String line) throws IOException {
         Path parent = machineFile.getParent();
         if (parent != null) {
@@ -128,7 +104,6 @@ public final class DownloadReportLog {
         return readDownloads(DownloadReportStore.machineFile(saveRoot), DownloadReportStore.pendingFile(saveRoot));
     }
 
-    /** Completed downloads (one per jsonl line) plus, when present and not already completed, the pending one. */
     static List<DownloadSession> readDownloads(Path machineFile, @Nullable Path pendingFile)
             throws IOException {
         List<DownloadSession> downloads = new ArrayList<>();
@@ -146,7 +121,7 @@ public final class DownloadReportLog {
         if (pendingFile != null && Files.exists(pendingFile)) {
             DownloadSession pending = parsePending(pendingFile);
             if (pending != null && !completedIds.contains(pending.identity().id())) {
-                downloads.add(pending); // the in-progress / interrupted download, most recent
+                downloads.add(pending);
             }
         }
         return downloads;
@@ -175,11 +150,10 @@ public final class DownloadReportLog {
         try {
             return readRecord(Json.parseObject(lines.get(0)));
         } catch (IllegalArgumentException e) {
-            return null; // a torn pending sentinel is treated as absent
+            return null;
         }
     }
 
-    /** One parsed object to one download; completion is present iff the object carries {@code finishedAt}. */
     private static DownloadSession readRecord(Map<String, @Nullable Object> object) {
         DownloadIdentity identity = readIdentity(object);
         ReportEnvironment environment = readEnvironment(object);
@@ -198,7 +172,7 @@ public final class DownloadReportLog {
 
     private static @Nullable ReportEnvironment readEnvironment(Map<String, @Nullable Object> object) {
         if (!object.containsKey("dimensionName") && !object.containsKey("minecraftVersion")) {
-            return null; // a record with no environment fields has none
+            return null;
         }
         return new ReportEnvironment(stringValue(object, "serverBrand"),
                 intValue(object, "simulationDistance"), stringValue(object, "dimensionName"),
@@ -214,7 +188,6 @@ public final class DownloadReportLog {
                 stringValue(object, "sourceKind"));
     }
 
-    /** The per-axis loss counts, empty for a record written before they were kept. */
     private static Map<String, Integer> readLosses(Map<String, @Nullable Object> object) {
         Map<String, Integer> losses = new LinkedHashMap<>();
         for (Map.Entry<String, @Nullable Object> entry : object.entrySet()) {
