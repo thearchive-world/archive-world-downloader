@@ -77,9 +77,7 @@ final class DownloadReportFormatter {
     }
 
     /**
-     * What the download lost, by axis, under the status it explains. Absent for a partial record written before the
-     * counts were kept, which is why the status line stands on its own above. The count reads after the axis name
-     * rather than before it, so a single loss does not render as a plural.
+     * The count reads after the axis name rather than before it, so a single loss does not render as a plural.
      */
     private static void appendLosses(StringBuilder out, Map<String, Integer> losses) {
         if (losses.isEmpty()) {
@@ -112,8 +110,8 @@ final class DownloadReportFormatter {
         DownloadCounts counts = session.counts();
         out.append("\n## Summary\n");
         if (counts != null) {
-            // Tiered only when the save total exceeds the session chunks: an equal (single-session),
-            // zero, or undercounted scan total adds nothing over the session line and must not headline.
+            // Tiered only when the save total exceeds the session chunks: an equal, zero, or undercounted scan total
+            // adds nothing over the session line and must not headline.
             SaveChunks saveChunks = session.saveChunks();
             SaveChunks tieredSave = saveChunks != null && saveChunks.total() > counts.chunks()
                     ? saveChunks
