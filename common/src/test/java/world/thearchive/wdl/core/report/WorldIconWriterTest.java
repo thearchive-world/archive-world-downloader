@@ -44,7 +44,7 @@ class WorldIconWriterTest {
     @Test
     void isFailSoftWhenTheRootIsRegularFile(@TempDir Path directory) throws IOException {
         Path regularFile = directory.resolve("blocker");
-        Files.write(regularFile, new byte[] { 1 }); // a regular file where a save directory is expected
+        Files.write(regularFile, new byte[] { 1 });
         assertDoesNotThrow(() -> WorldIconWriter.write(regularFile, PNG));
         assertInstanceOf(FileAlreadyExistsException.class,
                 warnings.drain("failed to write the world icon").getThrown());
