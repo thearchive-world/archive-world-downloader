@@ -8,10 +8,8 @@ final class ReportText {
 
     private static final String FORMAT_CODES = "0123456789abcdefklmnor";
 
-    // The metacharacters that are dangerous inline: link/image brackets, emphasis, inline code, autolink/HTML
-    // open, and strikethrough. Block constructs (#, -, +, >, ordered-list digit-dot) are special only at the
-    // start of a line, and server text is always rendered mid-line after a label with newlines already
-    // flattened, so escaping them would only add noise (for example a version "26.1.2") for no added safety.
+    // The metacharacters that are dangerous inline: link/image brackets, emphasis, inline code, autolink/HTML open, and
+    // strikethrough.
     private static final String MARKDOWN_METACHARACTERS = "\\`*_[]<~";
 
     private ReportText() {}
