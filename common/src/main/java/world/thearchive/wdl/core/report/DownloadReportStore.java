@@ -43,7 +43,7 @@ public final class DownloadReportStore {
         }
     }
 
-    /** Regenerate the human {@code download.md} from the read model; fail-soft like every report write. */
+    /** Regenerate the human {@code download.md} from the read model; fail-soft. */
     public synchronized void refreshHumanRendering(Path saveRoot) {
         try {
             regenerateHumanRendering(saveRoot);
@@ -53,9 +53,7 @@ public final class DownloadReportStore {
     }
 
     /**
-     * Append the completed line once (at-most-once), drop the sentinel, and refresh the human rendering. The save
-     * totals come in as a supplier evaluated only when the line is actually written, so the second driver never pays
-     * the scan.
+     * Append the completed line once (at-most-once), drop the sentinel, and refresh the human rendering.
      */
     public synchronized void complete(Path saveRoot, DownloadIdentity identity, ReportEnvironment environment,
             Map<String, String> settings, Instant finishedAt, DownloadCounts counts,
@@ -76,12 +74,12 @@ public final class DownloadReportStore {
         }
     }
 
-    /** The machine record file ({@code wdl/download.jsonl}), for readers such as the download screen. */
+    /** The machine record file ({@code wdl/download.jsonl}). */
     public static Path machineFile(Path saveRoot) {
         return reportFile(saveRoot, MACHINE_FILE);
     }
 
-    /** The crash sentinel file ({@code wdl/download.pending}); its presence with no completed line is a crash. */
+    /** The crash sentinel file ({@code wdl/download.pending}). */
     public static Path pendingFile(Path saveRoot) {
         return reportFile(saveRoot, PENDING_FILE);
     }
