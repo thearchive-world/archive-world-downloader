@@ -5,11 +5,6 @@ package world.thearchive.wdl.core.update;
 
 import java.util.Optional;
 
-/**
- * Semantic-version parse and precedence for the update check. {@link #parse(String)} tolerates a leading {@code v} and
- * refuses a malformed string with an empty {@link Optional}, never a throw; {@link #display(String)} is the shown form
- * of a raw version string and is total.
- */
 public final class SemVer implements Comparable<SemVer> {
     private final int major;
     private final int minor;
