@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
-/** The strictly-newer decision: client-side re-filter, newest by date with a semver tie-break. */
 class LatestReleaseTest {
     private static final SemVer RUNNING = SemVer.parse("1.0.0").orElseThrow();
 

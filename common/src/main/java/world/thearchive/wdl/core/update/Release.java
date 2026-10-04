@@ -8,11 +8,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * One immutable release row of the index. Constructed only from a fully-parsed row with every required field present
- * (the parse boundary drops partial rows), so the decision never sees a partial release; final fields only, so a row
- * publishes safely across the worker thread boundary.
- */
 public final class Release {
     private final String versionNumber;
     private final SemVer version;
@@ -33,7 +28,6 @@ public final class Release {
         this.versionType = versionType;
     }
 
-    /** The raw version string as the index returned it, for comparison and display cleaning. */
     public String versionNumber() {
         return versionNumber;
     }
