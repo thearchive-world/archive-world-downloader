@@ -6,7 +6,6 @@ package world.thearchive.wdl.core.update;
 import java.util.List;
 import java.util.Optional;
 
-/** The pure strictly-newer decision of the update check. */
 public final class LatestRelease {
     private LatestRelease() {}
 
