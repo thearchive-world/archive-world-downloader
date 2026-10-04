@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/** The version parse and precedence rules of the update check: tolerant in, total, never a throw. */
 class SemVerTest {
     private static SemVer version(String raw) {
         return SemVer.parse(raw).orElseThrow(() -> new AssertionError("expected " + raw + " to parse"));
