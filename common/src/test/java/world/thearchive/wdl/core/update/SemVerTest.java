@@ -34,8 +34,8 @@ class SemVerTest {
 
     @Test
     void discardsBuildMetadataBeforeThePrereleaseSplit() {
-        // The live shape 3.9.5+26.1-fabric hides a hyphen inside the build tail: splitting on '-' first
-        // would mis-read fabric as a prerelease and fail the numeric parse of 3.9.5+26.1.
+        // The shape 3.9.5+26.1-fabric hides a hyphen inside the build tail: splitting on '-' first would mis-read
+        // fabric as a prerelease.
         assertEquals(0, version("3.9.5+26.1-fabric").compareTo(version("3.9.5")));
     }
 
