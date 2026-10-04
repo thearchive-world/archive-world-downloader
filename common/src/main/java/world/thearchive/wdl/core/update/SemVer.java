@@ -19,10 +19,9 @@ public final class SemVer implements Comparable<SemVer> {
     }
 
     /**
-     * Parse {@code raw} to a comparable version, or empty if it is malformed. Build metadata is split off at the first
-     * {@code +} before the prerelease split and discarded: a shape like {@code 3.9.5+26.1-fabric} carries a hyphen
-     * inside its build tail, so splitting on {@code -} first would mis-read the tail as a prerelease and refuse the
-     * whole string.
+     * Build metadata is split off at the first {@code +} before the prerelease split: a shape like
+     * {@code 3.9.5+26.1-fabric} carries a hyphen inside its build tail, so splitting on {@code -} first would mis-read
+     * the tail as a prerelease.
      */
     public static Optional<SemVer> parse(String raw) {
         String remainder = stripLeadingV(raw);
@@ -57,9 +56,7 @@ public final class SemVer implements Comparable<SemVer> {
     }
 
     /**
-     * The shown form of a raw version string: a leading {@code v} and everything from the first {@code +} (build
-     * metadata) are stripped, so {@code v3.9.5+26.1-fabric} shows as {@code 3.9.5} while a prerelease like
-     * {@code 1.2.0-rc1} shows verbatim. Total: a non-version string passes through.
+     * The shown form of a raw version string: a leading {@code v} and everything from the first {@code +} are stripped.
      */
     public static String display(String raw) {
         String cleaned = stripLeadingV(raw);
@@ -72,9 +69,7 @@ public final class SemVer implements Comparable<SemVer> {
     }
 
     /**
-     * Numeric per-component precedence; a prerelease sorts below its bare release, and two prereleases order by plain
-     * string comparison (a deliberate simplification of the per-segment prerelease rules). Build metadata was discarded
-     * at parse and never participates.
+     * A prerelease sorts below its bare release.
      */
     @Override
     public int compareTo(SemVer other) {
