@@ -10,10 +10,10 @@
 
 [versions]
 loom = "1.17.21"
-moddev = "2.0.147"
-spotless = "8.10.2"
+moddev = "2.0.148"
+spotless = "8.10.3"
 errorprone-plugin = "5.1.1"
-mod-publish-plugin = "2.2.0"
+mod-publish-plugin = "2.2.1"
 
 [plugins]
 loom = { id = "fabric-loom", version.ref = "loom" }
@@ -32,5 +32,5 @@ errorprone-gradle-plugin = { module = "net.ltgt.gradle:gradle-errorprone-plugin"
 # tracks their currency (see the header note). The JUnit BOM's 6.x major is held back in dependabot.yml.
 jspecify        = { module = "org.jspecify:jspecify",                  version = "1.0.0" }
 errorprone-core = { module = "com.google.errorprone:error_prone_core", version = "2.50.0" }
-nullaway        = { module = "com.uber.nullaway:nullaway",             version = "0.14.1" }
+nullaway        = { module = "com.uber.nullaway:nullaway",             version = "0.14.2" }
 junit-bom       = { module = "org.junit:junit-bom",                    version = "5.14.4" }
