@@ -114,7 +114,7 @@ jobs:
       - name: Set up Gradle
         # basic is the MIT caching provider. The v6 default routes caching through the proprietary
         # gradle-actions-caching library, whose terms every fork's CI would otherwise accept silently.
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
         with:
           cache-provider: basic
 
@@ -125,7 +125,7 @@ jobs:
       # release workflow's publishMods, not these. Exclude the sources / dev jars Loom and ModDev also drop
       # into libs/ so the artifact carries only the production jar.
       - name: Upload Fabric artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: archive-wdl-fabric
           path: |
@@ -135,7 +135,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload NeoForge artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: archive-wdl-neoforge
           path: |
