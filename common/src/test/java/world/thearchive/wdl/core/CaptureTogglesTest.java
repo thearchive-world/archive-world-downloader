@@ -9,10 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
-/**
- * The capture-semantics toggle set and its conjunction, which is what keeps a mid-download settings edit from stranding
- * a marker: the on-screen aids draw an axis only where the live settings and the running download's latched set agree.
- */
 class CaptureTogglesTest {
     private static WdlConfig config(String... keyThenValue) {
         Properties properties = new Properties();
@@ -41,8 +37,6 @@ class CaptureTogglesTest {
                 "the interaction write rides the hot-chunk refresh, so off means no interaction reaches disk");
     }
 
-    // Two complementary patterns rather than one: with a single mixed fixture the axes sharing a value stay
-    // interchangeable, so a slot wired to the wrong knob reads correct. No two axes agree across both.
     @Test
     void eachAxisReadsItsOwnKnob() {
         CaptureToggles first = CaptureToggles.from(config("renderUnsavedOutline", "true",

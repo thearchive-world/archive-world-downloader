@@ -27,29 +27,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * The spectator crosshair fallback's guard: a container a SPECTATOR opens reaches disk only because
- * {@code ContainerCapture.resolveOpenTarget} still binds one to the crosshair. A spectator's click is not observable on
- * this loader, so nothing else can attribute the open. Fabric's {@code UseBlockCallback} returns for a spectator before
- * invoking its listeners, deliberately, so the open-click latch never sees the click even though vanilla sends the use
- * packet and the server opens the menu. Delete the fallback and this scenario goes red on the captured-set assertion,
- * which is what pins it as load-bearing rather than vestigial.
- *
- * <p>Distinct from {@link WdlContainerCaptureTest}, which drives the same open in creative and binds through the
- * clicked-block latch: nothing else in the suite enters the bind as a spectator, so the two branches of the resolve are
- * covered separately rather than by one scenario that cannot tell them apart.
- *
- * <p>The open is driven through {@code gameMode.useItemOn}, the method {@code Minecraft.startUseItem} calls for a
- * spectator too and the loader use hook's own injection site for blocks, so a drive that fails to latch here fails for
- * the loader's reason rather than for entering below the hook. The crosshair must land on the chest first for both
- * reasons at once: it is what the use call is handed, and it is what the bind reads.
- *
- * <p>The second scenario is the other half of the same rule, and the reason the fallback is per-axis rather than whole:
- * this loader DOES observe a spectator's entity click, so its crosshair entity leg can only ever fire for opens no
- * entity click accounts for, where the crosshair is a guess. It must bind nothing. The third narrows the kept block leg
- * the same way from inside: a block a spectator could not have opened is not evidence either, however confidently the
- * crosshair rests on it.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
     @Override
@@ -60,8 +37,6 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
             ContainerDriver.placeFilledChest(fixture.server(), chest);
             context.waitFor(client -> client.level.getBlockEntity(chest) instanceof ChestBlockEntity);
 
-            // The gamemode's effect, not the command's return: runCommand reports nothing when a command is
-            // refused, and a silently refused switch would make this pass as the creative scenario it mirrors.
             fixture.server().runCommand("gamemode spectator @a");
             context.waitFor(client -> client.player.isSpectator());
 
@@ -99,15 +74,8 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
     }
 
     /**
-     * The entity half of the fallback, on the loader that observes a spectator's entity click: the crosshair must not
-     * stand in for provenance there. The minecart is opened through the game mode directly, which reaches neither the
-     * use key nor the loader's use hook, so the menu arrives exactly as a server-opened GUI does, with the crosshair
-     * parked on a 27-slot container vehicle whose size the guard cannot tell from the menu's. Binding here would write
-     * whatever opened into that vehicle. A spectator's real click on the same minecart is observed and binds through
-     * the intent chain, so nothing this scenario forbids is a capture the loader could otherwise have attributed. That
-     * premise is asserted below rather than assumed: if it were ever false this loader would silently lose EVERY
-     * spectator entity-container capture while this scenario stayed green, because forbidding the crosshair bind looks
-     * identical either way from here.
+     * The minecart is opened through the game mode directly, which reaches neither the use key nor the loader's
+     * client-side use hook, so the menu arrives exactly as a server-opened GUI does.
      */
     private static UUID spectatorCrosshairEntityLegBindsNothing(ClientGameTestContext context,
             TestServerContext server, BlockPos stand) {
@@ -155,9 +123,6 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
         Check.that(!cartItems.contains("minecraft:diamond"),
                 "a spectator's unattributed open reached disk on the crosshair's vehicle: " + cartItems);
 
-        // The premise the refusal above rests on: a spectator's REAL click on the same minecart is observed
-        // on this loader and binds through the intent chain. Without this the scenario only proves that the
-        // crosshair was refused, which is equally true of a loader that observes nothing at all.
         CaptureDriver observed = CaptureDriver.start(context,
                 new DownloadTarget("wdl-spectator-entity-click", "wdl-spectator-entity-click", DownloadMode.NEW),
                 WdlConfig.DEFAULTS);
@@ -180,15 +145,12 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
     }
 
     /**
-     * The block leg is kept on this loader, but it must still refuse a block a spectator could not have opened. An
-     * ender chest is vanilla's one menu-opening block with no menu provider, and the server's spectator branch opens
-     * only from the provider, so no ender open a spectator caused can exist. Left unfiltered, an ender chest under the
-     * crosshair claims whatever open does arrive, and an ender bind merges into the player tag in level.dat rather than
-     * into a chunk.
+     * An ender chest is vanilla's one menu-opening block with no menu provider, and the server's spectator branch opens
+     * only from the provider, so no ender open a spectator caused can exist.
      *
-     * <p>The open is the minecart's, driven through the game mode so it reaches no use hook, and the crosshair is
-     * parked on the ender chest instead. Both are twenty-seven-slot chest menus, so nothing downstream can separate
-     * them: the discriminator is the block under the crosshair, which is exactly the wrong evidence.
+     * <p>The open is the minecart's, driven through the game mode, and the crosshair is parked on the ender chest
+     * instead. Both are twenty-seven-slot chest menus, so nothing downstream can separate them: the discriminator is
+     * the block under the crosshair, which is exactly the wrong evidence.
      */
     private static void spectatorCrosshairEnderChestBindsNothing(ClientGameTestContext context,
             TestServerContext server, BlockPos stand, UUID cartId) {
@@ -232,7 +194,6 @@ public class WdlSpectatorContainerCaptureTest implements FabricClientGameTest {
                 "the minecart's contents were written into the player's ender inventory: " + enderItems);
     }
 
-    /** Whether the client's crosshair is resolved onto a container vehicle (the entity-bind precondition). */
     private static boolean isLookingAtVehicle(Minecraft client) {
         return client.hitResult instanceof EntityHitResult entityHit
                 && entityHit.getType() == HitResult.Type.ENTITY

@@ -32,14 +32,6 @@ import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The lectern-merge synergy re-capture unlocks: a lectern placed AFTER its chunk was first captured has no block entity
- * in the snapshot-once tag, so the open-time book stash has nothing to merge onto. Re-capturing the chunk re-encodes
- * its block entities, so the placed lectern's block entity now exists and {@link ContainerMerge#mergeLecternChunkStash}
- * lands the stashed {@code Book}/{@code Page} on it. The book comes only from the stash, never the re-encode (the live
- * client lectern BE never holds a book, so a re-encode can never blank what merge sets), and the merge runs once per
- * chunk at flush, so repeated re-capture before that single flush cannot double-count or blank the contents.
- */
 class LecternRecaptureSynergyTest {
     private static final int LECTERN_X = 4;
     private static final int LECTERN_Y = 65;
@@ -73,7 +65,7 @@ class LecternRecaptureSynergyTest {
 
     @Test
     void withoutRecaptureNothingMergesOntoTheMissingLectern() {
-        // The snapshot-once gap: the chunk was captured before the lectern was placed, so its tag has none.
+        // The chunk was captured before the lectern was placed, so its tag has none.
         CompoundTag snapshotOnceTag = codec.encode(SyntheticChunks.full(registries, false), registries, false);
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
@@ -87,7 +79,6 @@ class LecternRecaptureSynergyTest {
 
     @Test
     void reCapturingThePlacedLecternLetsTheStashMergeOntoIt() {
-        // After re-capture the chunk's block entities include the placed lectern, so the merge lands.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, false,
                 List.of(blockEntity("minecraft:lectern", LECTERN_X, LECTERN_Y, LECTERN_Z)));
         CompoundTag recapturedTag = codec.encode(snapshot, registries, false);
@@ -104,9 +95,6 @@ class LecternRecaptureSynergyTest {
 
     @Test
     void repeatedRecaptureBeforeFlushMergesContentsExactlyOnce() {
-        // Re-capture re-encodes the chunk many times while it is hot; each fresh tag carries the (book-less)
-        // lectern block entity. The book comes from the stash and merges only at the single flush, so the
-        // count and contents are stable no matter how many re-encodes preceded it.
         CompoundTag latestRecapture = null;
         for (int reencode = 0; reencode < 3; reencode++) {
             ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, false,
@@ -122,7 +110,6 @@ class LecternRecaptureSynergyTest {
         assertEquals(1, merged, "the single flush merges the stash exactly once");
         assertTrue(stash.isEmpty(), "the stash entry is drained at flush, so it cannot merge again");
 
-        // A second flush-time merge (the stash now drained) adds nothing: re-capture never re-stocks the stash.
         int mergedAgain = ContainerMerge.mergeLecternChunkStash(sink, latestRecapture, chunkPos, stash).merged();
         assertEquals(0, mergedAgain, "a drained stash contributes no further merges, so the count cannot double");
         assertEquals("Stable", mergedTitle(latestRecapture), "the contents remain intact");

@@ -39,11 +39,7 @@ import world.thearchive.wdl.testsupport.BadStacks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the item and equipment degradation an item component the disk codec rejects causes. Where the
- * save absorbs that error rather than throwing, the whole field being written goes missing, and equipment is one field
- * covering every slot, so a mob wearing one bad stack would otherwise save with its entire equipment set gone and an
- * item entity carrying one with no item at all, with nothing in the log to show it. {@link EntitySinkImpl} repairs the
- * stack up front instead of recovering afterwards, so these tests assert on the saved NBT rather than on the entity
+ * {@link EntitySinkImpl} repairs the stack up front, so these tests assert on the saved NBT rather than on the entity
  * surviving: an unrepaired stack still yields non-null NBT, just without the equipment or the item in it.
  */
 class EntitySinkItemDegradationTest {
@@ -68,8 +64,6 @@ class EntitySinkItemDegradationTest {
         CompoundTag chunk = sink.encodeChunk(List.of(mob), new ChunkPos(0, 0), registries, false);
 
         assertNotNull(chunk, "the mob is saved");
-        // Where the save absorbs the codec error, the bad component costs the whole equipment field silently, so a
-        // non-null chunk proves nothing.
         CompoundTag entityTag = chunk.getListOrEmpty("Entities").getCompoundOrEmpty(0);
         ValueInput in = TagValueInput.create(ProblemReporter.DISCARDING, registries, entityTag);
         ItemStack savedBow = in.read("equipment", EntityEquipment.CODEC).orElseGet(EntityEquipment::new)
@@ -105,7 +99,6 @@ class EntitySinkItemDegradationTest {
         assertSame(sword, drop.getItem(), "the live carried item is restored");
     }
 
-    /** A headless Mob double; onEquipItem is overridden because the null level would NPE on equip. */
     private static final class EquipMob extends Mob {
         private EquipMob() {
             super(EntityType.PIG, null);
@@ -130,7 +123,6 @@ class EntitySinkItemDegradationTest {
         }
     }
 
-    /** A headless ItemEntity double carrying a caller-set stack. */
     private static final class DropItem extends ItemEntity {
         private DropItem() {
             super(EntityType.ITEM, null);

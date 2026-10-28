@@ -15,32 +15,9 @@ import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.impl.ItemStackSanitizer;
 
-/**
- * Serializes a merchant's open-menu trades to the on-disk holder: {@link #serialize} repairs each sell item's
- * disk-codec-invalid components, and {@link #scrubAndRemapOffers} scrubs each sell item's coordinates and remaps its
- * map id. A pure transform over already-client-held data: the client receives the offers over the menu channel and
- * exposes them as a {@code MerchantOffers}, and this drives the vanilla {@code MerchantOffers} codec directly, so the
- * tag it writes is the one vanilla's own {@code "Offers"} write produces and the archive loads without the mod.
- *
- * <p>{@link #serialize} builds the {@code {Offers:{Recipes:[...]}, Xp}} holder: the offers through
- * {@code MerchantOffers.CODEC} over registry-aware ops (the offers carry item stacks), and the trade experience only
- * for a villager (a wandering trader has none). {@link #scrubAndRemapOffers} walks each offer's {@code sell} item, the
- * only full item stack an offer carries, through the item-location scrub and the map-id remap every captured item
- * takes; the {@code buy}/{@code buyB} costs are match predicates, not instance data, so they carry no coordinate or map
- * id and are left alone.
- *
- * <p>The serialize keeps its throwing encode: the failure isolation for a sell item whose codec rejects lives at the
- * per-tick caller, which skips that villager and remembers it, exactly as the container path isolates per entity rather
- * than inside the codec.
- */
 final class MerchantOfferCapture {
     private MerchantOfferCapture() {}
 
-    /**
-     * Serialize {@code offers} to the {@code "Offers"} holder, adding {@code "Xp"} only when {@code isVillager}.
-     * Repairs each sell item's disk-codec-invalid components on a copy first. Throws if the codec still rejects an
-     * item; the caller isolates that per villager.
-     */
     static CompoundTag serialize(MerchantOffers offers, int xp, boolean isVillager, HolderLookup.Provider registries) {
         RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
         // Repair a snapshot, never the live offers backing the open trade menu.
@@ -57,11 +34,6 @@ final class MerchantOfferCapture {
         return holder;
     }
 
-    /**
-     * Run each offer's {@code sell} item through the item-location scrub (when {@code scrubCoordinates}) and the map-id
-     * remap (when {@code archive} is non-null), in place. A holder with no {@code "Offers"}/{@code "Recipes"}, or a
-     * recipe with no {@code "sell"}, is skipped. Drain-time work: call once per holder before it merges.
-     */
     static void scrubAndRemapOffers(CompoundTag holder, boolean scrubCoordinates, @Nullable MapArchive archive) {
         if (!(holder.get("Offers") instanceof CompoundTag offers)
                 || !(offers.get("Recipes") instanceof ListTag recipes)) {
