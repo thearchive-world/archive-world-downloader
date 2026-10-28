@@ -22,7 +22,6 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** The off-thread folder-size walk feeding the download screen's on-disk size: delivery and close. */
 class OnDiskSizeScannerTest {
     private static final long AWAIT_MILLIS = 2000;
 
@@ -85,7 +84,7 @@ class OnDiskSizeScannerTest {
         }
     }
 
-    /** A minimal qualifying source zip beside the folder name: level.dat plus a record with a finish time. */
+    /** A qualifying source zip beside the folder name: level.dat plus a record with a finish time. */
     private static Path cleanSourceZip(Path saves, String folderName) throws IOException {
         Path zip = saves.resolve(folderName + ".zip");
         try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
@@ -105,7 +104,6 @@ class OnDiskSizeScannerTest {
         assertFalse(scanner.isClosed(), "a fresh scanner is open");
         scanner.close();
         assertTrue(scanner.isClosed(), "close() marks the scanner closed");
-        // The screen replaces a closed scanner rather than reopening it, so a late submit must not throw at it.
         scanner.submit(folder, false);
     }
 
@@ -128,14 +126,12 @@ class OnDiskSizeScannerTest {
         }
     }
 
-    /** Drain until the submitted folder's result lands, failing after a bounded wait rather than blocking forever. */
     private static OnDiskSizeScanner.Result awaitOne(OnDiskSizeScanner scanner, Path folder)
             throws InterruptedException {
         return awaitDrained(scanner, byFolder -> byFolder.containsKey(folder), byFolder -> byFolder.get(folder),
                 "the walk result did not arrive within " + AWAIT_MILLIS + " ms");
     }
 
-    /** Drain until every submitted folder's result has landed; order across folders is not guaranteed. */
     private static Map<Path, OptionalLong> awaitAll(OnDiskSizeScanner scanner, Path... folders)
             throws InterruptedException {
         return awaitDrained(scanner, byFolder -> {
@@ -154,10 +150,6 @@ class OnDiskSizeScannerTest {
         }, "not all walk results arrived within " + AWAIT_MILLIS + " ms");
     }
 
-    /**
-     * Polls every 5 ms, draining completed walks into a folder-keyed map until {@code ready} accepts the accumulation,
-     * then returns {@code extract} of it; on timeout fails with {@code timeoutMessage} rather than blocking forever.
-     */
     private static <T> T awaitDrained(OnDiskSizeScanner scanner,
             Predicate<Map<Path, OnDiskSizeScanner.Result>> ready,
             Function<Map<Path, OnDiskSizeScanner.Result>, T> extract, String timeoutMessage)

@@ -16,9 +16,9 @@ import world.thearchive.wdl.fabric.FabricPlatformBridge;
 
 /**
  * Adds the wdl pause-menu row to the vanilla pause screen at the tail of {@code init()}, after every vanilla button.
- * fabric-api 0.28.5+1.15 ships no fabric-screen-api-v1 (ScreenEvents), so the row has no non-mixin screen hook. The row
- * goes straight into the Screen buttons and children lists through {@link ScreenAccessor}, mirroring the vanilla
- * addButton but bypassing any pause-screen override of it, so buildPauseMenuRow's placement holds.
+ * fabric-api 0.28.5 ships no fabric-screen-api-v1 ({@code ScreenEvents}), so the row has no non-mixin screen hook. The
+ * row goes straight into the Screen buttons and children lists through {@link ScreenAccessor}, mirroring the vanilla
+ * {@code addButton} but bypassing any pause-screen override of it, so {@code buildPauseMenuRow}'s placement holds.
  */
 @Mixin(PauseScreen.class)
 abstract class PauseScreenMixin {

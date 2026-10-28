@@ -21,14 +21,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/**
- * Fail-closed guard that new user-facing UI text lands as a translation key, not a hardcoded literal. Every user-facing
- * string is a {@code Component.translatable(...)} keyed under the {@code wdl} namespace; the
- * {@code new TextComponent(...)} calls left in the view layer render data or glyphs, never prose, and each is enrolled
- * below with the reason it is not text. This test pins that inventory per file, so a newly hardcoded literal fails the
- * build until it is classified: made a translation key if it is text, or enrolled here with a note if it is data or a
- * glyph. Same fail-closed enrollment shape as {@link PitestAllowlistEnrollmentTest}.
- */
 class UiLiteralEnrollmentTest {
     private static final String NEEDLE = "new TextComponent(";
 
@@ -37,15 +29,13 @@ class UiLiteralEnrollmentTest {
             Paths.get("../fabric/src/main/java/world/thearchive/wdl"),
             Paths.get("../neoforge/src/main/java/world/thearchive/wdl"));
 
-    // File to number of new TextComponent(...) calls, each one data or a glyph, never user-facing prose.
     private static final Map<String, Integer> ACKNOWLEDGED_UI_LITERALS = ImmutableMap.of(
             // the one amber-argument helper every confirm body's data insert (folder, backup or source zip
             // name, snapshot name) routes through
             "ResumeConfirm.java", 1,
-            // the disclosure triangle glyph and the update banner's underlined link label
+            // the disclosure triangle glyph and the update banner's link label
             "WdlDownloadsScreen.java", 2,
-            // the chat and toast arguments core flattened to data, plus the link-target hover text; all on the
-            // shared bridge rather than duplicated on each loader
+            // the chat and toast arguments core flattened to data, plus the link-target hover text
             "AbstractPlatformBridge.java", 3,
             // the empty no-phase HUD label placeholder, phaseLabel's NONE case
             "WdlHudOverlay.java", 1);
@@ -55,7 +45,6 @@ class UiLiteralEnrollmentTest {
         Map<String, Integer> found = new TreeMap<>();
         for (Path root : VIEW_ROOTS) {
             if (root.startsWith("..")) {
-                // A band ships only some loaders, so a loader root may be absent; only common's own root must exist.
                 if (!Files.isDirectory(root)) {
                     continue;
                 }

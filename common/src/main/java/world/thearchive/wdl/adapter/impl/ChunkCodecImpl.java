@@ -33,39 +33,20 @@ import org.jspecify.annotations.Nullable;
 import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
-/**
- * 1.15.2 chunk codec: replicates the minimal client-safe slice of vanilla
- * {@code ChunkSerializer.write(ServerLevel, ChunkAccess)} to NBT. Below the 1.21.2 cut the chunk write is a static
- * method that reads from a {@code ServerLevel} a multiplayer client never has, so {@link #encode} rebuilds the tag
- * field by field from the captured snapshot rather than calling vanilla.
- *
- * <p>Two steps (see {@link ChunkCodec}): {@link #capture(LevelChunk)} captures a live client chunk into a
- * {@link ChunkSnapshotSource}, and {@link #encode(ChunkSnapshotSource, boolean)} encodes that snapshot to NBT (pure, so
- * the headless round-trip guards it).
- */
 public final class ChunkCodecImpl implements ChunkCodec {
-    /** Client chunks have no post-processing (a worldgen artifact). */
     private static final ShortList[] NO_POST_PROCESSING = new ShortList[0];
 
-    // A 1.15.2 world is 0..256: block sections 0..15, with a light-only pad one section below and above. A taller
-    // source (a 26.x server reached through a downgrade proxy) sends sections beyond that range; a section carrying
-    // block data outside 0..15 would crash vanilla's unchecked sections[index] on load, so its block data is dropped
-    // and the biome column is re-sliced to 0..256. Entities above or below are unaffected (a separate save axis).
+    // A 1.15.2 world is 0..256: block sections 0..15, with a light-only pad one section below and above.
     private static final int MIN_BLOCK_SECTION = 0;
     private static final int MAX_BLOCK_SECTION = 15;
     private static final int BIOME_QUART_LAYERS = 64;
 
     /**
-     * Snapshot a live client chunk on the main thread (block-state section copies, per-chunk biomes, cloned heightmaps,
-     * block-entity NBT), everything detached so only immutable data crosses to the async IO worker. The server-only
-     * structure call is dropped here and reproduced as empty maps in {@link #encode(ChunkSnapshotSource, boolean)}.
+     * Snapshot a live client chunk on the main thread (block-state section copies, per-chunk biomes, cloned
+     * heightmaps), detached so none of them crosses live to the async IO worker.
      *
-     * <p>Light is read from the client light engine the way the server's own save path reads its engine: the padded
-     * section range, keeping only non-empty layers. A chunk qualifies only when it reports its initial server light
-     * applied ({@code isLightCorrect}); otherwise the snapshot carries no light and reports {@code lightCorrect=false},
-     * and vanilla relights that chunk on load. Pending light work is drained first, effectively once per tick (later
-     * calls find none): a block edit updates the section palette immediately while its relight waits for the render
-     * pass, so an undrained read could freeze pre-edit light under {@code isLightOn=true}.
+     * <p>A chunk qualifies only when it reports {@code isLightCorrect}; otherwise the snapshot carries no light and
+     * reports {@code lightCorrect=false}, and vanilla relights that chunk on load.
      */
     @Override
     public ChunkSnapshotSource capture(LevelChunk chunk) {
@@ -92,7 +73,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
                 skyLight = copyNonEmpty(lightEngine.getLayerListener(LightLayer.SKY)
                         .getDataLayerData(SectionPos.of(pos, sectionY)));
             }
-            // Below 1.18 an all-air or untransmitted section slot is null, so guard before copying.
+            // Below 1.18 an untransmitted section slot is null, so guard before copying.
             LevelChunkSection live = inChunk ? sections[index] : null;
             if (live != null || blockLight != null || skyLight != null) {
                 sectionData.add(new ChunkSnapshotSource.SectionData(sectionY,
@@ -125,7 +106,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         ChunkPos pos = snapshot.chunkPos();
         CompoundTag tag = new CompoundTag();
         tag.putInt("DataVersion", SharedConstants.getCurrentVersion().getWorldVersion());
-        // Below 1.18 the chunk NBT nests everything under a Level compound; only DataVersion sits at the root.
         CompoundTag levelTag = new CompoundTag();
         tag.put("Level", levelTag);
         levelTag.putInt("xPos", pos.x);
@@ -137,7 +117,7 @@ public final class ChunkCodecImpl implements ChunkCodec {
         ListTag sectionsTag = new ListTag();
         for (ChunkSnapshotSource.SectionData section : snapshot.sections()) {
             if (section.y() < MIN_BLOCK_SECTION - 1 || section.y() > MAX_BLOCK_SECTION + 1) {
-                continue; // outside the 1.15.2 section column (block range plus the one-section light pad); dropped
+                continue;
             }
             CompoundTag sectionTag = new CompoundTag();
             LevelChunkSection chunkSection = section.chunkSection();
@@ -168,8 +148,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         blockEntitiesTag.addAll(snapshot.blockEntities());
         levelTag.put("TileEntities", blockEntitiesTag);
 
-        // A captured chunk is a FULL LevelChunk, never a ProtoChunk, so the entities/CarvingMasks branch is dropped.
-        // Client chunks carry no scheduled ticks (those are server state), so both tick lists save empty.
         levelTag.put("TileTicks", new ListTag());
         levelTag.put("LiquidTicks", new ListTag());
         levelTag.put("PostProcessing", ChunkSerializer.packOffsets(NO_POST_PROCESSING));
@@ -183,11 +161,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return tag;
     }
 
-    /**
-     * A detached copy of a live section. Below 1.18 LevelChunkSection has no copy(), so the copy reconstructs a fresh
-     * section and replays the block states into it; below 1.20 the constructor also takes the section y-index. Biomes
-     * live per-chunk here, not on the section.
-     */
     private static LevelChunkSection copySection(int sectionY, LevelChunkSection section) {
         LevelChunkSection copy = new LevelChunkSection(sectionY);
         for (int y = 0; y < 16; y++) {
@@ -200,11 +173,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return copy;
     }
 
-    /**
-     * The per-chunk biome ids for the 1.15.2 column, always the 0..256 grid a 1.15.2 save expects. A taller source's
-     * container spans a wider height, so each cell is read through the container's world-Y-aware accessor and re-sliced
-     * to the 1024-cell shape rather than writing the container's own longer array.
-     */
     private static int[] clampedBiomes(LevelChunk chunk) {
         Registry<Biome> biomeRegistry = Registry.BIOME;
         ChunkBiomeContainer container = chunk.getBiomes();
@@ -220,18 +188,14 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return biomes;
     }
 
-    /** A detached copy of a stored layer, or null when the engine holds none (empty layers are omitted). */
     private static @Nullable DataLayer copyNonEmpty(@Nullable DataLayer layer) {
         return layer != null && !layer.isEmpty() ? layer.copy() : null;
     }
 
     /**
-     * Heightmaps to persist: those the client actually received ({@code sendToClient()}) and relevant to the chunk's
-     * status ({@code heightmapsAfter()}). For a FULL chunk this keeps the three CLIENT-usage maps and drops
-     * {@code OCEAN_FLOOR}, which the {@code LevelChunk} ctor pre-creates but the server never transmits (it filters the
-     * chunk packet by {@code sendToClient()}), leaving it present-but-zeroed on the client. Omitting it makes vanilla
-     * {@code read()} re-prime it on load rather than trust bad data. {@code sendToClient()} is exactly vanilla's own
-     * "what the client got" predicate, so it tracks correctly even if the heightmap set changes across versions.
+     * For a FULL chunk this drops {@code OCEAN_FLOOR}, which the {@code LevelChunk} ctor pre-creates but the server
+     * never transmits (it filters the chunk packet by {@code sendToClient()}), leaving it present-but-zeroed on the
+     * client. Omitting it makes vanilla {@code read()} re-prime it on load rather than trust bad data.
      */
     private static Map<Heightmap.Types, long[]> clientHeightmaps(ChunkSnapshotSource snapshot) {
         Set<Heightmap.Types> persistable = snapshot.status().heightmapsAfter();
@@ -244,12 +208,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return kept;
     }
 
-    /**
-     * The structure tag for a client chunk: {@code {Starts:{}, References:{}}}, exactly what vanilla
-     * {@code packStructureData} emits for empty start/reference maps (client chunks always carry empty ones). Built
-     * directly so we never call {@code StructurePieceSerializationContext.fromLevel(serverLevel)}, which dereferences
-     * {@code level.getServer()} and NPEs on a client.
-     */
     private static CompoundTag emptyStructureData() {
         CompoundTag structures = new CompoundTag();
         structures.put("Starts", new CompoundTag());
@@ -257,7 +215,6 @@ public final class ChunkCodecImpl implements ChunkCodec {
         return structures;
     }
 
-    /** Immutable snapshot of a captured live chunk (only {@link CompoundTag}s and copies cross threads). */
     private static final class CapturedChunkSnapshot implements ChunkSnapshotSource {
         private final ChunkPos chunkPos;
         private final int minSectionY;

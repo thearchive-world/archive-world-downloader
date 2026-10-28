@@ -17,10 +17,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.core.update.Release;
 import world.thearchive.wdl.core.update.SemVer;
 
-/**
- * The index request contract and the fail-soft parse: every failure shape yields an empty list and no thrown error,
- * exercised through an injected fake transport, never a socket.
- */
 class ReleaseIndexTest {
     @Test
     void requestCarriesTheIndexContract() {

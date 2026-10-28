@@ -23,25 +23,12 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the merchant-offer capture transform: {@link MerchantOfferCapture#serialize} writes a villager
- * or wandering trader's offers to the vanilla-shaped {@code {Offers:{Recipes:[...]}, Xp}} holder through the vanilla
- * {@code MerchantOffers} codec, and {@link MerchantOfferCapture#scrubAndRemapOffers} runs each offer's {@code sell}
- * item through the same item-location scrub and map-id remap every captured item takes. Real {@link ItemStack}s
- * carrying the components drive the round-trip, so a wrong key leaves the coordinate or the session map id and fails;
- * no live menu or {@code Level} is needed.
- */
 class MerchantOfferCaptureTest {
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.bootstrap();
     }
 
-    /**
-     * A lodestone compass whose target is the raw {@code LodestonePos}/{@code LodestoneDimension} keys
-     * {@link ItemLocationScrub} scrubs (below 1.20.5 there is no {@code LodestoneTracker} component; vanilla's own
-     * {@code CompassItem.addLodestoneTags} writes exactly these three keys on the item's {@code tag}).
-     */
     private static ItemStack lodestoneCompass() {
         ItemStack compass = new ItemStack(Items.COMPASS);
         GlobalPos pos = GlobalPos.of(DimensionType.OVERWORLD, new BlockPos(128, 64, -512));
@@ -52,7 +39,6 @@ class MerchantOfferCaptureTest {
         return compass;
     }
 
-    /** A filled-map stack carrying {@code mapId} in its raw {@code "map"} tag (below 1.20.5, no {@code map_id}). */
     private static ItemStack filledMap(int mapId) {
         ItemStack map = new ItemStack(Items.FILLED_MAP);
         map.getOrCreateTag().putInt("map", mapId);
@@ -60,7 +46,6 @@ class MerchantOfferCaptureTest {
     }
 
     private static MerchantOffers offering(ItemStack sell) {
-        // Below 1.20.5 there is no ItemCost; a merchant offer's buy cost is a plain ItemStack.
         MerchantOffers offers = new MerchantOffers();
         offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), sell, 1, 0, 0.0f));
         return offers;
@@ -70,7 +55,6 @@ class MerchantOfferCaptureTest {
         return MerchantOfferCapture.serialize(offering(sell), 0, false);
     }
 
-    /** The {@code sell} item's pre-component {@code tag} compound (below 1.20.5, no {@code components} map). */
     private static CompoundTag sellItemTag(CompoundTag holder) {
         return holder.getCompound("Offers").getList("Recipes", 10).getCompound(0)
                 .getCompound("sell").getCompound("tag");
@@ -98,11 +82,11 @@ class MerchantOfferCaptureTest {
     @Test
     void scrubBlanksLodestoneTargetOnSellItem() {
         CompoundTag holder = holderSelling(lodestoneCompass());
-        assertTrue(sellHasLodestoneTarget(holder), "precondition: the sell compass carries a target");
+        assertTrue(sellHasLodestoneTarget(holder), "precondition: the sell compass carries LodestonePos");
 
         MerchantOfferCapture.scrubAndRemapOffers(holder, true, null);
 
-        assertFalse(sellHasLodestoneTarget(holder), "the sell item's lodestone target is blanked");
+        assertFalse(sellHasLodestoneTarget(holder), "the sell item's LodestonePos is blanked");
     }
 
     @Test
@@ -138,6 +122,6 @@ class MerchantOfferCaptureTest {
         CompoundTag holder = holderSelling(new ItemStack(Items.DIAMOND));
         holder.getCompound("Offers").getList("Recipes", 10).getCompound(0).remove("sell");
 
-        MerchantOfferCapture.scrubAndRemapOffers(holder, true, null); // must not throw; reaches the per-recipe skip
+        MerchantOfferCapture.scrubAndRemapOffers(holder, true, null);
     }
 }

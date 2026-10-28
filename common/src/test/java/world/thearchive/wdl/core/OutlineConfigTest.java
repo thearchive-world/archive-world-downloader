@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
-/** The unsaved-container outline config block: defaults, parsing, range clamping, and malformed self-heal. */
 class OutlineConfigTest {
     @Test
     void defaultsAreOnAt96RedAndViolet() {
@@ -65,7 +64,7 @@ class OutlineConfigTest {
         properties.setProperty("outlineLineWidthScale", "-1");
         assertEquals(0.5f, WdlConfig.parse(properties, malformed).outline().lineWidthScale());
 
-        assertTrue(malformed.isEmpty()); // clamping to a bound is not a malformed edit
+        assertTrue(malformed.isEmpty());
     }
 
     @Test

@@ -11,11 +11,6 @@ import java.util.Map;
 
 import world.thearchive.wdl.core.RegionChunkScan;
 
-/**
- * The frozen in-save chunk totals a completed download recorded: every chunk present on disk at the finish instant, per
- * dimension, from the region-header scan. Unlike the session counts this covers prior sessions and dimensions the
- * session never visited. A plain immutable value; {@link #total()} is the sum of the per-dimension counts.
- */
 public final class SaveChunks {
     private final int total;
     private final List<DimensionChunks> dimensions;
@@ -47,7 +42,6 @@ public final class SaveChunks {
         return total;
     }
 
-    /** The per-dimension breakdown, one entry per dimension with at least one chunk on disk. */
     public List<DimensionChunks> dimensions() {
         return dimensions;
     }

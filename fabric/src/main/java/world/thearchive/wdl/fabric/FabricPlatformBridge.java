@@ -24,17 +24,7 @@ import world.thearchive.wdl.client.WdlKeyBinds;
 import world.thearchive.wdl.platform.AbstractPlatformBridge;
 import world.thearchive.wdl.platform.WdlCommands;
 
-/**
- * Fabric {@link AbstractPlatformBridge}: maps the loader-specific hooks (keybind, ticks, disconnect, config directory,
- * command registration) to Fabric's APIs. Constructed directly by {@code WdlFabricClient} and handed to
- * {@code Wdl.initialize}; every Fabric / vanilla call happens inside the methods (run from the client thread), never
- * the constructor.
- */
 public final class FabricPlatformBridge extends AbstractPlatformBridge {
-    // This band's fabric-api ships no fabric-screen-api-v1 (ScreenEvents), so the pause-menu row has no non-mixin
-    // screen hook; PauseScreenMixin injects it at the tail of PauseScreen.init() and reads this factory, which
-    // addPauseMenuButtons binds to the live callbacks once at startup. Set on the client thread before any pause
-    // screen opens and read on that same thread, so no synchronization is needed.
     private static @Nullable BiFunction<Screen, List<AbstractWidget>, List<AbstractWidget>> pauseMenuRowFactory;
 
     @Override
@@ -57,8 +47,8 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
 
     /**
      * The wdl pause-menu row for {@code PauseScreenMixin} to add at the tail of {@code PauseScreen.init()}, built from
-     * the callbacks {@link #addPauseMenuButtons} stored above {@code existingButtons}. Empty before that runs, and in
-     * the user's own local world, where the row is hidden.
+     * the callbacks {@link #addPauseMenuButtons} stored. Empty before that runs, and in the user's own local world,
+     * where the row is hidden.
      */
     public static List<AbstractWidget> pauseMenuRow(Screen screen, List<AbstractWidget> existingButtons) {
         BiFunction<Screen, List<AbstractWidget>, List<AbstractWidget>> factory = pauseMenuRowFactory;
@@ -109,21 +99,14 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
         return FabricLoader.getInstance().isModLoaded(modId);
     }
 
-    /**
-     * False. The mixin backing {@code UseBlockCallback} is injected into {@code MultiPlayerGameMode.useItemOn} above
-     * vanilla's own spectator return, but its handler body opens with its own spectator return, ahead of the invoker
-     * call, and says so ("vanilla spectator check happens later, repeat it before the event to avoid false
-     * invocations"), so no listener runs. The injection site is not what decides this; the handler body is.
-     */
     @Override
     public boolean observesSpectatorBlockClick() {
         return false;
     }
 
     /**
-     * True, the opposite of the block axis. {@code UseEntityCallback} is invoked as the first statement of a mixin on
-     * {@code Minecraft.startUseItem}, whose handler body carries no gamemode test, and vanilla reaches that call site
-     * for a spectator.
+     * True. {@code UseEntityCallback} is invoked as the first statement of a mixin, whose handler body carries no
+     * gamemode test, and vanilla reaches that call site for a spectator.
      */
     @Override
     public boolean observesSpectatorEntityClick() {
@@ -132,8 +115,6 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public void registerCommands(WdlCommands commands) {
-        // No-op on this band: the Fabric client-command API (fabric-command-api-v1, ClientCommandManager) postdates
-        // 1.15, so the /wdl command tree cannot be registered without a mixin, and none ship. The keybinds and the
-        // ModMenu config button remain the entry points here.
+        // No-op on this band: the Fabric client-command API (ClientCommandManager) postdates 1.15.
     }
 }

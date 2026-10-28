@@ -12,11 +12,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins the choosable overlay marker hues by exact hex through the enum's {@code rgb()} accessor: the four brand
- * defaults plus the curated four-hue Okabe-Ito alternative set. Config stores the enum constant; consumers read
- * {@code rgb()} at the draw site (no RGB round-trip).
- */
 class MarkerHueTest {
     @Test
     void markerHuesExposeTheirRgb() {
@@ -32,8 +27,6 @@ class MarkerHueTest {
 
     @Test
     void theTwoOverlayDefaultsCarryTheirBrandValue() {
-        // The fixed chrome token and the themeable marker default are separate roles that share a hue, so the
-        // overlay opens on-brand; a drift between the two would silently take the overlay off-brand.
         assertEquals(BrandColors.TEAL, MarkerHue.TEAL.rgb());
         assertEquals(BrandColors.AMBER, MarkerHue.AMBER.rgb());
     }
@@ -47,8 +40,6 @@ class MarkerHueTest {
 
     @Test
     void theCuratedSetIsExactlyEight() {
-        // Four brand defaults + four Okabe-Ito alternatives; the 8-hue Okabe-Ito set is deliberately NOT
-        // re-expanded, so the count matching is a coincidence of arithmetic, not the same set.
         assertEquals(8, MarkerHue.values().length);
     }
 
@@ -66,8 +57,6 @@ class MarkerHueTest {
 
     @Test
     void noCycleOffersBothAmberAndYellow() {
-        // The two read as one color under red-green deficiency, so a row listing both would present a choice
-        // that is not one. Only the covered row, whose sibling default is AMBER, still reaches YELLOW.
         for (MarkerHue brandDefault : Arrays.asList(MarkerHue.RED, MarkerHue.VIOLET, MarkerHue.TEAL,
                 MarkerHue.AMBER)) {
             List<MarkerHue> cycle = MarkerHue.presetCycle(brandDefault);
@@ -80,8 +69,6 @@ class MarkerHueTest {
 
     @Test
     void presetCycleNeverSurfacesTheSiblingRolesBrandHue() {
-        // Two roles draw side by side on one surface, so a row's cycle omits its sibling's signature hue. The
-        // other surface's defaults are offered: those roles never appear in the same view.
         List<MarkerHue> unscanned = MarkerHue.presetCycle(MarkerHue.RED);
         assertFalse(unscanned.contains(MarkerHue.VIOLET), "the unscanned cycle omits the recovered brand hue");
         assertTrue(unscanned.contains(MarkerHue.TEAL), "the outline surface may borrow an overlay brand hue");

@@ -5,13 +5,11 @@ package world.thearchive.wdl.client;
 
 import net.minecraft.client.gui.Font;
 
-/** Shared client-side text helpers. */
 final class ClientText {
     private static final String ELLIPSIS = "...";
 
     private ClientText() {}
 
-    /** {@code text} trimmed from the end with a trailing ellipsis to fit {@code maxWidth} pixels in {@code font}. */
     static String ellipsize(Font font, String text, int maxWidth) {
         if (font.width(text) <= maxWidth) {
             return text;

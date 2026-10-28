@@ -19,13 +19,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.impl.MapSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the per-band map serialize: serializeMap turns a client-shaped {@link MapItemSavedData} into
- * the inner {@code "data"} tag vanilla's own {@code MapItemSavedData.load} reads back to an equal map (the image,
- * dimension, and scale faithful), and a locked map serializes {@code locked=true}. Server-free by construction: a
- * constructed client map drives it, so neither a live menu nor a {@code Level} is needed; the live {@code getMapData}
- * resolution is not exercised headless.
- */
 class MapSinkRoundTripTest {
     private final MapSink sink = new MapSinkImpl();
 
@@ -35,13 +28,10 @@ class MapSinkRoundTripTest {
     }
 
     private static MapItemSavedData clientMap(byte scale, boolean locked) {
-        // 1.16.5 has no MapItemSavedData.createForClient; a client map is the bare instance with its public
-        // scale/dimension/locked fields set, the colors array already sized by the field initializer.
         MapItemSavedData map = new MapItemSavedData("map");
         map.scale = scale;
         map.dimension = DimensionType.OVERWORLD;
         map.locked = locked;
-        // A recognizable non-blank image, so a dropped or zeroed colors array fails the round-trip.
         map.colors[0] = (byte) 42;
         map.colors[100] = (byte) -7;
         map.colors[16383] = (byte) 99;
@@ -79,9 +69,7 @@ class MapSinkRoundTripTest {
 
     @Test
     void aDimensionlessMapStillSerializesItsImage() {
-        // A version-bridging proxy (ViaVersion/ViaBackwards fronting a newer server) can relay a filled map to the
-        // client with a null dimension, which vanilla save dereferences; the serialize must stand one in rather
-        // than lose the image, and leave the live client map's dimension as it was received.
+        // A filled map can reach the client with a null dimension, which vanilla save dereferences.
         MapItemSavedData map = clientMap((byte) 1, false);
         map.dimension = null;
 

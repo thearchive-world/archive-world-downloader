@@ -20,15 +20,9 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * Pins the natural-spawn equipment table: an item outside a type's pool in a pickup-fillable slot is a proven loot
- * pickup (persistence restored), an item inside the pool is ambiguous (left alone), the offhand is never inferred, and
- * unknown types are never inferred. Verified against decompiled 1.15.2.
- */
 class NaturalEquipmentTest {
     @BeforeAll
     static void bootstrap() {
-        // Populates BuiltInRegistries so Items.* / EntityType.* resolve and ItemStack.is works headless.
         TestRegistries.bootstrap();
     }
 
@@ -56,7 +50,7 @@ class NaturalEquipmentTest {
     void naturalHeadItemsAreCarvedOutGlobally() {
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.HEAD, of(Items.CARVED_PUMPKIN)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.SKELETON, EquipmentSlot.HEAD, of(Items.JACK_O_LANTERN)));
-        // Raid/patrol captain ominous banner; Paper strips the pattern to a bare white banner, match the item.
+        // Raid/patrol captain ominous banner.
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.PILLAGER, EquipmentSlot.HEAD, of(Items.WHITE_BANNER)));
     }
 
@@ -76,7 +70,6 @@ class NaturalEquipmentTest {
 
     @Test
     void typeSpecificArmorPools() {
-        // A base-armor spawn wears any armor tier naturally; a no-armor spawn never does.
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE, EquipmentSlot.CHEST, of(Items.GOLDEN_CHESTPLATE)));
         assertFalse(
                 NaturalEquipment.isNaturalFor(EntityType.DROWNED, EquipmentSlot.CHEST, of(Items.LEATHER_CHESTPLATE)));
@@ -84,7 +77,6 @@ class NaturalEquipmentTest {
 
     @Test
     void offhandIsNeverInferred() {
-        // The offhand is outside the inference: a mob can hold an unpersisted item there.
         assertTrue(NaturalEquipment.isNaturalFor(EntityType.ZOMBIE_PIGMAN, EquipmentSlot.OFFHAND,
                 of(Items.GOLD_INGOT)));
         assertFalse(NaturalEquipment.PICKUP_SLOTS.contains(EquipmentSlot.OFFHAND));
@@ -123,7 +115,6 @@ class NaturalEquipmentTest {
         assertFalse(NaturalEquipment.wasLootEquipped(pig), "a type with no spawn-gear profile is never inferred");
     }
 
-    /** A Mob double whose gear is served straight from the map, avoiding equipment machinery. */
     private static final class GearedMob extends Mob {
         private final Map<EquipmentSlot, ItemStack> gear;
 

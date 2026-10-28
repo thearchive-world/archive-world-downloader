@@ -9,11 +9,6 @@ import java.util.function.Function;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.network.chat.Component;
 
-/**
- * A minimal value-cycling button for this band: 1.15.2 ships no {@code CycleButton}, so the settings screen drives its
- * own. A press advances to the next value, wrapping, and fires the change callback; the face shows the current value
- * only.
- */
 final class WdlCycleButton<T> extends AbstractButton {
     private final List<T> values;
     private final Function<T, Component> labelFor;
