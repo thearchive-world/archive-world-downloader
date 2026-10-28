@@ -20,22 +20,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Resume container-clobber axis: a resumed download that re-captures a chunk whose chest was filled in a prior run,
- * WITHOUT re-opening the chest, must carry the chest's prior {@code Items} forward from disk rather than clobber them
- * with the fresh empty capture. A container's contents reach the client only through its open menu, so a resume that
- * does not re-open the chest captures it empty; {@code ChunkMerge} carries the on-disk Items forward (the re-walk
- * live-updates the terrain without wiping a chest the prior session opened). {@link WdlResumeCaptureTest} exercises
- * only the PRESERVE path (the prior area unloads, so its chunk is never re-captured); this drives the
- * re-capture-and-fold path, the one where a clobber would silently lose downloaded contents. The field-level merge
- * logic is the unit suite's ({@code ChunkMergeTest}); this is the integration proof that the live resume loop reaches
- * it.
- *
- * <p>A marker block placed in the chest's chunk only on the resume run makes the fold load-bearing: it exists in the
- * fresh re-capture but never on disk from the first run, so a green run shows the marker present (the chunk was
- * genuinely re-captured, not preserved untouched) AND the chest's planted item preserved (no clobber). The fold must
- * therefore take the new terrain while keeping the prior container contents.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlResumeContainerClobberTest implements FabricClientGameTest {
     private static final String RESUME_MARKER = "minecraft:gold_block";
@@ -51,7 +35,6 @@ public class WdlResumeContainerClobberTest implements FabricClientGameTest {
             ContainerDriver.placeFilledChest(server, chest);
             context.waitFor(client -> client.level.getBlockEntity(chest) instanceof ChestBlockEntity);
 
-            // NEW: open the chest so its synced contents bind and reach disk.
             ContainerDriver.aimEyesAt(context, ContainerDriver.center(chest));
             ContainerDriver.awaitCrosshair(context, client -> ContainerDriver.isLookingAt(client, chest),
                     "chest " + chest);
@@ -71,14 +54,9 @@ public class WdlResumeContainerClobberTest implements FabricClientGameTest {
             Check.that(ContainerDriver.capturedChestItems(firstSave, chest).contains(ContainerDriver.PLANTED_ITEM),
                     "NEW capture did not record the opened chest's planted item");
 
-            // Close the menu, and wait until it is actually closed, so the resume run re-captures with no open
-            // container to re-stash from: a still-open menu would let the resume pass by re-stashing rather than
-            // by the disk carry-forward this axis exists to prove.
             context.runOnClient(client -> client.player.closeContainer());
             context.waitFor(client -> client.player.containerMenu == client.player.inventoryMenu);
 
-            // RESUME: drop a marker in the chest's chunk and re-capture WITHOUT re-opening the chest. The fresh
-            // capture sees an empty chest; the fold must keep the prior Items while taking the new marker block.
             BlockPos marker = new BlockPos(chestChunk.getMinBlockX() + 8, 80, chestChunk.getMinBlockZ() + 8);
             server.runOnServer(minecraftServer -> minecraftServer.overworld().setBlock(marker,
                     Blocks.GOLD_BLOCK.defaultBlockState(), 3));

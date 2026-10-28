@@ -36,18 +36,11 @@ import world.thearchive.wdl.testsupport.BadStacks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the item and equipment degradation this band exhibits. Unlike the unresolved-leash case
- * ({@link EntitySinkLeashDegradationTest}), a disk-codec-invalid item component throws the entity save out entirely on
- * this band: {@link ItemStack#save} ends in {@code getOrThrow()}, and {@code Mob.addAdditionalSaveData} and
- * {@code ItemEntity.addAdditionalSaveData} call it directly per stack with no codec-level recovery, so a mob equipped
- * with a bad bow, or an item entity carrying a bad stack, would otherwise abort {@code encodeChunk} with an exception
- * rather than save with the item quietly gone. Both fixtures below are genuinely unsavable: a raw {@code set()} does no
- * validation on write, so an enchantment holder pinned at level 0, outside the codec's [1:255] range, and a
- * {@link DataComponents#DAMAGE} of -1, a {@code NON_NEGATIVE_INT} field, both cross the network codec fine and fail
- * only once the persistent codec encodes them. {@link EntitySinkImpl} repairs the stack up front instead of relying on
- * that throw, so these tests assert on the saved NBT itself, not just that the entity survived: a regression that let
- * the bad stack reach save unrepaired would make {@code encodeChunk} throw, not merely return NBT with the item
- * missing.
+ * Both fixtures below are genuinely unsavable: a raw {@code set()} does no validation on write, so an enchantment
+ * holder pinned at level 0, outside the codec's [1:255] range, and a {@link DataComponents#DAMAGE} of -1, a
+ * {@code NON_NEGATIVE_INT} field, both cross the network codec fine and fail only once the persistent codec encodes
+ * them. {@link EntitySinkImpl} repairs the stack up front, so these tests assert on the saved NBT itself, not just that
+ * the entity survived.
  */
 class EntitySinkItemDegradationTest {
     private final EntitySink sink = new EntitySinkImpl();
@@ -71,10 +64,8 @@ class EntitySinkItemDegradationTest {
         CompoundTag chunk = sink.encodeChunk(List.of(mob), new ChunkPos(0, 0), registries, false);
 
         assertNotNull(chunk, "the mob is saved");
-        // Assert on the SAVED NBT, not just non-null: on this band a disk-codec-invalid component throws
-        // entity.save out entirely, so encodeChunk itself is what is red without the fix. Read the saved equipment
-        // back and prove the repaired bow survived. Mob.addAdditionalSaveData writes equipment as the HandItems and
-        // ArmorItems ListTags (no EntityEquipment on this band), with the mainhand at HandItems index 0.
+        // Mob.addAdditionalSaveData writes equipment as the HandItems and ArmorItems ListTags, with the mainhand at
+        // HandItems index 0.
         CompoundTag entityTag = chunk.getList("Entities", Tag.TAG_COMPOUND).getCompound(0);
         CompoundTag savedBowTag = entityTag.getList("HandItems", Tag.TAG_COMPOUND).getCompound(0);
         ItemStack savedBow = ItemStack.parse(registries, savedBowTag).orElse(ItemStack.EMPTY);
@@ -108,13 +99,11 @@ class EntitySinkItemDegradationTest {
         assertSame(sword, drop.getItem(), "the live carried item is restored");
     }
 
-    /** A headless Mob double; onEquipItem is overridden because the null level would NPE on equip. */
     private static final class EquipMob extends Mob {
         private EquipMob() {
             super(EntityType.PIG, null);
         }
 
-        // The equipment save reads registryAccess off the level, which is null on this headless entity.
         @Override
         public RegistryAccess registryAccess() {
             return TestRegistries.frozen();
@@ -134,13 +123,11 @@ class EntitySinkItemDegradationTest {
         public void onEquipItem(EquipmentSlot slot, ItemStack oldItem, ItemStack newItem) {}
     }
 
-    /** A headless ItemEntity double carrying a caller-set stack. */
     private static final class DropItem extends ItemEntity {
         private DropItem() {
             super(EntityType.ITEM, null);
         }
 
-        // The carried item's save reads registryAccess off the level, which is null on this headless entity.
         @Override
         public RegistryAccess registryAccess() {
             return TestRegistries.frozen();

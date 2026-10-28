@@ -37,15 +37,6 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The guard for the per-chunk flush wiring: the arguments a flushed chunk reads off its snapshot and hands to the
- * writer, and the merges the writer thunks apply.
- *
- * <p>These call sites are where three separate defects have lived with the whole suite green, because a merge that has
- * good tests proves nothing about whether production still calls it, calls it with the arguments that make it
- * chunk-specific, or calls it at all. Each case here drives the wiring and asserts the artifact, so reverting a line to
- * the version that preceded it turns one red.
- */
 class ChunkFlushPlanTest {
     private static RegistryAccess registries;
 
@@ -57,7 +48,7 @@ class ChunkFlushPlanTest {
         registries = TestRegistries.frozen();
     }
 
-    /** Built on demand, never as a static initializer: ChunkPos static init needs the vanilla bootstrap. */
+    /** Built on demand: on some versions {@code ChunkPos}'s class initializer needs the vanilla bootstrap. */
     private static ChunkPos origin() {
         return new ChunkPos(0, 0);
     }
@@ -95,7 +86,6 @@ class ChunkFlushPlanTest {
         return stash;
     }
 
-    /** A sink whose merge throws, the band-merge failure the fold has to isolate and count. */
     private static final ContainerSink THROWING_CONTAINER_SINK = new ContainerSink() {
         @Override
         public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
@@ -122,8 +112,6 @@ class ChunkFlushPlanTest {
 
     @Test
     void theReadMergeHonorsTheBookshelfOccupancyItWasBuiltWith() {
-        // Reverting the writer to the hardcoded two-argument merge left the whole suite green once, because
-        // every other case passed the same merge that one used. The occupancy is what makes it chunk-specific.
         CompoundTag onDisk = chunkTagWith(bookshelf(4, 64, 9, 0, 1, 2));
         CompoundTag fresh = chunkTagWith(bookshelf(4, 64, 9));
         Long2IntOpenHashMap occupancy = ChunkMerge.occupancyMap();
@@ -136,10 +124,6 @@ class ChunkFlushPlanTest {
                 "slot 0 reads empty in the block-state the occupancy carries, so it is not carried back");
     }
 
-    /**
-     * The replaced positions are held per dimension and handed to the writer per chunk, so the narrowing is both what
-     * detaches them from the live set and what keeps one chunk's placements out of another's merge.
-     */
     @Test
     void theReplacedPositionsHandedOverAreThisChunksOwn() {
         BlockPos inside = new BlockPos(3, 64, 7);
@@ -156,8 +140,8 @@ class ChunkFlushPlanTest {
 
     @Test
     void theReadMergeHonorsTheOpenTimePositionsItWasBuiltWith() {
-        // Both fresh sides read as the client defaults, which is the whole difficulty: only the position set
-        // says whether that default was captured from a re-opened menu or never captured at all.
+        // Both fresh sides read as the client defaults: only the position set says whether that default was captured
+        // from a re-opened menu or never captured at all.
         CompoundTag onDisk = chunkTagWith(crafter(6, 64, 6, new int[] { 2, 5 }, 1));
         CompoundTag freshReopened = chunkTagWith(crafter(6, 64, 6, new int[0], 0));
         CompoundTag freshRewalked = chunkTagWith(crafter(6, 64, 6, new int[0], 0));
@@ -180,8 +164,6 @@ class ChunkFlushPlanTest {
 
     @Test
     void theComposedReadMergeDerivesTheOccupancyFromTheSnapshotItWasGiven() {
-        // The derivation, not just its use: reading the occupancy under a condition, or handing over an empty
-        // one, is the shape that broke, and it is neither a deletion nor a compile error.
         BlockPos shelfPos = new BlockPos(4, 64, 9);
         BlockState shelf = Blocks.CHISELED_BOOKSHELF.defaultBlockState()
                 .setValue(ChiseledBookShelfBlock.SLOT_OCCUPIED_PROPERTIES.get(1), true)
@@ -219,8 +201,8 @@ class ChunkFlushPlanTest {
 
     @Test
     void landingHolderPositionsIsWhatTheComposedReadMergeShouldBeGiven() {
-        // The list handed to the composed merge has to be the LANDING holders, not every drained one: a holder
-        // the fold drops writes no state, and calling it captured would blank what an earlier visit saved.
+        // The list handed to the composed merge has to be the LANDING holders, not every drained one: a holder the fold
+        // drops writes no state, and calling a type-changed one captured would blank what an earlier visit saved.
         CompoundTag crafterTag = blockEntity("minecraft:crafter", 6, 64, 6);
         ChunkSnapshotSource snapshot = snapshotOf(crafterTag);
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
@@ -373,7 +355,6 @@ class ChunkFlushPlanTest {
                 "and a saved bookshelf id over a block-state that is not one records nothing");
     }
 
-    /** A snapshot whose block-entity list is {@code blockEntities}, with no block states behind them. */
     private static ChunkSnapshotSource snapshotOf(CompoundTag... blockEntities) {
         return SyntheticChunks.fullWithBlockEntities(registries, true, List.of(blockEntities));
     }

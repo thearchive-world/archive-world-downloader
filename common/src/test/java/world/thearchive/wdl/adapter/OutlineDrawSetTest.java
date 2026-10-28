@@ -12,11 +12,6 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.core.MarkerHue;
 
-/**
- * The outline cull structure's rebuild contract: rims bucket by section, a rebuild drops the prior tick's rims, and a
- * section that goes a tick without rims is evicted so the map stays clamp-bounded rather than accumulating empty
- * buckets along the camera's path.
- */
 class OutlineDrawSetTest {
     private static OutlineRim rim() {
         return new OutlineRim(MarkerHue.RED, new AABB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0), new long[] { 0L });
@@ -47,15 +42,15 @@ class OutlineDrawSetTest {
         drawSet.add(2L, rim());
         drawSet.clear();
         drawSet.add(1L, rim());
-        assertEquals(1, totalRims(drawSet)); // only this tick's rim, no stale rim from section 2 survives
+        assertEquals(1, totalRims(drawSet));
     }
 
     @Test
     void unpopulatedSectionIsEvicted() {
         OutlineDrawSet drawSet = new OutlineDrawSet();
         drawSet.add(1L, rim());
-        drawSet.clear(); // section 1 emptied, its bucket may linger one tick to keep its capacity
-        drawSet.clear(); // a second rebuild without rims must drop it, so the map cannot grow unbounded
+        drawSet.clear();
+        drawSet.clear();
         assertTrue(drawSet.sections().isEmpty());
     }
 }

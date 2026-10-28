@@ -14,13 +14,7 @@ import java.util.Map;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
-/**
- * The world-output model: the masters, the world-open flags, the two capture knobs, the sparse {@code gamerule.*}
- * override map, and the band-agnostic game-rule merge (master-gate, curated + override merge, id-existence AND
- * value-type validation, unknown-id surfacing). MC-free.
- */
 class WorldOutputConfigTest {
-    /** A fake band schema: the known rule ids mapped to a primitive type ("bool" or "int"). */
     private static GameRuleSchema schema(Map<String, String> idToType) {
         return new GameRuleSchema() {
             @Override
@@ -170,7 +164,7 @@ class WorldOutputConfigTest {
         Properties properties = new Properties();
         properties.setProperty("gamerule.spawn_mobs", "true");
         properties.setProperty("gamerule.fire_spread_radius_around_player", "0");
-        properties.setProperty("captureEntities", "false"); // an unrelated key is not a gamerule
+        properties.setProperty("captureEntities", "false");
 
         Map<String, String> overrides = WorldOutputConfig.parse(properties).gameRuleOverrides();
 
@@ -205,7 +199,7 @@ class WorldOutputConfigTest {
     @Test
     void resolveOverrideReplacesCuratedValue() {
         Properties properties = new Properties();
-        properties.setProperty("gamerule.spawn_mobs", "true"); // curated has it as false
+        properties.setProperty("gamerule.spawn_mobs", "true");
 
         GameRuleResolution resolution = WorldOutputConfig.parse(properties).resolveGameRules(curated(),
                 schema(ruleTypes()));
@@ -217,7 +211,7 @@ class WorldOutputConfigTest {
     @Test
     void resolveNonCuratedValidIdPassesThrough() {
         Properties properties = new Properties();
-        properties.setProperty("gamerule.command_block_output", "false"); // valid id, not in the curated set
+        properties.setProperty("gamerule.command_block_output", "false");
 
         GameRuleResolution resolution = WorldOutputConfig.parse(properties).resolveGameRules(curated(),
                 schema(ruleTypes()));
@@ -229,7 +223,7 @@ class WorldOutputConfigTest {
     @Test
     void resolveInvalidBooleanValueIsDroppedNotWritten() {
         Properties properties = new Properties();
-        properties.setProperty("gamerule.spawn_mobs", "banana"); // valid id, garbage value
+        properties.setProperty("gamerule.spawn_mobs", "banana");
 
         GameRuleResolution resolution = WorldOutputConfig.parse(properties).resolveGameRules(curated(),
                 schema(ruleTypes()));
@@ -243,7 +237,7 @@ class WorldOutputConfigTest {
     @Test
     void resolveInvalidIntegerValueIsDropped() {
         Properties properties = new Properties();
-        properties.setProperty("gamerule.fire_spread_radius_around_player", "true"); // a bool for an int rule
+        properties.setProperty("gamerule.fire_spread_radius_around_player", "true");
 
         GameRuleResolution resolution = WorldOutputConfig.parse(properties).resolveGameRules(curated(),
                 schema(ruleTypes()));
@@ -255,7 +249,7 @@ class WorldOutputConfigTest {
     @Test
     void resolveUnknownIdIsSurfacedWhileCuratedSetStillApplies() {
         Properties properties = new Properties();
-        properties.setProperty("gamerule.doMobSpawning", "false"); // an id absent from this test's schema
+        properties.setProperty("gamerule.doMobSpawning", "false");
 
         GameRuleResolution resolution = WorldOutputConfig.parse(properties).resolveGameRules(curated(),
                 schema(ruleTypes()));

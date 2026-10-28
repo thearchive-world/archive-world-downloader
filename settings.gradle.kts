@@ -1,5 +1,4 @@
 pluginManagement {
-    // Convention plugins (wdl.java-conventions, wdl.nullness-conventions, wdl.common-merge).
     includeBuild("build-logic")
     repositories {
         gradlePluginPortal()

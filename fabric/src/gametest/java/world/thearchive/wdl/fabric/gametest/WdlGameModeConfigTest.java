@@ -15,20 +15,15 @@ import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
 /**
- * Game-mode axis: the world-defaults master governs the game type written to level.dat, the one capture-side
- * consequence of the master and the half no unit test can reach (the session reads the live client game mode,
- * minecraft.gameMode, not a value it is handed). The player is switched to survival first so the two cases are
- * distinguishable: with the master and openInCreative on (the default), the download opens in creative despite the
- * survival player, and with the master off it opens in the player's real survival mode. Level.dat's {@code GameType} is
- * what a singleplayer open reads, set from the captured player's game type.
+ * The player is switched to survival first so the two cases are distinguishable: with the master and
+ * {@code openInCreative} on (the default), the download opens in creative despite the survival player, and with the
+ * master off it opens in the player's real survival mode.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlGameModeConfigTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         try (MultiplayerFixture fixture = MultiplayerFixture.connect(context)) {
-            // The fixture spawns the player in creative; drop to survival and wait until the client observes it,
-            // which both applies the switch and proves the setup command took (runCommand is otherwise silent).
             fixture.server().runCommand("gamemode survival @a");
             context.waitFor(client -> client.gameMode != null
                     && client.gameMode.getPlayerMode() == GameType.SURVIVAL);

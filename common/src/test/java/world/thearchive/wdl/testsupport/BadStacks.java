@@ -14,9 +14,6 @@ import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
-/**
- * Builders for stacks/components that are legal in memory and over the wire but illegal on disk, for degradation tests.
- */
 public final class BadStacks {
     private BadStacks() {}
 
@@ -26,10 +23,7 @@ public final class BadStacks {
     }
 
     /**
-     * Build an {@link ItemEnchantments} carrying the given levels, including level 0. The disk codec rejects level 0
-     * and {@code Mutable.set} drops it, so the value goes in over the wire {@code STREAM_CODEC}, which has no such
-     * floor. On 1.21.4 the stream codec still carries a trailing {@code showInTooltip} boolean after the map, so the
-     * wire form written here appends it too.
+     * Build an {@link ItemEnchantments} carrying the given levels, including level 0.
      */
     public static ItemEnchantments enchantments(RegistryAccess registries, Map<Holder<Enchantment>, Integer> levels) {
         RegistryFriendlyByteBuf buf = new RegistryFriendlyByteBuf(Unpooled.buffer(), registries);

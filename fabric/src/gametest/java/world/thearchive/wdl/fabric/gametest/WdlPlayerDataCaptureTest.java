@@ -16,11 +16,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Player-data axis: the local player's inventory and position reach level.dat's {@code Player} slot. The given item
- * arrives at the client over the container-set-slot sync, and the capture assembles the live client player into
- * level.dat at finish, so a present item proves the whole client-player-to-disk path.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlPlayerDataCaptureTest implements FabricClientGameTest {
     @Override

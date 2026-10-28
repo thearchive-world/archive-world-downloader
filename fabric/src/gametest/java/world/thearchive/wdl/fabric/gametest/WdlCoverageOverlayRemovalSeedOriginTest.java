@@ -14,20 +14,8 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Removal calibration against a seed-registered anchor: an item frame already in the world when the download starts is
- * anchored only by the chunk-prime seed registration (its spawn packet predates the tee), and its own seed sample
- * cannot calibrate (20 blocks minus the 16-block haircut, {@code
- * SendRangeSampler.HAIRCUT_BLOCKS}, floors to radius 0). The calibration event under test is the removal: the player
- * walks straight away on real forward-key input, and once the horizontal distance passes the scaled 48-block send range
- * ({@code entity-broadcast-range-percentage} 30 of {@code clientTrackingRange(10)
- * * 16}) the server unpairs the frame and the teed RemoveEntities packet samples the anchored distance minus the
- * haircut. A sibling test pins the same removal against an arrival-registered anchor; the two registration origins are
- * pinned separately so a broken resolution in one cannot hide behind the other.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlCoverageOverlayRemovalSeedOriginTest implements FabricClientGameTest {
-    /** Upper bound on walk ticks before the run is declared stuck (plain walking covers ~0.22 blocks a tick). */
     private static final int WALK_TIMEOUT_TICKS = 600;
     /** Release the forward key this far from the frame: past the scaled 48-block range plus margin. */
     private static final double RELEASE_DISTANCE_BLOCKS = 60.0;
@@ -38,13 +26,9 @@ public class WdlCoverageOverlayRemovalSeedOriginTest implements FabricClientGame
             String dimension = context.computeOnClient(client -> client.level.dimension().location().toString());
             BlockPos playerBlockPos = context.computeOnClient(client -> client.player.blockPosition());
 
-            // One frame 20 blocks west, summoned BEFORE the download starts, so only the chunk-prime seed
-            // registration can anchor it: the origin under test. Hung on a constructed wall block (frames
-            // need a vertical face), anchored on the player's block position as the suite's range tests do.
-            // The frame sits on the far side of the walk on purpose: a hanging entity's spawn packet carries
-            // its BLOCK position while the server range-checks the snapped entity position, up to a block
-            // closer to its support; with the support between frame and player that corner bias points away
-            // from the walking player, keeping the floored removal sample off the 16-block radius boundary.
+            // One frame 20 blocks west, summoned BEFORE the download starts, so only the chunk-prime seed registration
+            // can anchor it: the origin under test. Hung on a constructed wall block, anchored on the player's block
+            // position.
             int frameX = playerBlockPos.getX() - 20;
             int frameZ = playerBlockPos.getZ();
             int frameY = playerBlockPos.getY();
@@ -52,8 +36,7 @@ public class WdlCoverageOverlayRemovalSeedOriginTest implements FabricClientGame
                     "setblock " + (frameX + 1) + " " + frameY + " " + frameZ + " minecraft:stone");
             fixture.server().runCommand(
                     "summon minecraft:item_frame " + frameX + " " + frameY + " " + frameZ + " {Facing:4b}");
-            // Wait until the client actually received the frame, so the prime runs with it loaded
-            // (synchronization only; the assertion reads the estimator, not the frame).
+            // Wait until the client actually received the frame, so the prime runs with it loaded.
             context.waitFor(client -> client.level
                     .getEntities((Entity) null, client.player.getBoundingBox().inflate(64)).stream()
                     .anyMatch(ItemFrame.class::isInstance));
@@ -69,12 +52,6 @@ public class WdlCoverageOverlayRemovalSeedOriginTest implements FabricClientGame
 
             walkPastRange(context, driver, frameX, frameZ);
 
-            // Haircut-aware bracket: the server unpairs just past the scaled 48-block range and the removal
-            // sample is the anchored distance minus the 16-block haircut, so a correct build floors to
-            // radius 2, with 3 admitted because the unpair can trail the crossing by movement ticks and
-            // sample a longer distance. The bracket's width is that prune lag, not haircut tolerance: an
-            // un-haircut removal also lands inside the bracket, and the haircut arithmetic is pinned by the
-            // sampler unit tests, not here. Exact equality would go red against a correct build under lag.
             int radius = driver.rangeRadiusChunks(dimension, 5);
             Check.that(radius >= 2 && radius <= 3,
                     "the walk-away removal must calibrate the radius into [2, 3], got " + radius);
@@ -83,20 +60,16 @@ public class WdlCoverageOverlayRemovalSeedOriginTest implements FabricClientGame
         }
     }
 
-    /**
-     * Walk the player due east, straight away from the frame, on real forward-key input, pumping a capture tick every
-     * walk tick; releases the key once past {@link #RELEASE_DISTANCE_BLOCKS} from the frame.
-     */
     private static void walkPastRange(ClientGameTestContext context, CaptureDriver driver, int frameX, int frameZ) {
-        // Input locomotion, never a player teleport: a /tp arms the sampler's anomaly window by design and
-        // would suppress the removal sample. Plain walking covers about 0.22 blocks a tick, safely under
-        // the SendRangeSampler.FAST_TICK_BLOCKS re-arm threshold (no sprinting, for the same headroom).
+        // Input locomotion, never a player teleport: a /tp arms the sampler's anomaly window by design and would
+        // suppress the removal sample. Plain walking covers about 0.22 blocks a tick, safely under the
+        // SendRangeSampler.FAST_TICK_BLOCKS re-arm threshold.
         context.runOnClient(client -> {
             client.player.setYRot(-90.0f); // yaw -90 faces plus x (east), directly away from the frame
             client.player.setXRot(0.0f);
         });
-        // A reconnect earlier in a multi-scenario run can leave a confirm screen focused, and an open screen
-        // suppresses movement input, so dismiss it before driving the forward key or the walk never starts.
+        // An open screen suppresses movement input, so dismiss it before driving the forward key or the walk never
+        // starts.
         context.runOnClient(client -> client.setScreen(null));
         context.getInput().holdKey(options -> options.keyUp);
         boolean pastRange = false;
@@ -110,6 +83,6 @@ public class WdlCoverageOverlayRemovalSeedOriginTest implements FabricClientGame
         context.getInput().releaseKey(options -> options.keyUp);
         Check.that(pastRange, "the player never walked " + (int) RELEASE_DISTANCE_BLOCKS
                 + " blocks from the frame within " + WALK_TIMEOUT_TICKS + " ticks");
-        driver.tick(10); // margin for the teed removal to land before the radius read
+        driver.tick(10);
     }
 }

@@ -23,13 +23,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Ender-chest container axis: an ender chest binds to the PLAYER's global ender inventory, not the block, so the
- * contents merge into level.dat's {@code Player.EnderItems} rather than a chunk block entity. The client does not know
- * its ender contents until it opens an ender chest (the menu syncs them), so the open is load-bearing: the player's
- * ender inventory is filled server-side, the drive opens the chest to sync and bind it, and the planted item must
- * appear in the captured {@code Player.EnderItems}.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlEnderChestCaptureTest implements FabricClientGameTest {
     @Override
@@ -79,12 +72,6 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
         }
     }
 
-    /**
-     * Third scenario: with savePlayerEnderChest off the finish strips EnderItems, so the open must bind nothing. A bind
-     * would clear the captured-set ender flag and tally a container the save does not hold, which is the report
-     * claiming content the archive deliberately drops. The menu still syncs the contents, so the empty EnderItems below
-     * is the strip and not an unsynced client.
-     */
     private static void enderChestOffBindsNothing(ClientGameTestContext context, TestServerContext server,
             BlockPos stand) {
         context.runOnClient(client -> {
@@ -129,16 +116,9 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
     }
 
     /**
-     * Second scenario: a click that opens nothing must seed nothing. An ender chest under a redstone conductor is
-     * vanilla's own case of that, its use handler returning before it builds any menu, and the click filter would
-     * otherwise latch it because an unobstructed ender chest genuinely does open one. A latched intent no open can
-     * consume is taken by the next open that no click accounts for, and because the ender discriminator is checked
-     * ahead of every other block leg, that open binds ENDER and merges into the player tag in level.dat rather than
-     * into a chunk.
-     *
-     * <p>The unattributed open here is a chest minecart driven through the game mode, which reaches no use hook. Both
-     * menus are twenty-seven-slot chest menus, so nothing downstream can separate them; the only thing standing between
-     * the minecart's open and the ender inventory is whether that click was latched.
+     * The unattributed open here is a chest minecart driven through the game mode. Both menus are twenty-seven-slot
+     * chest menus, so nothing downstream can separate them; the only thing standing between the minecart's open and the
+     * ender inventory is whether that click was latched.
      */
     private static void obstructedEnderChestSeedsNothing(ClientGameTestContext context, TestServerContext server,
             BlockPos stand) {
@@ -167,8 +147,6 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                 WdlConfig.DEFAULTS);
         run.tick(5);
 
-        // The use key, not a direct game-mode call: this click must reach the loader's use hook, because
-        // whether the hook latches it is the whole question.
         ContainerDriver.aimEyesAt(context, ContainerDriver.center(blocked));
         ContainerDriver.awaitCrosshair(context, client -> ContainerDriver.isLookingAt(client, blocked),
                 "obstructed ender chest " + blocked);
@@ -197,10 +175,6 @@ public class WdlEnderChestCaptureTest implements FabricClientGameTest {
                 .getList("EnderItems", Tag.TAG_COMPOUND).stream().map(t -> (CompoundTag) t)
                 .map(item -> (item.contains("id") ? item.getString("id") : "?"))
                 .toList();
-        // Not an emptiness check: the raw player tag carries the live client's own ender inventory whatever
-        // the bind does, so the diamond the first scenario planted is legitimately still here. What must be
-        // absent is the MINECART's item, which can only reach EnderItems through an ender bind that the
-        // obstructed click seeded.
         Check.that(!enderItems.contains("minecraft:emerald"),
                 "the minecart's contents were written into the player's ender inventory: " + enderItems);
     }

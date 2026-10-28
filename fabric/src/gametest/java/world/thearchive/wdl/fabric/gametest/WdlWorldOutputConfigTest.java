@@ -12,12 +12,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * World-output axis: the configured world-open state and game rules reach level.dat. The downloaded world opens at noon
- * ({@code DayTime} 6000) as a fixed world-open invariant, and the default config has the game-rule master on, so the
- * curated safe rule set is written. Both are observable in level.dat's {@code Data}, proving the world-output config is
- * applied to the assembled save, not just the chunks.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlWorldOutputConfigTest implements FabricClientGameTest {
     @Override

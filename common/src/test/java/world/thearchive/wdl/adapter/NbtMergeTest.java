@@ -17,11 +17,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The direct guard for {@link NbtMerge#carryListBySlot}'s write side. Every other case reaches it through a bookshelf
- * carry-forward, where the fresh block entity always carries an {@code "Items"} list because vanilla writes one
- * unconditionally, so nothing there can tell a carry that writes back from one that does not.
- */
 class NbtMergeTest {
     private static final int ALL_SLOTS = ~0;
 
@@ -40,9 +35,8 @@ class NbtMergeTest {
 
     @Test
     void aCarryThatCarriesNothingWritesNothing() {
-        // The occupancy says slot 0 now reads empty, so nothing is carried; the write must then not happen at
-        // all. A fresh side that already carries the key cannot see the difference, which is why this drives
-        // one that does not.
+        // A fresh side that already holds a list under the key cannot see the difference, which is why this drives one
+        // that does not.
         CompoundTag disk = withBooks(0);
         CompoundTag fresh = new CompoundTag();
 
@@ -63,8 +57,6 @@ class NbtMergeTest {
 
     @Test
     void aFreshValueOfTheWrongTypeIsLeftAloneWhenNothingCarries() {
-        // The fresh side is read through an instanceof guard, so a value that is not a list falls back to an
-        // empty one. Nothing carried means that empty list must not be written over what was there.
         CompoundTag disk = withBooks(0);
         CompoundTag fresh = new CompoundTag();
         fresh.put("Items", StringTag.valueOf("not a list"));

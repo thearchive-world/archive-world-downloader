@@ -25,12 +25,7 @@ import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
 /**
- * Server-authoritative {@code Sitting} restoration on capture, exercised end to end. A pet's
- * {@code TamableAnimal.orderedToSit} never leaves the server; only its sit pose is synced, so the capture orders a pet
- * to sit from the pose. A cat ordered to sit must read back {@code Sitting:1b}, a standing cat is the control and must
- * not, and a sitting cat riding a boat proves the restoration reaches passengers, which save nested under their
- * vehicle. The cats are {@code NoAI}, so the summoned pose is the pose the client sees and nothing stands them up or
- * walks them out of the chunk.
+ * The cats are {@code NoAI}, so nothing walks them out of the chunk.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlOrderedToSitCaptureTest implements FabricClientGameTest {
@@ -42,8 +37,8 @@ public class WdlOrderedToSitCaptureTest implements FabricClientGameTest {
             ChunkPos playerChunk = context.computeOnClient(client -> client.player.chunkPosition());
             BlockPos base = context.computeOnClient(client -> client.player.blockPosition());
             UUID owner = context.computeOnClient(client -> client.player.getUUID());
-            // A boat boards any non-player living entity it touches, so the cats stand four blocks from it, all
-            // inside the player's chunk.
+            // A boat with a free seat boards a cat it touches, so the cats stand four blocks from it, all inside the
+            // player's chunk.
             BlockPos cats = playerChunk.getMiddleBlockPosition(base.getY());
             String at = (cats.getX() + 0.5) + " " + cats.getY() + " " + (cats.getZ() + 0.5);
             String boatAt = (cats.getX() + 4.5) + " " + cats.getY() + " " + (cats.getZ() + 0.5);
@@ -102,7 +97,7 @@ public class WdlOrderedToSitCaptureTest implements FabricClientGameTest {
 
     /**
      * The custom name a mob was captured with: pre-1.21.5 writes CustomName as a serialized JSON text component, so a
-     * plain literal arrives quoted and an object carries it under text.
+     * plain literal arrives quoted.
      */
     private static String customNameOf(CompoundTag entity) {
         String json = entity.getString("CustomName");

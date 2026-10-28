@@ -20,8 +20,7 @@ import world.thearchive.wdl.core.WdlConfig;
 /**
  * Entity axis: an entity spawned while recording must be captured through the inbound packet tee and written to the
  * entities/ region. Spawning mid-capture is what routes it through the {@code ClientboundAddEntityPacket} the tee
- * observes, the packet-derived path entity capture rests on, rather than the loaded-chunk prime that back-fills
- * entities present before the download began.
+ * observes.
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlEntityCaptureTest implements FabricClientGameTest {
