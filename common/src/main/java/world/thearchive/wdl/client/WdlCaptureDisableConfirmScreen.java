@@ -8,10 +8,8 @@ import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.network.chat.Component;
 
 /**
- * The confirm for turning a download-harming capture toggle off. Unlike a plain {@link ConfirmScreen} it holds the exit
- * choices inert for a moment via vanilla's own {@code setDelay} (the death-screen delay pattern), so the
- * consequence-naming prompt cannot be clicked through on reflex. Esc lands on the safe cancel outcome rather than
- * confirming the toggle off.
+ * Unlike a plain {@link ConfirmScreen} it holds the exit choices inert for a moment, so the consequence-naming prompt
+ * cannot be clicked through on reflex.
  */
 final class WdlCaptureDisableConfirmScreen extends ConfirmScreen {
     private static final int DANGER_DELAY_TICKS = 20;

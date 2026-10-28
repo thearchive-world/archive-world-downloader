@@ -20,17 +20,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for container capture: the {@link ContainerSink} 1.21.11 path (captureItems -> merge) plus
- * vanilla's own {@code ContainerHelper.loadAllItems} read-back is a self-consistent round-trip: the captured slots
- * survive serialization, land on the block-entity tag under {@code "Items"}, and decode to the same stacks at the same
- * slots, with no other block-entity field clobbered.
- *
- * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
- * neither a live menu nor a {@code Level} is needed (items, unlike entities, parse back without one). The one
- * client-coupled step (reading the live open menu's container slots) is not exercised headless, exactly as for chunks
- * and entities. This test proves the serialize+merge+decode slice.
- */
 class ContainerMergeRoundTripTest {
     private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
@@ -40,7 +29,6 @@ class ContainerMergeRoundTripTest {
         registries = TestRegistries.frozen();
     }
 
-    /** A captured client chest BE tag carrying a real non-Items field, to assert no clobber. */
     private static CompoundTag chestTag(int x, int y, int z) {
         return namedBlockEntity("minecraft:chest", x, y, z, "keep-me");
     }
@@ -67,14 +55,12 @@ class ContainerMergeRoundTripTest {
 
         CompoundTag merged = sink.merge(chestTag(10, 64, -7), holder);
 
-        // No field clobber: id / pos / unrelated fields survive.
         assertEquals("minecraft:chest", merged.getStringOr("id", ""));
         assertEquals(10, merged.getIntOr("x", 0));
         assertEquals(64, merged.getIntOr("y", 0));
         assertEquals(-7, merged.getIntOr("z", 0));
         assertEquals("keep-me", customNameOf(merged));
 
-        // The merged "Items" decode via vanilla loadAllItems back to the same stacks at the same slots.
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(merged, back, registries);
 

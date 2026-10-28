@@ -21,14 +21,11 @@ import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
 /**
- * Lectern container axis: a lectern stashes a book and has no item slots, so the chest-shaped slot-0 sync wait does not
- * apply (its menu is a {@link LecternMenu} keyed on the book, not a {@code ChestMenu} slot). The book reaches the
- * client only through the open reading menu, so the drive opens the lectern and waits on the synced book; the captured
- * lectern block entity must carry the book with its planted page text.
+ * Lectern container axis: a lectern stashes a book, so the chest-shaped slot-0 sync wait does not apply (its menu is a
+ * {@link LecternMenu} keyed on the book, not a {@code ChestMenu} slot).
  */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlLecternCaptureTest implements FabricClientGameTest {
-    /** Planted on the lectern's book so the capture is asserted on the book's content, not just its presence. */
     private static final String PAGE_TEXT = "wdl lectern page";
 
     @Override
@@ -41,8 +38,7 @@ public class WdlLecternCaptureTest implements FabricClientGameTest {
             String at = lectern.getX() + " " + lectern.getY() + " " + lectern.getZ();
             server.runCommand("setblock " + at + " minecraft:lectern[facing=north,has_book=true]");
             // The book's page reaches the client only when the reading menu opens (the block entity's Book is not
-            // synced before then, so the readiness check below keys on the synced has_book blockstate). A page is
-            // planted so the capture is asserted on the book's content, not merely the book item's presence.
+            // synced before then, so the readiness check below keys on the synced has_book blockstate).
             server.runCommand("data merge block " + at + " {Book:{id:\"minecraft:writable_book\",count:1,"
                     + "components:{\"minecraft:writable_book_content\":{pages:[{raw:\"" + PAGE_TEXT + "\"}]}}}}");
             context.waitFor(client -> hasBook(client.level.getBlockState(lectern)));
@@ -88,7 +84,6 @@ public class WdlLecternCaptureTest implements FabricClientGameTest {
         }
     }
 
-    /** Whether the lectern holds a book, read from the synced has_book blockstate (the book NBT is client-blind). */
     private static boolean hasBook(BlockState state) {
         return state.hasProperty(LecternBlock.HAS_BOOK) && state.getValue(LecternBlock.HAS_BOOK);
     }

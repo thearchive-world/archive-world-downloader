@@ -23,16 +23,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * The prime's back-fill axis: an entity already loaded when the download starts reaches the save only through the
- * loaded-chunk prime, and a vehicle carrying exactly one player is refused there, so it has to be re-offered at finish.
- *
- * <p>A boat rather than a saddled mount: it meets the same one-player-vehicle refusal and has no AI, so it cannot
- * wander out of the chunk the readback reads.
- *
- * <p>The armor stand covers the other miss: on the topmost placeable block its box sits exactly where a build-height
- * bound stops, which a strict intersection test excludes.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
     private static final String FOLDER = "wdl-preexisting-entity";
@@ -55,7 +45,7 @@ public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
             context.waitFor(client -> client.player.getVehicle() != null);
 
             int maxY = context.computeOnClient(client -> client.level.getMaxY());
-            BlockPos capBlock = new BlockPos(playerPos.getX() + 16, maxY, playerPos.getZ()); // a chunk over
+            BlockPos capBlock = new BlockPos(playerPos.getX() + 16, maxY, playerPos.getZ());
             server.runCommand("setblock " + capBlock.getX() + " " + capBlock.getY() + " " + capBlock.getZ()
                     + " minecraft:stone");
             context.waitFor(client -> client.level.getBlockState(capBlock).is(Blocks.STONE));
@@ -69,7 +59,7 @@ public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
 
             CaptureDriver run = CaptureDriver.start(context,
                     new DownloadTarget(FOLDER, FOLDER, DownloadMode.NEW), WdlConfig.DEFAULTS);
-            run.tick(10); // the prime runs here
+            run.tick(10);
             server.runCommand("ride @a[limit=1] dismount");
             awaitDismount(context, run);
             ChunkPos boatChunk = context.computeOnClient(client -> requireBoat(client).chunkPosition());
@@ -102,10 +92,6 @@ public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
         }
     }
 
-    /**
-     * Pump {@code run} until the player is out of its vehicle. A bare wait would advance client ticks without ticking
-     * the capture, and the dismount has to land while the download is still recording.
-     */
     private static void awaitDismount(ClientGameTestContext context, CaptureDriver run) {
         for (int tick = 0; tick < DISMOUNT_TIMEOUT_TICKS; tick++) {
             if (context.computeOnClient(client -> client.player.getVehicle() == null)) {
@@ -134,7 +120,7 @@ public class WdlPreexistingEntityCaptureTest implements FabricClientGameTest {
 
     /**
      * The armor stand by its own column: the sibling's inflated player box never reaches the build cap, so a wait keyed
-     * on one would time out whatever the capture did.
+     * on one would time out.
      */
     private static @Nullable Entity stand(Minecraft client, int maxY) {
         AABB column = new AABB(client.player.getX() - 32, maxY - 8, client.player.getZ() - 32,

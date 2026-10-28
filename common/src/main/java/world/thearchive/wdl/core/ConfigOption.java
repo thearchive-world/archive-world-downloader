@@ -10,12 +10,10 @@ import org.jspecify.annotations.Nullable;
  * One config option's descriptor: its key, value {@link ConfigType}, canonical default string, optional numeric range,
  * the enum parser for an {@link ConfigType#ENUM} option, the read accessor off a live {@link WdlConfig}, and the exact
  * template bytes that precede its {@code key=value} line. The single source the template, parse, defaults, projection,
- * and report all derive from. The settings menu reads the value shape through the public accessors below to map each
- * option to an editing widget.
+ * and report all derive from.
  *
  * <p>The range is stored as a {@code double} pair holding either integer or float bounds (both are exactly
- * representable), so one range representation serves both numeric types. An unbounded integer carries the full
- * {@code int} range, which makes its clamp an identity.
+ * representable), so one range representation serves both numeric types.
  */
 public final class ConfigOption {
     final String key;
@@ -42,32 +40,32 @@ public final class ConfigOption {
         this.losesDataOnDisable = losesDataOnDisable;
     }
 
-    /** The {@code wdl.properties} key, the settings row's binding and its {@code gamerule.*}-free identity. */
+    /** The wdl.properties key. */
     public String key() {
         return key;
     }
 
-    /** The value shape, which the settings menu maps to an editing widget. */
+    /** The value shape. */
     public ConfigType type() {
         return type;
     }
 
-    /** The canonical default string, the row's revert-to-default target. */
+    /** The canonical default string. */
     public String defaultValue() {
         return defaultValue;
     }
 
-    /** The inclusive lower bound of a ranged numeric option (the full type range when unbounded). */
+    /** The inclusive lower bound of a ranged numeric option. */
     public double min() {
         return min;
     }
 
-    /** The inclusive upper bound of a ranged numeric option (the full type range when unbounded). */
+    /** The inclusive upper bound of a ranged numeric option. */
     public double max() {
         return max;
     }
 
-    /** Whether disabling this toggle destroys already-captured data, so the settings menu confirms the change. */
+    /** Whether disabling this toggle leaves a kind of data out of the download. */
     boolean losesDataOnDisable() {
         return losesDataOnDisable;
     }
@@ -77,7 +75,7 @@ public final class ConfigOption {
         return new ConfigOption(key, ConfigType.BOOLEAN, defaultValue, 0, 0, null, accessor, preamble, false);
     }
 
-    /** A boolean option whose disabling destroys already-captured data, so the menu confirms the change. */
+    /** A boolean option whose disabling leaves a kind of data out of the download. */
     static ConfigOption dataLossBoolean(String key, String defaultValue, Function<WdlConfig, Object> accessor,
             String preamble) {
         return new ConfigOption(key, ConfigType.BOOLEAN, defaultValue, 0, 0, null, accessor, preamble, true);

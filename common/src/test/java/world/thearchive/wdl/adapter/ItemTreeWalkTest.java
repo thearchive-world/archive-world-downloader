@@ -12,13 +12,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins ItemTreeWalk's nesting contract: the walk applies the leaf action to an item's own components and recurses into
- * the items nested in a shulker box container, a bundle, and a sulfur cube. It drives the walk over hand-built NBT
- * keyed by the component id strings, so it needs no live component and holds on every band, including one whose
- * Minecraft has no sulfur cube. The visited compounds are matched by identity, so the assertions stay clear of the
- * band-varying CompoundTag accessors.
- */
 class ItemTreeWalkTest {
     private static CompoundTag itemWithComponents(CompoundTag components) {
         CompoundTag item = new CompoundTag();
@@ -69,6 +62,6 @@ class ItemTreeWalkTest {
         CompoundTag components = new CompoundTag();
         components.put("minecraft:sulfur_cube_content", itemWithComponents(nestedComponents));
         assertTrue(visitedComponents(itemWithComponents(components)).contains(nestedComponents),
-                "an item nested in a sulfur cube is visited");
+                "an item nested in a sulfur_cube_content component is visited");
     }
 }

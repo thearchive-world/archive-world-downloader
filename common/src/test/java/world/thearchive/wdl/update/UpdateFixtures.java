@@ -9,7 +9,6 @@ import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.core.update.SemVer;
 
-/** Shared fixtures for the update package tests: runtime info, a well-formed body, and a recording transport. */
 final class UpdateFixtures {
     static final RuntimeInfo INFO = new RuntimeInfo("fabric", "1.21.11",
             SemVer.parse("1.0.0-SNAPSHOT").orElseThrow(), "1.0.0-SNAPSHOT+1.21.11", "x6JOJ1sf");

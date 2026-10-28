@@ -27,13 +27,6 @@ import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The container-merge synergy re-capture unlocks: a chest placed AFTER its chunk was first captured has no block entity
- * in the snapshot-once tag, so the open-time stash has nothing to merge onto. Re-capturing the chunk re-encodes its
- * block entities, so the placed chest's block entity now exists and {@link ContainerMerge#mergeChunkStash} lands the
- * stashed {@code Items} on it. The contents come only from the stash, never the re-encode, and the merge runs once per
- * chunk at flush, so repeated re-capture before that single flush cannot double-count or blank the contents.
- */
 class ContainerRecaptureSynergyTest {
     private static final int CHEST_X = 4;
     private static final int CHEST_Y = 65;
@@ -64,7 +57,6 @@ class ContainerRecaptureSynergyTest {
 
     @Test
     void withoutRecaptureNothingMergesOntoTheMissingChest() {
-        // The snapshot-once gap: the chunk was captured before the chest was placed, so its tag has no chest.
         CompoundTag snapshotOnceTag = codec.encode(SyntheticChunks.full(registries, false), registries, false);
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
@@ -78,7 +70,6 @@ class ContainerRecaptureSynergyTest {
 
     @Test
     void reCapturingThePlacedChestLetsTheStashMergeOntoIt() {
-        // After re-capture the chunk's block entities include the placed chest, so the merge lands.
         ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, false,
                 List.of(blockEntity("minecraft:chest", CHEST_X, CHEST_Y, CHEST_Z)));
         CompoundTag recapturedTag = codec.encode(snapshot, registries, false);
@@ -97,9 +88,6 @@ class ContainerRecaptureSynergyTest {
 
     @Test
     void repeatedRecaptureBeforeFlushMergesContentsExactlyOnce() {
-        // Re-capture re-encodes the chunk many times while it is hot; each fresh tag carries the (empty) chest
-        // block entity. The contents come from the stash and merge only at the single flush, so the count and
-        // contents are stable no matter how many re-encodes preceded it.
         CompoundTag latestRecapture = null;
         for (int reencode = 0; reencode < 3; reencode++) {
             ChunkSnapshotSource snapshot = SyntheticChunks.fullWithBlockEntities(registries, false,
@@ -115,7 +103,6 @@ class ContainerRecaptureSynergyTest {
         assertEquals(1, merged, "the single flush merges the stash exactly once");
         assertTrue(stash.isEmpty(), "the stash entry is drained at flush, so it cannot merge again");
 
-        // A second flush-time merge (the stash now drained) adds nothing: re-capture never re-stocks the stash.
         int mergedAgain = ContainerMerge.mergeChunkStash(sink, latestRecapture, chunkPos, stash).merged();
         assertEquals(0, mergedAgain, "a drained stash contributes no further merges, so the count cannot double");
         assertEquals(Items.DIAMOND, mergedItemAt(sink, latestRecapture, 0).getItem(), "the contents remain intact");

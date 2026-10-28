@@ -1,29 +1,18 @@
 name: Release (Modrinth, CurseForge, GitHub)
 
-# Publishes one band of a coordinated release. The tag is the version core plus the MC build-metadata (e.g.
-# 1.1.0+26.2), mirroring the jar name archive-wdl-<loader>-<mod_version>+<minecraft_version>.jar. The published
-# version is read from gradle.properties, not from the tag, so the flow is bump-then-tag; the guard step below
-# fails the run unless the pushed tag equals the built version, so a stale -SNAPSHOT cannot ship.
+# Every band shares one product version, and the release is ONE GitHub release titled at the core (e.g. 1.1.0) carrying
+# every band-times-loader jar. The publish plugin cannot build that release: its github block always creates a new
+# release, and its parent() link is a same-build dependency, so it cannot reach a release another band's separate run
+# created. The draft is created once beforehand by release-open, not here, so concurrent band runs never race to create
+# duplicate drafts (GitHub does not enforce tag uniqueness for drafts).
 #
-# Every band shares one product version, and the release is ONE GitHub release titled at the core (e.g. 1.1.0)
-# carrying every band-times-loader jar. The publish plugin cannot build that release: its github block always
-# creates a new release and 422s on an existing tag, and its parent() link is a same-build dependency, so it
-# cannot reach a release another band's separate run created. So publishMods here does only Modrinth and
-# CurseForge (per MC version, unchanged), and the funnel step below appends this band's jars to one shared DRAFT
-# release with gh. The draft is created once beforehand by release-open, not here, so concurrent band runs never
-# race to create duplicate drafts (GitHub does not enforce tag uniqueness for drafts).
-#
-# The release flow is: run release-open for the version, push the band tags a few at a time (GitHub creates no
-# tag-push events past three tags in one push, which also staggers the not-atomic platform publishes band by
-# band), then run release-finalize to verify the full matrix and publish the draft. A partial platform publish
-# is retried by deleting that band's partial version(s) and re-pushing its tag. Nothing is public until finalize
-# publishes the draft. PUBLISH_DRY_RUN=true validates the platform coordinates without uploading. Requires
-# MODRINTH_TOKEN and CURSEFORGE_TOKEN in the release environment; the built-in GITHUB_TOKEN covers the draft.
+# Push the band tags a few at a time: GitHub creates no tag-push events when more than three tags are pushed at once.
+# Requires MODRINTH_TOKEN and CURSEFORGE_TOKEN in the release environment; the built-in GITHUB_TOKEN covers the draft.
 on:
   push:
     tags:
-      # Semver core + literal '+' + any MC build-metadata (1.21.11, 26.2, ...). The core gates this to a
-      # real release tag; the metadata is left open so every MC band the release targets matches.
+      # The core gates this to a real release tag; the metadata is left open so every MC band the release targets
+      # matches.
       - '[0-9]+.[0-9]+.[0-9]+\+*'
 
 permissions:
@@ -33,11 +22,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Never cancel a release once it has started (a partial publish is the messy state described above).
+  # Never cancel a release once it has started: a cancelled run can leave a partial platform publish.
   cancel-in-progress: false
 
-# Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
-# pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
 defaults:
   run:
     shell: bash
@@ -63,9 +50,9 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           # The language target's own JDK is installed alongside the toolchain's wherever the two differ, because
           # era-specific build tooling still asks for that one: ForgeGradle runs its MCP steps on the Minecraft
-          # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it
-          # takes the default JAVA_HOME, which is what launches the daemon, and fabric-loom publishes
-          # org.gradle.jvm.version=21 that a daemon below it cannot resolve at all.
+          # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it takes the
+          # default JAVA_HOME, and fabric-loom publishes org.gradle.jvm.version=21 that a daemon below it cannot resolve
+          # at all.
           target="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
           jdks="$version"
           if [ "$target" != "$major" ]; then jdks="$(printf '%s\n%s' "$jdks" "$target")"; fi
@@ -77,19 +64,6 @@ jobs:
           verify=true
           for j in $jdks; do case "$j" in 16 | 16.*) verify=false ;; esac; done
           echo "verify=$verify" >> "$GITHUB_OUTPUT"
-          # fabric-loom publishes org.gradle.jvm.version=21, so a daemon below 21 cannot resolve it
-          # at all and the build dies while configuring the root project, which declares the plugin apply-false
-          # even on a band that ships no Fabric module. A band whose own build JDK is older therefore installs
-          # 21 beside it and lets 21 be the default JAVA_HOME, since that is what launches the daemon and
-          # setup-java hands the default to the last entry of a multi-version list. The real build JDK is then
-          # reached only through its JAVA_HOME_<major>_X64 variable and the fromEnv bridge below, a genuine
-          # toolchain resolution rather than a same-JVM --release target. A warm dependency cache hides the
-          # failure entirely, so it shows up only on a clean checkout.
-          # Gradle auto-detects the installation JAVA_HOME names plus whatever
-          # org.gradle.java.installations.fromEnv names, but nothing scans the GitHub Actions tool-cache paths
-          # setup-java installs into, and auto-download stays off per gradle.properties, so without this bridge
-          # there is nothing to fall back to. GRADLE_OPTS applies to every gradlew invocation in the job, so one
-          # line covers the root build and any separate island wrapper alike.
           echo "GRADLE_OPTS=-Dorg.gradle.java.installations.fromEnv=JAVA_HOME_${major}_X64" >> "$GITHUB_ENV"
 
       - name: Set up the build JDKs (Temurin)
@@ -106,11 +80,10 @@ jobs:
         with:
           cache-provider: basic
 
-      # Fail fast unless the pushed tag equals the version the build will publish (mod_version + MC metadata).
-      # Guards the bump-then-tag flow: a tag pushed before dropping -SNAPSHOT (or against the wrong MC pin)
-      # stops here instead of publishing a mislabeled stable version and minting a divergent release tag.
-      # The pushed tag flows through an env var, never inlined into the script by ${{ }} templating, so a
-      # crafted tag name cannot inject shell into this job (which later holds the publish tokens).
+      # Guards the bump-then-tag flow: a tag pushed before dropping -SNAPSHOT (or against the wrong MC pin) stops here
+      # instead of publishing a mislabeled stable version. The pushed tag flows through an env var, never inlined into
+      # the script by ${{ }} templating, so a crafted tag name cannot inject shell into this job (which later holds the
+      # publish tokens).
       - name: "Guard: pushed tag must equal the built version"
         env:
           REF_NAME: ${{ github.ref_name }}
@@ -136,8 +109,8 @@ jobs:
         # cannot change.
         run: ./gradlew build -Pmint_parent= --stacktrace
 
-      # The forge/ island is a separate Gradle build the root build above does not reach. Build it only on the
-      # bands that carry one, so its jar exists for the resolve / publish / upload steps below (mirrors ci.yml).
+      # The forge/ island is a separate Gradle build the root build above does not reach. Build it only on the bands
+      # that carry one, so its jar exists for the resolve / publish / upload steps below.
       - name: Build the Forge island (deep bands only)
         if: hashFiles('forge/gradlew') != ''
         run: cd forge && ./gradlew build --stacktrace
@@ -146,10 +119,7 @@ jobs:
         id: jars
         run: |
           set -euo pipefail
-          # Resolve every production jar this band ships. Root loaders come from settings.gradle.kts's include(...)
-          # (fabric and/or neoforge); the forge/ island (deep bands) is a separate build, so its jar is taken by
-          # glob from forge/build/libs, the same non-sources/non-dev selection ci.yml uploads. Command
-          # substitution (not < <(...)) so set -e catches a gradle failure; sorted for a stable, comma-joinable
+          # Command substitution (not < <(...)) so set -e catches a gradle failure; sorted for a stable, comma-joinable
           # order across parallel stdout.
           JARS=()
           LOADER_TASKS=()
@@ -176,8 +146,7 @@ jobs:
           for j in "${JARS[@]}"; do
             [ -s "$j" ] || { echo "::error::production jar missing or empty: $j"; exit 1; }
           done
-          # Comma-delimited single line (actions/attest subject-path accepts commas), joined without leaving IFS
-          # changed. The set is band-dependent: fabric+neoforge on modern bands, fabric+forge (or forge only) deep.
+          # Comma-delimited single line (actions/attest subject-path accepts commas).
           paths="$(IFS=,; printf '%s' "${JARS[*]}")"
           printf 'paths=%s\n' "$paths" >> "$GITHUB_OUTPUT"
 
@@ -200,9 +169,6 @@ jobs:
           if [ "$JDK_MAJOR" != "$EXPECT" ]; then
             echo "::error::compile toolchain Java $JDK_MAJOR != the declared toolchain $EXPECT"; exit 1
           fi
-          # One SHA-256 line per jar this band ships (band-dependent set from the resolve step above), so the
-          # forge jar carries a published, verifiable hash exactly like fabric/neoforge. The compile-toolchain
-          # JDK is a per-band build fact (the island compiles on the same toolchain), so one line covers all.
           IFS=',' read -ra JARS <<< "$PATHS"
           RECORD="reproducibility-${VERSION}.txt"
           {
@@ -220,16 +186,11 @@ jobs:
         with:
           subject-path: ${{ steps.jars.outputs.paths }}
 
-      # The notes are the authored changelog section for this version, plus this band's reproducibility record
-      # for the platforms; a missing section fails the run. PUBLISH_DRY_RUN=true validates the platform
-      # coordinates without uploading. The plugin no longer publishes to GitHub; the funnel step does.
       - name: Publish to Modrinth and CurseForge
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-          # Dry-run is opt-in via a repository variable. Unset resolves to 'false' (a real publish, unchanged
-          # from before); a fork or the CI test repo sets PUBLISH_DRY_RUN=true to validate the platform
-          # coordinates without uploading. Both the root loaders and the forge island read it from the env.
+          # Dry-run is opt-in via a repository variable. Unset resolves to 'false' (a real publish).
           PUBLISH_DRY_RUN: ${{ vars.PUBLISH_DRY_RUN || 'false' }}
           VERSION: ${{ github.ref_name }}
           RECORD: ${{ steps.repro.outputs.file }}
@@ -242,19 +203,15 @@ jobs:
           fi
           CHANGELOG="$(printf '%s\n\n%s\n' "$NOTES" "$(cat "$RECORD")")"
           export CHANGELOG
-          # Root loaders (fabric and/or neoforge) publish from the root build; skip it on a forge-only band,
-          # whose root includes no loader subproject and so has no publishMods task. The forge/ island is a
-          # separate build with its own publishMods config and publishes on its own. Both honor PUBLISH_DRY_RUN.
+          # Root loaders (fabric and/or neoforge) publish from the root build; skip it on a forge-only band, whose root
+          # includes no loader subproject and so has no publishMods task.
           if grep -E '^[[:space:]]*include\(' settings.gradle.kts | grep -qE '"fabric"|"neoforge"'; then
             ./gradlew publishMods
           fi
           if [ -f forge/gradlew ]; then ( cd forge && ./gradlew publishMods ); fi
 
-      # Append this band's jars and record to the shared draft release that release-open created for this
-      # version. Release assets are independent of the tagged commit, so one release carries jars from many
-      # separate runs; --clobber makes a re-push idempotent. This step only appends, never creates, so there is
-      # no draft to race over. Not gated on PUBLISH_DRY_RUN: a draft is invisible and deletable, safe even in a
-      # dry run, while the irreversible platform uploads are what dry-run protects.
+      # --clobber makes a re-push idempotent. Not gated on PUBLISH_DRY_RUN: a draft is invisible and deletable, safe
+      # even in a dry run, while the irreversible platform uploads are what dry-run protects.
       - name: Append this band's artifacts to the shared draft GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

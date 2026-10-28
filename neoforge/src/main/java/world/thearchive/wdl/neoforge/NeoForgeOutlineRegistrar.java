@@ -14,9 +14,7 @@ import world.thearchive.wdl.adapter.impl.RimRendererImpl;
 import world.thearchive.wdl.client.WdlOutlineRenderer;
 
 /**
- * The NeoForge half of the outline render seam, the analog of {@code FabricOutlineRegistrar}. It draws after the
- * translucent-blocks stage, mixin-free, on the game event bus, reading the view frustum straight off the stage event.
- * The lines batch is flushed explicitly, since nothing after this stage flushes it.
+ * The lines batch is flushed explicitly.
  */
 final class NeoForgeOutlineRegistrar {
     private final RimRenderer rimRenderer = new RimRendererImpl();
