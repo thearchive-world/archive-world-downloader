@@ -16,27 +16,15 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
-/**
- * Item NBT built by the vanilla writers rather than by hand: {@link ContainerHelper#saveAllItems} for an
- * {@code "Items"} list and {@code ItemStack#save} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
- * {@code "RecordItem"}).
- *
- * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: vanilla always writes {@code "Slot"}
- * and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under test sees
- * every entry collapsed onto one slot.
- */
 public final class ItemFixtures {
     private ItemFixtures() {}
 
     /**
      * The stack for {@code itemId}, count 1.
      *
-     * <p>An unregistered id is rejected rather than resolved. At this band {@code Registry.ITEM} is a plain
-     * {@code MappedRegistry} with no default, so {@code get} throws {@code No default value} rather than returning air;
-     * {@code getOptional} returns null for an id the registry does not hold. A silently resolved id would build an air
-     * stack, and the vanilla writer skips empty stacks: the fixture would come back as an empty list that this gate
-     * then accepts, since an empty list is its own round trip. That is the degenerate fixture the gate exists to
-     * reject, arriving through the builder.
+     * <p>An unregistered id is rejected rather than resolved. {@code getOptional} returns null for an id the registry
+     * does not hold, a stack of a null item is empty, and the vanilla writer skips empty stacks: the fixture would come
+     * back as an empty list that {@link FixtureFidelity} then accepts, since an empty list is its own round trip.
      */
     public static ItemStack stack(String itemId) {
         ResourceLocation id = new ResourceLocation(itemId);
@@ -75,12 +63,10 @@ public final class ItemFixtures {
         return holder(slots, stacks).getList("Items", 10);
     }
 
-    /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code itemIds} at ascending slots from 0. */
     public static CompoundTag itemsHolder(String... itemIds) {
         return itemsHolder(stacks(itemIds));
     }
 
-    /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code stacks} at ascending slots from 0. */
     public static CompoundTag itemsHolder(ItemStack... stacks) {
         return holder(ascending(stacks.length), stacks);
     }
@@ -92,8 +78,7 @@ public final class ItemFixtures {
 
     /**
      * An {@code "Items"} entry with no {@code "Slot"}, which vanilla never writes but a corrupted or foreign save can
-     * hold, and which its decode silently lands on slot 0. Only for a case whose subject is that entry; a fixture
-     * standing in for producer output belongs on {@link #entryAtSlot}.
+     * hold, and which its decode silently lands on slot 0.
      */
     public static CompoundTag malformedEntryWithoutSlot(String itemId) {
         CompoundTag entry = entryAtSlot(0, itemId);
@@ -101,27 +86,23 @@ public final class ItemFixtures {
         return entry;
     }
 
-    /** The tag vanilla writes for a single stored stack, as a lectern's {@code "Book"} carries it. */
+    /** The tag vanilla writes for a single stored stack. */
     public static CompoundTag itemTag(String itemId) {
         return itemTag(stack(itemId));
     }
 
     /**
-     * The tag vanilla writes for {@code stack}, as a lectern's {@code "Book"} or a jukebox's {@code "RecordItem"}
-     * carries it: {@code ItemStack#save}, the same call every 1.20.4 block-entity single-stack field uses (a
-     * {@code {id, Count, tag}} compound with {@code Count} as a byte). {@code ItemStack.CODEC} exists on this band but
-     * encodes {@code Count} as an int, which is not byte-for-byte what a real block entity's own save produces.
+     * The tag vanilla writes for {@code stack}, as a jukebox's {@code "RecordItem"} carries it.
      */
     public static CompoundTag itemTag(ItemStack stack) {
         return stack.save(new CompoundTag());
     }
 
     /**
-     * A written book of {@code pageCount} pages. The page count is load-bearing wherever a lectern's {@code "Page"}
-     * matters: vanilla clamps the saved page into the book's own page range, so a book with no pages can only ever be
-     * on page -1. Below 1.20.5 a written book has no {@code WrittenBookContent} component; vanilla's own
-     * {@code WrittenBookItem} reads {@code title}/{@code author}/{@code generation}/{@code resolved} and a
-     * {@code "pages"} list of JSON-component strings straight off the item tag.
+     * A written book of {@code pageCount} pages. Below 1.20.5 a written book has no {@code WrittenBookContent}
+     * component; vanilla's own {@code WrittenBookItem} reads
+     * {@code title}/{@code author}/{@code generation}/{@code resolved} and a {@code "pages"} list of JSON-component
+     * strings straight off the item tag.
      */
     public static ItemStack writtenBook(int pageCount) {
         ListTag pages = new ListTag();

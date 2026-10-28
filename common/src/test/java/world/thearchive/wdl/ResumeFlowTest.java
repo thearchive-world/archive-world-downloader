@@ -21,11 +21,6 @@ import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.platform.PlatformBridge;
 import world.thearchive.wdl.platform.WdlCommands;
 
-/**
- * The headless slice of the resume flow: the usable-name gate on {@code /wdl start <name>} refuses before the
- * remote-world guard or any resolution runs, so the refusal path never loads config or touches the MC client. The
- * busy-guard half of the ordering is not pinned here; the fixture's controller stays idle.
- */
 class ResumeFlowTest {
     @Test
     void anUnusableNameIsRefusedWithTheNeedsNameLineBeforeAnyOtherGuard() {
@@ -56,7 +51,6 @@ class ResumeFlowTest {
                 target -> fail("the refusal must not start a download"));
     }
 
-    /** A recording bridge: captures chat line keys, stubs the surfaces the refusal path never reaches. */
     private static final class RecordingBridge implements PlatformBridge {
         final List<String> chatKeys = new ArrayList<>();
 
@@ -129,10 +123,6 @@ class ResumeFlowTest {
 
         @Override
         public boolean observesSpectatorBlockClick() {
-            // Neither shipped loader answers false to both of these: Fabric is false/true and NeoForge
-            // true/false. This pair is the most permissive input the crosshair rule takes, so a headless
-            // test that ever reaches resolveOpenTarget would exercise a configuration nothing ships.
-            // Nothing does today, because that path needs a live client; match a real loader before one can.
             return false;
         }
 

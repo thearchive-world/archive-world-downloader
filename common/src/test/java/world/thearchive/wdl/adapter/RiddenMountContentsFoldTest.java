@@ -38,14 +38,9 @@ import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The finish-time fold of a seated player's mount, over a record whose root is not the mount. A mount that something
- * pushed itself under is written as a passenger of that carrier, since the record vanilla stores is the whole tree from
- * its root, so the entity whose chest the player opened is a nested node. A fold that asks its question about the root
- * misses it, and the mount reaches disk with an empty {@code "Items"} while the stash entry survives to the finish
- * warning; the record is the tree's only copy, so the contents are then on disk nowhere.
- *
- * <p>Both cases run the same fold over the same captured holder and differ only in whether the mount is the root, which
- * is the one axis the site reads.
+ * A mount that something pushed itself under is written as a passenger of that carrier, since the record vanilla stores
+ * is the whole tree from its root, so the entity whose chest the player opened is a nested node. A fold that asks its
+ * question about the root misses it.
  */
 class RiddenMountContentsFoldTest {
     private final ContainerSink sink = new ContainerSinkImpl();
@@ -112,14 +107,12 @@ class RiddenMountContentsFoldTest {
         assertFalse(passengerOf(folded).contains("Career"));
     }
 
-    /** The trade list a client merchant builds for itself, in the shape vanilla's own trade-list NBT write produces. */
     private static CompoundTag invented() {
         class_1145 offers = new class_1145();
         offers.add(new class_1144(new ItemStack(Items.EMERALD, 1), new ItemStack(Items.DIAMOND)));
         return offers.method_3557();
     }
 
-    /** The scenario shape: a chested mount that a plain minecart pushed itself under, so the mount is the passenger. */
     private static CompoundTag mountUnderCarrier() {
         return EntityFixtures.entityCarrying(EntityFixtures.entity("minecraft:minecart", CARRIER),
                 EntityFixtures.entity("minecraft:mule", MOUNT));
@@ -144,11 +137,6 @@ class RiddenMountContentsFoldTest {
         stash(session).put(uuid, holder);
     }
 
-    /**
-     * The session's open-time container stash, to seed. Reflective because every production path that fills it runs
-     * behind the client singleton (a menu open), and widening the field would publish mutable capture state to the
-     * whole package for a test's convenience.
-     */
     @SuppressWarnings("unchecked")
     private static Map<UUID, CompoundTag> stash(LiveCaptureSession session) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField("entityContainerStash");
@@ -156,7 +144,6 @@ class RiddenMountContentsFoldTest {
         return (Map<UUID, CompoundTag>) field.get(session);
     }
 
-    /** A session with no bound level, which is all the pure fold reads beside its own stash. */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
         properties.setProperty("captureEntities", "false");

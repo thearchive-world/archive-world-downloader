@@ -22,15 +22,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the merchant-offer capture transform: {@link MerchantOfferCapture#serialize} writes a
- * villager's offers to the vanilla-shaped {@code {Offers:{Recipes:[...]}}} holder through the trade list's own NBT
- * write, and {@link MerchantOfferCapture#scrubAndRemapOffers} runs each offer's {@code sell} item through the same
- * item-location scrub and map-id remap every captured item takes. This band writes no {@code "Xp"} trade-experience
- * key: trade experience is a 1.14 addition, absent here. Real {@link ItemStack}s carrying the tags drive the
- * round-trip, so a wrong key leaves the coordinate or the session map id and fails; no live menu or {@code Level} is
- * needed.
- */
 class MerchantOfferCaptureTest {
     @BeforeAll
     static void bootstrapVanilla() {
@@ -52,7 +43,6 @@ class MerchantOfferCaptureTest {
         return compass;
     }
 
-    /** A filled-map stack carrying {@code mapId} in its raw {@code "map"} tag (below 1.20.5, no {@code map_id}). */
     private static ItemStack filledMap(int mapId) {
         ItemStack map = new ItemStack(Items.FILLED_MAP);
         map.getOrCreateTag().putInt("map", mapId);
@@ -60,7 +50,6 @@ class MerchantOfferCaptureTest {
     }
 
     private static class_1145 offering(ItemStack sell) {
-        // This band's merchant offer takes a plain buy/sell ItemStack pair, no trade experience or price multiplier.
         class_1145 offers = new class_1145();
         offers.add(new class_1144(new ItemStack(Items.EMERALD, 1), sell));
         return offers;
@@ -70,7 +59,6 @@ class MerchantOfferCaptureTest {
         return MerchantOfferCapture.serialize(offering(sell));
     }
 
-    /** The {@code sell} item's pre-component {@code tag} compound (below 1.20.5, no {@code components} map). */
     private static CompoundTag sellItemTag(CompoundTag holder) {
         return holder.getCompound("Offers").getList("Recipes", 10).getCompound(0)
                 .getCompound("sell").getCompound("tag");
@@ -140,7 +128,6 @@ class MerchantOfferCaptureTest {
 
     @Test
     void reStashingTheSameLiveOffersResolvesToOneArchiveId() {
-        // The offers are re-stashed every tick the trade screen is open, each tick building a fresh holder.
         ItemStack live = filledMap(7);
         MapArchive archive = new MapArchive(MapManifest.empty(), sessionId -> null, (archiveId, dataTag) -> {});
 
@@ -169,6 +156,6 @@ class MerchantOfferCaptureTest {
         CompoundTag holder = holderSelling(new ItemStack(Items.DIAMOND));
         holder.getCompound("Offers").getList("Recipes", 10).getCompound(0).remove("sell");
 
-        MerchantOfferCapture.scrubAndRemapOffers(holder, true, null); // must not throw; reaches the per-recipe skip
+        MerchantOfferCapture.scrubAndRemapOffers(holder, true, null);
     }
 }

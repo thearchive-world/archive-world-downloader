@@ -27,13 +27,6 @@ import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.scores.Scoreboard;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A do-nothing overworld {@link Level} for headless entity fixtures. The {@code Mob} constructor binds a level, so a
- * mob cannot be built against a null one; this supplies the overworld dimension and a fresh profiler through the 1.13.2
- * {@code Level} constructor, with a null server, a null dimension-data store, a null chunk source (the abstract
- * {@code method_3712} factory returns none), and inert stubs for the members no fixture calls. The vanilla bootstrap
- * (via {@link TestRegistries}) must have populated the dimension registry first.
- */
 public final class HeadlessLevel extends Level {
     private final TagManager tags = new TagManager();
 
@@ -54,7 +47,7 @@ public final class HeadlessLevel extends Level {
         return null;
     }
 
-    // hasChunk returns the ChunkAccess at the chunk coordinates despite the boolean-sounding name; there is none here.
+    // hasChunk returns the ChunkAccess at the chunk coordinates despite the boolean-sounding name.
     @Override
     public @Nullable ChunkAccess hasChunk(int chunkX, int chunkZ) {
         return null;

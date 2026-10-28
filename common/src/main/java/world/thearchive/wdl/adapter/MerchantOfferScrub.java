@@ -10,14 +10,11 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * Drops the trade data a client-side merchant invents about itself, so the only trades that reach the archive are ones
- * a player actually saw.
- *
- * <p>A merchant's real offers exist on the server and reach the client only over the open menu channel. Ask a
- * client-side merchant for its offers anyway and it does not answer "none": it assigns itself a random career and
- * generates a full trade list from its profession, on the spot. Ordinary things ask, differing by version: rendering
- * its name, interacting with it, and below 1.21.1, where vanilla added the client-side check, its own entity write. On
- * disk the invention is indistinguishable from a real capture.
+ * A merchant's real offers exist on the server and reach the client only over the open menu channel. Ask a client-side
+ * merchant for its offers anyway and, unless it is a nitwit, it does not answer "none": it assigns itself a random
+ * career and generates a trade list from its profession, on the spot. Interacting with it asks, and so does reading its
+ * display name when it carries no custom name. Its entity write saves whatever list it holds, so on disk the invention
+ * is indistinguishable from a real capture.
  *
  * <p>It also silently defeats both carry-forwards. {@link EntityMerge} and {@link RecoveredEntityContent} restore saved
  * trades only into a slot still empty, which is what stops a stale copy overwriting a fresher one; an invented list
@@ -25,9 +22,7 @@ import net.minecraft.nbt.Tag;
  * chunk. Stripping therefore runs before every fold.
  *
  * <p>The career keys go with the offers because the same invention writes them: a client merchant's career is a number
- * it made up to pick a trade table with, not anything the server told it. The profession is left alone, being genuinely
- * synced, as is the trade experience, which a client reports at its own zero and which the carry-forward already treats
- * as absent.
+ * it made up to pick a trade table with, not anything the server told it.
  */
 final class MerchantOfferScrub {
     private static final String[] CLIENT_INVENTED_KEYS = { "Offers", "Career", "CareerLevel" };
@@ -35,9 +30,7 @@ final class MerchantOfferScrub {
     private MerchantOfferScrub() {}
 
     /**
-     * Strip invented trade data from every node of {@code entitiesChunkTag}, at any depth of the {@code "Passengers"}
-     * tree, and report how many nodes carried some. Call before the merchant folds: they set the captured trades
-     * afterwards, so a scrub cannot cost a real capture.
+     * Call before the merchant folds: they set the captured trades afterwards, so a scrub cannot cost a real capture.
      */
     static int stripInventedOffers(CompoundTag entitiesChunkTag) {
         Tag rawEntities = entitiesChunkTag.get("Entities");
@@ -54,11 +47,6 @@ final class MerchantOfferScrub {
         return stripped;
     }
 
-    /**
-     * The same strip over one entity record and its passengers, for the surfaces that write a record rather than a
-     * chunk: the player's own ridden vehicle, which is held out of the entity write and so is the only copy of anything
-     * riding with the player.
-     */
     static int stripInventedOffersFromRecord(CompoundTag entityRecord) {
         int stripped = 0;
         for (Map.Entry<UUID, CompoundTag> node : EntityTreeWalk.byUuid(entityRecord).entrySet()) {

@@ -22,9 +22,7 @@ import world.thearchive.wdl.adapter.WdlRegionStorage;
 import world.thearchive.wdl.adapter.WorldPaths;
 
 /**
- * 1.13.2 save-layout axis. Rooted at a single world save directory; maps a dimension to its vanilla on-disk folders and
- * pre-creates {@code region/} before the region writer opens it. There is no {@code entities/} region at this band:
- * entities live inside the {@code region/} chunk under {@code Level.Entities}.
+ * Pre-creates {@code region/} before the region writer opens it.
  */
 public final class WorldPathsImpl implements WorldPaths {
     private static final Logger LOGGER = LogManager.getLogger(WorldPathsImpl.class);
@@ -47,8 +45,6 @@ public final class WorldPathsImpl implements WorldPaths {
 
     @Override
     public Path dataDirectory() {
-        // Global: maps are stored under the overworld save root (= this saveRoot, the overworld dimension
-        // path), not under a per-dimension folder. Resolve-only; the first writer to reach it creates it.
         return saveRoot.resolve("data");
     }
 
@@ -60,10 +56,6 @@ public final class WorldPathsImpl implements WorldPaths {
         putIfPresent(result, "minecraft:the_end", saveRoot.resolve("DIM1").resolve("region"));
         Path dimensions = saveRoot.resolve("dimensions");
         if (Files.isDirectory(dimensions)) {
-            // dimensions/<namespace>/<path>/region; a ResourceLocation path may nest further, so any
-            // region-file-holding directory named region under the tree is taken, named by its parent's
-            // relative path. The holds-check lets a dimension whose path is literally "region" resolve to
-            // its real region directory one level deeper instead of its own root.
             Map<String, Path> custom = new TreeMap<>();
             try {
                 Files.walkFileTree(dimensions, new SimpleFileVisitor<Path>() {
@@ -86,7 +78,6 @@ public final class WorldPathsImpl implements WorldPaths {
                     }
                 });
             } catch (IOException | RuntimeException e) {
-                // Nothing thrown here may escape: a scan problem degrades the totals, never the save.
                 LOGGER.warn("cannot walk the dimensions directory {}; save totals will be partial",
                         dimensions, e);
             }
@@ -115,7 +106,6 @@ public final class WorldPathsImpl implements WorldPaths {
         return slash < 0 ? relative : relative.substring(0, slash) + ':' + relative.substring(slash + 1);
     }
 
-    /** Vanilla layout: overworld at the save root, Nether=DIM-1, End=DIM1. */
     private Path dimensionRoot(DimensionType dimension) {
         return dimension.getStorageFolder(saveRoot.toFile()).toPath();
     }

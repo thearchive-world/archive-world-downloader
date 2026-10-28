@@ -10,12 +10,6 @@ import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.adapter.impl.RimRendererImpl;
 import world.thearchive.wdl.client.WdlOutlineRenderer;
 
-/**
- * The Forge half of the outline render seam, the analog of {@code FabricOutlineRegistrar}. It draws at the end of level
- * rendering, mixin-free, on the game event bus. Forge 25's RenderWorldLastEvent exposes neither a frustum nor a matrix
- * stack, so the shared renderer draws every section against the ambient pre-blaze3d model-view and lets the GPU clip.
- * The shared cull owns the Tesselator buffer begin and flush at this band, so nothing is flushed here.
- */
 final class ForgeOutlineRegistrar {
     private final RimRenderer rimRenderer = new RimRendererImpl();
 

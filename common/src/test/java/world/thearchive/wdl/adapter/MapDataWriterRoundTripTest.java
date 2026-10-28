@@ -20,17 +20,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The {@code data/} writer: a serialized inner {@code "data"} tag wrapped as {@code {data, DataVersion}} and gzipped to
- * {@code data/<key>.dat} round-trips through a real compressed file, the {@code data/} directory is created on demand,
- * the {@code idcounts} file is the uncompressed root {@code {map: maxId}} vanilla 1.13.2 reads, and a failed
- * {@code idcounts} write leaves the id floor already on disk readable. Server-free: hand-built tags drive it (no map
- * type needed), matching the {@link LevelDatRoundTripTest} discipline.
- */
 class MapDataWriterRoundTripTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // sets the game version NbtUtils.addCurrentDataVersion reads
+        TestRegistries.bootstrap();
     }
 
     @Test

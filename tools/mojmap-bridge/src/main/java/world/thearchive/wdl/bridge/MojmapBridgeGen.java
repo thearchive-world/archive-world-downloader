@@ -50,28 +50,14 @@ import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
 
-/**
- * Generates the 1.13.2 Mojmap bridge mappings by SRG-pivot composition.
- *
- * <p>Composes obf(1.13.2) -&gt; Mojmap(1.14.4) from three public files (Mojang 1.14.4 ProGuard
- * mappings, mcp_config 1.14.4 joined.tsrg, mcp_config 1.13.2 joined.tsrg) using the searge member
- * ids as the version-stable pivot, hardened with a per-tier tie/margin vote guard, a structural
- * class cross-check, and a descriptor-fallback pass for churned-srg members. From the single
- * resulting obf-&gt;mojmap map it derives an intermediary-&gt;named mappings jar (for Fabric Loom) and
- * a mojmap-&gt;srg reobf mapping.
- *
- * <p>This is a build-time tool, not shipped code; it is intentionally a single self-contained class.
- */
 public final class MojmapBridgeGen {
 
-    // Pinned immutable coordinates (determinism).
     private static final String MCP_1132 = "1.13.2-20190213.203750";
     private static final String MCP_1144 = "1.14.4-20190829.143755";
     private static final String FORGE_MAVEN = "https://maven.minecraftforge.net/";
     private static final String MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
     private static final String INTERMEDIARY_URL =
             "https://maven.legacyfabric.net/net/legacyfabric/intermediary/1.13.2/intermediary-1.13.2-v2.jar";
-    // Pinned sha1 for the 1.13.2 client jar (from the 1.13.2 version manifest entry).
     private static final String CLIENT_1132_SHA1 = "30bfe37a8db404db11c7edf02cb5165817afb4d9";
 
     private static final Map<String, String> PRIM = Map.ofEntries(
@@ -83,63 +69,36 @@ public final class MojmapBridgeGen {
     private static final Pattern METHOD_RE = Pattern.compile("^(?:\\d+:\\d+:)?([^ ]+) ([^ (]+)\\((.*)\\) -> ([^ ]+)$");
     private static final Pattern FIELD_RE = Pattern.compile("^([^ ]+) ([^ ]+) -> ([^ ]+)$");
 
-    // ---- ProGuard-derived maps (1.14.4) -------------------------------------------------------
-    /** mojmap internal class -> obf14 internal class. */
     private final Map<String, String> mojClassM2o = new HashMap<>();
-    /** obf14 internal class -> mojmap internal class. */
     private final Map<String, String> obf14ToMoj = new HashMap<>();
-    /** (obf14 owner, obf14 name, obf14 desc) -> mojmap method name. */
     private final Map<String, String> mojMethod = new HashMap<>();
-    /** (obf14 owner, obf14 name) -> mojmap field name. */
     private final Map<String, String> mojField = new HashMap<>();
-    /** mojmap owner -> (mojmap-space method desc -> set of mojmap method names). For desc-fallback. */
     private final Map<String, Map<String, Set<String>>> mojMethodsByOwnerDesc = new HashMap<>();
 
-    // ---- 1.14.4 tsrg (obf14 -> srg) joined to mojmap ------------------------------------------
     private final Map<String, String> srgMethodToMoj = new HashMap<>();
     private final Map<String, String> srgFieldToMoj = new HashMap<>();
-    /** srg id -> set of mojmap owner classes that declare it in 1.14.4. */
     private final Map<String, Set<String>> srgOwnerSets = new HashMap<>();
-    /** srg id -> the unique mojmap owner (only for srg ids owned by exactly one class). */
     private final Map<String, String> srgUniqueOwner = new HashMap<>();
 
-    // ---- 1.13.2 tsrg (obf13 -> srg) -----------------------------------------------------------
     private final List<String> obf13ClassOrder = new ArrayList<>();
     private final Map<String, List<String>> obf13ClassSrgs = new HashMap<>();
-    /** obf13 methods: [owner, name, desc, srg]. */
     private final List<String[]> obf13Methods = new ArrayList<>();
-    /** obf13 fields: [owner, name, srg]. */
     private final List<String[]> obf13Fields = new ArrayList<>();
-    /** obf13 class -> srg class name (from joined_1132). */
     private final Map<String, String> obf13ClassToSrg = new HashMap<>();
 
-    // ---- jar structural data ------------------------------------------------------------------
     private final Map<String, ClassInfo> jar13 = new HashMap<>();
     private final Map<String, ClassInfo> jar14 = new HashMap<>();
 
-    // ---- results ------------------------------------------------------------------------------
     private final Map<String, String> obf13ToMojClass = new HashMap<>();
-    // Numeric-anonymous inner classes dropped from the class map so Loom's ordinal-preserving
-    // completion names them uniquely, rather than the vote's ordinal-swap colliding with the completion.
     private final Set<String> excludedAnons = new TreeSet<>();
 
-    // ---- merged-jar hierarchy (client + server-only classes) ----------------------------------
-    // superclass, interfaces, and declared virtual method slots per class, for the member-propagation
-    // consistency pass and the remap gate. Loom merges client+server before remapping.
     private final Map<String, MergedClass> merged = new HashMap<>();
 
-    // official class -> Legacy Fabric intermediary class name (net/minecraft/class_NNNN), used to
-    // detect the root-package landing of an unmapped class and to name its package-preserving fallback.
     private final Map<String, String> officialToInter = new HashMap<>();
 
-    // Legacy Fabric intermediary member names, the name Loom leaves on the dev classpath for every member
-    // the bridge does not Mojmap-map. Keyed by official owner + obf name (+ obf desc for methods, since a
-    // class reuses an obf method name across descriptors). The field value carries the obf descriptor too,
-    // since obf13Fields (from the MCP tsrg) does not record one.
     private final Map<String, String> officialToInterMethod = new HashMap<>();
     private final Map<String, String[]> officialToInterField = new HashMap<>();
 
-    // counters
     private int classesVoted;
     private int classesAssigned;
     private int classesBumpedOffTop;
@@ -159,20 +118,14 @@ public final class MojmapBridgeGen {
     private int fallbackPackagedByCoupling;
     private int fallbackPackagedBySrg;
 
-    // ---- coupling data (protected/package-private cross-class access between MC classes) ----------
-    /** obf class -> obf classes that directly extend or implement it (Minecraft classes only). */
     private final Map<String, List<String>> mcChildren = new HashMap<>();
-    /** non-public cross-class member-access edges as [accessor, declaringClass, accessFlags]. */
     private final List<String[]> couplingEdges = new ArrayList<>();
-    /** top-level orphan obf class -> Mojmap package of the mapped class it is same-package-coupled to. */
     private final Map<String, String> orphanCoupledPackage = new HashMap<>();
-    /** obf classes we assigned a package-preserving fallback name (not real Mojmap). */
     private final Set<String> fallbackClasses = new HashSet<>();
 
     static final class ClassInfo {
         String superName;
         final List<String> interfaces = new ArrayList<>();
-        /** field name -> descriptor. */
         final Map<String, String> fields = new TreeMap<>();
     }
 
@@ -180,10 +133,7 @@ public final class MojmapBridgeGen {
         int access;
         String superName;
         final List<String> interfaces = new ArrayList<>();
-        /** declared virtual methods (non-static, non-private; not <init>/<clinit>), as "name\tdesc". */
         final Set<String> virtualMethods = new TreeSet<>();
-        /** declared members (methods and fields) -> access flags, for coupling access checks. Only
-         * populated for Minecraft classes (in the srg map); libraries do not need it. */
         Map<String, Integer> memberAccess;
     }
 
@@ -235,60 +185,43 @@ public final class MojmapBridgeGen {
         log("[struct] structRejected=%d finalAssigned=%d leftUnmapped=%d",
                 classesStructRejected, classesAssigned, classesLeftUnmapped);
 
-        // member maps built per class
         Map<String, TreeMap<String, String[]>> methodsByClass = new HashMap<>();
         Map<String, TreeMap<String, String[]>> fieldsByClass = new HashMap<>();
         mapMembers(methodsByClass, fieldsByClass);
         log("[members] srgMapped=%d descfallback=%d churnedTypeUnmapped=%d leftUnmapped=%d",
                 membersSrgMapped, membersDescfallbackMapped, membersChurnedTypeUnmapped, membersLeftUnmapped);
 
-        // Merged client+server class set (Loom merges before remap; collisions can involve
-        // server-only classes), used both for injective-collision resolution and the remap gate.
         readMergedStructure(src.client1132, src.server1132);
         loadIntermediaryNames(src.intermediaryTiny);
         Set<String> mergedClasses = new TreeSet<>(merged.keySet());
         mergedClasses.addAll(obf13ToMojClass.keySet());
         log("[merged] classes=%d", mergedClasses.size());
 
-        // Give every unmapped class a package-preserving fallback name so Loom does not strand it at
-        // its flat root-package intermediary name (net/minecraft/class_NNNN) and break vanilla's own
-        // same-package access. Runs before collision resolution so the anon exclusion sees the fallback
-        // anchors as renamed. computeOrphanCoupledPackages first scans the merged jar for the hierarchy
-        // and member couplings that bind an orphan to a mapped class's package.
+        // Packaging runs before collision resolution so the anon exclusion sees the fallback anchors as renamed.
         computeOrphanCoupledPackages(src.client1132, src.server1132);
         packageUnmappedClasses();
 
-        // Collision resolution: drop numeric-anonymous inners so Loom's ordinal-preserving completion
-        // names them uniquely, and blank the Realms passthrough intruder.
         Set<String> blanked = resolveCollisions(mergedClasses);
         for (String c : excludedAnons) {
             methodsByClass.remove(c);
             fieldsByClass.remove(c);
         }
-        // A class blanked to resolve a collision is now unmapped and would itself land in the root
-        // package, so package the newly-blanked classes too.
         packageUnmappedClasses();
         log("[package] fallbackByAncestor=%d fallbackByCoupling=%d fallbackBySrg=%d",
                 fallbackPackagedByAncestor, fallbackPackagedByCoupling, fallbackPackagedBySrg);
         log("[collision] anonsExcluded=%d realmsBlanked=%d resolved=%d",
                 excludedAnons.size(), blanked.size(), collisionsResolved);
 
-        // Make method overrides hierarchy-consistent so tiny-remapper's member propagation does not
-        // abort Loom's remap with "Unfixable conflicts". Runs after the anon drop, then re-adds the
-        // overrides needed to make each slot consistent (anons included, hosted under a blank class
-        // line). The toggle exists only to prove the remap gate reproduces the pre-fix failure.
         if (System.getenv("BRIDGE_SKIP_HIERARCHY_FIX") == null) {
             enforceHierarchyConsistency(methodsByClass);
         }
         log("[hierarchy] propagated=%d divergentSlots=%d unmapped=%d",
                 membersHierarchyPropagated, hierarchyDivergentSlots, membersHierarchyUnmapped);
 
-        // emit obf-mojmap.tiny (hand-written, deterministic) from the one map
         Path obfMojmap = outDir.resolve("obf-mojmap.tiny");
         emitObfMojmap(obfMojmap, methodsByClass, fieldsByClass);
         log("[emit] wrote %s", obfMojmap);
 
-        // load the one map via mapping-io, derive the two outputs
         MemoryMappingTree oneMap = new MemoryMappingTree();
         MappingReader.read(obfMojmap, MappingFormat.TINY_2_FILE, oneMap);
 
@@ -319,14 +252,10 @@ public final class MojmapBridgeGen {
         log("OK");
     }
 
-    // ============================================================================================
-    // ProGuard parsing (mojmap -> obf14), two-pass (classes then members).
-    // ============================================================================================
     private final List<Path> proguardPaths = new ArrayList<>();
 
     private void parseProguard(Path path) throws IOException {
         proguardPaths.add(path);
-        // pass 1: classes
         try (BufferedReader r = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             String line;
             while ((line = r.readLine()) != null) {
@@ -344,7 +273,6 @@ public final class MojmapBridgeGen {
         }
     }
 
-    /** Second pass over all ProGuard files: members (needs mojClassM2o fully populated). */
     private void parseProguardMembers() throws IOException {
         for (Path path : proguardPaths) {
             String curObf = null;
@@ -379,18 +307,11 @@ public final class MojmapBridgeGen {
                         String name = m.group(2);
                         String params = m.group(3);
                         String obfname = m.group(4);
-                        // Mojang lists the static initializer and constructors (void <clinit>() -> <clinit>,
-                        // void <init>(...) -> <init>). These JVM special methods are never renamed; feeding
-                        // them into the pivot yields invalid mapping targets that tiny-remapper rejects.
                         if (name.equals("<init>") || name.equals("<clinit>")) {
                             continue;
                         }
                         String obfDesc = methodDesc(params, ret, true);
                         mojMethod.put(curObf + "\t" + obfname + "\t" + obfDesc, name);
-                        // parameter-only descriptor (mojmap space) for the fallback index: the
-                        // return type churns across versions (e.g. CompoundTag.put went void->Tag),
-                        // and Java forbids two methods with the same name and parameters, so the
-                        // parameter descriptor is the stable member identity within a class.
                         String mojParams = paramDesc(params, false);
                         mojMethodsByOwnerDesc
                                 .computeIfAbsent(curMoj, k -> new HashMap<>())
@@ -410,12 +331,6 @@ public final class MojmapBridgeGen {
         }
     }
 
-    /**
-     * Builds a JVM method descriptor from ProGuard param/return types.
-     *
-     * @param obfSpace when true, object types are mapped mojmap-&gt;obf14 (for joining with
-     *     joined_1144); when false they stay in mojmap-internal space (for the fallback index).
-     */
     private String methodDesc(String params, String ret, boolean obfSpace) {
         return paramDesc(params, obfSpace) + typeToDesc(ret, obfSpace);
     }
@@ -432,7 +347,6 @@ public final class MojmapBridgeGen {
         return sb.append(')').toString();
     }
 
-    /** Returns just the parameter portion "(...)" of a JVM method descriptor. */
     private static String paramPart(String methodDescriptor) {
         return methodDescriptor.substring(0, methodDescriptor.indexOf(')') + 1);
     }
@@ -458,9 +372,6 @@ public final class MojmapBridgeGen {
         return "[".repeat(dims) + base;
     }
 
-    // ============================================================================================
-    // joined_1144.tsrg: obf14 -> srg, joined to srg -> mojmap via the ProGuard maps.
-    // ============================================================================================
     private void parseJoined1144(Path path) throws IOException {
         String cur = null;
         try (BufferedReader r = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
@@ -507,9 +418,6 @@ public final class MojmapBridgeGen {
         }
     }
 
-    // ============================================================================================
-    // joined_1132.tsrg: obf13 -> srg.
-    // ============================================================================================
     private void parseJoined1132(Path path) throws IOException {
         String cur = null;
         try (BufferedReader r = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
@@ -539,9 +447,6 @@ public final class MojmapBridgeGen {
         }
     }
 
-    // ============================================================================================
-    // ASM jar structural read.
-    // ============================================================================================
     private void readJar(Path jar, Map<String, ClassInfo> into) throws IOException {
         try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(jar))) {
             ZipEntry e;
@@ -577,10 +482,8 @@ public final class MojmapBridgeGen {
     }
 
     /**
-     * Reads the merged (client + server-only classes, matching Loom's merge) hierarchy: each class's
-     * superclass, interfaces, and declared virtual method slots. A virtual method is non-static and
-     * non-private ({@code access & 0xA == 0}, tiny-remapper's {@code isVirtual}); only these propagate
-     * across the hierarchy, so only these can produce a source-name conflict.
+     * A virtual method is non-static and non-private ({@code access & 0xA == 0}, tiny-remapper's {@code isVirtual});
+     * only these propagate across the hierarchy, so only these can produce a source-name conflict.
      */
     private void readMergedStructure(Path client, Path server) throws IOException {
         readStructureInto(client);
@@ -597,7 +500,7 @@ public final class MojmapBridgeGen {
                 byte[] bytes = zis.readAllBytes();
                 ClassReader cr = new ClassReader(bytes);
                 if (merged.containsKey(cr.getClassName())) {
-                    continue; // client wins on a class present in both, matching the merge
+                    continue;
                 }
                 MergedClass info = new MergedClass();
                 boolean isMc = obf13ClassToSrg.containsKey(cr.getClassName());
@@ -644,14 +547,9 @@ public final class MojmapBridgeGen {
         }
     }
 
-    // ============================================================================================
-    // Class voting (tier 1 unique-owner + tier 2 full-owner), tie/margin guard on BOTH tiers,
-    // greedy bijective assignment.
-    // ============================================================================================
-    private static final int MIN_MARGIN = 1; // winner must beat runner-up by at least this many votes
+    private static final int MIN_MARGIN = 1;
 
     private void voteClasses() {
-        // tier 1: unique-owner votes
         Map<String, TreeMap<String, Integer>> votes1 = new HashMap<>();
         for (String cls : obf13ClassOrder) {
             TreeMap<String, Integer> v = new TreeMap<>();
@@ -667,7 +565,6 @@ public final class MojmapBridgeGen {
         }
         Set<String> votedClasses = new HashSet<>(votes1.keySet());
 
-        // tier-1 candidate pairs that pass the tie-free-unique-top + min-margin guard
         List<Object[]> pairs = new ArrayList<>();
         for (Map.Entry<String, TreeMap<String, Integer>> e : votes1.entrySet()) {
             String cls = e.getKey();
@@ -679,7 +576,6 @@ public final class MojmapBridgeGen {
             }
             pairs.add(new Object[] {v.get(top), cls, top});
         }
-        // assign greedily: highest score first, deterministic tie-breaks by class then target
         pairs.sort(Comparator
                 .comparingInt((Object[] p) -> -(Integer) p[0])
                 .thenComparing(p -> (String) p[1])
@@ -696,7 +592,6 @@ public final class MojmapBridgeGen {
             takenMoj.add(mcls);
         }
 
-        // tier 2: full owner-set votes over untaken mojmap targets, same guard
         List<Object[]> cand = new ArrayList<>();
         for (String cls : obf13ClassOrder) {
             if (obf13ToMojClass.containsKey(cls) || obf13ClassSrgs.getOrDefault(cls, List.of()).isEmpty()) {
@@ -739,17 +634,10 @@ public final class MojmapBridgeGen {
         classesVoted = votedClasses.size();
     }
 
-    /**
-     * Returns the winning target only if there is a unique top vote-getter that beats the runner-up
-     * by at least {@link #MIN_MARGIN}. Otherwise returns null (ambiguous, leave unmapped). Applied
-     * to BOTH tiers (the spike guarded only tier 2, which let the LecternBlock false-positive
-     * through in tier 1).
-     */
     private static String guardedTop(TreeMap<String, Integer> votes) {
         String best = null;
         int bestScore = -1;
         int secondScore = -1;
-        // TreeMap iteration is deterministic (sorted by target name), so ties resolve stably.
         for (Map.Entry<String, Integer> e : votes.entrySet()) {
             int s = e.getValue();
             if (s > bestScore) {
@@ -764,15 +652,11 @@ public final class MojmapBridgeGen {
             return null;
         }
         if (bestScore - secondScore < MIN_MARGIN) {
-            return null; // tie or margin too small
+            return null;
         }
         return best;
     }
 
-    // ============================================================================================
-    // Structural cross-check: reject a class assignment on a definite structural contradiction
-    // between the obf13 class and its candidate mojmap class (both projected into mojmap space).
-    // ============================================================================================
     private void structuralCrossCheck() {
         Set<String> debug = Set.of(
                 "net/minecraft/core/BlockPos", "net/minecraft/nbt/CompoundTag", "net/minecraft/nbt/ListTag",
@@ -794,26 +678,14 @@ public final class MojmapBridgeGen {
         }
     }
 
-    /**
-     * True unless there is a definite structural contradiction. We reject when superclass identity,
-     * interface arity, or the field-descriptor multiset positively disagree in mojmap space. When a
-     * signal cannot be determined (missing jar entry, unmapped supertype) we do not reject on it.
-     */
     private boolean structAgrees(String c13, String cMoj, boolean dbg) {
         String obf14 = mojClassM2o.get(cMoj);
         ClassInfo i13 = jar13.get(c13);
         ClassInfo i14 = obf14 != null ? jar14.get(obf14) : null;
         if (i13 == null || i14 == null) {
-            return true; // cannot determine -> do not reject
+            return true;
         }
 
-        // Field-descriptor multiset overlap in mojmap space. Exact agreement is NOT usable here:
-        // Minecraft classes are refactored across 1.13.2 -> 1.14.4 (superclasses inserted, fields
-        // hoisted into new bases), so a correct match such as BlockState (Object -> AbstractStateHolder)
-        // shares zero fields yet is the same class. We therefore veto only a gross structural
-        // contradiction: two field-rich classes whose field-descriptor multisets are wholly disjoint,
-        // which no genuine same-class pair exhibits. The vote margin guard and the intermediary oracle
-        // are the primary correctness signals; this is a defense-in-depth backstop.
         TreeMap<String, Integer> f13 = fieldDescMulti(i13, obf13ToMojClass);
         TreeMap<String, Integer> f14 = fieldDescMulti(i14, obf14ToMoj);
         int common = 0;
@@ -839,22 +711,8 @@ public final class MojmapBridgeGen {
         return !grossMismatch;
     }
 
-    /**
-     * Field-disjointness threshold for the structural veto. Exact structural agreement (superclass
-     * identity + interface arity + field multiset) is not achievable across 1.13.2 -&gt; 1.14.4 because
-     * Minecraft classes are refactored between these versions (BlockState gains AbstractStateHolder,
-     * ListTag gains CollectionTag, fields are hoisted into new bases), so a correct match can share
-     * zero fields. The searge member-id vote with its per-tier margin guard is the primary identity
-     * signal; this veto only rejects a bind where two field-rich classes share literally no field
-     * descriptor, a contradiction no genuine same-class pair produces.
-     */
     private static final int STRUCT_MIN_FIELDS = 4;
 
-    /**
-     * Projects an internal class name into mojmap space. For obf13 we use the composed class map;
-     * for obf14 we use the ProGuard map. Java/library classes (no mapping) pass through unchanged so
-     * both sides agree on them. Returns null only for null input.
-     */
     private static String normClass(String name, Map<String, String> map) {
         if (name == null) {
             return null;
@@ -871,7 +729,6 @@ public final class MojmapBridgeGen {
         return multi;
     }
 
-    /** Normalizes a field/method descriptor's object types into mojmap space via the given map. */
     private static String normDesc(String desc, Map<String, String> map) {
         StringBuilder sb = new StringBuilder();
         int i = 0;
@@ -891,11 +748,6 @@ public final class MojmapBridgeGen {
         return sb.toString();
     }
 
-    /**
-     * Returns true if every object type in the descriptor is either a primitive/array marker, a
-     * java/library class, or an obf13 class that maps to mojmap. When a class ref is an obf13 name
-     * with no mapping, the descriptor cannot be normalized (a churned 1.14-only type) -&gt; false.
-     */
     private boolean descFullyNormalizable(String desc) {
         int i = 0;
         while (i < desc.length()) {
@@ -917,17 +769,11 @@ public final class MojmapBridgeGen {
         return true;
     }
 
-    // ============================================================================================
-    // Member mapping: srg pivot + descriptor-fallback for churned-srg members.
-    // ============================================================================================
     private void mapMembers(Map<String, TreeMap<String, String[]>> methodsByClass,
             Map<String, TreeMap<String, String[]>> fieldsByClass) {
-        // churned methods collected per mapped class for the fallback pass
         Map<String, List<String[]>> churnedByClass = new HashMap<>();
-        // Every srg-mapped method's (normalized param descriptor -> mojmap name) per mapped class,
-        // identity maps (mojmap name equal to the obf name, such as equals or toString) included.
-        // An identity-named sibling emits no mapping line but must still occupy its descriptor slot,
-        // otherwise the fallback could assign a churned method onto its name.
+        // An identity-named sibling emits no mapping line but must still occupy its descriptor slot, otherwise the
+        // fallback could assign a churned method onto its name.
         Map<String, Map<String, Set<String>>> srgMappedByDesc = new HashMap<>();
 
         for (String[] m : obf13Methods) {
@@ -952,18 +798,13 @@ public final class MojmapBridgeGen {
             }
         }
 
-        // descriptor-fallback pass (methods)
         for (Map.Entry<String, List<String[]>> e : churnedByClass.entrySet()) {
             String cls = e.getKey();
             String cMoj = obf13ToMojClass.get(cls);
             Map<String, Set<String>> byDesc = mojMethodsByOwnerDesc.getOrDefault(cMoj, Map.of());
 
-            // mojmap names already occupied by srg-mapped methods in this class (identity maps
-            // included, seeded from the complete record above), keyed by normalized param descriptor,
-            // so a churned method cannot be assigned onto a name a srg-mapped sibling already holds.
             Map<String, Set<String>> consumed = srgMappedByDesc.getOrDefault(cls, Map.of());
 
-            // group churned methods by normalized parameter descriptor to detect intra-class ambiguity
             Map<String, List<String[]>> churnByDesc = new HashMap<>();
             for (String[] m : e.getValue()) {
                 if (!descFullyNormalizable(paramPart(m[2]))) {
@@ -1000,7 +841,6 @@ public final class MojmapBridgeGen {
             }
         }
 
-        // fields: srg pivot only (field descriptors are rarely discriminating for a fallback)
         for (String[] f : obf13Fields) {
             String cls = f[0];
             String name = f[1];
@@ -1019,35 +859,13 @@ public final class MojmapBridgeGen {
             ClassInfo info = jar13.get(cls);
             String desc = info != null ? info.fields.get(name) : null;
             if (desc == null) {
-                continue; // no descriptor available -> cannot emit a tiny v2 field line
+                continue;
             }
             fieldsByClass.computeIfAbsent(cls, k -> new TreeMap<>())
                     .put(name + "\t" + desc, new String[] {desc, name, moj});
         }
     }
 
-    // ============================================================================================
-    // Member-propagation consistency over the merged hierarchy.
-    //
-    // Loom remaps the merged jar with tiny-remapper, which propagates each method mapping across the
-    // class hierarchy: every class that declares a virtual method with the same (name, descriptor) is
-    // one "slot" and must resolve to ONE target name, else tiny-remapper aborts with "Unfixable
-    // conflicts" (the composed official->named mapping leaves some overrides at their Mojmap name and
-    // others at their Legacy Fabric intermediary name, or assigns two Mojmap names to one slot).
-    //
-    // A slot is the set of classes declaring a given virtual (name, descriptor), grouped by the
-    // inheritance graph: two declaring classes are in one slot when one is a transitive subtype of the
-    // other (an override chain), computed by unioning each declaring class with every declaring
-    // ancestor. This matches tiny-remapper's reachability (it walks up through all parents and down
-    // through all children, turning direction only at a class that declares the method). For each slot:
-    //   - exactly one Mojmap name M among its classes: assign M to every declaring class in the slot
-    //     (adding the overrides the srg pivot left unmapped, which fall to intermediary otherwise);
-    //   - two or more Mojmap names: the composition is genuinely divergent (distinct Mojmap methods
-    //     sharing one obfuscated slot); leave the ENTIRE slot unmapped so all overrides fall to their
-    //     consistent intermediary name, rather than emit a wrong unified name.
-    // Only virtual methods propagate; fields and static/private methods are set only on their own class
-    // and cannot produce a source-name conflict, so they are untouched.
-    // ============================================================================================
     private void enforceHierarchyConsistency(Map<String, TreeMap<String, String[]>> methodsByClass) {
         Map<String, List<String>> declByslot = new HashMap<>();
         for (Map.Entry<String, MergedClass> e : merged.entrySet()) {
@@ -1116,7 +934,6 @@ public final class MojmapBridgeGen {
 
     private static final TreeMap<String, String[]> EMPTY_METHODS = new TreeMap<>();
 
-    /** All transitive supertypes (superclass + interfaces) of a merged class. */
     private Iterable<String> ancestors(String c) {
         List<String> out = new ArrayList<>();
         ArrayDeque<String> queue = new ArrayDeque<>();
@@ -1162,32 +979,12 @@ public final class MojmapBridgeGen {
         }
     }
 
-    // ============================================================================================
-    // Package-preserving fallback for unmapped classes.
-    //
-    // A composed class with no Mojmap name (a 1.13.2-only class, no surviving srg->mojmap) would be
-    // emitted with an empty target. Loom's official->intermediary->named then names it by its flat
-    // Legacy Fabric intermediary name net/minecraft/class_NNNN, in the ROOT net.minecraft package. That
-    // relocation breaks vanilla's own same-package protected access: a real Block subclass stranded in
-    // the net.minecraft package can no longer be constructed by Block, which lives in the deeper
-    // net.minecraft.world.level.block package, so Bootstrap.bootStrap() dies with IllegalAccessError.
-    //
-    // Every unmapped top-level class instead gets a named target in the Mojmap package of the mapped
-    // class it is same-package-coupled to. Coupling is: it (or one of its inner classes, which inherit
-    // its package) is a subtype OR supertype of a mapped class, or accesses a mapped class's protected
-    // or package-private member, or a mapped class accesses one of its own protected or package-private
-    // members. A class the merged jar shows no such coupling for is not same-package-bound to any mapped
-    // class, so its srg package (a stable non-root package, though the MCP layout, not the Mojmap one)
-    // is a safe last resort. The simple name is the intermediary name (globally unique). Inner classes
-    // inherit their outer's package through Loom's inner-class completion, so only top-level classes are
-    // packaged here; numeric-anonymous inners still emit nothing.
-    // ============================================================================================
     private void packageUnmappedClasses() {
         Set<String> reallyMapped = new HashSet<>(obf13ToMojClass.keySet());
         Set<String> usedTargets = new HashSet<>(obf13ToMojClass.values());
         for (String c : new TreeSet<>(obf13ClassToSrg.keySet())) {
             if (c.indexOf('$') >= 0 || obf13ToMojClass.containsKey(c)) {
-                continue; // inner classes inherit via completion; mapped classes keep their Mojmap name
+                continue;
             }
             if (!landsInRootPackage(officialToInter.get(c))) {
                 continue; // already in a real package (an already-deobfuscated class); no relocation
@@ -1217,7 +1014,6 @@ public final class MojmapBridgeGen {
         }
     }
 
-    /** Mojmap package of the nearest mapped (superclass then interface) ancestor, or null if none. */
     private String nearestMappedAncestorPackage(String c, Set<String> reallyMapped) {
         ArrayDeque<String> queue = new ArrayDeque<>();
         Set<String> seen = new HashSet<>();
@@ -1263,7 +1059,6 @@ public final class MojmapBridgeGen {
         return i >= 0 ? internalName.substring(i + 1) : internalName;
     }
 
-    /** True for a flat Legacy Fabric intermediary name in the root net.minecraft package. */
     private static boolean landsInRootPackage(String name) {
         return name != null && name.startsWith("net/minecraft/class_")
                 && name.indexOf('/', "net/minecraft/".length()) < 0;
@@ -1294,16 +1089,6 @@ public final class MojmapBridgeGen {
         }
     }
 
-    // ============================================================================================
-    // Coupling detection. An orphan (a fallback class with no mapped ancestor) can still be
-    // same-package-coupled to a mapped class: it or one of its inner classes is a supertype or subtype
-    // of a mapped class, or accesses a mapped class's protected/package-private member, or has one of
-    // its own protected/package-private members accessed by a mapped class. The obfuscated jar keeps
-    // every class in the root package, so those accesses are same-package there; distributing the
-    // classes into real packages must keep each coupled pair together or the runtime throws
-    // IllegalAccessError at class-load or member-access. The orphan is placed in the Mojmap package of
-    // the mapped class it couples to (the majority package when several apply).
-    // ============================================================================================
     private void computeOrphanCoupledPackages(Path client, Path server) throws IOException {
         Set<String> reallyMapped = new HashSet<>(obf13ToMojClass.keySet());
         buildMcChildren();
@@ -1328,10 +1113,6 @@ public final class MojmapBridgeGen {
             candidates.put(o, new TreeMap<>());
             union.put(o, o);
         }
-        // strong same-package constraints from the hierarchy: a class must share the package of any
-        // package-private supertype it extends, and of any mapped subtype that extends it when it is
-        // itself package-private (extending or loading a package-private class needs same-package). When
-        // the coupled class is another orphan the constraint is recorded as a union instead.
         for (String o : orphanTops) {
             TreeMap<String, Integer> votes = candidates.get(o);
             for (String c : family.getOrDefault(o, List.of())) {
@@ -1352,8 +1133,6 @@ public final class MojmapBridgeGen {
                 }
             }
         }
-        // strong same-package constraints from protected/package-private member access. A coupling to a
-        // mapped class votes that class's package; a coupling between two orphans unions them.
         for (String[] edge : couplingEdges) {
             String xTop = topLevel(edge[0]);
             String dTop = topLevel(edge[1]);
@@ -1372,8 +1151,6 @@ public final class MojmapBridgeGen {
                 ufUnion(union, xTop, dTop);
             }
         }
-        // pool each coupled group's votes so an orphan anchored only through a coupled orphan inherits
-        // the same package.
         Map<String, TreeMap<String, Integer>> groupVotes = new HashMap<>();
         for (String o : orphanTops) {
             String root = ufFind(union, o);
@@ -1419,7 +1196,6 @@ public final class MojmapBridgeGen {
         }
     }
 
-    /** Mapped Minecraft classes that are transitive subtypes of the given class. */
     private List<String> mappedDescendants(String c, Set<String> reallyMapped) {
         List<String> out = new ArrayList<>();
         ArrayDeque<String> queue = new ArrayDeque<>(mcChildren.getOrDefault(c, List.of()));
@@ -1437,11 +1213,6 @@ public final class MojmapBridgeGen {
         return out;
     }
 
-    /**
-     * Records non-public cross-class member-access edges between Minecraft classes that require
-     * same-package placement: an access to a package-private member, or to a protected member from a
-     * class that is not a subtype of the declaring class. Deduplicated per accessor/declaring pair.
-     */
     private void scanCouplingReferences(Path client, Path server) throws IOException {
         Set<String> pairSeen = new HashSet<>();
         Set<String> entrySeen = new HashSet<>();
@@ -1461,7 +1232,7 @@ public final class MojmapBridgeGen {
                 ClassReader cr = new ClassReader(zis.readAllBytes());
                 String accessor = cr.getClassName();
                 if (!obf13ClassToSrg.containsKey(accessor)) {
-                    continue; // Minecraft classes only
+                    continue;
                 }
                 cr.accept(new ClassVisitor(Opcodes.ASM9) {
                     @Override
@@ -1497,18 +1268,17 @@ public final class MojmapBridgeGen {
         String declaring = declared[0];
         int access = Integer.parseInt(declared[1]);
         if ((access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE)) != 0) {
-            return; // public: any package; private: same-class only
+            return;
         }
         boolean protectedMember = (access & Opcodes.ACC_PROTECTED) != 0;
         if (protectedMember && isSubtype(accessor, declaring)) {
-            return; // protected access from a subtype is allowed across packages
+            return;
         }
         if (pairSeen.add(accessor + "\t" + declaring)) {
             couplingEdges.add(new String[] {accessor, declaring});
         }
     }
 
-    /** Resolves a member to its declaring Minecraft class and access flags, walking supertypes. */
     private String[] findMcMember(String owner, String name, String desc) {
         String key = name + "\t" + desc;
         MergedClass info = merged.get(owner);
@@ -1559,13 +1329,6 @@ public final class MojmapBridgeGen {
         return i < 0 ? c : c.substring(0, i);
     }
 
-    // ============================================================================================
-    // Coupling gate: after packaging, no cross-package protected/package-private coupling may remain
-    // between a mapped class and a fallback class. This is the check the runtime boot exercises at
-    // class-load (a package-private supertype in a different package) and member-access (a protected or
-    // package-private member reached across a package boundary). It is build-failing and is what
-    // actually predicts the boot, being stronger than the root-package check.
-    // ============================================================================================
     private boolean couplingGate() {
         effCache.clear();
         List<String> violations = new ArrayList<>();
@@ -1628,19 +1391,9 @@ public final class MojmapBridgeGen {
         return false;
     }
 
-    // ============================================================================================
-    // Collision resolution. Loom completes the class map with ORDINAL-PRESERVING inner-class
-    // inheritance: for an outer ot mapped to M, every inner ot$N in the jar is named M$N, and this
-    // completion overrides identity self-maps, so a pin such as ot$10 -> ot$10 does not hold. Because
-    // obf13 anonymous-inner numbering differs from Mojmap's, the vote's ordinal-swap row
-    // ot$2 -> EntityDataSerializers$10 then collides with the completion's ot$10 -> EntityDataSerializers$10.
-    // The fix is to stop competing with the completion: for a numeric-anonymous inner whose outer is
-    // renamed, emit no class mapping at all and let Loom's ordinal completion name it, which is
-    // injective by construction and harmless because common never references anonymous inners by name.
-    // Named inners ($Key, $Builder) and top-level classes keep their explicit mapping; the one
-    // remaining real clash is the Realms passthrough (chr's explicit RealmsGuiEventListener versus the
-    // unobfuscated net/minecraft/realms/RealmsGuiEventListener), resolved by blanking the intruder.
-    // ============================================================================================
+    // After the numeric-anonymous inners whose outer is renamed are dropped, the one remaining real clash is the Realms
+    // passthrough (chr's explicit RealmsGuiEventListener versus the unobfuscated
+    // net/minecraft/realms/RealmsGuiEventListener), resolved by blanking the intruder.
     private final Map<String, String> effCache = new HashMap<>();
 
     private Set<String> resolveCollisions(Set<String> mergedClasses) {
@@ -1666,8 +1419,6 @@ public final class MojmapBridgeGen {
             }
             String eff = e.getKey();
             group.sort(Comparator.naturalOrder());
-            // Keep the real class whose own name already equals the target (the passthrough), else the
-            // explicitly-mapped one; blank the rest so each passes through as its own name.
             String keeper = null;
             for (String c : group) {
                 if (c.equals(eff)) {
@@ -1696,11 +1447,6 @@ public final class MojmapBridgeGen {
         return blanked;
     }
 
-    /**
-     * The target Loom's completed class map resolves for an obf class: a real (non-identity) explicit
-     * mapping, else the ordinal-preserving inheritance from a renamed outer, else the obf name. An
-     * identity self-map is treated as unmapped, because Loom's ordinal completion overrides it.
-     */
     private String completedTarget(String c) {
         String cached = effCache.get(c);
         if (cached != null) {
@@ -1719,7 +1465,6 @@ public final class MojmapBridgeGen {
         return result;
     }
 
-    /** A class whose name after the last {@code $} is all digits (an anonymous inner). */
     private static boolean isNumericAnon(String c) {
         int i = c.lastIndexOf('$');
         if (i <= 0 || i == c.length() - 1) {
@@ -1733,11 +1478,6 @@ public final class MojmapBridgeGen {
         return true;
     }
 
-    /**
-     * True for a numeric-anonymous inner whose anchor (the class reached by stripping every trailing
-     * numeric segment) carries a real, non-identity mapping. Such inners are dropped so ordinal
-     * completion names them uniquely.
-     */
     private boolean isNumericAnonWithRenamedAnchor(String c) {
         if (!isNumericAnon(c)) {
             return false;
@@ -1750,15 +1490,8 @@ public final class MojmapBridgeGen {
         return t != null && !t.equals(anchor);
     }
 
-    // ============================================================================================
-    // Emit obf-mojmap.tiny (hand-written, deterministic sorted).
-    // ============================================================================================
     private void emitObfMojmap(Path out, Map<String, TreeMap<String, String[]>> methodsByClass,
             Map<String, TreeMap<String, String[]>> fieldsByClass) throws IOException {
-        // A numeric-anonymous inner stays out of the class map (blank target below, so Loom ordinal-
-        // completes its name) but is still emitted when the hierarchy pass gave it an override mapping,
-        // so its member line survives; an anon with no member mapping is absent from every source map
-        // and so is not emitted at all.
         Set<String> emit = new TreeSet<>();
         emit.addAll(obf13ToMojClass.keySet());
         emit.addAll(methodsByClass.keySet());
@@ -1779,14 +1512,11 @@ public final class MojmapBridgeGen {
         Files.writeString(out, sb.toString(), StandardCharsets.UTF_8);
     }
 
-    // ============================================================================================
-    // Derive intermediary -> named (via mapping-io) and package the jar.
-    // ============================================================================================
     private void deriveIntermediaryNamed(MemoryMappingTree oneMap, Path intermediaryTiny,
             Path outTiny, Path outJar) throws IOException {
         MemoryMappingTree tree = new MemoryMappingTree();
-        MappingReader.read(intermediaryTiny, MappingFormat.TINY_2_FILE, tree); // official -> intermediary
-        oneMap.accept(tree); // merge official -> mojmap on official
+        MappingReader.read(intermediaryTiny, MappingFormat.TINY_2_FILE, tree);
+        oneMap.accept(tree);
 
         MappingWriter writer = MappingWriter.create(outTiny, MappingFormat.TINY_2_FILE);
         tree.accept(new MappingSourceNsSwitch(
@@ -1799,23 +1529,8 @@ public final class MojmapBridgeGen {
         packageJar(outTiny, outJar);
     }
 
-    // ============================================================================================
-    // Derive mojmap -> srg (hand-built from the one map + joined_1132 srg ids).
-    //
-    // The source column must equal the name Loom leaves on the dev classpath for EVERY class and member,
-    // not only the ones the bridge Mojmap-maps: where a symbol stays unmapped the classpath keeps its
-    // Legacy Fabric intermediary name (class_NNNN / field_NNN / method_NNNNN), so the seam port that
-    // references it needs those intermediary names to reobfuscate too, or the shipped jar throws
-    // NoSuchField/MethodError at load. So every obf class with a 1.13.2 srg is emitted (mapped, fallback,
-    // OR an unmapped inner Loom completes as mappedOuter$intermediarySimple), and within it every member
-    // is emitted with its Mojmap name where the bridge mapped it, else its intermediary name.
-    //
-    // Field lines in tsrg v1 have no descriptor, so mapping-io cannot merge them by (name,desc); building
-    // the map directly from the in-memory maps is exact and deterministic.
-    // ============================================================================================
     private void deriveMojmapSrg(Path out, Map<String, TreeMap<String, String[]>> methodsByClass,
             Map<String, TreeMap<String, String[]>> fieldsByClass, Set<String> blanked) throws IOException {
-        // obf13 member -> srg lookup
         Map<String, String> methodSrg = new HashMap<>();
         for (String[] m : obf13Methods) {
             methodSrg.put(m[0] + "\t" + m[1] + "\t" + m[2], m[3]);
@@ -1824,8 +1539,6 @@ public final class MojmapBridgeGen {
         for (String[] f : obf13Fields) {
             fieldSrg.put(f[0] + "\t" + f[1], f[2]);
         }
-        // obf13 members grouped by owner, so the intermediary remainder pass can enumerate a class's own
-        // members without rescanning the flat lists per class.
         Map<String, List<String[]>> methodsByOwner = new HashMap<>();
         for (String[] m : obf13Methods) {
             methodsByOwner.computeIfAbsent(m[0], k -> new ArrayList<>()).add(m);
@@ -1835,25 +1548,16 @@ public final class MojmapBridgeGen {
             fieldsByOwner.computeIfAbsent(f[0], k -> new ArrayList<>()).add(f);
         }
 
-        // The dev-classpath name of every obf13 class, i.e. Loom's completed named result. Descriptors are
-        // normalized through this (not obf13ToMojClass), so a member whose type is an unmapped inner still
-        // reobfuscates by a descriptor that matches the compiled bytecode.
+        // Descriptors are normalized through this (not obf13ToMojClass), so a member whose type is an unmapped inner
+        // still reobfuscates by a descriptor that matches the compiled bytecode.
         Map<String, String> devClass = new HashMap<>();
         for (String c : obf13ClassToSrg.keySet()) {
             devClassName(c, devClass);
         }
 
-        // one row per dev class (source): srg class name + members (tag, devDesc, devName, srg)
         TreeMap<String, String> classSrg = new TreeMap<>();
         Map<String, List<String[]>> membersBySrc = new HashMap<>();
         for (String c13 : new TreeSet<>(obf13ClassToSrg.keySet())) {
-            // A numeric-anonymous inner emits no class line: Loom ordinal-completes its name and common
-            // never references it by name. A class the collision pass blanked emits none ONLY when it was
-            // not then re-packaged; packageUnmappedClasses gives every blanked class that would otherwise
-            // strand in the root package a fallback name (recorded in fallbackClasses) and Loom names it by
-            // that fallback, so a symbol that references it as a supertype needs its class_NNNN -> srg line
-            // (class_4122 = IGuiEventListener, implemented by the screens, is the leak that omitting these
-            // produced). Emit the re-packaged ones under their fallback dev name.
             if (excludedAnons.contains(c13) || (blanked.contains(c13) && !fallbackClasses.contains(c13))) {
                 continue;
             }
@@ -1862,8 +1566,6 @@ public final class MojmapBridgeGen {
             classSrg.put(src, srgClass);
             List<String[]> members = membersBySrc.computeIfAbsent(src, k -> new ArrayList<>());
 
-            // Members the bridge Mojmap-mapped: emit the Mojmap name, and record the obf identity so the
-            // remainder pass does not re-emit them under their intermediary name.
             Set<String> mappedMethods = new HashSet<>();
             Set<String> mappedFields = new HashSet<>();
             for (String[] mm : methodsByClass.getOrDefault(c13, new TreeMap<>()).values()) {
@@ -1881,8 +1583,6 @@ public final class MojmapBridgeGen {
                 }
             }
 
-            // Intermediary remainder: every remaining member keeps its Legacy Fabric intermediary name on
-            // the dev classpath (or, absent one, its obf name), so emit that name -> srg.
             for (String[] m : methodsByOwner.getOrDefault(c13, List.of())) {
                 if (mappedMethods.contains(m[1] + "\t" + m[2])) {
                     continue;
@@ -1898,7 +1598,7 @@ public final class MojmapBridgeGen {
                 String name = inter != null ? inter[0] : f[1];
                 String obfDesc = inter != null ? inter[1] : fieldDesc(c13, f[1]);
                 if (obfDesc == null) {
-                    continue; // no descriptor available -> cannot emit a tiny v2 field line
+                    continue;
                 }
                 members.add(new String[] {"f", normDesc(obfDesc, devClass), name, f[2]});
             }
@@ -1920,13 +1620,6 @@ public final class MojmapBridgeGen {
         Files.writeString(out, sb.toString(), StandardCharsets.UTF_8);
     }
 
-    /**
-     * The dev-classpath (Loom named) internal name of an obf13 class, memoized into {@code cache}: the
-     * Mojmap or package-preserving fallback name where the bridge assigned one, else Loom's inner-class
-     * completion (the mapped outer's name plus {@code $} plus the intermediary simple name), else the
-     * intermediary name of a top-level class the bridge left blank. This is what tiny-remapper wrote onto
-     * the provisioned classpath, so it is the exact source-side name the reobf mapping must key on.
-     */
     private String devClassName(String c, Map<String, String> cache) {
         String cached = cache.get(c);
         if (cached != null) {
@@ -1951,15 +1644,11 @@ public final class MojmapBridgeGen {
         return result;
     }
 
-    /** Obf field descriptor from the client jar structural read, or null for a server-only field. */
     private String fieldDesc(String owner, String name) {
         ClassInfo info = jar13.get(owner);
         return info != null ? info.fields.get(name) : null;
     }
 
-    // ============================================================================================
-    // Deterministic jar packaging (fixed timestamps, fixed manifest).
-    // ============================================================================================
     private void packageJar(Path tiny, Path jar) throws IOException {
         byte[] manifest = "Manifest-Version: 1.0\r\n\r\n".getBytes(StandardCharsets.UTF_8);
         byte[] mappings = Files.readAllBytes(tiny);
@@ -1971,27 +1660,14 @@ public final class MojmapBridgeGen {
 
     private static void writeEntry(ZipOutputStream zos, String name, byte[] data) throws IOException {
         ZipEntry e = new ZipEntry(name);
-        e.setTime(0L); // fixed timestamp for determinism
+        e.setTime(0L);
         zos.putNextEntry(e);
         zos.write(data);
         zos.closeEntry();
     }
 
-    // ============================================================================================
-    // Remap-apply gate: feed tiny-remapper the FULL official->named mapping Loom builds when it remaps
-    // the merged jar, and apply it over the merged client+server jar. It composes exactly as Loom does:
-    //   - classes: Loom's ordinal-preserving inner-class completion (completedTarget), which overrides
-    //     the identity self-map of an unmapped anonymous inner with mapped-outer$N;
-    //   - members: our Mojmap name where we have one, else the Legacy Fabric intermediary name (the
-    //     named column defaults to intermediary), so an override the srg pivot missed carries its
-    //     method_NNNNN name rather than staying obfuscated.
-    // tiny-remapper then runs member propagation with its defaults (the same the plain builder gives
-    // Loom): a class-target collision throws "duplicate class target name mappings detected" and a slot
-    // that propagates two different names throws "Unfixable conflicts". Feeding classes AND members with
-    // propagation on is the whole point; a class-only gate went green here twice while Loom failed on
-    // member propagation. Disabling the hierarchy pass (BRIDGE_SKIP_HIERARCHY_FIX) makes this gate red
-    // with the exact 479-conflict failure a fresh provision hits, proving it reproduces Loom.
-    // ============================================================================================
+    // Feeding classes AND members with propagation on is the whole point; a class-only gate goes green while Loom fails
+    // on member propagation.
     private boolean remapApplyGate(Set<String> mergedClasses, Path client, Path server, Path intermediaryTiny,
             Map<String, TreeMap<String, String[]>> methodsByClass,
             Map<String, TreeMap<String, String[]>> fieldsByClass) {
@@ -2042,8 +1718,6 @@ public final class MojmapBridgeGen {
 
             effCache.clear();
 
-            // Every class must land in a real package: Loom names an unmapped class by its flat
-            // intermediary name in the root net.minecraft package, which the fallback packaging removes.
             List<String> rootStranded = new ArrayList<>();
             for (String c : mergedClasses) {
                 String target = completedTarget(c);
@@ -2124,15 +1798,12 @@ public final class MojmapBridgeGen {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException ignored) {
-                    // best effort cleanup of a temp directory
                 }
             });
         } catch (IOException ignored) {
-            // best effort cleanup of a temp directory
         }
     }
 
-    /** Loom-style merge: every client class, plus every server class the client does not already carry. */
     private static void mergeJars(Path client, Path server, Path out) throws IOException {
         Files.deleteIfExists(out);
         Set<String> seen = new HashSet<>();
@@ -2168,10 +1839,6 @@ public final class MojmapBridgeGen {
         return n;
     }
 
-    // ============================================================================================
-    // Oracle gate: every composed obf->mojmap class must agree with the LF intermediary on the
-    // official obf identity (independent cross-check). Build-failing.
-    // ============================================================================================
     private boolean oracleGate(Path intermediaryTiny) throws IOException {
         MemoryMappingTree it = new MemoryMappingTree();
         MappingReader.read(intermediaryTiny, MappingFormat.TINY_2_FILE, it);
@@ -2198,9 +1865,6 @@ public final class MojmapBridgeGen {
         return true;
     }
 
-    // ============================================================================================
-    // Self-validation against ground truth.
-    // ============================================================================================
     private boolean selfValidate(Map<String, TreeMap<String, String[]>> methodsByClass,
             Map<String, TreeMap<String, String[]>> fieldsByClass, Set<String> blanked) {
         boolean ok = true;
@@ -2235,7 +1899,6 @@ public final class MojmapBridgeGen {
             }
         }
 
-        // churned members recovered by descriptor-fallback
         ok &= checkMember(methodsByClass, "net/minecraft/nbt/CompoundTag",
                 "(Ljava/lang/String;Lnet/minecraft/nbt/Tag;)V", "put");
         ok &= checkMember(methodsByClass, "net/minecraft/world/level/storage/LevelStorageSource",
@@ -2244,11 +1907,6 @@ public final class MojmapBridgeGen {
         return ok;
     }
 
-    /**
-     * Verifies a member resolves to the expected mojmap name. The obf13 owner is found via the
-     * class map; when normDesc is given the member is matched by normalized descriptor, else by
-     * mojmap name presence.
-     */
     private boolean checkMember(Map<String, TreeMap<String, String[]>> methodsByClass,
             String mojClass, String wantNormDesc, String wantName) {
         String obf13Owner = null;
@@ -2277,15 +1935,10 @@ public final class MojmapBridgeGen {
         return false;
     }
 
-    // ============================================================================================
-    // Intermediary-remainder gate: three members the bridge leaves at their Legacy Fabric intermediary
-    // name must resolve to their 1.13.2 srg id in the emitted mojmap-srg. One representative of each shape
-    // the emit has to cover: an intermediary FIELD on a Mojmap-mapped class (HitResult.field_595, the shape
-    // a class-name-only reobf would strand), an intermediary METHOD on a package-preserving fallback class
-    // (net/minecraft/world/chunk/storage/class_1199.method_17185), and any member of an unmapped INNER
-    // class Loom completes (net/minecraft/world/level/GameRules$class_1440.method_4675). Reads the emitted
-    // file so it proves the artifact, not just the in-memory maps.
-    // ============================================================================================
+    // One representative of each shape the mojmap-srg emit has to cover: an intermediary FIELD on a Mojmap-mapped class
+    // (HitResult.field_595), an intermediary METHOD on a package-preserving fallback class
+    // (net/minecraft/world/chunk/storage/class_1199.method_17185), and any member of an unmapped INNER class Loom
+    // completes (net/minecraft/world/level/GameRules$class_1440.method_4675).
     private boolean intermediaryRemainderGate(Path mojmapSrg) throws IOException {
         String[][] want = {
             {"net/minecraft/world/phys/HitResult", "field_595", "field_72313_a"},
@@ -2319,14 +1972,8 @@ public final class MojmapBridgeGen {
         return ok;
     }
 
-    // ============================================================================================
-    // Class-remainder gate: a package-preserving fallback class the vote blanked on a collision and then
-    // re-packaged must still emit its own c line, or a symbol that references it only as a type (not a
-    // member call) strands its class_NNNN name in the reobf'd jar with no mapping and NoClassDefFounds at
-    // load. The representative is class_4122 (obf chr) -> srg IGuiEventListener, the GuiEventListener
-    // supertype the screens implement, which Task 7a surfaced leaking. Reads the emitted file so it proves
-    // the artifact, not just the in-memory maps.
-    // ============================================================================================
+    // The class-remainder gate's representative is class_4122 (obf chr) -> srg IGuiEventListener, the GuiEventListener
+    // supertype the screens implement.
     private boolean classRemainderGate(Path mojmapSrg) throws IOException {
         String[][] want = {
             {"net/minecraft/client/gui/class_4122", "net/minecraft/client/gui/IGuiEventListener"},
@@ -2377,9 +2024,6 @@ public final class MojmapBridgeGen {
         System.out.println("fallback_packaged_by_srg=" + fallbackPackagedBySrg);
     }
 
-    // ============================================================================================
-    // Source provisioning (download + cache, sha-verified where pinned).
-    // ============================================================================================
     static final class Sources {
         Path joined1132;
         Path joined1144;
@@ -2391,7 +2035,6 @@ public final class MojmapBridgeGen {
         Path intermediaryTiny;
     }
 
-    // Pinned sha1 for the 1.13.2 server jar (from the 1.13.2 version manifest entry).
     private static final String SERVER_1132_SHA1 = "3737db93722a9e39eeada7c27e7aca28b144ffa7";
 
     private Sources ensureSources(Path cache) throws Exception {
@@ -2405,7 +2048,6 @@ public final class MojmapBridgeGen {
         s.client1144 = cache.resolve("client_1144.jar");
         s.intermediaryTiny = cache.resolve("intermediary_1132.tiny");
 
-        // If a prepopulated cache already has everything, skip all network.
         if (allExist(s)) {
             return s;
         }

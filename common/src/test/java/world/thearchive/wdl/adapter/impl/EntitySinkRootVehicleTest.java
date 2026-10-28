@@ -30,19 +30,6 @@ import world.thearchive.wdl.adapter.EntitySink;
 import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the ridden-vehicle RootVehicle capture. A vehicle carrying exactly one player is refused by
- * the entities region (vanilla persists it in the player's own {@code RootVehicle}, not the entities region), so the
- * chunk path drops it. {@link EntitySink#captureRootVehicle} is the sibling that serializes it anyway, the way
- * {@code ServerPlayer.saveParentVehicle} does with {@code root.save}, and the captured chest-boat contents fold into it
- * by {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone entity path's
- * {@code applyMobPersistence} seam: {@code PersistenceRequired} is server-authoritative and arrives false on the
- * client, so a name-tagged mount, and any mount under {@code forceMobPersistence}, keeps the stamp or it despawns once
- * the player dismounts in the downloaded world.
- *
- * <p>Uses two headless doubles: an {@link Entity} that reports as a one-player vehicle (a real player passenger cannot
- * be built headless), and a {@link Mob} for the branch the restoration is gated on.
- */
 class EntitySinkRootVehicleTest {
     private final EntitySink sink = new EntitySinkImpl();
     private final ContainerSink containerSink = new ContainerSinkImpl();
@@ -57,7 +44,7 @@ class EntitySinkRootVehicleTest {
         TestRegistries.bootstrap();
         RiddenVehicleEntity vehicle = new RiddenVehicleEntity();
         assertTrue(vehicle.isVehicle() && vehicle.hasOnePlayerPassenger(),
-                "precondition: a one-player vehicle the entities region refuses");
+                "precondition: a vehicle carrying exactly one player");
 
         assertNull(sink.encodeChunk(ImmutableList.of(vehicle), new ChunkPos(0, 0), false),
                 "the chunk path drops it, exactly the loss the RootVehicle capture fixes");
@@ -89,7 +76,7 @@ class EntitySinkRootVehicleTest {
         probe.put("Items", folded.getList("Items", 10));
         ContainerHelper.loadAllItems(probe, back);
         assertEquals(Items.DIAMOND, back.get(3).getItem(),
-                "the captured chest-boat loot lands at its slot in the mount");
+                "the captured container loot lands at its slot in the mount");
         assertEquals(9, back.get(3).getCount());
     }
 
@@ -129,17 +116,11 @@ class EntitySinkRootVehicleTest {
                         + "un-named mount threads the knob through the same seam the standalone entity path uses");
     }
 
-    /** A headless vehicle double the entities region refuses, standing in for a boat carrying one player. */
     private static final class RiddenVehicleEntity extends Entity {
         private RiddenVehicleEntity() {
-            // Below 1.16 Entity.saveWithoutId writes this.dimension.getId(), which the constructor sets only from a
-            // non-null level, so the double is built against the HeadlessLevel rather than a null one.
             super(EntityType.PIG, HeadlessLevel.get());
         }
 
-        // 1.16.5 has no Entity.shouldBeSaved; a one-player vehicle is refused by the isVehicle and
-        // hasOnePlayerPassenger primitives EntitySinkImpl reproduces that predicate from, forced true here since a
-        // real player passenger cannot be built headless.
         @Override
         public boolean isVehicle() {
             return true;
@@ -167,7 +148,6 @@ class EntitySinkRootVehicleTest {
         }
     }
 
-    /** A headless mount double on the {@link Mob} branch, where the persistence restoration applies. */
     private static final class RiddenMountMob extends Mob {
         private RiddenMountMob() {
             super(EntityType.PIG, HeadlessLevel.get());

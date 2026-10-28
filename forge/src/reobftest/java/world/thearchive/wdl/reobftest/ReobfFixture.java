@@ -6,11 +6,6 @@ package world.thearchive.wdl.reobftest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 
-// Compile-only reobf fixture. It references surviving Mojmap Minecraft members that each carry a
-// mojmap to srg entry (CompoundTag.putInt/getInt/putString/getString, BlockPos.below/above), so
-// reobfJar rewrites every Minecraft reference to its 1.13.2 searge id and checkReobf sees only valid
-// SRG names. The class's own world.thearchive.wdl name is absent from the mapping, so tiny-remapper
-// leaves it untouched, which is the reobf contract the island's shipped output relies on.
 public final class ReobfFixture {
 
     private ReobfFixture() {}

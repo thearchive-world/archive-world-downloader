@@ -39,15 +39,10 @@ import world.thearchive.wdl.core.report.DownloadReportStore;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The guard that the download report cannot cost a download. The stamp runs inside the world-open step, whose recorded
- * start error short-circuits every later write, so a throw there costs every captured chunk. Neither test covers the
- * live Minecraft reads whose failure the stamp degrades: no headless session can reach them.
- */
 class LiveCaptureSessionReportStampFailSoftTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // initialize the vanilla static constants the value types touch
+        TestRegistries.bootstrap();
     }
 
     @Test

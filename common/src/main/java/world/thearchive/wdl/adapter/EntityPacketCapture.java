@@ -50,72 +50,28 @@ import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.SendRangeSampler;
 
 /**
- * The production specialization of {@link EntityPacketAccumulator}, binding the MC packet types and mapping each
- * inbound entity packet to the generic state the main thread reconstructs from. This band splits a non-player spawn
- * across several packets ({@code AddEntity} for objects, {@code AddMob} for living entities, {@code AddPainting}, and
- * {@code AddExperienceOrb}), so the spawn payload is the erased {@code Packet} and {@link #createSpawnEntity}
- * dispatches on the concrete type at reconstruct; the newer bands fold every one of these into {@code AddEntity}. The
- * lightning bolt ({@code AddGlobalEntity}, this band only) is deliberately left unread: its entity type is not
- * serializable, so the unified bands never save it either, and reading it would only add sink refusals.
- * {@code SynchedEntityData.DataValue} is the synced-value payload and the equipment slot/stack pair the equipment
- * payload. The reconstruct applies each post-spawn packet the way the client handlers do, so this only has to decode
- * each packet to the same state the client would hold.
- *
- * <p>Every accessor used here is public MC API, so this compiles in {@code common} against the un-widened vanilla jar.
- * The one exception is {@code ClientboundMoveEntityPacket}'s entity id, which is {@code protected}; the per-loader tee,
- * where the access widener / transformer applies, reads it and calls {@link #onMove} with it. {@code RemoveEntities} is
- * handled only as a range sample and book cleanup; it never evicts from the accumulator (a client removal is
- * {@code RemovalReason.DISCARDED} and tells nothing about death versus unload, so reconstruction keeps every tracked
- * entity).
- *
- * <p>{@code Respawn} and {@code Login} are the two inbound packets that announce the world the stream has moved to (the
- * only two that assign the client a level; a configuration re-entry clears it to none), so both are routed to the
- * accumulator's dimension marker and to the sampler, whose id book the rebuilt level invalidates either way. Reading
- * the client's live level here instead would be wrong by a tick: the tee sees the packet on the Netty thread before the
- * main thread applies it, so the entity spawns that follow it on the wire would be stamped with the world the player
- * has left. The marker is advanced first in either branch, because it is the only per-packet state whose loss misfiles
- * data, where the sampler's loses at worst one invalidation.
- *
- * <p>It also carries the connection-scoped publication point. The per-loader inbound tee is installed once per
- * connection and has no reference to the per-download session, so the running capture publishes its accumulator here
- * for the tee to feed. A process singleton because at most one capture runs at a time
- * ({@link world.thearchive.wdl.core.CaptureController}); {@code null} when none is running, so the tee no-ops and the
- * accumulator never grows outside a capture.
+ * {@code Respawn} and {@code Login} are the two inbound packets that announce the world the stream has moved to, so
+ * both are routed to the accumulator's dimension marker and to the sampler, whose id book the rebuilt level invalidates
+ * either way. Reading the client's live level here instead would be wrong by a tick: the tee sees the packet on the
+ * Netty thread before the main thread applies it, so the entity spawns that follow it on the wire would be stamped with
+ * the world the player has left.
  */
 final class EntityPacketCapture
         extends
         EntityPacketAccumulator<Packet<?>, SynchedEntityData.DataItem<?>, EquipmentEntry> {
     private static volatile @Nullable EntityPacketCapture active;
 
-    /**
-     * The three static decoration types the covered overlay reports on. A decoration always qualifies for range
-     * sampling. This band's {@code EntityType} carries no tracking range (that lives on the server tracker below 1.14,
-     * not on the type), so the range-10 co-sampling of non-decoration types the newer bands do cannot be reproduced
-     * here; the estimator anchors on decorations alone, which are the stable markers it trusts most, and the
-     * mount/display exclusion list that guarded the co-sample is dropped with it.
-     */
     private static final Set<EntityType<?>> DECORATION_TYPES = ImmutableSet.of(
             EntityType.ITEM_FRAME, EntityType.PAINTING, EntityType.ARMOR_STAND);
 
-    // Spawn-object type ids from the vanilla client handleAddEntity switch at this band; the minecart id defers its
-    // subtype to the packet data, the item frame id is the one this class classifies directly for the frame diagnostic.
     private static final int SPAWN_OBJECT_MINECART = 10;
     private static final int SPAWN_OBJECT_ITEM_FRAME = 71;
     private static final int SPAWN_OBJECT_LEASH_KNOT = 77;
 
-    /**
-     * Diagnostic only (gated by {@code dumpReceivedFrames}, default off): the {@code (blockX blockY blockZ facing)} key
-     * of every item-frame spawn packet received, deduped, matching the key a saved frame's {@code block_pos} and
-     * {@code Facing} yield. Dumped at finish so a missing frame can be checked against what the client actually
-     * received (received-but-not-saved would be a capture bug; never-received is the server not sending it). Empty, and
-     * never populated, when the diagnostic is off.
-     */
     private final Set<String> receivedFrames = ConcurrentHashMap.newKeySet();
 
-    /** Whether to populate {@link #receivedFrames} (the {@code dumpReceivedFrames} diagnostic config knob). */
     private final boolean dumpReceivedFrames;
 
-    /** The live send-range estimator fed each received decoration or range-10 distance from the local player. */
     private final SendRangeEstimator sendRange;
 
     private final SendRangeSampler sampler;
@@ -128,7 +84,6 @@ final class EntityPacketCapture
         this.sampler = sampler;
     }
 
-    /** The sampler, for the session's main-thread gate-arm, seed, and sweep calls. */
     SendRangeSampler sampler() {
         return sampler;
     }
@@ -143,17 +98,10 @@ final class EntityPacketCapture
         }
     }
 
-    /** The connection-scoped publication point the inbound tee resolves. */
     public static @Nullable EntityPacketCapture active() {
         return active;
     }
 
-    /**
-     * Route one inbound packet (already unbundled by the tee) to the accumulator and the send-range sampler. Handles
-     * every entity packet whose entity id is public API; {@code ClientboundMoveEntityPacket} is fed via {@link #onMove}
-     * instead, because its id is not. {@code bundleNamedIds} carries every id a same-bundle {@code SetPassengers}
-     * names, vehicle or passenger; empty outside a bundle.
-     */
     public void accept(Packet<?> packet, IntSet bundleNamedIds) {
         if (packet instanceof ClientboundAddEntityPacket) {
             ClientboundAddEntityPacket add = (ClientboundAddEntityPacket) packet;
@@ -202,26 +150,16 @@ final class EntityPacketCapture
 
     private void onAdd(ClientboundAddEntityPacket add, IntSet bundleNamedIds) {
         observeSendRange(add, bundleNamedIds);
-        // This band's spawn is split by packet: ClientboundAddEntityPacket carries objects only (never a player),
-        // so the newer bands' PLAYER skip has nothing to fire on here.
         EntityPos pos = new EntityPos(add.getX(), add.getY(), add.getZ(),
                 decodeAngle((byte) add.getyRot()), decodeAngle((byte) add.getxRot()));
         spawn(add.getId(), add.getUUID(), chunkKey(add.getX(), add.getZ()), pos, add);
         if (dumpReceivedFrames
                 && add.method_7626() == SPAWN_OBJECT_ITEM_FRAME) {
-            // Diagnostic key for the received-frame diff: block_pos = floor(spawn pos), Facing = the data int
-            // (the frame's get3DDataValue, which is also what it saves). floor recovers the block whether the
-            // packet carries the block pos or the entity pos (the offset is in [0,1)).
             receivedFrames.add(Mth.floor(add.getX()) + " " + Mth.floor(add.getY()) + " " + Mth.floor(add.getZ())
                     + " " + add.getData());
         }
     }
 
-    /**
-     * Ingest a living-entity spawn ({@code AddMob}, this band's separate mob spawn, folded into {@code AddEntity} at
-     * 1.19). The spawn carries the synched data inline, so those values are seeded here the way handleAddMob applies
-     * them at spawn; later {@code SetEntityData} packets merge over them.
-     */
     private void onAddMob(ClientboundAddMobPacket mob) {
         EntityPos pos = new EntityPos(mob.getX(), mob.getY(), mob.getZ(),
                 decodeAngle(mob.getyRot()), decodeAngle(mob.getxRot()));
@@ -234,51 +172,33 @@ final class EntityPacketCapture
         }
     }
 
-    /**
-     * Ingest a painting spawn ({@code AddPainting}, separate until 1.19). A painting is a hanging entity fixed by its
-     * block pos and facing, so the accumulated position is that block, which the reconstruct rebuilds it on.
-     */
     private void onAddPainting(ClientboundAddPaintingPacket painting) {
         BlockPos block = painting.getPos();
         EntityPos pos = new EntityPos(block.getX(), block.getY(), block.getZ(), 0.0F, 0.0F);
         spawn(painting.getId(), painting.getUUID(), chunkKey(block.getX(), block.getZ()), pos, painting);
     }
 
-    /**
-     * Ingest an experience-orb spawn ({@code AddExperienceOrb}, separate until 1.21.5). The packet carries no UUID, so
-     * a synthetic id-derived one stands in as the accumulator's identity key; orbs are transient and merge.
-     */
     private void onAddExperienceOrb(ClientboundAddExperienceOrbPacket orb) {
         EntityPos pos = new EntityPos(orb.getX(), orb.getY(), orb.getZ(), 0.0F, 0.0F);
         spawn(orb.getId(), syntheticUuid(orb.getId()), chunkKey(orb.getX(), orb.getZ()), pos, orb);
     }
 
-    /** A stable id-derived UUID for a spawn packet that carries none (the experience orb). */
     private static UUID syntheticUuid(int id) {
         return new UUID(0L, id & 0xFFFFFFFFL);
     }
 
-    /**
-     * Whether this type feeds the range estimator. At this band only decorations qualify (see
-     * {@link #DECORATION_TYPES}).
-     */
     static boolean qualifies(EntityType<?> type) {
         return DECORATION_TYPES.contains(type);
     }
 
     /**
-     * Feed 1, arrivals: register always (a spawn is the fresh codec base and overwrites the anchor; bits survive),
-     * sample unless the suppression predicate or the same-flush commit rule blocks it. The commit rule drops an arrival
-     * any same-bundle SetPassengers names anywhere: a ridden vehicle pairs at its passenger's boosted range, the plugin
-     * chair pattern, so its arrival distance over-claims; the one collected set also feeds the ridden bit (a
-     * passenger-named qualifying arrival is thereby suppressed although its own pairing is unboosted, a deliberate
-     * one-set concession, under-claim). Reads the player and dimension from the client singleton at netty time; the
-     * render-distance bound caps what a stale read can commit.
+     * Reads the player and dimension from the client singleton at netty time; the render-distance bound caps what a
+     * stale read can commit.
      */
     private void observeSendRange(ClientboundAddEntityPacket add, IntSet bundleNamedIds) {
         EntityType<?> type = objectEntityType(add.method_7626());
         if (type == null || !qualifies(type)) {
-            return; // only decorations qualify at this band; an unmapped object type never does
+            return;
         }
         int id = add.getId();
         sampler.registerArrival(id, add.getX(), add.getZ());
@@ -304,15 +224,12 @@ final class EntityPacketCapture
     }
 
     /**
-     * Feed 2, the seed at chunk prime: register and sample a loaded entity on the main thread. The live passenger-chain
-     * check gates SAMPLING AND REGISTRATION both (a pre-start mount is invisible to the packet stream, so a frozen
-     * boarding position must never enter the book) but never the prime loop's buffering. The anchor is the position
-     * codec base, the packet-visible position, not the lerped render position: a lerped read would bake a permanent
-     * offset into the moved-bit compare.
+     * The live passenger-chain check gates SAMPLING AND REGISTRATION both (a pre-start mount is invisible to the packet
+     * stream, so a frozen boarding position must never enter the book).
      */
     void primeSeed(Entity entity, double playerX, double playerZ, int plausibleMaxBlocks, String dimensionId) {
         if (!qualifies(entity.getType())) {
-            return; // players are range 32 and never qualify
+            return;
         }
         if (entity.isPassenger() || entity.isVehicle()) {
             return;
@@ -344,7 +261,6 @@ final class EntityPacketCapture
         }
     }
 
-    /** Diagnostic: the deduped received item-frame keys, dumped at finish for the missing-vs-received diff. */
     public Set<String> receivedFrames() {
         return receivedFrames;
     }
@@ -362,7 +278,6 @@ final class EntityPacketCapture
 
     private void onSetEquipment(ClientboundSetEquippedItemPacket packet) {
         if (tracks(packet.getEntity())) {
-            // 1.15.2 sends one slot per packet, not the 1.16 slot/stack list.
             EquipmentSlot slot = packet.getSlot();
             recordEquipment(packet.getEntity(), slot.ordinal(), new EquipmentEntry(slot, packet.getItem()));
         }
@@ -400,16 +315,11 @@ final class EntityPacketCapture
     }
 
     /**
-     * Apply a relative move ({@code ClientboundMoveEntityPacket}, the common walk update) keyed by the entity id the
-     * tee read from the packet's non-public field. A relative move is a short delta in 1/4096 of a block off the last
-     * sent base, so it is resolved against the current accumulated position (vanilla's VecDeltaCodec).
-     *
-     * <p>Vanilla sends a rider rotation but never a position, so a rider's held coordinates stay frozen at where it
-     * boarded; a chunk home derived from them would revert the re-home onto its vehicle and split the pair across two
-     * drain batches. A rotation-only update therefore leaves the home alone.
+     * Vanilla's tracker sends a rider rotation but never a position, so a rider's held coordinates stay frozen at the
+     * last position the server sent; a chunk home derived from them would revert the re-home onto its vehicle and split
+     * the pair across two drain batches. A rotation-only update therefore leaves the home alone.
      */
     public void onMove(int id, short xa, short ya, short za, ClientboundMoveEntityPacket move) {
-        // This band has no ClientboundMoveEntityPacket.hasPosition; the Pos and PosRot subclasses carry a position.
         // The Pos and PosRot position-bearing subclasses are intermediary-named at this band (class_2028 is Pos,
         // class_2029 is PosRot); a plain relative move (class_2030, Rot only) carries no position.
         boolean hasPosition = move instanceof ClientboundMoveEntityPacket.class_2028
@@ -439,16 +349,13 @@ final class EntityPacketCapture
         return delta == 0 ? base : (Math.round(base * 4096.0) + delta) / 4096.0;
     }
 
-    /** Decode a wire-byte rotation (256 units per full turn) to degrees, as vanilla unpacks it. */
     private static float decodeAngle(byte packed) {
         return packed * 360 / 256.0F;
     }
 
     /**
-     * The {@link EntityType} a spawn-object packet's object-type id names, or null for an id this band does not spawn
-     * as an object. Mirrors the vanilla client handleAddEntity resolution; the minecart id defers its subtype to the
-     * packet data, so a bare minecart stands in here for the decoration classification, and {@link #createSpawnObject}
-     * resolves the real subtype when it reconstructs.
+     * The minecart id defers its subtype to the packet data, so {@link #createSpawnObject} resolves the real subtype
+     * when it reconstructs.
      */
     static @Nullable EntityType<?> objectEntityType(int spawnObjectType) {
         switch (spawnObjectType) {
@@ -514,13 +421,9 @@ final class EntityPacketCapture
     }
 
     /**
-     * Reconstruct the object a spawn-object packet describes, the int-type-to-entity resolution the vanilla client
-     * handleAddEntity applies. The minecart subtype is resolved from the packet data through
-     * AbstractMinecart.createMinecart; the item frame and leash knot are hanging entities built through their
-     * positioned constructors, which set the block pos and facing their save reads (a bare create leaves those null and
-     * there is no recreateFromPacket at this band, so Entity.save would throw); every other object is created bare from
-     * its {@link EntityType}, so the caller's own snap-to-position, synced-value, and equipment application fill it in.
-     * Null for an id this band does not spawn as an object, or a type with no factory.
+     * The item frame is a hanging entity built through its positioned constructor, which sets the facing its save reads
+     * (a bare create leaves it null and there is no {@code recreateFromPacket} at this band, so {@code Entity.save}
+     * would throw).
      */
     static @Nullable Entity createSpawnObject(ClientboundAddEntityPacket add, Level level) {
         int spawnObjectType = add.method_7626();
@@ -541,12 +444,6 @@ final class EntityPacketCapture
         return type == null ? null : type.create(level);
     }
 
-    /**
-     * Reconstruct the entity a spawn packet describes, dispatching on the concrete spawn packet the way the vanilla
-     * client's per-packet handlers do: an object through {@link #createSpawnObject}, a mob from its type id, a painting
-     * from its own constructor, an experience orb from its value. Null for a packet this does not spawn from, or a type
-     * with no factory. The caller applies the identity, position, synced values, and equipment.
-     */
     static @Nullable Entity createSpawnEntity(Packet<?> spawn, Level level) {
         if (spawn instanceof ClientboundAddEntityPacket) {
             return createSpawnObject((ClientboundAddEntityPacket) spawn, level);

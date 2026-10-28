@@ -24,15 +24,6 @@ import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The carry rules of {@link RecoveredEntityContent} in isolation, against the counts and the per-key precedence its
- * on-disk siblings in {@link EntityResumeContentCarryTest} cannot see: those assert the bytes a resume leaves in the
- * save, which is the same either way for a node that gained a key it already had.
- *
- * <p>The precedence cases are the load-bearing ones. The bank is filled from a prior download and applied to a chunk
- * whose own read-merge has already run, so anything it finds already present is at least as fresh as what it holds, and
- * overwriting would be the repair destroying newer trades than it restores.
- */
 class RecoveredEntityContentTest {
     private static final UUID VILLAGER = UUID.fromString("2f6c0f4a-1e88-4d3b-9a52-7c0b6e4d1a93");
     private static final UUID BOAT = UUID.fromString("8d1a44b7-5c02-4e69-b0f1-3a9e77c25d40");
@@ -73,8 +64,6 @@ class RecoveredEntityContentTest {
     void experienceIsNotCarriedOnItsOwn() {
         RecoveredEntityContent content = new RecoveredEntityContent();
         content.record(scannedChunkOf(villagerWith(offersSelling("minecraft:emerald"), 12)));
-        // Trades already present and no level: restoring a prior level here would claim a rank for a merchant
-        // whose current trades this download did capture.
         CompoundTag fresh = chunkOf(villagerWith(offersSelling("minecraft:diamond"), null));
 
         assertEquals(0, content.applyTo(fresh));
@@ -134,7 +123,6 @@ class RecoveredEntityContentTest {
         RecoveredEntityContent content = new RecoveredEntityContent();
         content.record(wrapAsRegionChunk(scanned));
 
-        // The scan hands the same tag on to the outline's own consumer, which is free to mutate it.
         node(scanned, VILLAGER).remove("Offers");
 
         CompoundTag fresh = chunkOf(EntityFixtures.entity("minecraft:villager", VILLAGER));
@@ -188,7 +176,6 @@ class RecoveredEntityContentTest {
         return boat;
     }
 
-    /** Built through the sink the capture itself uses, so the entries carry the Slot key vanilla always writes. */
     private ListTag itemsOf(String itemId) {
         NonNullList<ItemStack> stacks = NonNullList.withSize(27, ItemStack.EMPTY);
         stacks.set(0, ItemFixtures.stack(itemId));
@@ -234,7 +221,6 @@ class RecoveredEntityContentTest {
                 .getCompound("sell").getString("id");
     }
 
-    /** {@code getIntOr} is a later-band accessor; below it an absent key must not read back as a real zero. */
     private static int intOr(CompoundTag tag, String key, int fallback) {
         return tag.contains(key) ? tag.getInt(key) : fallback;
     }

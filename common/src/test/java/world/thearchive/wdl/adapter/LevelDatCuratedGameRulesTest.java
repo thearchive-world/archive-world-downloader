@@ -17,15 +17,9 @@ import world.thearchive.wdl.core.CuratedGameRule;
 import world.thearchive.wdl.core.SettingsLayout;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The curated game-rule set surfaced across the SPI for the settings menu: the curated safe rules (five at 1.14.4),
- * each with its curated (safe) value and the two toggle-position values, computed from the live {@code GameRules} so
- * the menu never re-hardcodes a band-specific set. The band-neutral order carries rows with no rule at 1.14.4
- * (fire-spread, vine-spread, warden-spawn, wandering-trader-spawn and patrol-spawn), whose order slots the menu skips.
- */
 class LevelDatCuratedGameRulesTest {
     private Map<String, CuratedGameRule> curated() {
-        TestRegistries.bootstrap(); // bootstrap the vanilla registries so a default GameRules can be built
+        TestRegistries.bootstrap();
         Map<String, CuratedGameRule> byId = new LinkedHashMap<>();
         for (CuratedGameRule rule : new LevelDataWriterImpl().curatedGameRules()) {
             byId.put(rule.id(), rule);
@@ -35,8 +29,8 @@ class LevelDatCuratedGameRulesTest {
 
     @Test
     void surfacesTheSixCuratedRulesById() {
-        // Four of the nine band-neutral curated specs have no rule at 1.14.4 (doVinesSpread, doWardenSpawning,
-        // doTraderSpawning and doPatrolSpawning are all later additions), so the runtime filter drops them and five
+        // Four of the ten band-neutral curated specs have no rule on this band (doVinesSpread, doWardenSpawning,
+        // doTraderSpawning and doPatrolSpawning are all later additions), so the runtime filter drops them and six
         // surface.
         Map<String, CuratedGameRule> byId = curated();
         assertEquals(6, byId.size());
@@ -66,8 +60,6 @@ class LevelDatCuratedGameRulesTest {
         for (String id : byId.keySet()) {
             assertTrue(SettingsLayout.GAME_RULE_ORDER.contains(id), id + " is curated but not laid out as a row");
         }
-        // At 1.14.4 five laid-out rows have no live rule: the band-neutral fire-spread row (no rule at any current
-        // band) plus vine-spread, warden-spawn, wandering-trader-spawn and patrol-spawn, all later additions.
         Set<String> absentAtThisBand = ImmutableSet.of("spread_vines", "spawn_wardens", "spawn_wandering_traders",
                 "spawn_patrols");
         for (String id : SettingsLayout.GAME_RULE_ORDER) {

@@ -11,19 +11,9 @@ import world.thearchive.wdl.adapter.OutlineRenderContext;
 import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.core.RimFace;
 
-/**
- * The rim primitive on this pre-blaze3d band: an explicit four-edge draw of the selected face as GL lines,
- * camera-relative. The edges are written straight to the shared line buffer the cull begins on the POSITION_COLOR
- * format, so a vertex carries position and color only; there is no pose to transform by, because the ambient model-view
- * already holds the camera orientation and the draw subtracts the camera position to reach that view space. The
- * rectangle's two in-plane axes span the block cell and its normal axis planes onto the model shape, lifted a small
- * standoff along the face normal, so the rim frames a recessed model (a chest) at block extent yet never z-fights a
- * flush one. We draw the edges explicitly rather than feed a flat {@code VoxelShape} to a shape renderer, which risks
- * degenerate zero-length edges. The line width is the global GL state the cull sets, not a per-vertex element.
- */
 public final class RimRendererImpl implements RimRenderer {
-    // A small outward lift of the drawn face along its normal, so the rim clears the model surface it planes
-    // onto and does not z-fight it. Raise it if a rim shimmers on a band.
+    // A small outward lift of the drawn face along its normal, so the rim clears the model surface it planes onto and
+    // does not z-fight it.
     private static final double SURFACE_STANDOFF = 0.02;
 
     @Override
@@ -33,8 +23,8 @@ public final class RimRendererImpl implements RimRenderer {
         }
         BufferBuilder lines = context.lines();
         Vec3 camera = context.cameraPos();
-        // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, lifted
-        // outward by the standoff, so a recessed model is framed while a flush one is drawn on its own surface.
+        // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, so a recessed
+        // model is framed.
         float minX = (float) (cellBox.minX - camera.x);
         float minY = (float) (cellBox.minY - camera.y);
         float minZ = (float) (cellBox.minZ - camera.z);

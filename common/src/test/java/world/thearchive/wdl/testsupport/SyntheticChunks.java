@@ -23,26 +23,17 @@ import net.minecraft.world.level.levelgen.Heightmap;
 
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
-/**
- * Synthetic {@link ChunkSnapshotSource} fixtures for the headless codec round-trip.
- *
- * <p>These build {@link LevelChunkSection}s (known blocks, PLAINS biomes) with no {@code Level}, which a headless
- * {@code LevelChunk} cannot avoid, so the round-trip exercises the mod's encode slice.
- */
 public final class SyntheticChunks {
-    /** A standard 1.13.2 overworld column: 0..256, so {@code minSectionY == 0}. */
+    /** A standard overworld column: 0..256, so {@code minSectionY == 0}. */
     public static final int MIN_Y = 0;
     public static final int HEIGHT = 256;
     public static final long GAME_TIME = 1234L;
 
     /**
-     * The terminal LEVELCHUNK status a saved full chunk carries: field_18865 ("postprocessed"). A networked client
-     * chunk carries none, so the capture promotes it to this before saving; there is no Mojmap name for it at this
-     * band.
+     * The terminal LEVELCHUNK status a saved full chunk carries: {@code field_18865} ("postprocessed").
      */
     private static final ChunkStatus FULL = ChunkStatus.field_18865;
 
-    /** A recognizable WORLD_SURFACE payload so the round-trip can assert the kept heightmap survives. */
     public static final long WORLD_SURFACE_SENTINEL = 0x0102030405060708L;
 
     /** Uniform per-cell light levels for the lit fixture, distinct so a swapped layer is caught. */
@@ -50,19 +41,14 @@ public final class SyntheticChunks {
     public static final byte SKY_LIGHT_FILL = 15;
 
     /**
-     * Packed long[] length of a 256-tall world's heightmap: 256 entries at 9 bits, tightly packed across long
-     * boundaries at roundUp(256 * 9, 64) / 64, so 36 longs at this band. The padded 7-per-long layout is a later band.
+     * Packed long[] length of a 256-tall world's heightmap.
      */
     private static final int HEIGHTMAP_LONGS = 36;
 
     private SyntheticChunks() {}
 
     /**
-     * A FULL chunk at (0,0): a single stone block in the bottom section, the rest air, PLAINS biomes. Its heightmap set
-     * is the four LIVE_WORLD maps vanilla writes to disk at this band (WORLD_SURFACE, MOTION_BLOCKING,
-     * MOTION_BLOCKING_NO_LEAVES, OCEAN_FLOOR); this band's Usage enum has no CLIENT tier, so the codec keeps all four.
-     * {@code lightCorrect} is caller-controlled, but at this band it has no on-disk form: light is section-resident and
-     * there is no chunk-level {@code isLightOn} (a 1.14 field), so a lit and a non-lit snapshot encode alike.
+     * A FULL chunk at (0,0): a single stone block in the bottom section, the rest air, PLAINS biomes.
      */
     public static ChunkSnapshotSource full(boolean lightCorrect) {
         return fullWithBlockEntities(lightCorrect, ImmutableList.of());
@@ -70,8 +56,7 @@ public final class SyntheticChunks {
 
     /**
      * As {@link #full} but with the given block-entity NBT (saved form, each carrying its own {@code id} +
-     * {@code x/y/z}). Models a chunk re-captured after a block entity is placed, edited, or broken, so the codec
-     * round-trip can prove a re-encode reflects the current block-entity set.
+     * {@code x/y/z}).
      */
     public static ChunkSnapshotSource fullWithBlockEntities(boolean lightCorrect,
             List<CompoundTag> blockEntities) {
@@ -79,8 +64,7 @@ public final class SyntheticChunks {
     }
 
     /**
-     * As {@link #fullWithBlockEntities} without the producer-shape check, for a case whose subject IS a shape no
-     * producer emits: a tag from a foreign or modded server that the codec must pass through opaquely.
+     * As {@link #fullWithBlockEntities} without the producer-shape check.
      */
     public static ChunkSnapshotSource fullWithMalformedBlockEntities(boolean lightCorrect,
             List<CompoundTag> blockEntities) {
@@ -107,11 +91,8 @@ public final class SyntheticChunks {
     }
 
     /**
-     * Every block entity as the chunk layer hands it over, which is where a snapshot's list comes from in production
-     * ({@code getBlockEntityNbtForSaving}): checked against its producer's shape, then stamped with the
-     * {@code keepPacked} only that layer writes. This is the choke point for the snapshot axis, the way
-     * {@code chunkTagWith} is for a serialized chunk tag; without it a snapshot is a third way a hand-built block
-     * entity reaches production code unchecked.
+     * Every block entity, checked against its producer's shape when {@code checkShape} is set; without the check a
+     * snapshot is a way a hand-built block entity reaches production code unchecked.
      */
     private static List<CompoundTag> saved(List<CompoundTag> blockEntities, boolean checkShape) {
         List<CompoundTag> stamped = new ArrayList<>();
@@ -126,20 +107,17 @@ public final class SyntheticChunks {
         return ImmutableList.copyOf(stamped);
     }
 
-    /** The standard heightmap set: the four LIVE_WORLD maps vanilla writes at this band, all kept by the codec. */
     private static Map<Heightmap.Types, long[]> standardHeightmaps() {
         Map<Heightmap.Types, long[]> heightmaps = new EnumMap<>(Heightmap.Types.class);
         heightmaps.put(Heightmap.Types.OCEAN_FLOOR, new long[HEIGHTMAP_LONGS]);
-        heightmaps.put(Heightmap.Types.WORLD_SURFACE, filled(WORLD_SURFACE_SENTINEL)); // carries the sentinel
+        heightmaps.put(Heightmap.Types.WORLD_SURFACE, filled(WORLD_SURFACE_SENTINEL));
         heightmaps.put(Heightmap.Types.MOTION_BLOCKING, new long[HEIGHTMAP_LONGS]);
         heightmaps.put(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, new long[HEIGHTMAP_LONGS]);
         return heightmaps;
     }
 
     /**
-     * A snapshot of {@code worldPos}'s chunk carrying {@code state} at {@code worldPos} (the rest air), for the
-     * reconcile gate's block-state read: only the one section containing {@code worldPos} is built, its {@code y()} set
-     * so the section lookup ({@code pos.getY() >> 4}) resolves it.
+     * A snapshot of {@code worldPos}'s chunk carrying {@code state} at {@code worldPos}.
      */
     public static ChunkSnapshotSource withBlockAt(BlockPos worldPos, BlockState state) {
         TestRegistries.bootstrap();
@@ -153,18 +131,13 @@ public final class SyntheticChunks {
     }
 
     /**
-     * As {@link #withBlockAt} but also carrying {@code blockEntity} in the snapshot's block-entity list, for a path
-     * that has to find a block entity and then read the block-state under it.
+     * As {@link #withBlockAt} but also carrying {@code blockEntity} in the snapshot's block-entity list.
      */
     public static ChunkSnapshotSource withBlockEntityAt(BlockPos worldPos,
             BlockState state, CompoundTag blockEntity) {
         return withBlockEntityAt(worldPos, state, blockEntity, true);
     }
 
-    /**
-     * As {@link #withBlockEntityAt} without the producer-shape check, for a case whose subject is a tag a producer
-     * never writes, such as one with a coordinate deliberately removed to prove the reader drops it.
-     */
     public static ChunkSnapshotSource withMalformedBlockEntityAt(BlockPos worldPos,
             BlockState state, CompoundTag blockEntity) {
         return withBlockEntityAt(worldPos, state, blockEntity, false);
@@ -186,8 +159,8 @@ public final class SyntheticChunks {
     /**
      * As {@link #full} with {@code lightCorrect=true} and captured light layers, including a below-chunk padding
      * section (sky only, null chunk section), the higher-band shape a light engine's padded range produces. Proves the
-     * encode slice writes the vanilla section-resident {@code BlockLight}/{@code SkyLight} shape for the in-range
-     * sections and drops the null-section pad, which has no home in this band's 0..15 block column.
+     * encode slice writes the vanilla section-resident {@code BlockLight}/{@code SkyLight} shape and drops the
+     * null-section pad, which has no home in this band's 0..15 block column.
      */
     public static ChunkSnapshotSource fullWithLight() {
         TestRegistries.bootstrap();
@@ -223,7 +196,6 @@ public final class SyntheticChunks {
         return data;
     }
 
-    /** PLAINS-filled per-column biome ids: the flat 16x16 grid a 1.13.2 chunk carries, 256 columns indexed z*16+x. */
     private static int[] plainsBiomes() {
         int plainsId = Registry.BIOME.getId(Biomes.PLAINS);
         int[] biomes = new int[16 * 16];

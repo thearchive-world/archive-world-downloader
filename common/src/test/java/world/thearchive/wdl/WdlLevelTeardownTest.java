@@ -16,14 +16,7 @@ import world.thearchive.wdl.core.RecoveredCoverage;
 import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * The band's level-teardown edge, translated by the wiring into the controller's own calls. This loader reports a
- * disconnect on a client tick, which cannot come round until the client has nulled the player the finish reads its
- * inventory, ender chest, advancements, statistics and game mode from, so the teardown is the last edge with a live
- * player and the wiring decides there what the controller is owed.
- */
 class WdlLevelTeardownTest {
-    /** A session that only counts what the controller asks of it; the save never completes on its own. */
     private static final class CountingSession implements CaptureController.Session {
         int finishes;
         int holds;
@@ -77,10 +70,6 @@ class WdlLevelTeardownTest {
         }
     }
 
-    /**
-     * The level-teardown edge fires on a dimension change too, and there the connection is still open: ending a
-     * download the player never stopped is exactly what the edge must not do.
-     */
     @Test
     void aTeardownWithTheConnectionOpenDoesNotEndTheDownload() {
         CaptureController controller = new CaptureController();
@@ -94,9 +83,6 @@ class WdlLevelTeardownTest {
         assertEquals(CaptureState.RECORDING, controller.state(), "the download is still running");
     }
 
-    /**
-     * The same signal with the connection already gone IS the disconnect, and the flush runs while the player is live.
-     */
     @Test
     void aTeardownWithTheConnectionClosedFinishesTheDownload() {
         CaptureController controller = new CaptureController();
@@ -110,10 +96,6 @@ class WdlLevelTeardownTest {
         assertEquals(CaptureState.SAVING, controller.state(), "the download is draining");
     }
 
-    /**
-     * The loader's own disconnect callback still arrives, past the player. It must find the download already finished
-     * rather than starting a second one.
-     */
     @Test
     void theTickEdgeDisconnectAfterTheClosedTeardownFinishesNothingFurther() {
         CaptureController controller = new CaptureController();

@@ -6,12 +6,8 @@ package world.thearchive.wdl.adapter;
 import net.minecraft.core.BlockPos;
 
 /**
- * The section-coordinate long packing the outline draw-set keys its buckets by, replacing {@code net.minecraft.core
- * .SectionPos} (a 1.14 addition absent at 1.13.2). The producer ({@link OutlineTracker}) packs a container's section
- * with {@link #blockToSection}/{@link #asLong}, and the consumer (the per-band outline renderer) unpacks it with
- * {@link #x}/{@link #y}/{@link #z} then {@link #sectionToBlockCoord}; the two must share this class so the encode and
- * decode cannot drift. The layout is a self-contained 22/20/22-bit scheme (x in the high 22 bits, z in the middle 22, y
- * in the low 20), sign-extended on read, so section coordinates across the full world range round-trip.
+ * The layout is a self-contained 22/20/22-bit scheme (x in the high 22 bits, z in the middle 22, y in the low 20),
+ * sign-extended on read, so section coordinates across the full world range round-trip.
  */
 public final class SectionKey {
     private static final int Z_BITS = 22;
@@ -21,12 +17,10 @@ public final class SectionKey {
 
     private SectionKey() {}
 
-    /** Pack section coordinates {@code (x, y, z)} into the bucket key. */
     public static long asLong(int x, int y, int z) {
         return ((long) x & 0x3FFFFF) << X_SHIFT | ((long) z & 0x3FFFFF) << Z_SHIFT | (long) y & 0xFFFFF;
     }
 
-    /** The section key covering a packed {@link BlockPos#asLong() block key} (block coordinates right-shifted by 4). */
     public static long blockToSection(long blockKey) {
         BlockPos pos = BlockPos.method_10488(blockKey);
         return asLong(pos.getX() >> 4, pos.getY() >> 4, pos.getZ() >> 4);

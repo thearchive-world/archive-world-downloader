@@ -37,11 +37,6 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The reload gate on a captured mount chest. Every chest slot is filled with a stack sized to that slot's own absolute
- * index and read back through vanilla's own entity reader, because a stack count assertion passes on shifted contents,
- * which is how a two-slot shift shipped past every gate the suite already had.
- */
 class MountChestSlotsTest {
     // Vanilla's setSlot addressing for a mount: 499 puts the chest on.
     private static final int CHEST_ITEM_SLOT = 499;
@@ -96,7 +91,6 @@ class MountChestSlotsTest {
                 new HeadlessPlatformBridge(Paths.get(".")), null).captureChestSlots(menu, player);
         assertNotNull(holder, "fixture: a chested mount menu must yield a holder");
 
-        // What the flush does: the mount's own saved tag, with only "Items" replaced by the captured holder.
         CompoundTag saved = mount.saveWithoutId(new CompoundTag());
         saved.put("Items", holder.getList("Items", 10));
         reloaded.load(saved);
@@ -123,19 +117,17 @@ class MountChestSlotsTest {
         return mount;
     }
 
-    /** Built through the entity type, this band's bridge mapping leaving the donkey class itself unnamed. */
     private static AbstractChestedHorse donkey() {
         return EntityType.DONKEY.create(HeadlessLevel.get());
     }
 
-    /** The strength has to be set before the chest goes on: the container is sized once, at that moment. */
+    /** The strength has to be set before the chest goes on: the container is sized at that moment. */
     private static Llama llamaOfStrength(int strength) {
         Llama llama = new Llama(HeadlessLevel.get());
         llama.getEntityData().set(strengthId(), strength);
         return llama;
     }
 
-    /** Reached by reflection because vanilla's own strength setter is private. */
     private static EntityDataAccessor<Integer> strengthId() {
         try {
             Field field = Llama.class.getDeclaredField("DATA_STRENGTH_ID");
@@ -148,7 +140,6 @@ class MountChestSlotsTest {
         }
     }
 
-    /** Reached by reflection: there is no {@code Entity.getSlot} at this band and the field is protected. */
     private static Container inventoryOf(AbstractHorse mount) {
         try {
             Field field = AbstractHorse.class.getDeclaredField("inventory");
@@ -159,7 +150,6 @@ class MountChestSlotsTest {
         }
     }
 
-    /** A headless {@code LocalPlayer}, guarded against the two abstract members that reach the client singleton. */
     private static LocalPlayer headlessPlayer() {
         Minecraft client = headlessClient();
         ClientPacketListener connection = new ClientPacketListener(client, null, null,
@@ -178,11 +168,6 @@ class MountChestSlotsTest {
         };
     }
 
-    /**
-     * Allocated without a constructor, {@code Minecraft}'s only constructor opening a window while
-     * {@code LocalPlayer}'s reaches the client for a sound manager. Named through {@code Class.forName} because
-     * {@code sun} is an illegal import.
-     */
     private static Minecraft headlessClient() {
         try {
             Class<?> unsafe = Class.forName("sun.misc.Unsafe");

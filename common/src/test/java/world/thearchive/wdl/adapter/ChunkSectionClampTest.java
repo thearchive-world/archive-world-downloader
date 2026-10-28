@@ -27,12 +27,6 @@ import world.thearchive.wdl.adapter.impl.ChunkCodecImpl;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * A downgrade proxy (ViaBackwards) can hand a 1.13.2 client sections outside the 0..255 column. A block section outside
- * 0..15 crashes vanilla's unchecked {@code sections[index]} on load, and this band has no light-pad column (light is
- * section-resident, not engine-driven, so a null-section light-only entry is a 1.14 shape that has no home here). The
- * codec therefore writes only the block sections inside 0..15 and drops every out-of-range or section-less entry.
- */
 class ChunkSectionClampTest {
     private final ChunkCodec codec = new ChunkCodecImpl();
 
@@ -40,12 +34,12 @@ class ChunkSectionClampTest {
     void sectionsOutsideTheBlockColumnAreDroppedSoTheSaveLoads() {
         TestRegistries.bootstrap();
         List<ChunkSnapshotSource.SectionData> sections = new ArrayList<>();
-        sections.add(new ChunkSnapshotSource.SectionData(-4, blockSection(-4), null, null)); // out of range, dropped
-        sections.add(new ChunkSnapshotSource.SectionData(-1, null, null, filledLight())); // section-less pad, dropped
-        sections.add(new ChunkSnapshotSource.SectionData(0, blockSection(0), null, null)); // in range, kept
-        sections.add(new ChunkSnapshotSource.SectionData(15, blockSection(15), null, null)); // in range, kept
-        sections.add(new ChunkSnapshotSource.SectionData(16, null, null, filledLight())); // section-less pad, dropped
-        sections.add(new ChunkSnapshotSource.SectionData(17, blockSection(17), null, null)); // out of range, dropped
+        sections.add(new ChunkSnapshotSource.SectionData(-4, blockSection(-4), null, null));
+        sections.add(new ChunkSnapshotSource.SectionData(-1, null, null, filledLight()));
+        sections.add(new ChunkSnapshotSource.SectionData(0, blockSection(0), null, null));
+        sections.add(new ChunkSnapshotSource.SectionData(15, blockSection(15), null, null));
+        sections.add(new ChunkSnapshotSource.SectionData(16, null, null, filledLight()));
+        sections.add(new ChunkSnapshotSource.SectionData(17, blockSection(17), null, null));
 
         CompoundTag level = codec.encode(new ClampSnapshot(sections), false).getCompound("Level");
 

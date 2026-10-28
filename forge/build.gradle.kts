@@ -18,11 +18,6 @@ import org.objectweb.asm.TypePath
 import org.objectweb.asm.commons.ClassRemapper
 import org.objectweb.asm.commons.Remapper
 
-// tiny-remapper (the reobf engine) and ASM (the checkReobf constant-pool scan) on the island's buildscript
-// classpath, pinned to the versions the tools/mojmap-bridge generator uses; tiny-remapper resolves from the
-// Fabric maven, ASM from Maven Central. Mirrors common/build.gradle.kts, which puts ASM on its buildscript
-// classpath for the compile-side annotation strip. asm-commons supplies the ClassRemapper/Remapper the scan
-// records references through.
 buildscript {
     repositories {
         mavenCentral()
@@ -35,41 +30,24 @@ buildscript {
     }
 }
 
-// The non-Fabric jar for this deep band, a hand-rolled plain-java island beside the band's Gradle-9 root. This
-// band predates the Mojmap floor, so no ForgeGradle, NeoGradle or Architectury Loom (the plugin of the 1.14.4 to
-// 1.16.5 islands) resolves official Mojang mappings for 1.13.2. So the island carries no Loom at all: the root's
-// Fabric-Loom provision remaps the vanilla 1.13.2 jar to Mojmap through the tools/mojmap-bridge mapping and
-// publishes that jar plus its transitive libraries to ../common/build/island-classpath.txt, which this build reads
-// as plain file dependencies. The Forge API the six glue files reference has no Mojmap-named distribution at this
-// band either, so remapForgeApi builds one from the real forge-1.13.2-25.0.223 universal jar (see below). The
-// island stays a separate build with its own wrapper because it runs a different Java toolchain (Java 8) than the
-// Gradle-9 root; two wrappers, one set of coordinates read from the root gradle.properties.
 plugins {
     java
-    // Release publishing. Pinned as a literal because the island is a separate build with no access to the root
-    // version catalog.
     id("me.modmuss50.mod-publish-plugin") version "2.2.0"
 }
 
-// Single source of coordinates: the island reads the band's gradle.properties from the sibling Gradle-9 root
-// rather than duplicating the version, MC pin, and compat coordinates. Two wrappers, one set of coordinates.
 val band = Properties().apply {
     rootDir.resolve("../gradle.properties").inputStream().use { load(it) }
 }
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.13.2.
+// Match wdl.java-conventions: the MC version rides as SemVer build metadata.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
-    // -> archive-wdl-forge
     archivesName.set("${band("mod_archives_base")}-forge")
 }
 
-// Mirrors wdl.java-conventions: the JDK that compiles is the language target unless the band overrides it
-// through java_toolchain_version, and --release then pins this island's bytecode back to that target. band()
-// errors on a missing key, so the optional coordinate is read off the properties directly.
 val islandTarget = band("java_version").toInt()
 val islandToolchain = band.getProperty("java_toolchain_version")?.toInt() ?: islandTarget
 
@@ -84,45 +62,23 @@ if (islandToolchain != islandTarget) {
 repositories {
     mavenCentral()
     maven("https://jm.gserv.me/repository/maven-snapshots/") { content { includeGroup("info.journeymap") } }
-    // The Forge maven hosts the real forge-1.13.2-25.0.223 universal jar (the loadability-critical API the six glue
-    // files bind) and net.minecraftforge:forgespi, the small mod-info SPI that carries IModInfo. Both are resolved
-    // here rather than stubbed.
     maven("https://maven.minecraftforge.net/")
 }
 
-// The Minecraft toolchain the root's Fabric Loom resolved: the Mojmap-remapped 1.13.2 jar (annotation-stripped)
-// plus every transitive library, one absolute path per line. common's assemble depends on
-// writeIslandClasspath, so a plain `./gradlew build` at the root produces this before this island ever
-// configures; run ./gradlew :common:writeIslandClasspath by hand if only the island is being built.
 val islandClasspathFile = rootDir.resolve("../common/build/island-classpath.txt")
 require(islandClasspathFile.exists()) {
     "island classpath not found at $islandClasspathFile; run ':common:writeIslandClasspath' in the root build first"
 }
 val islandMinecraft = files(islandClasspathFile.readLines().filter { it.isNotBlank() })
 
-// The main compile reads a handful of read-only vanilla fields (the connection's channel, the relative-move
-// packet's entity id, the horse menu's animal) that are private or protected at the Minecraft boundary. Forge widens
-// them at runtime through META-INF/accesstransformer.cfg, and the 1.14.4-and-up Forge islands widen them at compile
-// through Architectury Loom's accessTransformer step; this hand-rolled island has no Loom, so widenForCompile applies
-// the same widenings to the Mojmap Minecraft jar directly (translating the SRG access-transformer field coordinates
-// to Mojmap through the bridge). Only the Minecraft jar is widened; the other island libraries pass through unchanged.
 val mcJarMarker = "/stripped-minecraft/"
 val strippedMinecraftJar = islandMinecraft.filter { it.path.replace('\\', '/').contains(mcJarMarker) }
 val islandLibraries = islandMinecraft.filter { !it.path.replace('\\', '/').contains(mcJarMarker) }
 
-// The reobf fixture set. It compiles against the SAME Mojmap Minecraft classpath the island main uses, so reobfJar
-// has a compilable Mojmap-named input to reobfuscate. It is isolated from main: nothing on main depends on it and it
-// depends on nothing of main's, so ./gradlew reobfJar/checkReobf runs standalone.
 sourceSets {
     create("reobftest")
 }
 
-// The real Forge API the six glue files reference, met by a Mojmap-named view of the genuine forge-1.13.2-25.0.223
-// universal jar rather than a hand-rolled stub: the universal's net.minecraftforge.* classes reference Minecraft by
-// 1.13.2 SRG name, so remapForgeApi remaps them SRG -> Mojmap through the bridge's mojmap-srg.tiny (read in reverse)
-// and keeps ONLY the net/minecraftforge/** entries, so the universal's own patched net.minecraft.* classes never
-// shadow the Mojmap Minecraft the island already compiles against. forgespi supplies the mod-info SPI (IModInfo) the
-// universal does not carry; it names no Minecraft, so it needs no remap.
 val forgeUniversal: Configuration = configurations.create("forgeUniversal") { isTransitive = false }
 
 val forgeApiMappingFile = rootDir.resolve("../tools/mojmap-bridge/build/bridge/mojmap-srg.tiny")
@@ -130,11 +86,6 @@ require(forgeApiMappingFile.exists()) {
     "bridge mapping not found at $forgeApiMappingFile; run ':genBridge' in tools/mojmap-bridge first"
 }
 
-// Remaps the resolved Forge universal jar SRG -> Mojmap (the bridge's mojmap-srg.tiny read srg -> mojmap) with
-// tiny-remapper, then filters the output to net/minecraftforge/** classes so only the Forge API lands on the
-// compile classpath. The Minecraft classpath is read (not emitted) so tiny-remapper can resolve reference targets;
-// the universal names Minecraft by SRG, so its type references are rewritten to their Mojmap names by the class
-// mapping while the Forge classes themselves keep their own names.
 abstract class RemapForgeApi : DefaultTask() {
     @get:InputFiles
     abstract val universalJar: ConfigurableFileCollection
@@ -174,7 +125,7 @@ abstract class RemapForgeApi : DefaultTask() {
                     if (entry.name.endsWith(".class") && entry.name.startsWith("net/minecraftforge/")) {
                         val bytes = zin.readBytes()
                         val copy = ZipEntry(entry.name)
-                        copy.time = 0L // fixed timestamp for determinism
+                        copy.time = 0L
                         zout.putNextEntry(copy)
                         zout.write(bytes)
                         zout.closeEntry()
@@ -198,11 +149,6 @@ val remapForgeApi = tasks.register<RemapForgeApi>("remapForgeApi") {
     forgeApiJar.set(layout.buildDirectory.file("forge-api/forge-api-mojmap.jar"))
 }
 
-// Copies the Mojmap Minecraft jar with the access-transformer's read-only field widenings applied, so the main
-// compile can reach the fields the tee and mount-menu bind read. It parses META-INF/accesstransformer.cfg (SRG
-// class token plus SRG field id), translates each to its Mojmap class and field through the bridge (the SRG field id
-// is globally unique, so the field translation needs no class context), and rewrites those field access flags to
-// public in a full copy of the jar. Every other class passes through byte-for-byte.
 abstract class WidenForCompile : DefaultTask() {
     @get:InputFiles
     abstract val minecraftJar: ConfigurableFileCollection
@@ -285,7 +231,7 @@ abstract class WidenForCompile : DefaultTask() {
                         writer.toByteArray()
                     }
                     val copy = ZipEntry(entry.name)
-                    copy.time = 0L // fixed timestamp for determinism
+                    copy.time = 0L
                     zout.putNextEntry(copy)
                     zout.write(output)
                     zout.closeEntry()
@@ -313,37 +259,20 @@ dependencies {
 
     "reobftestCompileOnly"(islandMinecraft)
 
-    // The main compile sees the widened Minecraft jar (access-transformer fields opened) in place of the raw
-    // stripped jar, plus the other island libraries unchanged.
     compileOnly(islandLibraries)
     compileOnly(files(widenForCompile.flatMap { it.widenedJar }))
-    // The Mojmap-named Forge API view (remapped universal, net/minecraftforge/** only). The universal names none of
-    // its own supporting libraries, so the three the glue transitively reaches are declared alongside it, at the
-    // exact versions the 1.13.2 installer profile pins: eventbus (the Event base type every Forge event extends),
-    // forgespi (the IModInfo mod-info SPI ModContainer returns), and maven-artifact (the ArtifactVersion IModInfo's
-    // version is). None names Minecraft, so none is remapped.
     compileOnly(files(remapForgeApi.flatMap { it.forgeApiJar }))
     compileOnly("net.minecraftforge:eventbus:0.9.3")
     compileOnly("net.minecraftforge:forgespi:0.13.0")
     compileOnly("org.apache.maven:maven-artifact:3.6.0")
 
-    // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
-    // shim are null-marked. NullAway itself does not run on this island (it is a Gradle-9 build-logic pass over
-    // common); here the annotations only need to resolve so the marked source compiles.
     compileOnly(jspecify)
 
-    // JourneyMap public API for the source-merged binding (compat/journeymap), compile-only, never a runtime
-    // require. The island compiles under the same Mojmap classpath :common resolves; JourneyMap discovers the
-    // plugin by annotation scan. No XaeroPlus binding on this band, matching :common.
     compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
 }
 
-// Mirrors wdl.nullness-conventions, which this separate build never loads: the Target on NullMarked names
-// ElementType.MODULE, a constant Java 8 lacks, so javac 8 and javadoc 8 each warn "unknown enum constant" whenever
-// they read the class. The rewrite below drops the one MODULE element from that Target, copies every other entry as
-// is, and takes the resolved jar's place on every source set's compile classpath, which compileJava and javadoc both
-// derive from; the name filter also drops the root's own rewritten jar, which arrives through the island classpath
-// file. The jar is compile-only and never ships.
+// The Target on NullMarked names ElementType.MODULE, a constant Java 8 lacks, so javac 8 and javadoc 8 each warn
+// "unknown enum constant" whenever they read the class.
 abstract class StripNullMarkedModuleTarget : DefaultTask() {
     @get:InputFiles
     abstract val jspecifyJar: ConfigurableFileCollection
@@ -374,7 +303,6 @@ abstract class StripNullMarkedModuleTarget : DefaultTask() {
         }
     }
 
-    // The writer is given no reader to copy the constant pool from, so the MODULE constant leaves with its one use.
     private fun stripModuleTarget(bytes: ByteArray): ByteArray {
         val writer = ClassWriter(0)
         ClassReader(bytes).accept(object : ClassVisitor(Opcodes.ASM9, writer) {
@@ -407,19 +335,12 @@ sourceSets.configureEach {
     compileClasspath = compileClasspath.filter { !it.name.startsWith("jspecify-") } + strippedJspecify
 }
 
-// Source-merge :common the way a loader subproject does on the higher bands, but by direct path since the
-// island is a separate build with no access to :common's consumable configurations: fold common's main source
-// into this compile and its resources into the jar.
 tasks.named<JavaCompile>("compileJava") {
     source(rootDir.resolve("../common/src/main/java"))
 }
 
-// Mirrors wdl.java-conventions, which this separate build never loads: doclint's reference group at the private
-// member level, so a {@link}, {@linkplain}, @see or @throws target the band lacks fails the island the way it fails
-// the root. Javadoc reads sourceSets.main.allJava, and the merge above adds common to compileJava.source alone,
-// so the task documents the shim's own sources and never re-reports common's, which the root build already
-// checks. It joins check on the same javadoc_gate key the root reads, so one knob gates the band's two builds;
-// the key is read off the properties directly because band() refuses a missing one, which here means off.
+// At the private member level, a {@link}, {@linkplain}, @see or @throws target the band lacks fails the island the way
+// it fails the root.
 tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).apply {
         memberLevel = JavadocMemberLevel.PRIVATE
@@ -435,9 +356,6 @@ tasks.named<ProcessResources>("processResources") {
     from(rootDir.resolve("../common/src/main/resources")) {
         exclude("**/.gitkeep")
     }
-    // Keep mods.toml's and wdl-publishing.properties' templated fields in sync with the band coordinates,
-    // matching the higher bands' loader processResources. The Forge floor (forge_version_min) is a deliberate value
-    // distinct from the build coordinate forge_version.
     val tokens = mapOf(
         "version" to version.toString(),
         "minecraft_version" to band("minecraft_version"),
@@ -450,20 +368,6 @@ tasks.named<ProcessResources>("processResources") {
     filesMatching("wdl-publishing.properties") { expand(tokens) }
 }
 
-// --- Reobfuscation (Mojmap -> 1.13.2 SRG) + the checkReobf validation gate ---
-// The runtime name scheme below the Mojmap floor is full SRG: net/minecraft class names with func_*/field_*
-// members. common is written in Mojmap names and compiles against the Mojmap-remapped 1.13.2 jar, so the shipped
-// output must be reobfuscated Mojmap -> SRG before Forge loads it. The reobf mapping is the mojmap-srg.tiny the
-// tools/mojmap-bridge generator derives from the SAME obf-mojmap source as the intermediary-mojmap compile
-// mapping; the SRG side is the SRG column of mcp_config 1.13.2's joined.tsrg. Like genBridge and
-// writeIslandClasspath, both files are produced by a PREREQUISITE generator run and must already exist here.
-//
-// reobfJar reobfuscates the REAL merged-main island output (../common/src/main/java + the forge glue); the
-// reobftest fixture is retained only to feed checkReobfNegative, which proves the gate fires on a known-dirty
-// (un-reobfuscated) input. checkReobf catches UN- or MIS-resolution (a leaked Mojmap class name, a surviving
-// com/mojang/blaze3d reference, or a member left un-searge'd), NOT a wrong-but-valid class match: that a class
-// reobfs to a real but incorrect SRG class is caught by the generator's structural gate and the registry-boot
-// smoke test, which is why those exist.
 val reobfMappingFile = rootDir.resolve("../tools/mojmap-bridge/build/bridge/mojmap-srg.tiny")
 val srgOracleFile = rootDir.resolve("../tools/mojmap-bridge/build/sources/joined_1132.tsrg")
 require(reobfMappingFile.exists()) {
@@ -473,11 +377,7 @@ require(srgOracleFile.exists()) {
     "1.13.2 SRG oracle (joined.tsrg) not found at $srgOracleFile; run ':genBridge' in tools/mojmap-bridge first"
 }
 
-// Packages compiled (Mojmap-named) classes into a deterministic jar, then reobfuscates it Mojmap -> SRG with
-// tiny-remapper over the mojmap-srg.tiny mapping. The mod's own world.thearchive.wdl.* classes are absent from
-// the mapping, so tiny-remapper leaves them untouched and rewrites only their Minecraft references. The
-// Minecraft classpath is read (not emitted) so tiny-remapper can resolve the reference hierarchy. Both the real
-// merged-main output (reobfJar) and the reobftest fixture (reobfFixtureJar, for the negative gate) run through it.
+// The Minecraft classpath is read (not emitted) so tiny-remapper can resolve the reference hierarchy.
 abstract class ReobfMojmapToSrg : DefaultTask() {
     @get:InputFiles
     abstract val classesDirs: ConfigurableFileCollection
@@ -509,7 +409,7 @@ abstract class ReobfMojmapToSrg : DefaultTask() {
                     .sortedBy { it.path }
                     .forEach { classFile ->
                         val entry = ZipEntry(root.relativize(classFile.toPath()).toString().replace('\\', '/'))
-                        entry.time = 0L // fixed timestamp for determinism
+                        entry.time = 0L
                         zout.putNextEntry(entry)
                         zout.write(classFile.readBytes())
                         zout.closeEntry()
@@ -535,31 +435,14 @@ abstract class ReobfMojmapToSrg : DefaultTask() {
     }
 }
 
-// Scans a jar's constant pools (via ASM ClassRemapper, which visits every class reference and every member
-// reference) and fails on either arm:
-//   (a) a net/minecraft class reference that is not a valid 1.13.2 SRG class name (a leaked Mojmap class name,
-//       which would be a runtime NoClassDefFoundError), OR any surviving com/mojang/blaze3d reference. The
-//       blaze3d package DOES exist at 1.13.2 (e.g. com/mojang/blaze3d/platform/GlStateManager), but every
-//       blaze3d class reobfuscates to a net/minecraft SRG name (mojmap-srg maps them all to net/minecraft/*),
-//       so a correctly reobfuscated 1.13.2 jar carries zero blaze3d references; a survivor is an unmapped leak,
-//       the same failure class as a leaked Mojmap net/minecraft name. The valid net/minecraft set is the SRG
-//       column of joined.tsrg.
-//   (b) a member on a net/minecraft owner whose name is not a valid 1.13.2 searge member id and is not a JVM
-//       special (<init>/<clinit>) or a java.lang.Object method (a Mojmap or Legacy Fabric intermediary member
-//       with no mojmap-srg entry, which would be a runtime NoSuchMethod/FieldError). The valid set is every
-//       srg member name in joined.tsrg; a name test alone would pass a leaked intermediary field_NNN, which
-//       shares the field_ prefix with searge field ids. A leaked name that is also a known Mojmap member
-//       (present in mojmap-srg) is annotated as such. A non-searge name is NOT a leak when it resolves to a
-//       member inherited from a JDK or library supertype (java.lang.Enum.ordinal, a JDK-collection addAll):
-//       such names are un-obfuscatable and correct at runtime. That is decided by hierarchy resolution, not a
-//       by-name allowlist (which could hide a real leaked Mojmap method sharing a JDK name): the owner is
-//       reverse-mapped srg -> mojmap and its supertypes are walked over the Mojmap Minecraft jar; the member
-//       is a leak only if some net/minecraft class in that hierarchy actually declares it (matched by name and
-//       srg-normalized descriptor). A member no scanned vanilla class declares resolves to a JDK/library type
-//       and is safe. An owner that does not reverse-map (a Mojmap-named class in the negative fixture) fails
-//       closed as a leak.
-// expectClean flips the polarity: the pass gate (true) fails on any offender; the negative gate (false) fails
-// when NO offender is found, since a gate never seen to fire is not trusted.
+// The blaze3d package DOES exist at 1.13.2 (e.g. com/mojang/blaze3d/platform/GlStateManager), but every blaze3d class
+// reobfuscates to a net/minecraft SRG name (mojmap-srg maps them all to net/minecraft/*), so a correctly reobfuscated
+// 1.13.2 jar carries zero blaze3d references; a survivor is an unmapped leak, the same failure class as a leaked Mojmap
+// net/minecraft name. A non-searge name is NOT a leak when it resolves to a member inherited from a JDK or library
+// supertype (java.lang.Enum.ordinal, a JDK-collection addAll): such names are un-obfuscatable and correct at runtime.
+// The owner is reverse-mapped srg -> mojmap and its supertypes are walked over the Mojmap Minecraft jar; a mapped
+// owner's member is a leak only if some class in that hierarchy actually declares it (a method by name and
+// srg-normalized descriptor, a field by name).
 abstract class CheckReobf : DefaultTask() {
     @get:InputFile
     abstract val jarToScan: RegularFileProperty
@@ -570,9 +453,6 @@ abstract class CheckReobf : DefaultTask() {
     @get:InputFile
     abstract val mojmapSrgMapping: RegularFileProperty
 
-    // The Mojmap-named Minecraft jar, read for the arm (b) hierarchy resolution: a flagged member's owner is
-    // reverse-mapped srg -> mojmap and its supertypes walked here to tell a JDK-inherited member from a real
-    // net/minecraft leak.
     @get:InputFiles
     abstract val minecraftClasspath: ConfigurableFileCollection
 
@@ -650,8 +530,6 @@ abstract class CheckReobf : DefaultTask() {
             "notify", "notifyAll", "wait", "finalize",
         )
 
-        // Mojmap-space class hierarchy from the Mojmap Minecraft jar: superclass, interfaces, and the
-        // declared method (name + Mojmap descriptor) and field names per class, for the arm (b) resolution.
         val mcSuper = HashMap<String, String>()
         val mcInterfaces = HashMap<String, List<String>>()
         val mcMethods = HashMap<String, MutableSet<String>>()
@@ -740,11 +618,6 @@ abstract class CheckReobf : DefaultTask() {
             }
             return sb.toString()
         }
-        // True when some net/minecraft class in the owner's Mojmap hierarchy actually declares the member,
-        // i.e. it resolves to a reobfuscatable vanilla slot rather than an inherited JDK/library one. A member
-        // no walked vanilla class declares resolves to a JDK/library supertype and is not a leak. An owner
-        // with no srg -> mojmap entry fails closed (returns true), so the Mojmap-named negative fixture keeps
-        // flagging.
         fun mcDeclaresMember(srgOwner: String, name: String, srgDesc: String, isMethod: Boolean): Boolean {
             val mojOwner = srgToMojClass[srgOwner] ?: return true
             val queue = ArrayDeque<String>()
@@ -797,8 +670,8 @@ abstract class CheckReobf : DefaultTask() {
             if (!seenMembers.add("$owner.$name$descriptor")) {
                 continue
             }
-            // A method descriptor starts with '(' (memberRefs mixes methods and fields); a field carries a
-            // plain type descriptor. Skip a member that resolves to a JDK/library supertype: it is not a leak.
+            // A method descriptor starts with '(' (memberRefs mixes methods and fields); a field carries a plain type
+            // descriptor.
             val isMethod = descriptor.startsWith("(")
             if (!mcDeclaresMember(owner, name, descriptor, isMethod)) {
                 continue
@@ -844,11 +717,6 @@ val reobfJar = tasks.register<ReobfMojmapToSrg>("reobfJar") {
     srgJar.set(layout.buildDirectory.file("reobf/main-srg.jar"))
 }
 
-// The reobftest fixture keeps its own reobf pass, pinned to the fixture (never the real main), so the negative
-// gate always has a known-dirty input: checkReobfNegative scans this task's Mojmap-named (un-reobfuscated)
-// packaged jar and fails if the gate does NOT flag it. Its srgJar output is unused; only the mojmap side feeds
-// the negative gate. Keeping it separate from reobfJar is what lets reobfJar point at the real main while the
-// negative gate stays on the fixture.
 val reobfFixtureJar = tasks.register<ReobfMojmapToSrg>("reobfFixtureJar") {
     group = "build"
     description = "Packages the reobfTest fixture (Mojmap-named) for checkReobfNegative and reobfuscates it Mojmap -> 1.13.2 SRG."
@@ -881,54 +749,28 @@ tasks.register<CheckReobf>("checkReobfNegative") {
     expectClean.set(false)
 }
 
-// --- Ship jar (modJar) + the checkShipJar class-file health gate ---
-// The shipped Forge jar must be the reobf'd, SRG-named artifact. The java plugin's default `jar` archives
-// sourceSets.main.output, whose classes are Mojmap-named (pre-reobf) and so cannot ship correct runtime names,
-// and its from(sourceSet.output) build dependency on compileJava cannot be removed through any public API. So
-// the ship artifact is a fresh Jar, decoupled from the main compile by construction: it sources the reobf'd
-// classes from reobfJar plus the token-expanded resources (mods.toml, accesstransformer.cfg, pack.mcmeta, common
-// lang/assets) from processResources. This mirrors the higher bands' remapJar-as-ship-artifact split, where the
-// default jar is the dev jar and the remapped one is what ships. reobfJar targets the real merged-main output,
-// so modJar ships the real SRG-named classes.
 val modJar = tasks.register<Jar>("modJar") {
     group = "build"
     description = "Assembles the shippable Forge mod jar: reobf'd SRG classes + resources + accesstransformer.cfg."
     dependsOn(reobfJar)
-    // A fresh Jar defaults archiveBaseName to the project name; restate the -forge coordinate base sets on the
-    // default jar so the ship artifact is archive-wdl-forge-<version>.jar.
     archiveBaseName.set("${band("mod_archives_base")}-forge")
-    // Byte-stable for reproducibility.yml: sorted entries and a fixed timestamp normalize away tiny-remapper's
-    // un-pinned OutputConsumerPath entry times, so two builds of the shipped artifact hash identically.
     isReproducibleFileOrder = true
     isPreserveFileTimestamps = false
     from(zipTree(reobfJar.flatMap { it.srgJar }))
     from(tasks.named("processResources"))
 }
 
-// The default jar carries a dev classifier so it never collides with modJar's ship name. It stays the
-// Mojmap-named dev jar; modJar is the artifact CI uploads.
+// The default jar carries a dev classifier so it never collides with modJar's ship name.
 tasks.named<Jar>("jar") {
     archiveClassifier.set("dev")
 }
 
-// build/assemble produce the ship jar. modJar also builds standalone via ./gradlew modJar.
 tasks.named("assemble") {
     dependsOn(modJar)
 }
 
-// Class-file health gate over the shipped jar. Two arms:
-//   (a) every class parses (an ASM ClassReader pass over each .class entry); a malformed class is a runtime
-//       failure the reobf pipeline could otherwise ship silently.
-//   (b) no net/minecraft descriptor carrying a jspecify TYPE_USE @Nullable still names a Mojmap class. The
-//       source-merged common is @NullMarked with CLASS-retention @Nullable, so a nullable Minecraft-typed member
-//       ships a RuntimeInvisibleTypeAnnotations entry whose annotated member descriptor tiny-remapper must have
-//       remapped Mojmap -> SRG. Arm (b) re-extracts the net/minecraft names from each TYPE_USE-annotated member's
-//       descriptor and signature and fails on any that is not a valid 1.13.2 SRG class (the joined.tsrg oracle,
-//       the same set checkReobf validates against). The @Nullable's own descriptor is org.jspecify.*, never
-//       net/minecraft, so the load-bearing name is the annotated member's descriptor.
-// modJar ships the real merged-main output, so arm (a) parses every real shipped class. Arm (b) checks each
-// TYPE_USE-annotated Minecraft-typed member descriptor for a surviving Mojmap net/minecraft name; the @NullMarked
-// common puts @Nullable on Minecraft-typed members, so real input can exercise it.
+// The @Nullable's own descriptor is org.jspecify.*, never net/minecraft, so the load-bearing name is the annotated
+// member's descriptor.
 abstract class CheckShipJar : DefaultTask() {
     @get:InputFile
     abstract val jarToScan: RegularFileProperty
@@ -1063,15 +905,13 @@ tasks.named("check") {
     dependsOn("checkReobf", "checkReobfNegative", checkShipJar)
 }
 
-// Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge
-// jar to Modrinth and CurseForge per this band's MC version, mirroring the higher bands' loader subprojects.
-// Coordinates come from band() (the island reads the root gradle.properties), not providers.gradleProperty,
-// because forge/gradle.properties carries none. There is no github block: the release workflow funnels every
-// band's jars into one shared GitHub release with gh. Nothing publishes on an ordinary build.
+// Coordinates come from band() (the island reads the root gradle.properties), not providers.gradleProperty, because
+// forge/gradle.properties carries none. There is no github block: the release workflow funnels every band's jars into
+// one shared GitHub release with gh.
 publishMods {
-    // Resolve the shipped jar by path: every island build system (Loom remapJar, ForgeGradle reobfJar, plain
-    // java jar) emits build/libs/archive-wdl-forge-<version>.jar, and the release job builds the island before
-    // invoking publishMods, so one path form works on every band without a build-system-specific task handle.
+    // Resolve the shipped jar by path: every island build system emits build/libs/archive-wdl-forge-<version>.jar, and
+    // the release job builds the island before invoking publishMods, so one path form works on every band without a
+    // build-system-specific task handle.
     file.set(layout.buildDirectory.file("libs/${band("mod_archives_base")}-forge-${project.version}.jar"))
     changelog.set(providers.environmentVariable("CHANGELOG").orElse(""))
     type.set(STABLE)
@@ -1086,7 +926,6 @@ publishMods {
         projectId.set(band("modrinth_id"))
         accessToken.set(providers.environmentVariable("MODRINTH_TOKEN"))
         minecraftVersions.add(band("minecraft_version"))
-        // Java mod: no hard runtime dependency to declare (JourneyMap is an optional jar-in-jar).
     }
 
     curseforge {

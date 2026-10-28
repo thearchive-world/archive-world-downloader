@@ -24,9 +24,6 @@ application {
     mainClass = "world.thearchive.wdl.bridge.MojmapBridgeGen"
 }
 
-// Composes obf(1.13.2) -> Mojmap(1.14.4) and derives the intermediary->named jar and mojmap->srg
-// reobf mapping. Downloads and caches its pinned immutable sources under build/sources on first run;
-// the generator self-validates and fails the build on any mismatch.
 tasks.register<JavaExec>("genBridge") {
     group = "build"
     description = "Generates the 1.13.2 Mojmap bridge mappings."

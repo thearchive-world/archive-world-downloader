@@ -19,13 +19,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.PlayerSink;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless half of the player sink: the whole-entity serialize needs a live player and stays field-tested, but the
- * inventory-only capture it falls back to reads nothing but the inventory itself, so it round-trips here. The fallback
- * exists for a finish whose whole-entity write threw, and it must be a record vanilla loads the inventory back from and
- * nothing more: a key the serialize would have written, invented here, would be a default stamped where the finish
- * could not read the truth.
- */
 class PlayerSinkImplTest {
     private final PlayerSink sink = new PlayerSinkImpl();
 
@@ -34,7 +27,6 @@ class PlayerSinkImplTest {
         TestRegistries.bootstrap();
     }
 
-    /** A player inventory with no player behind it; the serialize reads only the three stack lists. */
     private static Inventory inventory() {
         return new Inventory(null);
     }

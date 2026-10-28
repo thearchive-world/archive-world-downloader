@@ -32,15 +32,6 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The guard for the per-chunk flush wiring: the arguments a flushed chunk reads off its snapshot and hands to the
- * writer, and the merges the writer thunks apply.
- *
- * <p>These call sites are where three separate defects have lived with the whole suite green, because a merge that has
- * good tests proves nothing about whether production still calls it, calls it with the arguments that make it
- * chunk-specific, or calls it at all. Each case here drives the wiring and asserts the artifact, so reverting a line to
- * the version that preceded it turns one red.
- */
 class ChunkFlushPlanTest {
     private final ContainerSink containerSink = new ContainerSinkImpl();
     private final LecternSink lecternSink = new LecternSinkImpl();
@@ -50,7 +41,7 @@ class ChunkFlushPlanTest {
         TestRegistries.bootstrap();
     }
 
-    /** Built on demand, never as a static initializer: ChunkPos static init needs the vanilla bootstrap. */
+    /** Built on demand: on some versions {@code ChunkPos}'s class initializer needs the vanilla bootstrap. */
     private static ChunkPos origin() {
         return new ChunkPos(0, 0);
     }
@@ -73,7 +64,6 @@ class ChunkFlushPlanTest {
         return stash;
     }
 
-    /** A sink whose merge throws, the band-merge failure the fold has to isolate and count. */
     private static final ContainerSink THROWING_CONTAINER_SINK = new ContainerSink() {
         @Override
         public CompoundTag captureItems(NonNullList<ItemStack> items) {
@@ -98,10 +88,6 @@ class ChunkFlushPlanTest {
         }
     };
 
-    /**
-     * The replaced positions are held per dimension and handed to the writer per chunk, so the narrowing is both what
-     * detaches them from the live set and what keeps one chunk's placements out of another's merge.
-     */
     @Test
     void theReplacedPositionsHandedOverAreThisChunksOwn() {
         BlockPos inside = new BlockPos(3, 64, 7);
@@ -118,8 +104,8 @@ class ChunkFlushPlanTest {
 
     @Test
     void theReadMergeHonorsTheOpenTimePositionsItWasBuiltWith() {
-        // Both fresh sides read as the client defaults, which is the whole difficulty: only the position set
-        // says whether that default was captured from a re-opened menu or never captured at all.
+        // Both fresh sides read as the client defaults: only the position set says whether that default was captured
+        // from a re-opened menu or never captured at all.
         CompoundTag onDisk = chunkTagWith(brewingStand(6, 64, 6, (short) 220, (byte) 12));
         CompoundTag freshReopened = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
         CompoundTag freshRewalked = chunkTagWith(brewingStand(6, 64, 6, (short) 0, (byte) 0));
@@ -164,8 +150,8 @@ class ChunkFlushPlanTest {
 
     @Test
     void landingHolderPositionsIsWhatTheComposedReadMergeShouldBeGiven() {
-        // The list handed to the composed merge has to be the LANDING holders, not every drained one: a holder
-        // the fold drops writes no state, and calling it captured would blank what an earlier visit saved.
+        // The list handed to the composed merge has to be the LANDING holders, not every drained one: a holder the fold
+        // drops writes no state, and calling a type-changed one captured would blank what an earlier visit saved.
         CompoundTag brewingStandTag = blockEntity("minecraft:brewing_stand", 6, 64, 6);
         ChunkSnapshotSource snapshot = snapshotOf(brewingStandTag);
         Map<BlockPos, CompoundTag> holders = new LinkedHashMap<>();
@@ -187,8 +173,7 @@ class ChunkFlushPlanTest {
     }
 
     // No vanilla lectern exists at this band, so the lectern-stash fold is exercised against a fieldless ender chest
-    // standing in as the carrier the LecternSink book merge writes "Book"/"Page" onto; the fold wiring is what is
-    // under test, not a real lectern.
+    // standing in as the carrier the LecternSink book merge writes "Book"/"Page" onto.
     @Test
     void foldChunkStashesMergesEveryStashOntoItsOwnBlockEntity() {
         CompoundTag chunkTag = chunkTagWith(
@@ -296,7 +281,6 @@ class ChunkFlushPlanTest {
                 "a type-changed position and a position with no captured block entity both drop out");
     }
 
-    /** A snapshot whose block-entity list is {@code blockEntities}, with no block states behind them. */
     private static ChunkSnapshotSource snapshotOf(CompoundTag... blockEntities) {
         return SyntheticChunks.fullWithBlockEntities(true, ImmutableList.copyOf(blockEntities));
     }

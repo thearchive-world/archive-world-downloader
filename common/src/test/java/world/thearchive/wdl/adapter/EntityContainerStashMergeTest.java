@@ -27,17 +27,6 @@ import world.thearchive.wdl.adapter.impl.EntitySinkImpl;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the save-time entity-container injection: {@link EntityContainerMerge#mergeEntityStash}
- * locates a stashed container vehicle inside the captured {@code entities/} chunk tag by entity {@code "UUID"}
- * (matching the {@code "Entities"} list), sets its {@code "Items"} via {@link ContainerSink#merge}, touches no other
- * entity, then drains the merged entry. This is the part that must never mis-target, so it is proven headless with
- * hand-built entity tags (no live client, no {@code Level}).
- *
- * <p>The {@code "UUID"} decode the merge relies on is total: a missing, odd-length, or wrong-type {@code "UUID"} yields
- * a skipped entity, not a throw. That matters because the merge runs between the chunk flush and
- * {@code activeWriter.finish()}: a throw there would leave an unopenable save plus a leaked session lock.
- */
 class EntityContainerStashMergeTest {
     private final ContainerSink containerSink = new ContainerSinkImpl();
     private final EntitySink entitySink = new EntitySinkImpl();
@@ -46,7 +35,6 @@ class EntityContainerStashMergeTest {
     private static final UUID UUID_B = new UUID(0x3333_3333_3333_3333L, 0x4444_4444_4444_4444L);
     private static final UUID UUID_C = new UUID(0x5555_5555_5555_5555L, 0x6666_6666_6666_6666L);
 
-    /** A band sink whose merge blows up, for the isolation cases; its capture side is never reached. */
     private static final ContainerSink THROWING_SINK = new ContainerSink() {
         @Override
         public CompoundTag captureItems(NonNullList<ItemStack> items) {
@@ -71,7 +59,7 @@ class EntityContainerStashMergeTest {
         return EntityFixtures.entity(id, uuid);
     }
 
-    /** Build the {@code entities/} chunk envelope via the real sink, so the merge runs against the live shape. */
+    /** Build the chunk envelope via the real sink, so the merge runs against the live shape. */
     private CompoundTag entitiesChunkTag(CompoundTag... entityTags) {
         return entitySink.encodeChunk(ImmutableList.copyOf(entityTags), new ChunkPos(0, 0));
     }
@@ -96,11 +84,11 @@ class EntityContainerStashMergeTest {
     void mergeEntityStashFillsTheMatchingEntityAndDrainsOnlyThatEntry() {
         CompoundTag chunkTag = entitiesChunkTag(
                 entityTag("minecraft:chest_minecart", UUID_A),
-                entityTag("minecraft:chest_boat", UUID_B)); // a neighbor vehicle that must stay untouched
+                entityTag("minecraft:chest_boat", UUID_B));
 
         Map<UUID, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(UUID_A, holderWith(2, new ItemStack(Items.EMERALD, 7)));
-        stash.put(UUID_C, holderWith(0, new ItemStack(Items.DIAMOND, 1))); // a vehicle in no captured chunk
+        stash.put(UUID_C, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
 
         int merged = EntityContainerMerge.mergeEntityStash(containerSink, chunkTag, stash).merged();
 
@@ -161,7 +149,6 @@ class EntityContainerStashMergeTest {
 
     @Test
     void mergeEntityStashIsTotalOnOddLengthUuid() {
-        // 3 ints, not the 4 a UUID needs
         CompoundTag entity = EntityFixtures.entityWithShortUuid("minecraft:chest_minecart", 1, 2, 3);
         CompoundTag chunkTag = entitiesChunkTag(entity);
         Map<UUID, CompoundTag> stash = new LinkedHashMap<>();
@@ -176,7 +163,6 @@ class EntityContainerStashMergeTest {
 
     @Test
     void mergeEntityStashIsTotalOnWrongTypeUuid() {
-        // a string where a 4-int array is expected
         CompoundTag entity = EntityFixtures.entityWithWrongTypeUuid("minecraft:chest_minecart", "not-a-uuid");
         CompoundTag chunkTag = entitiesChunkTag(entity);
         Map<UUID, CompoundTag> stash = new LinkedHashMap<>();
@@ -191,9 +177,6 @@ class EntityContainerStashMergeTest {
 
     @Test
     void mergeEntityStashCountsThrowingMergeAsFailedButStillDrains() {
-        // A band merge that throws between the chunk flush and finish() must be isolated: the vehicle's items are
-        // lost, its stash entry is still drained, and the loss is counted so the caller reports a partial save
-        // honestly instead of a clean one.
         CompoundTag chunkTag = entitiesChunkTag(entityTag("minecraft:chest_minecart", UUID_A));
         Map<UUID, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(UUID_A, new CompoundTag());
@@ -207,13 +190,10 @@ class EntityContainerStashMergeTest {
 
     @Test
     void refoldFlushedContainersCountsEveryCopyItRewritesAndDrainsNone() {
-        // The re-fold repeats an earlier fold into every later chunk the vehicle reaches, so its holders must
-        // survive the call. Counting is what says the repeat happened at all: the contents it writes are the same
-        // ones the first fold wrote, so a re-fold that silently did nothing looks identical on that chunk alone.
         CompoundTag chunkTag = entitiesChunkTag(
                 entityTag("minecraft:chest_minecart", UUID_A),
                 entityTag("minecraft:chest_boat", UUID_B),
-                entityTag("minecraft:chest_minecart", UUID_C)); // never folded, so nothing is written onto it
+                entityTag("minecraft:chest_minecart", UUID_C));
 
         Map<UUID, CompoundTag> folded = new LinkedHashMap<>();
         folded.put(UUID_A, holderWith(2, new ItemStack(Items.EMERALD, 7)));
@@ -236,8 +216,6 @@ class EntityContainerStashMergeTest {
 
     @Test
     void refoldFlushedContainersCountsThrowingMergeAsFailed() {
-        // A re-fold that throws leaves this copy of the vehicle empty beside a copy that has its contents, so it
-        // is a partial loss the caller has to report rather than a clean save.
         CompoundTag chunkTag = entitiesChunkTag(entityTag("minecraft:chest_minecart", UUID_A));
         Map<UUID, CompoundTag> folded = new LinkedHashMap<>();
         folded.put(UUID_A, new CompoundTag());
