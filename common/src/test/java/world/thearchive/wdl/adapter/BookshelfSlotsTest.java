@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/** The shared occupied-slot bitmask over real bookshelf block states. */
 class BookshelfSlotsTest {
     @BeforeAll
     static void bootstrap() {

@@ -12,10 +12,7 @@ import world.thearchive.wdl.core.WdlConfig;
 
 /**
  * Coverage overlay resume axis: a resumed download seeds the overlay with the dimension's prior on-disk coverage, not
- * only this session's re-downloaded chunks. A first NEW capture at spot A writes area A's region files; the player then
- * moves far so area A unloads; a RESUME records at spot B. The resume overlay must hold chunk A, which this run never
- * re-captures (the player is at B), so only the disk seed could have added it. No map overlay mod is on the gametest
- * classpath (XaeroPlus hard-depends on Xaero's maps, whose modal blocks a headless run), so the driver is told the
+ * only this session's re-downloaded chunks. No map overlay mod is on the gametest classpath, so the driver is told the
  * overlay is active to arm the seed.
  */
 @SuppressWarnings("UnstableApiUsage")
@@ -26,7 +23,6 @@ public class WdlCoverageOverlayResumeTest implements FabricClientGameTest {
             String dimension = context.computeOnClient(client -> client.level.dimension().identifier().toString());
             long chunkA = context.computeOnClient(client -> client.player.chunkPosition().toLong());
 
-            // Session 1 (NEW): capture and save area A, so its region files exist on disk.
             CaptureDriver.capture(context,
                     new DownloadTarget("wdl-overlay-resume", "wdl-overlay-resume", DownloadMode.NEW),
                     WdlConfig.DEFAULTS, 20);
@@ -38,8 +34,6 @@ public class WdlCoverageOverlayResumeTest implements FabricClientGameTest {
             long chunkB = context.computeOnClient(client -> client.player.chunkPosition().toLong());
             Check.that(chunkA != chunkB, "the tp did not move the player to a new chunk");
 
-            // Session 2 (RESUME), with the overlay reported active: the first capture tick's flush submits the seed,
-            // which reads area A's region headers off disk on the writer thread.
             CaptureDriver driver = CaptureDriver.start(context,
                     new DownloadTarget("wdl-overlay-resume", "wdl-overlay-resume", DownloadMode.RESUME),
                     WdlConfig.DEFAULTS, true);
@@ -53,9 +47,6 @@ public class WdlCoverageOverlayResumeTest implements FabricClientGameTest {
             Check.that(ContainerDriver.contains(overlay, chunkB),
                     "resume overlay lacks the live-captured chunk B " + chunkB);
 
-            // A resumed prior draws in the covered hue, never suspect: the prior session's path was not observed,
-            // so suspect would be a guess. The seed feeds the covered index too, so chunk A is covered; chunk B is
-            // covered by this session's live coverage disc around the player.
             context.waitFor(client -> ContainerDriver.contains(driver.overlayCoveredChunks(dimension), chunkA));
             long[] covered = driver.overlayCoveredChunks(dimension);
             Check.that(ContainerDriver.contains(covered, chunkA),

@@ -1,11 +1,6 @@
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.language.jvm.tasks.ProcessResources
 
-// Consumer side of the source-merge of :common into a loader subproject (MultiLoader-Template
-// "commonJava"/"commonResources" pattern). These resolvable configurations pull common's SOURCE (not a
-// compiled jar) and feed it to compileJava, so common's classes compile into the loader jar alongside the
-// loader's own: Loom remaps them in :fabric, while :neoforge runs Mojmap-named and needs no remap. The
-// producer side lives in :common.
 plugins {
     java
 }
@@ -32,15 +27,11 @@ tasks.named<JavaCompile>("compileJava") {
 tasks.named<ProcessResources>("processResources") {
     dependsOn(commonResources)
     from(commonResources)
-    exclude("**/.gitkeep")   // scaffolding placeholder; never package it
+    exclude("**/.gitkeep")
 }
 
-// Ship the license inside the artifact. GPL-3.0 section 4, which LGPL-3.0 section 0 incorporates, asks that
-// every recipient be given a copy of the License along with the Program, and a mod jar travels on its own
-// far from any listing page: modpacks, mirrors, a copied mods/ folder. This plugin is applied by every loader
-// subproject that produces a shipped jar, and Fabric's remapJar derives from jar, so configuring jar here
-// reaches each of those artifacts. Captured into a val so no Project reference survives into task execution
-// (configuration cache).
+// GPL-3.0 section 4, which LGPL-3.0 incorporates, asks that every recipient be given a copy of the License along with
+// the Program, and a mod jar travels on its own far from any listing page: modpacks, mirrors, a copied mods/ folder.
 val licenseTexts = listOf(rootProject.file("LICENSE"), rootProject.file("GPL-3.0.txt"))
 tasks.named<Jar>("jar") {
     from(licenseTexts) { into("META-INF") }

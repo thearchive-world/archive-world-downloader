@@ -65,48 +65,28 @@ import world.thearchive.wdl.core.GameRuleSchema;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
-/**
- * 1.21.11 {@code level.dat} writer for the selected generator: the default superflat VOID (all air, built from the
- * client's synced {@code BIOME} + {@code DIMENSION_TYPE} registries), or the vanilla DEFAULT/FLAT presets (built from
- * the reconstructed worldgen registries in {@link VanillaWorldgenRegistries}). The captured chunks always supply the
- * real terrain; the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the
- * server's actual land (the server's seed is not recoverable from a client).
- */
 public final class LevelDataWriterImpl implements LevelDataWriter {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final String LEVEL_NAME = "Archive World Downloader";
 
-    /** Server seed is unknown (not transmitted); irrelevant for void gen (no terrain is generated). */
     private static final long PLACEHOLDER_SEED = 0L;
 
-    /** 24000-tick day; 6000 is noon. */
     private static final long NOON = 6000L;
 
-    /**
-     * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
-     * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Fire is the integer fire_spread_radius_around_player=0 here; the rest are booleans. The user's gamerule.*
-     * overrides, keyed by band id, are validated and applied on top of this (see {@link WorldOutputConfig}).
-     */
     private static final List<CuratedSpec> CURATED_GAME_RULES = buildCuratedGameRules();
 
-    /** One curated rule: its stable WDL name, the running band's id for it, and the curated raw value. */
     private record CuratedSpec(String wdlId, String bandId, String curatedValue) {}
 
-    // SpecialWorldProperty is vanilla-deprecated, but the only public PrimaryLevelData ctor still
-    // requires it; we take it from the baked dimensions (FLAT, for this superflat void world).
     @SuppressWarnings("deprecation")
     @Override
     public LevelData buildLevelData(RegistryAccess clientRegistries, WorldOutputConfig worldOutput,
             @Nullable String worldName) {
         WorldType worldType = worldOutput.worldType();
-        // A real generator needs the full vanilla worldgen registries, which a multiplayer client is never sent;
-        // the void generator only needs the client's synced biome/dimension-type registries, so it stays on them
-        // and its output is unchanged. The dimensions and the encode context must share one registry set (their
-        // generator holders must be owned by the registries the encode resolves against), so both derive here.
-        // WorldgenWarmup warms off-thread on the same predicate, so widening this condition alone puts a
-        // reconstruction on the render thread.
+        // A real generator needs the full vanilla worldgen registries, which a multiplayer client is never sent. The
+        // dimensions and the encode context must share one registry set (their generator holders must be owned by the
+        // registries the encode resolves against), so both derive here. WorldgenWarmup warms off-thread on the same
+        // predicate, so widening this condition alone puts a reconstruction on the render thread.
         RegistryAccess generatorRegistries = worldType.generatesTerrain()
                 ? VanillaWorldgenRegistries.get()
                 : clientRegistries;
@@ -119,16 +99,15 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         GameRuleResolution gameRuleResolution = applyGameRules(gameRules, worldOutput);
 
         String levelName = worldName == null || worldName.isEmpty() ? LEVEL_NAME : worldName;
-        // Cheats and game mode are the world-defaults master's to impose; with it off the world opens vanilla,
-        // so cheats fall back to off here. Noon is a fixed invariant, applied unconditionally below.
+        // Cheats are the world-defaults master's to impose; with it off cheats fall back to off here.
         boolean allowCommands = worldOutput.overrideWorldDefaults() && worldOutput.allowCommands();
         LevelSettings settings = new LevelSettings(
                 levelName, GameType.SURVIVAL, false, Difficulty.NORMAL, allowCommands,
                 gameRules, WorldDataConfiguration.DEFAULT);
         WorldOptions worldOptions = worldOptions(worldType, worldOutput);
 
-        // Fail loud: PrimaryLevelData.setTagData silently omits WorldGenSettings if its encode errors,
-        // yielding an unopenable world. Pre-encode and reject any error/partial result first.
+        // Fail loud: PrimaryLevelData.setTagData silently omits or partially writes WorldGenSettings if its encode
+        // errors, yielding an unopenable world.
         DynamicOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
         DataResult<Tag> worldGen = WorldGenSettings.encode(ops, worldOptions, registries);
         if (worldGen.error().isPresent()) {
@@ -141,8 +120,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
                 settings, worldOptions, dimensions.specialWorldProperty(), dimensions.lifecycle());
         // Vanilla treats a level.dat whose initialized flag is false as new and replaces the spawn on first open.
         worldData.setInitialized(true);
-        // Downloaded worlds always open at noon, a fixed world-open invariant. A fresh PrimaryLevelData already
-        // opens clear (raining, thundering, and their timers default off), so weather needs no write here.
         worldData.setDayTime(NOON);
         return new LevelData(worldData, registries, gameRuleResolution);
     }
@@ -152,11 +129,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         VanillaWorldgenRegistries.get();
     }
 
-    /**
-     * Resolve the curated set with the user's overrides against this band's live rules, apply the effective rules to
-     * {@code gameRules} via the offline {@code set(.., null)} write, and log the dropped/unknown diagnostics. Returns
-     * the resolution.
-     */
     private static GameRuleResolution applyGameRules(GameRules gameRules, WorldOutputConfig worldOutput) {
         Map<String, GameRule<?>> available = availableRulesById(gameRules);
         GameRuleSchema schema = new GameRuleSchema() {
@@ -187,7 +159,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return resolution;
     }
 
-    /** The curated set keyed by the band's own rule id, the shape {@link WorldOutputConfig#resolveGameRules} merges. */
     private static Map<String, String> curatedByBandId() {
         Map<String, String> byBandId = new LinkedHashMap<>();
         for (CuratedSpec spec : CURATED_GAME_RULES) {
@@ -196,12 +167,10 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return byBandId;
     }
 
-    /** Set one validated rule on the offline GameRules (no server, so the change-callback is skipped). */
     private static <T> void setRule(GameRules gameRules, GameRule<T> rule, String rawValue) {
         rule.deserialize(rawValue).result().ifPresent(value -> gameRules.set(rule, value, null));
     }
 
-    /** Index the rules available at this band (feature-filtered) by their short id, for lookup and validation. */
     private static Map<String, GameRule<?>> availableRulesById(GameRules gameRules) {
         Map<String, GameRule<?>> byId = new HashMap<>();
         gameRules.availableRules().forEach(rule -> byId.put(rule.id(), rule));
@@ -215,7 +184,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         for (CuratedSpec spec : CURATED_GAME_RULES) {
             GameRule<?> rule = byId.get(spec.bandId());
             if (rule == null) {
-                continue; // a curated rule with no rule at this band is omitted, and the menu skips its order slot
+                continue;
             }
             if (rule.valueClass() == Boolean.class) {
                 rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(), "true", "false"));
@@ -227,13 +196,10 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    /** The rule's band default rendered to its raw string, for an integer rule's enabled (on) toggle position. */
     private static <T> String defaultRuleValue(GameRule<T> rule) {
         return rule.serialize(rule.defaultValue());
     }
 
-    // At this band the WDL name and the band's rule id coincide; a band whose vanilla ids differ maps them here, and
-    // drops a WDL rule with no band equivalent by omitting its spec.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "spawn_mobs", "false"));
@@ -252,8 +218,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     @Override
     public void save(LevelStorageSource.LevelStorageAccess access, LevelData data,
             @Nullable CapturedPlayer player) {
-        // Do not port to 26.x by picking the nearest saveDataTag overload: no overload there carries a player
-        // compound, so that band must write players/data/<uuid>.dat itself.
         if (player == null) {
             // level.dat's "Player" is the only copy of the player record at this band and this write carries
             // none, so writing unconditionally destroys a prior download's record, silently.
@@ -262,12 +226,10 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
             }
             return;
         }
-        // buildLevelData always produces a PrimaryLevelData; the setters flip the fields createTag reads.
         PrimaryLevelData levelData = (PrimaryLevelData) data.worldData();
         levelData.setGameType(player.gameType());
         levelData.setSpawn(RespawnData.of(player.dimension(), player.spawnPos(), player.yaw(), player.pitch()));
         levelData.setDifficulty(player.difficulty());
-        // The 3-argument saveDataTag routes the captured tag into createTag's "Player" slot.
         access.saveDataTag(data.registries(), data.worldData(), player.playerTag());
     }
 
@@ -286,12 +248,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         }
     }
 
-    /**
-     * The baked dimensions for the chosen generator: the vanilla NORMAL/FLAT presets (real terrain, built from the same
-     * worldgen registries the encode resolves against) or the hardcoded superflat void. The captured chunks always
-     * supply the real terrain; the generator only governs the un-captured surroundings, which for DEFAULT/FLAT are
-     * freshly generated and not the server's actual land (the server seed is not recoverable).
-     */
     private static WorldDimensions.Complete bakedDimensions(WorldType worldType, RegistryAccess registries) {
         return switch (worldType) {
             case DEFAULT -> WorldPresets.createNormalWorldDimensions(registries).bake(emptyLevelStems());
@@ -302,7 +258,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
     private static WorldOptions worldOptions(WorldType worldType, WorldOutputConfig worldOutput) {
         if (worldType == WorldType.VOID) {
-            return new WorldOptions(PLACEHOLDER_SEED, false, false); // no structures for void
+            return new WorldOptions(PLACEHOLDER_SEED, false, false);
         }
         return new WorldOptions(worldOutput.worldSeed(), worldOutput.generateFeatures(), false);
     }
@@ -311,7 +267,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable());
     }
 
-    /** The three vanilla dimensions, each a void superflat generator, baked into a LEVEL_STEM set. */
     private static WorldDimensions.Complete voidDimensions(RegistryAccess registries) {
         Registry<Biome> biomes = registries.lookupOrThrow(Registries.BIOME);
         ResourceKey<Biome> biomeKey = biomes.containsKey(Biomes.THE_VOID) ? Biomes.THE_VOID : Biomes.PLAINS;
@@ -319,7 +274,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
 
         FlatLevelGeneratorSettings flat = new FlatLevelGeneratorSettings(Optional.of(HolderSet.<StructureSet>empty()),
                 voidBiome, List.of());
-        flat.updateLayers(); // no layers -> all air (voidSettings)
+        flat.updateLayers();
 
         Registry<DimensionType> dimensionTypes = registries.lookupOrThrow(Registries.DIMENSION_TYPE);
         Map<ResourceKey<LevelStem>, LevelStem> stems = Map.of(

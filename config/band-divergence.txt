@@ -29,7 +29,9 @@ common/src/main/java/world/thearchive/wdl/Wdl.java
 common/src/main/java/world/thearchive/wdl/ResumeFlow.java
 # 1.21.11 paints through GuiGraphics with the renderWidget and renderContent overrides and opens the resume confirms
 # through Minecraft.setScreen; 26.1 replaced GuiGraphics with GuiGraphicsExtractor and renamed the overrides
-# extractWidgetRenderState and extractContent, and 26.2 moved setScreen into Minecraft.gui.
+# extractWidgetRenderState and extractContent, and 26.2 moved setScreen into Minecraft.gui. 1.21.11's
+# EditBox.moveCursorTo runs the responder (26.1 dropped the call), so the selected-row guard's note names the caret
+# move.
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 # 1.21.11 paints through GuiGraphics (render, renderContent), opens its confirm screens through Minecraft.setScreen
 # and tests a tooltip key with I18n.exists; 26.1 replaced GuiGraphics with GuiGraphicsExtractor (extractRenderState,
@@ -45,7 +47,10 @@ common/src/main/java/world/thearchive/wdl/platform/AbstractPlatformBridge.java
 
 # 1.21.11's ChunkPos is a class: built with new ChunkPos(BlockPos) or new ChunkPos(long), keyed with toLong and read
 # through the x and z fields; 26.1 made it a record (containing, unpack, pack, x() and z()). And the game-rule
-# resolution accessor is gameRules on 1.21.11's LevelData record, gameRuleResolution on 26.x's.
+# resolution accessor is gameRules on 1.21.11's LevelData record, gameRuleResolution on 26.x's. And through 1.21.11 the
+# map id counter is data/idcounts.dat and a map data/map_<id>.dat; 26.1 moved them to data/minecraft/maps/last_id.dat
+# and data/minecraft/maps/<id>.dat. And through 1.21.11 the player record is in level.dat; 26.1 moved it to
+# players/data/<uuid>.dat.
 common/src/main/java/world/thearchive/wdl/adapter/LiveCaptureSession.java
 # 1.21.11's ChunkPos is a class, so a chunk is built with new ChunkPos(BlockPos); 26.1 made it a record with
 # ChunkPos.containing.
@@ -81,21 +86,21 @@ common/src/main/java/world/thearchive/wdl/adapter/OutlineRenderContext.java
 # 26.2 removed MultiBufferSource (the draw takes the collector's Pose and VertexConsumer) and renamed the accessor
 # mainCamera.
 common/src/main/java/world/thearchive/wdl/client/WdlOutlineRenderer.java
-# 1.21.11 stashes the frustum on fabric-api 0.141.4's WorldRenderEvents.END_EXTRACTION and draws on
-# BEFORE_DEBUG_RENDER from the context's consumers; fabric-api for 26.1 renamed the events LevelRenderEvents and
-# dropped the frustum, and 26.2 removed MultiBufferSource, so 26.2 submits the outline on COLLECT_SUBMITS.
+# 1.21.11 stashes the frustum on fabric-api's WorldRenderEvents.END_EXTRACTION and draws on BEFORE_DEBUG_RENDER from the
+# context's consumers; fabric-api for 26.1 renamed the events LevelRenderEvents and dropped the frustum, and 26.2
+# removed MultiBufferSource, so 26.2 submits the outline on COLLECT_SUBMITS.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricOutlineRegistrar.java
 # 1.21.11 draws on RenderLevelStageEvent.AfterTranslucentBlocks into the shared render buffers and flushes the lines
 # batch itself; 26.2 removed MultiBufferSource and Minecraft.renderBuffers, so it records the outline on
 # SubmitCustomGeometryEvent through the submit-node collector.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgeOutlineRegistrar.java
 
-# 1.21.11 registers its key through fabric-api 0.141.4's KeyBindingHelper.registerKeyBinding; fabric-api for 26.1
-# renamed it KeyMappingHelper.registerKeyMapping.
+# 1.21.11 registers its key through fabric-api's KeyBindingHelper.registerKeyBinding; fabric-api for 26.1 renamed it
+# KeyMappingHelper.registerKeyMapping.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
-# 1.21.11 registers its key through fabric-api 0.141.4's KeyBindingHelper.registerKeyBinding, reads the pause-menu
-# widgets through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api for 26.1
-# renamed them KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
+# 1.21.11 registers its key through fabric-api's KeyBindingHelper.registerKeyBinding, reads the pause-menu widgets
+# through Screens.getButtons and builds the command tree from ClientCommandManager; fabric-api for 26.1 renamed them
+# KeyMappingHelper.registerKeyMapping, Screens.getWidgets and ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 # 1.21.11 is obfuscated and Loom remaps it to Mojang names, so the access widener names the named namespace; 26.1
 # ships unobfuscated, so the 26.x widener names official.
@@ -210,29 +215,37 @@ common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
 # the 26.x bootstrap joins the future and runs the DataComponentInitializers.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# 1.21.11's fabric-api 0.141.4 client gametest API waits for chunks through TestServerConnection.getClientWorld, a
-# TestClientWorldContext the fixture hands out as clientWorld; fabric-api 0.156.0 for 26.2 put waitForChunksDownload
-# on the connection itself and types the dedicated one TestDedicatedServerConnection.
+# 1.21.11's fabric-api client gametest API waits for chunks through TestServerConnection.getClientWorld, a
+# TestClientWorldContext the fixture hands out as clientWorld; fabric-api 0.156.0 for 26.2 put waitForChunksDownload on
+# the connection itself and types the dedicated one TestDedicatedServerConnection.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/MultiplayerFixture.java
-# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext;
-# fabric-api 0.156.0 for 26.2 put the wait on the connection and the fixture exposes it directly.
+# 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext; fabric-api 0.156.0
+# for 26.2 put the wait on the connection and the fixture exposes it directly. And through 1.21.11 the map id counter is
+# data/idcounts.dat; 26.1 moved it to data/minecraft/maps/last_id.dat.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlFramedMapRevisitUnionTest.java
-# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext;
-# fabric-api 0.156.0 for 26.2 put the wait on the connection and the fixture exposes it directly.
+# Through 1.21.11 the map id counter is data/idcounts.dat; 26.1 moved it to data/minecraft/maps/last_id.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlFilledMapCaptureTest.java
+# 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext; fabric-api 0.156.0
+# for 26.2 put the wait on the connection and the fixture exposes it directly.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapSchemeSignalBeginTest.java
-# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext;
-# fabric-api 0.156.0 for 26.2 put the wait on the connection and the fixture exposes it directly.
+# 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext; fabric-api 0.156.0
+# for 26.2 put the wait on the connection and the fixture exposes it directly. And through 1.21.11 a map is
+# data/map_<id>.dat; 26.1 moved it to data/minecraft/maps/<id>.dat.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlMapStreamCrashStateTest.java
-# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext;
-# fabric-api 0.156.0 for 26.2 put the wait on the connection and the fixture exposes it directly.
+# Through 1.21.11 a map is data/map_<id>.dat; 26.1 moved it to data/minecraft/maps/<id>.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOffModeMapIdCaptureTest.java
+# Through 1.21.11 a map is data/map_<id>.dat; 26.1 moved it to data/minecraft/maps/<id>.dat.
+fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlPlayerMapFinishStreamTest.java
+# 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext; fabric-api 0.156.0
+# for 26.2 put the wait on the connection and the fixture exposes it directly.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlResumeCaptureTest.java
-# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext, and keys
-# a chunk with ChunkPos.toLong; fabric-api 0.156.0 for 26.2 put the wait on the connection, and 26.1 made ChunkPos a
-# record keyed with pack().
+# 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext, and keys a chunk with
+# ChunkPos.toLong; fabric-api 0.156.0 for 26.2 put the wait on the connection, and 26.1 made ChunkPos a record keyed
+# with pack().
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlCoverageOverlayResumeTest.java
-# 1.21.11 waits for chunks through the fixture's clientWorld, the fabric-api 0.141.4 TestClientWorldContext, and reads
-# the captured player back from level.dat's Player slot; fabric-api 0.156.0 for 26.2 put the wait on the connection,
-# and 26.1 moved the player to players/data/<uuid>.dat.
+# 1.21.11 waits for chunks through the fixture's clientWorld, fabric-api's TestClientWorldContext, and reads the
+# captured player back from level.dat's Player slot; fabric-api 0.156.0 for 26.2 put the wait on the connection, and
+# 26.1 moved the player to players/data/<uuid>.dat.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlDisconnectFlushTest.java
 
 # 1.21.11 reads the current screen from Minecraft.screen; 26.2 moved it to Gui.screen under Minecraft.gui.
@@ -348,15 +361,12 @@ fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlWorldOutputConf
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/ToastReadback.java
 # 1.21.11 reads the camera through GameRenderer.getMainCamera; 26.2 renamed the accessor mainCamera.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/CaptureDriver.java
-# 1.21.11 draws the rim on fabric-api 0.141.4's WorldRenderEvents.BEFORE_DEBUG_RENDER from the context's consumers and
-# reads the camera through GameRenderer.getMainCamera; fabric-api for 26.1 renamed the events LevelRenderEvents, and
-# 26.2 removed MultiBufferSource (the rim is submitted on COLLECT_SUBMITS) and renamed the accessor mainCamera.
+# 1.21.11 draws the rim on fabric-api's WorldRenderEvents.BEFORE_DEBUG_RENDER from the context's consumers and reads the
+# camera through GameRenderer.getMainCamera; fabric-api for 26.1 renamed the events LevelRenderEvents, and 26.2 removed
+# MultiBufferSource (the rim is submitted on COLLECT_SUBMITS) and renamed the accessor mainCamera.
 fabric/src/gametest/java/world/thearchive/wdl/fabric/gametest/WdlOutlineRenderSmokeTest.java
 
 # 1.21.11 is obfuscated, so its Fabric build applies fabric-loom with layered Mojang plus Parchment mappings, declares
 # the mod dependencies through the mod* configurations and ships remapJar; 26.1 ships unobfuscated, so the 26.x build
 # applies the no-remap net.fabricmc.fabric-loom, plain configurations and the plain jar.
 fabric/build.gradle.kts
-# 1.21.11 carries an extra comment paragraph on the checkCoreJava8 --release 8 floor above the paragraph dev has; dev
-# has only that one.
-common/build.gradle.kts

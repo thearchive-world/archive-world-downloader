@@ -14,7 +14,6 @@ import net.minecraft.resources.Identifier;
 
 import world.thearchive.wdl.adapter.RenderSurface;
 
-/** The {@link RenderSurface} plug for this branch, wrapping {@link GuiGraphics}. */
 public final class RenderSurfaceImpl implements RenderSurface {
     private final GuiGraphics graphics;
 

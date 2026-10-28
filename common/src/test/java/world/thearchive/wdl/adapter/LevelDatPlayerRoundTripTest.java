@@ -32,21 +32,12 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the player-data level.dat apply: {@link LevelDataWriter#save} with a {@link CapturedPlayer}
- * routes the captured tag into the {@code "Player"} slot, flips {@code GameType}, sets the world {@code spawn} ({@code
- * RespawnData}) to the capture dimension + position, marks the level data {@code initialized} so vanilla keeps that
- * spawn on first open, and writes the captured {@code Difficulty}; with a {@code null} {@code CapturedPlayer} the
- * output is today's void world (no {@code Player}, default spawn, {@code initialized}, {@code SURVIVAL}). Driven
- * through the real production {@code LevelStorageAccess.saveDataTag}, so the headless suite guards the band-specific
- * 3-argument form.
- */
 class LevelDatPlayerRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
     private static CompoundTag capturedPlayerTag() {
         CompoundTag tag = new CompoundTag();
-        tag.putString("wdlMarker", "captured-player"); // a sentinel proving this exact tag lands in the Player slot
+        tag.putString("wdlMarker", "captured-player");
         tag.put("Inventory", new ListTag());
         return tag;
     }
@@ -124,7 +115,7 @@ class LevelDatPlayerRoundTripTest {
             throws IOException {
         CompoundTag playerTag = capturedPlayerTag();
         UUID boat = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
-        CompoundTag boatTag = EntityFixtures.entityTag("minecraft:chest_boat"); // the id loadEntityRecursive reads
+        CompoundTag boatTag = EntityFixtures.entityTag("minecraft:chest_boat");
         PlayerTag.setRootVehicle(playerTag, boat, boatTag);
         CapturedPlayer captured = new CapturedPlayer(playerTag, BlockPos.ZERO, 0.0F, 0.0F,
                 Level.OVERWORLD, GameType.CREATIVE, Difficulty.NORMAL);

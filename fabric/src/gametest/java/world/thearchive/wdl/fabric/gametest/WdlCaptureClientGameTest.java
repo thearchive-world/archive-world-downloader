@@ -18,12 +18,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * The one-block round-trip smoke: place a distinctive block on the server, drive a real capture to a save on disk, and
- * assert the block is in the captured chunk's palette. It is the driver spine the rest of the coverage matrix grows on,
- * proving the live front (a real {@code ClientLevel} snapshot through the capture loop and writer) reaches an on-disk
- * save.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlCaptureClientGameTest implements FabricClientGameTest {
     @Override

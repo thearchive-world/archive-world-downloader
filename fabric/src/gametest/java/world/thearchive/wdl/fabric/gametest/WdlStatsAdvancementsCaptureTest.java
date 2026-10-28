@@ -16,11 +16,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Stats and advancements axis: grant an advancement, drive a real capture, and assert both JSON surfaces reach disk
- * with real values. Proves the one thing headless tests cannot: the async stats request is genuinely answered and the
- * server's values land on disk.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlStatsAdvancementsCaptureTest implements FabricClientGameTest {
     private static final String GRANTED = "minecraft:story/root";
@@ -32,8 +27,7 @@ public class WdlStatsAdvancementsCaptureTest implements FabricClientGameTest {
             server.runCommand("advancement grant @a only " + GRANTED);
             UUID uuid = context.computeOnClient(client -> client.player.getUUID());
 
-            // Handle form: the first driver.tick() pumps the controller, which sends REQUEST_STATS (start() does
-            // not pump). Then wait for the async reply via the public StatsCounter getter (no isEmpty() exists).
+            // The first driver.tick() pumps the controller, which sends REQUEST_STATS (start() does not pump).
             CaptureDriver driver = CaptureDriver.start(context,
                     new DownloadTarget("wdl-progress", "wdl-progress", DownloadMode.NEW), WdlConfig.DEFAULTS);
             driver.tick(1);
