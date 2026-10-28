@@ -12,13 +12,6 @@ import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.adapter.impl.RimRendererImpl;
 import world.thearchive.wdl.client.WdlOutlineRenderer;
 
-/**
- * The Fabric half of the outline render seam. It stashes the live view frustum on the public pre-pass extraction event
- * and draws on the post-terrain debug-render event, both mixin-free, handing the band-agnostic
- * {@link WdlOutlineRenderer} a render context and the band {@link RimRenderer} it constructs. The frustum is a
- * per-frame stash because the draw event does not carry it; a missing stash (the first frame, or a frame with no
- * extraction) skips the draw rather than dereferencing null.
- */
 final class FabricOutlineRegistrar {
     private final RimRenderer rimRenderer = new RimRendererImpl();
     private @Nullable Frustum stashedFrustum;

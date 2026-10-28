@@ -30,18 +30,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for lectern-book capture: the {@link LecternSink} 1.21.11 path (captureBook -> merge) plus
- * vanilla's own {@code ItemStack.CODEC} read-back (the exact form {@code LecternBlockEntity.loadAdditional} uses) is a
- * self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity tag under
- * {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field
- * clobbered. Runs for both a signed <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern
- * contents).
- *
- * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
- * neither a live menu nor a {@code Level} is needed. The one client-coupled step (lifting the book from the live open
- * menu's slot 0) is not exercised headless, exactly as for containers.
- */
 class LecternSinkRoundTripTest {
     private static RegistryAccess registries;
     private final LecternSink sink = new LecternSinkImpl();
@@ -51,7 +39,6 @@ class LecternSinkRoundTripTest {
         registries = TestRegistries.frozen();
     }
 
-    /** A captured client lectern BE tag carrying a real non-Book field, to assert no clobber. */
     private static CompoundTag lecternTag(int x, int y, int z) {
         return namedBlockEntity("minecraft:lectern", x, y, z, "keep-me");
     }
@@ -75,7 +62,7 @@ class LecternSinkRoundTripTest {
 
     private static ItemStack readBackBook(CompoundTag merged) {
         ValueInput in = TagValueInput.create(ProblemReporter.DISCARDING, registries, merged);
-        Optional<ItemStack> back = in.read("Book", ItemStack.CODEC); // vanilla loadAdditional's exact read
+        Optional<ItemStack> back = in.read("Book", ItemStack.CODEC);
         assertTrue(back.isPresent(), "the merged Book must decode via vanilla ItemStack.CODEC");
         return back.get();
     }
@@ -94,7 +81,6 @@ class LecternSinkRoundTripTest {
         CompoundTag holder = sink.captureBook(writtenBook(), 1, registries);
         CompoundTag merged = sink.merge(lecternTag(10, 64, -7), holder);
 
-        // No field clobber: id / pos / unrelated fields survive.
         assertEquals("minecraft:lectern", merged.getStringOr("id", ""));
         assertEquals(10, merged.getIntOr("x", 0));
         assertEquals(64, merged.getIntOr("y", 0));

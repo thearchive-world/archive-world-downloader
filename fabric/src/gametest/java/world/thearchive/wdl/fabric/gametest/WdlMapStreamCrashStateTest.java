@@ -21,22 +21,11 @@ import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.core.browse.DownloadFolders;
 import world.thearchive.wdl.core.report.DownloadReportStore;
 
-/**
- * Streamed-map crash durability: a captured map's {@code data/map_<id>.dat} lands on disk during capture, not at
- * finalize, so a crashed session keeps the maps it already saw. The run drives a remap-on capture, forces the framed
- * map's chunk to flush by roaming out of the keep-hot window (which captures the frame entity and streams its map),
- * then asserts the mid-capture on-disk state a crash at that point would leave: the map file present under
- * {@code data/} and the pending crash sentinel marking the folder resumable. A second RESUME session then proves the
- * streamed file survives the resume merge with the {@code idcounts} floor intact.
- *
- * <p>The interrupt is not injected: as in {@link WdlMapSchemeSignalBeginTest}, the mid-capture, pre-finalize on-disk
- * state is exactly the state a crash would leave behind.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlMapStreamCrashStateTest implements FabricClientGameTest {
-    /** The first map created on a fresh world: {@code getFreeMapId} issues 0 first, so the frame references it. */
+    /** The first map created on a fresh world: {@code getFreeMapId} issues 0 first. */
     private static final int RECEIVED_MAP_ID = 0;
-    /** Chunks to roam so the starting chunk leaves the keep-hot window (> 7) and the writer opens on its flush. */
+    /** Chunks to roam so the starting chunk leaves the keep-hot window (> 7). */
     private static final int ROAM_BLOCKS = 9 * 16;
 
     @Override
@@ -62,9 +51,6 @@ public class WdlMapStreamCrashStateTest implements FabricClientGameTest {
                     WdlConfig.DEFAULTS);
             run.tick(5);
 
-            // Force the first flush so the writer opens and the frame's chunk drains: the frame entity is
-            // captured on that flush, which streams its map. This is the mid-capture, pre-finalize state a
-            // crash would leave behind.
             roamTo(context, fixture, server, home.getX() + ROAM_BLOCKS, home);
 
             Path saveRoot = savesDirectory.resolve("wdl-map-stream-crash");
@@ -96,7 +82,6 @@ public class WdlMapStreamCrashStateTest implements FabricClientGameTest {
         }
     }
 
-    /** Teleport every player to {@code x} (keeping the home y/z), then wait for arrival and the chunk download. */
     private static void roamTo(ClientGameTestContext context, MultiplayerFixture fixture, TestServerContext server,
             int x, BlockPos home) {
         server.runCommand("tp @a " + x + " " + home.getY() + " " + home.getZ());

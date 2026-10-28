@@ -24,13 +24,6 @@ import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the resume recovered-coverage scan: {@link RecoveredScan} reads each on-disk chunk the writer
- * thread carries forward and collects the positions that were already captured in a prior session (a block container
- * with non-empty {@code "Items"}, a lectern with a {@code "Book"}, a jukebox with a {@code "RecordItem"}, or a beehive
- * with {@code "bees"}), so the outline marks them recovered rather than unsaved. An empty (re-walked, never re-opened)
- * container is not coverage, and a position is coverage only in the dimension it was carried forward in.
- */
 class RecoveredScanTest {
     private static final UUID CART_A = new UUID(0x1111_1111_1111_1111L, 0x2222_2222_2222_2222L);
     private static final UUID CART_B = new UUID(0x3333_3333_3333_3333L, 0x4444_4444_4444_4444L);
@@ -210,8 +203,6 @@ class RecoveredScanTest {
 
     @Test
     void recordsTheNestedPassengerContainerAsCoverage() {
-        // A chested mule pushed into a minecart saves nested under the minecart's Passengers, so the resume
-        // outline must mark it recovered from the nested node or it re-outlines and re-captures it empty.
         RecoveredScan scan = new RecoveredScan();
         scan.recordEntities(Level.OVERWORLD,
                 entityChunkWith(EntityFixtures.entityCarrying(emptyVehicle(CART_A), filledVehicle(CART_B))));

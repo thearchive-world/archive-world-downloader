@@ -16,25 +16,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Reads the client's live toasts back for the restore-flow gametests: the mod surfaces every restore refusal (occupant,
- * folder-missing, tainted, and the per-cause restore-blocked family) as a {@code SystemToast} whose body and title are
- * the only durable evidence of which refusal fired. No production seam exposes the dispatched copy, so this reflects
- * the queued and visible toast lists (their fields are private on the vanilla types) and renders each
- * {@code SystemToast}'s title and message lines back to plain text. Reflection is test-only and adds no shipped-jar
- * footprint; the gametest source set carries no portability constraint.
- *
- * <p>The refusal path dedupes on a shared toast id (one refusal on screen suppresses a second), so a test that asserts
- * several refusals in turn calls {@link #clear} between them: it empties both toast lists so the next refusal is
- * neither suppressed nor confused with the prior one.
- */
 final class ToastReadback {
     private ToastReadback() {}
 
-    /**
-     * The plain text (title then message lines) of the newest {@code SystemToast} the client holds, or null when none
-     * is present. Read on the client thread; the toast lists are not thread-safe.
-     */
     static @Nullable String latestText(Minecraft minecraft) {
         SystemToast toast = newestSystemToast(minecraft.getToastManager());
         if (toast == null) {

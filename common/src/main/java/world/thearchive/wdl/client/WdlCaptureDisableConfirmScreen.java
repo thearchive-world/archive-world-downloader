@@ -8,10 +8,8 @@ import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.network.chat.Component;
 
 /**
- * The confirm for turning a download-harming capture toggle off. Unlike a plain {@link ConfirmScreen} it focuses the
- * safe keep choice as the default and holds the dangerous disable choice inert for a moment, so the consequence-naming
- * prompt cannot be clicked through on reflex (vanilla's death-screen delay pattern). Esc, and a cancel, still land on
- * the safe outcome.
+ * Unlike a plain {@link ConfirmScreen} it focuses the safe keep choice as the default and holds the dangerous disable
+ * choice inert for a moment, so the consequence-naming prompt cannot be clicked through on reflex.
  */
 final class WdlCaptureDisableConfirmScreen extends ConfirmScreen {
     private static final int DANGER_DELAY_TICKS = 20;
