@@ -36,8 +36,8 @@ class ContainerCaptureTest {
         ContainerCapture.putBrewingState(holder, 123, 7);
         assertEquals((short) 123, holder.getShort("BrewTime"));
         assertEquals((byte) 7, holder.getByte("Fuel"));
-        // The coercing getShortOr/getByteOr above would pass on a swapped short/byte too, so pin the on-disk
-        // tag type directly: vanilla persists BrewTime as a short and Fuel as a byte, and the archive must match.
+        // The coercing getters above would pass on a swapped short/byte too, so pin the on-disk tag type directly:
+        // vanilla persists BrewTime as a short and Fuel as a byte, and the archive must match.
         assertInstanceOf(ShortTag.class, holder.get("BrewTime"), "BrewTime must be a short tag");
         assertInstanceOf(ByteTag.class, holder.get("Fuel"), "Fuel must be a byte tag");
     }
@@ -55,7 +55,7 @@ class ContainerCaptureTest {
         crafting.setItem(0, new ItemStack(Items.STICK, 2));
         crafting.setItem(4, new ItemStack(Items.DIAMOND, 1));
         SimpleContainer result = new SimpleContainer(1);
-        result.setItem(0, new ItemStack(Items.EMERALD, 64)); // the recipe preview, container index 0
+        result.setItem(0, new ItemStack(Items.EMERALD, 64));
 
         List<Slot> slots = new ArrayList<>();
         for (int i = 0; i < 9; i++) {
@@ -92,7 +92,7 @@ class ContainerCaptureTest {
         SimpleContainer crafting = new SimpleContainer(9);
         SimpleContainer other = new SimpleContainer(1);
         List<Slot> slots = new ArrayList<>();
-        slots.add(new Slot(other, 0, 0, 0)); // only a non-crafting slot backs the menu
+        slots.add(new Slot(other, 0, 0, 0));
         assertNull(ContainerCapture.selectCrafterInputs(slots, crafting));
     }
 }

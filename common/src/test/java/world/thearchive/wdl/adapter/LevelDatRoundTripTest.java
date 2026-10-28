@@ -32,11 +32,6 @@ import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * level.dat round-trip: from a client-like reg (BIOME + DIMENSION_TYPE, NO LEVEL_STEM, just what a multiplayer client
- * syncs), the writer produces a superflat VOID world whose Data tag, written to a real compressed level.dat and read
- * back, preserves seed, the three dimensions and DataVersion, with the dimensions being flat-void generators.
- */
 class LevelDatRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
@@ -73,7 +68,7 @@ class LevelDatRoundTripTest {
     @Test
     void buildsFromClientRegistryWithoutLevelStem() {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
-        // Precondition mirrors a real multiplayer client: dimension types + biomes synced, no LEVEL_STEM.
+        // A real multiplayer client is sent dimension types and biomes but no dimension generators.
         assertTrue(registries.lookup(Registries.LEVEL_STEM).isEmpty(),
                 "precondition: client-like reg has no LEVEL_STEM");
         assertDoesNotThrow(() -> writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null),
@@ -85,9 +80,6 @@ class LevelDatRoundTripTest {
         RegistryAccess.Frozen registries = TestRegistries.frozen();
         LevelDataWriter.LevelData built = writer.buildLevelData(registries, WorldOutputConfig.DEFAULTS, null);
 
-        // Drive the REAL production save (LevelStorageAccess.saveDataTag) rather than a hand-rolled NbtIo write,
-        // so the headless suite guards the band-specific saveDataTag call inside LevelDataWriter.save()
-        // (that call drops its RegistryAccess argument at 26.1.2).
         LevelStorageSource source = LevelStorageSource.createDefault(saves);
         try (LevelStorageSource.LevelStorageAccess access = source.createAccess("wdltest")) {
             writer.save(access, built, null);

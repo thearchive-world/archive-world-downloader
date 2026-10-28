@@ -29,16 +29,16 @@
 # method reference directly.
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# At Fabric API 0.97.3+1.20.4 the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the
-# peek key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API for 26.2 registers a HUD
-# element through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
+# On 1.20.4's Fabric API the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the peek
+# key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API registers a HUD element
+# through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
 # (keymapping.v1).
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# At Fabric API 0.97.3+1.20.4 the platform bridge reads the pause-menu widget list through Screens.getButtons,
-# registers the key through KeyBindingHelper.registerKeyBinding and builds the client command tree through
-# ClientCommandManager (command.v2), where dev's Fabric API for 26.2 names them Screens.getWidgets,
-# KeyMappingHelper.registerKeyMapping and ClientCommands.
+# On 1.20.4's Fabric API the platform bridge reads the pause-menu widget list through Screens.getButtons, registers the
+# key through KeyBindingHelper.registerKeyBinding and builds the client command tree through ClientCommandManager
+# (command.v2), where dev's Fabric API names them Screens.getWidgets, KeyMappingHelper.registerKeyMapping and
+# ClientCommands.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -156,9 +156,8 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 # explicit tag, and applySaddleItem takes no registries argument.
 common/src/test/java/world/thearchive/wdl/adapter/impl/SaddleCaptureTest.java
 
-# Added. Below 1.20.5 a horse's armor and a llama's carpet are not synced equipment: the client holds the real armor
-# stack, so a horse's ArmorItem is copied byte for byte, while a llama's DecorItem is a plain carpet built from its
-# synced dye color alone.
+# Added. Here the client holds the real armor stack, so a horse's ArmorItem is copied byte for byte, while a llama's
+# DecorItem is a plain carpet built from its synced dye color alone.
 common/src/test/java/world/thearchive/wdl/adapter/impl/MountArmorCaptureTest.java
 
 # Below the 1.21 update the HUD render callback carries a float partial-tick rather than a DeltaTracker, so the
@@ -173,9 +172,11 @@ common/src/main/java/world/thearchive/wdl/client/WdlHudOverlay.java
 # clicks on the right of a row.
 common/src/main/java/world/thearchive/wdl/client/WdlDownloadsScreen.java
 
-# The same getScrollbarPosition divergence reaches the settings list: below 1.20.5 the fixed width/2 + 124 assumes
-# the 220-wide default row, so with the settings list's wider row it lands inside each row and cuts through the
-# controls, so the list follows 1.20.5 and above and derives it from the row right edge.
+# The same getScrollbarPosition divergence reaches the settings list: below 1.20.5 the fixed width/2 + 124 assumes the
+# 220-wide default row, so with the settings list's wider row it lands inside each row and cuts through the controls, so
+# the list follows 1.20.5 and above and derives it from the row right edge. At 1.20.4 a Tooltip keeps its own hover
+# clock, so one rebuilt every frame never shows, and the Defaults note names the equality check that rebuilds it only
+# when the state flips.
 common/src/main/java/world/thearchive/wdl/client/WdlSettingsScreen.java
 
 # NeoForge 20.4 leaves the FML-module test tier off (FancyModLoader 2.0.x publishes no junit-fml), so this script
@@ -186,12 +187,11 @@ neoforge/build.gradle.kts
 # Below the 1.21 update ResourceLocation has no fromNamespaceAndPath factory, so the HUD-layer id is built with the
 # public ResourceLocation(String, String) constructor. NeoForge 20.4 registers the HUD through
 # RegisterGuiOverlaysEvent plus an IGuiOverlay (RegisterGuiLayersEvent is later), the config screen through
-# ConfigScreenHandler.ConfigScreenFactory (not IConfigScreenFactory), and @Mod has no dist element; the
-# client-only declaration lives in mods.toml's side = "CLIENT" dependency entries instead.
+# ConfigScreenHandler.ConfigScreenFactory (not IConfigScreenFactory), and @Mod has no dist element.
 neoforge/src/main/java/world/thearchive/wdl/neoforge/WdlNeoForge.java
 
 # Added. NeoForge 20.4 scans META-INF/mods.toml for the mod manifest; NeoForge 20.6 and above renames it to
-# META-INF/neoforge.mods.toml. The template content is unchanged, only the path.
+# META-INF/neoforge.mods.toml.
 neoforge/src/main/resources/META-INF/mods.toml
 
 # Deleted. NeoForge 20.4 scans META-INF/mods.toml for the mod manifest and has no neoforge.mods.toml; NeoForge 20.6
@@ -225,12 +225,11 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 # Provider, and ContainerHelper.loadAllItems/saveAllItems take no registries argument.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
 
-# Below the 1.21 update a captured jukebox carries the pre-JukeboxSongPlayer playing flag (IsPlaying) rather than
-# the ticks_since_song_started sidecar, so these merge fixtures and assertions use that key. Below 1.20.5 a beehive
-# block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and vanilla's
-# JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount alongside a present RecordItem, so the
-# jukebox fixture carries those too and the beehive fixture goes through the unchecked malformedChunkTagWith
-# instead of the fidelity-checked chunkTagWith.
+# Below the 1.21 update a captured jukebox carries the pre-JukeboxSongPlayer playing flag (IsPlaying) rather than the
+# ticks_since_song_started sidecar, so these merge fixtures and assertions use that key. Below 1.20.5 a beehive block
+# entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and vanilla's
+# JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount, so the jukebox fixture carries those too;
+# the beehive fixture goes through the unchecked malformedChunkTagWith instead of the fidelity-checked chunkTagWith.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
 
 # Below the 1.21 update a captured jukebox is marked playing via IsPlaying rather than the ticks_since_song_started
@@ -247,6 +246,10 @@ common/src/main/java/world/thearchive/wdl/adapter/AsyncSaveWriter.java
 # Below 1.20.5 there is no SimpleRegionStorage, so the merge-write reads and writes through the vanilla
 # IOWorker's loadAsync and store rather than read and write.
 common/src/main/java/world/thearchive/wdl/adapter/RegionChunkWriter.java
+
+# Below 1.20.5 item data reaches the client as NBT whose strings arrive through readUTF and so re-encode within its
+# limit, so a stashed holder's pack cannot fail and compact carries no note on a failed pack.
+common/src/main/java/world/thearchive/wdl/adapter/StashHolder.java
 
 # Below 1.20.5 there is no RegionStorageInfo; instead of supplying one per dimension, this seam opens the
 # vanilla IOWorker directly (openRegionStorage/openEntitiesStorage).
@@ -265,16 +268,18 @@ common/src/test/java/world/thearchive/wdl/adapter/BookshelfOccupancyFlushTest.ja
 # through WorldPaths rather than constructing one directly.
 common/src/test/java/world/thearchive/wdl/adapter/CarryForwardWiringTest.java
 
-# Below 1.20.5 there is no SimpleRegionStorage, so the writer and the entity read-back open the vanilla
-# IOWorker through WorldPaths. Below 1.20.5 a filled map's id is the raw int tag."map", not a components entry,
-# and DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form.
+# Below 1.20.5 there is no SimpleRegionStorage, so the writer and the entity read-back open the vanilla IOWorker through
+# WorldPaths. Below 1.20.5 a filled map's id is the raw int tag."map", not a components entry, and DataResult.getOrThrow
+# takes (boolean, Consumer<String>), not the no-argument form. Below 1.21.2 ChunkPos's class initializer reaches no
+# registry, so the test carries no note on keeping its ChunkPos fields out of static initialization.
 common/src/test/java/world/thearchive/wdl/adapter/EntityVehicleRelocationTest.java
 
 # Below 1.20.5 there is no SimpleRegionStorage, so the writer and the entity read-back open the vanilla IOWorker through
 # WorldPaths. Below 1.20.5 DataResult.getOrThrow takes (boolean, Consumer<String>), not the no-argument form. Below
 # 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from 1.21.5
 # they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr or
-# unwraps getList and getCompound with orElseThrow.
+# unwraps getList and getCompound with orElseThrow. Below 1.21.2 ChunkPos's class initializer reaches no registry, so
+# the test carries no note on keeping its ChunkPos out of static initialization.
 common/src/test/java/world/thearchive/wdl/adapter/LiveCaptureSessionResumedMountReleaseTest.java
 
 # Below 1.20.5 there is no SimpleRegionStorage, so the sweep is proven against the vanilla IOWorker (a
@@ -317,17 +322,12 @@ common/src/test/java/world/thearchive/wdl/adapter/LevelDatRoundTripTest.java
 # pre-1.21.5 accessor (getListOrEmpty is 1.21.5 and above).
 common/src/main/java/world/thearchive/wdl/adapter/EntityContainerMerge.java
 
-# Below 1.20.5 a horse's armor and a llama's decor are not synced equipment yet, so alongside the pre-1.21.5 saddle,
-# capture re-derives ArmorItem and DecorItem from the horse's synced armor variant or the llama's synced dye color
-# rather than reading an equipment map, and the carry-forward Javadoc documents both cuts.
-common/src/main/java/world/thearchive/wdl/adapter/EntityMerge.java
-
 # Below 1.20.5 a mount has no chest inventory of its own: the saddle slot, the armor slot and the chest are one
-# container AbstractChestedHorse writes from index 2 up, stamping each stack's own index as its Slot, and whose
-# read refuses any saved entry numbered below 2. So the chest lift numbers its holder from index 2 into that whole
-# inventory rather than from zero; the 0-based holder dev captures is the right one at 1.20.5 and above, where the
-# write is Slot = i - 1 counting up from 1 and the read puts j back at j + 1. Below 1.21.11 AbstractChestedHorse
-# sits in net.minecraft.world.entity.animal.horse rather than the .equine package that rename moved it to.
+# container AbstractChestedHorse writes from index 2 up, stamping each stack's own index as its Slot, and whose read
+# refuses any saved entry numbered below 2. So the chest lift numbers its holder from index 2 into that whole inventory
+# rather than from zero; the 0-based holder dev captures is the right one at 1.20.5 and above. Below 1.21.11
+# AbstractChestedHorse sits in net.minecraft.world.entity.animal.horse rather than the .equine package that rename moved
+# it to.
 common/src/main/java/world/thearchive/wdl/adapter/ContainerCapture.java
 
 # Below 1.20.5 an item is {id, Count, tag}; the walk recurses into a shulker's nested items via
@@ -354,10 +354,9 @@ common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
 # caller is stable across the cut.
 common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 
-# Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the
-# raw LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position (carried
-# by a pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and
-# tag.BlockEntityTag.FlowerPos, both scrubbed here.
+# Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the raw
+# LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position are
+# tag.BlockEntityTag.Bees[].EntityData.FlowerPos and tag.BlockEntityTag.FlowerPos, both scrubbed here.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
@@ -388,8 +387,9 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
 # takes no registries argument, and DataResult.getOrThrow takes (boolean, Consumer<String>).
 common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
 
-# Below 1.20.5 an item is {id, Count, tag}; the walk drives hand-built NBT keyed by tag.BlockEntityTag.Items (a
-# shulker) and tag.Items (a bundle) rather than the component keys, and there is no sulfur cube to recurse into.
+# Below 1.20.5 an item is {id, Count, tag} with no components map, so the test drives the walk with hand-built NBT keyed
+# by tag.BlockEntityTag.Items (a shulker) and tag.Items (a bundle) and drops the sulfur-cube case, since that walk has
+# no sulfur-cube branch.
 common/src/test/java/world/thearchive/wdl/adapter/ItemTreeWalkTest.java
 
 # Below 1.20.5 there is no WrittenBookContent component; a written book's title/author/generation/resolved and its
@@ -422,19 +422,18 @@ common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferCaptureTest.java
 # no CODEC, so the offers holder is built via MerchantOffers.createTag rather than encoding through RegistryOps.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantStashMergeTest.java
 
-# Added at 1.20.4, and needed by every band below 1.20.5. Pins the slot numbering a captured mount chest has to
-# carry: AbstractChestedHorse writes each chest stack under its index in the mount's whole inventory, counting up
-# from 2, and its read refuses any saved entry numbered below 2, so a 0-based holder loses its two lowest stacks
-# and lands every survivor two slots early with no log line and no loss-report row. The gate reloads the captured
-# holder through vanilla's own readAdditionalSaveData rather than counting what came back, because a count is
-# exactly what a whole-chest shift leaves untouched. Its two cases are the two chest widths a captured mount can
-# carry: getInventorySize is a flat 17 for a chested donkey or mule rather than anything read off
-# getInventoryColumns, while Llama overrides it with 2 + 3 * getInventoryColumns and answers getInventoryColumns
-# with its own strength, so the llama case runs all five strengths vanilla's own setter clamps to. Each case reads
-# that width back off AbstractHorse.getSlot, whose 498 + m addressing answers SlotAccess.NULL one slot past the
-# end, rather than trusting the formula the fixture just sized itself by. No band at or above 1.20.5 carries the
-# file: the write there is Slot = i - 1 counting up from 1 and the read puts j back at j + 1, which makes the
-# 0-based holder dev captures the correct one there.
+# Added at 1.20.4, and needed by every band below 1.20.5. Pins the slot numbering a captured mount chest has to carry:
+# AbstractChestedHorse writes each chest stack under its index in the mount's whole inventory, counting up from 2, and
+# its read refuses any saved entry numbered below 2, so a 0-based holder loses its two lowest stacks and lands every
+# survivor two slots early with no log line and no loss-report row. The gate reloads the captured holder through
+# vanilla's own readAdditionalSaveData rather than counting what came back. Its two cases are the two chest widths a
+# captured mount can carry: getInventorySize is a flat 17 for a chested donkey or mule rather than anything read off
+# getInventoryColumns, while Llama overrides it with 2 + 3 * getInventoryColumns and answers getInventoryColumns with
+# its own strength, so the llama case runs all five strengths vanilla's own setter clamps to. Each case reads that width
+# back off AbstractHorse.getSlot, whose 498 + m addressing answers SlotAccess.NULL one slot past the end, rather than
+# trusting the formula the fixture just sized itself by. No band at or above 1.20.5 carries the file: the write there
+# numbers the chest from 0 (Slot = i - 1 counting up from 1 through 1.21.4, and from 1.21.5 a chest-only inventory
+# written from 0), which makes the 0-based holder dev captures the correct one there.
 common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
 
 # Below 1.20.5 a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and
@@ -443,9 +442,9 @@ common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
 # malformedChunkTagWith instead of the fidelity-checked chunkTagWith.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredScanTest.java
 
-# Below 1.20.5 only a BaseContainerBlockEntity carries an arbitrary custom name, written as the raw CustomName
-# JSON key rather than the minecraft:custom_name component, and a beehive's occupants are the pre-component
-# {EntityData, TicksInHive, MinOccupationTicks} entries under Bees rather than an Occupant.LIST_CODEC encode.
+# Below 1.20.5 a block entity's custom name is written as the raw CustomName JSON key rather than the
+# minecraft:custom_name component, and a beehive's occupants are the pre-component {EntityData, TicksInHive,
+# MinOccupationTicks} entries under Bees rather than an Occupant.LIST_CODEC encode.
 common/src/test/java/world/thearchive/wdl/testsupport/BlockEntityFixtures.java
 
 # Below 1.20.5 an item's count is the raw Count byte (not a components-map int), so a hand-built entry without it
@@ -466,22 +465,21 @@ common/src/test/java/world/thearchive/wdl/testsupport/MapHolderFixtures.java
 neoforge/src/main/java/world/thearchive/wdl/neoforge/NeoForgePlatformBridge.java
 
 # 1.20.4 leaves the FML-module test tier off (no junit-fml for FancyModLoader 2.0.x), so this lone FML-module
-# ServiceLoader smoke test is excluded from the build; it carries the 1.20.4 @Mod form (no dist element) for when
-# the tier returns.
+# ServiceLoader smoke test is excluded from the build; it carries the 1.20.4 @Mod form (no dist element).
 neoforge/src/test/java/world/thearchive/wdl/neoforge/NeoForgeServiceResolutionTest.java
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
 # 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr,
-# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero while the
-# assertions rely on -1. Below 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a
-# plain ItemStack buy cost and serializes through vanilla's own MerchantOffers.createTag.
+# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero. Below 1.20.5
+# there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain ItemStack buy cost and
+# serializes through vanilla's own MerchantOffers.createTag.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound and getList return the value, where from 1.21.5 they
 # return Optional and dev reads through the defaulting getCompoundOrEmpty and getListOrEmpty, and dev's getIntOr becomes
-# a local intOr helper because getInt reads an absent key back as a real zero while the assertions rely on -1. Below
-# 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain ItemStack buy cost and
-# serializes through vanilla's own MerchantOffers.createTag.
+# a local intOr helper because getInt reads an absent key back as a real zero. Below 1.20.5 there is no ItemCost and no
+# MerchantOffers codec, so the merchant fixture takes a plain ItemStack buy cost and serializes through vanilla's own
+# MerchantOffers.createTag.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
@@ -489,7 +487,10 @@ common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
 # Below 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain ItemStack buy
 # cost and serializes through vanilla's own MerchantOffers.createTag, and there is no SimpleRegionStorage and no
 # entitiesStorageInfo on WorldPaths, so the on-disk oracle opens the entities store as a vanilla IOWorker through
-# WorldPaths.openEntitiesStorage and reads it through loadAsync.
+# WorldPaths.openEntitiesStorage and reads it through loadAsync. Below 1.21.2 ChunkPos's class initializer reaches no
+# registry, so the test carries no note on keeping its ChunkPos fields out of static initialization. Below 1.21 a client
+# villager still invents trades when asked for its offers, so the test keeps its note on client-invented trades, which
+# the 1.20.6 file drops because it is carried to versions whose client refuses.
 common/src/test/java/world/thearchive/wdl/adapter/EntityResumeContentCarryTest.java
 
 # Below 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain

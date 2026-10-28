@@ -12,11 +12,8 @@ import net.minecraft.client.multiplayer.ClientAdvancements;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Snapshots the client's advancement progress into an id-string keyed map. The progress map inside
- * {@link ClientAdvancements} is private; {@link ClientAdvancements#setListener} is the only public enumeration path and
- * synchronously replays every stored entry to the listener, so we install a harvesting listener, copy what it replays,
- * then clear it (restoring the no-listener state the advancements screen expects when closed). The id is taken as a
- * {@code String} so the band-renamed id type ({@code ResourceLocation} vs {@code Identifier}) never appears here.
+ * The progress map inside {@link ClientAdvancements} is private; {@link ClientAdvancements#setListener} is the only
+ * public enumeration path and synchronously replays to the listener the progress of every advancement in its tree.
  */
 final class AdvancementSnapshot {
     private AdvancementSnapshot() {}

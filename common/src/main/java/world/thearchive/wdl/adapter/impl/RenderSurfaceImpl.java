@@ -13,7 +13,6 @@ import net.minecraft.resources.ResourceLocation;
 
 import world.thearchive.wdl.adapter.RenderSurface;
 
-/** The {@link RenderSurface} plug for this branch, wrapping {@link GuiGraphics}. */
 public final class RenderSurfaceImpl implements RenderSurface {
     private final GuiGraphics graphics;
 
@@ -53,8 +52,6 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void blitSprite(String sprite, int x, int y, int width, int height, int color) {
-        // Below 1.21.2 blitSprite takes no tint argument, so the ARGB color is applied as a draw-color multiplier
-        // around the blit and reset to opaque white after.
         graphics.setColor((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
                 (color & 0xFF) / 255.0F, (color >>> 24) / 255.0F);
         graphics.blitSprite(new ResourceLocation("wdl", sprite), x, y, width, height);

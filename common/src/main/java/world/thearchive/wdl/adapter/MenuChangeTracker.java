@@ -14,18 +14,13 @@ import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Tracks whether an open menu's slot contents (or the lectern's reading page) changed since the last stash, so the
- * per-tick last-seen-wins stash re-serializes only on a real change rather than every tick (a shulker-filled double
- * chest is around fifteen hundred item encodes per pass). The change signal is per-slot stack identity, count, and
- * bundle contents: a client-side slot mutation either replaces the slot's stack object (a sync packet's fresh stack, a
- * click prediction's move or split), changes its count (a prediction's grow or shrink), or, in the one vanilla in-place
- * case, mutates the bundle's contents NBT in place (BundleItem's click-prediction override mutates the slot-resident
- * stack's tag, and the server's matching ack resends no slot; the contents are a mutable {@code "Items"} list, so a
- * value compare of a per-slot snapshot catches an insert or remove). BundleItem is the only vanilla overrider of the
- * stack-on-stack click hooks, so no other item mutates its contents in a slot. The signal also carries a small
- * menu-only ContainerData vector (a crafter's disabled and triggered flags, a brewing stand's brew time and fuel), so a
- * data-only tick like a running brew with no slot movement re-stashes. Main-thread only, reset at bind and close so one
- * open menu never inherits another's snapshot.
+ * The change signal is per-slot stack identity, count, and bundle contents: a click or sync mutation of a slot either
+ * replaces the slot's stack object (a sync packet's fresh stack, a click prediction's move or split), changes its count
+ * (a prediction's grow or shrink), or, in the one vanilla in-place case, mutates the bundle's contents NBT in place
+ * ({@code BundleItem}'s click-prediction override mutates the slot-resident stack's tag, and the server's matching ack
+ * resends no slot; the contents are a mutable {@code "Items"} list, so a value compare of a per-slot snapshot catches
+ * an insert or remove). The signal also carries a small {@code ContainerData} vector, so a data-only tick like a
+ * running brew with no slot movement re-stashes.
  */
 final class MenuChangeTracker {
     static final int[] NO_DATA = new int[0];
@@ -40,9 +35,8 @@ final class MenuChangeTracker {
     private int lastPage;
 
     /**
-     * Whether {@code slots} (or {@code page}) differ from the last snapshot; when they do, the snapshot advances to the
-     * current state, so a true return means "stash now". The first call after a reset is always a change (there is
-     * nothing to compare against, and the stash must run at least once).
+     * The first call after a reset is always a change (there is nothing to compare against, and the stash must run at
+     * least once).
      */
     boolean changedSince(List<Slot> slots, int page, int[] data) {
         ItemStack[] stacks = lastStacks;
@@ -64,7 +58,6 @@ final class MenuChangeTracker {
         return false;
     }
 
-    /** Drop the snapshot (and its strong stack references) so the next open starts fresh. */
     void reset() {
         lastStacks = null;
         lastCounts = null;
@@ -95,7 +88,6 @@ final class MenuChangeTracker {
         lastPage = page;
     }
 
-    /** A value copy of a bundle's contents list, or null when the stack is not a bundle or carries none. */
     private static @Nullable Tag bundleSignal(ItemStack stack) {
         if (!(stack.getItem() instanceof BundleItem)) {
             return null;

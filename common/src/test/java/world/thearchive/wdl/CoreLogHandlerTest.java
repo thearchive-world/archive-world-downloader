@@ -33,8 +33,6 @@ class CoreLogHandlerTest {
         captured.add(new Captured(severity, loggerName, message, thrown));
     };
 
-    // When a test attaches to a live logger, restore it afterward so the global java.util.logging state the
-    // next test sees is unchanged (the DownloadReportStoreTest discipline).
     @Nullable
     private Logger attachedTo;
     @Nullable

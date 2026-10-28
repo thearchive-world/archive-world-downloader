@@ -36,10 +36,6 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The reload gate on a captured mount chest. Every stack is sized to its own absolute slot index, because a stack count
- * assertion passes on shifted contents, which is how this shipped past every gate the suite already had.
- */
 class MountChestSlotsTest {
     // Vanilla's numbered slot addressing for a mount: 499 puts the chest on, which rebuilds its inventory around it.
     private static final int CHEST_ITEM_SLOT = 499;
@@ -81,7 +77,6 @@ class MountChestSlotsTest {
     private static void assertTheChestReloadsWhereItWasCapturedFrom(AbstractChestedHorse mount,
             AbstractChestedHorse reloaded) {
         int inventorySize = WORN_SLOTS + CHEST_ROWS * mount.getInventoryColumns();
-        // Read against vanilla's own inventory rather than a formula carried over from a sibling band.
         assertNotSame(SlotAccess.NULL, mount.getSlot(MOUNT_SLOT_BASE + inventorySize - 1),
                 "fixture: the mount's own inventory must reach the last slot this fixture fills");
         assertSame(SlotAccess.NULL, mount.getSlot(MOUNT_SLOT_BASE + inventorySize),
@@ -100,7 +95,6 @@ class MountChestSlotsTest {
                         .captureChestSlots(menu, player);
         assertNotNull(holder, "fixture: a chested mount menu must yield a holder");
 
-        // What the flush does: the mount's own saved tag, with only "Items" replaced by the captured holder.
         CompoundTag saved = mount.saveWithoutId(new CompoundTag());
         saved.put("Items", holder.getList("Items", Tag.TAG_COMPOUND));
         reloaded.readAdditionalSaveData(saved);
@@ -119,7 +113,6 @@ class MountChestSlotsTest {
                 "every captured chest stack must survive the reload, none dropped by vanilla's slot gate");
     }
 
-    /** A mount put through vanilla's own chest placement, which is what sizes its inventory around the chest. */
     private static AbstractChestedHorse chested(AbstractChestedHorse mount) {
         assertTrue(mount.getSlot(CHEST_ITEM_SLOT).set(new ItemStack(Items.CHEST)),
                 "fixture: the mount must take the chest");
@@ -127,14 +120,13 @@ class MountChestSlotsTest {
         return mount;
     }
 
-    /** The strength has to be set before the chest goes on, because the inventory is sized once, at that moment. */
+    /** The strength has to be set before the chest goes on, because the inventory is sized at that moment. */
     private static Llama llamaOfStrength(int strength) {
         Llama llama = new Llama(EntityType.LLAMA, HeadlessLevel.get());
         llama.getEntityData().set(strengthId(), strength);
         return llama;
     }
 
-    /** The synced strength, reached by reflection because vanilla's own setter is private. */
     private static EntityDataAccessor<Integer> strengthId() {
         try {
             Field field = Llama.class.getDeclaredField("DATA_STRENGTH_ID");

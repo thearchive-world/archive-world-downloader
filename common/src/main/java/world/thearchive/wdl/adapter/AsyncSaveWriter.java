@@ -25,96 +25,46 @@ import org.slf4j.Logger;
 import world.thearchive.wdl.core.SaveProgress;
 
 /**
- * A single background thread that owns the captured world's region storages and drains submitted chunks to disk, so the
- * client render thread never blocks on region I/O and never runs the heavy chunk serialize either. {@link #submitChunk}
- * hands over a lazy encode-and-fold {@link Supplier} that the writer thread resolves (the deferred but deterministic
- * encode of immutable, detached inputs); {@link #submitEntity} hands over a fully-encoded, immutable
- * {@link CompoundTag}. Either way the writer thread is the sole owner of the {@link IOWorker}s, the one-writer
- * invariant, and the reason only immutable or deferred-immutable work may cross the queue.
- *
- * <p>That invariant is this class's own, not one vanilla imposes: the region {@code IOWorker} is safe to call from any
- * thread, because it queues onto a concurrent queue and serializes execution by a status compare-and-set rather than by
- * caller identity. What needs the single thread is here. The two per-dimension {@link Storages} are unsynchronized and
- * open lazily by get-then-put, so a second writer could open two storages over one directory. The merge and rewrite
- * paths are read-modify-write per {@link ChunkPos} and would lose a merge if interleaved. And the finalize order is
- * fixed.
- *
- * <p>{@link #finish()} enqueues an end-of-stream marker; the writer drains the remaining tags,
- * {@code synchronize(true)}s each storage, runs the {@link LevelDataWrite} and then the {@link Finalizer}, closes each
- * storage and the supplied {@link AutoCloseable} (the {@code LevelStorageAccess} holding the session lock), and
- * completes the returned future with the per-target tallies (or the error that aborted it). The future is completed
- * normally even on failure, so the caller polls it with one branch.
+ * The two per-dimension {@link Storages} are unsynchronized and open lazily by get-then-put, so a second writer could
+ * open two storages over one directory. The merge and rewrite paths are read-modify-write per {@link ChunkPos} and
+ * would lose a merge if interleaved.
  */
 final class AsyncSaveWriter {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    // Comfortably over a measured chunk encode (single-digit milliseconds), since overrunning it costs the very chunk
-    // the pause exists to protect, while the client thread waits.
+    // Overrunning it can cost the very chunk the pause exists to protect.
     private static final long ENCODE_HANDSHAKE_TIMEOUT_MILLIS = 250L;
 
-    // Twenty times the level.dat write's measured worst case on a light pack (about 100 ms headless, no loader
-    // registry snapshot); inside the tolerable freeze.
     private static final long FINALIZE_HANDSHAKE_TIMEOUT_MILLIS = 2_000L;
 
-    // Only a stuck-save backstop, so it sits far above the registry rebuild it waits out (tens of milliseconds).
     private static final long PAUSE_SELF_RELEASE_TIMEOUT_MILLIS = 10_000L;
 
-    /**
-     * Lazily opens a region storage on the writer thread; called once per (target, dimension) on its first tag. The
-     * dimension lets one writer follow the player across a portal, opening each dimension's storage on demand, so two
-     * same-position chunks in different dimensions never collide on one storage.
-     */
     @FunctionalInterface
     public interface StorageOpener {
         IOWorker open(ResourceKey<Level> dimension) throws Exception;
     }
 
-    /** The best-effort pre-write step run before the drain opens any storage (the resume backup). */
     @FunctionalInterface
     public interface Preflight {
         void run() throws Exception;
     }
 
-    /**
-     * The level.dat write, run on the writer thread after the drain and under the encode permit, since the registries
-     * can be read inside it, by the write itself or by a loader's save hook.
-     */
     @FunctionalInterface
     public interface LevelDataWrite {
         void run() throws Exception;
     }
 
-    /**
-     * The on-disk steps run on the writer thread after the level.dat write, with no permit held (the player record,
-     * idcounts, the map manifest and the completion record). It receives the writer's soft-failure tallies so the
-     * completion record can stamp the real clean-or-partial status; both are zero on a loss-free save.
-     */
     @FunctionalInterface
     public interface Finalizer {
         void run(int chunksFailed, int entityChunksFailed) throws Exception;
     }
 
-    /**
-     * The best-effort finish-time output step run after the storages and session lock have closed (the export zip).
-     * Returns the written zip's filename for the completion surfaces, or null when none was written.
-     */
     @FunctionalInterface
     public interface OutputFinalizer {
         @Nullable
         String run() throws Exception;
     }
 
-    /**
-     * Per-target write tallies, plus any error that aborted the save (null on success). The region chunks are split
-     * into those new to the archive (no prior on disk) and those re-captured (merged with a prior copy on a resume),
-     * with {@code mergedContainers} the count of on-disk block containers whose contents carried forward;
-     * {@code entitiesCarriedForward} is the entity analog (a re-flushed entity-chunk's contents and unioned-in
-     * entities), a diagnostic that flags chunks re-flushed with partial sets; {@code entitiesRecovered} counts only
-     * those whose content came from a prior download's record in a different chunk file, so it is the one term that
-     * says an interaction-captured entity moved between downloads. {@link #chunksWritten()} is the total the
-     * saved-world message reports. {@code zipFileName} is the export zip actually written on a clean save, or null
-     * (knob off, zip failed, or the save failed), so a completion surface never names a zip that is not on disk.
-     */
     record SaveResult(int chunksNew, int chunksRecaptured, int mergedContainers, int chunksFailed,
             int entityChunksWritten, int entityChunksFailed, int entitiesCarriedForward, int entitiesRecovered,
             @Nullable String zipFileName, @Nullable Throwable error) {
@@ -122,7 +72,6 @@ final class AsyncSaveWriter {
             return error != null;
         }
 
-        /** Region chunks written this session, new plus re-captured (the archive headline minus the prior count). */
         public int chunksWritten() {
             return chunksNew + chunksRecaptured;
         }
@@ -168,31 +117,14 @@ final class AsyncSaveWriter {
     private int guardLapses;
     private final Thread thread;
 
-    // Total write tasks handed over so far, the denominator of the HUD's chunk-drain bar. Incremented on the
-    // main thread at submit and read on the writer thread, hence volatile; only the main thread writes it.
     private volatile long submitted;
 
-    // The recovered-coverage observer, or null on a fresh download. A passive outline side-channel run from the
-    // read-only resume scan (scanResumeChunk), entirely off the chunk write path, so it can never affect a write.
-    // Set on the main thread before the first submit, read on the writer thread.
     private volatile @Nullable BiConsumer<ResourceKey<Level>, CompoundTag> resumeReadObserver;
 
-    // The entities-store recovered observer, the entity sibling of resumeReadObserver: fed the prior on-disk
-    // entity chunk by an entities-targeted resume scan, off the chunk write path. Same threading discipline.
     private volatile @Nullable BiConsumer<ResourceKey<Level>, CompoundTag> resumeEntityReadObserver;
 
-    // The interaction-captured content prior downloads already saved, or null on a fresh download. Same threading
-    // discipline as the observers above.
     private volatile @Nullable RecoveredEntityContent recoveredEntityContent;
 
-    /**
-     * The writer-thread steps run around the drain, in lifecycle order: {@code preflight} before any chunk is written
-     * into the folder (the pre-merge resume backup), {@code levelDataWrite} and then {@code finalizer} after the drain
-     * while the folder is open, and {@code outputs} after the storages and session lock have closed (the export zip).
-     * {@code preflight} and {@code outputs} are best-effort: a throw from either is caught and logged, never failing
-     * the save, so a zip failure can never endanger the openable folder. A {@code levelDataWrite} or {@code finalizer}
-     * throw aborts the save the usual way.
-     */
     public AsyncSaveWriter(StorageOpener regionOpener, StorageOpener entitiesOpener, Preflight preflight,
             LevelDataWrite levelDataWrite, Finalizer finalizer, OutputFinalizer outputs, AutoCloseable access,
             SaveProgress progress) {
@@ -209,70 +141,39 @@ final class AsyncSaveWriter {
         this.thread.start();
     }
 
-    /**
-     * Set the observer each {@link #submitResumeScan} hands its on-disk chunk and dimension, for the outline's
-     * recovered-coverage scan. Call on the main thread before the first submit; the observer runs on the writer thread,
-     * which owns the on-disk read, entirely off the chunk write path.
-     */
     public void observeResumeReads(BiConsumer<ResourceKey<Level>, CompoundTag> observer) {
         this.resumeReadObserver = observer;
     }
 
-    /**
-     * Set the observer each {@link #submitEntityResumeScan} hands its on-disk entity chunk and dimension, for the
-     * outline's recovered-entity scan. The entity sibling of {@link #observeResumeReads}; same threading rules.
-     */
     public void observeEntityResumeReads(BiConsumer<ResourceKey<Level>, CompoundTag> observer) {
         this.resumeEntityReadObserver = observer;
     }
 
-    /** Set the bank this writer carries onto a moved entity, after each entity chunk's own read-merge. */
     public void carryRecoveredEntityContent(RecoveredEntityContent content) {
         this.recoveredEntityContent = content;
     }
 
-    /**
-     * Enqueue a read-only scan of {@code dimension}'s on-disk chunk at {@code pos} for recovered coverage: the writer
-     * reads the prior chunk it owns and reports it to the observer without writing, so a resumed chunk's prior-captured
-     * positions are known while it is still in view, not only when it later flushes. Call on the main thread; a no-op
-     * when no observer is set. Self-gating on a fresh download (the caller scans only on a resume), and the read
-     * returns empty for any chunk with no prior.
-     */
     public void submitResumeScan(ResourceKey<Level> dimension, ChunkPos pos) {
         queue.add(new ScanTask(Target.REGION, dimension, pos));
     }
 
-    /**
-     * Enqueue a read-only scan of {@code dimension}'s on-disk entity chunk at {@code pos} for recovered coverage, the
-     * entity sibling of {@link #submitResumeScan}: the writer reads the prior entities chunk it owns and reports it to
-     * the entity observer without writing. Call on the main thread; a no-op when no entity observer is set, and the
-     * read returns empty for any chunk with no prior.
-     */
     public void submitEntityResumeScan(ResourceKey<Level> dimension, ChunkPos pos) {
         queue.add(new ScanTask(Target.ENTITIES, dimension, pos));
     }
 
     /**
-     * Enqueue an off-render-thread action to run on the writer thread, in order with the chunk drain (the coverage
-     * overlay's resume prior-coverage seed and the map data writes streamed during capture). Neither touches the
-     * writer's own region stores (raw region-header reads, single data/ file writes), so a task never contends with
-     * them. A {@link RuntimeException} is caught and logged, never aborting the save; a task owning a soft-failure
-     * tally must catch and count its own exceptions. Call on the main thread before {@link #finish}; it runs before the
-     * finalize.
-     *
-     * <p>A task submitted here reports no progress, so the HUD bar sits at its last chunk fraction while the task runs.
-     * Use {@link #submitMapBatch} for the finish-time map writes, whose count is large enough to need a bar.
+     * A {@link RuntimeException} is caught and logged, never aborting the save; a task owning a soft-failure tally must
+     * catch and count its own exceptions.
      */
     public void submit(Runnable action) {
         queue.add(new RunTask(action));
     }
 
     /**
-     * Enqueue the finish-time map data writes as one counted batch (main thread, before {@link #finish}). The writer
-     * runs them in order, reporting one step per write through {@link SaveProgress#maps}, so the bar advances over a
-     * known total rather than freezing mid-chunk-phase the way a pile of uncounted {@link #submit} tasks would. Submit
-     * after the last chunk and entity write so the phases advance in turn. A no-op for an empty list, which leaves the
-     * map phase unpublished and the bar going straight from chunks to compressing.
+     * The writer runs them in order, reporting one step per write through {@link SaveProgress#maps}, so the bar
+     * advances over a known total rather than freezing mid-chunk-phase the way a pile of uncounted {@link #submit}
+     * tasks would. Submit after the last chunk and entity write so the phases advance in turn. A no-op for an empty
+     * list, which leaves the map phase unpublished.
      */
     public void submitMapBatch(List<Runnable> writes) {
         if (writes.isEmpty()) {
@@ -281,34 +182,19 @@ final class AsyncSaveWriter {
         queue.add(new MapBatchTask(List.copyOf(writes)));
     }
 
-    /**
-     * Enqueue a lazy encode-and-fold thunk for {@code dimension}'s {@code region/} storage (main thread). The writer
-     * thread resolves {@code encode} (the heavy chunk serialize plus the container/lectern fold), so it must close over
-     * only immutable, detached inputs the writer then solely owns (the snapshot, the drained holders, the per-band
-     * codec/sinks, the frozen registries). {@code merge} is the on-disk read-merge the writer applies to that chunk,
-     * supplied per chunk because it closes over what only the main thread can read off the captured snapshot.
-     */
     public void submitChunk(ResourceKey<Level> dimension, ChunkPos pos, Supplier<CompoundTag> encode,
             RegionChunkWriter.ChunkReadMerge merge) {
         submitted++;
         queue.add(new WriteTask(Target.REGION, dimension, pos, encode, merge));
     }
 
-    /**
-     * Enqueue a read-modify-write of {@code dimension}'s already-written {@code region/} chunk at {@code pos} (main
-     * thread): the writer reads the on-disk chunk, applies {@code rewrite} to fold detached open-time holders onto its
-     * block entities, and writes it back. The recovery path for a container or lectern opened in a chunk that had
-     * already flushed and left the keep-hot buffer; {@code rewrite} must close over only immutable, detached data the
-     * writer then solely owns (the drained holders, the per-band sinks).
-     */
     public void submitChunkRewrite(ResourceKey<Level> dimension, ChunkPos pos, RegionChunkWriter.ChunkRewrite rewrite) {
         submitted++;
         queue.add(new RewriteTask(dimension, pos, rewrite));
     }
 
     /**
-     * Enqueue an encoded entity-chunk tag for {@code dimension}'s {@code entities/} storage (main thread). The writer
-     * thread owns {@code tag} after this call; the caller must not mutate it afterward.
+     * The writer thread owns {@code tag} after this call; the caller must not mutate it afterward.
      */
     public void submitEntity(ResourceKey<Level> dimension, ChunkPos pos, CompoundTag tag) {
         submitted++;
@@ -316,29 +202,24 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * Signal end-of-stream; the writer drains, finalizes, closes, and completes the returned future. Call after the
-     * last submit: any {@link #submitChunk}/{@link #submitEntity} after this marker is silently dropped (the writer
-     * loop has already exited).
+     * Call after the last submit: any {@link #submitChunk}/{@link #submitEntity} after this marker is silently dropped.
      */
     public CompletableFuture<SaveResult> finish() {
         queue.add(FinalizeTask.INSTANCE);
         return result;
     }
 
-    /** The completion future, polled on the main thread (never completed exceptionally). */
     public CompletableFuture<SaveResult> result() {
         return result;
     }
 
     /**
-     * Stop the writer reading the loader's registries, and wait for a read already in flight to finish (main thread).
-     * Forge rebuilds the client's registries in place when a level closes: a chunk encode reading them meanwhile
-     * resolves blocks to nothing, which some bands write as air rather than reporting, and the level.dat write reads
-     * them through the loader's own save hook and can carry a torn snapshot. Returning from this call is the guarantee
-     * the caller needs: no read is running, and none starts until {@link #resumeEncoding}.
+     * The loader can rebuild the client's registries in place when a level closes: a chunk encode reading them
+     * meanwhile resolves blocks to nothing.
      *
-     * <p>The wait is bounded because it runs on the thread the player is waiting on: a read that overruns it is let go
-     * rather than freezing the client, costing the one chunk or level.dat this was protecting.
+     * <p>The wait is bounded because it can run on the client thread: a read that overruns it is let go rather than
+     * freezing the client, risking the one chunk this was protecting, or the level.dat where a loader's save hook reads
+     * the registries.
      */
     public void pauseEncoding() {
         long startNanos = System.nanoTime();
@@ -371,23 +252,20 @@ final class AsyncSaveWriter {
                 }
             }
         } finally {
-            // INFO rather than DEBUG, and not behind a toggle, because a report of a stalled teardown arrives
-            // with the game log and nothing else, and this is the only number in it that separates this mod's share
-            // of that stall from every other mod's. Bounded without a toggle: nothing reaches this call unless a
-            // download is running.
+            // INFO rather than DEBUG, and not behind a toggle, because a report of a stalled teardown arrives with the
+            // game log and nothing else. Bounded without a toggle: nothing reaches this call unless a download is
+            // running.
             LOGGER.info("held the save writer off the registry: the calling thread blocked for {} ms",
                     (System.nanoTime() - startNanos) / 1_000_000L);
         }
     }
 
-    /** Whether encoding is currently held off, so the session wiring around the pause is testable. */
     boolean isEncodingPaused() {
         synchronized (encodeLock) {
             return encodingPaused;
         }
     }
 
-    /** Let the writer read the registries again, once the loader has finished rebuilding (main thread). */
     public void resumeEncoding() {
         synchronized (encodeLock) {
             encodingPaused = false;
@@ -396,8 +274,7 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * Bounded because a resume that never arrives must not strand the save: the download would sit in saving forever,
-     * which is worse than the race the wait avoids.
+     * Bounded because a resume that never arrives must not strand the save: the download would sit in saving forever.
      */
     private void acquireEncodePermit(boolean finalize) {
         synchronized (encodeLock) {
@@ -424,7 +301,6 @@ final class AsyncSaveWriter {
         }
     }
 
-    /** Bounded waits that gave up, each counted as a loss: a chunk that may hold air, or a torn level.dat. */
     private int guardLapses() {
         synchronized (encodeLock) {
             return guardLapses;
@@ -440,8 +316,6 @@ final class AsyncSaveWriter {
     }
 
     private void run() {
-        // One storage per dimension, opened on demand: a session that follows the player across a portal writes
-        // each dimension's chunks/entities to its own vanilla folder (overworld region/, nether DIM-1/, ...).
         Storages regions = new Storages(regionOpener, "region");
         Storages entities = new Storages(entitiesOpener, "entities");
         int chunksNew = 0;
@@ -455,8 +329,8 @@ final class AsyncSaveWriter {
         @Nullable
         Throwable error = null;
         try {
-            // The pre-merge safety copy runs before the drain opens any storage, so a resume is backed up before
-            // it modifies the folder. Best-effort: a failed backup never aborts the save.
+            // The pre-merge safety copy runs before the drain opens any storage, so a resume is backed up before it
+            // modifies the folder.
             bestEffort(preflight, "the resume backup");
             long drained = 0;
             Task next;
@@ -480,23 +354,19 @@ final class AsyncSaveWriter {
                 if (next instanceof RewriteTask rewrite) {
                     progress.chunks(++drained, submitted);
                     IOWorker region = regions.storageFor(rewrite.dimension());
-                    // An unopenable dimension leaves no on-disk chunk to fold the orphaned contents onto, the
-                    // same outcome rewriteExisting reports for a position with no prior, and neither has a
-                    // tally of its own.
                     if (region != null) {
                         mergedContainers += RegionChunkWriter.rewriteExisting(region, rewrite.pos(), rewrite.rewrite());
                     }
                     continue;
                 }
                 WriteTask task = (WriteTask) next;
-                progress.chunks(++drained, submitted); // both REGION and ENTITIES drain under the one chunks phase
+                progress.chunks(++drained, submitted);
                 CompoundTag tag;
                 acquireEncodePermit(false);
                 try {
-                    tag = task.encode().get(); // encode + stage-(a) fold on this thread (a no-op for entities)
+                    tag = task.encode().get();
                 } catch (RuntimeException e) {
-                    // Per-chunk isolation, the existing discipline (captureLoadedChunks / RegionChunkWriter): one
-                    // chunk's deferred encode throwing must not abort the stream. Count it failed and move on.
+                    // One chunk's deferred encode throwing must not abort the stream.
                     LOGGER.warn("skipping chunk {}: encode failed", task.pos(), e);
                     if (task.target() == Target.REGION) {
                         chunksFailed++;
@@ -517,9 +387,6 @@ final class AsyncSaveWriter {
                         chunksFailed++;
                         continue;
                     }
-                    // A fresh download reads empty for most chunks, but not for all of them: a revisit re-writes
-                    // a position this session already wrote, which is why the merge is supplied per chunk rather
-                    // than fixed here.
                     RegionChunkWriter.MergeWriteResult merged = RegionChunkWriter.writeMerging(region, task.pos(), tag,
                             task.merge());
                     switch (merged.outcome()) {
@@ -540,13 +407,9 @@ final class AsyncSaveWriter {
                         entityChunksFailed++; // per chunk, as above
                         continue;
                     }
-                    // The entities target read-merges too: a re-captured entity-chunk carries forward each on-disk
-                    // vehicle's contents AND every on-disk entity the fresh capture lacks (EntityMerge unions, so
-                    // a partial re-flush adds to rather than overwrites the prior set). Counted separately from
-                    // block containers: a non-zero tally means chunks were re-flushed with partial sets.
-                    // The after-merge step is what reaches an entity that changed entity-chunk between downloads:
-                    // its prior record is in another chunk file, so this chunk's own read-merge has nothing to
-                    // carry, and only content banked from the resume scan can fill it.
+                    // The after-merge step is what reaches an entity that changed entity-chunk between downloads: its
+                    // prior record is in another chunk file, so this chunk's own read-merge has nothing to carry, and
+                    // only content banked from the resume scan can fill it.
                     RecoveredEntityContent recovered = this.recoveredEntityContent;
                     RegionChunkWriter.MergeWriteResult merged = RegionChunkWriter.writeMerging(entityStore,
                             task.pos(), tag, task.merge(), recovered == null ? null : recovered::applyTo);
@@ -595,18 +458,17 @@ final class AsyncSaveWriter {
         if (error == null) {
             zipFileName = bestEffortOutput(outputs, "the export zip");
         }
-        // A lapsed guard means a chunk or level.dat was written across a possible rebuild, the silent half of the
-        // defect the guard exists for; it reaches this tally so every surface this result feeds reports partial.
+        // A lapsed guard means a chunk or level.dat was written across a possible rebuild; it reaches this tally so
+        // every surface this result feeds reports partial.
         result.complete(new SaveResult(chunksNew, chunksRecaptured, mergedContainers, chunksFailed + guardLapses(),
                 entityChunksWritten, entityChunksFailed, entitiesCarriedForward, entitiesRecovered, zipFileName,
                 error));
     }
 
     /**
-     * Writer thread: run the batched map data writes in order, publishing the map phase across them. Each write is
-     * isolated the way the {@link RunTask} branch isolates a single task, so one map's throw cannot escape the drain
-     * loop and abort the save before the level.dat finalize. A write owning a soft-failure tally counts its own
-     * failures, which is why this catch only logs.
+     * Each write is isolated the way the {@link RunTask} branch isolates a single task, so one map's throw cannot
+     * escape the drain loop and abort the save before the level.dat finalize. A write owning a soft-failure tally
+     * counts its own failures, which is why this catch only logs.
      */
     private void writeMapBatch(List<Runnable> writes) {
         int total = writes.size();
@@ -623,9 +485,7 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * Writer thread: read {@code scan}'s on-disk chunk from the target storage this writer owns (region/ or entities/)
-     * and hand it to that target's recovered-coverage observer without writing. Isolated: a failure is logged and never
-     * touches a chunk write.
+     * Isolated: a failure is logged and never stops a chunk write.
      */
     private void scanResumeChunk(ScanTask scan, Storages regions, Storages entities) {
         boolean region = scan.target() == Target.REGION;
@@ -635,7 +495,7 @@ final class AsyncSaveWriter {
         }
         IOWorker storage = (region ? regions : entities).storageFor(scan.dimension());
         if (storage == null) {
-            return; // the dimension logged its own open failure; a scan reads nothing and loses nothing
+            return;
         }
         try {
             storage.loadAsync(scan.pos()).join().ifPresent(onDisk -> observer.accept(scan.dimension(), onDisk));
@@ -644,7 +504,6 @@ final class AsyncSaveWriter {
         }
     }
 
-    /** Run a best-effort writer-thread step (the resume backup); a throw is logged, never fatal. */
     private static void bestEffort(Preflight step, String what) {
         try {
             step.run();
@@ -653,7 +512,6 @@ final class AsyncSaveWriter {
         }
     }
 
-    /** As {@link #bestEffort}, for the output step: a throw is logged and reports no written zip. */
     private static @Nullable String bestEffortOutput(OutputFinalizer step, String what) {
         try {
             return step.run();
@@ -675,16 +533,10 @@ final class AsyncSaveWriter {
     }
 
     /**
-     * The writer thread's storages for one target ({@code region/} or {@code entities/}), one per dimension, opened on
-     * that dimension's first task. Both instances are locals of {@link #run}, reachable only from it and from what it
-     * calls on its own thread, so they need no synchronization.
-     *
-     * <p>A failed open is retried on the dimension's next task rather than remembered, because the failure can be of
-     * the moment: this project's own Windows gate has shown transient file locks to be real, and a dimension written
-     * off on one chunk would cost every later chunk it holds for the rest of the download. What is remembered is the
-     * LOG, one stack per dimension, since one root cause fails every chunk of that dimension alike and a stack per
-     * chunk buries it under as many copies as the dimension is wide. The caller counts what each dropped task costs,
-     * which is why the count is per chunk while the cause is per dimension.
+     * A failed open is retried on the dimension's next task rather than remembered, because the failure can be of the
+     * moment: a dimension written off on one chunk would cost every later chunk it holds for the rest of the download.
+     * What is remembered is the LOG, one stack per dimension, since one root cause fails every chunk of that dimension
+     * alike and a stack per chunk buries it under as many copies as the dimension is wide.
      */
     private static final class Storages {
         private final StorageOpener opener;
@@ -698,10 +550,8 @@ final class AsyncSaveWriter {
         }
 
         /**
-         * The storage for {@code dimension}, opened on demand, or null when it cannot be opened. Null is the whole
-         * reason this returns rather than throws: an opener that threw out of the drain loop would skip the finalize
-         * and leave the chunks already on disk in a folder with no level.dat, which is a save the player cannot open,
-         * so the caller counts the dropped task and the drain runs on to the finalize.
+         * Null is the whole reason this returns rather than throws: an opener that threw out of the drain loop would
+         * skip the finalize, so the caller counts the dropped task and the drain runs on to the finalize.
          */
         private @Nullable IOWorker storageFor(ResourceKey<Level> dimension) {
             IOWorker storage = open.get(dimension);
@@ -722,13 +572,7 @@ final class AsyncSaveWriter {
         }
 
         /**
-         * Flush every open storage, logging rather than throwing a failure. Vanilla's flush is a channel force, and
-         * every chunk write was already awaited before it, so what a failure puts in doubt is whether those bytes
-         * survive a power loss, not whether the file system has them. Nothing is counted for it: the close that follows
-         * forces every region file again, so the failure this catch sees is usually resolved by the next statement, and
-         * this project's recorded posture is that region data is forced once at finalize and promises nothing against
-         * power loss. What the catch is for is the step behind it, the level.dat write, which a throw here would skip
-         * and leave a folder the player cannot open.
+         * What the catch is for is the step behind it, the level.dat write, which a throw here would skip.
          */
         private void synchronizeAll() {
             for (Map.Entry<ResourceKey<Level>, IOWorker> entry : open.entrySet()) {

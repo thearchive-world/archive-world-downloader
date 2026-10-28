@@ -8,11 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * The two orthogonal capabilities the three-state recapture mode gates: keeping the loaded area current as it changes
- * (hot re-capture), and overwriting an already-downloaded area when the player revisits it. OFF is snapshot-once,
- * NEARBY keeps the working area live but freezes each area once left, and EVERYWHERE also overwrites on revisit.
- */
 class RecaptureModeTest {
     @Test
     void offDoesNeither() {

@@ -15,28 +15,6 @@ import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.VersionAdapter;
 import world.thearchive.wdl.adapter.impl.VersionAdapterImpl;
 
-/**
- * Per-loader ServiceLoader-resolution + entrypoint smoke test.
- *
- * <p>Runs on a production-faithful FML load: MDG NeoForge-mode's {@code unitTest} block boots FMLLoader and loads this
- * module as a mod (the same module setup the client uses), so the {@code net.neoforged.*} bridge classes load and the
- * {@code META-INF/services} provider metadata is present. This exercises the loader-agnostic core, the source-merge,
- * and ServiceLoader against a second loader.
- *
- * <p>The resolution test uses the exact classloader {@code Wdl.initialize} uses ({@code Wdl.class.getClassLoader()}),
- * asserting the discovered SPI binds to its implementation:
- * <ul>
- * <li>{@link VersionAdapter} &rarr; {@link VersionAdapterImpl} (provided by :common, source-merged in)</li>
- * </ul>
- * {@code WdlNeoForge} constructs the {@code PlatformBridge} directly rather than discovering it via
- * {@link ServiceLoader}, so it is not exercised headless.
- *
- * <p>This proves the mod loads under FML and that the {@link VersionAdapter} SPI resolves on the real NeoForge
- * classpath, plus the {@code @Mod} entrypoint declaration. It does not exercise the client-only
- * {@code @Mod(dist=CLIENT)} constructor or live event firing ({@code RegisterKeyMappingsEvent} /
- * {@code ClientTickEvent.Post} / disconnect). The harness runs server-dist and these need a running client; those are
- * not exercised headless.
- */
 class NeoForgeServiceResolutionTest {
     @Test
     void versionAdapterResolvesOnNeoForge() {
@@ -51,7 +29,5 @@ class NeoForgeServiceResolutionTest {
         Mod mod = WdlNeoForge.class.getAnnotation(Mod.class);
         assertNotNull(mod, "WdlNeoForge must carry @Mod");
         assertEquals("wdl", mod.value(), "@Mod id must match the mods.toml modId + ServiceLoader wiring");
-        // NeoForge 20.4's @Mod has no dist element (20.6's dist = Dist.CLIENT does not exist here); the
-        // client-only declaration lives in mods.toml's side = "CLIENT" dependency entries instead.
     }
 }

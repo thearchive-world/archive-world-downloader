@@ -22,16 +22,6 @@ import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The guard against a client-side merchant's own account of its trades reaching the archive. Asked for its offers, a
- * client merchant does not answer "none": it assigns itself a random career and generates a trade list from its
- * profession. Several ordinary things ask, differing by version, and on disk the result is indistinguishable from a
- * real capture. It also blocks the genuine trades already saved from being carried over it, both carry-forwards filling
- * only an empty slot.
- *
- * <p>The fixtures build that shape directly rather than provoking it, because a band whose vanilla guards the
- * client-side write cannot produce it locally. The keys are the seam, so the cases hold on every band.
- */
 class MerchantOfferScrubTest {
     private static final UUID VILLAGER = UUID.fromString("2f6c0f4a-1e88-4d3b-9a52-7c0b6e4d1a93");
     private static final UUID RIDER = UUID.fromString("8d1a44b7-5c02-4e69-b0f1-3a9e77c25d40");
@@ -70,7 +60,7 @@ class MerchantOfferScrubTest {
     void theSyncedProfessionSurvives() {
         CompoundTag villager = EntityFixtures.entity("minecraft:villager", VILLAGER);
         villager.put("Offers", offers());
-        villager.putInt("Profession", 2); // the server tells the client this one, so it is real
+        villager.putInt("Profession", 2);
         CompoundTag chunk = EntityFixtures.entityChunkTagWith(villager);
 
         MerchantOfferScrub.stripInventedOffers(chunk);
@@ -134,7 +124,7 @@ class MerchantOfferScrubTest {
     @Test
     void aCareerWithNoTradeListIsDroppedButNotCounted() {
         CompoundTag villager = EntityFixtures.entity("minecraft:villager", VILLAGER);
-        villager.putInt("Career", 4); // the versions that have this key write it for every villager, always
+        villager.putInt("Career", 4);
         CompoundTag chunk = EntityFixtures.entityChunkTagWith(villager);
 
         assertEquals(0, MerchantOfferScrub.stripInventedOffers(chunk),
@@ -144,7 +134,6 @@ class MerchantOfferScrubTest {
     }
 
     private static CompoundTag offers() {
-        // Below 1.20.5 there is no ItemCost; a merchant offer's buy cost is a plain ItemStack.
         MerchantOffers offers = new MerchantOffers();
         offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), ItemFixtures.stack("minecraft:diamond"),
                 1, 0, 0.0f));
@@ -162,7 +151,6 @@ class MerchantOfferScrubTest {
         throw new AssertionError("no node " + uuid);
     }
 
-    /** {@code getIntOr} is a later-band accessor; below it an absent key must not read back as a real zero. */
     private static int intOr(CompoundTag tag, String key, int fallback) {
         return tag.contains(key) ? tag.getInt(key) : fallback;
     }

@@ -39,10 +39,8 @@ class FlashbackReplayProbeTest {
         assertFalse(probe.isReplayServer(new ReplayServer()));
     }
 
-    // The no-leak assertion, the safety property the whole feature rests on: what the gate sees in genuine
-    // singleplayer and in a LAN-hosted world is an instance of the SUPERCLASS, and during client shutdown it
-    // is null. Neither may ever match. The stub models the real subclass relation, so this fails if the
-    // isInstance test is ever inverted to isAssignableFrom or widened to the supertype.
+    // The stub models the real subclass relation, so this fails if the isInstance test is ever inverted to
+    // isAssignableFrom or widened to the supertype.
     @Test
     void aPlainLocalServerAndNullServerNeverMatch() {
         FlashbackReplayProbe probe = FlashbackReplayProbe.resolve(true, REAL, loader);
@@ -51,10 +49,9 @@ class FlashbackReplayProbeTest {
         assertTrue(probe.isReplayServer(new ReplayServer()), "the subclass must still match");
     }
 
-    // Drives the shipped class name rather than this file's own literal, so the constant is covered too. The
-    // other tests all pass REAL through the package-private seam, which leaves the production constant free to
-    // be widened to a supertype (making the gate true in genuine singleplayer) with the suite still green. The
-    // stubs sit at Flashback's real fully-qualified name, so resolution succeeds here with no dependency on it.
+    // Drives the shipped class name rather than this file's own literal, so the constant is covered too. The other
+    // tests all go through the package-private seam, which leaves the production constant free to be widened to a
+    // supertype (making the gate true in genuine singleplayer with Flashback loaded) with the suite still green.
     @Test
     void theShippedClassNameMatchesOnlyTheReplayServer() {
         FlashbackReplayProbe probe = FlashbackReplayProbe.resolve(true);
