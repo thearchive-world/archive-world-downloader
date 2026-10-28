@@ -15,15 +15,11 @@ import java.util.stream.Stream;
 
 /**
  * The persisted translation table from a filled map's content hash ({@link MapHash}) to a stable archive id, plus one
- * monotonic counter shared by every referenced map. A filled map's session-local {@code MapId} is reshuffled by a
- * server that renumbers ids per session, so resuming into a folder must re-key each map by its content, not its session
- * id; this manifest is the one identity that needs persisting (chunks and entities are already coordinate/UUID stable
- * on disk).
+ * counter shared by every referenced map. Every contract of this class assumes that counter stays below
+ * {@code Integer.MAX_VALUE}, past which the int wraps.
  *
- * <p>MC-free and dependency-free (pure {@code String}-to-{@code int} over {@code java.nio}), so the core owns it on
- * every band. The on-disk form is a line-oriented, schema-versioned file ({@code <save>/wdl/map-ids}) mirroring the
- * download report's durable-contract discipline: a header line carries the schema version and the counter high-water,
- * then one {@code <hex-sha256>\t<archiveId>} per imaged map. Reading is crash-tolerant (a torn line is skipped), and
+ * <p>The on-disk form is a line-oriented, schema-versioned file ({@code <save>/wdl/map-ids}): a header line carries the
+ * schema version and the counter high-water, then one {@code <hex-sha256>\t<archiveId>} per recorded hash.
  * {@link #save(Path)} writes via a temporary sibling and an atomic move so a torn write leaves the prior manifest
  * intact.
  */
@@ -35,9 +31,6 @@ public final class MapManifest {
     private static final String WDL_SUBFOLDER = "wdl";
     private static final String MANIFEST_FILE = "map-ids";
     private static final String DATA_SUBFOLDER = "data";
-    // Two on-disk map-data layouts the resume floor must recognize band-independently: the 1.21.x flat form names
-    // files map_<n>.dat directly in the data directory, and the 26.x namespaced form puts them in a maps/ subfolder
-    // as <n>.dat, one level under the data/minecraft namespace directory.
     private static final String FLAT_MAP_PREFIX = "map_";
     private static final String MAPS_SUBFOLDER = "maps";
     private static final String NAMESPACE_SUBFOLDER = "minecraft";
@@ -50,16 +43,16 @@ public final class MapManifest {
         this.nextArchiveId = nextArchiveId;
     }
 
-    /** A fresh manifest for a new download: the archive id space starts empty at id 0. */
+    /** A fresh manifest: the archive id space starts empty at id 0. */
     public static MapManifest empty() {
         return new MapManifest(new LinkedHashMap<>(), 0);
     }
 
     /**
-     * Raise the counter past {@code highestUsedId} so no id the folder already used can be reissued to a different
-     * picture. Monotonic and idempotent: a value the counter already clears changes nothing, and -1 means no used id is
-     * known. Kept separate from {@link #load(Path)} so a caller whose floor read fails can still keep the manifest it
-     * parsed.
+     * Raise the counter past {@code highestUsedId}, when {@code highestUsedId} is below {@code Integer.MAX_VALUE}, so
+     * no id the folder already used can be reissued to a different picture. Monotonic and idempotent: a value the
+     * counter already clears changes nothing, and -1 means no used id is known. Kept separate from {@link #load(Path)}
+     * so a caller whose floor read fails can still keep the manifest it parsed.
      */
     public void raiseCounterAbove(int highestUsedId) {
         nextArchiveId = Math.max(nextArchiveId, highestUsedId + 1);
@@ -70,15 +63,13 @@ public final class MapManifest {
         return saveFolder.resolve(WDL_SUBFOLDER).resolve(MANIFEST_FILE);
     }
 
-    /** Whether {@code saveFolder} carries a remap manifest, i.e. a prior session downloaded it with remapping on. */
     public static boolean existsIn(Path saveFolder) {
         return Files.exists(pathIn(saveFolder));
     }
 
     /**
      * The archive id for {@code hash}: an already-known hash returns its stable id; a new hash takes the next counter
-     * id and records it. Idempotent across sources within a session and across sessions once persisted, which is what
-     * defeats a renumbering server.
+     * id and records it.
      */
     public int lookupOrInsert(String hash) {
         Integer existing = idByHash.get(hash);
@@ -90,31 +81,24 @@ public final class MapManifest {
         return id;
     }
 
-    /**
-     * A fresh counter id for an imageless referenced map (chest-only or nested, no colors to hash): it routes through
-     * the same monotonic counter so it can never alias a real picture's data file, but records no hash, so a re-seen
-     * imageless map across a resume takes a new id (rare, monotonic, never a wrong picture).
-     */
     public int allocateImageless() {
         return nextArchiveId++;
     }
 
-    /** The next archive id this manifest would hand out (the counter high-water, persisted in the header). */
     int nextArchiveId() {
         return nextArchiveId;
     }
 
-    /** The highest archive id assigned so far, the value written into {@code idcounts}'s {@code map}; -1 if none. */
+    /** The counter less one. */
     public int highestAssignedId() {
         return nextArchiveId - 1;
     }
 
-    /** The number of imaged maps with a recorded hash (imageless allocations are not counted). */
     int size() {
         return idByHash.size();
     }
 
-    /** Load the manifest at {@code file} (absent gives an empty manifest), with no on-disk crash floor applied. */
+    /** Load the manifest at {@code file} (absent gives an empty manifest). */
     public static MapManifest load(Path file) throws IOException {
         if (!Files.exists(file)) {
             return empty();
@@ -136,9 +120,8 @@ public final class MapManifest {
 
     /**
      * The highest map-data file id under {@code dataDirectory}, across both on-disk layouts, or -1 if there are none:
-     * the 1.21.x flat {@code map_<n>.dat} directly in the directory, and the 26.x {@code maps/<n>.dat} subfolder form.
-     * A band passes its own data directory (26.x includes the namespace segment), and recognizing both keeps the resume
-     * id floor band-independent.
+     * the flat {@code map_<n>.dat} directly in the directory, and the namespaced {@code maps/<n>.dat} subfolder form.
+     * Recognizing both keeps the resume id floor band-independent.
      */
     public static int highestDataFileId(Path dataDirectory) throws IOException {
         int flat = highestMatching(dataDirectory, FLAT_MAP_PREFIX);
@@ -160,11 +143,9 @@ public final class MapManifest {
     }
 
     /**
-     * Whether resuming into {@code saveFolder} would mix map-id schemes: it holds imaged map data whose scheme (archive
-     * ids when a manifest is present, original ids otherwise) differs from {@code remapMapIds}. Map data is looked up
-     * in both the 1.21.x {@code data/} root and the 26.x {@code data/minecraft/} namespace root. A folder with no
-     * imaged map data never mismatches. An IO failure reads as no mismatch, so a bad disk read never fires a spurious
-     * warn.
+     * Whether resuming into {@code saveFolder} would mix map-id schemes: it holds map data whose scheme (archive ids
+     * when a manifest is present, original ids otherwise) differs from {@code remapMapIds}. A folder with no map data
+     * never mismatches. An IO failure reads as no mismatch.
      */
     public static boolean schemeMismatch(Path saveFolder, boolean remapMapIds) {
         try {
@@ -195,8 +176,8 @@ public final class MapManifest {
             return -1;
         }
         try {
-            // fields[0] is the write-only schema stamp: on load it is only sign-checked as a validity gate,
-            // its value unused (a forward-compat marker, like a DataVersion).
+            // fields[0] is the write-only schema stamp: on load it is only sign-checked as a validity gate, its value
+            // unused.
             if (Integer.parseInt(fields[0].trim()) < 0) {
                 return -1;
             }
@@ -212,12 +193,12 @@ public final class MapManifest {
         }
         String[] fields = line.split(SEPARATOR, -1);
         if (fields.length != 2 || fields[0].isEmpty()) {
-            return; // a torn or malformed line is skipped (crash-tolerant)
+            return;
         }
         try {
             idByHash.put(fields[0], Integer.parseInt(fields[1].trim()));
         } catch (NumberFormatException e) {
-            // A torn trailing id is skipped
+            // An id that does not parse skips the line
         }
     }
 
@@ -229,7 +210,7 @@ public final class MapManifest {
         try {
             return Integer.parseInt(digits);
         } catch (NumberFormatException e) {
-            return -1; // a non-numeric stem, such as the 26.x maps/last_id.dat index, is not a map-data file
+            return -1; // a non-numeric stem, such as the maps/last_id.dat index, is not a map-data file
         }
     }
 }

@@ -34,10 +34,6 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The reload gate on a captured mount chest. Every case sizes each stack to its own slot index, because a stack count
- * assertion passes on shifted contents, which is how this shipped past every gate the suite already had.
- */
 class MountChestSlotsTest {
     // Vanilla's own slot addressing for a mount: 499 is the chest item, and 500 + n is chest slot n, answering
     // SlotAccess.NULL past the end.
@@ -95,7 +91,6 @@ class MountChestSlotsTest {
                         .captureChestSlots(menu, player);
         assertNotNull(holder, "fixture: a chested mount menu must yield a holder");
 
-        // What the flush does: the mount's own saved tag, with only "Items" replaced by the captured holder.
         CompoundTag saved = mount.saveWithoutId(new CompoundTag());
         saved.put("Items", holder.getList("Items", Tag.TAG_COMPOUND));
         reloaded.readAdditionalSaveData(saved);
@@ -122,8 +117,7 @@ class MountChestSlotsTest {
     }
 
     /**
-     * A llama at a chosen strength. The strength has to be set before the chest goes on, because the inventory is sized
-     * once, at that moment.
+     * The strength has to be set before the chest goes on, because the inventory is sized at that moment.
      */
     private static Llama llamaOfStrength(int strength) {
         Llama llama = new Llama(EntityType.LLAMA, HeadlessLevel.get());
@@ -131,7 +125,6 @@ class MountChestSlotsTest {
         return llama;
     }
 
-    /** The synced strength, reached by reflection because vanilla's own setter is private. */
     private static EntityDataAccessor<Integer> strengthId() {
         try {
             Field field = Llama.class.getDeclaredField("DATA_STRENGTH_ID");

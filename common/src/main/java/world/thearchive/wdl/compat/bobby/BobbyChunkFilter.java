@@ -9,14 +9,6 @@ import org.slf4j.LoggerFactory;
 
 import world.thearchive.wdl.platform.PlatformBridge;
 
-/**
- * Rejects Bobby's locally cached chunks from capture. Bobby serves cached {@code FakeChunk} objects through
- * {@code ClientChunkCache.getChunk}, which is exactly where terrain capture and the container-outline scan read; this
- * filter identifies them by class so those reads can treat a cached chunk as an unsent one.
- *
- * <p>Null-object: {@link #INACTIVE} matches nothing, so callers never null-check. Holds no compile-time Bobby
- * reference, the only mention is the class-name string, resolved reflectively.
- */
 public final class BobbyChunkFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(BobbyChunkFilter.class);
 
@@ -35,13 +27,11 @@ public final class BobbyChunkFilter {
         this.fakeChunkClass = fakeChunkClass;
     }
 
-    /** Resolve the shared filter once at startup; logs one line describing the outcome. */
+    /** Resolve the shared filter once at startup; logs at most one line describing the outcome. */
     public static BobbyChunkFilter resolve(PlatformBridge bridge) {
         return resolve(bridge.isModLoaded(BOBBY_MOD_ID), FAKE_CHUNK_CLASS, BobbyChunkFilter.class.getClassLoader());
     }
 
-    // Package-private seam: lets the unit test drive all three outcomes through the real Class.forName without a
-    // full PlatformBridge stub. initialize=false so no static initializer runs on resolution.
     static BobbyChunkFilter resolve(boolean bobbyPresent, String className, ClassLoader loader) {
         if (!bobbyPresent) {
             return INACTIVE;

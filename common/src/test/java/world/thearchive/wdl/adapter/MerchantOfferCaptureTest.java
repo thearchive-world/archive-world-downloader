@@ -25,14 +25,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the merchant-offer capture transform: {@link MerchantOfferCapture#serialize} writes a villager
- * or wandering trader's offers to the vanilla-shaped {@code {Offers:{Recipes:[...]}, Xp}} holder through the vanilla
- * {@code MerchantOffers} codec, and {@link MerchantOfferCapture#scrubAndRemapOffers} runs each offer's {@code sell}
- * item through the same item-location scrub and map-id remap every captured item takes. Real {@link ItemStack}s
- * carrying the components drive the round-trip, so a wrong key leaves the coordinate or the session map id and fails;
- * no live menu or {@code Level} is needed.
- */
 class MerchantOfferCaptureTest {
     private static RegistryAccess registries;
 
@@ -57,7 +49,6 @@ class MerchantOfferCaptureTest {
         return compass;
     }
 
-    /** A filled-map stack carrying {@code mapId} in its raw {@code "map"} tag (below 1.20.5, no {@code map_id}). */
     private static ItemStack filledMap(int mapId) {
         ItemStack map = new ItemStack(Items.FILLED_MAP);
         map.getOrCreateTag().putInt("map", mapId);
@@ -65,7 +56,6 @@ class MerchantOfferCaptureTest {
     }
 
     private static MerchantOffers offering(ItemStack sell) {
-        // Below 1.20.5 there is no ItemCost; a merchant offer's buy cost is a plain ItemStack.
         MerchantOffers offers = new MerchantOffers();
         offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), sell, 1, 0, 0.0f));
         return offers;
@@ -75,7 +65,6 @@ class MerchantOfferCaptureTest {
         return MerchantOfferCapture.serialize(offering(sell), 0, false);
     }
 
-    /** The {@code sell} item's pre-component {@code tag} compound (below 1.20.5, no {@code components} map). */
     private static CompoundTag sellItemTag(CompoundTag holder) {
         return holder.getCompound("Offers").getList("Recipes", 10).getCompound(0)
                 .getCompound("sell").getCompound("tag");
@@ -143,6 +132,6 @@ class MerchantOfferCaptureTest {
         CompoundTag holder = holderSelling(new ItemStack(Items.DIAMOND));
         holder.getCompound("Offers").getList("Recipes", 10).getCompound(0).remove("sell");
 
-        MerchantOfferCapture.scrubAndRemapOffers(holder, true, null); // must not throw; reaches the per-recipe skip
+        MerchantOfferCapture.scrubAndRemapOffers(holder, true, null);
     }
 }

@@ -23,34 +23,13 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The fixture-fidelity gate: proves a fixture tag carries the shape the vanilla producer that would have written it
- * actually emits.
- *
- * <p>The property gated is a fixed point of vanilla's own decode then encode. A block-entity tag is fed to
- * {@link BlockEntity#loadStatic} and saved back through {@link BlockEntity#save}; an {@code "Items"} holder is fed to
- * {@link ContainerHelper#loadAllItems} and saved back through {@link ContainerHelper#saveAllItems}. A fixture built
- * from a mental model rather than from the producer differs from its own round trip, because vanilla writes keys
- * unconditionally that a hand-built tag omits ({@code "Slot"} and {@code "Count"} on every item entry, and each block
- * entity's own always-written state). Such a fixture collapses the cases a test means to distinguish, so the test
- * passes for a reason unrelated to the behavior it names.
- *
- * <p>Nothing here is a key list to maintain. The producer is called, so the expected shape follows the band the tests
- * compile against.
- */
 public final class FixtureFidelity {
-    /**
-     * Written by the chunk layer around a saved block entity ({@code LevelChunk.getBlockEntityNbtForSaving}), not by
-     * the block entity itself, so it is invisible to the block-entity round trip and is set aside before it and
-     * restored after.
-     */
     public static final String KEEP_PACKED = "keepPacked";
 
     private static @Nullable Map<ResourceLocation, BlockState> representativeStates;
 
     private FixtureFidelity() {}
 
-    /** A freshly placed block entity of type {@code blockEntityId} at {@code x/y/z}, with no level behind it. */
     public static BlockEntity newBlockEntity(String blockEntityId, int x, int y, int z) {
         BlockPos pos = new BlockPos(x, y, z);
         BlockState state = representativeState(blockEntityId);
@@ -62,23 +41,14 @@ public final class FixtureFidelity {
         return blockEntity;
     }
 
-    /** What vanilla writes for {@code blockEntity}, the same call the chunk save makes. */
     public static CompoundTag save(BlockEntity blockEntity) {
         return blockEntity.save(new CompoundTag());
     }
 
-    /**
-     * The tag vanilla writes for a freshly placed block entity of {@code blockEntityId} at {@code x/y/z}: every
-     * always-written key at its default, and nothing else.
-     */
     public static CompoundTag blockEntityShape(String blockEntityId, int x, int y, int z) {
         return save(newBlockEntity(blockEntityId, x, y, z));
     }
 
-    /**
-     * Fail unless {@code blockEntityTag} is exactly what vanilla would write for the state it describes.
-     * {@link #KEEP_PACKED} is exempt, being written outside the block entity's own save.
-     */
     public static void assertBlockEntityShape(CompoundTag blockEntityTag) {
         CompoundTag subject = blockEntityTag.copy();
         subject.remove(KEEP_PACKED);
@@ -101,11 +71,6 @@ public final class FixtureFidelity {
         }
     }
 
-    /**
-     * Fail unless {@code holderTag}'s {@code "Items"} list is exactly what {@link ContainerHelper#saveAllItems} emits
-     * for the stacks it decodes to. Catches an entry missing {@code "Slot"}, whose {@code ItemStackWithSlot} decode
-     * silently lands every such entry on slot 0.
-     */
     public static void assertItemsHolderShape(CompoundTag holderTag) {
         Tag rawItems = holderTag.get("Items");
         if (rawItems != null && !(rawItems instanceof ListTag)) {
@@ -126,10 +91,6 @@ public final class FixtureFidelity {
         }
     }
 
-    /**
-     * A container wide enough to hold every slot the list names, so the round trip is testing the entries' shape rather
-     * than {@code ItemStackWithSlot.isValidInContainer} dropping an out-of-range one.
-     */
     private static int containerSize(ListTag items) {
         int highest = -1;
         for (int i = 0; i < items.size(); i++) {
@@ -139,7 +100,6 @@ public final class FixtureFidelity {
         return highest + 1;
     }
 
-    /** The default state of some block hosting {@code blockEntityId}, for the load side of the round trip. */
     private static BlockState representativeState(String blockEntityId) {
         ResourceLocation id = new ResourceLocation(blockEntityId);
         BlockState state = representativeStates().get(id);

@@ -18,26 +18,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The shared connection packet tee: a Netty handler inserted before the connection's {@code "packet_handler"} so it
- * observes the same decoded packet stream the client does, in both directions. Inbound it feeds the active
- * {@link EntityPacketCapture} the spawn and post-spawn packets it needs to reconstruct every non-player entity
- * independent of unload; outbound it hands the active {@link OpenClickTracker} the one request that opens a ridden
- * vehicle's own inventory. It always forwards every packet unchanged in both directions, so it has zero effect on what
- * the client receives or sends.
- *
- * <p>Anchored on {@code "packet_handler"}, which is added once per connection and never renamed or removed, so a single
- * insertion survives the login to configuration to play handler swaps (the inbound {@code "decoder"} /
- * {@code "inbound_config"} and {@code "bundler"} are torn down and recreated repeatedly across those switches,
- * {@code "packet_handler"} is not). Installed unconditionally at play-join: the capture mechanism is on by default, and
- * the tee no-ops whenever no capture is publishing an accumulator. The anchor also decides the outbound side: a write
- * starts at the pipeline TAIL, so a handler sitting between the encoder and {@code "packet_handler"} sees the packet
- * value object before it is serialized.
- *
- * <p>Runs on the Netty event-loop thread (the world state is applied later, on the main thread), so it treats each
- * packet as the source of truth at tee time and reads only the immutable, fully-materialized packet value objects. It
- * therefore publishes to the main thread rather than calling into capture state directly. Two reads are non-public and
- * reachable only through a loader-specific mechanism (a Fabric access widener, a NeoForge access transformer), so each
- * per-loader plug supplies them: the connection's channel and the relative-move packet's entity id.
+ * Runs on the Netty event-loop thread (the world state is applied later, on the main thread), so it treats each packet
+ * as the source of truth at tee time and reads only the immutable, fully-materialized packet value objects. It
+ * therefore publishes to the main thread rather than calling into capture state directly.
  */
 public abstract class ConnectionTee extends ChannelDuplexHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionTee.class);
@@ -45,7 +28,6 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
 
     private static volatile boolean transferSignal;
 
-    /** Netty side: a configuration-phase re-entry was teed; the next controller tick stops the download. */
     static void signalTransfer() {
         transferSignal = true;
     }
@@ -67,21 +49,18 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
         transferSignal = false;
     }
 
-    /** The connection's Netty channel; the per-loader plug widens or transforms the non-public field. */
     protected abstract Channel channel(Connection connection);
 
-    /** A relative-move packet's entity id; the per-loader plug widens or transforms the non-public field. */
     protected abstract int entityId(ClientboundMoveEntityPacket move);
 
     /**
-     * Insert this tee into {@code connection}'s pipeline before {@code "packet_handler"}, once. Fail-soft: any pipeline
-     * surprise is logged, never thrown, so it never disrupts the connection.
+     * Insert this tee into {@code connection}'s pipeline before {@code "packet_handler"}, once.
      */
     protected final void installInto(Connection connection) {
         try {
             ChannelPipeline pipeline = channel(connection).pipeline();
             if (pipeline.get("packet_handler") == null || pipeline.get(NAME) != null) {
-                return; // not a configured play pipeline, or already installed
+                return;
             }
             pipeline.addBefore("packet_handler", NAME, this);
             LOGGER.info("connection tee installed on the play connection");
@@ -100,17 +79,11 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
                 LOGGER.warn("connection tee inspection failed (the packet is still delivered)", e);
             }
         }
-        context.fireChannelRead(message); // always forward, unchanged: the tee never consumes
+        context.fireChannelRead(message);
     }
 
     /**
-     * Observe the one outgoing request that opens a ridden vehicle's own inventory, so the ridden-vehicle bind rests on
-     * the client's own act rather than on a sampled key. Vanilla builds and sends this from exactly one place,
-     * {@code LocalPlayer.sendOpenInventory}, called only by the inventory-key branch of
-     * {@code Minecraft.handleKeybinds} and only when the ridden vehicle has a custom inventory screen, so seeing it
-     * means vanilla has already decided to open the vehicle's menu, once per request.
-     *
-     * <p>The packet names the PLAYER, not the vehicle ({@code ServerboundPlayerCommandPacket} is constructed from the
+     * The packet names the PLAYER, not the vehicle ({@code ServerboundPlayerCommandPacket} is constructed from the
      * sending entity), and this runs on the Netty event loop where no world state may be read, so it only raises a
      * signal and {@link OpenClickTracker} stamps the vehicle on the main thread.
      */
@@ -120,20 +93,16 @@ public abstract class ConnectionTee extends ChannelDuplexHandler {
                 && command.getAction() == ServerboundPlayerCommandPacket.Action.OPEN_INVENTORY) {
             OpenClickTracker.signalOpenInventoryRequest();
         }
-        super.write(context, message, promise); // always forward, unchanged: the tee never consumes
+        super.write(context, message, promise);
     }
 
     private void route(Packet<?> packet, EntityPacketCapture capture) {
-        // No inbound packet bundling below 1.19.4, so there is no bundle-scoped SetPassengers pre-scan: every
-        // packet routes directly and SetPassengers arrives as an ordinary in-stream packet, so no ids are named
-        // ahead of their spawn and bundleNamedIds is always empty here.
         routeOne(packet, capture, IntSets.EMPTY_SET);
     }
 
     private void routeOne(Packet<?> packet, EntityPacketCapture capture, IntSet bundleNamedIds) {
         if (packet instanceof ClientboundMoveEntityPacket move) {
-            // A relative move's entity id has no public getter, so the capture cannot read it; pass the loader's
-            // widened or transformed field. Every other entity packet exposes its id publicly.
+            // A relative move's entity id has no public getter, so the capture cannot read it.
             capture.onMove(entityId(move), move);
         } else {
             capture.accept(packet, bundleNamedIds);

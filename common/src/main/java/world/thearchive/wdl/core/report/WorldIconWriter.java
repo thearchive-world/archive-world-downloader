@@ -11,12 +11,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Writes the source server's icon bytes to {@code <saveRoot>/icon.png}, where MC reads the world-list thumbnail and the
- * report's {@code <img src="../icon.png">} resolves. The bytes are already a PNG (vanilla validates the server icon),
- * so they are written as-is. Fail-soft like every report write: a failure is caught and logged, never thrown, so it can
- * never corrupt the openable save. A convenience world artifact, not part of the machine contract.
- */
 public final class WorldIconWriter {
     private static final Logger LOGGER = Logger.getLogger(WorldIconWriter.class.getName());
     private static final String ICON_FILE = "icon.png";

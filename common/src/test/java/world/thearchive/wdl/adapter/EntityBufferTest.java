@@ -22,13 +22,8 @@ import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The headless guard for the per-tick entity accumulation buffer: entities are keyed by UUID so re-seeing one in a new
- * chunk re-homes it (the write-time dedup, within-session), and chunks drain independently so the buffer stays bounded
- * as the player roams (it is the entity analog of the keep-hot chunk buffer).
- *
- * <p>The chunk view is served from an index rather than a scan, so several tests here pin the invariant that the chunks
- * it reports partition the buffer exactly: an entity the chunk view fails to report is never written and never counted
- * as a drop, so it would leave a silently short save that reports itself clean.
+ * The chunk view is served from an index rather than a scan: an entity the chunk view fails to report is never written
+ * and never counted as a drop, so it would leave a silently short save that reports itself clean.
  */
 class EntityBufferTest {
     private static final UUID UUID_A = new UUID(0, 1);
@@ -38,7 +33,7 @@ class EntityBufferTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // ChunkPos static init needs the vanilla bootstrap (SharedConstants)
+        TestRegistries.frozen();
     }
 
     private static CompoundTag tag(String marker) {
@@ -69,7 +64,7 @@ class EntityBufferTest {
     void reSeeingAnEntityInNewChunkReHomesItAndDropsTheStaleCopy() {
         EntityBuffer buffer = new EntityBuffer();
         buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("old"));
-        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("new")); // it walked into a new chunk
+        buffer.accumulate(UUID_A, new ChunkPos(5, 5), tag("new"));
 
         assertTrue(buffer.drainChunk(new ChunkPos(0, 0)).isEmpty(), "the stale copy is gone from the old chunk");
         List<CompoundTag> current = buffer.drainChunk(new ChunkPos(5, 5));
@@ -166,7 +161,7 @@ class EntityBufferTest {
 
         List<String> markers = new ArrayList<>();
         for (ChunkPos pos : buffer.bufferedChunks()) {
-            markers.addAll(markersOf(buffer.drainChunk(pos))); // the flush loop drains inside the iteration
+            markers.addAll(markersOf(buffer.drainChunk(pos)));
         }
 
         assertEquals(Set.of("a", "b"), new HashSet<>(markers));
@@ -179,8 +174,8 @@ class EntityBufferTest {
         buffer.accumulate(UUID_A, new ChunkPos(0, 0), tag("a"));
         buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
         buffer.accumulate(UUID_C, new ChunkPos(1, 1), tag("c"));
-        buffer.accumulate(UUID_A, new ChunkPos(1, 1), tag("a-moved")); // re-home into an occupied chunk
-        buffer.accumulate(UUID_B, new ChunkPos(2, 2), tag("b-moved")); // re-home, emptying (0, 0)
+        buffer.accumulate(UUID_A, new ChunkPos(1, 1), tag("a-moved"));
+        buffer.accumulate(UUID_B, new ChunkPos(2, 2), tag("b-moved"));
         buffer.accumulate(UUID_D, new ChunkPos(2, 2), tag("d"));
 
         List<String> markers = new ArrayList<>();
@@ -218,7 +213,7 @@ class EntityBufferTest {
         buffer.accumulate(UUID_B, new ChunkPos(0, 0), tag("b"));
 
         List<CompoundTag> drained = buffer.drainChunk(new ChunkPos(0, 0));
-        drained.removeIf(tag -> "a".equals(tag.getString("id"))); // the caller filters the drain in place
+        drained.removeIf(tag -> "a".equals(tag.getString("id")));
 
         assertEquals(List.of("b"), markersOf(drained));
     }

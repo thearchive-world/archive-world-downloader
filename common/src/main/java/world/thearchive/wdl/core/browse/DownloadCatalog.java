@@ -20,12 +20,6 @@ import world.thearchive.wdl.core.report.DownloadSession;
 import world.thearchive.wdl.core.report.SaveChunks;
 import world.thearchive.wdl.core.report.WorldIconWriter;
 
-/**
- * Lists the wdl-managed downloads under the saves directory as {@link DownloadEntry} rows, reading each one's summary,
- * health, and icon from its {@code wdl/} record and siblings without walking the folder; the row's size is filled in
- * later by the screen's own on-disk walk. MC-free and headless: it is handed the saves directory and the
- * currently-loaded world path; the client facts come from the caller.
- */
 public final class DownloadCatalog {
     private static final Logger LOGGER = Logger.getLogger(DownloadCatalog.class.getName());
 
@@ -59,7 +53,7 @@ public final class DownloadCatalog {
         DownloadSession latestComplete = null;
         for (DownloadSession session : DownloadReportLog.readDownloads(folder)) {
             if (!session.isComplete()) {
-                pending = session; // a surviving crash sentinel (at most one per folder)
+                pending = session;
             } else if (isNewerThan(session, latestComplete)) {
                 latestComplete = session;
             }
@@ -69,8 +63,6 @@ public final class DownloadCatalog {
         byte[] icon = readIcon(folder);
         boolean tainted = SinglePlayerTaint.isTainted(folder);
 
-        // Complete only when a completion record exists and no live sentinel survives; otherwise recoverable,
-        // which deliberately surfaces no summary. The size is not read here: the screen walks the folder.
         if (latestComplete != null && pending == null) {
             String worldName = worldName(latestComplete, folderName);
             DownloadHealth health = latestComplete.isClean() ? DownloadHealth.COMPLETE : DownloadHealth.PARTIAL;
@@ -78,10 +70,7 @@ public final class DownloadCatalog {
             SaveChunks saveChunks = latestComplete.saveChunks();
             DownloadCounts rowCounts = sessionCounts;
             boolean chunksOnly = false;
-            // A resume knows its cumulative chunk total but not a cumulative entity or container count, so
-            // it shows chunks only; a total not exceeding the session chunks (failed, empty, or undercounted
-            // scan) falls back wholesale, never a smaller-than-session number. Both locals are null-checked
-            // here so NullAway sees the guard before either is dereferenced.
+            // A total not exceeding the session chunks falls back wholesale, never a smaller-than-session number.
             if (sessionCounts != null && saveChunks != null && saveChunks.total() > sessionCounts.chunks()) {
                 rowCounts = new DownloadCounts(saveChunks.total(), sessionCounts.entities(),
                         sessionCounts.containers());
@@ -106,7 +95,6 @@ public final class DownloadCatalog {
         return instant != null ? instant.toEpochMilli() : 0L;
     }
 
-    /** The world's full level.dat name: the recorded download name, or the folder name when none was recorded. */
     private static String worldName(@Nullable DownloadSession session, String folderName) {
         if (session == null) {
             return folderName;

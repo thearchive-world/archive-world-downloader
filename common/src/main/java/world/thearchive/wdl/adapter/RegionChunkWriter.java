@@ -12,28 +12,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The per-chunk discipline for region writes: a read, merge, or write that throws for one chunk is logged, that chunk
- * is skipped, and the save continues.
+ * The per-chunk discipline for region writes: a read, merge, or write that throws an exception for one chunk is logged,
+ * that chunk is skipped, and the save continues.
  */
 final class RegionChunkWriter {
     private static final Logger LOGGER = LoggerFactory.getLogger(RegionChunkWriter.class);
 
     private RegionChunkWriter() {}
 
-    /**
-     * Carry forward what the on-disk tag holds and the fresh capture lacks; returns the merge-back count. May mutate
-     * {@code fresh} in place, and may throw while doing so: a throw abandons the write, so a partly-carried
-     * {@code fresh} is never persisted. Mutations to {@code onDisk} are never written back.
-     */
     @FunctionalInterface
     public interface ChunkReadMerge {
         int merge(CompoundTag onDisk, CompoundTag fresh);
     }
 
-    /**
-     * Mutate a chunk tag in place, returning how many nodes changed. May throw, and a throw abandons the write exactly
-     * as a throwing merge does.
-     */
     @FunctionalInterface
     public interface ChunkRewrite {
         int apply(CompoundTag tag);
@@ -52,19 +43,10 @@ final class RegionChunkWriter {
         FAILED
     }
 
-    /**
-     * A read-merge write's outcome, the merge-back count the merge reported (zero unless re-captured), and separately
-     * the count an after-merge step carried in. The two are not summed: a merge-back came from this chunk's own prior
-     * copy, an after-merge carry came from somewhere else, and only the second says a record moved between downloads.
-     */
     record MergeWriteResult(MergeOutcome outcome, int mergeBacks, int recoveredCarries) {}
 
     /**
-     * Runs on the writer thread, which solely owns {@code storage}. The prior may be a resumed download's or this
-     * session's own earlier flush of the same chunk, so this is the ordinary revisit path and not only the resume path.
-     * A {@code null} tag is {@link MergeOutcome#NOTHING_TO_WRITE}. A read that throws and a merge that throws both
-     * leave what is stored untouched as {@link MergeOutcome#PRESERVED}, discarding the whole of {@code tag} rather than
-     * only the part the merge would have added; a write that throws is {@link MergeOutcome#FAILED}.
+     * Runs on the writer thread, which solely owns {@code storage}.
      */
     public static MergeWriteResult writeMerging(IOWorker storage, ChunkPos pos,
             @Nullable CompoundTag tag, ChunkReadMerge merge) {
@@ -74,9 +56,7 @@ final class RegionChunkWriter {
     /**
      * As above, plus {@code afterMerge}, run on the merged tag once the prior copy of this same chunk has had its say
      * and before anything is written. Ordering is the contract: a step run here can only see what the chunk's own prior
-     * did not supply, so a carry sourced from another chunk can never displace this one's. A throw from it is the same
-     * loss as a throwing merge and is preserved the same way, which is why it sits inside that try rather than beside
-     * the write.
+     * did not supply, so a carry sourced from another chunk can never displace this one's.
      */
     public static MergeWriteResult writeMerging(IOWorker storage, ChunkPos pos,
             @Nullable CompoundTag tag, ChunkReadMerge merge, @Nullable ChunkRewrite afterMerge) {
@@ -118,13 +98,9 @@ final class RegionChunkWriter {
     }
 
     /**
-     * Read an already-written chunk, fold detached open-time holders onto its block entities in place, and write it
-     * back: the recovery path for a container or lectern opened in a chunk that had already flushed and left the
-     * keep-hot buffer, so its captured contents never reached the on-disk block entity through the normal per-chunk
-     * drain. The prior chunk carries the terrain and every already-saved container, so {@code rewrite} only adds the
-     * newly-captured contents. Returns how many block entities the fold landed contents on, and zero when there is no
-     * on-disk prior to fold into (the contents are logged as lost rather than synthesized onto a terrainless chunk) or
-     * a read, fold, or write failure isolates the chunk per the per-chunk discipline, never aborting the drain.
+     * Returns how many block entities the fold landed contents on, and zero when there is no on-disk prior to fold into
+     * (the contents are logged as lost rather than synthesized onto a terrainless chunk) or a read, fold, or write
+     * failure isolates the chunk per the per-chunk discipline, never aborting the drain.
      */
     public static int rewriteExisting(IOWorker storage, ChunkPos pos, ChunkRewrite rewrite) {
         CompoundTag onDisk;

@@ -25,11 +25,6 @@ import world.thearchive.wdl.core.CuratedGameRule;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The SPI warm hook: the 1.21.11 override drives the memoized reconstruction, the same warmed set reaches the
- * level-data build (so a DEFAULT world still encodes), and the interface default is inert for a band that never
- * reconstructs worldgen.
- */
 class LevelDataWriterWarmTest {
     @BeforeAll
     static void primeTags() {
