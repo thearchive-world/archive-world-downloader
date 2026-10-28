@@ -19,7 +19,9 @@ import re
 import sys
 from collections import Counter, defaultdict
 
-RECON = "/tmp/claude-1000/-mnt-c-data-ws-git-minecraft-mods-wdl/c9049057-2435-42cd-85b6-ef52210f94ca/scratchpad/recon"
+if len(sys.argv) != 2:
+    sys.exit(f"usage: {sys.argv[0]} <recon-dir>")
+RECON = sys.argv[1]
 SCRATCH = RECON + "/compose"
 
 MOJ_FILES = [RECON + "/moj_client_1144.txt", RECON + "/moj_server_1144.txt"]
