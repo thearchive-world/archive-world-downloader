@@ -8,14 +8,12 @@ import net.fabricmc.loader.api.ModContainer;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Fabric journeymap-entrypoint adapter that yields the JourneyMap plugin matching the installed generation. Two
- * JourneyMap generations serve this Minecraft, and both read the single journeymap entrypoint eagerly through
- * getEntrypoints, which instantiates every listed entry and aborts the whole scan, JourneyMap's own plugins included,
- * if one throws. No static entrypoint form survives that: a bare class link-loads the wrong-generation plugin's absent
+ * Two JourneyMap generations serve this Minecraft, and both read the single journeymap entrypoint, up to JourneyMap
+ * 6.0.4 eagerly through {@code getEntrypoints}, which instantiates every listed entry and aborts the whole scan if one
+ * throws. No static entrypoint form survives that: a bare class link-loads the wrong-generation plugin's absent
  * interface, a method reference demands a single-method interface, and a field reference is checked against its
- * declared type. A custom language adapter is the one path the loader routes per entry with the requested plugin
- * interface as the type argument, so this constructs only the matching-generation plugin and returns null, never
- * throwing, for anything else. Forge discovers the plugins by annotation and needs none of this.
+ * declared type. A custom language adapter receives the requested plugin interface as the type argument per entry, so
+ * this constructs only the matching-generation plugin and returns null, never throwing, for anything else.
  */
 public final class WdlJourneyMapAdapter implements LanguageAdapter {
     private static final String V2_PLUGIN = "world.thearchive.wdl.compat.journeymap.v2.WdlJourneyMapPlugin";
@@ -35,7 +33,7 @@ public final class WdlJourneyMapAdapter implements LanguageAdapter {
             }
             return type.cast(resolved.getDeclaredConstructor().newInstance());
         } catch (ReflectiveOperationException | LinkageError e) {
-            // Returning null rather than throwing is deliberate: a throw aborts JourneyMap's entire eager
+            // Returning null rather than throwing is deliberate: up to JourneyMap 6.0.4 a throw aborts its entire eager
             // entrypoint scan and drops every plugin, so a wdl-side failure stays a missing wdl overlay.
             return null;
         }

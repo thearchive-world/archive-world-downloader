@@ -15,13 +15,6 @@ import net.minecraft.stats.StatType;
 import net.minecraft.stats.StatsCounter;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Pure JSON builders for the player's progress surfaces: data in, detached JSON bytes out, no {@code Minecraft} or live
- * client state, so the logic is headless-testable. The advancement value shape is vanilla's own
- * {@code AdvancementProgress.Serializer} Gson adapter; the stats shape is hand-built (the vanilla serializer is
- * server-only). The advancement id is keyed as a plain {@code String} so the band-renamed id codec
- * ({@code ResourceLocation} vs {@code Identifier}) never appears here.
- */
 final class PlayerProgressSerializer {
     private static final Gson gson = new GsonBuilder()
             .registerTypeAdapter(AdvancementProgress.class, new AdvancementProgress.Serializer())
@@ -29,7 +22,6 @@ final class PlayerProgressSerializer {
 
     private PlayerProgressSerializer() {}
 
-    /** The {@code advancements/<uuid>.json} bytes: id-string keyed progress + a {@code DataVersion} stamp. */
     static byte[] advancementsJson(Map<String, AdvancementProgress> progressById, int dataVersion) {
         JsonObject root = new JsonObject();
         progressById.forEach((id, progress) -> root.add(id, gson.toJsonTree(progress)));
@@ -38,10 +30,7 @@ final class PlayerProgressSerializer {
     }
 
     /**
-     * The {@code stats/<uuid>.json} bytes grouped by stat type ({@code {stats:{typeId:{valueId:count}}}}) plus a
-     * {@code DataVersion} stamp, enumerated over the full stat-type registry (captures modded types too, like vanilla's
-     * own dispatched map) keeping only counts {@code > 0}. Returns {@code null} when nothing enumerates (an empty
-     * result means no stats reply landed, so the caller writes no file rather than an empty one).
+     * Returns {@code null} when nothing enumerates, so the caller writes no file rather than an empty one.
      */
     static byte @Nullable [] statsJson(StatsCounter counter, int dataVersion) {
         JsonObject stats = new JsonObject();

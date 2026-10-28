@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-/** The MC-free live counts: chunks, containers, and the live per-UUID entity tally. */
 class CaptureCountsTest {
     @Test
     void carriesChunksContainersAndEntities() {

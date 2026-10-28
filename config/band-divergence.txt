@@ -30,17 +30,16 @@
 # PackRepository(new ServerPacksSource()).
 common/src/test/java/world/thearchive/wdl/testsupport/TestRegistries.java
 
-# At Fabric API 0.92.11+1.20.1 the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the
-# peek key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API for 26.2 registers a HUD
-# element through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
+# On 1.20.1's Fabric API the client entrypoint registers the HUD overlay through HudRenderCallback.EVENT and the peek
+# key through KeyBindingHelper.registerKeyBinding (keybinding.v1), where dev's Fabric API registers a HUD element
+# through HudElementRegistry.addLast under an Identifier and the key through KeyMappingHelper.registerKeyMapping
 # (keymapping.v1).
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricClient.java
 
-# At Fabric API 0.92.11+1.20.1 the platform bridge reads the pause-menu widget list through Screens.getButtons,
-# registers the key through KeyBindingHelper.registerKeyBinding and builds the client command tree through
-# ClientCommandManager (command.v2), where dev's Fabric API for 26.2 names them Screens.getWidgets,
-# KeyMappingHelper.registerKeyMapping and ClientCommands; against 1.20.2 the file differs only in where the
-# buildPauseMenuRow call wraps.
+# On 1.20.1's Fabric API the platform bridge reads the pause-menu widget list through Screens.getButtons, registers the
+# key through KeyBindingHelper.registerKeyBinding and builds the client command tree through ClientCommandManager
+# (command.v2), where dev's Fabric API names them Screens.getWidgets, KeyMappingHelper.registerKeyMapping and
+# ClientCommands; against 1.20.2 the file differs only in where the buildPauseMenuRow call wraps.
 fabric/src/main/java/world/thearchive/wdl/fabric/FabricPlatformBridge.java
 
 # Deleted: the client game tests dev carries under fabric/src/gametest/. fabric-client-gametest-api-v1 first shipped
@@ -118,14 +117,6 @@ common/src/test/java/world/thearchive/wdl/testsupport/HeadlessLevel.java
 # not a Registry, below 1.21.2).
 common/src/test/java/world/thearchive/wdl/testsupport/RegistriesSmokeTest.java
 
-# Resolves an item by id via Registry.get, the pre-1.21.2 accessor (renamed getValue at 1.21.2). Below the 1.21 update
-# ResourceLocation has no parse factory, so an id string is built with the public ResourceLocation(String) constructor.
-# Below 1.20.5 there are no item components: a custom name is set via ItemStack#setHoverName, a single stored stack is
-# written with ItemStack#save (a {id, Count, tag} compound with Count as a byte, where 1.20.1's ItemStack.CODEC encodes
-# Count as an int), a written book's title/author/pages live directly on the item's tag, and
-# ContainerHelper.saveAllItems takes no registries argument.
-common/src/test/java/world/thearchive/wdl/testsupport/ItemFixtures.java
-
 # Below 1.21.2 ChunkSerializer.read needs a ServerLevel the headless test lacks, so the round-trip proves
 # self-consistency by decoding each section's block-state and biome container directly.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkRoundTripTest.java
@@ -165,8 +156,7 @@ common/src/test/java/world/thearchive/wdl/adapter/impl/EntitySinkRootVehicleTest
 # The geared mob double is built against the HeadlessLevel, since below 1.21.2 the Mob constructor reads
 # level.getProfilerSupplier() and cannot take a null level. 1.20.1 keeps the entity type constants on EntityType and the
 # banner items as per-color constants such as Items.WHITE_BANNER (26.2 moved them to EntityTypes and the Items.BANNER
-# collection), has no COPPER_HELMET (added at 1.21.9) or PARCHED (added at 26.2) to assert on, and its Javadoc stamp
-# reads Verified against decompiled 1.20.1, where 1.20.2's reads 1.20.2.
+# collection), has no COPPER_HELMET (added at 1.21.9) or PARCHED (added at 1.21.11) to assert on.
 common/src/test/java/world/thearchive/wdl/adapter/impl/NaturalEquipmentTest.java
 
 # Below the 1.21 update the HUD render callback carries a float partial-tick rather than a DeltaTracker, so the shared
@@ -211,7 +201,8 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygons.jav
 # Minecraft 1.20.1 has two JourneyMap generations in the wild (5.x on the 1.9 API, 6.x on the 2.0 API), so 1.20.1
 # carries a second plugin for the 2.0 API under compat/journeymap/v2 beside the 1.9 one at the base package. The shared
 # coverage geometry (the tracer and its HoledRing) is public so the v2 polygon builder can reach it across packages; dev
-# and 1.20.2 carry a single JourneyMap generation and keep it package-private.
+# and 1.20.2 carry a single JourneyMap generation and keep it package-private. Its trace and HoledRing keep their
+# one-line Javadoc contracts, which the v2 polygon builder reads.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/CoveragePolygonTracer.java
 
 # Added: the 2.0 plugin entry for 1.20.1's second JourneyMap generation, discovered by the JourneyMapPlugin annotation
@@ -230,11 +221,11 @@ common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/CoveragePolygons.
 # compat/journeymap/v2 subpackage.
 common/src/main/java/world/thearchive/wdl/compat/journeymap/v2/package-info.java
 
-# Added: the Fabric language adapter for 1.20.1's two JourneyMap generations. JourneyMap reads the journeymap entrypoint
-# eagerly and fails the whole scan if a listed entry throws, so neither plugin can be a static entry; the loader routes
-# the adapter per entry with the requested plugin interface as its type argument, so it constructs only the plugin
-# matching the installed JourneyMap and returns null otherwise. A single-generation band lists its plugin in the
-# manifest directly and has no adapter.
+# Added: the Fabric language adapter for 1.20.1's two JourneyMap generations. JourneyMap up to 6.0.4 reads the
+# journeymap entrypoint eagerly and fails the whole scan if a listed entry throws, so neither plugin can be a static
+# entry; the loader routes the adapter per entry with the requested plugin interface as its type argument, so it
+# constructs only the plugin matching the installed JourneyMap and returns null otherwise. A single-generation band
+# lists its plugin in the manifest directly and has no adapter.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlJourneyMapAdapter.java
 
 # The Fabric manifest declares the wdl_jm language adapter and routes the journeymap entrypoint through it rather than
@@ -255,19 +246,12 @@ common/src/test/java/world/thearchive/wdl/adapter/PlayerTagTest.java
 # Provider, and ContainerHelper.loadAllItems/saveAllItems take no registries argument.
 common/src/test/java/world/thearchive/wdl/testsupport/FixtureFidelity.java
 
-# Below the 1.21 update a captured jukebox carries the pre-JukeboxSongPlayer playing flag (IsPlaying) rather than
-# the ticks_since_song_started sidecar, so these merge fixtures and assertions use that key. Below 1.20.5 a beehive
-# block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and vanilla's
-# JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount alongside a present RecordItem, so the
-# jukebox fixture carries those too and the beehive fixture goes through the unchecked malformedChunkTagWith
-# instead of the fidelity-checked chunkTagWith.
+# Below the 1.21 update a captured jukebox carries the pre-JukeboxSongPlayer playing flag (IsPlaying) rather than the
+# ticks_since_song_started sidecar, so these merge fixtures and assertions use that key. Below 1.20.5 a beehive block
+# entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and vanilla's
+# JukeboxBlockEntity.saveAdditional always writes RecordStartTick/TickCount, so the jukebox fixture carries those too;
+# the beehive fixture goes through the unchecked malformedChunkTagWith instead of the fidelity-checked chunkTagWith.
 common/src/test/java/world/thearchive/wdl/adapter/ChunkMergeTest.java
-
-# Below the 1.21 update a captured jukebox is marked playing via IsPlaying rather than the ticks_since_song_started
-# sidecar, so this round-trip asserts the playing flag. Below 1.20.5 there are no item components: the RecordItem
-# write is ItemStack#save (read back via vanilla's own ItemStack.of) and the beehive occupants are the
-# pre-component {EntityData, TicksInHive, MinOccupationTicks} entries under Bees rather than Occupant.LIST_CODEC.
-common/src/test/java/world/thearchive/wdl/adapter/InteractionMergeRoundTripTest.java
 
 # Below 1.20.5 there is no SimpleRegionStorage or RegionStorageInfo, so the region storage this writer drains against is
 # the vanilla IOWorker, one per dimension from the caller's opener: loadAsync, synchronize and close directly, store
@@ -371,9 +355,8 @@ common/src/main/java/world/thearchive/wdl/adapter/MenuChangeTracker.java
 common/src/main/java/world/thearchive/wdl/adapter/MerchantOfferCapture.java
 
 # Below 1.20.5 an item's data lives in its tag compound rather than a components map: the lodestone target is the raw
-# LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position (carried by a
-# pre-component item's whole block-entity copy) are tag.BlockEntityTag.Bees[].EntityData.FlowerPos and
-# tag.BlockEntityTag.FlowerPos, both of which the scrub clears.
+# LodestonePos/LodestoneDimension keys, and a beehive's occupants and the hive's own flower position are
+# tag.BlockEntityTag.Bees[].EntityData.FlowerPos and tag.BlockEntityTag.FlowerPos, both of which the scrub clears.
 common/src/main/java/world/thearchive/wdl/adapter/ItemLocationScrub.java
 
 # Below 1.20.5 ContainerHelper.loadAllItems takes no registries argument.
@@ -405,18 +388,14 @@ common/src/test/java/world/thearchive/wdl/adapter/InteractionStashMergeTest.java
 # Consumer<String>).
 common/src/test/java/world/thearchive/wdl/adapter/ItemLocationScrubTest.java
 
-# Below 1.20.5 an item is {id, Count, tag}; the walk drives hand-built NBT keyed by tag.BlockEntityTag.Items (a
-# shulker) and tag.Items (a bundle) rather than the component keys, and there is no sulfur cube to recurse into.
+# Below 1.20.5 an item is {id, Count, tag} with no components map, so the test drives the walk with hand-built NBT keyed
+# by tag.BlockEntityTag.Items (a shulker) and tag.Items (a bundle) and drops the sulfur-cube case, since that walk has
+# no sulfur-cube branch.
 common/src/test/java/world/thearchive/wdl/adapter/ItemTreeWalkTest.java
 
 # Below 1.20.5 there is no WrittenBookContent component; a written book's title/author/generation/resolved and its
 # pages live directly on the item's tag, so the fixture and the read-back build/read that shape.
 common/src/test/java/world/thearchive/wdl/adapter/LecternRecaptureSynergyTest.java
-
-# Below 1.20.5 there are no WrittenBookContent/WritableBookContent components; a written book's
-# title/author/generation/resolved and its pages (JSON-component strings) live on the item's tag, an unsigned
-# book's pages are plain strings, and the read-back is vanilla's own ItemStack.of rather than ItemStack.CODEC.
-common/src/test/java/world/thearchive/wdl/adapter/LecternSinkRoundTripTest.java
 
 # Below 1.20.5 there is no WrittenBookContent component; a written book's title/author/generation/resolved and its
 # pages live directly on the item's tag, so the fixture and the read-back build/read that shape.
@@ -443,13 +422,12 @@ common/src/test/java/world/thearchive/wdl/adapter/MerchantStashMergeTest.java
 # AbstractChestedHorse writes each chest stack under its index in the mount's whole inventory, counting up from 2, and
 # its read refuses any saved entry numbered below 2, so a 0-based holder loses its two lowest stacks and lands every
 # survivor two slots early with no log line and no loss-report row. The gate reloads the captured holder through
-# vanilla's own readAdditionalSaveData rather than counting what came back, because a count is exactly what a
-# whole-chest shift leaves untouched. Its two cases are the two chest widths a captured mount can carry:
-# getInventorySize is a flat 17 for a chested donkey or mule rather than anything read off getInventoryColumns, while
-# Llama overrides it with 2 + 3 * getInventoryColumns and answers getInventoryColumns with its own strength, so the
-# llama case runs all five strengths vanilla's own setter clamps to. No band at or above 1.20.5 carries the file: the
-# write there is Slot = i - 1 counting up from 1 and the read puts j back at j + 1, which makes the 0-based holder dev
-# captures the correct one there.
+# vanilla's own readAdditionalSaveData rather than counting what came back. Its two cases are the two chest widths a
+# captured mount can carry: getInventorySize is a flat 17 for a chested donkey or mule rather than anything read off
+# getInventoryColumns, while Llama overrides it with 2 + 3 * getInventoryColumns and answers getInventoryColumns with
+# its own strength, so the llama case runs all five strengths vanilla's own setter clamps to. No band at or above 1.20.5
+# carries the file: the write there numbers the chest from 0 (Slot = i - 1 counting up from 1 through 1.21.4, and from
+# 1.21.5 a chest-only inventory written from 0), which makes the 0-based holder dev captures the correct one there.
 common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
 
 # Below 1.20.5 a beehive block entity's occupants key is still Bees (capitalized), the pre-lowercasing form, and
@@ -457,12 +435,6 @@ common/src/test/java/world/thearchive/wdl/adapter/MountChestSlotsTest.java
 # RecordItem, so the fixtures carry those too and the beehive fixture goes through the unchecked
 # malformedChunkTagWith instead of the fidelity-checked chunkTagWith.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredScanTest.java
-
-# Below 1.20.5 a block entity has no components map, so a custom name is the raw CustomName JSON key its setCustomName
-# writes (a BaseContainerBlockEntity, beacon, banner or enchantment table carries one) rather than a
-# minecraft:custom_name component, and a beehive's occupants are the pre-component {EntityData, TicksInHive,
-# MinOccupationTicks} entries under Bees rather than an Occupant.LIST_CODEC encode.
-common/src/test/java/world/thearchive/wdl/testsupport/BlockEntityFixtures.java
 
 # Below 1.20.5 an item's count is the raw Count byte (not a components-map int), so a hand-built entry without it
 # is silently dropped by ContainerHelper.saveAllItems rather than round-tripping with a single named key missing.
@@ -499,19 +471,18 @@ common/src/test/java/world/thearchive/wdl/adapter/ChunkFlushPlanTest.java
 # Below 1.20.3 NbtIo.readCompressed takes a File with no NbtAccounter argument.
 common/src/test/java/world/thearchive/wdl/adapter/LevelDatPlayerRoundTripTest.java
 
-# Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this round trip reads and writes through the File
-# forms.
+# Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this round trip reads through the File forms.
 common/src/test/java/world/thearchive/wdl/adapter/MapDataWriterRoundTripTest.java
 
 # Below 1.20.3 NbtIo has no Path or NbtAccounter overloads, so this write-task test uses the File forms.
 common/src/test/java/world/thearchive/wdl/adapter/MapWriteTaskTest.java
 
-# ModMenu 7.2.2, the 1.20.1 pin, ships no update-checker API (UpdateChecker, UpdateInfo and UpdateChannel arrived in a
-# later ModMenu; the 9.2.0 that 1.20.4 pins has them), so the entrypoint implements only the config-screen factory and
+# ModMenu 7.x, the 1.20.1 line, ships no update-checker API (UpdateChecker, UpdateInfo and UpdateChannel arrived in a
+# later ModMenu; the 9.x line 1.20.4 pins has them), so the entrypoint implements only the config-screen factory and
 # does not override getUpdateChecker.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlFabricModMenu.java
 
-# Deleted: ModMenu 7.2.2, the 1.20.1 pin, ships no update-checker API, so the ModMenu update-badge feeder is deleted
+# Deleted: ModMenu 7.x, the 1.20.1 line, ships no update-checker API, so the ModMenu update-badge feeder is deleted
 # rather than divergent; the launch update check still runs, only its ModMenu badge is gone.
 fabric/src/main/java/world/thearchive/wdl/fabric/WdlModMenuUpdateChecker.java
 
@@ -543,16 +514,16 @@ forge/src/main/resources/pack.mcmeta
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
 # 1.21.5 they return Optional and dev reads through the defaulting getCompoundOrEmpty, getListOrEmpty and getStringOr,
-# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero while the
-# assertions rely on -1. Below 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a
-# plain ItemStack buy cost and serializes through vanilla's own MerchantOffers.createTag.
+# and dev's getIntOr becomes a local intOr helper because getInt reads an absent key back as a real zero. Below 1.20.5
+# there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain ItemStack buy cost and
+# serializes through vanilla's own MerchantOffers.createTag.
 common/src/test/java/world/thearchive/wdl/adapter/RecoveredEntityContentTest.java
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound and getList return the value, where from 1.21.5 they
 # return Optional and dev reads through the defaulting getCompoundOrEmpty and getListOrEmpty, and dev's getIntOr becomes
-# a local intOr helper because getInt reads an absent key back as a real zero while the assertions rely on -1. Below
-# 1.20.5 there is no ItemCost and no MerchantOffers codec, so the merchant fixture takes a plain ItemStack buy cost and
-# serializes through vanilla's own MerchantOffers.createTag.
+# a local intOr helper because getInt reads an absent key back as a real zero. Below 1.20.5 there is no ItemCost and no
+# MerchantOffers codec, so the merchant fixture takes a plain ItemStack buy cost and serializes through vanilla's own
+# MerchantOffers.createTag.
 common/src/test/java/world/thearchive/wdl/adapter/MerchantOfferScrubTest.java
 
 # Below 1.21.5 the CompoundTag and ListTag accessors getCompound, getList and getString return the value, where from
@@ -582,25 +553,20 @@ common/src/test/java/world/thearchive/wdl/LangKeyCoverageTest.java
 # unconditionally and carries no such gate.
 build-logic/src/main/kotlin/wdl.nullness-conventions.gradle.kts
 
-# The consumer comment names :fabric alone as the remapping loader, 1.20.1 including no :neoforge; the code is dev's.
-build-logic/src/main/kotlin/wdl.common-merge.gradle.kts
-
 # The root includes common and fabric, the second loader being Forge, built by the island under forge/, where dev
-# includes common, fabric and neoforge. The comment preceding include(...) names why NeoForge is absent at 1.20.1 (its
-# only 1.20.1 line is the transitional 47.1.x fork, published as net.neoforged:forge and covered by the Forge jar),
-# where 1.20.2's names the missing Gradle module metadata of NeoForge 20.2.x.
+# includes common, fabric and neoforge.
 /settings.gradle.kts
 
 # The apply-false plugin block declares loom, spotless and mod-publish-plugin, the catalog-pinned plugins 1.20.1's
 # subprojects apply, and no moddev (1.20.2 declares moddev for its ModDevGradle-built common; dev declares the set for
-# common, fabric and neoforge), and the mod-publish-plugin note names :fabric as the sole applier.
+# common, fabric and neoforge).
 /build.gradle.kts
 
-# NeoForm has no 1.20.1 release (NeoForged forked from Forge at 1.20.2), so common builds on NeoGradle's vanilla plugin
-# (net.neoforged.gradle.vanilla 7.1.38, versioned inline) over mcp_config 1.20.1, with net.minecraft:client as an
-# implementation dependency and no Parchment layer, where 1.20.2 and dev build on ModDevGradle Vanilla mode over a
-# neoform_version. It pulls XaeroPlus's +forge flavor (1.20.2's common pulls +neoforge) and both JourneyMap API
-# generations, the loader-suffixless 1.9 SNAPSHOT and the 2.0 -common flavor, from jm.gserv.me and maven.blamejared.com.
+# NeoForm has no 1.20.1 release, so common builds on NeoGradle's vanilla plugin (net.neoforged.gradle.vanilla, versioned
+# inline) over the official client mappings, with net.minecraft:client as an implementation dependency and no Parchment
+# layer, where 1.20.2 and dev build on ModDevGradle Vanilla mode over a neoform_version. It pulls XaeroPlus's +forge
+# flavor (1.20.2's common pulls +neoforge) and both JourneyMap API generations, the loader-suffixless 1.9 SNAPSHOT and
+# the 2.0 -common flavor, from jm.gserv.me and maven.blamejared.com.
 common/build.gradle.kts
 
 # 1.20.1 is obfuscated, so the Fabric build applies fabric-loom with layered Mojang plus Parchment mappings, declares
@@ -617,6 +583,16 @@ fabric/build.gradle.kts
 forge/build.gradle.kts
 
 # The catalog carries loom, spotless and mod-publish-plugin, the plugins 1.20.1's builds apply, and no moddev entry
-# (1.20.2's carries moddev 2.0.146 for its ModDevGradle-built common; dev's carries loom for fabric, moddev for common
+# (1.20.2's carries a moddev entry for its ModDevGradle-built common; dev's carries loom for fabric, moddev for common
 # and neoforge, and mod-publish-plugin for fabric and neoforge); the tool-library entries match dev's.
 gradle/libs.versions.toml
+
+# Below 1.20.2 a proxy's backend switch does not end the download (no configuration phase signals it), so the rider
+# re-home test's recycled-id note names that switch, where the bands from 1.21.1 name a Flashback replay of one and
+# 1.20.2 to 1.20.6 carry no note.
+common/src/test/java/world/thearchive/wdl/adapter/EntityPacketAccumulatorTest.java
+
+# Below 1.20.2 a proxy's backend switch does not end the download, so the re-home guard's comment names that
+# switch as the way a held rider can belong to another world, where the bands from 1.21.1 name a Flashback replay
+# of one and 1.20.2 to 1.20.6 carry no comment.
+common/src/main/java/world/thearchive/wdl/adapter/EntityPacketAccumulator.java

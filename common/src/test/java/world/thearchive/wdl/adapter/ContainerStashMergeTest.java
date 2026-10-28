@@ -31,19 +31,10 @@ import world.thearchive.wdl.testsupport.BlockEntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the save-time container injection: {@link ContainerMerge#mergeChunkStash} locates a stashed
- * container's block entity inside the captured chunk tag by {@code BlockPos} (matching the {@code "block_entities"}
- * list's {@code x/y/z}) and sets its {@code "Items"}, touching no other block entity, then drains the merged entry as
- * the chunk is flushed. This is the part that must never mis-target (writing the wrong block's items corrupts the
- * archive), so it is proven headless with hand-built chunk tags (no live client, no {@code Level}).
- */
 class ContainerStashMergeTest {
     private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
 
-    // A sink that merges ONLY the holder's "Items", so the state-key tests prove the whitelist copy happens
-    // beside the sink rather than inside it.
     private static final ContainerSink ITEMS_ONLY_SINK = new ContainerSink() {
         @Override
         public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
@@ -77,11 +68,11 @@ class ContainerStashMergeTest {
         BlockPos chestPos = new BlockPos(10, 70, 20);
         CompoundTag chunkTag = chunkTagWith(
                 blockEntity("minecraft:chest", 10, 70, 20),
-                blockEntity("minecraft:furnace", 11, 70, 20)); // a neighbor BE that must stay untouched
+                blockEntity("minecraft:furnace", 11, 70, 20));
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(chestPos, holderWith(2, new ItemStack(Items.EMERALD, 7)));
-        BlockPos elsewhere = new BlockPos(100, 70, 200); // a container in a different chunk, not being flushed
+        BlockPos elsewhere = new BlockPos(100, 70, 200);
         stash.put(elsewhere, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
 
         int merged = ContainerMerge.mergeChunkStash(sink, chunkTag, new ChunkPos(chestPos), stash).merged();
@@ -102,7 +93,7 @@ class ContainerStashMergeTest {
     @Test
     void mergeChunkStashDrainsButDoesNotMergeWhenNoBlockEntityAtThePos() {
         BlockPos pos = new BlockPos(1, 64, 1);
-        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:chest", 2, 64, 1)); // a chest, but elsewhere
+        CompoundTag chunkTag = chunkTagWith(blockEntity("minecraft:chest", 2, 64, 1));
 
         Map<BlockPos, CompoundTag> stash = new LinkedHashMap<>();
         stash.put(pos, holderWith(0, new ItemStack(Items.DIAMOND, 1)));
@@ -120,9 +111,6 @@ class ContainerStashMergeTest {
 
     @Test
     void mergeChunkStashCountsThrowingMergeAsFailedButStillDrains() {
-        // A band merge that throws must be isolated: the block's items are lost, the entry is still drained (its
-        // chunk is leaving memory, so it cannot wait for a retry), and the loss is counted so the caller reports a
-        // partial save honestly instead of a clean one.
         ContainerSink throwingSink = new ContainerSink() {
             @Override
             public CompoundTag captureItems(NonNullList<ItemStack> items, RegistryAccess registries) {
@@ -163,9 +151,6 @@ class ContainerStashMergeTest {
         holder.putByte("Fuel", (byte) 7);
         holder.putString("wdl_block_entity_id", "minecraft:brewing_stand");
         holder.putString("junk", "never");
-        // The three captured content keys the sink does not own. They are what tells a whitelist keyed on
-        // open-time state apart from one that copies whatever it recognizes: a key this mod captures is not
-        // thereby state, and only the sink decides what content reaches the block entity.
         holder.put("Book", ItemFixtures.itemTag(ItemFixtures.writtenBook(1)));
         holder.put("RecordItem", ItemFixtures.itemTag("minecraft:music_disc_cat"));
         holder.put("bees", BlockEntityFixtures.bees(20));
@@ -190,8 +175,6 @@ class ContainerStashMergeTest {
     @Test
     void holderWithoutStateKeysMergesItemsOnly() {
         BlockPos pos = new BlockPos(10, 70, 20);
-        // The captured brewing stand carries NON-default state, so "the merge left it alone" is distinguishable from
-        // "the merge rewrote it with defaults". At the producer defaults the two are the same tag.
         CompoundTag brewingStand = blockEntity("minecraft:brewing_stand", 10, 70, 20);
         brewingStand.putShort("BrewTime", (short) 220);
         brewingStand.putByte("Fuel", (byte) 12);

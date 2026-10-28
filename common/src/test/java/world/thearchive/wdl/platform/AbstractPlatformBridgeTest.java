@@ -14,20 +14,15 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
-/**
- * The pause-menu anchor rule. The fallback half runs only on bands whose pause screen names no disconnect button, and
- * the rejection half only when another mod has moved the named one off screen, so neither is reachable from a live
- * client on a modern band.
- */
 class AbstractPlatformBridgeTest {
-    // A 427 by 240 pause screen, vanilla's own layout at the common GUI scale: a 204-wide column centered on 213.
+    // A 427 by 240 pause screen, vanilla's own layout: a 204-wide column centered on 213.
     private static final int SCREEN_WIDTH = 427;
     private static final int SCREEN_HEIGHT = 240;
     private static final int COLUMN_X = SCREEN_WIDTH / 2 - 102;
 
     @Test
     void cornerButtonDoesNotOutrankTheMenuColumn() {
-        // Just Zoom's pause-screen button: 20 by 20 at the bottom left, below every vanilla button.
+        // A corner button: 20 by 20 at the bottom left, below every vanilla button.
         Button corner = button(20, SCREEN_HEIGHT - 40, 20, 20);
         Button disconnect = button(COLUMN_X, 150, 204, 20);
         assertSame(disconnect, AbstractPlatformBridge.anchor(
@@ -92,7 +87,7 @@ class AbstractPlatformBridgeTest {
 
     @Test
     void theShiftSpansTheColumnAndSparesCornerButtons() {
-        // Just Zoom's button sits below the anchor at the bottom left. Moving it clipped it off the screen edge.
+        // The corner button sits below the anchor at the bottom left. Moving it would clip it off the screen edge.
         int anchorX = COLUMN_X;
         int anchorY = 150;
         int anchorWidth = 204;

@@ -16,23 +16,16 @@ import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.core.RimFace;
 
 /**
- * The 1.20.1 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
- * {@link RenderType#lines()} type, camera-relative. The rectangle's two in-plane axes come from the block cell and its
- * normal axis from the model shape, lifted a small standoff along the face normal, so the rim frames a recessed model
- * (a chest) at block extent yet never z-fights a flush one. Each edge carries its own direction as its normal, because
- * the lines shader thickens perpendicular to position plus normal, so a face-outward normal would collapse the edge to
- * zero width. We draw the edges explicitly rather than feed a flat {@code VoxelShape} to {@code renderShape}, which
- * risks degenerate zero-length edges.
+ * Each edge carries its own direction as its normal, because the lines shader thickens perpendicular to position plus
+ * normal, so a face-outward normal would collapse some edges to zero width.
  */
 public final class RimRendererImpl implements RimRenderer {
-    // A small outward lift of the drawn face along its normal, so the rim clears the model surface it planes
-    // onto and does not z-fight it. Raise it if a rim shimmers on a band.
+    // A small outward lift of the drawn face along its normal, so the rim clears the model surface it planes onto and
+    // does not z-fight it.
     private static final double SURFACE_STANDOFF = 0.02;
 
-    // The transformed position and edge normal, reused so neither per-vertex write allocates on the render
-    // path: vertex(Pose, ...) and normal(Pose, ...) each new a Vector3f per call, two per vertex, the
-    // dominant outline allocation under a dense base, and the per-frame path must stay allocation-free.
-    // We do both transforms into these fields and write with the no-pose overloads. Render thread only.
+    // The transformed position and edge normal, reused so neither per-vertex write allocates on the render path: the
+    // per-frame path must stay allocation-free. Render thread only.
     private final Vector3f position = new Vector3f();
     private final Vector3f normal = new Vector3f();
 
@@ -45,8 +38,8 @@ public final class RimRendererImpl implements RimRenderer {
         PoseStack.Pose pose = context.pose().last();
         float width = context.lineWidth();
         Vec3 camera = context.cameraPos();
-        // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, lifted
-        // outward by the standoff, so a recessed model is framed while a flush one is drawn on its own surface.
+        // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, so a recessed
+        // model is framed.
         float minX = (float) (cellBox.minX - camera.x);
         float minY = (float) (cellBox.minY - camera.y);
         float minZ = (float) (cellBox.minZ - camera.z);
@@ -101,13 +94,11 @@ public final class RimRendererImpl implements RimRenderer {
             dy /= length;
             dz /= length;
         }
-        pose.normal().transform(dx, dy, dz, normal); // once per edge; both vertices share the edge direction
+        pose.normal().transform(dx, dy, dz, normal);
         vertex(lines, pose, width, x1, y1, z1, colorArgb);
         vertex(lines, pose, width, x2, y2, z2, colorArgb);
     }
 
-    // The lines format is POSITION_COLOR_NORMAL on this band: it carries no per-vertex width element, so line
-    // width is the global vanilla default and the context's resolved width is threaded here but not applied.
     private void vertex(VertexConsumer lines, PoseStack.Pose pose, float width, float x, float y, float z,
             int colorArgb) {
         pose.pose().transformPosition(x, y, z, position);
