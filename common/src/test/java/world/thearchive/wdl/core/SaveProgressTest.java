@@ -7,10 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * The finalization progress holder, asserted headless: the three phases each report a done/total fraction that resets
- * to zero at the phase boundary and clamps to 1.0, mirroring the writer-thread phase machine.
- */
 class SaveProgressTest {
     private static final float DELTA = 1.0e-6f;
 

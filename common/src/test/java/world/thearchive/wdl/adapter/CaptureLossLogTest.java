@@ -22,8 +22,8 @@ import world.thearchive.wdl.testsupport.LogCapture;
 /**
  * The per-item capture-loss voice. Pinned here because all three parts of its contract are invisible to a compiler: a
  * loss line that stops carrying its item stops telling a user what they lost, a line that stops carrying its cause
- * makes every loss after the first indistinguishable and misattributes them to whichever cause happened to arrive
- * first, and a repeat that starts carrying its stack again buries the causes under a finish drain's worth of copies.
+ * leaves its stackless repeats naming no cause, and a repeat that starts carrying its stack again buries the causes
+ * under a finish drain's worth of copies.
  */
 class CaptureLossLogTest {
     private static final String ACTION = "failed to write map data {}";
@@ -40,7 +40,7 @@ class CaptureLossLogTest {
 
     @AfterEach
     void detachAppender() {
-        if (captured != null) { // an attach that threw leaves nothing to close, and an NPE here would bury it
+        if (captured != null) {
             captured.close();
         }
     }

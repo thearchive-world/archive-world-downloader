@@ -19,12 +19,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The change-signal guard for {@link MenuChangeTracker}: the per-tick stash gate must fire on the first look at a menu,
- * on a slot's stack being replaced (the sync-packet and click-prediction shape), on an in-place count change (a
- * prediction's grow or shrink), and on a lectern page turn, while an unchanged menu is skipped. Real container-backed
- * {@link Slot}s drive it, the same objects the live menu exposes.
- */
 class MenuChangeTrackerTest {
     @BeforeAll
     static void bootstrapVanilla() {
@@ -79,9 +73,8 @@ class MenuChangeTrackerTest {
 
     @Test
     void inPlaceBundleContentMutationFires() {
-        // Below 1.20.5 BundleItem's click-prediction override mutates the slot-resident stack's "Items" tag in
-        // place: same object, same count, only the tag's Items list swapped. The gate must not read that as
-        // unchanged.
+        // Below 1.20.5 BundleItem's click-prediction override mutates the slot-resident stack's "Items" tag in place:
+        // same object, same count.
         MenuChangeTracker tracker = new MenuChangeTracker();
         SimpleContainer container = new SimpleContainer(1);
         ItemStack bundle = new ItemStack(Items.BUNDLE);

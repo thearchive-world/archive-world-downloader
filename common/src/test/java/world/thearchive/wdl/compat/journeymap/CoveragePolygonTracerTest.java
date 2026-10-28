@@ -14,11 +14,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.core.ChunkRectangleReducer;
 import world.thearchive.wdl.core.OverlayHighlights;
 
-/**
- * The tracer must carve each tone's holes so that its filled render (hull minus holes) is exactly the tone's rectangle
- * area, never more. The regression it guards: a suspect island inside a covered region inside more suspect made
- * JourneyMap's own hole grouping flood the covered tone with the suspect fill.
- */
 final class CoveragePolygonTracerTest {
     private static final int MAX_RECTANGLES = 4096;
 
@@ -30,10 +25,6 @@ final class CoveragePolygonTracerTest {
         return rectangles.length / 4;
     }
 
-    /**
-     * The two tone-rectangle sets JourneyMapOverlayDriver.buildBatch selects: fine partition, or coarsened past the
-     * cap.
-     */
     private static int[][] toneRectangles(long[] saved, long[] covered) {
         OverlayHighlights.TonePartition part = OverlayHighlights.partitionTones(saved, covered);
         int[] coveredFine = ChunkRectangleReducer.reduce(part.covered());
@@ -69,7 +60,6 @@ final class CoveragePolygonTracerTest {
         return new Area(new Polygon(xs, zs, count));
     }
 
-    /** The area the renderer fills for a tone: each hull minus its carved holes, unioned. */
     private static Area renderedFill(int[] rectangles) {
         Area fill = new Area();
         for (CoveragePolygonTracer.HoledRing ring : CoveragePolygonTracer.trace(rectangles)) {
@@ -120,8 +110,8 @@ final class CoveragePolygonTracerTest {
 
     @Test
     void nestedSuspectIslandInsideCoveredRing() {
-        // The reported bug: suspect center, covered ring, suspect outer. The covered-ring hole must stay with the
-        // outer suspect hull, not the inner suspect island, or the outer hull renders uncarved over the covered tone.
+        // Suspect center, covered ring, suspect outer. The covered-ring hole must stay with the outer suspect hull, not
+        // the inner suspect island, or the outer hull renders uncarved over the covered tone.
         LongOpenHashSet saved = new LongOpenHashSet();
         LongOpenHashSet covered = new LongOpenHashSet();
         for (int cx = 0; cx < 40; cx++) {
@@ -205,7 +195,6 @@ final class CoveragePolygonTracerTest {
 
     @Test
     void singleEnclosedSuspectGap() {
-        // One suspect chunk fully enclosed by covered, itself enclosed by the saved bound: the minimal trigger.
         LongOpenHashSet saved = new LongOpenHashSet();
         LongOpenHashSet covered = new LongOpenHashSet();
         for (int cx = 0; cx < 9; cx++) {
@@ -221,8 +210,6 @@ final class CoveragePolygonTracerTest {
 
     @Test
     void coarsenedToneRectanglesTraceWithoutOverlap() {
-        // The coarsen->trace seam the >4096 cap would take: a covered ring around a suspect core, coarsened onto a
-        // small grid, must still trace to disjoint fills that each match their coarse rectangles exactly.
         LongOpenHashSet saved = new LongOpenHashSet();
         LongOpenHashSet covered = new LongOpenHashSet();
         for (int cx = 0; cx < 24; cx++) {

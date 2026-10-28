@@ -35,12 +35,7 @@ import world.thearchive.wdl.platform.AbstractPlatformBridge;
 import world.thearchive.wdl.platform.WdlCommands;
 
 /**
- * Forge implementation of {@link world.thearchive.wdl.platform.PlatformBridge PlatformBridge}, constructed by
- * {@link WdlForge} with the mod event bus it fetched from FMLJavaModLoadingContext. Forge, like NeoForge, splits
- * a <i>mod</i> event bus (registration, e.g. {@link RegisterKeyMappingsEvent}) from the <i>game</i> event bus
- * ({@link MinecraftForge#EVENT_BUS}, gameplay, e.g. {@link TickEvent.ClientTickEvent}); a {@code KeyMapping} can
- * only be registered on the mod bus, so this bridge holds it for {@link #registerKeybind}. {@code isRemoteWorld}
- * and {@code sendChat} are pure-vanilla and inherited from {@link AbstractPlatformBridge}.
+ * A {@code KeyMapping} can only be registered on the mod bus, so this bridge holds it for {@link #registerKeybind}.
  */
 final class ForgePlatformBridge extends AbstractPlatformBridge {
     private final IEventBus modEventBus;
@@ -67,8 +62,6 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     @Override
     public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
             Runnable onPrimary, Runnable onConfig) {
-        // ScreenEvent.Init.Post fires on the game bus for every screen init; guard to the pause screen and add
-        // the buttons as listeners (a Button is a renderable GuiEventListener), the mixin-free injection path.
         MinecraftForge.EVENT_BUS.addListener((ScreenEvent.Init.Post event) -> {
             if (!(event.getScreen() instanceof PauseScreen)) {
                 return;
@@ -86,7 +79,6 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
 
     @Override
     protected @Nullable AbstractWidget disconnectButton(Screen pauseScreen) {
-        // access-transformed: net.minecraft.client.gui.screens.PauseScreen f_252482_ (disconnectButton)
         return pauseScreen instanceof PauseScreen pause ? pause.disconnectButton : null;
     }
 
@@ -167,8 +159,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     }
 
     /**
-     * {@link RegisterClientCommandsEvent} fires on the GAME bus, so register it on {@link MinecraftForge#EVENT_BUS},
-     * the same bus this bridge already uses for ticks and disconnect.
+     * {@link RegisterClientCommandsEvent} fires on the GAME bus, so register it on {@link MinecraftForge#EVENT_BUS}.
      */
     @Override
     public void registerCommands(WdlCommands commands) {

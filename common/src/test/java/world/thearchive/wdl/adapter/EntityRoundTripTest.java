@@ -26,31 +26,9 @@ import world.thearchive.wdl.adapter.impl.WorldPathsImpl;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for entity capture: the {@link EntitySink} pure envelope slice
- * ({@link EntitySink#encodeChunk(List, ChunkPos)} over already-serialized entity tags) plus the {@code entities/}
- * {@link IOWorker} write/read is a self-consistent, vanilla-valid Anvil round-trip: {@code Position} decodes via
- * {@link ChunkPos#CODEC}, the {@code Entities} list survives with each entity's {@code id}, and {@code DataVersion} is
- * stamped.
- *
- * <p>Server-free by construction: hand-built entity tags drive the envelope, so neither a live {@code Entity} nor a
- * {@code Level} is needed. The two client/level-coupled steps are not exercised headless, exactly as for chunks
- * ({@link ChunkRoundTripTest}):
- * <ul>
- * <li>the live {@code entity.save(ValueOutput)} serialization needs a real {@code Entity}; and</li>
- * <li>{@code EntityType.loadEntitiesRecursive} parse-back needs a {@code Level}.</li>
- * </ul>
- * This test proves the on-disk envelope + region IO self-consistency.
- */
 class EntityRoundTripTest {
     private final EntitySink sink = new EntitySinkImpl();
 
-    /**
-     * Initialize vanilla's static state (versioned constants + built-in registries) so {@code ChunkPos},
-     * {@code DataFixers}, and the region pipeline are usable headless. The pure envelope is itself registry-free; we
-     * reuse the project's memoized bootstrap (not its {@code RegistryAccess}) only so this test is self-sufficient when
-     * run in isolation.
-     */
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.frozen();
@@ -60,7 +38,6 @@ class EntityRoundTripTest {
         return paths.openEntitiesStorage(Level.OVERWORLD);
     }
 
-    /** A minimal stand-in for a serialized entity tag: an {@code id} (its type) plus a placement marker. */
     private static CompoundTag entityTag(String id, int marker) {
         CompoundTag tag = EntityFixtures.entityTag(id);
         tag.putInt("wdlMarker", marker);
@@ -95,8 +72,7 @@ class EntityRoundTripTest {
         WorldPaths paths = new WorldPathsImpl(save);
         Path entitiesDirectory = paths.entitiesDirectory(Level.OVERWORLD);
 
-        // Same boundary set the chunk path covers: (0,0)+(31,31) share r.0.0; the others cross into
-        // r.1.0 / r.0.1 / r.-1.-1. A distinct marker per entity-chunk proves each lands at its own pos.
+        // (0,0)+(31,31) share r.0.0; the others cross into r.1.0 / r.0.1 / r.-1.-1.
         List<ChunkPos> positions = List.of(
                 new ChunkPos(0, 0), new ChunkPos(31, 31), new ChunkPos(32, 0),
                 new ChunkPos(0, 32), new ChunkPos(-1, -1));
@@ -109,7 +85,6 @@ class EntityRoundTripTest {
             out.synchronize(true).join();
         }
 
-        // Reopen with a FRESH storage and read every entity-chunk back at its position.
         try (IOWorker in = entityStorage(paths)) {
             for (int i = 0; i < positions.size(); i++) {
                 CompoundTag back = in.loadAsync(positions.get(i)).join()

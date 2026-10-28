@@ -14,7 +14,6 @@ import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** The minimal flat-JSON writer and parser behind the durable machine record. */
 class JsonTest {
     @Test
     void writesCompactObjectInInsertionOrder() {
@@ -58,7 +57,7 @@ class JsonTest {
     void formatsNumbersIndependentOfDefaultLocale() {
         Locale previous = Locale.getDefault();
         try {
-            Locale.setDefault(Locale.GERMANY); // grouping/decimal separators differ from ROOT
+            Locale.setDefault(Locale.GERMANY);
             Map<String, Object> fields = new LinkedHashMap<>();
             fields.put("chunks", 1234567L);
 

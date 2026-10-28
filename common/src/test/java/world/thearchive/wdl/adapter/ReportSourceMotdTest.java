@@ -13,9 +13,8 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The deterministic guard for the report's source-MOTD read. An absent MOTD is the ordinary case on a direct connect to
- * a server that sends no status packet, so what this pins is that the report keeps a real source rather than degrading
- * to an unidentified one.
+ * An absent MOTD is the ordinary case on a direct connect to a server that sends no status packet, so what this pins is
+ * that the report keeps a real source rather than degrading to an unidentified one.
  */
 class ReportSourceMotdTest {
     @BeforeAll

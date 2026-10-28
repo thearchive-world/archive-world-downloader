@@ -8,14 +8,10 @@ import net.minecraft.world.level.block.ChiseledBookShelfBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 
-/**
- * The occupied-slot bitmask of a chiseled bookshelf, kept in one place so the capture's slot count and the outline's
- * rim classification cannot disagree on which slots are filled.
- */
 final class BookshelfSlots {
     private BookshelfSlots() {}
 
-    /** Bit n is set when slot n of bookshelf {@code state} holds a book; 0 when {@code state} is not a bookshelf. */
+    /** 0 when {@code state} is not a bookshelf. */
     static int occupiedSlotMask(BlockState state) {
         if (!(state.getBlock() instanceof ChiseledBookShelfBlock)) {
             return 0;

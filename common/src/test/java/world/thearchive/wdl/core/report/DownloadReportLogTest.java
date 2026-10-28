@@ -143,7 +143,7 @@ class DownloadReportLogTest {
                 settings(), FINISHED, new DownloadCounts(1, 1, 0), new SaveChunks(1, List.of()),
                 Collections.emptyMap()));
         Files.write(jsonl, "{\"v\":1,\"id\":\"b\"".getBytes(StandardCharsets.UTF_8),
-                StandardOpenOption.APPEND); // a half-written crash tail, no newline
+                StandardOpenOption.APPEND);
 
         List<DownloadSession> downloads = DownloadReportLog.readDownloads(jsonl, null);
         assertEquals(1, downloads.size(), "the torn trailing line is skipped, the good record stands");
@@ -194,8 +194,7 @@ class DownloadReportLogTest {
         assertEquals(2, read.dimensions().size());
         assertEquals("minecraft:the_nether", read.dimensions().get(1).dimensionName());
         assertEquals(200, read.dimensions().get(1).chunks());
-        // One session dimension proves the sd. entries did not leak into the d. parse, and the settings
-        // round-trip proves they did not leak into the s. parse either.
+        // One session dimension proves the sd. entries did not leak into the d. parse.
         assertEquals(1, session.counts().dimensions().size());
         assertEquals(settings(), session.settings());
     }

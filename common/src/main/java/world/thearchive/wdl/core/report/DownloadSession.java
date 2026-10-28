@@ -8,12 +8,6 @@ import java.util.Collections;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
-/**
- * One download as read back from the machine record: its identity, settings diff, and the server/software environment
- * captured at begin, plus the optional completion. A session with no completion reads as interrupted
- * ({@link #isComplete()} is false, {@link #finishedAt()} and {@link #counts()} null). The environment is null only for
- * a pre-bump v1 record that predates it.
- */
 public final class DownloadSession {
     private final DownloadIdentity identity;
     private final Map<String, String> settings;
@@ -25,7 +19,6 @@ public final class DownloadSession {
     private final @Nullable SaveChunks saveChunks;
     private final Map<String, Integer> losses;
 
-    /** A session with no per-loss breakdown: an interrupted download, or a record written before losses were kept. */
     public DownloadSession(DownloadIdentity identity, Map<String, String> settings,
             @Nullable ReportEnvironment environment, boolean complete, boolean clean,
             @Nullable Instant finishedAt, @Nullable DownloadCounts counts, @Nullable SaveChunks saveChunks) {
@@ -52,20 +45,14 @@ public final class DownloadSession {
         return identity;
     }
 
-    /** The capture-time settings that differ from the defaults, keyed by config key. */
     public Map<String, String> settings() {
         return settings;
     }
 
-    /** The server/software context captured at begin; null when read from a pre-bump v1 record. */
     public @Nullable ReportEnvironment environment() {
         return environment;
     }
 
-    /**
-     * What this download lost, by axis, counts only, empty when it lost nothing a tally counts. An absent axis is the
-     * absence of a counted loss, never an assertion that nothing was lost.
-     */
     public Map<String, Integer> losses() {
         return losses;
     }
