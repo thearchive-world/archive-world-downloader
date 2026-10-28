@@ -24,18 +24,9 @@ import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Backup fidelity for the map-id manifest: a resume's pre-merge {@code -pre-resume.zip} must preserve the manifest as
- * the prior session left it, so the open-time manifest step must not touch it before the writer-thread backup runs. Two
- * legs share one NEW capture: a matched remap-on resume, whose backup must hold the original manifest bytes, and an
- * off-mode resume into the remap-on folder, whose backup must still hold the pre-resume manifest (an open-time delete
- * would remove it before the zip; that leg is the decisive gate, since a matched resume's open-time rewrite is
- * byte-identical and invisible to leg A). The finalize manifest step still lands the final state on every path, so the
- * off-mode resume's live folder ends manifest-free.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlResumeBackupManifestFidelityTest implements FabricClientGameTest {
-    /** The first map created on a fresh world: {@code getFreeMapId} issues 0 first, so the frame references it. */
+    /** The first map created on a fresh world: {@code getFreeMapId} issues 0 first. */
     private static final int RECEIVED_MAP_ID = 0;
 
     @Override
@@ -65,8 +56,6 @@ public class WdlResumeBackupManifestFidelityTest implements FabricClientGameTest
                     "the NEW remap-on capture must leave a manifest at " + MapManifest.pathIn(saveRoot));
             byte[] original = readBytes(MapManifest.pathIn(saveRoot));
 
-            // Leg A: a matched remap-on resume. The backup must hold the pre-resume manifest bytes. A
-            // byte-identical open-time rewrite would pass this leg; the off-mode leg below is the decisive gate.
             CaptureDriver.capture(context,
                     new DownloadTarget("wdl-backup-manifest", "wdl-backup-manifest", DownloadMode.RESUME),
                     WdlConfig.DEFAULTS, 30);
@@ -78,8 +67,6 @@ public class WdlResumeBackupManifestFidelityTest implements FabricClientGameTest
                     "the backup's manifest must be the original bytes; an open-time mutation reached the folder "
                             + "before the backup");
 
-            // Leg B: an off-mode resume into the remap-on folder. An open-time delete would strip the manifest
-            // before the backup zips, so the second backup still holding it is the fidelity gate.
             byte[] preResume = readBytes(MapManifest.pathIn(saveRoot));
             Properties offProperties = new Properties();
             offProperties.setProperty("remapMapIds", "false");

@@ -4,9 +4,7 @@
 package de.johni0702.minecraft.bobby;
 
 /**
- * Bare stand-in at Bobby's real class name so BobbyChunkFilter's Class.forName resolution and isInstance check can be
- * exercised without a dependency on the Bobby mod. Only the fully-qualified name and instance identity matter here; the
- * real Bobby FakeChunk extends LevelChunk, which is irrelevant to the filter.
+ * Bare stand-in at Bobby's real class name.
  */
 public final class FakeChunk {
     public FakeChunk() {}

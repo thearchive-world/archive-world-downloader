@@ -24,11 +24,8 @@ import world.thearchive.wdl.testsupport.BadStacks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the per-stack loss an item component the disk codec rejects causes on the container capture.
- * Where the write absorbs that error instead of throwing, the rest of the chest still lands and the archive is simply
- * missing that one item, with nothing in the capture to show it. {@link ContainerSinkImpl} repairs each stack before
- * the write, so this reads the captured {@code "Items"} list back rather than checking that a holder came out, and it
- * pins the slot each stack lands in.
+ * {@link ContainerSinkImpl} repairs each stack before the write, so this reads the captured {@code "Items"} list back
+ * rather than checking that a holder came out.
  */
 class ContainerSinkItemDegradationTest {
     private final ContainerSink sink = new ContainerSinkImpl();
@@ -44,7 +41,6 @@ class ContainerSinkItemDegradationTest {
         ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
         sword.set(DataComponents.DAMAGE, -1); // a damage below zero is rejected on save
         ItemStack diamond = new ItemStack(Items.DIAMOND);
-        // Non-adjacent, so a rebuild that compacted or appended would move the diamond rather than pass unnoticed.
         NonNullList<ItemStack> items = NonNullList.withSize(4, ItemStack.EMPTY);
         items.set(0, sword);
         items.set(3, diamond);

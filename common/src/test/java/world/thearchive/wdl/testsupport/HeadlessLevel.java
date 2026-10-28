@@ -42,9 +42,6 @@ import net.minecraft.world.scores.Scoreboard;
 import net.minecraft.world.ticks.LevelTickAccess;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Headless vanilla {@link Level} for plain JUnit tests: it carries only what constructing a live entity double needs.
- */
 public final class HeadlessLevel extends Level {
     private static @Nullable Level instance;
 

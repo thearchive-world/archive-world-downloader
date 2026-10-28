@@ -13,13 +13,7 @@ import world.thearchive.wdl.platform.PlatformBridge;
 import world.thearchive.wdl.platform.WdlCommands;
 
 /**
- * A {@link PlatformBridge} that registers nothing and surfaces nothing, for headless tests that need a bridge only
- * because the type under test takes one. Every callback registration is dropped rather than stored: a test whose
- * subject fires one is asserting through the wrong seam, and the player-facing arms throw so a chat or toast reaching a
- * unit test fails loudly instead of passing silently.
- *
- * <p>Not final only so a test whose subject IS the surfacing can override those two arms. Overriding them to quiet an
- * unexpected chat defeats the point of the throw.
+ * The player-facing arms throw, so a chat or toast reaching a unit test fails loudly instead of passing silently.
  */
 public class HeadlessPlatformBridge implements PlatformBridge {
     private final Path configDirectory;
@@ -89,10 +83,9 @@ public class HeadlessPlatformBridge implements PlatformBridge {
 
     @Override
     public boolean observesSpectatorBlockClick() {
-        // Neither shipped loader answers false to both of these: Fabric is false/true and NeoForge
-        // true/false. This pair is the most permissive input the crosshair rule takes, so a headless test
-        // that ever reaches resolveOpenTarget would exercise a configuration nothing ships. Nothing does
-        // today, because that path needs a live client; make these match a real loader before one can.
+        // No shipped loader answers false to both of these. This pair is the most permissive input the crosshair rule
+        // takes, so a headless test that ever reaches resolveOpenTarget would exercise a configuration nothing ships.
+        // Nothing does today, because that path needs a live client; make these match a real loader before one can.
         return false;
     }
 

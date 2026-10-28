@@ -21,9 +21,6 @@ import world.thearchive.wdl.core.SendRangeEstimator;
 import world.thearchive.wdl.core.SendRangeSampler;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the MC-typed half of the packet capture: which accumulator call an inbound packet routes to.
- */
 class EntityPacketCaptureTest {
     private static final UUID VEHICLE_UUID = new UUID(0, 1);
     private static final UUID RIDER_UUID = new UUID(0, 2);
@@ -31,13 +28,13 @@ class EntityPacketCaptureTest {
 
     @BeforeAll
     static void bootstrapVanillaStatics() {
-        TestRegistries.frozen(); // the spawn payload names an EntityType, which needs the vanilla statics
+        TestRegistries.frozen();
     }
 
     @Test
     void aRotationOnlyMoveLeavesTheRiderHomedOnItsVehiclesChunk() {
-        // A rider's held coordinates stay frozen at where it boarded, so a chunk key recomputed from them reverts
-        // the re-home onto its vehicle.
+        // A rider's held coordinates are not moved with its vehicle, so a chunk key recomputed from them reverts the
+        // re-home onto its vehicle.
         long boardingChunk = new ChunkPos(0, 0).pack();
         long farChunk = new ChunkPos(4, 0).pack();
         EntityPacketCapture capture = capture();
@@ -61,8 +58,7 @@ class EntityPacketCaptureTest {
         capture.spawn(1, VEHICLE_UUID, new ChunkPos(0, 0).pack(), entityPos(12.0, 64.0, 8.0),
                 addEntity(1, VEHICLE_UUID));
 
-        // A relative move is a delta in 1/4096 of a block off the held position, so this walks seven blocks east,
-        // across the chunk border at x=16.
+        // A relative move is a delta in 1/4096 of a block off the held position.
         capture.onMove(1, new ClientboundMoveEntityPacket.PosRot(1,
                 new VecDelta.Linear((short) (7 * 4096), (short) 0, (short) 0), (byte) 0, (byte) 0, true));
 
@@ -77,8 +73,7 @@ class EntityPacketCaptureTest {
         capture.spawn(1, VEHICLE_UUID, new ChunkPos(0, 0).pack(), entityPos(12.0, 64.0, 8.0),
                 addEntity(1, VEHICLE_UUID));
 
-        // A living entity's walk arrives as steps, each a delta off the step before it, so this walks three blocks
-        // east and then four more, ending across the chunk border at x=16 like the single delta above.
+        // A living entity's walk arrives as steps, each a delta off the step before it.
         capture.onMove(1, new ClientboundMoveEntityPacket.PosRot(1, new VecDelta.Stepped(List.of(
                 new VecDelta.Stepped.DeltaStep((short) (3 * 4096), (short) 0, (short) 0, 1),
                 new VecDelta.Stepped.DeltaStep((short) (4 * 4096), (short) 0, (short) 0, 2))),

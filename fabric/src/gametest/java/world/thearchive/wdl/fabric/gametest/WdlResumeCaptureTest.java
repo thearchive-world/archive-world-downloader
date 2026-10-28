@@ -15,12 +15,6 @@ import world.thearchive.wdl.core.DownloadMode;
 import world.thearchive.wdl.core.DownloadTarget;
 import world.thearchive.wdl.core.WdlConfig;
 
-/**
- * Resume axis: a resumed download adds new content without clobbering the prior run. A first NEW capture records area
- * A, the player then moves far enough that area A unloads, and a second RESUME capture records a new area B. The
- * resumed save must still hold area A (preserved, never re-captured this run) and now hold area B (added), which is the
- * add-to-without-clobber contract resume exists for.
- */
 @SuppressWarnings("UnstableApiUsage")
 public class WdlResumeCaptureTest implements FabricClientGameTest {
     @Override

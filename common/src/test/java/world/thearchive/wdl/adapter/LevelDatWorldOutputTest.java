@@ -38,13 +38,6 @@ import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The 26.1.2 world-output writes, verified through the production save to disk. The 26.x world metadata is split across
- * namespaced save-side files rather than one level.dat: worldgen is {@code data/minecraft/world_gen_settings.dat}, the
- * curated game rules are {@code data/minecraft/game_rules.dat}, and noon is a {@code data/minecraft/world_clocks.dat}
- * payload (setDayTime is gone). Weather is left unwritten so vanilla opens clear. The game-rule master gates the
- * curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it.
- */
 class LevelDatWorldOutputTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
@@ -53,7 +46,6 @@ class LevelDatWorldOutputTest {
 
     private int worldCounter;
 
-    /** A built and paired save root: everything worldgen, game rules and clocks land in is on disk under saveRoot. */
     private record Saved(LevelDataWriter.LevelData built, Path saveRoot) {}
 
     private LevelDataWriter.LevelData build(WorldOutputConfig worldOutput) {
@@ -61,7 +53,6 @@ class LevelDatWorldOutputTest {
         return writer.buildLevelData(registries, worldOutput, null);
     }
 
-    /** Build the metadata and run the real production save to disk, returning it paired with its save root. */
     private Saved save(WorldOutputConfig worldOutput) throws IOException {
         LevelDataWriter.LevelData built = build(worldOutput);
         String name = "world" + worldCounter++;
@@ -76,7 +67,6 @@ class LevelDatWorldOutputTest {
         return built.worldData().createTag(null);
     }
 
-    /** The inner {@code data} tag of a namespaced {@code data/minecraft/<name>.dat} SavedData envelope. */
     private static CompoundTag savedData(Path saveRoot, String name) throws IOException {
         Path file = saveRoot.resolve("data").resolve("minecraft").resolve(name + ".dat");
         return NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("data");
@@ -103,7 +93,6 @@ class LevelDatWorldOutputTest {
         return state.totalTicks();
     }
 
-    /** Whether a weather SavedData was written; the mod writes none so vanilla opens the world clear. */
     private static boolean weatherWritten(Path saveRoot) {
         return Files.exists(saveRoot.resolve("data").resolve("minecraft").resolve("weather.dat"));
     }
@@ -155,10 +144,10 @@ class LevelDatWorldOutputTest {
 
     @Test
     void aDefaultWorldIsStableWhileVoidStaysExperimental() {
-        // A DEFAULT world is the three vanilla generators, so its re-derived lifecycle is stable and it opens
-        // without the experimental-world warning; the void world's flat nether/end are inherently experimental.
-        // The lifecycle is re-derived from the baked generators at load, never read from level.dat, so no
-        // level.dat write can suppress the void world's warning.
+        // A DEFAULT world is the three vanilla generators, so its re-derived lifecycle is stable and it opens without
+        // the experimental-world warning; the void world's flat nether/end are inherently experimental. The lifecycle
+        // is re-derived from the generators at load and never stored in level.dat, so no level.dat flag can suppress
+        // the void world's warning.
         assertEquals(Lifecycle.stable(), lifecycle(build(with("worldType", "DEFAULT"))));
         assertEquals(Lifecycle.experimental(), lifecycle(build(WorldOutputConfig.DEFAULTS)));
     }
@@ -245,7 +234,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void anUnknownOverrideIdIsSurfacedNotWritten() throws IOException {
-        Saved saved = save(with("gamerule.doMobSpawning", "false")); // a 1.21.4 id
+        Saved saved = save(with("gamerule.doMobSpawning", "false"));
 
         assertTrue(saved.built().gameRuleResolution().unknownIds().contains("doMobSpawning"),
                 "the cross-band loss is surfaced");
@@ -254,7 +243,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void aValidOverrideIsWritten() throws IOException {
-        // immediate_respawn is not in the curated set; a valid override of it passes through.
+        // immediate_respawn is not in the curated set.
         GameRules rules = gameRules(save(with("gamerule.immediate_respawn", "true")));
 
         assertTrue(rules.get(GameRules.IMMEDIATE_RESPAWN), "an arbitrary valid rule passes through");

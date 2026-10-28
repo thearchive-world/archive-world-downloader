@@ -1,11 +1,5 @@
 name: Mutation testing (common)
 
-# The ratcheted PITest gate: :common:pitest mutates the fidelity allowlist and fails below the
-# mutationThreshold floor set in common/build.gradle.kts. It is deliberately separate from ci.yml (the fast
-# source-merge / core-invariant / headless-unit gate) so it never slows that gate, mirroring
-# capture-verification.yml. Each minion forks a JVM that boots the vanilla registries off the test runtime
-# classpath, so this is heavier than the unit gate; the thread count (common/build.gradle.kts) defaults to a
-# size the runner carries without oversubscribing. The floor is only raised as coverage grows, never lowered.
 on:
   push:
     branches:
@@ -13,12 +7,10 @@ on:
       # Version branches too (three-part 1.21.11/26.1.2, two-part 26.2), so the ratchet guards every era band.
       - "[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+"
-    # An exclusion, not an include list, and targetTests is the reason. It is world.thearchive.wdl.*Test, so
-    # PIT runs every test in the module and aborts unless that baseline is green: anything any test READS is an
-    # input to the score, not just the mutated classes. Three tests scan ../fabric and ../neoforge, six read
-    # assets/wdl/lang, and between them they reach most of common/src/main. What is left below cannot move the
-    # score, and an exclusion also fails in the safe direction: a new top-level directory starts running this
-    # tier rather than silently ceasing to.
+    # An exclusion, not an include list, and targetTests is the reason. It is world.thearchive.wdl.*Test, so PIT runs
+    # every test in the module and aborts unless that baseline is green: anything any test READS is an input to the
+    # score, not just the mutated classes. An exclusion also fails in the safe direction: a new top-level directory
+    # starts running this tier rather than silently ceasing to.
     paths-ignore:
       - '**/*.md'
       - 'release-matrix.txt'
@@ -50,12 +42,8 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # A newer push cancels the run its commit superseded, on a branch as on a pull request: only the tip's result
-  # is ever read.
   cancel-in-progress: true
 
-# Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
-# pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
 defaults:
   run:
     shell: bash
@@ -63,9 +51,8 @@ defaults:
 jobs:
   mutation-testing:
     runs-on: ubuntu-latest
-    # PITest forks a JVM per minion that boots the vanilla registries, so a full run is minutes, not seconds.
-    # Cap it generously so a legitimately slow but green run survives, while a hang still fails fast rather
-    # than running to the 6h default.
+    # Cap it generously so a legitimately slow but green run survives, while a hang still fails fast rather than running
+    # to the 6h default.
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -83,9 +70,9 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           # The language target's own JDK is installed alongside the toolchain's wherever the two differ, because
           # era-specific build tooling still asks for that one: ForgeGradle runs its MCP steps on the Minecraft
-          # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it
-          # takes the default JAVA_HOME, which is what launches the daemon, and fabric-loom publishes
-          # org.gradle.jvm.version=21 that a daemon below it cannot resolve at all.
+          # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it takes the
+          # default JAVA_HOME, and fabric-loom publishes org.gradle.jvm.version=21 that a daemon below it cannot resolve
+          # at all.
           target="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
           jdks="$version"
           if [ "$target" != "$major" ]; then jdks="$(printf '%s\n%s' "$jdks" "$target")"; fi
@@ -97,19 +84,6 @@ jobs:
           verify=true
           for j in $jdks; do case "$j" in 16 | 16.*) verify=false ;; esac; done
           echo "verify=$verify" >> "$GITHUB_OUTPUT"
-          # fabric-loom publishes org.gradle.jvm.version=21, so a daemon below 21 cannot resolve it
-          # at all and the build dies while configuring the root project, which declares the plugin apply-false
-          # even on a band that ships no Fabric module. A band whose own build JDK is older therefore installs
-          # 21 beside it and lets 21 be the default JAVA_HOME, since that is what launches the daemon and
-          # setup-java hands the default to the last entry of a multi-version list. The real build JDK is then
-          # reached only through its JAVA_HOME_<major>_X64 variable and the fromEnv bridge below, a genuine
-          # toolchain resolution rather than a same-JVM --release target. A warm dependency cache hides the
-          # failure entirely, so it shows up only on a clean checkout.
-          # Gradle auto-detects the installation JAVA_HOME names plus whatever
-          # org.gradle.java.installations.fromEnv names, but nothing scans the GitHub Actions tool-cache paths
-          # setup-java installs into, and auto-download stays off per gradle.properties, so without this bridge
-          # there is nothing to fall back to. GRADLE_OPTS applies to every gradlew invocation in the job, so one
-          # line covers the root build and any separate island wrapper alike.
           echo "GRADLE_OPTS=-Dorg.gradle.java.installations.fromEnv=JAVA_HOME_${major}_X64" >> "$GITHUB_ENV"
 
       - name: Set up the build JDKs (Temurin)

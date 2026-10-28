@@ -15,10 +15,8 @@ import world.thearchive.wdl.update.UpdateAvailable;
 import world.thearchive.wdl.update.UpdateCheck;
 
 /**
- * Feeds the mod's launch-scoped update result to ModMenu's mod-list badge. ModMenu calls this once at client init on
- * its own worker thread and caches the result for the session (it does not re-query on opening the Mods list), so this
- * blocks on {@link UpdateCheck#awaitSettled(long)} rather than returning an early null. Reusing the launch check means
- * no extra network request. Returns null (no badge) when no newer release is held.
+ * ModMenu calls this at client init on its own worker thread (it does not re-query on opening the Mods list), so this
+ * blocks on {@link UpdateCheck#awaitSettled(long)} rather than returning an early null.
  */
 final class WdlModMenuUpdateChecker implements UpdateChecker {
     private static final long AWAIT_MILLIS = 10_000L;

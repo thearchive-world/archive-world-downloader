@@ -17,11 +17,6 @@ import net.minecraft.world.level.saveddata.maps.MapId;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
-/**
- * Shared map-item-holder NBT fixtures for the map archive tests: a filled-map stack, a shulker or bundle nesting one,
- * and the captured {@code Items} holder they serialize into. Hoisted here so the id collector, remap, and archive tests
- * share one copy rather than each carrying its own.
- */
 public final class MapHolderFixtures {
     private MapHolderFixtures() {}
 

@@ -20,15 +20,9 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * Pins the natural-spawn equipment table: an item outside a type's pool in a pickup-fillable slot is a proven loot
- * pickup (persistence restored), an item inside the pool is ambiguous (left alone), the offhand is never inferred, and
- * unknown types are never inferred. Verified against decompiled 26.2.
- */
 class NaturalEquipmentTest {
     @BeforeAll
     static void bootstrap() {
-        // Populates BuiltInRegistries so Items.* / EntityType.* resolve and ItemStack.is works headless.
         TestRegistries.frozen();
     }
 
@@ -58,7 +52,7 @@ class NaturalEquipmentTest {
     void naturalHeadItemsAreCarvedOutGlobally() {
         assertTrue(NaturalEquipment.isNaturalFor(EntityTypes.ZOMBIE, EquipmentSlot.HEAD, of(Items.CARVED_PUMPKIN)));
         assertTrue(NaturalEquipment.isNaturalFor(EntityTypes.SKELETON, EquipmentSlot.HEAD, of(Items.JACK_O_LANTERN)));
-        // Raid/patrol captain ominous banner; Paper strips the pattern to a bare white banner, match the item.
+        // Raid/patrol captain ominous banner.
         assertTrue(NaturalEquipment.isNaturalFor(EntityTypes.PILLAGER, EquipmentSlot.HEAD, of(Items.BANNER.white())));
     }
 

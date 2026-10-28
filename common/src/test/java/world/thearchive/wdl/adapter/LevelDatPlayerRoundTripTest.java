@@ -34,25 +34,15 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the 26.x player-data apply: {@link LevelDataWriter#save} with a {@link CapturedPlayer} writes
- * the captured tag to {@code players/data/<uuid>.dat} and stamps its uuid as the level.dat {@code singleplayer_uuid},
- * flips {@code GameType}, sets the world {@code spawn} ({@code RespawnData}) to the capture dimension + position, marks
- * the level data {@code initialized} so vanilla keeps that spawn on first open, and writes the captured
- * {@code Difficulty} into {@code difficulty_settings}; with a {@code null} {@code CapturedPlayer} the output is the
- * void world (no player file, default spawn, {@code initialized}, {@code SURVIVAL}). Driven through the real production
- * {@code LevelStorageAccess.saveDataTag}, so the headless suite guards the band-specific 2-argument form and the
- * separate player-file write.
- */
 class LevelDatPlayerRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
-    // A client saveWithoutId always carries its UUID; the 26.x plug reads it to place players/data/<uuid>.dat.
+    // A client saveWithoutId always carries its UUID.
     private static final UUID PLAYER_UUID = UUID.fromString("11111111-2222-3333-4444-555555555555");
 
     private static CompoundTag capturedPlayerTag() {
         CompoundTag tag = new CompoundTag();
-        tag.putString("wdlMarker", "captured-player"); // a sentinel proving this exact tag lands in players/data
+        tag.putString("wdlMarker", "captured-player");
         tag.store("UUID", UUIDUtil.CODEC, PLAYER_UUID);
         tag.put("Inventory", new ListTag());
         return tag;
@@ -70,7 +60,6 @@ class LevelDatPlayerRoundTripTest {
         return NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap()).getCompoundOrEmpty("Data");
     }
 
-    /** The 26.x player home: the captured tag gzipped at {@code players/data/<uuid>.dat}, no Data wrapper. */
     private static CompoundTag playerData(Path saves, String name) throws IOException {
         Path file = saves.resolve(name).resolve("players").resolve("data").resolve(PLAYER_UUID + ".dat");
         return NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap());
@@ -114,7 +103,7 @@ class LevelDatPlayerRoundTripTest {
     void savesWithNullCapturedPlayerMatchTodaysVoidOutput(@TempDir Path saves) throws IOException {
         CompoundTag data = saveAndReadBack(saves, "noplayer", null);
 
-        assertFalse(data.contains("Player"), "no captured player -> no Player slot");
+        assertFalse(data.contains("Player"), "level.dat carries no Player compound");
         assertEquals(GameType.SURVIVAL.getId(), data.getIntOr("GameType", -99),
                 "the void world stays the default survival");
         assertTrue(data.contains("spawn"), "the default spawn is still written");
@@ -128,7 +117,7 @@ class LevelDatPlayerRoundTripTest {
         CompoundTag first = saveAndReadBack(saves, "resumed", captured);
         assertTrue(first.contains("singleplayer_uuid"), "the captured finish stamps the folder");
 
-        // A disconnect-flushed finish over the same folder: no live player to read, everything else unchanged.
+        // A disconnect-flushed finish over the same folder: no live player to read.
         CompoundTag second = saveAndReadBack(saves, "resumed", null);
 
         assertEquals(first.read("singleplayer_uuid", UUIDUtil.CODEC).orElse(null),
@@ -145,7 +134,7 @@ class LevelDatPlayerRoundTripTest {
             throws IOException {
         CompoundTag playerTag = capturedPlayerTag();
         UUID boat = UUID.fromString("0fedcba9-8765-4321-fedc-ba9876543210");
-        CompoundTag boatTag = EntityFixtures.entityTag("minecraft:chest_boat"); // the id loadEntityRecursive reads
+        CompoundTag boatTag = EntityFixtures.entityTag("minecraft:chest_boat");
         PlayerTag.setRootVehicle(playerTag, boat, boatTag);
         CapturedPlayer captured = new CapturedPlayer(playerTag, BlockPos.ZERO, 0.0F, 0.0F,
                 Level.OVERWORLD, GameType.CREATIVE, Difficulty.NORMAL);
