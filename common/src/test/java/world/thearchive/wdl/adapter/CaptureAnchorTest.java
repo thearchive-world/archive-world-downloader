@@ -18,11 +18,6 @@ import org.junit.jupiter.api.Test;
 
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The deterministic guard for the seated position anchor: a seated player anchors to its vehicle, a standing player to
- * the camera anchor. This pins the decision that the anchor keys on {@code isPassenger()}, not on whether a RootVehicle
- * was written, so a regression re-keying it is caught headless rather than only at the live gate.
- */
 class CaptureAnchorTest {
     @BeforeAll
     static void bootstrapVanilla() {

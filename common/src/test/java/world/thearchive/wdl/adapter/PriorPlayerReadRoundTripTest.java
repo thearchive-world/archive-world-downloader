@@ -33,20 +33,11 @@ import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The resume-read guard, the read mirror of {@link LevelDatPlayerRoundTripTest}: after a player download, the plug's
- * own {@link LevelDataWriter#readPriorPlayer} recovers the captured player from wherever this band wrote it, so a
- * resume that never reopens the ender chest carries the prior contents forward instead of clobbering them with an empty
- * chest. Band-agnostic: it asserts only the recovered tag, not its on-disk location, so it holds on every band while
- * the plug owns where the read lands.
- */
 class PriorPlayerReadRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
     private static final UUID PLAYER_UUID = UUID.fromString("11111111-2222-3333-4444-555555555555");
 
-    // Bind the item data components before any fixture builds an ItemStack: at 26.x the components bind in the
-    // resource reload TestRegistries.frozen drives, not in Bootstrap, so an EnderItems stack built first throws.
     @BeforeAll
     static void bootstrapVanilla() {
         TestRegistries.frozen();

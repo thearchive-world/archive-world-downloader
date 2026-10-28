@@ -28,21 +28,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/**
- * The lang-file fidelity gate: every shipped locale mirrors en_us's key set and order, is placeholder-safe, and is
- * written in one canonical byte shape. en_us is the source of truth, verbatim: every locale carries exactly its key set
- * in order. This test is the build-time enforcement that a hand-edit or a bad sync cannot slip a drifted locale into a
- * release. It also enrolls the shipped file set itself, since every other check here iterates whatever is on disk and
- * so cannot see a locale that stopped shipping, and holds the contributor-facing translation form to that same set.
- * MC-free: pure resource checks, reading the source files from the module tree (the
- * {@link PitestAllowlistEnrollmentTest} pattern), plus the one issue form above the module root.
- */
 class LangFidelityTest {
     private static final Path LANG_DIRECTORY = Paths.get("src/main/resources/assets/wdl/lang");
     private static final String SOURCE = "en_us.json";
 
-    // Enrolled because nothing else in the tree reads this directory for anything but en_us: no other test, no
-    // Gradle task, no resource-processing step. Without the enrollment a sync that drops locale files ships green.
     private static final Set<String> SHIPPED_LANG_FILES = ImmutableSet.of(
             "cs_cz.json", "da_dk.json", "de_de.json", "en_pt.json", "en_us.json", "es_ar.json", "es_cl.json",
             "es_ec.json", "es_es.json", "es_mx.json", "es_uy.json", "es_ve.json", "esan.json", "fi_fi.json",
@@ -50,7 +39,6 @@ class LangFidelityTest {
             "nn_no.json", "no_no.json", "pl_pl.json", "pt_br.json", "pt_pt.json", "qcb_es.json", "ru_ru.json",
             "sv_se.json", "tr_tr.json", "uk_ua.json", "zh_cn.json", "zh_tw.json");
 
-    // The only conversion shapes the lang files use: %s, positional %1$s/%2$s, and the %% literal.
     private static final Pattern token = Pattern.compile("%(?:(\\d+)\\$)?([a-zA-Z%])");
 
     private static final Path TRANSLATION_FORM = Paths.get("../.github/ISSUE_TEMPLATE/5-translation.yml");
@@ -98,7 +86,7 @@ class LangFidelityTest {
             for (Map.Entry<String, String> entry : data.entrySet()) {
                 String expected = en.get(entry.getKey());
                 if (expected == null) {
-                    continue; // key-set parity is asserted separately
+                    continue;
                 }
                 assertEquals(
                         placeholderArguments(expected),
@@ -125,7 +113,7 @@ class LangFidelityTest {
             assertTrue(content.endsWith("}\n"), name + " must end with '}' and a single trailing newline");
             assertFalse(content.endsWith("\n\n"), name + " has a trailing blank line");
             String[] lines = content.split("\n", -1);
-            for (int i = 1; i < lines.length - 2; i++) { // between the opening { and closing }
+            for (int i = 1; i < lines.length - 2; i++) {
                 String line = lines[i];
                 assertTrue(line.startsWith("  \""), name + " line " + (i + 1) + " is not indented two spaces");
                 assertFalse(line.endsWith(" "), name + " line " + (i + 1) + " has trailing whitespace");
@@ -133,12 +121,6 @@ class LangFidelityTest {
         }
     }
 
-    /**
-     * The set of format-argument positions a string references, by Java Formatter rules: a bare %s consumes the next
-     * sequential argument, %k$s references argument k explicitly, and %% is a literal. A locale may reorder and switch
-     * between %s and %1$s freely (it routinely must, to fit its grammar). Only a dropped, added, or out-of-range
-     * argument, which is how a translated line crashes or loses a value, changes the set.
-     */
     private static Set<Integer> placeholderArguments(String value) {
         Set<Integer> arguments = new TreeSet<>();
         int auto = 0;
@@ -153,7 +135,6 @@ class LangFidelityTest {
         return arguments;
     }
 
-    /** The Locale dropdown's options in file order, keyed off its stable id rather than its position. */
     private static List<String> localeDropdownOptions() {
         List<String> lines;
         try {
@@ -178,7 +159,6 @@ class LangFidelityTest {
                 options.add(option.group(1));
             }
         }
-        // Without this the set comparison below fails on the escape hatch instead of on the layout change.
         assertFalse(options.isEmpty(), "no locale dropdown found in " + TRANSLATION_FORM.toAbsolutePath());
         return options;
     }

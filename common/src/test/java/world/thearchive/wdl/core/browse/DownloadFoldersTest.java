@@ -75,9 +75,8 @@ class DownloadFoldersTest {
 
     @Test
     void resolveManagedResumeContainsAndRejectsTraversingName(@TempDir Path root) throws IOException {
-        // The traversal target is a real managed folder beside the saves directory, so an unsanitized name
-        // would find it: a target outside saves that no later guard can recognize, because resolveResume
-        // reads the traversed path back to its bare basename.
+        // The traversal target is a real managed folder beside the saves directory, so an unsanitized name would find
+        // it.
         Path saves = Files.createDirectories(root.resolve("saves"));
         markManaged(root.resolve("outside-saves"));
         assertNull(DownloadFolders.resolveManagedResume("../outside-saves", saves),

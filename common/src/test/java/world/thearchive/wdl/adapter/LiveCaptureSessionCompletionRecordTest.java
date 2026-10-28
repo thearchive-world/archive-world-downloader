@@ -35,33 +35,18 @@ import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The clean-or-partial flag as it reaches disk. Every loss tally in the tree is pinned against the predicate, and the
- * record's own reader is pinned against a flag handed to it, but between the two sits the derivation that turns one
- * into the other, which nothing else asserts at any tier. It is one line, and one line is enough: a dropped negation
- * stamps every download that lost something as complete, which is exactly the outcome every one of those tallies exists
- * to prevent, and the downloads screen reads that status.
- *
- * <p>Both arms are asserted, since either alone passes on a constant: a clean save must record complete and a save
- * carrying one counted loss must record partial. The loss is seeded on a single tally rather than driven from a
- * capture, because which tally moved is the sibling tests' subject and the derivation reads only their sum.
- *
- * <p>The completion inputs are seeded reflectively. Production stamps them at world-open through {@code beginReport},
- * which takes the client singleton no headless session can answer, and the two steps that consume them are private; the
- * state seeded here is the record's own identity, not capture state, so nothing about the verdict under test is stood
- * in for. What that leaves unpinned is the production ordering, that world-open stamps the triple and finish freezes
- * the counts before the writer finalizes; the record is only written at all when both have run.
+ * Both arms are asserted, since either alone passes on a constant.
  */
 class LiveCaptureSessionCompletionRecordTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // vanilla statics, which building a session needs before it runs
+        TestRegistries.frozen();
     }
 
     /**
-     * A session with no bound level, reporting to nobody. Entity and container capture are off so the constructor
-     * publishes no process-wide capture into the static activation slots; chat and toasts are off because the headless
-     * bridge throws on both and the chat arm resolves the save folder through the client. All four are asserted rather
-     * than assumed: an unrecognized config key falls back to the default, which is on for all four.
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots. All four toggles are asserted rather than assumed: an unrecognized config key falls back to the
+     * default, which is on for all four.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
@@ -81,7 +66,6 @@ class LiveCaptureSessionCompletionRecordTest {
                 () -> {});
     }
 
-    /** A save that wrote everything it was given, so the whole verdict is the session's own tallies. */
     private static AsyncSaveWriter.SaveResult cleanWrite() {
         return new AsyncSaveWriter.SaveResult(0, 0, 0, 0, 0, 0, 0, 0, null, null);
     }
@@ -153,10 +137,6 @@ class LiveCaptureSessionCompletionRecordTest {
                         + "seeing an axis knows it is real rather than a zero row");
     }
 
-    /**
-     * The one completion record written under {@code saveRoot}. Read through the production reader, so a flag written
-     * under the wrong key or in the wrong sense fails here rather than passing a raw-text match.
-     */
     private static DownloadSession recordedSession(Path saveRoot) throws Exception {
         List<DownloadSession> downloads = DownloadReportLog.readDownloads(saveRoot);
         assertEquals(1, downloads.size(), "the finish writes exactly one completion record");
@@ -165,10 +145,6 @@ class LiveCaptureSessionCompletionRecordTest {
         return recorded;
     }
 
-    /**
-     * Stamp the report identity, which production does at world-open through the client singleton. The completion write
-     * returns early without it, so this is what opens the path rather than anything about the verdict.
-     */
     private static void beginReport(LiveCaptureSession session, Path saveRoot) throws Exception {
         set(session, "reportRoot", saveRoot);
         set(session, "reportIdentity", new DownloadIdentity("headless-download", Instant.EPOCH, "downloader",
@@ -176,7 +152,6 @@ class LiveCaptureSessionCompletionRecordTest {
         set(session, "reportEnvironment", new ReportEnvironment("", 0, "minecraft:overworld", "1.21.11", "0"));
     }
 
-    /** Freeze the end-of-capture counts, then run the finish report that writes the completion record. */
     private static void freezeAndReport(LiveCaptureSession session, AsyncSaveWriter.SaveResult result)
             throws Exception {
         invoke(session, "prepareReportCompletion");

@@ -14,23 +14,13 @@ import world.thearchive.wdl.adapter.OutlineRenderContext;
 import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.core.RimFace;
 
-/**
- * The 1.16.5 rim primitive: an explicit four-edge draw of the selected face on the depth-tested
- * {@link RenderType#lines()} type, camera-relative. The rectangle's two in-plane axes come from the block cell and its
- * normal axis from the model shape, lifted a small standoff along the face normal, so the rim frames a recessed model
- * (a chest) at block extent yet never z-fights a flush one. We draw the edges explicitly rather than feed a flat
- * {@code VoxelShape} to {@code renderShape}, which risks degenerate zero-length edges. This band's {@code lines()}
- * vertex format is POSITION_COLOR, with no per-vertex normal or width element, so each vertex carries position and
- * color only and the line width is the global vanilla default.
- */
 public final class RimRendererImpl implements RimRenderer {
-    // A small outward lift of the drawn face along its normal, so the rim clears the model surface it planes
-    // onto and does not z-fight it. Raise it if a rim shimmers on a band.
+    // A small outward lift of the drawn face along its normal, so the rim clears the model surface it planes onto and
+    // does not z-fight it.
     private static final double SURFACE_STANDOFF = 0.02;
 
-    // The transformed position, reused so the per-vertex write does not allocate on the render path: vertex(Pose, ...)
-    // news a Vector4f per call, the dominant outline allocation under a dense base, and the per-frame path must stay
-    // allocation-free. We transform into this field and write with the no-pose overload. Render thread only.
+    // The transformed position, reused so the per-vertex write does not allocate on the render path: the per-frame path
+    // must stay allocation-free. Render thread only.
     private final Vector4f position = new Vector4f();
 
     @Override
@@ -42,8 +32,8 @@ public final class RimRendererImpl implements RimRenderer {
         PoseStack.Pose pose = context.pose().last();
         float width = context.lineWidth();
         Vec3 camera = context.cameraPos();
-        // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, lifted
-        // outward by the standoff, so a recessed model is framed while a flush one is drawn on its own surface.
+        // The two in-plane axes span the full block cell; the normal axis planes onto the model shape, so a recessed
+        // model is framed.
         float minX = (float) (cellBox.minX - camera.x);
         float minY = (float) (cellBox.minY - camera.y);
         float minZ = (float) (cellBox.minZ - camera.z);

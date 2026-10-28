@@ -35,39 +35,17 @@ import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The session's map-loss tally, pinned at the joints the leaf-level {@link LiveCaptureSession#mapWriteTask} test cannot
- * see: that the streamed write task is handed the session's own counter, that a map imaged after the finish batch
- * closed is counted rather than only logged, that the finalize-time idcounts failure reaches the same partial verdict
- * through a counter of its own, that the map-id manifest's read and write do the same through a third, and that a
- * non-zero count is what turns the completion record from clean to partial. Break any of those and a download that
- * silently lost maps still reports clean, except the idcounts and manifest ones, where the loss is instead a download
- * whose map ids may be reissued or a folder that will re-image every map it already holds, or an unrelated failure
- * inflating the count of maps a reader is told to go find in the log. Four tests are not tally tests: one pins the
- * ordering inside the world-open seam the others bind through, one pins that a streamed map actually reaches disk,
- * without which every tally test here would also pass on a bind that published no writer at all, one pins that the
- * finalize floor write is the staged one, and one pins the second source the degraded manifest's id floor is seeded
- * from.
- *
- * <p>Two boundaries. The tally is pinned from {@code streamMapData} inward: the archive is built here with a stub sink,
- * so nothing in this class would notice if the production wiring stopped handing {@code MapArchive} the session's own
- * {@code streamMapData}. That mutation is caught, but a tier away, by the filled-map gametests that read
- * {@code data/map_*.dat} back off disk. And the loud failure that {@code level()} exists for is unreachable from this
- * tier, because every path to it needs a client, so the nullable field's guarantee rests on review rather than on a
- * test. Closing either here needs the level seam these tests deliberately do without.
- */
 class LiveCaptureSessionMapTallyTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // vanilla statics, which a test reaching a map write needs before it runs
+        TestRegistries.frozen();
     }
 
     /**
-     * A session with no bound level, which is all the map paths need. Entity and container capture are off so the
-     * constructor publishes no process-wide capture into the static activation slots; a test that turns either on
-     * leaves a session published there for the rest of the suite JVM, since only {@code finish()} clears it. The
-     * toggles are asserted rather than assumed: an unrecognized config key falls back to the default, which is on for
-     * both, so a silent key rename would arm every session this fixture builds.
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots; a test that turns either on leaves a session published there, since only the finish path clears
+     * it. The toggles are asserted rather than assumed: an unrecognized config key falls back to the default, which is
+     * on for both, so a silent key rename would arm every session this fixture builds.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
@@ -85,12 +63,6 @@ class LiveCaptureSessionMapTallyTest {
                 () -> {});
     }
 
-    /**
-     * A writer whose region and entity storages are never opened, since a map write reaches disk through MapDataWriter
-     * and never through a region storage. The openers throw rather than returning a stub, but the writer thread turns a
-     * throw into a failed SaveResult, so a test that binds this must assert the result did not fail for the guard to
-     * have any force.
-     */
     private static AsyncSaveWriter mapOnlyWriter() {
         return new AsyncSaveWriter(
                 dimension -> {
@@ -104,14 +76,12 @@ class LiveCaptureSessionMapTallyTest {
                 new SaveProgress());
     }
 
-    /** A regular file where the {@code data/} directory belongs, so every write under it fails at open. */
     private static Path unwritableDataRoot(Path save) throws Exception {
         Files.createDirectories(save);
         Files.write(save.resolve("data"), "not a directory".getBytes(StandardCharsets.UTF_8));
         return save;
     }
 
-    /** An archive whose image resolver and data sink are both inert, so a test drives the session directly. */
     private static MapArchive stubArchive() {
         return new MapArchive(MapManifest.empty(), id -> null, (archiveId, dataTag) -> {});
     }
@@ -191,22 +161,12 @@ class LiveCaptureSessionMapTallyTest {
                         + "for a per-item line that was never written");
     }
 
-    /**
-     * The session's lost-map count. Read reflectively because folding the idcounts counter back into it is the
-     * tidy-looking edit that would silently break the invariant this asserts, and the verdict cannot see it: the two
-     * counters sum into one partial-or-clean answer either way.
-     */
     private static int mapsFailed(LiveCaptureSession session) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField("mapsFailed");
         field.setAccessible(true);
         return ((AtomicInteger) field.get(session)).get();
     }
 
-    /**
-     * A map imaged after the finish batch closed has nowhere to go, and the count of it is what the log line beside it
-     * cannot stand in for: the wiring test pins that line, so without this the increment could be dropped and only a
-     * reader of the log would ever know the map was lost.
-     */
     @Test
     void aMapImagedAfterTheFinishBatchClosedLandsInTheSessionsOwnTally(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
@@ -225,11 +185,6 @@ class LiveCaptureSessionMapTallyTest {
         assertTrue(session.isPartialSave(0, 0), "and one lost map is enough to make the finish partial");
     }
 
-    /**
-     * The streamed write reaches disk, which is what tells the counted branches apart from each other: every other map
-     * test asserts a non-zero tally, and the no-writer branch increments that same tally, so all of them would still
-     * pass if the world-open bind stopped publishing the writer and no map were ever written.
-     */
     @Test
     void aStreamedMapWriteReachesDiskThroughTheBoundWriter(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
@@ -246,10 +201,6 @@ class LiveCaptureSessionMapTallyTest {
         assertFalse(session.isPartialSave(0, 0), "a map that reached disk is no loss, so the finish reads clean");
     }
 
-    /**
-     * Close the finish batch, which production does only inside {@code finish()}, behind the client singleton the
-     * headless session does without.
-     */
     private static void closeTheFinishBatch(LiveCaptureSession session) throws Exception {
         Field closed = LiveCaptureSession.class.getDeclaredField("finishBatchClosed");
         closed.setAccessible(true);
@@ -269,11 +220,6 @@ class LiveCaptureSessionMapTallyTest {
                         + "reading it must not consume the count");
     }
 
-    /**
-     * The manifest write sits beside the idcounts write and carries the same kind of shared-file consequence. That
-     * consequence is the folder's, not one map's: without a rewritten manifest a resume can no longer tell an archived
-     * id from a fresh one, so it re-images every map the folder already holds.
-     */
     @Test
     void aManifestWriteFailureLandsInTheManifestTallyAndTurnsTheVerdictPartial(@TempDir Path temporary)
             throws Exception {
@@ -294,10 +240,9 @@ class LiveCaptureSessionMapTallyTest {
     }
 
     /**
-     * The read sibling of the write above, which degrades to an empty manifest and carries the same consequence for the
-     * folder: the download proceeds treating every map it already holds as new. What the degradation must not do is
-     * restart the id counter, whose high-water lives in the file that just failed to read: an unseeded counter hands id
-     * 0 to the first map this session images, and that write lands on the prior download's map_0.dat.
+     * What the degradation must not do is restart the id counter, whose high-water lives in the file that just failed
+     * to read: an unseeded counter hands id 0 to the first map this session images, and that write lands on the prior
+     * download's map_0.dat.
      */
     @Test
     void aManifestReadFailureStillIssuesIdsAboveTheMapFilesTheFolderHolds(@TempDir Path temporary)
@@ -322,11 +267,6 @@ class LiveCaptureSessionMapTallyTest {
         assertTrue(session.isPartialSave(0, 0), "which makes the finish partial rather than clean");
     }
 
-    /**
-     * The second, independent source for that seed. A prior download's highest id can be an imageless one, which
-     * allocates a counter id and writes no map file, so the map files alone would under-read the floor and the seeded
-     * counter would reissue it.
-     */
     @Test
     void aManifestReadFailureTakesItsSeedFromIdCountsWhenNoMapFileCarriesIt(@TempDir Path temporary)
             throws Exception {
@@ -343,11 +283,6 @@ class LiveCaptureSessionMapTallyTest {
                 "and the ids issued clear the imageless one the prior download allocated");
     }
 
-    /**
-     * The repair the write record is a flag rather than a tally for: the same file is written at world-open and again
-     * at finalize, so a fault at the first that the second heals cost the download nothing. A tally would have reported
-     * that download partial, and reported two losses for one file when both writes failed.
-     */
     @Test
     void aManifestWriteRepairedLaterInTheSameDownloadLeavesTheVerdictClean(@TempDir Path temporary)
             throws Exception {
@@ -368,14 +303,12 @@ class LiveCaptureSessionMapTallyTest {
                 "a download whose manifest is correct when it ends lost nothing here, so it reads clean");
     }
 
-    /** A manifest path whose parent is a regular file, so staging the atomic write under it fails at open. */
     private static Path unwritableManifestFile(Path temporary) throws Exception {
         Path blocker = temporary.resolve("blocker");
         Files.write(blocker, "not a directory".getBytes(StandardCharsets.UTF_8));
         return blocker.resolve("map-ids");
     }
 
-    /** Bind the manifest path, which production resolves in the world-open step behind the client singleton. */
     private static void bindManifestFile(LiveCaptureSession session, Path file) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField("mapIdsFile");
         field.setAccessible(true);
@@ -383,9 +316,8 @@ class LiveCaptureSessionMapTallyTest {
     }
 
     /**
-     * The session's loss counter named {@code field}. Read reflectively because the verdict cannot tell one term of its
-     * sum from another: a site rewired to a sibling counter still reads partial, so pinning the verdict alone would
-     * pass on the mistake.
+     * Read reflectively because the verdict cannot tell one term of its sum from another: a site rewired to a sibling
+     * counter still reads partial, so pinning the verdict alone would pass on the mistake.
      */
     private static int losses(LiveCaptureSession session, String field) throws Exception {
         Field counter = LiveCaptureSession.class.getDeclaredField(field);
@@ -393,7 +325,6 @@ class LiveCaptureSessionMapTallyTest {
         return counter.getInt(session);
     }
 
-    /** Whether the session records the manifest on disk as stale, read for the same reason the counters are. */
     private static boolean stale(LiveCaptureSession session) throws Exception {
         Field flag = LiveCaptureSession.class.getDeclaredField("mapManifestStale");
         flag.setAccessible(true);
@@ -406,11 +337,6 @@ class LiveCaptureSessionMapTallyTest {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(temporary.resolve("save"));
         MapArchive archive = stubArchive();
         archive.archiveIdFor(42); // an id referenced this session is what gives idCountsTag a value to write
-        // Inside the factory is the one moment where the publication order is observable, and it is the order
-        // the whole parameter shape exists for: the finalizer reads this field on the writer thread, and
-        // world-open earns that edge by assigning it before the writer exists. A write driven from here lands
-        // on disk only if the bind assigned the archive first. The paths half is not pinned: writeIdCounts
-        // takes them as an argument, and every in-class reader of the field needs state this moment lacks.
         Supplier<AsyncSaveWriter> counted = () -> {
             session.writeIdCounts(paths);
             return mapOnlyWriter();

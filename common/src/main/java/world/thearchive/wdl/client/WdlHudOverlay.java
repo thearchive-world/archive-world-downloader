@@ -31,16 +31,8 @@ import world.thearchive.wdl.core.SaveStage;
 import world.thearchive.wdl.platform.PlatformBridge;
 
 /**
- * The shared, state-driven HUD overlay drawn while a download records and saves: the primary live status surface (the
- * chat line stays as the dependency-free fallback). One render body serves both loaders and both layouts, reading all
- * live state through the {@link Wdl} facade and drawing with the vanilla surface's filled-rectangle and text primitives
- * only (no sprites, no pose or matrix), so it carries across the version bands with only the banded surface-name and
- * text-method edits the band map enumerates.
- *
- * <p>The HUD pass runs even behind an open screen, so the overlay self-gates (no player or level, a screen open, or the
- * HUD hidden) rather than relying on the registration to suppress it. It does not yield to the F3 debug screen: that
- * screen draws its own left and right columns and leaves the overlay's space clear, and a lone always-visible debug
- * entry such as the FPS line must not suppress the overlay either.
+ * The HUD pass runs even behind an open screen, so the overlay self-gates rather than relying on the registration to
+ * suppress it.
  */
 public final class WdlHudOverlay {
     private static final int PADDING = 4;
@@ -50,15 +42,13 @@ public final class WdlHudOverlay {
     private static final int GLYPH_GAP = 4;
     private static final int COMPACT_WIDTH = 140;
     private static final int DETAILED_WIDTH = 160;
-    // The widest shortened count the compact line renders: the chunk label reserves this width so it holds its
-    // place as the live count grows and shortens (see CaptureStatus.compactCount).
+    // The widest shortened count the compact line renders: the chunk label reserves this width so it holds its place as
+    // the live count grows and shortens.
     private static final String COMPACT_COUNT_TEMPLATE = "99.9M";
     private static final int SCREEN_MARGIN = 4;
     private static final int FADE_TAIL_MILLIS = 500;
     private static final float TRACK_LIGHTEN = 0.30f;
 
-    // The phase markers: a recording-red dot, a saving-gray dot, and a done-teal check. The dots share a shape
-    // and read apart by color and by the bar that only saving draws; the check is shape-distinct for done.
     private static final String GLYPH_RECORDING = "●";
     private static final String GLYPH_SAVING = "●";
     private static final String GLYPH_DONE = "✔";
@@ -114,7 +104,6 @@ public final class WdlHudOverlay {
         }
     }
 
-    // The peek key, registered per loader and bound here, plus the toggle-mode latch the overlay flips per press.
     private static @Nullable KeyMapping peekKey;
     private static boolean peekToggled;
 
@@ -125,7 +114,7 @@ public final class WdlHudOverlay {
         peekKey = key;
     }
 
-    /** Draw one frame; called per render from each loader's registered HUD element/layer. */
+    /** Draw one frame. */
     public static void render(PoseStack poseStack, float partialTick) {
         try {
             Minecraft minecraft = Minecraft.getInstance();
@@ -136,7 +125,7 @@ public final class WdlHudOverlay {
             }
             Frame frame = resolveFrame(config);
             if (frame == null) {
-                return; // idle, or past the done linger: the overlay draws nothing
+                return;
             }
             boolean detailed = config.detailed() || isPeeking(config);
             draw(new RenderSurfaceImpl(poseStack), minecraft.font, config, frame, detailed);
@@ -196,7 +185,7 @@ public final class WdlHudOverlay {
                 peekToggled = !peekToggled;
             }
         } else {
-            peekToggled = false; // hold mode reads the live key state, so a stale toggle never lingers
+            peekToggled = false;
         }
     }
 
@@ -239,11 +228,11 @@ public final class WdlHudOverlay {
 
     private static int contentHeight(Phase phase, boolean detailed) {
         if (detailed) {
-            int rows = phase == Phase.SAVING ? 5 : 4; // four count rows, plus the saving stage row
+            int rows = phase == Phase.SAVING ? 5 : 4;
             return rows * LINE_HEIGHT + (phase == Phase.SAVING ? BAR_HEIGHT + 2 : 0);
         }
         if (phase == Phase.SAVING) {
-            return LINE_HEIGHT + SAVING_BAR_HEIGHT; // the status row, then the tall label-bearing bar
+            return LINE_HEIGHT + SAVING_BAR_HEIGHT;
         }
         return LINE_HEIGHT;
     }
@@ -279,8 +268,7 @@ public final class WdlHudOverlay {
     }
 
     /**
-     * The compact finalization bar: a full-width track filled to the fraction, with the phase label drawn over the left
-     * and the percent over the right. The over-bar text is always shadowed for contrast.
+     * The over-bar text is always shadowed for contrast.
      */
     private static void drawLabeledBar(RenderSurface surface, Font font, int x, int y, int width,
             SaveStage stage, float fraction, float alpha) {
@@ -302,7 +290,6 @@ public final class WdlHudOverlay {
         int rowWidth = contentWidth - glyphAdvance;
         int textColor = withAlpha(BrandColors.IVORY, alpha);
         int rowY = contentY;
-        // The phase glyph sits to the left of the first row, not on a line of its own.
         surface.text(font, glyph, contentX, rowY, withAlpha(glyphColor(frame.phase()), alpha), shadow);
         drawRow(surface, font, "wdl.hud.label.chunks", Integer.toString(counts.chunks()),
                 rowX, rowY, rowWidth, textColor, shadow);

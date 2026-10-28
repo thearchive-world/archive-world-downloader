@@ -27,7 +27,7 @@ class PlayerProgressSerializerTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // boots BuiltInRegistries + the Stats statics (side effect only)
+        TestRegistries.frozen();
     }
 
     private static JsonObject parse(byte[] json) {
@@ -39,7 +39,7 @@ class PlayerProgressSerializerTest {
         StatsCounter counter = new StatsCounter();
         counter.setValue(null, Stats.CUSTOM.get(Stats.PLAY_ONE_MINUTE), 1200); // base setValue ignores the player
         counter.setValue(null, Stats.BLOCK_MINED.get(Blocks.STONE), 5);
-        counter.setValue(null, Stats.BLOCK_MINED.get(Blocks.DIRT), 0); // a zero must be filtered out
+        counter.setValue(null, Stats.BLOCK_MINED.get(Blocks.DIRT), 0);
 
         byte[] bytes = PlayerProgressSerializer.statsJson(counter, DATA_VERSION);
         assertNotNull(bytes, "a populated counter yields a blob");

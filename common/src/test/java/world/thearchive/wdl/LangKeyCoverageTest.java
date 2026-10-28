@@ -28,14 +28,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/**
- * The gate between the keys the code names and the keys en_us carries, in both directions. {@link LangFidelityTest}
- * holds the 32 locales to en_us and never looks at the code, so without this a key only production names could be
- * absent from every catalog and stay green: MC renders a missing key as the raw key string, and a tooltip behind
- * {@code I18n.exists} renders nothing at all.
- *
- * <p>MC-free: source and resource reads off the module tree, the {@link UiLiteralEnrollmentTest} pattern.
- */
 class LangKeyCoverageTest {
     private static final Path CATALOG = Paths.get("src/main/resources/assets/wdl/lang/en_us.json");
 
@@ -44,8 +36,7 @@ class LangKeyCoverageTest {
             Paths.get("../fabric/src/main/java/world/thearchive/wdl"),
             Paths.get("../neoforge/src/main/java/world/thearchive/wdl"));
 
-    // Anchored on both quotes so a log line that merely mentions wdl.properties is not read as a key, and narrowed
-    // to the three shapes the project uses so vanilla's own key.* names cannot be swept in.
+    // Anchored on both quotes so a log line that merely mentions wdl.properties is not read as a key.
     private static final Pattern keyLiteral = Pattern
             .compile("\"((?:wdl|key\\.wdl|key\\.category\\.wdl)\\.[A-Za-z0-9_.]+)\"");
 
@@ -74,8 +65,7 @@ class LangKeyCoverageTest {
             "wdl.settings.tab.",
             "wdl.settings.value.");
 
-    // The controls heading MC derives from the wdl:downloader category identifier, and the two entries
-    // ModMenu reads off the mod id.
+    // The controls heading, and the two entries ModMenu reads off the mod id.
     private static final Set<String> EXTERNAL_CONSUMERS = ImmutableSet.of(
             "key.categories.wdl.downloader",
             "modmenu.descriptionTranslation.wdl",
@@ -162,7 +152,6 @@ class LangKeyCoverageTest {
         Set<String> literals = new TreeSet<>();
         for (Path root : PRODUCTION_ROOTS) {
             if (root.startsWith("..")) {
-                // A band ships only some loaders, so a loader root may be absent; only common's own root must exist.
                 if (!Files.isDirectory(root)) {
                     continue;
                 }

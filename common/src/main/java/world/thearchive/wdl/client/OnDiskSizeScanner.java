@@ -18,27 +18,11 @@ import world.thearchive.wdl.core.export.FolderSize;
 import world.thearchive.wdl.core.export.RestoreSource;
 
 /**
- * Walks download folders off the render thread so the download screen can fill in each row's on-disk size: the screen
- * submits a folder here the first time the row is drawn and drains the true on-disk total when it lands; a row shows no
- * size until then. The walk reuses {@link FolderSize#onDiskSize} (the one size algorithm) on a single daemon thread, so
- * folders are walked sequentially and cannot saturate disk I/O on weak hardware. Each completed walk crosses back as a
- * {@link Result} on a queue the screen drains on its tick, never a callback, so nothing runs on the walker thread.
- *
- * <p>The same worker also answers the tainted rows' restore-source availability probe (the request kind is the submit
- * flag): one queue, disjoint row domains, since a tainted row never shows a size and a size row never shows the restore
- * chip. An availability result carries the newest clean source zip via {@link RestoreSource#find} and no size; a size
- * result carries no source.
- *
- * <p>{@link #close()} stops the scanner when its screen closes: queued walks are dropped, and because the underlying
- * {@link FolderSize} walk is uninterruptible, a walk already running finishes on the daemon thread and its
- * {@link Result} is discarded rather than written into the replaced screen. Daemon threads also mean a survivor walk
- * can never block JVM exit.
+ * {@link #close()} stops the scanner when its screen closes: queued walks are dropped, and because the underlying
+ * {@link FolderSize} walk is uninterruptible, a walk already running finishes on the daemon thread. Daemon threads also
+ * mean a survivor walk can never block JVM exit.
  */
 final class OnDiskSizeScanner implements AutoCloseable {
-    /**
-     * One finished request for {@code folder}: a size walk's on-disk total ({@linkplain OptionalLong#empty() empty} if
-     * it failed) with no source, or an availability probe's clean source zip (null when none qualifies) with no size.
-     */
     static final class Result {
         private final Path folder;
         private final OptionalLong size;
@@ -72,10 +56,6 @@ final class OnDiskSizeScanner implements AutoCloseable {
     private final Queue<Result> completed = new ConcurrentLinkedQueue<>();
     private volatile boolean closed;
 
-    /**
-     * Schedule an off-thread request for {@code folder}, delivered through {@link #drainCompleted()}:
-     * {@code availability} picks the restore-source probe over the size walk.
-     */
     void submit(Path folder, boolean availability) {
         if (closed) {
             return;
@@ -94,7 +74,6 @@ final class OnDiskSizeScanner implements AutoCloseable {
         }
     }
 
-    /** The newest clean restore source for the download folder, or null when no candidate qualifies. */
     private static @Nullable Path availabilitySource(Path folder) {
         Path savesDirectory = folder.getParent();
         Path name = folder.getFileName();
@@ -104,12 +83,10 @@ final class OnDiskSizeScanner implements AutoCloseable {
         return RestoreSource.find(savesDirectory, name.toString()).map(RestoreSource::zip).orElse(null);
     }
 
-    /** Whether the scanner has been closed; a closed scanner accepts no walks and must be replaced to scan again. */
     boolean isClosed() {
         return closed;
     }
 
-    /** The requests finished since the last drain, oldest first; called on the render thread (the screen tick). */
     List<Result> drainCompleted() {
         List<Result> drained = new ArrayList<>();
         Result result;

@@ -40,39 +40,25 @@ import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The headless guard for the fail-soft: the finish-time player assembly runs after chunks have committed to disk, so an
- * uncaught serialize or scrub throw there would abort before the writer finalizes and leave a chunks-without-level.dat
- * unopenable world plus a leaked lock. {@link LiveCaptureSession#failSoft} degrades any throw to a null snapshot, which
- * the (separately tested) null-{@code CapturedPlayer} level.dat path writes as the openable void world. The remaining
- * "the writer still finalizes" half is the last two tests here: the fail-soft above covers the throws it was written
- * for, and the guard those two pin covers the finish body wholesale, including the steps between the last submit and
- * the end-of-stream marker that no fail-soft wraps.
- *
- * <p>The degradation is deliberate, so the second half here is that it is not silent: a level.dat written with no
- * Player tag has lost the download's inventory, ender chest and game mode, and a verdict that still read clean over
- * that would be the completion record asserting something untrue. Both halves are asserted for each, since neither
- * alone is enough: the counter moved (the verdict sums every term, so a step charged to a sibling counter still reads
- * partial) and the verdict turned partial (a counter no term of the sum reads is a loss nothing reports). The
- * production call sites sit past the client reads, so what this pins is the contract they share and not that they still
- * call it.
+ * Neither half alone is enough: the counter moved (the verdict sums every term, so a step charged to a sibling counter
+ * still reads partial) and the verdict turned partial (a counter no term of the sum reads is a loss the verdict does
+ * not report).
  */
 class LiveCaptureSessionFailSoftTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // initialize the vanilla static constants the value types touch
+        TestRegistries.frozen();
     }
 
     /**
-     * A session with no bound level, which is all the fail-soft contract needs. Entity and container capture are off so
-     * the constructor publishes no process-wide capture into the static activation slots, which only {@code finish()}
-     * would clear; the toggles are asserted rather than assumed, since an unrecognized config key falls back to the
-     * default, which is on for both.
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots, which only the finish path clears; the toggles are asserted rather than assumed, since an
+     * unrecognized config key falls back to the default, which is on for both.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         return session(new HeadlessPlatformBridge(configDirectory));
     }
 
-    /** The headless bridge with its chat arm recording, for the one path whose subject is that it surfaces. */
     private static final class SurfacingBridge extends HeadlessPlatformBridge {
         private boolean surfaced;
 
@@ -139,9 +125,6 @@ class LiveCaptureSessionFailSoftTest {
 
     @Test
     void eachDegradedStepIsCountedOnItsOwn(@TempDir Path temporary) throws Exception {
-        // These are independent losses, and one of them (the salvaged mount) runs only because another
-        // already failed, so a tally that latched on the first would under-report every finish that lost
-        // more than one snapshot.
         LiveCaptureSession session = session(temporary);
 
         session.failSoft("player", () -> {
@@ -154,12 +137,6 @@ class LiveCaptureSessionFailSoftTest {
         assertEquals(2, losses(session), "a lost player and a lost progress snapshot are two losses, not one");
     }
 
-    /**
-     * Bind a session to a writer with no storage behind it, which is all the end-of-stream contract needs: the guard
-     * submits nothing, so the drain opens neither target, and what matters is whether the writer reached its finalize
-     * at all. The finalizer arrives as a parameter so a test can read the session through it, on the writer thread, at
-     * the instant the production one stamps the completion record.
-     */
     private static AsyncSaveWriter bindWriter(LiveCaptureSession session, Path temporary,
             AsyncSaveWriter.Finalizer finalizer) {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(temporary.resolve("save"));
@@ -176,13 +153,6 @@ class LiveCaptureSessionFailSoftTest {
                 new SaveProgress()));
     }
 
-    /**
-     * The finish body throwing anywhere on its way to the end-of-stream marker: the marker must still be enqueued, or
-     * the writer thread parks in its queue take for the rest of the game session holding the world's session lock, with
-     * no level.dat written, the future never completed, and nothing at all reported to the player. The verdict half
-     * matters as much: a save that completes claiming a success it did not have is worse than the parked thread, so the
-     * throw is counted, and it is counted before the marker so that the writer thread's own finalize reads it.
-     */
     @Test
     void aThrowOnTheWayToTheMarkerStillFinalizesTheSaveAndCountsTheLoss(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
@@ -209,11 +179,6 @@ class LiveCaptureSessionFailSoftTest {
         assertTrue(session.isPartialSave(0, 0), "which the main-thread verdict reads as partial too");
     }
 
-    /**
-     * The guard catches {@link Throwable} rather than {@link RuntimeException}, and the difference is the whole defect
-     * for an Error: the terminal state matters more than which class of failure got in the way, so an Error must not be
-     * the one throw that still parks the writer.
-     */
     @Test
     void anErrorOnTheWayToTheMarkerIsCaughtLikeAnyOtherThrow(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
@@ -228,11 +193,6 @@ class LiveCaptureSessionFailSoftTest {
         assertEquals(1, losses(session), "and the Error counts like any other degraded finish step");
     }
 
-    /**
-     * The same guard on the path that does not throw, which the test above cannot see, and it is not only the ordinary
-     * finish that needs it: the nothing-captured exit returns without submitting anything, and a download whose every
-     * chunk was dropped as void reaches it with a writer already open behind it.
-     */
     @Test
     void aFinishThatDoesNotThrowReachesTheSameEndOfStreamAndCountsNothing(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
@@ -251,10 +211,6 @@ class LiveCaptureSessionFailSoftTest {
         assertFalse(session.isPartialSave(0, 0), "so the download reports clean");
     }
 
-    /**
-     * The controller takes the hold on the connection edge and hands it back a tick later, so what this pins is the
-     * session's half of that seam: the hold reaches the writer it owns, and the release lets it go again.
-     */
     @Test
     void holdAndReleaseReachTheWriterTheSessionOwns(@TempDir Path temporary) throws Exception {
         LiveCaptureSession session = session(temporary);
@@ -271,10 +227,7 @@ class LiveCaptureSessionFailSoftTest {
     }
 
     /**
-     * The one link no unit above pins: that {@link LiveCaptureSession#finish} routes through the guard at all.
-     * Headless, {@code Minecraft.getInstance()} is null, so the finish body throws on its first client read, which is
-     * the same shape as any other throw on the way to the marker and exercises the whole route. What this cannot pin is
-     * the executor the production path passes.
+     * Headless, {@code Minecraft.getInstance()} is null, so the finish body throws on its first client read.
      */
     @Test
     void finishItselfReachesTheEndOfStreamThroughTheGuard(@TempDir Path temporary) throws Exception {
@@ -288,12 +241,6 @@ class LiveCaptureSessionFailSoftTest {
         assertEquals(1, losses(session), "and the throw that got it there is counted like any other");
     }
 
-    /**
-     * A finish that never opened a world has no writer to signal, and so no future for the controller to poll either.
-     * Nothing is at risk on disk there, since the world-open closes its own access when it fails before handing one
-     * over, but a download that never completes leaves the controller saving for the rest of the session with no way to
-     * start another, so this finish has to end and report itself.
-     */
     @Test
     void aThrowWithNoWriterOpenIsReportedAndEndsTheDownload(@TempDir Path temporary) throws Exception {
         SurfacingBridge bridge = new SurfacingBridge(temporary);
@@ -309,11 +256,6 @@ class LiveCaptureSessionFailSoftTest {
         assertTrue(session.isSaveComplete(), "and the controller can leave the saving state");
     }
 
-    /**
-     * The session's degraded-finish-step counter. Read reflectively because the verdict cannot tell one term of its sum
-     * from another: a site rewired to a sibling counter still reads partial, so pinning the verdict alone would pass on
-     * the mistake.
-     */
     private static int losses(LiveCaptureSession session) throws Exception {
         Field counter = LiveCaptureSession.class.getDeclaredField("finishStepsFailed");
         counter.setAccessible(true);

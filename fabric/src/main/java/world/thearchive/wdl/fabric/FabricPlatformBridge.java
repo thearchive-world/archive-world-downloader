@@ -25,12 +25,6 @@ import world.thearchive.wdl.client.WdlKeyBinds;
 import world.thearchive.wdl.platform.AbstractPlatformBridge;
 import world.thearchive.wdl.platform.WdlCommands;
 
-/**
- * Fabric {@link AbstractPlatformBridge}: maps the loader-specific hooks (keybind, ticks, disconnect, config directory,
- * command registration) to Fabric's APIs. Constructed directly by {@code WdlFabricClient} and handed to
- * {@code Wdl.initialize}; every Fabric / vanilla call happens inside the methods (run from the client thread), never
- * the constructor.
- */
 public final class FabricPlatformBridge extends AbstractPlatformBridge {
     @Override
     protected void registerKeybind(String keyId, Runnable onPress) {
@@ -100,21 +94,14 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
         return FabricLoader.getInstance().isModLoaded(modId);
     }
 
-    /**
-     * False. The mixin backing {@code UseBlockCallback} is injected into {@code MultiPlayerGameMode.useItemOn} above
-     * vanilla's own spectator return, but its handler body opens with its own spectator return, ahead of the invoker
-     * call, and says so ("vanilla spectator check happens later, repeat it before the event to avoid false
-     * invocations"), so no listener runs. The injection site is not what decides this; the handler body is.
-     */
     @Override
     public boolean observesSpectatorBlockClick() {
         return false;
     }
 
     /**
-     * True, the opposite of the block axis. {@code UseEntityCallback} is invoked as the first statement of a mixin on
-     * {@code Minecraft.startUseItem}, whose handler body carries no gamemode test, and vanilla reaches that call site
-     * for a spectator.
+     * True. {@code UseEntityCallback} is invoked as the first statement of a mixin, whose handler body carries no
+     * gamemode test, and vanilla reaches that call site for a spectator.
      */
     @Override
     public boolean observesSpectatorEntityClick() {
@@ -123,8 +110,6 @@ public final class FabricPlatformBridge extends AbstractPlatformBridge {
 
     @Override
     public void registerCommands(WdlCommands commands) {
-        // The 1.16.5 client-command API is v1: a static DISPATCHER registered at construction. The Java 8 compiler
-        // cannot infer the source type through register(), so the command-source type is witnessed explicitly.
         ClientCommandManager.DISPATCHER.register(
                 AbstractPlatformBridge.<FabricClientCommandSource>wdlCommandTree(
                         commands, ClientCommandManager::literal, ClientCommandManager::argument));

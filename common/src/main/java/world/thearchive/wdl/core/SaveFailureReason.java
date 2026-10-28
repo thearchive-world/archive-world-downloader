@@ -5,11 +5,6 @@ package world.thearchive.wdl.core;
 
 import org.jspecify.annotations.Nullable;
 
-/**
- * The reason phrase of a save failure, either a wdl translation key naming a failure category (rendered at the platform
- * seam) or a verbatim literal for a throwable's own message, which has no fixed key. MC-free so the decision stays
- * headless-testable; the seam turns a keyed reason into a translatable and a literal reason into plain text.
- */
 public final class SaveFailureReason {
     private final @Nullable String translationKey;
     private final String text;
@@ -19,12 +14,10 @@ public final class SaveFailureReason {
         this.text = text;
     }
 
-    /** A category reason named by a wdl translation key (access denied, path not found, unknown error). */
     static SaveFailureReason keyed(String translationKey) {
         return new SaveFailureReason(translationKey, "");
     }
 
-    /** A verbatim reason carrying a throwable's own message, which has no fixed key to resolve. */
     public static SaveFailureReason literal(String text) {
         return new SaveFailureReason(null, text);
     }

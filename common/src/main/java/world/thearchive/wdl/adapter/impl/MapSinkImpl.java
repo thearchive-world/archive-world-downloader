@@ -11,27 +11,17 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
 import world.thearchive.wdl.adapter.MapSink;
 
-/**
- * 1.16.5 map sink: serializes a client {@code MapItemSavedData} via vanilla's own {@code MapItemSavedData.save} (the
- * pre-1.21.5 {@code SavedData} write), so the captured inner {@code "data"} tag is byte-for-byte what a vanilla
- * {@code data/map_<id>.dat} would hold.
- *
- * <p>The single step is client-coupled (a live {@code MapItemSavedData}), mirroring {@code ContainerSink}'s lift; the
- * headless round-trip re-parse via the same call is the automated guard.
- */
 public final class MapSinkImpl implements MapSink {
     @Override
     public Tag serializeMap(MapItemSavedData saved, RegistryAccess registries) {
-        // save writes the inner map "data" compound the band-agnostic MapDataWriter then wraps as
-        // {data, DataVersion} and gzips. It puts the live colors array into that compound rather than a copy of
-        // it, and vanilla's map packet handler keeps writing received pixels into that same array.
+        // save puts the live colors array into its compound rather than a copy of it, and vanilla's map packet handler
+        // keeps writing received pixels into that same array.
         if (saved.dimension != null) {
             return saved.save(new CompoundTag()).copy();
         }
-        // A version-bridging proxy (ViaVersion/ViaBackwards fronting a newer server) can relay a filled map to the
-        // client with a null dimension, which save dereferences (this.dimension.location()). Stand in the overworld
-        // key for the serialize so the image still writes, then restore so the live client map is left as received,
-        // the way the session leaves its locked flag alone.
+        // A filled map can reach the client with a null dimension, which save dereferences (this.dimension.location()).
+        // Stand in the overworld key for the serialize so the image still writes, then restore so the live client map
+        // is left as received.
         saved.dimension = Level.OVERWORLD;
         try {
             return saved.save(new CompoundTag()).copy();

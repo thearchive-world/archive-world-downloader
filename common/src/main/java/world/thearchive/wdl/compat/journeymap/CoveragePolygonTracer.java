@@ -12,13 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Traces chunk-space coverage rectangles into merged block-space polygon rings with correctly nested holes. Pure
- * java.awt geometry with no MC or JourneyMap types, so it is headless-testable.
- *
- * <p>This stands in for JourneyMap's {@code PolygonHelper.createPolygonFromArea}, whose {@code classifyAndGroup}
- * assigns a hole to the first hull whose filled outline it merely intersects. When a suspect island sits inside a
- * covered region inside more suspect, that hands the covered-region hole to the inner island, leaves the outer suspect
- * hull with no hole carved, and floods the whole covered tone with the suspect fill. Pairing each hole with the
+ * This stands in for JourneyMap's {@code PolygonHelper.createPolygonFromArea}, whose {@code classifyAndGroup} can
+ * assign a hole to the first hull whose filled outline it merely intersects. When a suspect island sits inside a
+ * covered region inside more suspect, that can hand the covered-region hole to the inner island, leave the outer
+ * suspect hull with no hole carved, and flood the whole covered tone with the suspect fill. Pairing each hole with the
  * smallest hull that contains it, the innermost, is the correct association and renders the two tones without overlap.
  */
 public final class CoveragePolygonTracer {
@@ -44,10 +41,8 @@ public final class CoveragePolygonTracer {
     }
 
     /**
-     * The merged hulls-with-holes covering {@code chunkRects}, four ints per rectangle in chunk space (inclusive
-     * {@code minChunkX, minChunkZ, maxChunkX, maxChunkZ}). Each rectangle is expanded to its block extent and the
-     * rectangles are unioned before tracing, so adjacent rectangles merge into a single hull. Empty input yields an
-     * empty list.
+     * The merged hulls-with-holes covering {@code chunkRectangles}, four ints per rectangle in chunk space (inclusive
+     * {@code minChunkX, minChunkZ, maxChunkX, maxChunkZ}).
      */
     public static List<HoledRing> trace(int[] chunkRectangles) {
         if (chunkRectangles.length == 0) {
@@ -69,7 +64,7 @@ public final class CoveragePolygonTracer {
         List<int[]> holeRings = new ArrayList<>();
         for (int[] ring : contours(area)) {
             if (ring.length < 6) {
-                continue; // fewer than three points is not a fillable polygon
+                continue;
             }
             if (isHole(ring)) {
                 holeRings.add(ring);
@@ -111,12 +106,6 @@ public final class CoveragePolygonTracer {
         return result;
     }
 
-    /**
-     * Walk the area boundary into one flat x,z ring per subpath, collinear run midpoints dropped. A pair of gaps that
-     * touch only at a diagonal corner yields one self-touching (figure-8) hole ring, which is left intact, matching
-     * JourneyMap's own createPolygonFromArea; the renderer's Earcut can then leave a degenerate sliver at the pinch. We
-     * deliberately do not split such rings: the artifact is cosmetic and rare.
-     */
     private static List<int[]> contours(Area area) {
         List<int[]> rings = new ArrayList<>();
         List<int[]> current = new ArrayList<>();
@@ -141,10 +130,6 @@ public final class CoveragePolygonTracer {
         return rings;
     }
 
-    /**
-     * Drop the redundant midpoints of purely horizontal or vertical runs, which the chunk rectangles produce in
-     * abundance, and flatten to alternating x,z ints. Diagonals stay intact; the coverage rectangles emit none.
-     */
     private static int[] flattenSimplified(List<int[]> points) {
         List<int[]> kept;
         if (points.size() < 3) {
@@ -176,7 +161,6 @@ public final class CoveragePolygonTracer {
         return flat;
     }
 
-    /** A ring is a hole when its signed area is negative (clockwise winding, +x right and +z down). */
     private static boolean isHole(int[] ring) {
         long sum = 0;
         int ax = ring[ring.length - 2];
@@ -191,7 +175,6 @@ public final class CoveragePolygonTracer {
         return sum < 0;
     }
 
-    /** The unsigned area a ring encloses, for ranking a hole's candidate hulls by size (innermost is smallest). */
     private static double ringArea(int[] ring) {
         long twice = 0;
         int ax = ring[ring.length - 2];

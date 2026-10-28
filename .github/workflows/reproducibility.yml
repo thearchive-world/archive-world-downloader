@@ -1,19 +1,11 @@
 name: Reproducibility
 
-# Advisory (non-required) guard: builds every production jar twice and fails on any SHA-256 mismatch,
-# so a future plugin/dependency bump that breaks byte-reproducibility is caught per-commit. Same-machine,
-# shared-warm-GRADLE_USER_HOME scope only (a strict subset of the third-party guarantee); the cold-cache /
-# cross-image acceptance lives in the release process, not here. Kept off the fast ci.yml gate, like
-# mutation-testing.yml / capture-verification.yml.
 on:
   push:
     branches:
       - dev
       - "[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+"
-    # The job builds one tree twice and diffs the jars, so a source change moves both halves identically and
-    # only the build definition can break the property. An include list is therefore honest here in a way it is
-    # not for the mutation tier: this job runs no tests, so nothing it reads is hidden behind a test glob.
     paths:
       - 'gradle/**'          # the wrapper's pinned Gradle version as much as the catalog
       - 'gradlew'            # sets DEFAULT_JVM_OPTS and picks the JVM; gradle/** and **/*.gradle.kts miss it
@@ -25,8 +17,6 @@ on:
       - 'forge/gradlew'
       - 'forge/gradle/**'
       - 'forge/gradle.properties'
-      # This file too: the exact JDK patch is pinned below and is itself a determinism input, so a bump has to
-      # re-baseline here rather than wait for someone to touch build-logic.
       - '.github/workflows/reproducibility.yml'
   pull_request:
     paths:
@@ -39,7 +29,7 @@ on:
       - 'forge/gradle/**'
       - 'forge/gradle.properties'
       - '.github/workflows/reproducibility.yml'
-  # On demand: re-baselining after a Temurin patch bump or re-checking a tag needs no commit to carry it.
+  # On demand: re-checking a tag needs no commit to carry it.
   workflow_dispatch:
 
 permissions:
@@ -49,8 +39,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
-# pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
 defaults:
   run:
     shell: bash
@@ -58,8 +46,6 @@ defaults:
 jobs:
   reproducibility:
     runs-on: ubuntu-latest
-    # Two full builds, plus two of the forge/ island where the band ships one; the second of each reuses the
-    # warm GRADLE_USER_HOME Minecraft remap, so budget ~ cold-once + assemble-twice rather than 2x a cold build.
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -77,9 +63,9 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           # The language target's own JDK is installed alongside the toolchain's wherever the two differ, because
           # era-specific build tooling still asks for that one: ForgeGradle runs its MCP steps on the Minecraft
-          # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it
-          # takes the default JAVA_HOME, which is what launches the daemon, and fabric-loom publishes
-          # org.gradle.jvm.version=21 that a daemon below it cannot resolve at all.
+          # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it takes the
+          # default JAVA_HOME, and fabric-loom publishes org.gradle.jvm.version=21 that a daemon below it cannot resolve
+          # at all.
           target="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
           jdks="$version"
           if [ "$target" != "$major" ]; then jdks="$(printf '%s\n%s' "$jdks" "$target")"; fi
@@ -91,19 +77,6 @@ jobs:
           verify=true
           for j in $jdks; do case "$j" in 16 | 16.*) verify=false ;; esac; done
           echo "verify=$verify" >> "$GITHUB_OUTPUT"
-          # fabric-loom publishes org.gradle.jvm.version=21, so a daemon below 21 cannot resolve it
-          # at all and the build dies while configuring the root project, which declares the plugin apply-false
-          # even on a band that ships no Fabric module. A band whose own build JDK is older therefore installs
-          # 21 beside it and lets 21 be the default JAVA_HOME, since that is what launches the daemon and
-          # setup-java hands the default to the last entry of a multi-version list. The real build JDK is then
-          # reached only through its JAVA_HOME_<major>_X64 variable and the fromEnv bridge below, a genuine
-          # toolchain resolution rather than a same-JVM --release target. A warm dependency cache hides the
-          # failure entirely, so it shows up only on a clean checkout.
-          # Gradle auto-detects the installation JAVA_HOME names plus whatever
-          # org.gradle.java.installations.fromEnv names, but nothing scans the GitHub Actions tool-cache paths
-          # setup-java installs into, and auto-download stays off per gradle.properties, so without this bridge
-          # there is nothing to fall back to. GRADLE_OPTS applies to every gradlew invocation in the job, so one
-          # line covers the root build and any separate island wrapper alike.
           echo "GRADLE_OPTS=-Dorg.gradle.java.installations.fromEnv=JAVA_HOME_${major}_X64" >> "$GITHUB_ENV"
 
       - name: Set up the build JDKs (Temurin)
@@ -121,12 +94,9 @@ jobs:
       - name: Build, then rebuild clean, and byte-diff the production jars
         run: |
           set -euo pipefail
-          # Loader-aware jar resolution. The root build's production jars come from the loader subprojects the
-          # band includes: a fabric+neoforge band includes :fabric and :neoforge, a deep band includes :fabric alone
-          # or neither, its Forge jar coming from the separate forge/ island build that the island arm below
-          # covers. Read the loader set from settings.gradle.kts's include(...) statements -- matching the quoted
-          # project name on an include line, so a comment naming a loader cannot false-positive -- and never
-          # assert a :<loader>:printProductionJar for a project this band does not include.
+          # Read the loader set from settings.gradle.kts's include(...) statements -- matching the quoted project name
+          # on an include line, so a comment line naming a loader cannot false-positive -- and never assert a
+          # :<loader>:printProductionJar for a project this band does not include.
           LOADER_TASKS=()
           for loader in fabric neoforge; do
             if grep -E '^[[:space:]]*include\(' settings.gradle.kts | grep -q "\"${loader}\""; then
@@ -150,17 +120,14 @@ jobs:
           if [ "${#LOADER_TASKS[@]}" -eq 0 ]; then
             echo "no loader subprojects on this band (settings.gradle.kts includes no :fabric/:neoforge), so the root"
             echo "build produces no production jar; the forge/ island's ship jar is compared below."
-            # The island still builds on top of the root build, as it does in ci.yml and release.yml: an island can
-            # configure against the root's outputs (the hand-rolled one reads the Minecraft classpath the root's
-            # Loom resolved out of common/build), so the root is assembled once here even though it yields no jar
+            # An island can configure against the root's outputs (the hand-rolled one reads the Minecraft classpath the
+            # root's Loom resolved out of common/build), so the root is assembled once here even though it yields no jar
             # to compare.
             ./gradlew assemble --no-build-cache
           else
-            # Resolve the authoritative jar paths deterministically: capture via command substitution, so set -e
-            # catches a gradle failure (a process-substitution < <(...) would swallow its exit code); filter to jar
-            # paths under build/libs (tolerating any stray -q line); and sort, so parallel execution
-            # (org.gradle.parallel=true races the subprojects' stdout) can't reorder the list and false-fail the
-            # diff on byte-identical jars.
+            # Resolve the authoritative jar paths deterministically: capture via command substitution, so set -e catches
+            # a gradle failure (a process-substitution < <(...) would swallow its exit code); filter to jar paths under
+            # build/libs (tolerating any stray -q line).
             hash_jars() {
               local out
               out="$(./gradlew -q "${LOADER_TASKS[@]}")"
@@ -216,8 +183,6 @@ jobs:
             echo "reproducible: both island builds produced a byte-identical ship jar"
           fi
 
-      # A mismatch is diagnosed from the run's own jars instead of a rebuild. A green run uploads nothing, and a run
-      # that failed before a jar was hashed has nothing to upload either.
       - name: Upload both builds' jars
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

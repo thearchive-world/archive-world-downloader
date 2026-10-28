@@ -30,14 +30,6 @@ import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the band-agnostic {@link PlayerTag} operations on an already-serialized player tag: the strip
- * knobs (drop {@code Inventory}/{@code SelectedItemSlot}/{@code equipment}/{@code EnderItems}), the unconditional
- * Death-location double strip ({@code LastDeathLocation} + {@code current_explosion_impact_pos}), the respawn-point
- * strip ({@code SpawnX}/{@code SpawnY}/{@code SpawnZ}/{@code SpawnForced}/{@code Spawns}), the {@code Dimension} write
- * and the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure NBT, so
- * it round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
- */
 class PlayerTagTest {
     private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
@@ -47,7 +39,6 @@ class PlayerTagTest {
         registries = TestRegistries.frozen();
     }
 
-    /** A player-like tag carrying the strip-able keys plus an unrelated field that must always survive. */
     private static CompoundTag playerTag() {
         CompoundTag tag = new CompoundTag();
         tag.put("Inventory", new ListTag());
@@ -56,7 +47,7 @@ class PlayerTagTest {
         equipment.put("offhand", new CompoundTag());
         tag.put("equipment", equipment); // offhand and armor live here, not in Inventory, since 1.21.5
         tag.put("EnderItems", new ListTag());
-        tag.putShort("Air", (short) 300); // an Entity field the strips must never touch
+        tag.putShort("Air", (short) 300);
         return tag;
     }
 
@@ -78,7 +69,7 @@ class PlayerTagTest {
         assertFalse(tag.contains("EnderItems"), "EnderItems dropped");
         assertTrue(tag.contains("Inventory"), "inventory kept when only the ender knob is off");
         assertTrue(tag.contains("SelectedItemSlot"));
-        assertTrue(tag.contains("equipment"), "equipment kept with the inventory it belongs to");
+        assertTrue(tag.contains("equipment"), "equipment kept");
     }
 
     @Test
@@ -95,24 +86,23 @@ class PlayerTagTest {
     void stripDeathLocationRemovesBothCoordinateFieldsAndNoToggleRestoresThem() {
         CompoundTag tag = playerTag();
         tag.put("LastDeathLocation", new CompoundTag());
-        tag.put("current_explosion_impact_pos", new ListTag()); // value shape irrelevant; the strip drops the key
+        tag.put("current_explosion_impact_pos", new ListTag());
 
         PlayerTag.stripDeathLocation(tag);
 
-        assertFalse(tag.contains("LastDeathLocation"), "the last death location is removed");
-        assertFalse(tag.contains("current_explosion_impact_pos"), "the explosion-impact coordinate too");
+        assertFalse(tag.contains("LastDeathLocation"), "LastDeathLocation is removed");
+        assertFalse(tag.contains("current_explosion_impact_pos"), "current_explosion_impact_pos too");
 
-        // There is no flag on stripDeathLocation, and applying the keep-everything knobs cannot bring them back.
         PlayerTag.applyStripKnobs(tag, true, true);
-        assertFalse(tag.contains("LastDeathLocation"), "no config combination restores the death location");
-        assertFalse(tag.contains("current_explosion_impact_pos"), "nor the explosion-impact coordinate");
+        assertFalse(tag.contains("LastDeathLocation"), "no config combination restores LastDeathLocation");
+        assertFalse(tag.contains("current_explosion_impact_pos"), "nor current_explosion_impact_pos");
         assertTrue(tag.contains("Air"), "the strip leaves the rest of the tag intact");
     }
 
     @Test
     void stripRespawnPointRemovesTheFlatSpawnKeys() {
         CompoundTag tag = playerTag();
-        tag.putInt("SpawnX", 120); // the client's copy of the server's world spawn, never a bed
+        tag.putInt("SpawnX", 120);
         tag.putInt("SpawnY", 72);
         tag.putInt("SpawnZ", -340);
         tag.putBoolean("SpawnForced", true);
@@ -187,13 +177,13 @@ class PlayerTagTest {
         CompoundTag tag = playerTag(); // EnderItems starts as the empty list saveWithoutId wrote
         NonNullList<ItemStack> ender = NonNullList.withSize(27, ItemStack.EMPTY);
         ender.set(5, new ItemStack(Items.ENDER_PEARL, 9));
-        CompoundTag holder = sink.captureItems(ender, registries); // an "Items" list in ItemStackWithSlot form
+        CompoundTag holder = sink.captureItems(ender, registries);
 
         PlayerTag.setEnderItems(tag, holder);
 
         assertTrue(tag.get("EnderItems") instanceof ListTag, "EnderItems is now the captured list");
         CompoundTag probe = new CompoundTag();
-        probe.put("Items", tag.getList("EnderItems", 10)); // read the remapped list via the same codec
+        probe.put("Items", tag.getList("EnderItems", 10));
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ContainerHelper.loadAllItems(probe, back);
         assertEquals(Items.ENDER_PEARL, back.get(5).getItem(), "the captured ender item lands at its EnderItems slot");
@@ -228,7 +218,7 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsIgnoresAnUnseatedResume() {
         CompoundTag prior = priorPlayerWithRootVehicle();
-        CompoundTag fresh = playerTag(); // un-seated this session, no RootVehicle
+        CompoundTag fresh = playerTag();
 
         boolean restored = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -242,7 +232,7 @@ class PlayerTagTest {
     void restorePriorMountContentsNeedsBothEntityCompounds() {
         CompoundTag prior = priorPlayerWithRootVehicle();
         CompoundTag fresh = playerTag();
-        fresh.put("RootVehicle", new CompoundTag()); // seated shape present, but no Entity serialized
+        fresh.put("RootVehicle", new CompoundTag());
 
         boolean restored = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -275,7 +265,6 @@ class PlayerTagTest {
         assertFalse(fresh.contains("RootVehicle"));
     }
 
-    /** A RootVehicle whose Entity carries the mount's own UUID and an Items list, the seated-mount capture shape. */
     private static CompoundTag mountRootVehicle(UUID mountUuid, ListTag items) {
         CompoundTag rootVehicle = new CompoundTag();
         CompoundTag entity = EntityFixtures.entity("minecraft:chest_boat", mountUuid);
@@ -316,7 +305,7 @@ class PlayerTagTest {
         CompoundTag prior = playerSeatedIn(
                 mountRootVehicle(mount, itemList("minecraft:diamond", "minecraft:gold_ingot")));
         CompoundTag fresh = playerSeatedIn(
-                mountRootVehicle(mount, itemList("minecraft:emerald"))); // reopened this session
+                mountRootVehicle(mount, itemList("minecraft:emerald")));
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -329,7 +318,7 @@ class PlayerTagTest {
         CompoundTag prior = playerSeatedIn(mountRootVehicle(
                 UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"), itemList("minecraft:diamond")));
         CompoundTag fresh = playerSeatedIn(mountRootVehicle(
-                UUID.fromString("11111111-2222-3333-4444-555555555555"), new ListTag())); // a different mount
+                UUID.fromString("11111111-2222-3333-4444-555555555555"), new ListTag()));
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -340,7 +329,7 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsRestoresNothingWhenThePriorMountHeldNothing() {
         UUID mount = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        CompoundTag prior = playerSeatedIn(mountRootVehicle(mount, new ListTag())); // the prior mount was empty too
+        CompoundTag prior = playerSeatedIn(mountRootVehicle(mount, new ListTag()));
         CompoundTag fresh = playerSeatedIn(mountRootVehicle(mount, new ListTag()));
 
         assertFalse(PlayerTag.restorePriorMountContents(prior, fresh), "an empty prior mount is not a recovery");
@@ -419,7 +408,7 @@ class PlayerTagTest {
     @Test
     void aFreshEnderChestIsKeptOverThePrior() {
         CompoundTag prior = priorPlayer(itemList("minecraft:dirt"));
-        CompoundTag fresh = priorPlayer(itemList("minecraft:diamond", "minecraft:emerald")); // re-opened this session
+        CompoundTag fresh = priorPlayer(itemList("minecraft:diamond", "minecraft:emerald"));
 
         boolean carried = PlayerTag.carryForwardEnderItems(prior, fresh);
 
@@ -437,7 +426,7 @@ class PlayerTagTest {
 
     @Test
     void aPriorWithNoEnderItemsKeyCarriesNothing() {
-        CompoundTag prior = new CompoundTag(); // a pre-engine or absent prior player tag
+        CompoundTag prior = new CompoundTag();
         CompoundTag fresh = playerTag();
 
         assertFalse(PlayerTag.carryForwardEnderItems(prior, fresh));
