@@ -21,10 +21,9 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The headless guard for the player capture's detachment: the finish-time inventory capture must hand the map-id remap
- * a copy, not the stacks the player is holding. Below 1.15 vanilla {@code ItemStack.save} puts the live stack's own
- * {@code tag} compound into its output, so a capture that does not copy lets the remap rewrite the held item's map id,
- * which blanks a carried map on the live client until the server resends the slot.
+ * The finish-time player capture must hand the map-id remap a copy, not the stacks the player is holding. Below 1.15
+ * vanilla {@code ItemStack.save} puts the live stack's own {@code tag} compound into its output, so a capture that does
+ * not copy lets the remap rewrite the held item's map id.
  */
 class PlayerCaptureAliasTest {
     @BeforeAll

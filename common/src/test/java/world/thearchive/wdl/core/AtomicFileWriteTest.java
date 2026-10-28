@@ -15,7 +15,6 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** The staged-write contract. */
 class AtomicFileWriteTest {
     @Test
     void writesTheBytesAndCreatesTheMissingParent(@TempDir Path directory) throws IOException {

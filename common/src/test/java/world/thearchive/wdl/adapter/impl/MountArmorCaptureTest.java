@@ -37,15 +37,13 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the mount slot-1 write: a horse's armor and a llama's carpet. Both are real stacks in the
- * mount's own inventory slot 1, a container the server never sends, so vanilla's writer finds the slot empty and both
- * mounts archive bare.
+ * A horse's armor and a llama's carpet are real stacks in the mount's own inventory slot 1, a container the client
+ * never fills, so vanilla's writer finds the slot empty.
  *
  * <p>Every fixture leaves that slot EMPTY and reaches the synced source instead, and that is the whole point: a mount
  * armored or carpeted the ordinary way carries the key from vanilla's own writer, so a slot-1 fixture would pass with
  * this class's production code deleted. Live-entity tests drive {@code encodeChunk} and {@code captureRootVehicle}, so
- * removing either call site in {@link EntitySinkImpl} reddens one of them; the tag-level tests pin the on-disk
- * contract.
+ * removing either call site in {@link EntitySinkImpl} reddens one of them.
  */
 class MountArmorCaptureTest {
     private final EntitySink sink = new EntitySinkImpl();
@@ -55,7 +53,6 @@ class MountArmorCaptureTest {
         TestRegistries.bootstrap();
     }
 
-    /** The client holds the real stack on this band, so the assertion is byte equality, not merely the right item. */
     @Test
     void anArmoredHorseIsWrittenWithTheArmorItsInventoryNeverHeld() {
         ItemStack armor = new ItemStack(Items.DIAMOND_HORSE_ARMOR);
@@ -106,7 +103,6 @@ class MountArmorCaptureTest {
         assertFalse(saved.contains("DecorItem"), "a bare llama must not be given a carpet it never wore");
     }
 
-    /** Checked through the registry name each color names itself, so a transposition in the table cannot pass. */
     @Test
     void everyDyeColorWritesTheCarpetThatColorNames() {
         for (DyeColor color : DyeColor.values()) {
@@ -129,11 +125,6 @@ class MountArmorCaptureTest {
                 "a trader llama inherits the carpet path whole");
     }
 
-    /**
-     * A mount riding something else reaches disk only as a nested compound, because the entities path refuses a
-     * passenger its own entry. A plain minecart picks up a parked mount with no size gate, which is the ordinary way
-     * this state arises in play.
-     */
     @Test
     void anArmoredMountNestedUnderItsVehicleIsWrittenArmoredToo() {
         Minecart cart = new Minecart(EntityType.MINECART, HeadlessLevel.get());
@@ -150,10 +141,6 @@ class MountArmorCaptureTest {
                 "an armored mount nested under its vehicle must be written armored, not skipped for being nested");
     }
 
-    /**
-     * The mount a player is sitting on is refused by the entities path and reaches disk only through the second
-     * serialize, so the write has to be on both paths or the most ordinary case of all archives bare.
-     */
     @Test
     void aCarpetedMountIsWrittenCarpetedOnTheRootVehiclePath() {
         CompoundTag saved = sink.captureRootVehicle(carpetedLlama(DyeColor.PURPLE), false);
@@ -165,8 +152,7 @@ class MountArmorCaptureTest {
 
     /**
      * Vanilla drops any passenger whose own save it refuses, so the saved list is shorter than the live one and the two
-     * cannot be indexed in lockstep. Both mounts are armored, and differently, so a stamp walking either list by
-     * position writes the wrong armor rather than none.
+     * cannot be indexed in lockstep.
      */
     @Test
     void anArmoredMountIsFoundByUuidWhenAnEarlierPassengerIsDroppedFromTheSavedList() {
@@ -244,11 +230,6 @@ class MountArmorCaptureTest {
                 "fixture: slot 1 must stay empty, or vanilla writes the key itself and the test proves nothing");
     }
 
-    /**
-     * Whether the mount's own inventory slot 1 is empty. This band has no {@code Entity.getSlot}, so the protected
-     * container is reached directly; the assertion it backs is what stops the fixture from letting vanilla's own writer
-     * emit the key.
-     */
     private static boolean mountSlotOneIsEmpty(AbstractHorse mount) {
         try {
             Field field = AbstractHorse.class.getDeclaredField("inventory");
@@ -259,10 +240,6 @@ class MountArmorCaptureTest {
         }
     }
 
-    /**
-     * The synced carpet-color accessor, reached by reflection because it is private and every public route to it runs
-     * through inventory slot 1.
-     */
     private static EntityDataAccessor<Integer> swagId() {
         try {
             Field field = Llama.class.getDeclaredField("DATA_SWAG_ID");

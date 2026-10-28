@@ -16,12 +16,6 @@ import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The 1.15.2 world-output writes: the curated safe game rules and the world-open state land in the level.dat Data tag.
- * Noon and clear weather are fixed invariants applied regardless of the world-defaults master, the game-rule master
- * gates the curated set, and the override validation drops a bad value or surfaces an unknown id rather than writing it
- * against the real {@code GameRules}.
- */
 class LevelDatWorldOutputTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
@@ -53,8 +47,6 @@ class LevelDatWorldOutputTest {
         return WorldOutputConfig.parse(properties);
     }
 
-    // At 1.15.2 the generator seed and structure toggle live directly in the Data tag (RandomSeed, MapFeatures),
-    // not in a WorldGenSettings compound (that is 1.16 and later).
     private CompoundTag worldGenTag(LevelDataWriter.LevelData built) {
         return dataTag(built);
     }
@@ -180,7 +172,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void anUnknownOverrideIdIsSurfacedNotWritten() {
-        // spawn_mobs is the 1.21.5+ snake_case id; the 1.21.4 rule is doMobSpawning.
+        // spawn_mobs is the 1.21.11+ snake_case id; the rule below that cut is doMobSpawning.
         LevelDataWriter.LevelData built = build(with("gamerule.spawn_mobs", "true"));
 
         assertTrue(built.gameRules().unknownIds().contains("spawn_mobs"), "the cross-band loss is surfaced");
@@ -189,7 +181,7 @@ class LevelDatWorldOutputTest {
 
     @Test
     void aValidOverrideIsWritten() {
-        // doLimitedCrafting is not in the curated set; a valid override of it passes through.
+        // doLimitedCrafting is not in the curated set.
         GameRules rules = gameRules(build(with("gamerule.doLimitedCrafting", "true")));
 
         assertTrue(rules.getBoolean(GameRules.RULE_LIMITED_CRAFTING), "an arbitrary valid rule passes through");

@@ -23,18 +23,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for lectern-book capture: the {@link LecternSink} 1.20.4 path (captureBook -> merge) plus
- * vanilla's own {@code ItemStack.of} read-back (the exact form {@code LecternBlockEntity.loadAdditional} uses) is a
- * self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity tag under
- * {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field
- * clobbered. Runs for both a signed <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern
- * contents).
- *
- * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
- * neither a live menu nor a {@code Level} is needed. The one client-coupled step (lifting the book from the live open
- * menu's slot 0) is not exercised headless, exactly as for containers.
- */
 class LecternSinkRoundTripTest {
     private final LecternSink sink = new LecternSinkImpl();
 
@@ -43,15 +31,13 @@ class LecternSinkRoundTripTest {
         TestRegistries.bootstrap();
     }
 
-    /** A captured client lectern BE tag carrying a real non-Book field, to assert no clobber. */
     private static CompoundTag lecternTag(int x, int y, int z) {
         return namedBlockEntity("minecraft:lectern", x, y, z, "keep-me");
     }
 
     /**
-     * A signed written book. Below 1.20.5 there is no {@code WrittenBookContent} component; vanilla's own
-     * {@code WrittenBookItem} reads {@code title}/{@code author}/{@code generation}/{@code resolved} and a
-     * {@code "pages"} list of JSON-component strings straight off the item tag.
+     * Vanilla's own {@code WrittenBookItem} reads {@code title}/{@code author}/{@code generation}/{@code resolved} and
+     * a {@code "pages"} list of JSON-component strings straight off the item tag.
      */
     private static ItemStack writtenBook() {
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
@@ -68,8 +54,7 @@ class LecternSinkRoundTripTest {
     }
 
     /**
-     * An unsigned writable (book and quill) book. Below 1.20.5 there is no {@code WritableBookContent} component;
-     * vanilla's own {@code WritableBookItem} reads a {@code "pages"} list of plain (non-JSON) strings.
+     * Vanilla's own {@code WritableBookItem} reads a {@code "pages"} list of plain (non-JSON) strings.
      */
     private static ItemStack writableBook() {
         ItemStack book = new ItemStack(Items.WRITABLE_BOOK);
@@ -81,7 +66,6 @@ class LecternSinkRoundTripTest {
     }
 
     private static ItemStack readBackBook(CompoundTag merged) {
-        // vanilla loadAdditional's exact read
         ItemStack back = ItemStack.of(merged.getCompound("Book"));
         assertTrue(!back.isEmpty(), "the merged Book must decode via vanilla ItemStack.of");
         return back;
@@ -102,7 +86,6 @@ class LecternSinkRoundTripTest {
         CompoundTag holder = sink.captureBook(writtenBook(), 1);
         CompoundTag merged = sink.merge(lecternTag(10, 64, -7), holder);
 
-        // No field clobber: id / pos / unrelated fields survive.
         assertEquals("minecraft:lectern", merged.getString("id"));
         assertEquals(10, merged.getInt("x"));
         assertEquals(64, merged.getInt("y"));

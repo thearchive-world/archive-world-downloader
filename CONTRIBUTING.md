@@ -141,7 +141,10 @@ enough to review, and squash-merge keeps you as the author of the merged commit.
    merge. Three heavier tiers are advisory: a headless-client capture test, a mutation-testing run,
    and a byte-reproducibility double build. Each runs only when the pull request touches something
    that can move its result, so most pull requests skip some of them.
-2. Base the pull request on the `dev` branch, which is the active development branch.
+2. Base it on `dev`, even for a bug you found on an older Minecraft version. Almost all code is
+   shared: a fix lands on `dev` and gets cherry-picked to the version branches. Base it on a version
+   branch only when what you are changing does not exist on `dev`, for example that version's
+   `forge/` module or a comment only that branch carries.
 3. Keep it focused on one change. A smaller, single-purpose pull request is faster to review.
 4. Reference any issue it resolves with `Closes #NN` in the description.
 5. Cover new behavior with a test where you can. A change to the capture path also needs manual

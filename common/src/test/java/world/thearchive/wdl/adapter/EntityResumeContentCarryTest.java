@@ -47,21 +47,9 @@ import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The on-disk guard for a villager whose trades were captured by one download and which occupies a different
- * entity-chunk when a later download resumes. Trades reach the client only through the open trade menu, so the resumed
- * session re-serializes the villager carrying none; the entity read-merge carries {@code "Offers"} forward only inside
- * the chunk file it is writing, so the resumed copy lands in a second chunk file under the same UUID with no trades,
- * and vanilla keeps whichever chunk loads first. The remedy pinned here is that the previously saved trades are read
- * back off disk during the resume and re-applied to the later copy, so which one survives stops mattering.
- *
- * <p>The session-scoped sibling of this guard is {@link EntityVehicleRelocationTest}, which covers a vehicle moving
- * between two flushes of one session, where the retained in-memory holder supplies the re-fold. That holder does not
- * survive a session boundary, which is the hole these cases cover.
- *
- * <p>Asserted against the bytes under {@code entities/} across every chunk the two downloads could have written,
- * because that is the only place the trade-less second copy is visible: every write succeeds and no tally moves.
- * Deliberately never writes the session's folded maps: a case that seeds them itself passes whether or not a resume can
- * populate them, which is the blind spot {@link MerchantStashMergeTest} has by construction.
+ * Asserted against the bytes across every chunk the two downloads could have written, because every write succeeds and
+ * no failure tally moves. Deliberately never writes the session's folded maps: a case that seeds them itself passes
+ * even when the resume recovers nothing.
  */
 class EntityResumeContentCarryTest {
     private static final UUID VILLAGER = UUID.fromString("2f6c0f4a-1e88-4d3b-9a52-7c0b6e4d1a93");
@@ -70,8 +58,6 @@ class EntityResumeContentCarryTest {
 
     private final ContainerSink sink = new ContainerSinkImpl();
 
-    // Instance fields, not constants: ChunkPos's own class initializer reaches a built-in registry, so touching one
-    // before the bootstrap in @BeforeAll fails the whole class with "Not bootstrapped".
     private final ChunkPos opened = new ChunkPos(0, 0);
     private final ChunkPos wandered = new ChunkPos(1, 0);
 
@@ -104,10 +90,9 @@ class EntityResumeContentCarryTest {
         AsyncSaveWriter secondWriter = second.openWorld(source, ignoredRoot -> {});
         assertNotNull(secondWriter, "the resume must open the same world");
         // The resume walks past the chunk the villager used to occupy. Submitted before the entity write below, which
-        // is what production does: the scan is enqueued when the chunk enters the capture buffer, the entity write
-        // only when it later drains, and the writer serves one queue in order.
+        // is what production does: the writer serves one queue in order.
         secondWriter.submitEntityResumeScan(DimensionType.OVERWORLD, opened);
-        // No stash: the resumed session never opened the trade menu, so its serialize carries no offers.
+        // No stash: the resumed session never opened the trade menu.
         bufferEntity(second, VILLAGER, wandered, EntityFixtures.entity("minecraft:villager", VILLAGER));
         second.flushEntityChunk(secondWriter, wandered);
         assertFalse(secondWriter.finish().get(30, TimeUnit.SECONDS).failed(), "the resume drains cleanly");
@@ -145,7 +130,7 @@ class EntityResumeContentCarryTest {
         AsyncSaveWriter secondWriter = second.openWorld(source, ignoredRoot -> {});
         assertNotNull(secondWriter, "the resume must open the same world");
         secondWriter.submitEntityResumeScan(DimensionType.OVERWORLD, opened);
-        // No stash: the resumed session never reopened the chest, so its serialize carries nothing.
+        // No stash: the resumed session never reopened the chest.
         bufferEntity(second, BOAT, wandered, EntityFixtures.entity("minecraft:chest_boat", BOAT));
         second.flushEntityChunk(secondWriter, wandered);
         assertFalse(secondWriter.finish().get(30, TimeUnit.SECONDS).failed(), "the resume drains cleanly");
@@ -164,8 +149,6 @@ class EntityResumeContentCarryTest {
         LevelStorageSource source = new LevelStorageSource(saves, saves.resolve("backups"), DataFixers.getDataFixer());
         seedHosts(saves, opened, wandered);
 
-        // One download trades with the villager in each of two chunks, so the save holds two records for it and the
-        // one in the chunk the resume re-writes is the fresher of the two.
         LiveCaptureSession first = session(configDirectory, DownloadMode.NEW);
         AsyncSaveWriter firstWriter = first.openWorld(source, saveRoot -> {});
         assertNotNull(firstWriter, "the first download must open its world");
@@ -186,7 +169,7 @@ class EntityResumeContentCarryTest {
         LiveCaptureSession second = session(configDirectory, DownloadMode.RESUME);
         AsyncSaveWriter secondWriter = second.openWorld(source, ignoredRoot -> {});
         assertNotNull(secondWriter, "the resume must open the same world");
-        secondWriter.submitEntityResumeScan(DimensionType.OVERWORLD, opened); // banks the older trades
+        secondWriter.submitEntityResumeScan(DimensionType.OVERWORLD, opened);
         bufferEntity(second, VILLAGER, wandered, EntityFixtures.entity("minecraft:villager", VILLAGER));
         second.flushEntityChunk(secondWriter, wandered);
         assertFalse(secondWriter.finish().get(30, TimeUnit.SECONDS).failed(), "the resume drains cleanly");
@@ -214,9 +197,8 @@ class EntityResumeContentCarryTest {
         assertEquals("minecraft:emerald", firstSellId(entitiesOnDisk(saveRoot, VILLAGER, opened).get(0)),
                 "guard: the first download saved the trades the player actually saw");
 
-        // A client villager invents a random career and a random trade list the moment anything asks it for its
-        // offers, so a capture can arrive carrying trades that were never on the server. Built here rather than
-        // provoked: on a band whose vanilla guards the client-side write, nothing local produces the shape.
+        // A client villager can invent a random trade list the moment anything asks it for its offers, so a capture can
+        // arrive carrying trades that were never on the server.
         LiveCaptureSession second = session(configDirectory, DownloadMode.RESUME);
         AsyncSaveWriter secondWriter = second.openWorld(source, ignoredRoot -> {});
         assertNotNull(secondWriter, "the resume must open the same world");
@@ -232,7 +214,6 @@ class EntityResumeContentCarryTest {
                         + "being carried forward over it");
     }
 
-    /** The Recipes offers holder vanilla's own {@code MerchantOffers.createTag} writes, one offer selling the item. */
     private static CompoundTag offersWith(String sellId) {
         MerchantOffers offers = new MerchantOffers();
         offers.add(new MerchantOffer(new ItemStack(Items.EMERALD, 1), ItemFixtures.stack(sellId), 1, 0, 0.0f));
@@ -251,12 +232,6 @@ class EntityResumeContentCarryTest {
                 .getCompound("sell").getString("id");
     }
 
-    /**
-     * Every on-disk entity tag carrying {@code uuid}, across each entity-chunk the two downloads could have reached.
-     *
-     * <p>Entities live inside the region chunk under {@code Level.Entities} here, so the on-disk oracle reads the host
-     * chunk the fold wrote into rather than a separate {@code entities/} region.
-     */
     private static List<CompoundTag> entitiesOnDisk(Path saveRoot, UUID uuid, ChunkPos... positions) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(saveRoot);
         List<CompoundTag> found = new ArrayList<>();
@@ -284,9 +259,8 @@ class EntityResumeContentCarryTest {
     }
 
     /**
-     * Write an empty host chunk at each position before any download opens. Entities fold into the region chunk that
-     * holds the terrain here, so a fold with no host on disk is a counted loss rather than a write, and without this
-     * the fixture would prove nothing about carrying content forward.
+     * Entities fold into the region chunk that holds the terrain here, so a fold with no host on disk is a counted loss
+     * rather than a write.
      */
     private static void seedHosts(Path saves, ChunkPos... positions) throws Exception {
         WorldPaths paths = new VersionAdapterImpl().worldPaths(saves.resolve(FOLDER));
@@ -299,11 +273,6 @@ class EntityResumeContentCarryTest {
         }
     }
 
-    /**
-     * A session targeting one fixed folder name so a resume lands on the folder the first download wrote. The resume
-     * backup is off because it zips the whole folder on the writer thread before the drain, which this case does not
-     * exercise and which would only slow it.
-     */
     private static LiveCaptureSession session(Path configDirectory, DownloadMode mode) {
         Properties properties = new Properties();
         properties.setProperty("captureEntities", "false");
@@ -339,11 +308,6 @@ class EntityResumeContentCarryTest {
         buffer.accumulate(uuid, pos, tag);
     }
 
-    /**
-     * One of the session's capture-state collections, to seed. Reflective because every production path that fills one
-     * runs behind the client singleton (a trade-menu open, a packet-driven promote), and widening the fields would
-     * publish mutable capture state to the whole package for a test's convenience.
-     */
     @SuppressWarnings("unchecked")
     private static <T> T state(LiveCaptureSession session, String name) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField(name);

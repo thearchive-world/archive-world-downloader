@@ -9,26 +9,16 @@ import journeymap.client.api.model.MapPolygon;
 import journeymap.client.api.model.ShapeProperties;
 import net.minecraft.core.BlockPos;
 
-/**
- * Turns chunk-space coverage rectangles into JourneyMap polygon hulls and builds the fill-only shape style for a
- * coverage tone. The rectangle merge and hole tracing is {@link CoveragePolygonTracer}, pure geometry with no MC or
- * render state, so the driver runs this off the client thread and only shows the resulting polygons back on it.
- */
 final class CoveragePolygons {
-    // The horizontal plane the coverage polygons are placed on. JourneyMap projects overlays onto the top-down
-    // map by their x and z, so the y is cosmetic here; one fixed value keeps every tone on the same plane.
     private static final int OVERLAY_Y = 64;
 
-    // The coverage fill alpha as a 0..1 fraction, the 100/255 the sibling overlay integration draws at, so the
-    // two read as the same highlight.
     private static final float FILL_OPACITY = 100f / 255f;
 
     private CoveragePolygons() {}
 
     /**
-     * The fill-only shape style for a tone: {@code rgb} filled at the shared coverage opacity with the stroke fully
-     * suppressed. The default {@link ShapeProperties} carries a two-pixel opaque black outline, so the stroke opacity
-     * and width are both zeroed here or a black grid would draw between adjacent rectangles.
+     * The default {@link ShapeProperties} carries a two-pixel opaque black outline, so the stroke opacity and width are
+     * both zeroed here or a black grid would draw between adjacent rectangles.
      */
     static ShapeProperties toneStyle(int rgb) {
         return new ShapeProperties()
@@ -39,12 +29,9 @@ final class CoveragePolygons {
     }
 
     /**
-     * One convex JourneyMap polygon per coverage rectangle, four ints per rectangle in chunk space (inclusive
-     * {@code minChunkX, minChunkZ, maxChunkX, maxChunkZ}). The rectangles are disjoint and abut, so their translucent
-     * fills tile seamlessly and the uncovered gaps stay uncovered. This band feeds JourneyMap the rectangles rather
-     * than the merged holed hulls {@link CoveragePolygonTracer} produces, because JourneyMap 5.7.0 neither subtracts a
-     * hole nor fills a concave polygon: it floods the tone over the gaps and streaks the tessellation to a corner. An
-     * empty input yields an empty list.
+     * This band feeds JourneyMap the rectangles rather than the merged holed hulls {@link CoveragePolygonTracer}
+     * produces, because JourneyMap 5.7.0, the 1.14.4 and 1.15.2 build, neither subtracts a hole nor fills a concave
+     * polygon: it floods the tone over the gaps and streaks the tessellation to a corner.
      */
     static List<MapPolygon> polygons(int[] rectangles) {
         List<MapPolygon> result = new ArrayList<>(rectangles.length / 4);

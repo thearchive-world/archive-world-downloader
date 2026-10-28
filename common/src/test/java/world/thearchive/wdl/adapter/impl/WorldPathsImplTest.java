@@ -39,9 +39,6 @@ class WorldPathsImplTest {
     @Test
     void aDimensionPathLiterallyNamedRegionResolvesToItsRealRegionDir(@TempDir Path saveRoot)
             throws IOException {
-        // dimensions/myns/region is the dimension ROOT of a dimension whose path is "region"; its real
-        // region directory is dimensions/myns/region/region. The parent holds no region files, so the
-        // visitor descends through it instead of matching it, and no phantom entry appears.
         touchRegionFile(saveRoot.resolve("dimensions").resolve("myns").resolve("region").resolve("region"));
 
         Map<String, Path> directories = new WorldPathsImpl(saveRoot).onDiskRegionDirectories();
@@ -54,7 +51,7 @@ class WorldPathsImplTest {
             throws IOException {
         Files.createDirectories(saveRoot.resolve("region"));
         Files.createDirectories(saveRoot.resolve("dimensions").resolve("myns").resolve("empty")
-                .resolve("region")); // custom candidate without region files: not enumerated
+                .resolve("region"));
 
         Map<String, Path> directories = new WorldPathsImpl(saveRoot).onDiskRegionDirectories();
 
@@ -62,7 +59,6 @@ class WorldPathsImplTest {
         assertTrue(Files.notExists(saveRoot.resolve("DIM-1")), "enumeration must not create directories");
     }
 
-    /** The directory plus one empty region-named file, enough for the holds-region-files check. */
     private static void touchRegionFile(Path regionDirectory) throws IOException {
         Files.createDirectories(regionDirectory);
         Files.createFile(regionDirectory.resolve("r.0.0.mca"));

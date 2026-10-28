@@ -15,7 +15,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
-/** The production transport's failure mapping and its bounded-body guard. */
 class HttpTransportTest {
     @Test
     void mapsConnectionFailuresToTheFailureSentinel() {

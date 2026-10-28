@@ -28,19 +28,6 @@ import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.LogCapture;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The finish line naming what a download lost, term by term. Its fourteen counts arrive as fourteen consecutive
- * arguments against fourteen labels the compiler never compares them to, so two of them swapped still compiles,
- * renders, and still reads as a plausible report while attributing a loss to the wrong axis. Only the rendered text
- * tells the pairing apart, so every counter is given a distinct value and the whole line is asserted. It is the line a
- * user is asked for when a download reports partial, and the tally it explains is the same one the completion record
- * stamps clean or partial from, so a term reading against the wrong label sends the reader after the wrong axis of the
- * capture.
- *
- * <p>The reporting step is private and driven reflectively. It runs headlessly only with chat messages and toasts both
- * off: the chat arm resolves the save folder through the client singleton, which no headless session can answer, and
- * both arms surface through a bridge that has no player to reach.
- */
 class LiveCaptureSessionFinishLossLineTest {
     private static final String SESSION_LOGGER = LiveCaptureSession.class.getName();
 
@@ -65,13 +52,12 @@ class LiveCaptureSessionFinishLossLineTest {
 
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.bootstrap(); // vanilla statics, which building a session needs before it runs
+        TestRegistries.bootstrap();
     }
 
     /**
-     * A session with no bound level, reporting to nobody. Entity and container capture are off so the constructor
-     * publishes no process-wide capture into the static activation slots; chat and toasts are off because the headless
-     * bridge throws on both. All four are asserted rather than assumed: an unrecognized config key falls back to the
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots. All four toggles are asserted rather than assumed: an unrecognized config key falls back to the
      * default, which is on for all four.
      */
     private static LiveCaptureSession session(Path configDirectory) {
@@ -93,9 +79,8 @@ class LiveCaptureSessionFinishLossLineTest {
     }
 
     /**
-     * A save that wrote everything it was given, so the whole failure count on the line is the session's own. Every
-     * component is distinct, because the saved-world line renders them positionally and two zeros cannot tell a swapped
-     * pair apart.
+     * Every writer tally but the two failure counts is distinct, because the saved-world line renders them positionally
+     * and two equal values cannot tell a swapped pair apart.
      */
     private static AsyncSaveWriter.SaveResult cleanWrite() {
         return new AsyncSaveWriter.SaveResult(11, 12, 13, 0, 15, 0, 17, 18, null, null);
@@ -135,7 +120,6 @@ class LiveCaptureSessionFinishLossLineTest {
         }
     }
 
-    /** Give each of the fourteen tallies its own value; production accrues them across two threads and a session. */
     private static void recordLosses(LiveCaptureSession session) {
         setCount(session, "chunksCaptureFailed", CHUNKS);
         counter(session, "mapsFailed").set(MAPS);

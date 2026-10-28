@@ -13,9 +13,7 @@ description = "Keep the multiplayer worlds you visit. As you explore, the mod sa
 logoFile = "icon.png"
 logoBlur = false
 
-# Loader floor = gradle.properties forge_version_min (a deliberate value, not the build coordinate); the exact
-# minecraft pin below already locks the band one-to-one, so the upper bound stays open. Forge uses the boolean
-# mandatory key here where NeoForge 20.4 uses type = "required".
+# Forge uses the boolean mandatory key here where NeoForge 20.4 uses type = "required".
 [[dependencies.wdl]]
 modId = "forge"
 mandatory = true

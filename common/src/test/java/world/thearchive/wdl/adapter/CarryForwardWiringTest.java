@@ -47,13 +47,9 @@ import world.thearchive.wdl.testsupport.SyntheticChunks;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The wiring guard for what a chunk flush lets its on-disk prior carry forward, driven end to end through a real region
- * file: the decision lives in which read-merge the flush hands the writer, and a test that calls a merge itself passes
- * whichever merge it chose, which is exactly what a mis-wired call site does not change.
- *
- * <p>The suppressed and unsuppressed cases are the point as a pair. A position a placement replaced carries nothing on
- * the flush that acts on it and carries normally on the one after, and an ordinary revisit carries its own capture
- * forward throughout, so a suppression widened to everything is as red as one that suppresses nothing.
+ * Driven end to end through a real region file: the decision lives in which read-merge the flush hands the writer, and
+ * a test that calls a merge itself passes whichever merge it chose, which is exactly what a mis-wired call site does
+ * not change.
  */
 class CarryForwardWiringTest {
     private final BlockPos chest = new BlockPos(6, 64, 11);
@@ -63,7 +59,6 @@ class CarryForwardWiringTest {
         TestRegistries.bootstrap();
     }
 
-    /** An ordinary revisit must still keep what this download captured at that position. */
     @Test
     void aPriorOnDiskIsCarriedForward(@TempDir Path temporary) throws Exception {
         ChunkPos pos = new ChunkPos(chest);
@@ -82,11 +77,6 @@ class CarryForwardWiringTest {
                 "a re-walk through this world's own chunk carries its captured contents forward as before");
     }
 
-    /**
-     * A placement suppresses the carry-forward for the flush that acts on it and no longer. What that flush leaves on
-     * disk is already post-placement, so the visit after it is reading this download's own capture; holding the
-     * suppression would erase that capture on every later pass, which is the shape a permanent refusal always has.
-     */
     @Test
     void aReplacedPositionSuppressesOnceAndNotForever(@TempDir Path temporary) throws Exception {
         ChunkPos pos = new ChunkPos(chest);
@@ -112,10 +102,10 @@ class CarryForwardWiringTest {
     }
 
     /**
-     * The open-time half of the same wiring: what a container this flush captured leaves on disk. The merge cannot tell
-     * this case from an ordinary revisit, because both fresh sides carry the same empty {@code "Items"}; only the
-     * positions the flush derives from its own drained holders separate them, so a flush that stopped deriving them, or
-     * handed over an empty list, would restore items the player watched leave and no other case here would move.
+     * The merge cannot tell this case from an ordinary revisit, because both fresh sides carry the same empty
+     * {@code "Items"}; only the positions the flush derives from its own drained holders separate them, so a flush that
+     * stopped deriving them, or handed over an empty list, would restore items the player watched leave and no other
+     * case here would move.
      */
     @Test
     void aContainerThisFlushCapturedEmptyIsLeftEmptyOnDisk(@TempDir Path temporary) throws Exception {
@@ -137,7 +127,6 @@ class CarryForwardWiringTest {
                         + "earlier write archived there");
     }
 
-    /** The open-time container capture at {@code pos}, the stash the per-chunk flush drains and folds. */
     @SuppressWarnings("unchecked")
     private static void stashContainer(LiveCaptureSession session, BlockPos pos, CompoundTag holder)
             throws Exception {
@@ -149,7 +138,7 @@ class CarryForwardWiringTest {
     /**
      * Land a placement in {@code pos} through the recognizer the loader hook calls, so the session's own callback is
      * what marks the cell. Seeding the set directly would prove the flush consumes it and leave the line that fills it
-     * unpinned, which is the half the defect lived in.
+     * unpinned.
      */
     private static void placeBlockAt(LiveCaptureSession session, BlockPos pos) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField("interactionCapture");
@@ -159,7 +148,6 @@ class CarryForwardWiringTest {
         capture.recordPlaceAt(pos, new ItemStack(Items.CHEST));
     }
 
-    /** The open-time lectern capture at {@code pos}, which a placement in that cell must also drop. */
     @SuppressWarnings("unchecked")
     private static void stashLectern(LiveCaptureSession session, BlockPos pos, CompoundTag holder)
             throws Exception {
@@ -169,9 +157,8 @@ class CarryForwardWiringTest {
     }
 
     /**
-     * The lectern half of the placement drop. A lectern captured at a cell and then built over keeps its book keyed to
-     * that position, and the merge gate compares block-entity types, so a lectern placed there would inherit the book
-     * of the one it replaced.
+     * A lectern captured at a cell and then built over keeps its book keyed to that position, and the merge gate
+     * compares block-entity types, so a lectern placed there would inherit the book of the one it replaced.
      */
     @Test
     void aPlacementDropsTheLecternCapturedInThatCell(@TempDir Path temporary) throws Exception {

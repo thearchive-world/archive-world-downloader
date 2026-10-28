@@ -50,28 +50,10 @@ import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The one path that carries a previous download's parked mount forward. A mount ridden at the end of a download is
- * written to no entities region at all, because a vehicle with exactly one player passenger fails vanilla's own save
- * gate, so its single copy is that session's level.dat RootVehicle. A resume that finishes un-seated rewrites the
- * level.dat with no RootVehicle, which destroys that copy, and the release is what puts the mount into the world as a
- * standalone entity before that happens. Everything it fails to write is gone for good, including whatever the previous
- * download archived inside a chest boat or a chested animal.
- *
- * <p>Three axes. ROUTING: the position and the dimension must come from the same tag, so the cross-dimension case
- * asserts both the arrival and the absence, since a write that reaches the right folder while also reaching the wrong
- * one is still a corrupt save. IDENTITY: the release must decline exactly when this finish already saved the prior
- * mount inside the player's own RootVehicle, which is a question about the whole captured mount tree rather than its
- * root, so the two mounts here share an entity type and differ only by UUID and one of them rides nested inside the
- * other. COUNTING: each exit that reaches the release proper and writes nothing is asserted twice over, on the named
- * counter and on the verdict the completion record stamps from, since a counter no term of the sum reads reports
- * nothing; and every no-op is asserted in the other direction, on the absence of the WRITE rather than the absence of a
- * loss, because a path that wrongly runs and succeeds also loses nothing.
- *
- * <p>The release is driven directly, package-private for that, because every production caller runs behind the client
- * singleton; what that leaves unpinned is {@code finish()} calling it at all, and calling it in the right place, which
- * only the gametest tier can reach. The prior level.dat is a real compressed file read through the production reader,
- * and the writer is real over real region storages, so the dimension a submit routes to is read back off disk rather
- * than from a recorded call.
+ * Each exit that reaches the release proper and writes nothing is asserted twice over, on the named counter and on the
+ * verdict the completion record stamps from, since a counter no term of the sum reads reports nothing; and the
+ * fresh-download, same-mount and nested-mount no-op cases are asserted in the other direction, on the absence of the
+ * WRITE rather than the absence of a loss, because a path that wrongly runs and succeeds also loses nothing.
  */
 class LiveCaptureSessionResumedMountReleaseTest {
     private static final UUID MOUNT = UUID.fromString("f4c1a8d2-3b76-4e05-9a1c-8d2e6b70f513");
@@ -136,9 +118,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
     void aMountWhoseDimensionThisDownloadCannotRouteCountsAsLost(@TempDir Path temporary) throws Exception {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD);
-        // A prior tag naming a dimension no download of ours writes. Writing it into the dimension this
-        // session finished in is exactly the wrong-target write the routing exists to stop, so the mount is
-        // reported lost rather than put somewhere plausible.
         CompoundTag prior = priorPlayerTag(DimensionType.NETHER, mount());
         prior.putString("Dimension", "examplepack:skylands");
         writePriorPlayerTag(session, save, prior);
@@ -207,9 +186,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = session(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD,
                 DownloadMode.NEW);
-        // A level.dat is present because the target folder is being written over. It belongs to a world this
-        // download is replacing rather than continuing, so reading a mount out of it would put an entity from
-        // some other capture into a save that never held it.
         writePriorLevelDat(session, save, DimensionType.NETHER, mount());
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
@@ -231,8 +207,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
         writePriorLevelDat(session, save, DimensionType.NETHER, mount());
-        // Still riding the SAME mount at the finish, so this session's own level.dat carries it and releasing
-        // it as a standalone entity would write a second copy of a mount that was never dropped.
         seatedOn(session, mount(), MOUNT);
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
@@ -253,9 +227,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.OVERWORLD);
         writePriorLevelDat(session, save, DimensionType.NETHER, mount());
-        // Rode a donkey in the previous download, rode a boat in this one. The fresh record replaces the prior
-        // one in the Player slot, so the donkey is preserved by nothing unless it is released here, and being
-        // seated on SOMETHING is not the same question as being seated on THAT mount.
         seatedOn(session, otherMount(), OTHER_MOUNT);
         WorldPaths paths = paths(save);
         seedHost(paths, DimensionType.NETHER, mountChunk()); // the prior download already wrote the mount's chunk
@@ -275,9 +246,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
         writePriorLevelDat(session, save, DimensionType.NETHER, mount());
-        // The player is riding the prior mount, but that mount is itself in a boat, so the RootVehicle record
-        // holds the OUTER boat with the mount nested under it. The mount is still under the player and still
-        // saved by this finish, so releasing it would put a second copy of it in the world.
         seatedOn(session, EntityFixtures.entityCarrying(otherMount(), mount()), OTHER_MOUNT, MOUNT);
         WorldPaths paths = paths(save);
         AsyncSaveWriter writer = saveWriter(paths);
@@ -299,9 +267,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = temporary.resolve("save");
         LiveCaptureSession session = resumingSession(new VersionAdapterImpl(), temporary, DimensionType.NETHER);
         writePriorLevelDat(session, save, DimensionType.NETHER, mount());
-        // The capture ran and filled the exclusion set, then the whole player assembly threw, so level.dat
-        // takes its no-player arm and carries no RootVehicle at all. The mount is already held back from the
-        // standalone write by that same set, so the release is the only thing left that can save it.
         Set<UUID> excluded = state(session, "excludedRootVehicleUuids");
         excluded.add(MOUNT);
         WorldPaths paths = paths(save);
@@ -332,9 +297,8 @@ class LiveCaptureSessionResumedMountReleaseTest {
     }
 
     /**
-     * {@link MerchantOfferScrub} removes an {@code Offers} key without reading its value, so the fixture's stand-in for
-     * the invented trade list is an empty compound and this test names no merchant type or trade-list API, the types
-     * that change between versions.
+     * {@link MerchantOfferScrub} removes an {@code Offers} key without reading its value, so the fixture's
+     * {@code Offers} is an empty compound.
      */
     @Test
     void aVillagerLeftAboardTheParkedBoatLosesTheTradesItsClientMadeUp(@TempDir Path temporary) throws Exception {
@@ -361,16 +325,14 @@ class LiveCaptureSessionResumedMountReleaseTest {
         assertFalse(passenger.contains("Offers"), "which reaches the archive without the trades its client made up");
     }
 
-    /** The prior download's mount, carrying the loot whose survival is the whole point of releasing it. */
     private static CompoundTag mount() {
         return EntityFixtures.containerVehicleAt("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z,
                 MOUNT_LOOT);
     }
 
     /**
-     * The chunk the mount's position lands in, stated rather than recomputed with production's own formula, which would
-     * agree with whatever formula production used. Not a constant: ChunkPos's class initializer reaches a built-in
-     * registry, so touching one before the bootstrap fails the whole class.
+     * The chunk the mount's position lands in, stated rather than computed through production's own locator, which
+     * would agree with whatever formula it used.
      */
     private static ChunkPos mountChunk() {
         return new ChunkPos(-71, 30);
@@ -382,8 +344,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = saves.resolve("world");
         LiveCaptureSession session = session(new VersionAdapterImpl(), configDirectory, DimensionType.NETHER,
                 DownloadMode.RESUME);
-        // A mount ridden at a finish is refused every standalone write, so its entity-chunk copy is frozen at the
-        // last flush it was dismounted for, while the player record holds what the player saw from horseback.
         writePriorLevelDat(session, save, DimensionType.NETHER,
                 EntityFixtures.containerVehicleAt("minecraft:chest_boat", MOUNT, MOUNT_X, MOUNT_Y, MOUNT_Z,
                         "minecraft:diamond", "minecraft:emerald"));
@@ -403,8 +363,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         Path save = saves.resolve("world");
         LiveCaptureSession session = session(new VersionAdapterImpl(), configDirectory, DimensionType.NETHER,
                 DownloadMode.RESUME);
-        // The earlier download finished on foot, so it wrote no RootVehicle at all and the prior-record restore
-        // has nothing to match against.
         writePriorLevelDat(session, save, DimensionType.NETHER, null);
         bankRecoveredContents(session, MOUNT, "minecraft:diamond");
 
@@ -427,7 +385,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return raw.getCompound("RootVehicle").getCompound("Entity").getList("Items", 10);
     }
 
-    /** Seed the bank the resume scan fills, standing in for a prior download's entity-chunk record. */
     private static void bankRecoveredContents(LiveCaptureSession session, UUID uuid, String... itemIds)
             throws Exception {
         RecoveredEntityContent bank = state(session, "recoveredEntityContent");
@@ -441,19 +398,12 @@ class LiveCaptureSessionResumedMountReleaseTest {
         bank.record(chunk);
     }
 
-    /**
-     * A second mount of the SAME entity type, so identity rests on the UUID alone. Two boats is also the realistic
-     * switch; a donkey against a boat would let a check comparing entity types pass by accident.
-     */
     private static CompoundTag otherMount() {
         return EntityFixtures.entityAt("minecraft:chest_boat", OTHER_MOUNT, 8.5, 64.0, 8.5);
     }
 
-    /** A prior level.dat player tag: the dimension it finished in, and the mount it was riding if any. */
     private static CompoundTag priorPlayerTag(DimensionType dimension, @Nullable CompoundTag mount) {
         CompoundTag player = new CompoundTag();
-        // The band's save keys the player file on its UUID (players/data/<uuid>.dat at 26.x), so a prior written
-        // through it must carry one; a client saveWithoutId always does.
         player.putUUID("UUID", PRIOR_PLAYER);
         PlayerTag.setDimension(player, dimension);
         if (mount != null) {
@@ -470,10 +420,7 @@ class LiveCaptureSessionResumedMountReleaseTest {
     }
 
     /**
-     * Seed a prior download through the band's own save so the production reader finds the player wherever this band
-     * writes it (a level.dat Player compound pre-26.x, {@code players/data/<uuid>.dat} at 26.x), then point the session
-     * at the level.dat the way world-open does. Hand-writing the level.dat here would encode one band's layout and
-     * diverge from the read under test.
+     * Hand-writing the level.dat here would encode one band's layout and diverge from the read under test.
      */
     private static void writePriorPlayerTag(LiveCaptureSession session, Path save, CompoundTag player)
             throws Exception {
@@ -487,16 +434,10 @@ class LiveCaptureSessionResumedMountReleaseTest {
         set(session, "levelDatFile", save.resolve("level.dat"));
     }
 
-    /**
-     * Put the session in the state a finish that captured a mount leaves behind: the player tag carrying the
-     * RootVehicle record, AND the exclusion set holding every entity of the captured mount tree. Both, because
-     * production writes them together and the release reads the set; seeding only the tag would let a check that
-     * consults the wrong one pass.
-     */
     private static void seatedOn(LiveCaptureSession session, CompoundTag root, UUID... capturedTree)
             throws Exception {
         CompoundTag playerTag = new CompoundTag();
-        PlayerTag.setRootVehicle(playerTag, capturedTree[0], root); // the tree's root; nothing here reads Attach
+        PlayerTag.setRootVehicle(playerTag, capturedTree[0], root);
         set(session, "capturedPlayer", new CapturedPlayer(playerTag, BlockPos.ZERO, 0f, 0f, DimensionType.NETHER,
                 GameType.SURVIVAL, Difficulty.NORMAL));
         Set<UUID> excluded = state(session, "excludedRootVehicleUuids");
@@ -504,9 +445,9 @@ class LiveCaptureSessionResumedMountReleaseTest {
     }
 
     /**
-     * A session bound to no level, finishing in {@code finishedIn}. Entity and container capture are off so the
-     * constructor publishes no process-wide capture into the static activation slots, which only {@code finish()}
-     * clears; the toggles are asserted rather than assumed, since an unrecognized key falls back to on.
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots, which only the finish path clears; the toggles are asserted rather than assumed, since an
+     * unrecognized key falls back to on.
      */
     private static LiveCaptureSession session(VersionAdapter adapter, Path configDirectory,
             DimensionType finishedIn, DownloadMode mode) {
@@ -531,7 +472,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return new VersionAdapterImpl().worldPaths(save);
     }
 
-    /** A writer over the real region storage, so which dimension a submit routed to is answerable off disk. */
     private static AsyncSaveWriter saveWriter(WorldPaths paths) {
         return new AsyncSaveWriter(
                 paths::openRegionStorage,
@@ -542,9 +482,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
                 new SaveProgress());
     }
 
-    /**
-     * Seed a host region chunk at {@code pos} in {@code dimension} (the chunk a prior download had already written).
-     */
     private static void seedHost(WorldPaths paths, DimensionType dimension, ChunkPos pos) throws Exception {
         try (WdlRegionStorage region = paths.openRegionStorage(dimension)) {
             CompoundTag host = new CompoundTag();
@@ -553,10 +490,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         }
     }
 
-    /**
-     * The region chunk at {@code pos} in {@code dimension} whose {@code Level.Entities} the release folded the mount
-     * into, or null when nothing was written there (no host chunk exists until the seed above writes one).
-     */
     private static @Nullable CompoundTag entityChunk(WorldPaths paths, DimensionType dimension, ChunkPos pos)
             throws Exception {
         try (WdlRegionStorage storage = paths.openRegionStorage(dimension)) {
@@ -565,14 +498,12 @@ class LiveCaptureSessionResumedMountReleaseTest {
         }
     }
 
-    /** The one entity a region chunk's {@code Level.Entities} holds, so both its identity and contents can be read. */
     private static CompoundTag soleEntity(CompoundTag entityChunk) {
         ListTag entities = entityChunk.getCompound("Level").getList("Entities", 10);
         assertEquals(1, entities.size(), "the release writes exactly the one mount");
         return entities.getCompound(0);
     }
 
-    /** The UUID of the one entity a region chunk's {@code Level.Entities} holds, telling a mount from a stray. */
     private static String soleEntityUuid(CompoundTag entityChunk) {
         ListTag entities = entityChunk.getCompound("Level").getList("Entities", 10);
         assertEquals(1, entities.size(), "the release writes exactly the one mount");
@@ -581,7 +512,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return uuid.toString();
     }
 
-    /** The one passenger an entity carries, so what rode with the mount can be read back as well as the mount. */
     private static CompoundTag solePassenger(CompoundTag entity) {
         assertTrue(entity.contains("Passengers", 9), "the released mount carries a Passengers list");
         ListTag passengers = entity.getList("Passengers", 10);
@@ -589,7 +519,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return passengers.getCompound(0);
     }
 
-    /** The item id of the one stack an entity's container holds. */
     private static String soleItemId(CompoundTag entity) {
         ListTag items = entity.getList("Items", 10);
         assertEquals(1, items.size(), "the fixture archives exactly one stack");
@@ -602,7 +531,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         return counter.getInt(session);
     }
 
-    /** A live capture-state collection, seeded directly because only a client-driven capture fills one. */
     @SuppressWarnings("unchecked")
     private static <T> T state(LiveCaptureSession session, String name) throws Exception {
         Field field = LiveCaptureSession.class.getDeclaredField(name);
@@ -616,7 +544,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         field.set(session, value);
     }
 
-    /** The production adapter on every axis, so each subclass below swaps exactly the one it is named for. */
     private static class DelegatingAdapter implements VersionAdapter {
         private final VersionAdapterImpl real = new VersionAdapterImpl();
 
@@ -661,7 +588,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         }
     }
 
-    /** A sink that hands back no envelope, the refusal the release cannot tell from an empty chunk. */
     private static final class RefusingEntitySinkAdapter extends DelegatingAdapter {
         private final EntitySink refusing = new StubEntitySink() {
             @Override
@@ -676,7 +602,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         }
     }
 
-    /** A sink whose envelope build throws, the fail-soft catch's own input. */
     private static final class ThrowingEntitySinkAdapter extends DelegatingAdapter {
         private final EntitySink throwing = new StubEntitySink() {
             @Override
@@ -691,7 +616,6 @@ class LiveCaptureSessionResumedMountReleaseTest {
         }
     }
 
-    /** The sink members the release never reaches, so a call to one is a routing mistake rather than a pass. */
     private abstract static class StubEntitySink implements EntitySink {
         @Override
         public @Nullable CompoundTag encodeChunk(List<Entity> entities, ChunkPos pos,

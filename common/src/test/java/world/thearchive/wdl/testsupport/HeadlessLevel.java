@@ -28,12 +28,6 @@ import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.scores.Scoreboard;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A do-nothing overworld {@link Level} for headless entity fixtures. At 1.15.2 the {@code Mob} constructor binds a
- * level, so a mob cannot be built against a null one; this supplies the overworld dimension and an inactive profiler
- * through the pre-1.16 {@code Level} constructor, with a null chunk source and inert stubs for the abstract members no
- * fixture calls. The vanilla bootstrap (via {@link TestRegistries}) must have populated the dimension registry first.
- */
 public final class HeadlessLevel extends Level {
     private final TagManager tags = new TagManager();
 
