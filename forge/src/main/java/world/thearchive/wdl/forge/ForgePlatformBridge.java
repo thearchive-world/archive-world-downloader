@@ -34,12 +34,7 @@ import world.thearchive.wdl.platform.AbstractPlatformBridge;
 import world.thearchive.wdl.platform.WdlCommands;
 
 /**
- * Forge implementation of {@link world.thearchive.wdl.platform.PlatformBridge PlatformBridge}, constructed by
- * {@link WdlForge} with the mod event bus it fetched from FMLJavaModLoadingContext. Forge, like NeoForge, splits
- * a <i>mod</i> event bus (registration and lifecycle, e.g. {@link FMLClientSetupEvent}) from the <i>game</i> event
- * bus ({@link MinecraftForge#EVENT_BUS}, gameplay, e.g. {@link TickEvent.ClientTickEvent}); a {@code KeyMapping} is
- * registered from the mod bus, so this bridge holds it for {@link #registerKeybind}. {@code isRemoteWorld}
- * and {@code sendChat} are pure-vanilla and inherited from {@link AbstractPlatformBridge}.
+ * A {@code KeyMapping} is registered from the mod bus, so this bridge holds it for {@link #registerKeybind}.
  */
 final class ForgePlatformBridge extends AbstractPlatformBridge {
     private final IEventBus modEventBus;
@@ -53,7 +48,6 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     protected void registerKeybind(String keyId, Runnable onPress) {
         KeyMapping key = new KeyMapping(keyId, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN,
                 WdlKeyBinds.CATEGORY);
-        // Below 1.19 there is no RegisterKeyMappingsEvent; keys register through ClientRegistry during client setup.
         modEventBus.addListener(
                 (FMLClientSetupEvent event) -> event.enqueueWork(() -> ClientRegistry.registerKeyBinding(key)));
         MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent event) -> {
@@ -68,8 +62,6 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     @Override
     public void addPauseMenuButtons(Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled,
             Runnable onPrimary, Runnable onConfig) {
-        // ScreenEvent.InitScreenEvent.Post fires on the game bus for every screen, and a Button is a renderable
-        // GuiEventListener, so the pause-menu buttons inject as screen listeners with no mixin.
         MinecraftForge.EVENT_BUS.addListener((ScreenEvent.InitScreenEvent.Post event) -> {
             if (!(event.getScreen() instanceof PauseScreen)) {
                 return;
@@ -142,8 +134,8 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     }
 
     /**
-     * True. The patched {@code MultiPlayerGameMode.performUseItemOn} posts {@code RightClickBlock} before its
-     * spectator return, and {@code ForgeHooks.onRightClickBlock} posts to the bus unconditionally.
+     * True. The patched {@code MultiPlayerGameMode} posts {@code RightClickBlock} before its spectator return, and
+     * {@code ForgeHooks.onRightClickBlock} posts to the bus unconditionally.
      */
     @Override
     public boolean observesSpectatorBlockClick() {
@@ -162,8 +154,7 @@ final class ForgePlatformBridge extends AbstractPlatformBridge {
     }
 
     /**
-     * {@link RegisterClientCommandsEvent} fires on the GAME bus, so register it on {@link MinecraftForge#EVENT_BUS},
-     * the same bus this bridge already uses for ticks and disconnect.
+     * {@link RegisterClientCommandsEvent} fires on the GAME bus, so register it on {@link MinecraftForge#EVENT_BUS}.
      */
     @Override
     public void registerCommands(WdlCommands commands) {

@@ -1,10 +1,6 @@
 import net.minecraftforge.gradle.userdev.UserDevExtension
 import java.util.Properties
 
-// The non-Fabric jar for this deep band, built on the ForgeGradle 6 toolchain against real Forge. FG6 is
-// Gradle-8-only, so this is a separate Gradle-8 island beside the band's Gradle-9 root (common + fabric); the
-// two builds have two wrappers. ForgeGradle publishes no plugin marker, so it is applied from the buildscript
-// classpath rather than the plugins block.
 buildscript {
     repositories {
         maven("https://maven.minecraftforge.net/")
@@ -17,41 +13,32 @@ buildscript {
 
 plugins {
     java
-    // Release publishing. Pinned as a literal because the island is a separate build with no access to the root
-    // version catalog; keep in sync with gradle/libs.versions.toml's mod-publish-plugin.
     id("me.modmuss50.mod-publish-plugin") version "2.2.0"
 }
 
 apply(plugin = "net.minecraftforge.gradle")
 
-// Single source of coordinates: the island reads the band's gradle.properties from the sibling Gradle-9 root
-// rather than duplicating the version, MC pin, and compat coordinates. Two wrappers, one set of coordinates.
 val band = Properties().apply {
     rootDir.resolve("../gradle.properties").inputStream().use { load(it) }
 }
 fun band(key: String): String = band.getProperty(key) ?: error("missing '$key' in ../gradle.properties")
 
 group = band("mod_group")
-// Match wdl.java-conventions: the MC patch rides as SemVer build metadata, e.g. 1.1.0+1.18.2.
+// Match wdl.java-conventions: the MC version rides as SemVer build metadata.
 version = "${band("mod_version")}+${band("minecraft_version")}"
 
 base {
-    // -> archive-wdl-forge
     archivesName.set("${band("mod_archives_base")}-forge")
 }
 
-// Mirrors wdl.java-conventions, which this separate build never loads. Load-bearing here rather than a backstop:
-// reobfJar hands the jar task's output to ForgeAutoRenamingTool, which copies every entry's time into the
-// reobfuscated jar it writes back over it, so the Jar defaults would put the build's wall clock into the shipped
-// bytes and no two clean builds would match.
+// reobfJar hands the jar task's output to ForgeAutoRenamingTool, which copies every entry's time into the reobfuscated
+// jar it writes back over it, so the Jar defaults would put the build's wall clock into the shipped bytes and no two
+// clean builds would match.
 tasks.withType<AbstractArchiveTask>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }
 
-// Mirrors wdl.java-conventions: the JDK that compiles is the language target unless the band overrides it
-// through java_toolchain_version, and --release then pins this island's bytecode back to that target. band()
-// errors on a missing key, so the optional coordinate is read off the properties directly.
 val islandTarget = band("java_version").toInt()
 val islandToolchain = band.getProperty("java_toolchain_version")?.toInt() ?: islandTarget
 
@@ -71,43 +58,25 @@ repositories {
 }
 
 configure<UserDevExtension> {
-    // Forge's Mojang-official mappings put Mojmap net.minecraft on the classpath directly, the exact namespace
-    // common/ is written in, with no intermediary remap layer.
     mappings("official", band("minecraft_version"))
-    // Widen at compile the three read-only vanilla fields the tee and the mount-menu read reach, the Forge
-    // analog of the Fabric access widener; the same file is auto-loaded at runtime from META-INF.
+    // This file is auto-loaded at runtime from META-INF.
     accessTransformer(file("src/main/resources/META-INF/accesstransformer.cfg"))
 }
 
 dependencies {
     "minecraft"("net.minecraftforge:forge:${band("forge_version")}")
 
-    // JSpecify (@NullMarked / @Nullable), compile-only and CLASS-retention: the source-merged common/ and the
-    // shim are null-marked. NullAway itself does not run on this island (it is a Gradle-9 build-logic pass over
-    // common + fabric); here the annotations only need to resolve so the marked source compiles.
     compileOnly("org.jspecify:jspecify:1.0.0")
 
-    // JourneyMap public API for the source-merged binding (compat/journeymap), compile-only, never a runtime
-    // require. FG6 compiles against Mojmap (official mappings); at this band there is no -neoforge-SNAPSHOT
-    // JourneyMap flavor, so this uses the same loader-suffixless 1.9 API coordinate :common resolves. reobfJar
-    // maps WDL's calls to SRG for the shipped Forge jar. No XaeroPlus binding on this band: XaeroPlus ships no
-    // 1.18.x build, so the overlay is dropped as a disclosed limit, matching :common.
     compileOnly("info.journeymap:journeymap-api:${band("journeymap_api_coordinate")}-SNAPSHOT")
 }
 
-// Source-merge :common the way wdl.common-merge does for the Gradle-9 loaders, but by direct path since the
-// island is a separate build with no access to :common's consumable configurations: fold common's main source
-// into this compile and its resources into the jar.
 tasks.named<JavaCompile>("compileJava") {
     source(rootDir.resolve("../common/src/main/java"))
 }
 
-// Mirrors wdl.java-conventions, which this separate build never loads: doclint's reference group at the private
-// member level, so a {@link}, {@linkplain}, @see or @throws target the band lacks fails the island the way it fails
-// the root. Javadoc reads sourceSets.main.allJava, and the merge above adds common to compileJava.source alone,
-// so the task documents the shim's own sources and never re-reports common's, which the root build already
-// checks. It joins check on the same javadoc_gate key the root reads, so one knob gates the band's two builds;
-// the key is read off the properties directly because band() refuses a missing one, which here means off.
+// At the private member level, a {@link}, {@linkplain}, @see or @throws target the band lacks fails the island the way
+// it fails the root.
 tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).apply {
         memberLevel = JavadocMemberLevel.PRIVATE
@@ -123,9 +92,6 @@ tasks.named<ProcessResources>("processResources") {
     from(rootDir.resolve("../common/src/main/resources")) {
         exclude("**/.gitkeep")
     }
-    // Keep mods.toml's and wdl-publishing.properties' templated fields in sync with the band coordinates,
-    // matching the fabric processResources. The Forge floor (forge_version_min) is a deliberate value
-    // distinct from the build coordinate forge_version.
     val tokens = mapOf(
         "version" to version.toString(),
         "minecraft_version" to band("minecraft_version"),
@@ -138,15 +104,12 @@ tasks.named<ProcessResources>("processResources") {
     filesMatching("wdl-publishing.properties") { expand(tokens) }
 }
 
-// Release publishing (mod-publish-plugin), driven by the release workflow on a version tag: it uploads the Forge
-// jar to Modrinth and CurseForge per this band's MC version, mirroring the fabric loader subproject.
-// Coordinates come from band() (the island reads the root gradle.properties), not providers.gradleProperty,
-// because forge/gradle.properties carries none. No github block: the release workflow funnels every band's jars
-// into one shared GitHub release with gh. Nothing publishes on an ordinary build.
+// Coordinates come from band() (the island reads the root gradle.properties), not providers.gradleProperty. No github
+// block: the release workflow funnels every band's jars into one shared GitHub release with gh.
 publishMods {
-    // Resolve the shipped jar by path: every island build system (Loom remapJar, ForgeGradle reobfJar, plain
-    // java jar) emits build/libs/archive-wdl-forge-<version>.jar, and the release job builds the island before
-    // invoking publishMods, so one path form works on every band without a build-system-specific task handle.
+    // Resolve the shipped jar by path: every island build system emits build/libs/archive-wdl-forge-<version>.jar, and
+    // the release job builds the island before invoking publishMods, so one path form works on every band without a
+    // build-system-specific task handle.
     file.set(layout.buildDirectory.file("libs/${band("mod_archives_base")}-forge-${project.version}.jar"))
     changelog.set(providers.environmentVariable("CHANGELOG").orElse(""))
     type.set(STABLE)
@@ -161,7 +124,6 @@ publishMods {
         projectId.set(band("modrinth_id"))
         accessToken.set(providers.environmentVariable("MODRINTH_TOKEN"))
         minecraftVersions.add(band("minecraft_version"))
-        // Java mod: no hard runtime dependency to declare (JourneyMap is an optional jar-in-jar).
     }
 
     curseforge {

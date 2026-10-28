@@ -1,16 +1,13 @@
 import wdl.buildlogic.registerCheckLicenseHeader
 
-// Shared JVM baseline for every wdl subproject: the Java toolchain, the lint-only Checkstyle pass,
-// the common repositories, group/version, and the JUnit setup. (Spotless is applied per-subproject,
-// not here: loaded from an included build its Eclipse JDT formatter fails intermittently under the
-// configuration cache + build cache + parallel execution.)
+// Spotless is applied per-subproject, not here: loaded from an included build its Eclipse JDT formatter fails
+// intermittently under the configuration cache + build cache + parallel execution.
 plugins {
     java
     checkstyle
 }
 
 group = providers.gradleProperty("mod_group").get()
-// Carry the MC patch as SemVer build metadata, e.g. 1.0.0-SNAPSHOT+1.21.11
 version = "${providers.gradleProperty("mod_version").get()}+${providers.gradleProperty("minecraft_version").get()}"
 
 repositories {
@@ -19,11 +16,10 @@ repositories {
     maven("https://maven.neoforged.net/releases")
 }
 
-// The JDK that COMPILES, normally the language target itself. A band overrides it through
-// java_toolchain_version only where the target's own JDK cannot be used: javac 16 assigns local variable slots
-// non-deterministically, so a band targeting 16 compiles on 17 and keeps its jar byte-reproducible. Where the
-// two differ, --release pins the bytecode to the language target so a newer compiler does not move the
-// artifact; where they agree no release flag is set and compilation is byte-identical to before this existed.
+// The JDK that COMPILES, normally the language target itself. A band overrides it through java_toolchain_version only
+// where the target's own JDK cannot be used: javac 16 assigns local variable slots non-deterministically, so a band
+// targeting 16 compiles on 17 and keeps its jar byte-reproducible. Where the two differ, --release pins the bytecode to
+// the language target so a newer compiler does not move the artifact.
 val javaTarget = providers.gradleProperty("java_version").get().toInt()
 val javaToolchain = providers.gradleProperty("java_toolchain_version").orNull?.toInt() ?: javaTarget
 
@@ -38,18 +34,14 @@ if (javaToolchain != javaTarget) {
     tasks.withType<JavaCompile>().configureEach { options.release.set(javaTarget) }
 }
 
-// Lint-only Checkstyle, wired into check via the built-in plugin's checkstyleMain/checkstyleTest.
-// Shared config at the repo root; it runs alongside the Java toolchain set just above.
 checkstyle {
     toolVersion = "10.20.2"
     configFile = rootProject.file("config/checkstyle/checkstyle.xml")
     maxWarnings = 0
 }
 
-// JUnit 5, applied uniformly rather than only where a subproject has tests: on a test-less subproject it
-// is inert and the test task stays NO-SOURCE. The BOM coordinate lives in
-// the version catalog (Dependabot currency); read via VersionCatalogsExtension since the libs accessor
-// is absent in precompiled script plugins (gradle/gradle#15383).
+// The BOM coordinate lives in the version catalog (Dependabot currency); read via VersionCatalogsExtension since the
+// libs accessor is absent in precompiled script plugins (gradle/gradle#15383).
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 dependencies {
@@ -67,13 +59,10 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-// Doclint's reference group: javadoc is the one tool in this build that resolves a {@link}, {@linkplain}, @see or
-// @throws target, since Checkstyle's JavadocStyle checks structure only, so a reference to a symbol the band lacks
-// otherwise ships green. The other groups stay off; missing would demand @param and @return on every documented
-// member. PRIVATE member level because doclint checks only what javadoc documents, and at the default -protected
-// every private member and package-private type, where most of the prose lives, goes unchecked. The task joins
-// check only where a band sets javadoc_gate=true, so a band with references still to fix stays green while the
-// shared wiring propagates unchanged.
+// Javadoc is the one tool in this build that resolves a {@link}, {@linkplain}, @see or @throws target, since
+// Checkstyle's JavadocStyle checks structure only, so a reference to a symbol the band lacks otherwise ships green.
+// PRIVATE member level because doclint checks only what javadoc documents, and at the default -protected every private
+// member and package-private type goes unchecked.
 tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).apply {
         memberLevel = JavadocMemberLevel.PRIVATE
@@ -85,9 +74,6 @@ if (providers.gradleProperty("javadoc_gate").orNull.toBoolean()) {
     tasks.named("check") { dependsOn(tasks.named("javadoc")) }
 }
 
-// Reproducible archives: constant entry timestamps + stable order, so a jar rebuilt from a tag on the
-// same compile-toolchain JDK is byte-identical. This is a backstop: Loom's remapJar and ModDevGradle's
-// jar are already reproducible, so it locks that against a future default change and covers the sources jar.
 tasks.withType<AbstractArchiveTask>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
@@ -103,5 +89,4 @@ tasks.register("printCompileJavaVersion") {
     }
 }
 
-// Gate the mandatory two-line license header on every Java file (all source sets).
 registerCheckLicenseHeader()

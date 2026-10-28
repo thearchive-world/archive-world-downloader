@@ -31,23 +31,18 @@ import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
 /**
- * The automated guard for the horse-family saddle write. Below the 1.21.5 equipment-slot cut the saddle is a real stack
- * in the mount's own inventory slot 0, which the server never sends to the client, so vanilla's writer finds slot 0
- * empty and a saddled horse archives unsaddled. Only the saddled bit of the synced entity-data flags arrives, so the
- * capture writes a plain saddle from it and lets vanilla's load path re-derive the flag.
+ * Below the 1.21.5 equipment-slot cut the saddle is a real stack in the mount's own inventory slot 0, which the client
+ * never fills, so vanilla's writer finds slot 0 empty and a saddled horse archives unsaddled.
  *
  * <p>The fixture must set the flag while leaving slot 0 empty, and that is the whole point. Vanilla itself writes
  * {@code SaddleItem} from slot 0, so a horse saddled the ordinary way would carry the key with this class's production
- * code deleted, and every assertion below would pass against nothing. {@link #saddleFlag} therefore reaches the private
- * synced accessor directly, reproducing the client's state, which is the only state that tells the two writers apart.
- * No public route exists: the flag setter is protected and every public path runs through slot 0.
+ * code deleted, and every assertion below would pass against nothing.
  *
  * <p>Three live-entity tests drive {@code encodeChunk} end to end and one drives {@code captureRootVehicle}, so
- * removing either call site in {@link EntitySinkImpl} reddens one of them; the two tag-level tests pin the on-disk
- * contract itself.
+ * removing either call site in {@link EntitySinkImpl} reddens one of them.
  */
 class SaddleCaptureTest {
-    private static final int FLAG_SADDLE = 4; // AbstractHorse.FLAG_SADDLE, private there
+    private static final int FLAG_SADDLE = 4; // AbstractHorse.FLAG_SADDLE
 
     private final EntitySink sink = new EntitySinkImpl();
 
@@ -72,7 +67,7 @@ class SaddleCaptureTest {
                 "vanilla keeps the stack only when it is a saddle, so anything else is silently dropped on load");
         assertEquals(1, loaded.getCount(), "one saddle, the stack a mount wears");
         assertTrue(loaded.getTag() == null,
-                "a plain saddle: the client holds no source for a saddle's components, so none may be invented");
+                "a plain saddle: the client holds no source for a saddle's tag, so none may be invented");
     }
 
     @Test
@@ -90,8 +85,7 @@ class SaddleCaptureTest {
 
     /**
      * A mount riding something else reaches disk only as a nested compound, because {@code shouldBeSaved} refuses a
-     * passenger its own entry. A plain minecart picks up a parked mount with no size gate, which is the ordinary way
-     * this state arises in play.
+     * passenger its own entry.
      */
     @Test
     void aSaddledMountNestedUnderItsVehicleIsWrittenSaddledToo() {
@@ -114,9 +108,9 @@ class SaddleCaptureTest {
     }
 
     /**
-     * The mount a player is sitting on is refused by the entities path (vanilla persists it in the player's own
-     * RootVehicle record) and reaches disk only through this second serialize, so the saddle has to be written on both
-     * paths or the most ordinary case of all, a player riding their saddled horse, archives bare.
+     * The mount a player is sitting on is refused by the entities path and reaches disk only through this second
+     * serialize, so the saddle has to be written on both paths or the most ordinary case of all, a player riding their
+     * saddled horse, archives bare.
      */
     @Test
     void aRiddenSaddledMountIsWrittenSaddledOnTheRootVehiclePath() {
@@ -162,10 +156,6 @@ class SaddleCaptureTest {
         return horse;
     }
 
-    /**
-     * The synced flags accessor, reached by reflection because it is private and no public setter leaves slot 0 empty.
-     * The same shape {@code CaptureAnchorTest} uses to reach {@code Entity.vehicle}.
-     */
     private static EntityDataAccessor<Byte> saddleFlag() {
         try {
             Field field = AbstractHorse.class.getDeclaredField("DATA_ID_FLAGS");

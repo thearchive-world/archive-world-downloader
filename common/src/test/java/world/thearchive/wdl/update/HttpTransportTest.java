@@ -15,7 +15,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import org.junit.jupiter.api.Test;
 
-/** The production transport's failure mapping and its bounded-body guard. */
 class HttpTransportTest {
     @Test
     void mapsConnectionFailuresToTheFailureSentinel() {

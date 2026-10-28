@@ -17,15 +17,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
-/**
- * Item NBT built by the vanilla writers rather than by hand: {@link ContainerHelper#saveAllItems} for an
- * {@code "Items"} list and {@code ItemStack#save} for a single stored stack (a lectern's {@code "Book"}, a jukebox's
- * {@code "RecordItem"}).
- *
- * <p>Hand-built entries are the shape the fixture-fidelity gate exists to reject: vanilla always writes {@code "Slot"}
- * and {@code "Count"}, and an entry missing {@code "Slot"} decodes to slot 0, so a slot-aware rule under test sees
- * every entry collapsed onto one slot.
- */
 public final class ItemFixtures {
     private static final ResourceLocation AIR_ID = new ResourceLocation("minecraft:air");
 
@@ -36,8 +27,7 @@ public final class ItemFixtures {
      *
      * <p>An unregistered id is rejected rather than resolved. {@code Registry.ITEM} is a defaulted registry, so a typo
      * returns air, an air stack is empty, and the vanilla writer skips empty stacks: the fixture would come back as an
-     * empty list that this gate then accepts, since an empty list is its own round trip. That is the degenerate fixture
-     * the gate exists to reject, arriving through the builder.
+     * empty list that {@link FixtureFidelity} then accepts, since an empty list is its own round trip.
      */
     public static ItemStack stack(String itemId) {
         ResourceLocation id = new ResourceLocation(itemId);
@@ -76,12 +66,10 @@ public final class ItemFixtures {
         return holder(slots, stacks).getList("Items", Tag.TAG_COMPOUND);
     }
 
-    /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code itemIds} at ascending slots from 0. */
     public static CompoundTag itemsHolder(String... itemIds) {
         return itemsHolder(stacks(itemIds));
     }
 
-    /** The whole {@code {"Items": [...]}} holder vanilla writes for {@code stacks} at ascending slots from 0. */
     public static CompoundTag itemsHolder(ItemStack... stacks) {
         return holder(ascending(stacks.length), stacks);
     }
@@ -93,8 +81,7 @@ public final class ItemFixtures {
 
     /**
      * An {@code "Items"} entry with no {@code "Slot"}, which vanilla never writes but a corrupted or foreign save can
-     * hold, and which its decode silently lands on slot 0. Only for a case whose subject is that entry; a fixture
-     * standing in for producer output belongs on {@link #entryAtSlot}.
+     * hold, and which its decode silently lands on slot 0.
      */
     public static CompoundTag malformedEntryWithoutSlot(String itemId) {
         CompoundTag entry = entryAtSlot(0, itemId);
@@ -109,20 +96,17 @@ public final class ItemFixtures {
 
     /**
      * The tag vanilla writes for {@code stack}, as a lectern's {@code "Book"} or a jukebox's {@code "RecordItem"}
-     * carries it: {@code ItemStack#save}, the same call every 1.20.4 block-entity single-stack field uses (a
-     * {@code {id, Count, tag}} compound with {@code Count} as a byte). {@code ItemStack.CODEC} exists on this band but
-     * encodes {@code Count} as an int, which is not byte-for-byte what a real block entity's own save produces.
+     * carries it.
      */
     public static CompoundTag itemTag(ItemStack stack) {
         return stack.save(new CompoundTag());
     }
 
     /**
-     * A written book of {@code pageCount} pages. The page count is load-bearing wherever a lectern's {@code "Page"}
-     * matters: vanilla clamps the saved page into the book's own page range, so a book with no pages can only ever be
-     * on page -1. Below 1.20.5 a written book has no {@code WrittenBookContent} component; vanilla's own
-     * {@code WrittenBookItem} reads {@code title}/{@code author}/{@code generation}/{@code resolved} and a
-     * {@code "pages"} list of JSON-component strings straight off the item tag.
+     * A written book of {@code pageCount} pages. Below 1.20.5 a written book has no {@code WrittenBookContent}
+     * component; vanilla's own {@code WrittenBookItem} reads
+     * {@code title}/{@code author}/{@code generation}/{@code resolved} and a {@code "pages"} list of JSON-component
+     * strings straight off the item tag.
      */
     public static ItemStack writtenBook(int pageCount) {
         ListTag pages = new ListTag();

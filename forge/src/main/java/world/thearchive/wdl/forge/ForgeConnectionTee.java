@@ -9,26 +9,20 @@ import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 
 import world.thearchive.wdl.adapter.ConnectionTee;
 
-/**
- * The Forge connection tee: {@link ConnectionTee}'s shared Netty plumbing plus the two non-public reads it
- * needs, made reachable by the Forge access transformer (the connection's channel and the relative-move
- * packet's entity id).
- */
 final class ForgeConnectionTee extends ConnectionTee {
     private ForgeConnectionTee() {}
 
-    /** Insert the tee into the play connection, once. */
     static void install(Connection connection) {
         new ForgeConnectionTee().installInto(connection);
     }
 
     @Override
     protected Channel channel(Connection connection) {
-        return connection.channel; // access-transformed: net.minecraft.network.Connection channel
+        return connection.channel;
     }
 
     @Override
     protected int entityId(ClientboundMoveEntityPacket move) {
-        return move.entityId; // access-transformed
+        return move.entityId;
     }
 }

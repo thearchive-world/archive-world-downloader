@@ -25,14 +25,6 @@ import world.thearchive.wdl.adapter.OpenClickTracker;
 import world.thearchive.wdl.client.WdlHudOverlay;
 import world.thearchive.wdl.client.WdlKeyBinds;
 
-/**
- * Forge client entrypoint, the analog of {@code WdlFabricClient} and the NeoForge {@code WdlNeoForge}. Unlike
- * NeoForge, Forge's {@code @Mod} constructor takes no arguments, so the mod event bus is fetched from
- * {@link FMLJavaModLoadingContext} rather than injected; keybind and HUD-layer registration listen on that bus,
- * while the connection tee, interaction observers and outline draw listen on {@link MinecraftForge#EVENT_BUS}.
- * Forge's {@code IEventBus} has no {@code addListener(Class, Consumer)} overload, so each listener is a typed
- * lambda whose parameter names the event. Client-only is declared in mods.toml's {@code side = "CLIENT"} entries.
- */
 @Mod("wdl")
 public final class WdlForge {
     public WdlForge() {
@@ -54,13 +46,9 @@ public final class WdlForge {
 
         KeyMapping peekKey = new KeyMapping(
                 "key.wdl.peek_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, WdlKeyBinds.CATEGORY);
-        // Below 1.19 there is no RegisterKeyMappingsEvent; keys register through ClientRegistry during client setup.
         modEventBus.addListener(
                 (FMLClientSetupEvent event) -> event.enqueueWork(() -> ClientRegistry.registerKeyBinding(peekKey)));
         WdlHudOverlay.bindPeekKey(peekKey);
-        // Register above all layers rather than relative to a gamemode-gated vanilla layer, so the overlay draws
-        // in every gamemode; it self-gates F1 and blocking screens. The id is namespaced under this mod (wdl:hud).
-        // Below 1.19 the HUD host is OverlayRegistry, not the RegisterGuiOverlaysEvent added at 1.19.
         OverlayRegistry.registerOverlayTop("hud",
                 (gui, poseStack, partialTick, screenWidth, screenHeight) -> WdlHudOverlay.render(poseStack,
                         partialTick));

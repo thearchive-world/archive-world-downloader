@@ -1,10 +1,8 @@
 name: Release open (create the draft)
 
-# Creates the empty DRAFT GitHub release for a product version, run once by the maintainer before pushing the
-# band tags. Centralizing draft creation here is what lets the per-band runs only append and never create:
-# GitHub does not enforce tag uniqueness for drafts, so two concurrent first-band creates would each make a
-# duplicate draft and later uploads would scatter across them. The release flow is: run this, push the band
-# tags a few at a time, then run release-finalize to verify the matrix and publish the draft.
+# Centralizing draft creation here is what lets the per-band runs only append and never create: GitHub does not enforce
+# tag uniqueness for drafts, so two concurrent first-band creates would each make a duplicate draft and later uploads
+# would scatter across them.
 on:
   workflow_dispatch:
     inputs:
@@ -34,9 +32,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # Idempotent: if the release already exists (a re-run, or the draft is already open) this is a no-op, so
-      # it never turns an in-progress release back into an empty draft. --target pins the umbrella tag, minted
-      # only at publish, to the commit this workflow runs on.
+      # --target pins the umbrella tag to the commit this workflow runs on if GitHub creates it at publish.
       - name: Create the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

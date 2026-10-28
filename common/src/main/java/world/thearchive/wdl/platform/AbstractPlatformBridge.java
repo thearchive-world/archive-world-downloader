@@ -38,22 +38,11 @@ import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.core.browse.DownloadFolders;
 
-/**
- * Partial {@link PlatformBridge} carrying the methods that are pure vanilla on every loader: {@link #isRemoteWorld()},
- * {@link #sendChat(ChatCopy)}, and {@link #sendToast(ToastCopy)} use only {@code Minecraft}/{@code Component} APIs that
- * live on the {@code common} classpath, so each loader bridge inherits them instead of duplicating the logic. The
- * loader-specific hooks (keybind, ticks, disconnect, config directory, command registration) stay abstract for the
- * per-loader subclass.
- */
 public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    // Below 1.20.3 SystemToast has no custom-id class, so these reuse two distinct vanilla toast categories
-    // (PERIODIC_NOTIFICATION for job-done, TUTORIAL_HINT for refusals), which keep the vanilla default display
-    // time (which the accessibility notification-time multiplier scales). Job-done toasts are always constructed
-    // fresh, never addOrUpdate-reset, so each event surfaces its own toast. Refusals use their own category so a
-    // repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message, and
-    // vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body unwrapped).
+    // Job-done toasts are always constructed fresh, never addOrUpdate-reset, so each event surfaces its own toast. A
+    // repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message.
     private static final SystemToast.SystemToastIds TOAST_ID = SystemToast.SystemToastIds.PERIODIC_NOTIFICATION;
     private static final SystemToast.SystemToastIds REFUSAL_TOAST_ID = SystemToast.SystemToastIds.TUTORIAL_HINT;
 
@@ -63,12 +52,10 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     // 204 from 1.14.4), so the floor admits a full-row button on every band and no half-row one.
     private static final int MIN_ANCHOR_WIDTH = 100;
 
-    // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
-    // inside the methods, never the constructor, and isModLoaded is a loader call. Read only on the client
-    // main thread, so the lazy init needs no synchronization.
+    // Read only on the client main thread, so the lazy init needs no synchronization.
     private @Nullable FlashbackReplayProbe replayProbe;
 
-    // The row this bridge last built, held to recognize a widget list that was never rebuilt. Client main thread only.
+    // Client main thread only.
     private @Nullable AbstractWidget lastPrimary;
 
     @Override
@@ -82,25 +69,24 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     }
 
     /**
-     * Register an unbound key mapping for {@code keyId} under the wdl category; {@code onPress} runs once per press on
-     * the client main thread.
+     * Register an unbound key mapping for {@code keyId} under the wdl category; {@code onPress} runs on the client main
+     * thread.
      */
     protected abstract void registerKeybind(String keyId, Runnable onPress);
 
     @Override
     public boolean isRemoteWorld() {
         Minecraft mc = Minecraft.getInstance();
-        // getConnection() is null until Minecraft.player is assigned, which is what keeps this false during
-        // the world-load window where a replay server is already installed and the client is already ticking.
+        // getConnection() is null until Minecraft.player is assigned, which is what keeps this false during the
+        // world-load window where a replay server is already installed.
         if (mc.getConnection() == null) {
             return false;
         }
         return !mc.isLocalServer() || isReplayPlayback();
     }
 
-    // Kept private so nothing invites an off-main-thread read from the coverage overlay, which would break the
-    // lazy init above. isInstance(null) is false, which is the sole guard over the shutdown window where the
-    // singleplayer server field is already cleared but isLocalServer is not.
+    // isInstance(null) is false, which is the sole guard over the shutdown window where the singleplayer server field
+    // is already cleared but isLocalServer is not.
     private boolean isReplayPlayback() {
         if (replayProbe == null) {
             replayProbe = FlashbackReplayProbe.resolve(isModLoaded(FlashbackReplayProbe.MOD_ID));
@@ -192,15 +178,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     /**
      * Build the wdl pause-menu row (a primary action button plus a settings button) above the lowest button of the menu
      * column, shifting that button and everything below it in the same column down to open the row. Returns the widgets
-     * for the loader to add through its own screen hook; the layout is loader-agnostic. Returns none in the user's own
-     * local world and on a pause screen with no identifiable anchor, shifting nothing in those cases.
+     * for the loader to add. Returns none in the user's own local world and on a pause screen with no identifiable
+     * anchor, shifting nothing in those cases.
      */
     protected List<AbstractWidget> buildPauseMenuRow(Screen screen, List<AbstractWidget> widgets,
             Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled, Runnable onPrimary,
             Runnable onConfig) {
-        // A local world refuses every action this row leads to, and the /wdl commands and downloads keybind
-        // still reach the settings and downloads screens there, so the row is hidden rather than disabled.
-        // Replay playback is a remote world, so the row is present there and its actions work.
         if (!isRemoteWorld()) {
             return List.of();
         }
@@ -217,7 +200,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         int y = anchor.y;
         int width = anchor.getWidth();
         // Bounded to the anchor's own column. Shifting everything lower drags a corner button off the screen edge;
-        // shifting only what spans the center strands the half-width and non-button rows a mod appends below.
+        // shifting only what spans the center strands the half-width rows a mod appends below.
         for (AbstractWidget widget : widgets) {
             if (movesWithAnchor(widget, x, y, width)) {
                 widget.y = widget.y + ROW_PITCH;
@@ -243,12 +226,6 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                 && widget.x + widget.getWidth() > anchorX;
     }
 
-    /**
-     * The lowest button of the centered menu column. This band's pause screen names no disconnect button, so geometry
-     * is the only signal available. Center-containment and the width floor are what separate a menu button from a
-     * corner button or a half-row pair: vanilla's half-row width is 98 on every band, and a half-row button never spans
-     * the center.
-     */
     static @Nullable AbstractWidget lowestColumnButton(List<AbstractWidget> widgets, int screenWidth) {
         int center = screenWidth / 2;
         AbstractWidget lowest = null;
@@ -264,25 +241,23 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         return lowest;
     }
 
-    /** Run a /wdl action and report Brigadier success. */
     private static int run(Runnable action) {
         action.run();
         return 1;
     }
 
-    /** Suggest the wdl-managed download names for {@code /wdl resume} tab-completion. */
     private static CompletableFuture<Suggestions> suggestDownloads(SuggestionsBuilder builder) {
         Path savesDirectory = Minecraft.getInstance().getLevelSource().getBaseDir();
         try {
             return SharedSuggestionProvider.suggest(DownloadFolders.listManaged(savesDirectory), builder);
         } catch (IOException exception) {
-            return builder.buildFuture(); // no suggestions if the saves directory cannot be read
+            return builder.buildFuture();
         }
     }
 
     /**
-     * Build the /wdl command tree once, source-generic, so each loader registers the same grammar with only its own
-     * literal and argument builder factories. The action lambdas never read the command source.
+     * Build the /wdl command tree, source-generic, so each loader registers the same grammar with only its own literal
+     * and argument builder factories. The action lambdas never read the command source.
      */
     protected static <S> LiteralArgumentBuilder<S> wdlCommandTree(WdlCommands commands,
             Function<String, LiteralArgumentBuilder<S>> literal,

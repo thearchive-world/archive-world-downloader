@@ -7,10 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * The exposed-face selection rule: given the six neighbor-sealed booleans, the rim sits on the first open face in the
- * preference order top, bottom, then the sides; a fully-enclosed container draws nothing.
- */
 class RimFaceTest {
     @Test
     void nothingSealedPrefersTop() {
