@@ -25,14 +25,6 @@ import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the band-agnostic {@link PlayerTag} operations on an already-serialized player tag: the strip
- * knob (drop {@code Inventory}/{@code SelectedItemSlot}, which at this band also carries the armor and offhand slots),
- * the death-location strip (a harmless no-op here; neither key exists in a 1.12.2 player tag), the respawn-point strip
- * ({@code SpawnX}/{@code SpawnY}/{@code SpawnZ}/{@code SpawnForced}/{@code Spawns}), the {@code Dimension} write and
- * the read that a resume routes by, and the ender-items remap ({@code Items} -> {@code EnderItems}). Pure NBT, so it
- * round-trips headless on hand-built tags and {@link ContainerSink}-captured holders.
- */
 class PlayerTagTest {
     private final ContainerSink sink = new ContainerSinkImpl();
 
@@ -41,13 +33,12 @@ class PlayerTagTest {
         TestRegistries.bootstrap();
     }
 
-    /** A player-like tag carrying the strip-able keys plus an unrelated field that must always survive. */
     private static NBTTagCompound playerTag() {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setTag("Inventory", new NBTTagList());
         tag.setInteger("SelectedItemSlot", 4);
         tag.setTag("EnderItems", new NBTTagList());
-        tag.setShort("Air", (short) 300); // an Entity field the strips must never touch
+        tag.setShort("Air", (short) 300);
         return tag;
     }
 
@@ -81,8 +72,6 @@ class PlayerTagTest {
 
     @Test
     void stripDeathLocationIsNoOpAtThisBand() {
-        // Neither key exists in a 1.12.2 player tag (LastDeathLocation is 1.19, current_explosion_impact_pos is
-        // 1.21), so the strip has nothing to remove and the rest of the tag is untouched either way.
         NBTTagCompound tag = playerTag();
 
         PlayerTag.stripDeathLocation(tag);
@@ -164,15 +153,15 @@ class PlayerTagTest {
         // by accident: the overworld is what an unroutable id would collapse onto if this fell back.
         NBTTagCompound tag = playerTag();
         assertNull(PlayerTag.dimensionOf(tag), "a player tag with no Dimension key names no dimension");
-        tag.setInteger("Dimension", 99); // an id outside the three a capture ever writes
+        tag.setInteger("Dimension", 99);
         assertNull(PlayerTag.dimensionOf(tag), "nor does one naming a dimension the capture never routes to");
     }
 
     @Test
     void setPositionWritesTheCaptureAnchorInTheShapesVanillaReadsBack() {
-        // Vanilla reads Pos as three doubles and Rotation as two floats in yaw-then-pitch order, and a list of any
-        // other shape or order loads silently as the origin, so the saved player would land somewhere the capture
-        // never anchored with no error anywhere.
+        // Vanilla reads Pos as three doubles and Rotation as two floats in yaw-then-pitch order, and a list of another
+        // element type loads silently as zeros, so the saved player would land somewhere the capture never anchored
+        // with no error anywhere.
         NBTTagCompound tag = playerTag();
 
         PlayerTag.setPosition(tag, new BlockPos(12, 70, -34), 90.0f, -15.0f);
@@ -193,13 +182,13 @@ class PlayerTagTest {
         NBTTagCompound tag = playerTag(); // EnderItems starts as the empty list writeToNBT wrote
         NonNullList<ItemStack> ender = NonNullList.withSize(27, ItemStack.EMPTY);
         ender.set(5, new ItemStack(Items.ENDER_PEARL, 9));
-        NBTTagCompound holder = sink.captureItems(ender); // an "Items" list in slot-tagged form
+        NBTTagCompound holder = sink.captureItems(ender);
 
         PlayerTag.setEnderItems(tag, holder);
 
         assertTrue(tag.getTag("EnderItems") instanceof NBTTagList, "EnderItems is now the captured list");
         NBTTagCompound probe = new NBTTagCompound();
-        probe.setTag("Items", tag.getTagList("EnderItems", 10)); // read the remapped list via the same codec
+        probe.setTag("Items", tag.getTagList("EnderItems", 10));
         NonNullList<ItemStack> back = NonNullList.withSize(27, ItemStack.EMPTY);
         ItemStackHelper.loadAllItems(probe, back);
         assertEquals(Items.ENDER_PEARL, back.get(5).getItem(), "the captured ender item lands at its EnderItems slot");
@@ -234,7 +223,7 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsIgnoresAnUnseatedResume() {
         NBTTagCompound prior = priorPlayerWithRootVehicle();
-        NBTTagCompound fresh = playerTag(); // un-seated this session, no RootVehicle
+        NBTTagCompound fresh = playerTag();
 
         boolean restored = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -247,7 +236,7 @@ class PlayerTagTest {
     void restorePriorMountContentsNeedsBothEntityCompounds() {
         NBTTagCompound prior = priorPlayerWithRootVehicle();
         NBTTagCompound fresh = playerTag();
-        fresh.setTag("RootVehicle", new NBTTagCompound()); // seated shape present, but no Entity serialized
+        fresh.setTag("RootVehicle", new NBTTagCompound());
 
         boolean restored = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -280,7 +269,6 @@ class PlayerTagTest {
         assertFalse(fresh.hasKey("RootVehicle"));
     }
 
-    /** A RootVehicle whose Entity carries the mount's own UUID and an Items list, the seated-mount capture shape. */
     private static NBTTagCompound mountRootVehicle(UUID mountUuid, NBTTagList items) {
         NBTTagCompound rootVehicle = new NBTTagCompound();
         NBTTagCompound entity = EntityFixtures.entity("minecraft:chest_boat", mountUuid);
@@ -320,7 +308,7 @@ class PlayerTagTest {
         NBTTagCompound prior = playerSeatedIn(
                 mountRootVehicle(mount, itemList("minecraft:diamond", "minecraft:gold_ingot")));
         NBTTagCompound fresh = playerSeatedIn(
-                mountRootVehicle(mount, itemList("minecraft:emerald"))); // reopened this session
+                mountRootVehicle(mount, itemList("minecraft:emerald")));
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -333,7 +321,7 @@ class PlayerTagTest {
         NBTTagCompound prior = playerSeatedIn(mountRootVehicle(
                 UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"), itemList("minecraft:diamond")));
         NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(
-                UUID.fromString("11111111-2222-3333-4444-555555555555"), new NBTTagList())); // a different mount
+                UUID.fromString("11111111-2222-3333-4444-555555555555"), new NBTTagList()));
 
         boolean carried = PlayerTag.restorePriorMountContents(prior, fresh);
 
@@ -344,7 +332,7 @@ class PlayerTagTest {
     @Test
     void restorePriorMountContentsRestoresNothingWhenThePriorMountHeldNothing() {
         UUID mount = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        NBTTagCompound prior = playerSeatedIn(mountRootVehicle(mount, new NBTTagList())); // prior mount was empty too
+        NBTTagCompound prior = playerSeatedIn(mountRootVehicle(mount, new NBTTagList()));
         NBTTagCompound fresh = playerSeatedIn(mountRootVehicle(mount, new NBTTagList()));
 
         assertFalse(PlayerTag.restorePriorMountContents(prior, fresh), "an empty prior mount is not a recovery");
@@ -423,7 +411,7 @@ class PlayerTagTest {
     @Test
     void aFreshEnderChestIsKeptOverThePrior() {
         NBTTagCompound prior = priorPlayer(itemList("minecraft:dirt"));
-        NBTTagCompound fresh = priorPlayer(itemList("minecraft:diamond", "minecraft:emerald")); // reopened this session
+        NBTTagCompound fresh = priorPlayer(itemList("minecraft:diamond", "minecraft:emerald"));
 
         boolean carried = PlayerTag.carryForwardEnderItems(prior, fresh);
 
@@ -441,7 +429,7 @@ class PlayerTagTest {
 
     @Test
     void aPriorWithNoEnderItemsKeyCarriesNothing() {
-        NBTTagCompound prior = new NBTTagCompound(); // a pre-engine or absent prior player tag
+        NBTTagCompound prior = new NBTTagCompound();
         NBTTagCompound fresh = playerTag();
 
         assertFalse(PlayerTag.carryForwardEnderItems(prior, fresh));

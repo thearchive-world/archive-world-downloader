@@ -22,27 +22,6 @@ import net.minecraftforge.fml.common.StartupQuery;
 import net.minecraftforge.fml.common.eventhandler.EventBus;
 import net.minecraftforge.fml.relauncher.Side;
 
-/**
- * Headless vanilla registry bootstrap for plain JUnit tests.
- *
- * <p>There is no game running here. At 1.12.2 the registries the chunk codec and level.dat writer read are the static
- * built-in {@code net.minecraft.util.registry.RegistryNamespaced} tables (blocks, items, biomes), each populated by its
- * own class's static initializer; there is no composite registry-access object at this band. So this only runs the
- * vanilla bootstrap, and a test that needs a block or item reads the static {@code Block.REGISTRY}/{@code
- * Item.REGISTRY} tables directly.
- *
- * <p>{@link Bootstrap#register()} is idempotent (guarded by its own {@code alreadyRegistered} flag) but expensive, so
- * it is run once per JVM.
- *
- * <p>{@link FMLCommonHandler#instance()}'s {@code sidedDelegate} is never set outside FML's own client/server
- * lifecycle, so {@link FMLCommonHandler#getDataFixer()} null-dereferences it until this loads one. Vanilla reaches that
- * method unconditionally from {@code WorldInfo.updateTagCompound} and {@code EntityPlayer.writeEntityToNBT}, so every
- * level.dat and player-entity write needs it. {@link FMLCommonHandler#instance()}'s two real sided delegates
- * ({@code FMLClientHandler}/{@code FMLServerHandler}) both source it from a live {@code Minecraft}/{@code
- * MinecraftServer}, which a headless test has neither, so this loads a minimal delegate instead: only
- * {@code getDataFixer()} does real work (the same {@link DataFixesManager#createFixer()} vanilla itself wraps), and
- * every other member is unreached by this suite, so a call into one is a genuine surprise, not a silent stub.
- */
 public final class TestRegistries {
     private static boolean bootstrapped;
 
@@ -58,14 +37,6 @@ public final class TestRegistries {
         bootstrapped = true;
     }
 
-    /**
-     * Sets {@link FMLCommonHandler}'s {@code sidedDelegate} directly, not through
-     * {@link FMLCommonHandler#beginLoading}: that method also calls {@code MinecraftForge.initialize()}, which reaches
-     * {@code ForgeHooks.initTools()}'s SRG-obfuscated reflection lookup ({@code ObfuscationReflectionHelper}), a lookup
-     * only FML's own launch classloader resolves to the deobfuscated field. A bare JUnit JVM has no such classloader,
-     * so that call throws {@code NoSuchFieldException}; going around {@code beginLoading} avoids it entirely, since
-     * only {@code getDataFixer()} is reached from this suite.
-     */
     private static void loadSidedHandler() {
         try {
             Field sidedDelegate = FMLCommonHandler.class.getDeclaredField("sidedDelegate");

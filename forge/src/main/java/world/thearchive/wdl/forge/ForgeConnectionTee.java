@@ -12,14 +12,7 @@ import net.minecraftforge.fml.relauncher.ReflectionHelper;
 import world.thearchive.wdl.adapter.ConnectionTee;
 
 /**
- * The Forge connection tee: {@link ConnectionTee}'s shared Netty plumbing plus the non-public reads it needs. The
- * relative-move packet's entity id is non-public with no getter; the connection's channel has a public getter
- * ({@link NetworkManager#channel()}) and is read directly. This band has no compile-time access-widening step
- * (there is no Architectury Loom or Mojmap compile view), so unlike the Fabric access widener and the higher-band
- * NeoForge transformer, the shipped accesstransformer.cfg is a runtime-only FMLAT and cannot be read as a direct
- * field access at compile. The entity id field is read reflectively instead, resolving once by its dev (MCP) name
- * with its production (searge) name as the fallback; the position deltas have public getters at this band and are
- * read through those.
+ * The entity id field is read reflectively, resolving once by its dev (MCP) name with its production (searge) name.
  */
 final class ForgeConnectionTee extends ConnectionTee {
     private static final Field ENTITY_ID_FIELD =
@@ -27,7 +20,6 @@ final class ForgeConnectionTee extends ConnectionTee {
 
     private ForgeConnectionTee() {}
 
-    /** Insert the tee into the play connection, once. */
     static void install(NetworkManager connection) {
         new ForgeConnectionTee().installInto(connection);
     }
@@ -46,9 +38,8 @@ final class ForgeConnectionTee extends ConnectionTee {
         }
     }
 
-    // The move-delta fields are int at this band, exposed by the public getX/getY/getZ getters, and the shared
-    // contract narrows them to short. An inbound relative-move packet reads each delta with PacketBuffer.readShort
-    // (a sign-extended short), so the int always holds a value in short range and the narrowing is exact.
+    // An inbound relative-move packet reads each delta with PacketBuffer.readShort (a sign-extended short), so the int
+    // always holds a value in short range and the narrowing is exact.
     @Override
     protected short moveDeltaX(SPacketEntity move) {
         return (short) move.getX();

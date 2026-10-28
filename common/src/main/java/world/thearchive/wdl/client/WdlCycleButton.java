@@ -10,10 +10,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.util.text.ITextComponent;
 
-/**
- * A minimal value-cycling button for this band: it ships no {@code CycleButton}, so the settings screen drives its own.
- * A press advances to the next value, wrapping, and fires the change callback; the face shows the current value only.
- */
 final class WdlCycleButton<T> extends GuiButton {
     private final List<T> values;
     private final Function<T, ITextComponent> labelFor;

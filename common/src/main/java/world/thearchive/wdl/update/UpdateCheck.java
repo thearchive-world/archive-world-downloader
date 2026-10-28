@@ -16,10 +16,9 @@ import world.thearchive.wdl.core.update.Release;
 import world.thearchive.wdl.core.update.SemVer;
 
 /**
- * The launch-scoped update check: dispatched once after config load, run on an injected worker, and held as one
- * published result both surfaces read. The worker's single volatile write of the held result is the only cross-thread
- * hop (the write happens-before every later read, and the value is immutable); the chat latch and the banner dismissal
- * are read and written on the client main thread only, so they stay plain fields.
+ * The worker's single volatile write of the held result happens-before every later read, and the value is immutable;
+ * the chat latch and the banner dismissal are read and written on the client main thread only, so they stay plain
+ * fields.
  */
 public final class UpdateCheck {
     public static final String MODRINTH_PAGE_URL = "https://modrinth.com/mod/wdl";
@@ -33,8 +32,8 @@ public final class UpdateCheck {
 
     /**
      * Run the check once for this launch: the opt-out is honored before any request (off means zero requests), a repeat
-     * dispatch is a no-op, and the fetch, filter, and compare run entirely on {@code worker}. Every failure inside the
-     * check leaves the held result empty, which reads as up to date.
+     * dispatch once the check has started makes no further request, and the fetch, filter, and compare run entirely on
+     * {@code worker}. Every failure inside the check leaves the held result empty, which reads as up to date.
      */
     public void dispatch(RuntimeInfo info, WdlConfig config, Transport transport, Executor worker) {
         if (!config.checkForUpdates()) {
@@ -62,12 +61,6 @@ public final class UpdateCheck {
         return held;
     }
 
-    /**
-     * Block up to {@code timeoutMillis} for the launch check to settle (the worker finished, or the check was
-     * disabled). Returns true if it settled, false on timeout or interruption; {@link #available()} then holds the
-     * final result. A launch that never dispatched at all leaves the latch untouched and this returns false at the
-     * timeout. Callable off the client thread (the ModMenu update worker).
-     */
     public boolean awaitSettled(long timeoutMillis) {
         try {
             return settled.await(timeoutMillis, TimeUnit.MILLISECONDS);

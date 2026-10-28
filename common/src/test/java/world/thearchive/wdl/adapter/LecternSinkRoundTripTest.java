@@ -24,24 +24,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.impl.LecternSinkImpl;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for lectern-book capture: the {@link LecternSink} path (captureBook -> merge) plus vanilla's own
- * {@code new ItemStack(NBTTagCompound)} read-back (the exact form {@code TileEntityLectern.readFromNBT} uses) is a
- * self-consistent round-trip: the captured book survives serialization, lands on the lectern block-entity tag under
- * {@code "Book"} with the reading {@code "Page"}, and decodes back to the same book, with no other block-entity field
- * clobbered. Runs for both a signed <b>written</b> book and an unsigned <b>writable</b> book (both are valid lectern
- * contents).
- *
- * <p>Server-free by construction: real {@link ItemStack}s and a hand-built block-entity tag drive the round-trip, so
- * neither a live menu nor a {@code World} is needed. The one client-coupled step (lifting the book from the live open
- * menu's slot 0) is not exercised headless, exactly as for containers.
- *
- * <p>At 1.12.2 the merge cases are disabled: lecterns are a 1.14 block entity, so no captured lectern block-entity tag
- * can be built from a real producer here, and lectern-book capture is a documented limit at this band. The pure
- * {@link LecternSink#merge} keeps coverage through the re-pointed {@code ChunkFlushPlanTest} and
- * {@code AsyncSaveWriterTest} fold-wiring tests, which drive it against a stand-in carrier. {@code captureBook} needs
- * only a book item, so it still runs.
- */
 class LecternSinkRoundTripTest {
     private static final String LECTERN_ABSENT = "lecterns absent at 1.12.2 (1.14 block entity, documented limit)";
 
@@ -52,15 +34,13 @@ class LecternSinkRoundTripTest {
         TestRegistries.bootstrap();
     }
 
-    /** A captured client lectern BE tag carrying a real non-Book field, to assert no clobber. */
     private static NBTTagCompound lecternTag(int x, int y, int z) {
         return namedBlockEntity("minecraft:lectern", x, y, z, "keep-me");
     }
 
     /**
-     * A signed written book. Vanilla's own {@code ItemWrittenBook} reads {@code title}/{@code author}/
-     * {@code generation}/{@code resolved} and a {@code "pages"} list of JSON-component strings straight off the item
-     * tag.
+     * Vanilla's own {@code ItemWrittenBook} reads {@code title}/{@code author}/{@code generation}/{@code resolved} and
+     * a {@code "pages"} list of JSON-component strings straight off the item tag.
      */
     private static ItemStack writtenBook() {
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
@@ -80,8 +60,7 @@ class LecternSinkRoundTripTest {
     }
 
     /**
-     * An unsigned writable (book and quill) book. Vanilla's own {@code ItemWritableBook} reads a {@code "pages"} list
-     * of plain (non-JSON) strings.
+     * Vanilla's own {@code ItemWritableBook} reads a {@code "pages"} list of plain (non-JSON) strings.
      */
     private static ItemStack writableBook() {
         ItemStack book = new ItemStack(Items.WRITABLE_BOOK);
@@ -94,7 +73,6 @@ class LecternSinkRoundTripTest {
     }
 
     private static ItemStack readBackBook(NBTTagCompound merged) {
-        // vanilla readFromNBT's exact read
         ItemStack back = new ItemStack(merged.getCompoundTag("Book"));
         assertTrue(!back.isEmpty(), "the merged Book must decode via vanilla's ItemStack(NBTTagCompound)");
         return back;
@@ -116,7 +94,6 @@ class LecternSinkRoundTripTest {
         NBTTagCompound holder = sink.captureBook(writtenBook(), 1);
         NBTTagCompound merged = sink.merge(lecternTag(10, 64, -7), holder);
 
-        // No field clobber: id / pos / unrelated fields survive.
         assertEquals("minecraft:lectern", merged.getString("id"));
         assertEquals(10, merged.getInteger("x"));
         assertEquals(64, merged.getInteger("y"));

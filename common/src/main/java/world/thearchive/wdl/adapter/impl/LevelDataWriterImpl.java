@@ -34,31 +34,15 @@ import world.thearchive.wdl.core.GameRuleSchema;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.core.WorldType;
 
-/**
- * 1.12.2 {@code level.dat} writer for the selected generator: the default superflat VOID (a single air layer over the
- * void biome), or the vanilla DEFAULT/FLAT presets. Pre-1.13 {@code level.dat} records only the generator name and its
- * options string, so no worldgen registries are reconstructed here. The captured chunks always supply the real terrain;
- * the generator only fills the un-captured gaps, which for DEFAULT/FLAT are freshly generated and not the server's
- * actual land (the server's seed is not recoverable from a client).
- */
 public final class LevelDataWriterImpl implements LevelDataWriter {
     private static final Logger LOGGER = LogManager.getLogger(LevelDataWriterImpl.class);
 
     private static final String LEVEL_NAME = "Archive World Downloader";
 
-    /** 24000-tick day; 6000 is noon. */
     private static final long NOON = 6000L;
 
-    /**
-     * The curated safe set: each rule's stable WDL name, the running band's own id for it, and the curated raw value.
-     * The WDL name is what the menu and the lang catalogs bind (band-stable); the band id is what the download writes.
-     * Every curated rule is a boolean here; a curated rule with no rule at this band is dropped at runtime by
-     * {@link #curatedGameRules} and skipped by {@link #applyGameRules}. The user's gamerule.* overrides, keyed by band
-     * id, are validated and applied on top of this (see {@link WorldOutputConfig}).
-     */
     private static final List<CuratedSpec> CURATED_GAME_RULES = buildCuratedGameRules();
 
-    /** One curated rule: its stable WDL name, the running band's id for it, and the curated raw value. */
     private static final class CuratedSpec {
         private final String wdlId;
         private final String bandId;
@@ -95,8 +79,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         if (worldType == WorldType.VOID) {
             settings.setGeneratorOptions(voidGeneratorOptions());
         }
-        // Cheats and game mode are the world-defaults master's to impose; with it off the world opens vanilla,
-        // so cheats fall back to off here. Noon is a fixed invariant, applied unconditionally below.
+        // Cheats are the world-defaults master's to impose; with it off cheats fall back to off here.
         if (worldOutput.overrideWorldDefaults() && worldOutput.allowCommands()) {
             settings.enableCommands();
         }
@@ -106,18 +89,13 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         // Vanilla treats a level.dat whose initialized flag is false as new and replaces the spawn on first open.
         levelData.setServerInitialized(true);
         GameRuleResolution gameRuleResolution = applyGameRules(levelData.getGameRulesInstance(), worldOutput);
-        // Downloaded worlds always open at noon, a fixed world-open invariant. A fresh WorldInfo already opens clear
-        // (raining, thundering, and their timers default off), so weather needs no write here.
         levelData.setWorldTime(NOON);
         return new LevelDataWriter.LevelData(levelData, gameRuleResolution);
     }
 
     /**
-     * The superflat options string for a VOID world: a single air layer over the void biome. The grammar is
-     * {@code FlatGeneratorInfo}'s classic form, {@code "<version>;<layers>;<biome>;<features>"}: version 3 selects
-     * namespaced block names for the layers, a bare block name with no leading count defaults to one layer, the biome
-     * is the void biome's numeric id, and the trailing empty segment means no structures (an omitted segment would
-     * default to a village).
+     * The grammar is {@code FlatGeneratorInfo}'s classic form, {@code "<version>;<layers>;<biome>;<features>"}: version
+     * 3 selects namespaced block names for the layers.
      */
     private static String voidGeneratorOptions() {
         return "3;minecraft:air;" + Biome.getIdForBiome(Biomes.VOID) + ";";
@@ -126,11 +104,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
     @Override
     public void warmWorldgen() {}
 
-    /**
-     * Resolve the curated set with the user's overrides against this band's live rules and apply the effective rules to
-     * {@code gameRules} through the per-key {@code setOrCreateGameRule}, logging the dropped/unknown diagnostics.
-     * Returns the resolution.
-     */
     private static GameRuleResolution applyGameRules(GameRules gameRules, WorldOutputConfig worldOutput) {
         GameRuleSchema schema = new GameRuleSchema() {
             @Override
@@ -144,8 +117,8 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
             }
         };
         GameRuleResolution resolution = worldOutput.resolveGameRules(curatedByBandId(), schema);
-        // The curated set is merged in unconditionally by resolveGameRules, so a curated id absent from this band's
-        // own rule set (a curated rule only a higher band has) is still guarded here before the write.
+        // The curated set is merged in by resolveGameRules, so a curated id absent from this band's own rule set (a
+        // curated rule only a higher band has) is still guarded here before the write.
         for (Map.Entry<String, String> rule : resolution.effective().entrySet()) {
             if (gameRules.hasRule(rule.getKey())) {
                 gameRules.setOrCreateGameRule(rule.getKey(), rule.getValue());
@@ -160,7 +133,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return resolution;
     }
 
-    /** The curated set keyed by the band's own rule id, the shape {@link WorldOutputConfig#resolveGameRules} merges. */
     private static Map<String, String> curatedByBandId() {
         Map<String, String> byBandId = new LinkedHashMap<>();
         for (CuratedSpec spec : CURATED_GAME_RULES) {
@@ -169,7 +141,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return byBandId;
     }
 
-    /** Whether the raw string is a valid value for this rule: true or false for a boolean, an int for an integer. */
     private static boolean valueParses(GameRules gameRules, String id, String rawValue) {
         if (gameRules.areSameType(id, GameRules.ValueType.BOOLEAN_VALUE)) {
             return "true".equals(rawValue) || "false".equals(rawValue);
@@ -191,12 +162,11 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         List<CuratedGameRule> rules = new ArrayList<>();
         for (CuratedSpec spec : CURATED_GAME_RULES) {
             if (!gameRules.hasRule(spec.bandId())) {
-                continue; // a curated rule with no rule at this band is omitted, and the menu skips its order slot
+                continue; // a curated rule with no rule at this band is omitted
             }
             if (gameRules.areSameType(spec.bandId(), GameRules.ValueType.BOOLEAN_VALUE)) {
                 rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(), "true", "false"));
             } else {
-                // An integer rule's enabled position is its band default, and disabled is 0.
                 String enabled = String.valueOf(gameRules.getInt(spec.bandId()));
                 rules.add(new CuratedGameRule(spec.wdlId(), spec.bandId(), spec.curatedValue(), enabled, "0"));
             }
@@ -204,10 +174,7 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         return Collections.unmodifiableList(rules);
     }
 
-    // The WDL names are the band-neutral curated keys; each maps to its 1.12.2 vanilla rule id here. The fire-spread
-    // row is named for the newer integer radius rule; the boolean doFireTick is this band's equivalent. A curated
-    // name with no rule at this band (the wandering-trader, patrol, warden and vine-spread rules are all 1.14 and
-    // above) is dropped at runtime, so this list is the superset.
+    // The fire-spread row is named for the newer integer radius rule; the boolean doFireTick is this band's equivalent.
     private static List<CuratedSpec> buildCuratedGameRules() {
         List<CuratedSpec> curated = new ArrayList<>();
         curated.add(new CuratedSpec("spawn_mobs", "doMobSpawning", "false"));
@@ -235,7 +202,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         }
         WorldInfo worldInfo = data.worldData();
         worldInfo.setGameType(player.gameType());
-        // 1.12.2 setSpawn takes only a position; the spawn yaw has no level.dat field at this band.
         worldInfo.setSpawn(player.spawnPos());
         worldInfo.setDifficulty(player.difficulty());
         storage.saveWorldInfoWithPlayer(worldInfo, player.playerTag());
@@ -246,7 +212,6 @@ public final class LevelDataWriterImpl implements LevelDataWriter {
         if (!Files.exists(levelDatFile)) {
             return null;
         }
-        // 1.12.2 CompressedStreamTools.readCompressed takes an InputStream, not a File.
         try (InputStream input = Files.newInputStream(levelDatFile)) {
             NBTTagCompound root = CompressedStreamTools.readCompressed(input);
             if (!root.hasKey("Data", 10)) {

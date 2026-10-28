@@ -3,12 +3,7 @@
 
 package world.thearchive.wdl.reobftest;
 
-// Positive reobf fixture. Under Unimined a wrong compiled Minecraft reference cannot compile (the classic
-// checkReobf reference scan is largely redundant here), so the residual mis-bind surface is a reflective,
-// SRG-shaped string literal, the kind a runtime binder feeding Class.getDeclaredField/getDeclaredMethod uses
-// to reach a Forge-obfuscated member by name. This literal names net/minecraft/entity/Entity's "world" field
-// (MCP name) under its real 1.12.2 searge id; checkShipJar resolves it against the pinned mcp_config
-// joined.tsrg oracle, where it must succeed.
+// This literal names net/minecraft/entity/Entity's "world" field (MCP name) under its real 1.12.2 searge id.
 public final class ReobfFixture {
 
     private ReobfFixture() {}

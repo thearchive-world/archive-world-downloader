@@ -33,12 +33,6 @@ import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 import world.thearchive.wdl.core.MapManifest;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the on-sight map archive: the live remap table ({@link MapManifest} plus the memoized
- * session-to-archive resolution and the on-sight data stream). The renumbering-server idempotency gate is driven
- * entirely here with an injected image resolver, so neither a live {@code Level} nor the {@code getMapData} resolution
- * is needed.
- */
 class MapArchiveTest {
     private final ContainerSink sink = new ContainerSinkImpl();
 
@@ -47,18 +41,13 @@ class MapArchiveTest {
         TestRegistries.bootstrap();
     }
 
-    /**
-     * A synthetic serialized inner map data tag: the three hashed fields, plus the deliberately-ignored
-     * {@code "locked"} and the {@code "xCenter"}/{@code "zCenter"} vanilla always writes, so a fixture that varies
-     * either one is comparing realistic tags.
-     */
     private static NBTTagCompound mapData(int colorFill, int scale, DimensionType dimension, boolean locked) {
         byte[] colors = new byte[16384];
         Arrays.fill(colors, (byte) colorFill);
         NBTTagCompound data = new NBTTagCompound();
         data.setTag("colors", new NBTTagByteArray(colors));
         data.setByte("scale", (byte) scale);
-        data.setInteger("dimension", dimension.getId()); // at 1.15.2 vanilla writes the map dimension as an int id
+        data.setInteger("dimension", dimension.getId()); // Forge writes the map dimension as an int id
         data.setBoolean("locked", locked);
         data.setInteger("xCenter", 0);
         data.setInteger("zCenter", 0);
@@ -75,7 +64,6 @@ class MapArchiveTest {
         return ids;
     }
 
-    /** A collecting sink: records each streamed (archiveId, dataTag), in order, and counts fires. */
     private static final class CollectingSink implements MapArchive.MapDataSink {
         final Map<Integer, NBTBase> streamed = new LinkedHashMap<>();
         int fires;
@@ -87,7 +75,6 @@ class MapArchiveTest {
         }
     }
 
-    /** Write what the archive streamed plus its finalize idcounts, the on-disk shape a session leaves. */
     private static void writeDataFiles(Path dataDirectory, CollectingSink stream, MapArchive archive) {
         stream.streamed.forEach((id, tag) -> {
             try {
@@ -159,7 +146,6 @@ class MapArchiveTest {
 
     @Test
     void aLaterImagedSourceUpgradesAnEarlierImagelessResolution() {
-        // The map is first seen imageless (in a chest, no colors), then carried so colors arrive.
         boolean[] hasColors = { false };
         CollectingSink stream = new CollectingSink();
         MapArchive archive = new MapArchive(MapManifest.empty(), id -> hasColors[0] ? picture(3) : null, stream);
@@ -188,8 +174,6 @@ class MapArchiveTest {
     void remappingTheCapturedHolderLeavesTheLiveStackAlone() {
         CollectingSink stream = new CollectingSink();
         MapArchive archive = new MapArchive(MapManifest.empty(), id -> picture(1), stream);
-        // Below 1.15 vanilla ItemStack.save shares the live stack's tag compound instead of copying it, so a
-        // capture that does not detach hands the remap the player's own held item.
         ItemStack live = filledMap(1988);
         NBTTagCompound holder = holderOf(sink, live);
 
@@ -209,7 +193,6 @@ class MapArchiveTest {
         Path manifestB = directory.resolve("b").resolve("wdl").resolve("map-ids");
         Path dataB = directory.resolve("b").resolve("data");
 
-        // Session A: pictures P and Q under one server's session ids 1988, 1993.
         CollectingSink sinkA = new CollectingSink();
         MapArchive archiveA = new MapArchive(MapManifest.empty(),
                 id -> id == 1988 ? pictureP : id == 1993 ? pictureQ : null, sinkA);
@@ -220,7 +203,6 @@ class MapArchiveTest {
         int idOfP = archiveA.archiveIdFor(1988);
         int idOfQ = archiveA.archiveIdFor(1993);
 
-        // Session B: resume, seeded from A's manifest; the same pictures, session ids reshuffled to 0, 1.
         MapManifest resumed = MapManifest.load(manifestA);
         resumed.raiseCounterAbove(MapManifest.highestDataFileId(dataA));
         CollectingSink sinkB = new CollectingSink();
@@ -267,14 +249,13 @@ class MapArchiveTest {
     void offModeFloorSeedsIdcountsAbovePriorSessionsHigherId() {
         CollectingSink stream = new CollectingSink();
         MapArchive archive = new MapArchive(MapManifest.empty(), id -> picture(1), stream, false, 50);
-        archive.archiveIdFor(5); // a low imaged id this session
+        archive.archiveIdFor(5);
         assertEquals(MapDataWriter.serializeIdCounts(50), archive.idCountsTag(),
                 "the seeded floor keeps idcounts above a prior session's higher id");
     }
 
     @Test
     void offModeImagelessThenImagedUpgradesAndStreamsOnce() {
-        // The imageless-add trap: a null-resolve sighting must not mark the id imaged, or this upgrade dies.
         boolean[] hasColors = { false };
         CollectingSink stream = new CollectingSink();
         MapArchive archive = new MapArchive(MapManifest.empty(), id -> hasColors[0] ? picture(4) : null, stream,
@@ -298,13 +279,12 @@ class MapArchiveTest {
 
     @Test
     void offModeImagedThenImagelessReferenceDoesNotRefire() {
-        // The clobber walk: once imaged, a later reference short-circuits before the resolver runs.
         boolean[] hasColors = { true };
         CollectingSink stream = new CollectingSink();
         MapArchive archive = new MapArchive(MapManifest.empty(), id -> hasColors[0] ? picture(5) : null, stream,
                 false, -1);
         assertEquals(15, archive.archiveIdFor(15), "the frame images 15");
-        hasColors[0] = false; // the chest re-reference would resolve imageless, but the gate short-circuits first
+        hasColors[0] = false;
         assertEquals(15, archive.archiveIdFor(15), "the chest re-reference reuses id 15");
         assertEquals(1, stream.fires, "no re-fire, no re-write, no clobber");
     }
@@ -313,14 +293,12 @@ class MapArchiveTest {
     void offModeResumeRewritesImagedIdempotentlyAndLeavesImagelessPrior(@TempDir Path directory) throws IOException {
         Path data = directory.resolve("data");
 
-        // Session A, off-mode: image server map 700 and land it on disk.
         CollectingSink sinkA = new CollectingSink();
         MapArchive archiveA = new MapArchive(MapManifest.empty(), id -> picture(6), sinkA, false, -1);
         archiveA.archiveIdFor(700);
         writeDataFiles(data, sinkA, archiveA);
         byte[] prior = Files.readAllBytes(data.resolve("map_700.dat"));
 
-        // Session B, off-mode resume (floor seeded past A): re-seeing 700 imaged re-streams the same id.
         CollectingSink sinkB = new CollectingSink();
         MapArchive archiveB = new MapArchive(MapManifest.empty(), id -> picture(6), sinkB, false, 700);
         archiveB.archiveIdFor(700);
@@ -329,7 +307,6 @@ class MapArchiveTest {
         assertArrayEquals(prior, Files.readAllBytes(data.resolve("map_700.dat")),
                 "the re-write is idempotent: same server map, same bytes");
 
-        // Session C, off-mode resume: an imageless re-reference streams nothing, the prior file is untouched.
         CollectingSink sinkC = new CollectingSink();
         MapArchive archiveC = new MapArchive(MapManifest.empty(), id -> null, sinkC, false, 700);
         archiveC.archiveIdFor(700);

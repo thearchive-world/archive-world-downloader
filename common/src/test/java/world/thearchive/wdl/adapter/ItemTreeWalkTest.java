@@ -12,13 +12,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins ItemTreeWalk's nesting contract: below 1.20.5 an item is {@code {id, Count, tag}}, and the walk applies the leaf
- * action to the item's own {@code tag} compound, then recurses into the items nested in a shulker box
- * ({@code tag.BlockEntityTag.Items}) and a bundle ({@code tag.Items}). It drives the walk over hand-built NBT keyed by
- * those pre-component keys. The visited compounds are matched by identity, so the assertions stay clear of the
- * band-varying NBTTagCompound accessors.
- */
 class ItemTreeWalkTest {
     private static NBTTagCompound itemWithTag(NBTTagCompound tag) {
         NBTTagCompound item = new NBTTagCompound();
@@ -33,7 +26,7 @@ class ItemTreeWalkTest {
     }
 
     @Test
-    void walkVisitsAnItemsOwnComponents() {
+    void walkVisitsAnItemsOwnTag() {
         NBTTagCompound tag = new NBTTagCompound();
         assertTrue(visitedTags(itemWithTag(tag)).contains(tag),
                 "the walk applies the leaf action to the item's own tag");
@@ -53,13 +46,13 @@ class ItemTreeWalkTest {
     }
 
     @Test
-    void walkRecursesIntoBundle() {
+    void walkRecursesIntoAnItemsOwnItemsList() {
         NBTTagCompound nestedTag = new NBTTagCompound();
-        NBTTagList bundleItems = new NBTTagList();
-        bundleItems.appendTag(itemWithTag(nestedTag));
+        NBTTagList ownItems = new NBTTagList();
+        ownItems.appendTag(itemWithTag(nestedTag));
         NBTTagCompound tag = new NBTTagCompound();
-        tag.setTag("Items", bundleItems);
+        tag.setTag("Items", ownItems);
         assertTrue(visitedTags(itemWithTag(tag)).contains(nestedTag),
-                "an item nested in a bundle is visited");
+                "an item nested in an item's own Items list is visited");
     }
 }

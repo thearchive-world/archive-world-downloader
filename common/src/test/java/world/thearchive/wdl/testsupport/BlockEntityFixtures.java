@@ -13,15 +13,6 @@ import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.impl.ContainerSinkImpl;
 
-/**
- * Shared block-entity NBT fixtures for the merge tests: the tag vanilla writes for a block entity, a chunk tag wrapping
- * a {@code Level.TileEntities} list, and by-position lookups into that list. Hoisted here so the
- * container/lectern/interaction merge tests share one copy rather than each carrying its own.
- *
- * <p>{@link #blockEntity} is the producer's own output rather than a hand-listed set of keys, and {@link #chunkTagWith}
- * re-checks every tag handed to it against {@link FixtureFidelity}, so a fixture that overlays keys onto the base is
- * checked after the overlay, wherever it was assembled.
- */
 public final class BlockEntityFixtures {
     private BlockEntityFixtures() {}
 
@@ -34,10 +25,7 @@ public final class BlockEntityFixtures {
     }
 
     /**
-     * As {@link #blockEntity} for a block entity the player renamed, so a merge can be shown to leave a real sibling
-     * field alone. At 1.12.2 only a {@link net.minecraft.tileentity.TileEntityLockableLoot} (a chest and the like)
-     * carries an arbitrary name; the raw {@code "CustomName"} JSON key written here is exactly what its
-     * {@code setCustomName} would write, so the fidelity round trip still passes for one.
+     * As {@link #blockEntity}, carrying a custom name.
      */
     public static NBTTagCompound namedBlockEntity(String id, int x, int y, int z, String customName) {
         NBTTagCompound tag = blockEntity(id, x, y, z);
@@ -55,11 +43,7 @@ public final class BlockEntityFixtures {
     }
 
     /**
-     * A block entity of a type no block on this band hosts. {@link #blockEntity} cannot build one: it resolves the type
-     * to a representative block state to take the producer's shape from, and a type this band does not register has
-     * none. Only for such a type, and only where what is under test is band-agnostic tag code a save written on a band
-     * that does have the block reaches; a registered type belongs on {@link #blockEntity}, where the shape is checked,
-     * and a tag from here reaches a chunk through {@link #malformedChunkTagWith}.
+     * A block entity of a type no block on this band hosts.
      */
     public static NBTTagCompound unhostedBlockEntity(String id, int x, int y, int z) {
         NBTTagCompound tag = new NBTTagCompound();
@@ -71,11 +55,7 @@ public final class BlockEntityFixtures {
     }
 
     /**
-     * A block entity carrying a key no vanilla writer emits, for the one property that needs exactly that: the chunk
-     * codec must pass a block entity's NBT through opaquely, since the tags it re-encodes come from the client and may
-     * have been written by a foreign or modded server. A probe vanilla itself round-trips cannot prove that, because a
-     * codec that silently rebuilt every tag from vanilla's own load would still preserve it. Not for a fixture standing
-     * in for producer output.
+     * A block entity carrying a key no vanilla writer emits.
      */
     public static NBTTagCompound blockEntityWithForeignKey(String id, int x, int y, int z, String key,
             String value) {
@@ -87,9 +67,7 @@ public final class BlockEntityFixtures {
     /**
      * The open-time holder the band sink produces for a container of {@code containerSize} whose every slot is empty,
      * stamped with {@code blockEntityId} as the open-time write stamps it so a fold's type gate is exercised rather
-     * than bypassed. Built through the sink rather than by hand because the emptiness is the subject wherever this is
-     * used: an empty container serializes {@code "Items"} as a present empty list, which is what a re-captured
-     * container that nobody opened also looks like.
+     * than bypassed.
      */
     public static NBTTagCompound emptyContainerHolder(int containerSize, String blockEntityId) {
         TestRegistries.bootstrap();
@@ -101,8 +79,7 @@ public final class BlockEntityFixtures {
 
     /**
      * A {@code "Bees"}-shaped list of one occupant per named {@code ticksInHive}, the
-     * {@code {EntityData, TicksInHive, MinOccupationTicks}} entry vanilla's {@code TileEntityBeehive.readFromNBT}
-     * reads.
+     * {@code {EntityData, TicksInHive, MinOccupationTicks}} entry.
      */
     public static NBTTagList bees(int... ticksInHive) {
         NBTTagList list = new NBTTagList();
@@ -119,12 +96,10 @@ public final class BlockEntityFixtures {
     }
 
     /**
-     * A chunk tag whose {@code Level.TileEntities} list holds {@code blockEntities}, each carrying the
-     * {@code keepPacked} the chunk layer writes around a live block entity.
+     * A chunk tag whose {@code Level.TileEntities} list holds {@code blockEntities}.
      *
-     * <p>Every tag is checked against its producer's shape first. This is the choke point: a fixture assembled anywhere
-     * and handed to a chunk merge passes through here, so an omitted key fails the build at the test that would
-     * otherwise have passed over it.
+     * <p>Every tag is checked against its producer's shape first, so an omitted key fails the build at the test that
+     * would otherwise have passed over it.
      */
     public static NBTTagCompound chunkTagWith(NBTTagCompound... blockEntities) {
         NBTTagCompound chunkTag = new NBTTagCompound();
@@ -139,10 +114,7 @@ public final class BlockEntityFixtures {
     }
 
     /**
-     * A chunk tag whose block entities are NOT checked against their producers, for the cases whose subject is a shape
-     * no producer emits: an entry a corrupted or foreign save holds, or a field deliberately removed to prove the
-     * reader drops it. Reach for {@link #chunkTagWith} everywhere else; a fixture that merely stands in for producer
-     * output belongs there, and routing it here is how the check stops meaning anything.
+     * A chunk tag whose block entities are NOT checked against their producers.
      */
     public static NBTTagCompound malformedChunkTagWith(NBTTagCompound... blockEntities) {
         NBTTagCompound chunkTag = new NBTTagCompound();
@@ -158,11 +130,6 @@ public final class BlockEntityFixtures {
         return chunkTag;
     }
 
-    /**
-     * One block entity as the chunk layer hands it to the region writer: checked against its producer's shape, then
-     * carrying the {@code keepPacked} that layer stamps beside every live block entity it saves. Use this where a
-     * fixture reaches a chunk without going through {@link #chunkTagWith}.
-     */
     public static NBTTagCompound savedBlockEntity(NBTTagCompound blockEntityTag) {
         FixtureFidelity.assertBlockEntityShape(blockEntityTag);
         NBTTagCompound saved = blockEntityTag.copy();

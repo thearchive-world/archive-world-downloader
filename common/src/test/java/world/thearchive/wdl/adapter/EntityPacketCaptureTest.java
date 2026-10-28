@@ -23,9 +23,6 @@ import world.thearchive.wdl.core.SendRangeSampler;
 import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the MC-typed half of the packet capture: which accumulator call an inbound packet routes to.
- */
 class EntityPacketCaptureTest {
     private static final UUID VEHICLE_UUID = new UUID(0, 1);
     private static final UUID RIDER_UUID = new UUID(0, 2);
@@ -33,13 +30,13 @@ class EntityPacketCaptureTest {
 
     @BeforeAll
     static void bootstrapVanillaStatics() {
-        TestRegistries.bootstrap(); // the spawn payload names an EntityType, which needs the vanilla statics
+        TestRegistries.bootstrap();
     }
 
     @Test
     void aRotationOnlyMoveLeavesTheRiderHomedOnItsVehiclesChunk() {
-        // A rider's held coordinates stay frozen at where it boarded, so a chunk key recomputed from them reverts
-        // the re-home onto its vehicle.
+        // A rider's held coordinates are not moved with its vehicle, so a chunk key recomputed from them reverts the
+        // re-home onto its vehicle.
         long boardingChunk = ChunkPos.asLong(0, 0);
         long farChunk = ChunkPos.asLong(4, 0);
         EntityPacketCapture capture = capture();
@@ -63,8 +60,7 @@ class EntityPacketCaptureTest {
         EntityPacketCapture capture = capture();
         capture.spawn(1, VEHICLE_UUID, ChunkPos.asLong(0, 0), entityPos(12.0, 64.0, 8.0), addEntity(1, VEHICLE_UUID));
 
-        // A relative move is a delta in 1/4096 of a block off the held position, so this walks seven blocks east,
-        // across the chunk border at x=16.
+        // A relative move is a delta in 1/4096 of a block off the held position.
         capture.onMove(1, (short) (7 * 4096), (short) 0, (short) 0,
                 new SPacketEntity.S17PacketEntityLookMove(1, 7 * 4096, 0, 0,
                         (byte) 0, (byte) 0, true));
@@ -92,8 +88,8 @@ class EntityPacketCaptureTest {
     }
 
     private static SPacketSpawnObject addEntity(int id, UUID uuid) {
-        // This band's spawn packet is built from the spawned entity and an object-type id, not from an EntityType.
-        // These tests store it as an opaque spawn payload without decoding it, so a bare entity spawned as a minecart
+        // This band's spawn packet is built from the spawned entity and an object-type id, not from an EntityType. The
+        // capture stores it as an opaque spawn payload without decoding it, so a bare entity spawned as a minecart
         // object stands in.
         Entity source = new PlaceholderEntity();
         source.setEntityId(id);
@@ -101,7 +97,6 @@ class EntityPacketCaptureTest {
         return new SPacketSpawnObject(source, 10);
     }
 
-    /** A bare entity double, all the spawn-packet constructor reads from its argument at this band. */
     private static final class PlaceholderEntity extends Entity {
         private PlaceholderEntity() {
             super(null);
@@ -121,7 +116,7 @@ class EntityPacketCaptureTest {
      * An item frame's spawn-object payload carries a HORIZONTAL facing index, not the all-six one. Reading it with the
      * all-six lookup maps 0 and 1 onto down and up, which a hanging entity rejects outright, so the frame is dropped
      * from the download entirely; and it maps 3 onto south where the server meant east, so the frame is saved facing
-     * the wrong way with nothing logged. Half of every wall's frames go one way, a quarter the other.
+     * the wrong way with nothing logged.
      */
     @Test
     void anItemFrameKeepsTheFacingTheServerSent() {

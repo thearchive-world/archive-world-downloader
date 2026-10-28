@@ -4,15 +4,10 @@
 package world.thearchive.wdl.core;
 
 /**
- * The keep-hot flush decision: which buffered chunks are far enough from the player to stream to disk and drop from
- * memory, so the in-memory buffer stays bounded by a hot window around the player no matter how far the capture roams.
- * Version-agnostic core: imports no {@code net.minecraft.*} type (CI-enforced) and stays Java-8-clean, so it is
- * cherry-pickable across era-band branches.
+ * The keep-hot flush decision: which buffered chunks are far enough from a given center chunk to stream to disk and
+ * drop from memory.
  *
- * <p>Distance is the square (Chebyshev) chunk distance, matching the square render-distance region the capture walks. A
- * chunk is kept buffered while it is within the keep-hot radius (so a container opened while the chunk is hot can still
- * be merged in before the tag leaves memory) and flushed once it is farther; the boundary is inclusive (exactly at the
- * radius is kept).
+ * <p>Distance is the square (Chebyshev) chunk distance, matching the square render-distance region the capture walks.
  */
 public final class FlushPolicy {
     private FlushPolicy() {}

@@ -12,10 +12,7 @@ import net.minecraftforge.fml.client.IModGuiFactory;
 import world.thearchive.wdl.Wdl;
 
 /**
- * The mods-list config-screen hook at this band, the analog of the {@code ExtensionPoint.CONFIGGUIFACTORY}
- * registration the 1.14.4-and-above bands make. FML resolves this class by name from the {@code guiFactory}
- * attribute on {@link WdlForge}'s {@code @Mod} annotation and instantiates it reflectively, so it stays public with
- * a no-arg constructor; the mods list greys its config button out unless {@link #hasConfigGui} returns true.
+ * FML resolves this class by name and instantiates it reflectively, so it stays public.
  */
 public final class ForgeConfigGuiFactory implements IModGuiFactory {
     @Override

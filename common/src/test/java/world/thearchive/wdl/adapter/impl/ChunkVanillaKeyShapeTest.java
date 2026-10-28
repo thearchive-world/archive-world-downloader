@@ -22,12 +22,6 @@ import org.junit.jupiter.api.Test;
 import world.thearchive.wdl.adapter.ChunkCodec;
 import world.thearchive.wdl.adapter.ChunkSnapshotSource;
 
-/**
- * The chunk vanilla-key byte-gate: pins the pre-Flattening numeric shape {@link ChunkCodecImpl} must encode, which a
- * wrong-but-self-consistent encode (a copied 1.13+ {@code DataVersion}, or a palette key) would still pass a purely
- * symmetric round-trip test. Every key asserted here is a real 1.12.2 on-disk key or its explicit absence, both taken
- * from the recon's vanilla {@code AnvilChunkLoader.writeChunkToNBT} key table, not from this band's own naming.
- */
 class ChunkVanillaKeyShapeTest {
     private static final int NON_EMPTY_SECTION_Y = 0;
 
@@ -68,7 +62,6 @@ class ChunkVanillaKeyShapeTest {
         assertTrue(section.hasKey("Data"), "the Data nibble array must be written alongside Blocks");
     }
 
-    /** A synthetic snapshot carrying one non-empty section, for driving {@link ChunkCodecImpl#encode} in isolation. */
     private static ChunkSnapshotSource nonEmptyChunk() {
         ExtendedBlockStorage section = new ExtendedBlockStorage(NON_EMPTY_SECTION_Y << 4, true);
         section.set(0, 0, 0, Blocks.STONE.getDefaultState());

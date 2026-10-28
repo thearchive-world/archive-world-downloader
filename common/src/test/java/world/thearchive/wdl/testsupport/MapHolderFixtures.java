@@ -11,11 +11,6 @@ import net.minecraft.util.NonNullList;
 
 import world.thearchive.wdl.adapter.ContainerSink;
 
-/**
- * Shared map-item-holder NBT fixtures for the map archive tests: a filled-map stack, a shulker nesting one, and the
- * captured {@code Items} holder they serialize into. Hoisted here so the id collector, remap, and archive tests share
- * one copy rather than each carrying its own.
- */
 public final class MapHolderFixtures {
     private MapHolderFixtures() {}
 
@@ -28,8 +23,7 @@ public final class MapHolderFixtures {
     }
 
     /**
-     * A shulker box whose {@code tag.BlockEntityTag.Items} nests {@code contents}. At this band shulker boxes are
-     * sixteen per-color blocks with no colorless variant; the color is incidental to the fixture.
+     * A shulker box whose {@code tag.BlockEntityTag.Items} nests {@code contents}.
      */
     public static ItemStack shulkerHolding(ItemStack... contents) {
         ItemStack shulker = new ItemStack(Blocks.PURPLE_SHULKER_BOX);

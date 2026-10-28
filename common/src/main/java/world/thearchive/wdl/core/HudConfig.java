@@ -4,11 +4,9 @@
 package world.thearchive.wdl.core;
 
 /**
- * The HUD-overlay side of the config: the master on/off toggle, anchor, offset, the compact/detailed default, the
- * peek-key mode, the optional panel and its opacity, and the done-linger hold. A nested value object composed onto
- * {@link WdlConfig}, constructed from a schema read via {@link #from(ConfigValues)}, so the parse, clamping, and
- * defaults live in {@link ConfigSchema} rather than here. MC-free and headless-testable; the keybind itself is a loader
- * concern, not a stored key.
+ * The HUD-overlay side of the config. A nested value object composed onto {@link WdlConfig}, constructed from a schema
+ * read via {@link #from(ConfigValues)}, so the parse, clamping, and defaults live in {@link ConfigSchema} rather than
+ * here.
  */
 public final class HudConfig {
     private final boolean showHud;
@@ -34,12 +32,12 @@ public final class HudConfig {
         this.doneLingerSeconds = doneLingerSeconds;
     }
 
-    /** Master: whether the rendered overlay is drawn at all (default on); when off, the chat line stands. */
+    /** Master: whether the rendered overlay is drawn at all (default on). */
     public boolean showHud() {
         return showHud;
     }
 
-    /** Which screen corner or edge the overlay anchors to (default a top corner). */
+    /** Which screen position the overlay anchors to. */
     public HudAnchor anchor() {
         return anchor;
     }
@@ -54,7 +52,7 @@ public final class HudConfig {
         return offsetY;
     }
 
-    /** Whether the detailed layout is the default (the peek key overrides this live). */
+    /** Whether the detailed layout is the default. */
     public boolean detailed() {
         return detailed;
     }
@@ -79,7 +77,6 @@ public final class HudConfig {
         return doneLingerSeconds;
     }
 
-    /** The HUD fields drawn from a completed schema read. */
     static HudConfig from(ConfigValues values) {
         return new HudConfig(
                 values.booleanValue("showHud"),

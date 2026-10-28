@@ -49,14 +49,6 @@ import world.thearchive.wdl.core.SettingsLayout;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.core.WorldType;
 
-/**
- * The in-mod settings screen: a tabbed, staged editor over the MC-free config model. Each descriptor value-type becomes
- * a vanilla widget (boolean/game-rule toggle, ranged slider, enum/marker cycle, seed/hex field), built from the public
- * widget primitives rather than vanilla's package-private option wrapper so the feature needs no access-widener and no
- * mixin. Edits stage into a {@link SettingsDraft} held on this instance (surviving a resize rebuild); Done and Esc
- * commit, Discard abandons behind a confirm, and disabling a core capture toggle confirms at the change. The rows,
- * their order, and the gamerule group come from {@link SettingsLayout}.
- */
 public final class WdlSettingsScreen extends GuiScreen {
     private static final int TAB_TOP = 6;
     private static final int TAB_HEIGHT = 20;
@@ -73,10 +65,6 @@ public final class WdlSettingsScreen extends GuiScreen {
     private static final int REVERT_ICON_WIDTH = 10;
     private static final int REVERT_ICON_HEIGHT = 10;
 
-    /**
-     * The keys stay declared in {@link ConfigSchema} and laid out in {@link SettingsLayout}, which ship byte-identical
-     * to every band, so refusing the row here is what keeps them unforked.
-     */
     private static final Set<String> HIDDEN_ROWS = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList("lockDownloadedMaps", "saveItemCoordinates")));
 
@@ -89,8 +77,6 @@ public final class WdlSettingsScreen extends GuiScreen {
     private int activeTab;
     private @Nullable GuiButton defaults;
     private @Nullable SettingsList list;
-    // Below 1.19.3 there is no per-widget Tooltip, and a control's tooltip inside the scrolling list clips to the
-    // list scissor, so hovered tooltips are recorded here and drawn screen-side after the list in render.
     private final List<Map.Entry<Gui, ITextComponent>> hoverTooltips = new ArrayList<>();
 
     public WdlSettingsScreen(@Nullable GuiScreen parent, WdlConfig live, Consumer<WdlConfig> onSave,
@@ -137,8 +123,8 @@ public final class WdlSettingsScreen extends GuiScreen {
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
         super.mouseClicked(mouseX, mouseY, mouseButton);
         if (this.list != null) {
-            // Drop focus first so a click re-focuses only the seed field it lands on, matching the higher bands
-            // where the list owns focus; the field's own mouseClicked below re-takes it when the click hits it.
+            // Drop focus first so a click re-focuses only the seed field it lands on; the field's own mouseClicked
+            // below re-takes it when the click hits it.
             this.list.clearFieldFocus();
             this.list.mouseClicked(mouseX, mouseY, mouseButton);
         }
@@ -179,10 +165,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /**
-     * A button that runs an action on press, since the pre-1.13 GuiButton has no onPress; dispatched by
-     * actionPerformed.
-     */
     private final class ActionButton extends GuiButton {
         private final Runnable onPress;
 
@@ -203,7 +185,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         for (int i = 0; i < count; i++) {
             int index = i;
             int tabX = column.left() + i * tabWidth;
-            // the last tab absorbs the division remainder so the strip's right edge meets the control edge
             int thisTabWidth = i == count - 1 ? column.right() - tabX : tabWidth;
             ITextComponent title = new TextComponentTranslation(
                     SettingsLayout.tabLabelKey(SettingsLayout.TABS.get(i).id()));
@@ -214,15 +195,13 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /** The option content band width, the single source the tab strip, footer, and list rows all size to. */
     private int contentBandWidth() {
         return Math.min(this.width - 20, ROW_BAND_MAX);
     }
 
     /**
-     * The visible option column the tab strip and footer both bracket: labels start at the row content inset, and the
-     * right-anchored control stops a revert-affordance slot short of the band edge, so neither spans the raw band, only
-     * the column between them. Matching the list's own width/2 - band/2 origin keeps them aligned.
+     * The visible option column the tab strip and footer both bracket: labels start at the row content inset. Matching
+     * the list's own width/2 - band/2 origin keeps them aligned.
      */
     private ColumnBounds optionColumn() {
         int band = contentBandWidth();
@@ -231,7 +210,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         return new ColumnBounds(left, right);
     }
 
-    /** The visible option column's horizontal bounds. */
     private static final class ColumnBounds {
         private final int left;
         private final int right;
@@ -262,10 +240,8 @@ public final class WdlSettingsScreen extends GuiScreen {
         int defaultsX = doneX + buttonWidth + GAP;
         int discardX = defaultsX + buttonWidth + GAP;
         addButton(new ActionButton(doneX, footerY, buttonWidth, 20, I18n.format("gui.done"), this::closeAndSave));
-        // This band's button carries no hover-tooltip parameter, so the Defaults button has no hover explanation.
         this.defaults = addButton(new ActionButton(defaultsX, footerY, buttonWidth, 20,
                 I18n.format("wdl.settings.defaults"), this::onDefaults));
-        // the last button absorbs the division remainder so the footer's right edge meets the control edge
         addButton(new ActionButton(discardX, footerY, column.right() - discardX, 20,
                 I18n.format("wdl.settings.discard"), this::onDiscard));
     }
@@ -273,26 +249,21 @@ public final class WdlSettingsScreen extends GuiScreen {
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTick) {
         this.drawDefaultBackground();
-        // The Defaults button would only revert to a state the draft is already in, so it grays out (never
-        // hides, keeping the footer stable and the feature discoverable) while the draft equals defaults, and
-        // a tooltip on the gray state says why. Kept current with live edits by resolving before the widgets
-        // draw; the equality check gates the write so the tooltip is rebuilt only when the state flips.
+        // The Defaults button grays out (never hides, keeping the footer stable and the feature discoverable).
         if (this.defaults != null) {
             boolean atDefaults = this.draft.isAtDefaults(this::isRowVisible);
             if (this.defaults.enabled == atDefaults) {
                 this.defaults.enabled = !atDefaults;
             }
         }
-        // Below the 1.19.4 GUI additions GuiScreen.render paints only its buttons, so the list added as a widget is
-        // drawn by hand. It draws before the buttons here, not after as the renderable order on the higher bands:
-        // below 1.20.2 this list fills tiled dirt above and below itself, which is what hides its unclipped row
-        // overflow at the top and bottom edges (it does not scissor), so drawing it first lets that fill hide the
-        // overflow while the tab strip and footer buttons paint on top of it. Drawing it after would bury both.
+        // GuiScreen.drawScreen paints only its buttons and labels, so the list is drawn by hand. It draws before the
+        // buttons: this list fills tiled dirt above and below itself, which is what hides its unclipped row overflow at
+        // the top and bottom edges (it does not scissor), so drawing it first lets that fill hide the overflow while
+        // the tab strip and footer buttons paint on top of it. Drawing it after would bury both.
         if (this.list != null) {
             this.list.drawScreen(mouseX, mouseY, partialTick);
         }
         super.drawScreen(mouseX, mouseY, partialTick);
-        // The recorded hover tooltips are drawn here, unclipped, after the list.
         for (Map.Entry<Gui, ITextComponent> tip : this.hoverTooltips) {
             if (isControlHovered(tip.getKey(), mouseX, mouseY)) {
                 this.drawHoveringText(
@@ -303,10 +274,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    // Below 1.13 GuiButton and GuiTextField share only the Gui base, so a row's control is held as Gui and narrowed
-    // at each site through these: a button exposes position, width, render, and hover directly, while a GuiTextField
-    // carries its own coordinate fields and a fixed width and has no hover state, so its hover is tested against the
-    // control box.
     private static void setControlActive(Gui control, boolean active) {
         if (control instanceof GuiButton) {
             ((GuiButton) control).enabled = active;
@@ -364,7 +331,7 @@ public final class WdlSettingsScreen extends GuiScreen {
             }
             boolean hasGameRuleRows = section.isGameRuleGroup() && !this.curatedById.isEmpty();
             if (visibleKeys.isEmpty() && !hasGameRuleRows) {
-                continue; // a section left with no row to show, install-gated or hidden here, drops its header
+                continue;
             }
             if (section.labelKey() != null) {
                 settingsList.add(new HeaderRow(section.labelKey()));
@@ -386,10 +353,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /**
-     * Whether {@code key}'s row shows: a hidden row never appears, and a row that names required mods appears only when
-     * one of them is loaded.
-     */
     private boolean isRowVisible(String key) {
         if (HIDDEN_ROWS.contains(key)) {
             return false;
@@ -485,11 +448,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /**
-     * The confirm for reducing recapture freshness (the enum sibling of {@link #showDisableConfirm}): the widget has
-     * already cycled to the lower mode, so confirming stages it and canceling leaves the draft untouched, and returning
-     * to this screen re-reads the mode from the draft so a cancel visibly snaps it back.
-     */
     private void showReduceRecaptureConfirm(String key, RecaptureMode value) {
         Minecraft minecraft = Minecraft.getMinecraft();
         Consumer<Boolean> choice = confirmed -> {
@@ -498,8 +456,6 @@ public final class WdlSettingsScreen extends GuiScreen {
             }
             minecraft.displayGuiScreen(this);
         };
-        // The lost capability differs by target: switching to OFF freezes every area after its first capture,
-        // while switching to NEARBY only drops the revisit overwrite (the area around you stays current).
         String messageKey = value == RecaptureMode.OFF
                 ? "wdl.settings.confirm.recapture.to_off.message"
                 : "wdl.settings.confirm.recapture.to_nearby.message";
@@ -539,7 +495,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         return SettingsLayout.valueLabelKey(value);
     }
 
-    /** Attach the option's help tooltip to its control, only when the language file carries the key (helpKey). */
     private void applyTooltip(Gui widget, String key) {
         String tooltipKey = SettingsLayout.optionTooltipKey(key);
         if (I18n.hasKey(tooltipKey)) {
@@ -555,14 +510,8 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /**
-     * The confirm for turning a download-harming capture toggle off: the widget has already flipped to off, so
-     * confirming stages the disable and canceling leaves the draft untouched; either way returning to this screen
-     * re-reads the toggle from the draft, so a cancel visibly snaps it back on. The body names the per-toggle outcome,
-     * and the confirm focuses the safe keep choice by default.
-     */
     private void showDisableConfirm(String key) {
-        String base = "wdl.settings.confirm.capture"; // only the boolean capture toggles route here
+        String base = "wdl.settings.confirm.capture";
         Minecraft minecraft = Minecraft.getMinecraft();
         Consumer<Boolean> choice = confirmed -> {
             if (confirmed) {
@@ -630,7 +579,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /** The scrollable list of rows for the active tab; rebuilt whole on a tab switch or resize. */
     private final class SettingsList extends GuiListExtended {
         private final List<SettingsEntry> entries = new ArrayList<>();
 
@@ -659,9 +607,8 @@ public final class WdlSettingsScreen extends GuiScreen {
 
         @Override
         protected int getScrollBarX() {
-            // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row, so with this
-            // screen's wider row it lands inside each row and cuts through the controls; later bands derive it
-            // from the row right edge, which this follows.
+            // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row, so with this screen's
+            // wider row it lands inside each row and cuts through the controls.
             return this.left + this.width / 2 + getListWidth() / 2 + 10;
         }
 
@@ -686,7 +633,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /** A list row: a section header, an option, or a game rule. */
     private abstract class SettingsEntry implements GuiListExtended.IGuiListEntry {
         private int contentX;
         private int contentY;
@@ -736,7 +682,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /** A non-interactive section caption drawn in the brand accent. */
     private final class HeaderRow extends SettingsEntry {
         private final ITextComponent label;
 
@@ -752,7 +697,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /** A row with a label, one editing control, and a revert affordance, master-gated when applicable. */
     private abstract class ControlRow extends SettingsEntry {
         private final ITextComponent label;
         private final GuiButton revert;
@@ -774,7 +718,6 @@ public final class WdlSettingsScreen extends GuiScreen {
 
         abstract void refresh();
 
-        /** Whether this row shows the passive "capture disabled" mark beside its control (off core toggles). */
         boolean showsCaptureWarning() {
             return false;
         }
@@ -798,8 +741,6 @@ public final class WdlSettingsScreen extends GuiScreen {
             setControlPosition(control, controlX, controlY);
             renderControl(control, mouseX, mouseY, partialTick);
 
-            // Passive indicator: an amber caution mark sits just left of an off core-capture toggle, a
-            // defense-in-depth reminder that the download will be missing that data beyond the confirm-at-change.
             if (showsCaptureWarning()) {
                 int glyphY = controlY + (CONTROL_HEIGHT - fontRenderer.FONT_HEIGHT) / 2;
                 surface.text(fontRenderer, CAPTURE_WARNING_GLYPH,
@@ -807,8 +748,7 @@ public final class WdlSettingsScreen extends GuiScreen {
                         BrandColors.opaque(BrandColors.AMBER));
             }
 
-            // The revert affordance is shown only when the row differs from its default, hidden otherwise
-            // (not grayed). The control slot above stays reserved either way, so nothing reflows as it appears.
+            // The revert affordance is shown only when the row differs from its default, hidden otherwise (not grayed).
             boolean modified = isModified();
             this.revert.visible = modified;
             this.revert.enabled = enabled && modified;
@@ -816,15 +756,11 @@ public final class WdlSettingsScreen extends GuiScreen {
             this.revert.y = controlY;
             this.revert.drawButton(Minecraft.getMinecraft(), mouseX, mouseY, partialTick);
 
-            // The revert icon is a bundled sprite, not a font glyph: the revert codepoint resolves only through
-            // the tiny unifont fallback, which no scale renders crisply. The button carries a blank label so
-            // vanilla draws nothing underneath. The white source is tinted to carry the enabled/disabled color,
-            // and a second offset draw gives it the same drop shadow the surrounding button text has.
+            // The button carries a blank label so vanilla draws nothing underneath.
             if (modified) {
                 int iconColor = BrandColors.opaque(enabled ? BrandColors.WHITE : BrandColors.GRAY);
-                // Quarter-brightness of the foreground, matching vanilla Font's drop-shadow derivation.
+                // Quarter-brightness of the foreground, matching vanilla FontRenderer's drop-shadow derivation.
                 int shadowColor = (iconColor & 0xFCFCFC) >> 2 | (iconColor & 0xFF000000);
-                // Center on the button face, which excludes the one-pixel bottom shadow row of the widget sprite.
                 int iconX = revertX + (REVERT_WIDTH - REVERT_ICON_WIDTH) / 2;
                 int iconY = controlY + (CONTROL_HEIGHT - 1 - REVERT_ICON_HEIGHT) / 2;
                 surface.blitSprite(REVERT_ICON, iconX + 1, iconY + 1,
@@ -834,9 +770,9 @@ public final class WdlSettingsScreen extends GuiScreen {
             }
         }
 
-        // The list routes a row click, drag, and key to the entry, not to its inner widgets, so the row forwards
-        // each to its control (a cycle button advances, a slider grabs, a seed field focuses and takes keys) and
-        // to its revert button.
+        // The list routes a row click and key to the entry, not to its inner widgets, so the row forwards each to its
+        // control (a cycle button advances, a slider grabs, a seed field focuses and takes keys) and to its revert
+        // button.
         @Override
         public boolean mousePressed(int slotIndex, int mouseX, int mouseY, int mouseEvent, int relativeX,
                 int relativeY) {
@@ -886,7 +822,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /** A descriptor-backed option row: reverts to the descriptor default. */
     private final class OptionRow extends ControlRow {
         private final String key;
         private final Gui control;
@@ -926,7 +861,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /** A curated game-rule row: a toggle over the sparse override map, reverting by deleting its entry. */
     private final class GameRuleRow extends ControlRow {
         private final CuratedGameRule rule;
         private final WdlCycleButton<Boolean> toggle;
@@ -967,13 +901,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /**
-     * A slider over a descriptor range; its message renders the current value through the option's value key. This band
-     * ships no reusable slider primitive (the vanilla one is bound to a game Option), so the slider is driven on the
-     * button base directly: a press or held drag sets the fraction from the mouse, the handle is drawn in the button
-     * background pass, and a subclass supplies only the value quantization and formatting (int versus tenth-quantized
-     * float).
-     */
     private abstract class RangeSlider extends GuiButton {
         final String key;
         protected double value;
@@ -985,10 +912,8 @@ public final class WdlSettingsScreen extends GuiScreen {
             this.value = initialFraction;
         }
 
-        /** The current slider value, quantized and formatted for both the label and the draft. */
         abstract String currentText();
 
-        /** The slider fraction for the value currently staged in the draft. */
         abstract double draftFraction();
 
         protected void updateMessage() {
@@ -1073,7 +998,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         }
     }
 
-    /** Quantized to a tenth, for the outline rim-width scale. */
     private final class FloatSlider extends RangeSlider {
         private final float min;
         private final float max;
@@ -1105,7 +1029,6 @@ public final class WdlSettingsScreen extends GuiScreen {
         return max == min ? 0.0 : (value - min) / (max - min);
     }
 
-    /** Tint {@code component} the nearest vanilla color to the brand amber (gold), mutating its style in place. */
     private static ITextComponent amberComponent(ITextComponent component) {
         component.getStyle().setColor(TextFormatting.GOLD);
         return component;

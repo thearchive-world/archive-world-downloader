@@ -23,12 +23,6 @@ import world.thearchive.wdl.adapter.impl.LevelDataWriterImpl;
 import world.thearchive.wdl.core.WorldOutputConfig;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * level.dat round-trip: the writer produces a superflat VOID world whose Data tag, written to a real compressed
- * level.dat and read back, preserves the seed, DataVersion, and the flat-void generator name. At 1.12.2 the generator
- * is stored as a {@code WorldType} name plus its options string in the Data tag (the void world uses the {@code flat}
- * preset).
- */
 class LevelDatRoundTripTest {
     private final LevelDataWriter writer = new LevelDataWriterImpl();
 
@@ -61,7 +55,6 @@ class LevelDatRoundTripTest {
     @Test
     void buildsWithoutWorldgenRegistries() {
         TestRegistries.bootstrap();
-        // At 1.12.2 the writer records only a WorldType and options, so it needs no worldgen registries.
         assertDoesNotThrow(() -> writer.buildLevelData(WorldOutputConfig.DEFAULTS, null),
                 "must derive the void generator, not fail");
     }
@@ -71,9 +64,6 @@ class LevelDatRoundTripTest {
         TestRegistries.bootstrap();
         LevelDataWriter.LevelData built = writer.buildLevelData(WorldOutputConfig.DEFAULTS, null);
 
-        // Drive the REAL production save (ISaveHandler.saveWorldInfo) rather than a hand-rolled
-        // CompressedStreamTools write, so the headless suite guards the band-specific save call inside
-        // LevelDataWriter.save().
         ISaveHandler storage = storageSource(saves).getSaveLoader("wdltest", true);
         writer.save(storage, built, null);
 

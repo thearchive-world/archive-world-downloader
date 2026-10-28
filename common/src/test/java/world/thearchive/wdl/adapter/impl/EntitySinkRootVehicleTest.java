@@ -12,7 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableList;
 import com.mojang.authlib.GameProfile;
 import java.util.UUID;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.passive.EntityPig;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
@@ -29,20 +28,6 @@ import world.thearchive.wdl.adapter.EntitySink;
 import world.thearchive.wdl.testsupport.HeadlessLevel;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the ridden-vehicle RootVehicle capture. A vehicle carrying exactly one player is refused by
- * the entities region (vanilla persists it in the player's own {@code RootVehicle}, not the entities region), so the
- * chunk path drops it. {@link EntitySink#captureRootVehicle} is the sibling that serializes it anyway, the way
- * {@code EntityPlayerMP.writeEntityToNBT}'s own root-vehicle write does, and the captured chest-boat contents fold into
- * it by {@code "Items"}. It also pins the mount persistence restoration, which shares the standalone entity path's
- * {@code applyMobPersistence} seam: {@code PersistenceRequired} is server-authoritative and arrives false on the
- * client, so a name-tagged mount, and any mount under {@code forceMobPersistence}, keeps the stamp or it despawns once
- * the player dismounts in the downloaded world.
- *
- * <p>Uses a real {@link EntityPig} as the mount, a headless {@link EntityPlayer} double as its one-player passenger (a
- * real network-bound player cannot be built headless), and {@link Entity#startRiding} to wire the real riding
- * relationship {@code isBeingRidden}/{@code getRecursivePassengers} read.
- */
 class EntitySinkRootVehicleTest {
     private final EntitySink sink = new EntitySinkImpl();
     private final ContainerSink containerSink = new ContainerSinkImpl();
@@ -52,7 +37,6 @@ class EntitySinkRootVehicleTest {
         TestRegistries.bootstrap();
     }
 
-    /** A headless player double: a real player passenger cannot be built headless (needs a network connection). */
     private static final class HeadlessPlayer extends EntityPlayer {
         HeadlessPlayer() {
             super(HeadlessLevel.get(), new GameProfile(UUID.randomUUID(), "wdl-test"));
@@ -79,7 +63,7 @@ class EntitySinkRootVehicleTest {
     void captureRootVehicleSerializesTheOnePlayerVehicleTheChunkPathDrops() {
         TestRegistries.bootstrap();
         EntityPig vehicle = riddenByOnePlayer();
-        assertTrue(vehicle.isBeingRidden(), "precondition: a one-player vehicle the entities region refuses");
+        assertTrue(vehicle.isBeingRidden(), "precondition: a vehicle carrying exactly one player");
 
         assertNull(sink.encodeChunk(ImmutableList.of(vehicle), new ChunkPos(0, 0), false),
                 "the chunk path drops it, exactly the loss the RootVehicle capture fixes");
@@ -111,7 +95,7 @@ class EntitySinkRootVehicleTest {
         probe.setTag("Items", folded.getTagList("Items", 10));
         ItemStackHelper.loadAllItems(probe, back);
         assertEquals(Items.DIAMOND, back.get(3).getItem(),
-                "the captured chest-boat loot lands at its slot in the mount");
+                "the captured container loot lands at its slot in the mount");
         assertEquals(9, back.get(3).getCount());
     }
 

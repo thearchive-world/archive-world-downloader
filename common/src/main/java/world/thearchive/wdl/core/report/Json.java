@@ -8,16 +8,9 @@ import java.util.Locale;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Compact, flat JSON for one machine-record line: an object of string keys to string, integer, boolean, or null values.
- * Deliberately not a general JSON library, only the shape the report emits and reads back, so the Java-8 core carries
- * the durable readback contract with no third-party dependency. Numbers render via the JDK integer types' own
- * {@code toString}, which is locale-independent, so on-disk values are stable on any machine.
- */
 final class Json {
     private Json() {}
 
-    /** Serialize {@code fields} to one compact JSON object line, keys in iteration order. */
     static String writeObject(Map<String, @Nullable Object> fields) {
         StringBuilder out = new StringBuilder();
         out.append('{');
@@ -35,11 +28,6 @@ final class Json {
         return out.toString();
     }
 
-    /**
-     * Parse one flat JSON object line into a {@link LinkedHashMap} (insertion-ordered) of string keys to String / Long
-     * / Double / Boolean / null. Throws {@link IllegalArgumentException} on anything that is not a single well-formed
-     * flat object, so a torn or corrupt line is rejected rather than half-read.
-     */
     static Map<String, @Nullable Object> parseObject(String line) {
         Cursor cursor = new Cursor(line);
         cursor.skipWhitespace();
@@ -128,7 +116,6 @@ final class Json {
         return new IllegalArgumentException("malformed JSON object line: " + line);
     }
 
-    /** A scanning index over one line; every read advances past what it consumed and validates as it goes. */
     private static final class Cursor {
         private final String source;
         private int index;
@@ -187,7 +174,7 @@ final class Json {
                 if (character == '\\') {
                     out.append(readEscape());
                 } else if (character < 0x20) {
-                    throw malformed(source); // a raw control char is not legal inside a JSON string
+                    throw malformed(source);
                 } else {
                     out.append(character);
                 }

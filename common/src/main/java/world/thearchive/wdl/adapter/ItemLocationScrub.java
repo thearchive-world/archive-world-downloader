@@ -7,31 +7,6 @@ import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 
-/**
- * Reusable privacy scrub for item-borne location data: blanks the lodestone-compass target and the flower position
- * carried by a silk-touched beehive item on every item it reaches, recursing into shulker boxes (the item's
- * {@code BlockEntityTag.Items}) and bundles (the item's {@code Items}) over the shared {@link ItemTreeWalk}. Below the
- * 1.20.5 component update an item's data lives in its {@code tag} compound, so the scrub removes the coordinate keys
- * there: the lodestone target ({@code LodestonePos} plus {@code LodestoneDimension}, leaving {@code LodestoneTracked})
- * and, on a beehive item, the hive's own {@code BlockEntityTag.FlowerPos} and each occupant's
- * {@code BlockEntityTag.Bees[].EntityData.FlowerPos} (leaving each a valid bee). The pre-component item copies the
- * hive's whole block-entity NBT, so it carries the hive's own top-level flower position too, which the component era
- * drops; both are stripped here.
- *
- * <p>Operates only on already-serialized NBT (our own captured copy), never on a live {@code ItemStack}, so it cannot
- * corrupt the player's session. Below the 1.20.5 update it uses the {@code {id, Count, tag}} item shape and the
- * band-stable {@code get}/{@code instanceof}/{@code remove} NBT ops, so this band re-authors the pre-component key
- * paths while the walk and merge discipline are shared.
- *
- * <p>Reaches items three ways: an item-list holder via {@link #scrub(NBTTagCompound, String)} (the inventory, the ender
- * items, a drained container), a chunk-path block entity via {@link #scrubBlockEntity(NBTTagCompound)} (a decorated
- * pot, a shelf), and a serialized entity via {@link #scrubEntity(NBTTagCompound)} (an item frame, an item display, mob
- * equipment, an allay, a dropped item, and their passengers).
- *
- * <p>Scope, stated so the toggle does not over-promise: the scrub blanks the lodestone target and the beehive flower
- * positions only. Opaque server NBT whose coordinate leak is speculative is left alone, since blanking a whole unknown
- * subtree would corrupt legitimate items, unlike the single-key removals above.
- */
 final class ItemLocationScrub {
     private static final String LODESTONE_POS = "LodestonePos";
     private static final String LODESTONE_DIMENSION = "LodestoneDimension";
@@ -44,11 +19,6 @@ final class ItemLocationScrub {
 
     private ItemLocationScrub() {}
 
-    /**
-     * Blank every item-borne coordinate on every item in {@code holder}'s {@code listKey} list (each list element is an
-     * item-NBT compound, with or without a leading {@code "Slot"}), recursing into nested containers and bundles. A
-     * missing or non-list {@code listKey} is a no-op. The holder is mutated in place.
-     */
     public static void scrub(NBTTagCompound holder, String listKey) {
         if (holder.getTag(listKey) instanceof NBTTagList) {
             NBTTagList list = (NBTTagList) holder.getTag(listKey);
@@ -56,13 +26,6 @@ final class ItemLocationScrub {
         }
     }
 
-    /**
-     * Blank every item-borne coordinate on every item held by {@code blockEntity}, wherever the block entity stores it
-     * (a decorated pot's {@code item}, a campfire's {@code Items}, and so on), recursing into nested containers and
-     * bundles. Walks the block entity's direct children through {@link ItemTreeWalk}, which acts only on a real item's
-     * {@code tag}, so non-item children (the block entity's own coordinates, its type id) are a no-op. Works for every
-     * block-entity type without a per-type key list.
-     */
     public static void scrubBlockEntity(NBTTagCompound blockEntity) {
         for (String key : blockEntity.getKeySet()) {
             NBTBase value = blockEntity.getTag(key);
@@ -76,14 +39,6 @@ final class ItemLocationScrub {
         }
     }
 
-    /**
-     * Blank every item-borne coordinate on {@code entity} and, recursively, on its passengers. Walks the direct
-     * children name-agnostically (any direct child item compound, any item list), so it reaches the displayed item
-     * under either {@code Item} or the lowercase {@code item}, and inventory lists, without hard-coding field names.
-     * Two entity-specific shapes the generic walk cannot reach are handled explicitly: {@code equipment} is a compound
-     * of slot to item, so each value is walked; {@code Passengers} is a list of nested entities, so each is recursed.
-     * Works only on already-serialized entity NBT.
-     */
     public static void scrubEntity(NBTTagCompound entity) {
         for (String key : entity.getKeySet()) {
             NBTBase value = entity.getTag(key);
@@ -115,16 +70,10 @@ final class ItemLocationScrub {
         }
     }
 
-    /**
-     * Blank every item-borne coordinate on a single serialized item compound ({@code {id, Count, tag}}), recursing into
-     * nested containers and bundles. The single-item entry, for an offer's {@code sell} item, which sits under no list
-     * holder.
-     */
     public static void scrubItem(NBTTagCompound item) {
         ItemTreeWalk.walkItem(item, ItemLocationScrub::scrubItemTag);
     }
 
-    /** Blank the lodestone target and the beehive flower positions on an item's {@code tag}. */
     private static void scrubItemTag(NBTTagCompound tag) {
         tag.removeTag(LODESTONE_POS);
         tag.removeTag(LODESTONE_DIMENSION);

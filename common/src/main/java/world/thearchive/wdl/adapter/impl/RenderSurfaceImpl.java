@@ -17,17 +17,10 @@ import org.jspecify.annotations.Nullable;
 
 import world.thearchive.wdl.adapter.RenderSurface;
 
-/**
- * The {@link RenderSurface} plug for this branch. At this band there is no {@code GuiGraphics} and GUI draws take no
- * {@code PoseStack}: draws go through the static {@link Gui} helpers and {@link FontRenderer}, and a tooltip renders
- * through the owning {@link GuiScreen}, the only object that draws one at this version. A HUD draw, which never shows a
- * tooltip, uses the screen-less constructor. The font draws take a {@code String}, so a {@link ITextComponent} is
- * flattened with {@code getString}.
- */
 public final class RenderSurfaceImpl implements RenderSurface {
     private final @Nullable GuiScreen screen;
 
-    /** For a HUD draw, which never renders a tooltip. */
+    /** For a draw which never renders a tooltip. */
     public RenderSurfaceImpl() {
         this(null);
     }
@@ -80,9 +73,6 @@ public final class RenderSurfaceImpl implements RenderSurface {
 
     @Override
     public void blitSprite(String sprite, int x, int y, int width, int height, int color) {
-        // This band has no GUI sprite atlas (blitSprite is 1.20.2 and later), so the sprite is drawn from its
-        // texture file directly; the ARGB color is applied as a draw-color multiplier around the blit, since the
-        // pre-1.20 blit likewise takes no tint argument. The sole wdl sprite is the 10 by 10 revert icon.
         Minecraft.getMinecraft().getTextureManager()
                 .bindTexture(new ResourceLocation("wdl", "textures/gui/sprites/" + sprite + ".png"));
         GlStateManager.color((color >> 16 & 0xFF) / 255.0F, (color >> 8 & 0xFF) / 255.0F,
@@ -94,9 +84,8 @@ public final class RenderSurfaceImpl implements RenderSurface {
     @Override
     public void blitFavicon(ResourceLocation icon, int x, int y, int size) {
         Minecraft.getMinecraft().getTextureManager().bindTexture(icon);
-        // A selected list row leaves the shader color at black (the AbstractSelectionList highlight sets it and
-        // never resets it), and the blit does not set its own, so without this reset the selected row's icon
-        // multiplies to black. Vanilla's own world-selection list resets to white here for the same reason.
+        // A selected list row leaves the GL color at black (the GuiSlot highlight sets it and never resets it), and the
+        // blit does not set its own, so without this reset the selected row's icon multiplies to black.
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         GlStateManager.enableBlend();
         Gui.drawModalRectWithCustomSizedTexture(x, y, 0.0F, 0.0F, size, size, size, size);

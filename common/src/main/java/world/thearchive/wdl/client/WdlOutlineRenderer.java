@@ -23,7 +23,6 @@ import world.thearchive.wdl.Wdl;
 import world.thearchive.wdl.adapter.OutlineDrawSet;
 import world.thearchive.wdl.adapter.OutlineRenderContext;
 import world.thearchive.wdl.adapter.OutlineRim;
-import world.thearchive.wdl.adapter.OutlineTracker;
 import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.adapter.SectionKey;
 import world.thearchive.wdl.core.BrandColors;
@@ -32,23 +31,15 @@ import world.thearchive.wdl.core.RimFace;
 import world.thearchive.wdl.core.TimingWindow;
 
 /**
- * The band-agnostic outline cull: each frame it iterates the populated sections of the draw-set, frustum-rejects whole
- * sections, and delegates the draw of each surviving rim, on the exposed face the rim carries, to the injected per-band
- * {@link RimRenderer}. Per-frame cost scales with on-screen sections, not the total tracked set. The draw is gated on
- * the live capture being recording, so the to-do rims stop the instant the capture ends even before the next
- * maintenance tick clears the draw-set.
+ * The draw is gated on the live capture being recording, so the to-do rims stop the instant the capture ends even
+ * before the next maintenance tick clears the draw-set.
  *
- * <p>The renderer reads no MC world state: each rim's exposed face is computed and stamped on the client tick by
- * {@link OutlineTracker}, since the neighbors it seals against change only on the tick, so the per-frame path is a pure
- * section frustum cull plus the delegated draw. On this pre-blaze3d band the cull owns the line pass itself: it sets
- * the GL line state, begins the shared Tessellator buffer on the POSITION_COLOR line format, lets each rim write its
- * edges camera-relative into that buffer, then flushes and restores state in a finally so a throwing rim never leaves
- * the buffer building or the state dirty. Runs on the render thread, the vanilla client thread.
+ * <p>On this pre-blaze3d band the cull owns the line pass itself: it flushes and restores state in a finally so a
+ * throwing rim never leaves the buffer building.
  */
 public final class WdlOutlineRenderer {
     private static final Logger LOGGER = LogManager.getLogger(WdlOutlineRenderer.class);
 
-    // The outlineDebugTiming window, in frames: the rolling render-thread cost is read from here.
     private static final int TIMING_WINDOW_FRAMES = 200;
     private static final TimingWindow renderTiming = new TimingWindow(TIMING_WINDOW_FRAMES);
     private static boolean errorLogged;
@@ -106,13 +97,11 @@ public final class WdlOutlineRenderer {
     }
 
     /**
-     * Build the per-frame render context from the loader's frustum and the shared line buffer, resolving the effective
-     * rim line width from the config scale, then cull and draw the live set. A null frustum (a loader whose render
-     * event exposes none) draws every section, the GPU clipping off-screen.
+     * Build the per-frame render context from the loader's frustum and the shared line buffer, then cull and draw the
+     * live set. A null frustum (a loader whose render event exposes none) draws every section, the GPU clipping
+     * off-screen.
      */
     public static void render(@Nullable ICamera frustum, RimRenderer rimRenderer) {
-        // The vanilla block-selection line width (LevelRenderer.renderHitOutline), which the config scale multiplies
-        // per its documented contract; the legacy GL line width is settable on this pre-blaze3d band.
         float base = Math.max(2.5F, Minecraft.getMinecraft().displayWidth / 1920.0F * 2.5F);
         float lineWidth = (float) (Wdl.config().outline().lineWidthScale() * base);
         OutlineRenderContext context = new OutlineRenderContext(Tessellator.getInstance().getBuffer(), frustum,
@@ -120,9 +109,9 @@ public final class WdlOutlineRenderer {
         render(context, Wdl.outlineDrawSet(), rimRenderer);
     }
 
-    // The world modelview this overlay draws into puts the camera entity's interpolated feet position at its
-    // origin (the eye height is folded into the view translate), the same origin vanilla's own block-outline and
-    // block-break overlays subtract, so the rim draw subtracts exactly this. There is no Camera type before 1.14.
+    // The world modelview this overlay draws into puts the camera entity's interpolated feet position at its origin
+    // (the eye height is folded into the view translate), the same origin vanilla's own block-outline and block-break
+    // overlays subtract, so the rim draw subtracts exactly this.
     private static Vec3d cameraPos() {
         Minecraft minecraft = Minecraft.getMinecraft();
         Entity camera = minecraft.getRenderViewEntity();
@@ -132,8 +121,7 @@ public final class WdlOutlineRenderer {
                 camera.lastTickPosZ + (camera.posZ - camera.lastTickPosZ) * partialTick);
     }
 
-    // Mirrors LevelRenderer.renderHitOutline, minus its projection-scale trick: the rim's surface standoff is the
-    // z-fight guard instead. The depth test is left on so a rim is occluded by nearer terrain.
+    // The depth test is left on so a rim is occluded by nearer terrain.
     private static void setupLineState(float lineWidth) {
         GlStateManager.enableBlend();
         GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA,
@@ -150,7 +138,6 @@ public final class WdlOutlineRenderer {
         GlStateManager.disableBlend();
     }
 
-    /** Roll the per-frame render-thread cost into a windowed log line. */
     private static void recordRenderTiming(long elapsedNanos, int rimsDrawn, int sectionsVisible,
             int sectionsPopulated) {
         if (renderTiming.record(elapsedNanos)) {

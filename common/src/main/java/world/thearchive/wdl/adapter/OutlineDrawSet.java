@@ -10,20 +10,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The outline's cull structure: a sparse map from {@code SectionPos.asLong()} to the rims that fall in that section,
- * holding only sections that contain a rim. It is rebuilt on the client tick and read on the render thread, which in
- * vanilla is the same client thread, so it carries no concurrency machinery. The per-frame render iterates the
- * populated sections, frustum-rejects whole sections, and emits only the survivors' rims, so per-frame cost scales with
- * what is on screen, not the total tracked set.
+ * It is rebuilt on the client tick and read on the render thread, which in vanilla is the same client thread, so it
+ * carries no concurrency machinery.
  */
 public final class OutlineDrawSet {
     private final Long2ObjectMap<List<OutlineRim>> sections = new Long2ObjectOpenHashMap<>();
 
     /**
-     * Empty every section's rims before the tick rebuilds membership, retaining each bucket and its grown backing array
-     * so the rebuild refills it without reallocating (the draw-set is rebuilt every tick). A bucket already empty here
-     * got no rim last tick, so its section has left the clamp: drop it, which bounds the map to the clamp plus one tick
-     * of lag rather than letting it accumulate empty buckets along the camera's path.
+     * A bucket already empty here got no rim last tick: drop it, which bounds the map to the clamp plus one tick of lag
+     * rather than letting it accumulate empty buckets along the camera's path.
      */
     void clear() {
         ObjectIterator<Long2ObjectMap.Entry<List<OutlineRim>>> entries = sections.long2ObjectEntrySet().iterator();
@@ -37,12 +32,11 @@ public final class OutlineDrawSet {
         }
     }
 
-    /** Add {@code rim} to its section bucket, creating the bucket on first use. */
     void add(long sectionKey, OutlineRim rim) {
         sections.computeIfAbsent(sectionKey, key -> new ArrayList<>()).add(rim);
     }
 
-    /** The populated sections keyed by {@code SectionPos.asLong()}, for the per-frame cull to iterate. */
+    /** The sections keyed by their packed section position. */
     public Long2ObjectMap<List<OutlineRim>> sections() {
         return sections;
     }

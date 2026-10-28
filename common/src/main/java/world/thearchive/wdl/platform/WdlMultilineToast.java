@@ -10,12 +10,6 @@ import net.minecraft.client.gui.toasts.GuiToast;
 import net.minecraft.client.gui.toasts.IToast;
 import net.minecraft.client.renderer.GlStateManager;
 
-/**
- * A toast that renders a title over several wrapped body lines. This band's SystemToast draws its body as one line and
- * its GuiToast slot is a fixed 32 pixels, so a body carrying a newline (the download-complete chunk count then the save
- * name) renders the newline as a tofu glyph and overruns the frame. This wraps the body to the frame width and stitches
- * the 160 by 32 frame sprite taller to hold the extra lines. The higher bands use SystemToast.multiline, absent here.
- */
 final class WdlMultilineToast implements IToast {
     private static final int INNER_WIDTH = 160 - 18 - 8;
     private static final int LINE_STEP = 12;

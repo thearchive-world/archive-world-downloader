@@ -3,10 +3,6 @@
 
 package world.thearchive.wdl.update;
 
-/**
- * One positive check outcome, built once at publication with both versions already display-cleaned, so every surface
- * renders running to latest without re-deriving anything.
- */
 public final class UpdateAvailable {
     private final String runningDisplay;
     private final String latestDisplay;

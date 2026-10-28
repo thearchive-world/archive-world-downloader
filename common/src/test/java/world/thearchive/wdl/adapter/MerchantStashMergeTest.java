@@ -25,15 +25,6 @@ import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the save-time villager-trade fold: {@link EntityContainerMerge#mergeMerchantStash} locates a
- * stashed villager inside the captured {@code entities/} chunk tag by {@code "UUID"}, sets its {@code "Offers"} and
- * (for a villager) {@code "Xp"} from the holder, then drains the merged entry; {@code refoldFlushedMerchants}
- * re-applies an already-folded holder to another chunk copy so a wandering trader that crossed entity-chunks carries
- * its trades to each. The merchant sibling of {@link EntityContainerStashMergeTest}, but the fold is a plain tag copy
- * with no sink and no per-node failure isolation, so these cases assert the payload and the drain rather than a
- * lost-item tally.
- */
 class MerchantStashMergeTest {
     private static final UUID UUID_A = new UUID(0x1111_1111_1111_1111L, 0x2222_2222_2222_2222L);
     private static final UUID UUID_B = new UUID(0x3333_3333_3333_3333L, 0x4444_4444_4444_4444L);
@@ -55,9 +46,7 @@ class MerchantStashMergeTest {
         return EntityFixtures.entityChunkTagWith(entities);
     }
 
-    /** The Recipes offers holder vanilla's own trade-list NBT write produces, one offer selling the item. */
     private static NBTTagCompound offersWith(String sellId) {
-        // This band's merchant offer takes a plain buy/sell ItemStack pair, no trade experience or price multiplier.
         MerchantRecipeList offers = new MerchantRecipeList();
         offers.add(new MerchantRecipe(new ItemStack(Items.EMERALD, 1), ItemFixtures.stack(sellId)));
         return offers.getRecipiesAsTags();
@@ -98,7 +87,7 @@ class MerchantStashMergeTest {
 
         assertEquals(1, tally.merged(), "only the villager present in this chunk folds");
         assertEquals(0, tally.failed(), "a plain-copy fold never fails");
-        assertEquals(12, node(chunk, UUID_A).getInteger("Xp"), "the experience folds");
+        assertEquals(12, node(chunk, UUID_A).getInteger("Xp"), "the Xp key folds");
         assertEquals("minecraft:emerald", firstSellId(node(chunk, UUID_A)), "the trades fold");
         assertFalse(node(chunk, UUID_B).hasKey("Offers"), "the neighbor villager is untouched");
         assertTrue(stash.isEmpty(), "the merged entry is drained");
@@ -108,12 +97,12 @@ class MerchantStashMergeTest {
     void mergeMerchantStashWanderingTraderHolderHasNoXp() {
         NBTTagCompound chunk = entitiesChunk(wanderingTrader(UUID_A));
         Map<UUID, NBTTagCompound> stash = new HashMap<>();
-        stash.put(UUID_A, merchantHolder(offersWith("minecraft:emerald"), null)); // no Xp for a wandering trader
+        stash.put(UUID_A, merchantHolder(offersWith("minecraft:emerald"), null));
 
         EntityContainerMerge.mergeMerchantStash(chunk, stash);
 
         assertTrue(node(chunk, UUID_A).getTag("Offers") instanceof NBTTagCompound, "the trades fold");
-        assertFalse(node(chunk, UUID_A).hasKey("Xp"), "a wandering trader gets no experience");
+        assertFalse(node(chunk, UUID_A).hasKey("Xp"), "the node gets no Xp");
     }
 
     @Test
@@ -129,9 +118,9 @@ class MerchantStashMergeTest {
 
     @Test
     void refoldFlushedMerchantsReappliesToAnotherChunkCopy() {
-        NBTTagCompound chunkB = entitiesChunk(villager(UUID_A)); // the same trader, in another entity-chunk
+        NBTTagCompound chunkB = entitiesChunk(villager(UUID_A));
         Map<UUID, NBTTagCompound> folded = new LinkedHashMap<>();
-        folded.put(UUID_A, merchantHolder(offersWith("minecraft:emerald"), 3)); // already folded in chunk A
+        folded.put(UUID_A, merchantHolder(offersWith("minecraft:emerald"), 3));
 
         MergeTally tally = EntityContainerMerge.refoldFlushedMerchants(chunkB, folded, new HashMap<>());
 
@@ -146,7 +135,7 @@ class MerchantStashMergeTest {
         Map<UUID, NBTTagCompound> folded = new LinkedHashMap<>();
         folded.put(UUID_A, merchantHolder(offersWith("minecraft:emerald"), 3));
         Map<UUID, NBTTagCompound> stash = new HashMap<>();
-        stash.put(UUID_A, merchantHolder(offersWith("minecraft:diamond"), 9)); // reopened; its own fold runs next
+        stash.put(UUID_A, merchantHolder(offersWith("minecraft:diamond"), 9));
 
         EntityContainerMerge.refoldFlushedMerchants(chunkB, folded, stash);
 

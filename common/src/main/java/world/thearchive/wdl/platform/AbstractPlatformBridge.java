@@ -38,22 +38,10 @@ import world.thearchive.wdl.core.ChatCopy;
 import world.thearchive.wdl.core.ToastCopy;
 import world.thearchive.wdl.core.browse.DownloadFolders;
 
-/**
- * Partial {@link PlatformBridge} carrying the methods that are pure vanilla on every loader: {@link #isRemoteWorld()},
- * {@link #sendChat(ChatCopy)}, and {@link #sendToast(ToastCopy)} use only {@code Minecraft}/{@code ITextComponent} APIs
- * that live on the {@code common} classpath, so each loader bridge inherits them instead of duplicating the logic. The
- * loader-specific hooks (keybind, ticks, disconnect, config directory, command registration) stay abstract for the
- * per-loader subclass.
- */
 public abstract class AbstractPlatformBridge implements PlatformBridge {
     private static final Logger LOGGER = LogManager.getLogger(AbstractPlatformBridge.class);
 
-    // This band's SystemToast has no custom-id class, so these reuse two distinct vanilla toast categories from the
-    // SystemToast.Type enum (which carries only TUTORIAL_HINT and NARRATOR_TOGGLE here), which keep the vanilla
-    // default display time (which the accessibility notification-time multiplier scales). Job-done toasts are always
-    // constructed fresh, never addOrUpdate-reset, so each event surfaces its own toast. Refusals use their own
-    // category so a repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message,
-    // and vanilla addOrUpdate cannot be used instead (its reset path rebuilds the body unwrapped).
+    // A repeated click cannot queue a parade: one refusal on screen or in the queue is the whole message.
     private static final SystemToast.Type TOAST_ID = SystemToast.Type.NARRATOR_TOGGLE;
     private static final SystemToast.Type REFUSAL_TOAST_ID = SystemToast.Type.TUTORIAL_HINT;
 
@@ -63,12 +51,10 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     // 204 from 1.14.4), so the floor admits a full-row button on every band and no half-row one.
     private static final int MIN_ANCHOR_WIDTH = 100;
 
-    // Resolved on first use, not in the constructor: FabricPlatformBridge pins that every loader call happens
-    // inside the methods, never the constructor, and isModLoaded is a loader call. Read only on the client
-    // main thread, so the lazy init needs no synchronization.
+    // Read only on the client main thread, so the lazy init needs no synchronization.
     private @Nullable FlashbackReplayProbe replayProbe;
 
-    // The row this bridge last built, held to recognize a widget list that was never rebuilt. Client main thread only.
+    // Client main thread only.
     private @Nullable GuiButton lastPrimary;
 
     @Override
@@ -82,16 +68,16 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     }
 
     /**
-     * Register an unbound key mapping for {@code keyId} under the wdl category; {@code onPress} runs once per press on
-     * the client main thread.
+     * Register an unbound key mapping for {@code keyId} under the wdl category; {@code onPress} runs on the client main
+     * thread.
      */
     protected abstract void registerKeybind(String keyId, Runnable onPress);
 
     @Override
     public boolean isRemoteWorld() {
         Minecraft mc = Minecraft.getMinecraft();
-        // getConnection() is null until Minecraft.player is assigned, which is what keeps this false during
-        // the world-load window where a replay server is already installed and the client is already ticking.
+        // getConnection() is null until Minecraft.player is assigned, which is what keeps this false during the
+        // world-load window where a replay server is already installed.
         if (mc.getConnection() == null) {
             return false;
         }
@@ -104,9 +90,6 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         return connection == null || !connection.getNetworkManager().isChannelOpen();
     }
 
-    // Kept private so nothing invites an off-main-thread read from the coverage overlay, which would break the
-    // lazy init above. isInstance(null) is false, which is the sole guard over the shutdown window where the
-    // singleplayer server field is already cleared but isSingleplayer is not.
     private boolean isReplayPlayback() {
         if (replayProbe == null) {
             replayProbe = FlashbackReplayProbe.resolve(isModLoaded(FlashbackReplayProbe.MOD_ID));
@@ -167,13 +150,6 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         return rendered;
     }
 
-    /**
-     * The nearest of the sixteen named colors to an arbitrary RGB value. Pre-1.16 {@code Style} carries only a
-     * {@link TextFormatting} color, not the free RGB {@code TextColor} the shared copy supplies, so an exact color is
-     * quantized to the closest vanilla color by squared distance. This band's {@code TextFormatting} exposes no RGB
-     * accessor either, so each named color's value is recomputed from its color index by the vanilla color-table
-     * formula.
-     */
     private static TextFormatting nearestFormatting(int rgb) {
         int red = (rgb >> 16) & 0xFF;
         int green = (rgb >> 8) & 0xFF;
@@ -197,9 +173,6 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         return nearest;
     }
 
-    // The RGB of a named color from its 0..15 index, the vanilla FontRenderer color-table computation: a base of
-    // 0 or 85 from bit 3, each channel then 0 or 170 above that base from its own bit, and the gold slot (index 6)
-    // biased 85 brighter on red.
     private static int colorTableRgb(int index) {
         int base = (index >> 3 & 1) * 85;
         int red = (index >> 2 & 1) * 170 + base;
@@ -236,12 +209,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             return;
         }
         if (toast.refusal()) {
-            // Refusals are single-line; the vanilla SystemToast keeps the getToast dedup above.
+            // The vanilla SystemToast keeps the getToast dedup above.
             mc.getToastGui().add(new SystemToast(id, new TextComponentTranslation(toast.titleKey()), body));
             return;
         }
-        // A job-done body can carry a newline (the chunk count then the save name), which this band's SystemToast
-        // draws as one overrunning line; a multiline toast wraps it and stitches its own frame instead.
+        // A job-done body can run wider than the frame, which this band's SystemToast draws as one overrunning line; a
+        // multiline toast wraps it.
         int bodyRgb = toast.bodyColor().isPresent() ? 0xFF000000 | toast.bodyColor().getAsInt() : -1;
         mc.getToastGui().add(new WdlMultilineToast(mc.fontRenderer,
                 new TextComponentTranslation(toast.titleKey()).getUnformattedText(), body.getUnformattedText(),
@@ -251,15 +224,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     /**
      * Build the wdl pause-menu row (a primary action button plus a settings button) above the lowest button of the menu
      * column, shifting that button and everything below it in the same column down to open the row. Returns the widgets
-     * for the loader to add through its own screen hook; the layout is loader-agnostic. Returns none in the user's own
-     * local world and on a pause screen with no identifiable anchor, shifting nothing in those cases.
+     * for the loader to add. Returns none in the user's own local world and on a pause screen with no identifiable
+     * anchor, shifting nothing in those cases.
      */
     protected List<GuiButton> buildPauseMenuRow(List<GuiButton> widgets,
             Supplier<String> primaryLabelKey, BooleanSupplier primaryEnabled, Runnable onPrimary,
             Runnable onConfig) {
-        // A local world refuses every action this row leads to, and the /wdl commands and downloads keybind
-        // still reach the settings and downloads screens there, so the row is hidden rather than disabled.
-        // Replay playback is a remote world, so the row is present there and its actions work.
         if (!isRemoteWorld()) {
             return ImmutableList.of();
         }
@@ -268,8 +238,6 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         if (lastPrimary != null && widgets.contains(lastPrimary)) {
             return ImmutableList.of();
         }
-        // This band has no Screen width on the call path; the scaled resolution is the same number and is what
-        // the rest of the band reads for screen dimensions.
         GuiButton anchor = lowestColumnButton(widgets, new ScaledResolution(Minecraft.getMinecraft()).getScaledWidth());
         if (anchor == null) {
             return ImmutableList.of();
@@ -278,7 +246,7 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
         int y = anchor.y;
         int width = anchor.width;
         // Bounded to the anchor's own column. Shifting everything lower drags a corner button off the screen edge;
-        // shifting only what spans the center strands the half-width and non-button rows a mod appends below.
+        // shifting only what spans the center strands the half-width rows a mod appends below.
         for (GuiButton widget : widgets) {
             if (movesWithAnchor(widget, x, y, width)) {
                 widget.y = widget.y + ROW_PITCH;
@@ -297,12 +265,6 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
                 && widget.x + widget.width > anchorX;
     }
 
-    /**
-     * The lowest button of the centered menu column. This band's pause screen names no disconnect button, so geometry
-     * is the only signal available. Center-containment and the width floor are what separate a menu button from a
-     * corner button or a half-row pair: vanilla's half-row width is 98 on every band, and a half-row button never spans
-     * the center.
-     */
     static @Nullable GuiButton lowestColumnButton(List<GuiButton> widgets, int screenWidth) {
         int center = screenWidth / 2;
         GuiButton lowest = null;
@@ -318,13 +280,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
     }
 
     /**
-     * The pause-menu buttons this band builds: a plain {@link GuiButton} carrying its own press action, since below the
-     * 1.13 GUI rewrite {@code GuiButton} has no onPress callback and a click is dispatched by the screen's
-     * action-performed path off the button identity instead. The loader's action-performed hook calls {@link #press()}.
+     * The pause-menu buttons this band builds: a plain {@link GuiButton} carrying its own press action. The loader's
+     * action-performed hook calls {@link #press()}.
      */
     public static final class WdlMenuButton extends GuiButton {
         // A pause-menu button id outside GuiIngameMenu's own 0..12 range, so the vanilla screen's actionPerformed
-        // switch never claims a click on this row; the press is dispatched by the loader's action-performed hook.
+        // switch never claims a click on this row.
         private static final int ID = 0x77646C01;
         private final Runnable action;
         private final @Nullable String tooltipKey;
@@ -350,17 +311,15 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             }
         }
 
-        /** Run the button's action; called by the loader's action-performed hook when this button is clicked. */
+        /** Run the button's action. */
         public void press() {
             action.run();
         }
     }
 
     /**
-     * Build the {@code /wdl} client command, source-generic over the loader-agnostic {@link WdlCommands} actions. Below
-     * the 1.13 command rewrite there is no Brigadier tree: this is a classic {@link CommandBase} whose {@code execute}
-     * and {@code getTabCompletions} branch on the raw argument array, and whose actions run on the client main thread
-     * (the client command handler dispatches there). The loader registers it through its own client-command surface.
+     * Build the {@code /wdl} client command over the {@link WdlCommands} actions: a classic {@link CommandBase} whose
+     * actions run on the client main thread (the client command handler dispatches there).
      */
     protected static ICommand wdlCommand(WdlCommands commands) {
         return new WdlClientCommand(commands);
@@ -441,15 +400,12 @@ public abstract class AbstractPlatformBridge implements PlatformBridge {
             return ImmutableList.of();
         }
 
-        /** The wdl-managed download names under the saves directory, empty if the folder cannot be read. */
         private static List<String> managedDownloadNames() {
-            // This band's save format exposes no saves-root accessor, and the saves folder is the game directory's
-            // own saves child at this band, so it is resolved from there.
             Path savesDirectory = Minecraft.getMinecraft().gameDir.toPath().resolve("saves");
             try {
                 return DownloadFolders.listManaged(savesDirectory);
             } catch (IOException exception) {
-                return ImmutableList.of(); // no suggestions if the saves directory cannot be read
+                return ImmutableList.of();
             }
         }
     }

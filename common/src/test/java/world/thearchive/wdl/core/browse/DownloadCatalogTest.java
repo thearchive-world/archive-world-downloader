@@ -42,7 +42,7 @@ class DownloadCatalogTest {
 
     @Test
     void excludesPlainVanillaSavesAndListsOnlyWdlManagedFolders(@TempDir Path saves) throws IOException {
-        Files.createDirectories(saves.resolve("vanilla-save")); // no wdl/ subfolder
+        Files.createDirectories(saves.resolve("vanilla-save"));
         writeComplete(saves.resolve("download-2026-06-22"), "a", "Download", STARTED.plusSeconds(4),
                 new DownloadCounts(10, 5, 0));
 
@@ -146,7 +146,6 @@ class DownloadCatalogTest {
 
     @Test
     void aCompletedLineWithLiveSentinelReadsRecoverable(@TempDir Path saves) throws IOException {
-        // A clean finish, then a resume that crashed: a completed line for id a plus a live sentinel for id b.
         Path folder = saves.resolve("resumed-2026-06-22");
         writeComplete(folder, "a", "Resumed", STARTED.plusSeconds(4), new DownloadCounts(50, 50, 0));
         writePending(folder, "b", "Resumed");
@@ -162,7 +161,7 @@ class DownloadCatalogTest {
         Path folder = saves.resolve("marked-2026-06-22");
         Path pending = DownloadReportStore.pendingFile(folder);
         Files.createDirectories(pending.getParent());
-        Files.write(pending, new byte[0]); // a torn/empty sentinel: marked, but no parseable session
+        Files.write(pending, new byte[0]);
 
         DownloadEntry entry = DownloadCatalog.list(saves, null).get(0);
 
@@ -186,7 +185,6 @@ class DownloadCatalogTest {
     @Test
     void theLatestCompletedLineWinsRegardlessOfOnDiskOrder(@TempDir Path saves) throws IOException {
         Path folder = saves.resolve("reordered-2026-06-22");
-        // Newer line written FIRST on disk, older second: selection is by finish time, not append order.
         writeComplete(folder, "b", "New", Instant.parse("2026-06-22T09:00:00Z"), new DownloadCounts(99, 99, 0));
         writeComplete(folder, "a", "Old", Instant.parse("2026-06-22T08:00:00Z"), new DownloadCounts(10, 10, 0));
 
@@ -197,7 +195,7 @@ class DownloadCatalogTest {
     void anOversizedIconOnDiskIsSkippedWithoutReadingIt(@TempDir Path saves) throws IOException {
         Path folder = saves.resolve("bigicon-2026-06-22");
         writeComplete(folder, "a", "BigIcon", STARTED.plusSeconds(4), new DownloadCounts(1, 1, 0));
-        WorldIconWriter.write(folder, new byte[WorldIcon.MAX_BYTES + 1]); // larger than the byte cap
+        WorldIconWriter.write(folder, new byte[WorldIcon.MAX_BYTES + 1]);
 
         assertNull(DownloadCatalog.list(saves, null).get(0).iconBytes(), "an oversized icon is skipped");
     }
@@ -248,9 +246,6 @@ class DownloadCatalogTest {
 
     @Test
     void notExceedingSaveTotalFallsBackToTheSessionCounts(@TempDir Path savesDirectory) throws IOException {
-        // Covers both fallback shapes: a zero total (whole scan failed) and an undercounted total below the
-        // session's own chunks (partial scan); neither may put a smaller-than-session chunk number on screen,
-        // and neither is chunks-only (all three session numbers stay on the row).
         Path zeroFolder = savesDirectory.resolve("scanless-world");
         DownloadReportLog.append(DownloadReportStore.machineFile(zeroFolder),
                 DownloadReportLog.completedLine(ReportFixtures.identity("a", "survival.thearchive.world",
@@ -279,10 +274,6 @@ class DownloadCatalogTest {
 
     @Test
     void anEqualSaveTotalIsNotChunksOnly(@TempDir Path savesDirectory) throws IOException {
-        // The common clean single-session case: the scan total equals the session's own chunks, adding
-        // nothing, so the row keeps all three session numbers and is not chunks-only. This pins the gate at
-        // exceeding, not at differing and not at not-below: DownloadCatalog is not mutation-enrolled, so
-        // without it a > to >= regression would silently dash a plain single-session row.
         Path folder = savesDirectory.resolve("equal-world");
         DownloadReportLog.append(DownloadReportStore.machineFile(folder),
                 DownloadReportLog.completedLine(ReportFixtures.identity("a", "survival.thearchive.world",

@@ -10,15 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * The headless guard for the one ordering a dimension change rests on: everything drained lands in the dimension being
- * left, which is only true while that dimension is still bound, so every drain must run before any swap. A store
- * drained after the swap writes one world's contents into another world's folder, and that is the failure the
- * registration order cannot express because this owns the order rather than each caller.
- *
- * <p>The clears run last, after the entered dimension is bound, and the first bind runs the swaps alone, since a
- * session that has captured nothing has nothing to drain into or clear for.
- */
 class DimensionRebindTest {
     private static final String OVERWORLD = "overworld";
     private static final String NETHER = "the_nether";
@@ -55,8 +46,6 @@ class DimensionRebindTest {
 
     @Test
     void drainsRunInRegistrationOrder() {
-        // The drains feed each other: entities promote into the buffer that the flush beside them then writes,
-        // so their order among themselves is the caller's to state and this must preserve it.
         List<String> order = new ArrayList<>();
         DimensionRebind<String> rebind = new DimensionRebind<>();
         rebind.registerDrain(() -> order.add("promote"));
@@ -82,8 +71,6 @@ class DimensionRebindTest {
 
     @Test
     void theFirstBindSwapsWithoutDrainingOrClearing() {
-        // A session binds its starting dimension through the same list, which is what keeps the enrollment from
-        // drifting from the constructor. Draining there would flush a capture that has not begun.
         List<String> order = new ArrayList<>();
         DimensionRebind<String> rebind = new DimensionRebind<>();
         rebind.registerDrain(() -> order.add("drain"));

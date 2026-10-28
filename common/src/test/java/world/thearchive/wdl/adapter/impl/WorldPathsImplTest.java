@@ -16,13 +16,6 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Below 1.16 there is no {@code dimensions/<namespace>/<path>} resource-location tree to scan (see
- * {@link WorldPathsImpl}): every dimension is the fixed {@link net.minecraft.world.DimensionType}-registered set, saved
- * at the world root (overworld) or a {@code "DIM" + id} folder. So this pins only that fixed set, keyed by
- * {@code DimensionType.getName()} (no namespace prefix at this band); a custom-namespaced dimension folder is not a
- * scenario this band can construct.
- */
 class WorldPathsImplTest {
     @Test
     void enumeratesTheOnDiskRegionDirectoriesInStableOrder(@TempDir Path saveRoot) throws IOException {

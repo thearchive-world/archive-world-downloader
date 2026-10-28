@@ -11,22 +11,15 @@ import net.minecraft.util.math.ChunkPos;
 
 import world.thearchive.wdl.adapter.WdlRegionStorage;
 
-/**
- * Drives a chunk NBT tag through vanilla's real region pipeline (the synchronous {@link WdlRegionStorage} over
- * RegionFileStorage at this band) and back, so the codec round-trip exercises on-disk Anvil write/read rather than an
- * in-memory shortcut.
- */
 public final class RegionRoundTrip {
     private RegionRoundTrip() {}
 
-    /** Open a region storage rooted at {@code directory} (caller closes it). */
     public static WdlRegionStorage open(Path directory) {
         return new WdlRegionStorage(directory.toFile());
     }
 
     /**
-     * Write {@code tag} at {@code pos}, drain to disk, then read it back through a <em>fresh</em> storage instance: a
-     * pass then proves the bytes survived a real serialize -> disk -> deserialize.
+     * Write {@code tag} at {@code pos}, drain to disk, then read it back through a <em>fresh</em> storage instance.
      */
     public static NBTTagCompound writeThenRead(Path directory, ChunkPos pos, NBTTagCompound tag) {
         try (WdlRegionStorage writer = open(directory)) {

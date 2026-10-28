@@ -9,19 +9,12 @@ import journeymap.api.v2.common.JourneyMapPlugin;
 
 import world.thearchive.wdl.Wdl;
 
-/**
- * JourneyMap discovers this through its {@code JourneyMapPlugin}-annotated classpath scan, and only when JourneyMap
- * itself is present, so this never loads without it; the JourneyMap API is compile-only and never ships.
- */
 @JourneyMapPlugin(apiVersion = "2.0.0")
 public final class WdlJourneyMapPlugin implements IClientPlugin {
     private final JourneyMapOverlayDriver driver = new JourneyMapOverlayDriver();
 
     public WdlJourneyMapPlugin() {
-        // Public no-arg constructor is a JourneyMap discovery requirement, and JourneyMap runs it twice: the
-        // entrypoint scan builds one instance only to read its class and drops it, then the plugin registry
-        // builds the instance it keeps. Only the second is ever initialized, so construction must stay free of
-        // side effects; anything eager here leaks on the copy that is thrown away. Once-only work goes below.
+        // A public no-arg constructor is a JourneyMap discovery requirement.
     }
 
     @Override
