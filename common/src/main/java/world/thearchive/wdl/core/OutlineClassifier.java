@@ -6,14 +6,6 @@ package world.thearchive.wdl.core;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The pure three-way outline classifier. Given a pre-paired logical container (its one or two block pos keys, its
- * borne-entity id if any, and whether it is an ender chest) plus the session captured-set and the prior-session
- * recovered-set, it decides whether the container draws no rim (captured this session), the recovered hue, or the
- * unsaved hue, in that precedence. The any-position rule makes a multi-block container one entry: a double chest
- * classifies captured (or recovered) when EITHER half matches. MC-free and Java-8-clean; the per-frame face geometry is
- * the separate rule of {@link RimFace}, not selected here.
- */
 public final class OutlineClassifier {
     private OutlineClassifier() {}
 
@@ -34,16 +26,8 @@ public final class OutlineClassifier {
     }
 
     /**
-     * The per-slot classify for one chiseled bookshelf: a single logical container whose six slots are captured one
-     * interaction at a time, taken as bitmasks where bit {@code n} is slot {@code n}. It draws no rim once every
-     * occupied slot was captured this session, the recovered hue once every occupied slot was saved in a prior session
-     * and none is disturbed this session, and the unsaved hue otherwise. An empty bookshelf ({@code occupiedMask} 0)
-     * falls into the no-rim case.
-     *
-     * <p>Recovered tests the two masks together, because the save holds their union: a shelf's stored items are unioned
-     * by slot rather than replaced, so a slot this session captured and a slot a prior session saved are both in the
-     * copy on disk and neither puts the other at risk. A shelf whose every occupied slot is covered either way is
-     * therefore saved, and only a slot covered by neither warrants the unsaved hue.
+     * The {@link OutlineClass#RECOVERED} test reads {@code capturedMask | savedMask}, not {@code savedMask} alone: the
+     * carry-forward for a slot-captured container unions its slots per slot rather than replacing the list.
      */
     public static OutlineClass classifyBookshelf(int occupiedMask, int capturedMask, int savedMask) {
         if ((occupiedMask & ~capturedMask) == 0) {
@@ -80,7 +64,6 @@ public final class OutlineClassifier {
     }
 
     /**
-     * Whether the type recorded for a captured block position still matches the live block-entity type there (Gate 2).
      * A captured key with no recorded type falls back to bare membership, so the gate only ever adds precision and
      * never re-rims a validly captured container.
      */

@@ -16,17 +16,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
-/**
- * Repairs a client-held ItemStack so Minecraft's disk codec accepts it. A component the network codec carries can be
- * one the disk codec rejects, which costs the entity or the item that carries it. Vanilla's own codec decides which
- * component is at fault.
- */
 public final class ItemStackSanitizer {
     private static final int MAX_CONTAINER_SLOTS = 256;
 
     private ItemStackSanitizer() {}
 
-    /** A save-clean stack: the same instance when already savable, else a repaired copy, else {@code EMPTY}. */
     public static ItemStack sanitizeForSave(ItemStack stack, RegistryOps<Tag> ops) {
         if (stack.isEmpty() || savable(stack, ops)) {
             return stack;
@@ -41,7 +35,6 @@ public final class ItemStackSanitizer {
      * no floor to {@code EMPTY} if a repair leaves the stack unsavable. The caller must own {@code stack}.
      */
     public static void sanitizeInPlace(ItemStack stack, RegistryOps<Tag> ops) {
-        // ItemStack.EMPTY is a shared singleton, so nothing below may write to it.
         if (stack.isEmpty() || savable(stack, ops)) {
             return;
         }
@@ -53,7 +46,7 @@ public final class ItemStackSanitizer {
         List<DataComponentType<?>> failing = new ArrayList<>();
         for (TypedDataComponent<?> component : stack.getComponents()) {
             if (component.type().isTransient()) {
-                continue; // a transient component has no disk codec, so an error here is a false positive
+                continue;
             }
             if (component.encodeValue(ops).error().isPresent()) {
                 failing.add(component.type());

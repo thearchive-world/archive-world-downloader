@@ -10,8 +10,6 @@ import java.util.concurrent.Executor;
 import org.junit.jupiter.api.Test;
 
 class CompletionMarshalTest {
-    // An inline executor: the marshal is meant to run on Minecraft-as-Executor; Runnable::run models the
-    // game thread running the task without a real client.
     private static final Executor inline = Runnable::run;
 
     @Test

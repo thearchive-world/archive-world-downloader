@@ -1,17 +1,12 @@
 name: Capture verification (Fabric)
 
-# The automated capture-verification tier: a real headless Fabric client drives WDL's capture against a
-# version-pinned fixture world and asserts the on-disk save. It is deliberately separate from ci.yml (the fast
-# source-merge / core-invariant / headless-unit gate) so it never slows that gate or changes its required
-# status. Requiring this tier would deadlock a documentation-only pull request: a workflow the paths-ignore
-# filters above skip leaves its check pending rather than passing, and a pending required check blocks the
-# merge. The client runs under a virtual framebuffer (xvfb-run), a real GL context with no display.
+# Requiring this tier would deadlock a documentation-only pull request: a workflow the paths-ignore filters skip leaves
+# its check pending rather than passing, and a pending required check blocks the merge.
 on:
   push:
     branches:
       - dev
-      # Run the tier on every era-band branch too (three-part 1.21.11/26.1.2, two-part 26.2), not dev alone,
-      # so a push to a version branch still exercises the headless capture. PRs run it regardless.
+      # Run the tier on every era-band branch too (three-part 1.21.11/26.1.2, two-part 26.2), not dev alone.
       - "[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+"
     paths-ignore:
@@ -33,12 +28,8 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # A newer push cancels the run its commit superseded, on a branch as on a pull request: only the tip's result
-  # is ever read.
   cancel-in-progress: true
 
-# Load-bearing: selects bash's documented template, bash --noprofile --norc -eo pipefail {0}. Without it a
-# pipeline reports only its last command's status, so a failed gradle call can read as green behind a filter.
 defaults:
   run:
     shell: bash
@@ -46,10 +37,8 @@ defaults:
 jobs:
   capture-verification:
     runs-on: ubuntu-latest
-    # The local run boots the client and works through the scenarios in a few minutes, but a hosted runner
-    # has no warm Gradle or Loom cache and renders through software OpenGL, so the first run pays a cold
-    # setup. Budget generously rather than risk killing a legitimately slow but green run; without a cap a
-    # hung headless client would run to the 6h default.
+    # Budget generously rather than risk killing a legitimately slow but green run; without a cap a hung headless client
+    # would run to the 6h default.
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -58,9 +47,9 @@ jobs:
           persist-credentials: false
 
       # A band whose Minecraft version predates fabric-client-gametest-api-v1 (first shipped at 1.21.4) sets
-      # client_gametest=false, and fabric/build.gradle.kts then leaves runClientGameTest unregistered. Resolve
-      # the same flag here so the tier skips cleanly on those bands instead of invoking a task that does not
-      # exist; an absent key defaults to enabled, so every 1.21.4-and-later band runs the tier unchanged.
+      # client_gametest=false. Resolve the same flag here so the tier skips cleanly on those bands instead of invoking a
+      # task that does not exist; an absent key defaults to enabled, so every 1.21.4-and-later band runs the tier
+      # unchanged.
       - name: Resolve whether this band registers the client gametest tier
         id: tier
         run: |
@@ -78,9 +67,9 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           # The language target's own JDK is installed alongside the toolchain's wherever the two differ, because
           # era-specific build tooling still asks for that one: ForgeGradle runs its MCP steps on the Minecraft
-          # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it
-          # takes the default JAVA_HOME, which is what launches the daemon, and fabric-loom publishes
-          # org.gradle.jvm.version=21 that a daemon below it cannot resolve at all.
+          # version's JDK whatever the project compiles with. 21 goes last where the build JDK is older so it takes the
+          # default JAVA_HOME, and fabric-loom publishes org.gradle.jvm.version=21 that a daemon below it cannot resolve
+          # at all.
           target="$(sed -n 's/^java_version=//p' gradle.properties | tr -d '[:space:]')"
           jdks="$version"
           if [ "$target" != "$major" ]; then jdks="$(printf '%s\n%s' "$jdks" "$target")"; fi
@@ -92,19 +81,6 @@ jobs:
           verify=true
           for j in $jdks; do case "$j" in 16 | 16.*) verify=false ;; esac; done
           echo "verify=$verify" >> "$GITHUB_OUTPUT"
-          # fabric-loom publishes org.gradle.jvm.version=21, so a daemon below 21 cannot resolve it
-          # at all and the build dies while configuring the root project, which declares the plugin apply-false
-          # even on a band that ships no Fabric module. A band whose own build JDK is older therefore installs
-          # 21 beside it and lets 21 be the default JAVA_HOME, since that is what launches the daemon and
-          # setup-java hands the default to the last entry of a multi-version list. The real build JDK is then
-          # reached only through its JAVA_HOME_<major>_X64 variable and the fromEnv bridge below, a genuine
-          # toolchain resolution rather than a same-JVM --release target. A warm dependency cache hides the
-          # failure entirely, so it shows up only on a clean checkout.
-          # Gradle auto-detects the installation JAVA_HOME names plus whatever
-          # org.gradle.java.installations.fromEnv names, but nothing scans the GitHub Actions tool-cache paths
-          # setup-java installs into, and auto-download stays off per gradle.properties, so without this bridge
-          # there is nothing to fall back to. GRADLE_OPTS applies to every gradlew invocation in the job, so one
-          # line covers the root build and any separate island wrapper alike.
           echo "GRADLE_OPTS=-Dorg.gradle.java.installations.fromEnv=JAVA_HOME_${major}_X64" >> "$GITHUB_ENV"
 
       - name: Set up the build JDKs (Temurin)
@@ -131,18 +107,14 @@ jobs:
         if: steps.tier.outputs.enabled == 'true'
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri mesa-vulkan-drivers
 
-      # LIBGL_ALWAYS_SOFTWARE pins mesa to llvmpipe so GL never tries a (nonexistent) GPU. --no-configuration-cache
-      # is required because the Loom run task reads a stale argFile under the configuration cache (enabled in
-      # gradle.properties), which fails on cache reuse.
+      # --no-configuration-cache is required because the Loom run task reads a stale argFile under the configuration
+      # cache, which fails on cache reuse.
       - name: Run the Fabric capture-verification tier (headless client)
         if: steps.tier.outputs.enabled == 'true'
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: xvfb-run -a ./gradlew :fabric:runClientGameTest --no-configuration-cache --stacktrace
 
-      # The gametest framework writes a screenshot only when a scenario fails, so this artifact is empty on a
-      # green run and carries the failing frame otherwise. if-no-files-found: ignore keeps a green run (and a
-      # future run-dir path change) from failing the step; it is post-mortem only.
       - name: Upload gametest screenshots
         if: ${{ failure() && steps.tier.outputs.enabled == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

@@ -27,17 +27,6 @@ import world.thearchive.wdl.core.export.RestoreOperation;
 import world.thearchive.wdl.core.export.RestoreSource;
 import world.thearchive.wdl.platform.PlatformBridge;
 
-/**
- * The resume/confirm state machine behind the command and keybind download-start surfaces: the toggle keybind,
- * auto-download-on-join, and the {@code /wdl start} and {@code /wdl resume} commands (the downloads screen runs its own
- * parallel cascade and does not route here). It classifies a start name against the saves directory: the quick-start
- * flow routes a fresh name to a NEW start and an existing folder through the tainted to map-id-mismatch to merge
- * confirm cascade, while {@code /wdl start <name>} refuses an existing folder outright, building the three
- * {@link ResumeConfirm} screens. Constructed once by {@link Wdl#initialize}: it reads the shared controller for the
- * idle guard, sends chat through the bridge, loads config fresh per decision, defers each screen open onto Wdl's
- * client-tick slot, and invokes Wdl's terminal start action. It builds screens and reads paths, so it is shared-SPI,
- * not core.
- */
 final class ResumeFlow {
     private final CaptureController controller;
     private final PlatformBridge bridge;
@@ -55,12 +44,8 @@ final class ResumeFlow {
     }
 
     /**
-     * The smart quick-start flow behind the keybind and auto-download, whose callers pass a concrete default name and
-     * whether the start is a deliberate player act (the keybind) or the automatic join hook, the split that decides the
-     * origin tag and with it whether a blocked resume may offer a restore: an existing wdl-managed folder routes
-     * through the merge confirm and resumes it (a RESUME-mode target, so the existing level.dat name is kept), or
-     * continues silently when {@code confirmResume} is off; an existing folder that is not a wdl download refuses with
-     * the occupant chat before any confirm; a fresh name starts a NEW folder, dated per {@code appendDateSuffix}.
+     * An existing wdl-managed folder takes a RESUME-mode target, so the existing level.dat name is kept. An existing
+     * folder that is not a wdl download refuses with the occupant chat before any confirm.
      */
     void begin(String defaultName, boolean deliberate) {
         NewStart start = classifyNewStart(defaultName, deliberate);
@@ -85,13 +70,6 @@ final class ResumeFlow {
         }
     }
 
-    /**
-     * {@code /wdl start <name>}: start a NEW download of that name. An explicit start is an intentional, named act, so
-     * a name that sanitizes to nothing is refused in chat; only this command path validates, since {@link #begin}'s
-     * default name is trusted usable. Keeps the {@code start}/{@code resume} verbs domain-specific: a name that is
-     * already a download is refused here, pointing the player at {@code /wdl resume}, rather than silently continuing
-     * it.
-     */
     void startNamed(String name) {
         if (!TargetResolver.hasUsableName(name)) {
             bridge.sendChat(ChatCopy.startNeedsName());
@@ -120,10 +98,8 @@ final class ResumeFlow {
     }
 
     /**
-     * {@code /wdl resume <name>}: validate the name is an existing wdl-managed download, then route through the shared
-     * merge confirm before resuming. The guards (already-running, remote-world, currently-open world) run before the
-     * confirm, so a resume that will be refused never flashes the backup warning first; a name that is not a
-     * wdl-managed folder, or that is empty after containment, is rejected in chat and starts nothing.
+     * The guards (already-running, remote-world, currently-open world) run before the confirm, so a resume they refuse
+     * never flashes the backup warning first.
      */
     void resume(String name) {
         CaptureState state = controller.state();
@@ -150,9 +126,7 @@ final class ResumeFlow {
     }
 
     /**
-     * Guard (already-running, remote-world) then resolve the name into a NEW target and classify it against the saves
-     * directory, or null when a guard rejected it (the chat notice is already sent). The guards run up front so a
-     * resume that will be refused never flashes the backup warning first.
+     * The guards run up front so a resume they refuse never flashes the backup warning first.
      */
     private @Nullable NewStart classifyNewStart(String name, boolean deliberate) {
         CaptureState state = controller.state();
@@ -173,20 +147,14 @@ final class ResumeFlow {
                 Wdl.loadedWorldPath(minecraft)));
     }
 
-    /** A resolved NEW target paired with its on-disk classification, the shared result of {@link #classifyNewStart}. */
     private record NewStart(DownloadTarget target, TargetClassification classification) {}
 
     /**
-     * The command, keybind, and auto-download resume junction: the tainted decision (fresh disk read) is the outermost
-     * gate, so a hard refusal comes before any advisory warn. A REFUSE stops with the refusal chat, unless the resume
-     * was deliberate (the origin tag) and a fresh source discovery finds a clean backup, in which case the refusal
-     * becomes the blocked-offer screen whose Restore dispatches the replace; the auto join never opens it, so an
-     * unattended start still refuses silently. A CONFIRM shows the tainted confirm whose Continue runs the map-id
-     * mismatch gate then a direct start (the tainted confirm stands in for the merge confirm, one prompt not two),
-     * picking the restorable tip variant when the folder is tainted and a source exists (an unknown taint keeps the
-     * plain tainted copy); an ALLOW runs the map-id mismatch gate then the normal merge confirm. The
-     * tainted-and-blocked case never flashes the mismatch confirm. The pre-resume backup reassurance rides on the
-     * terminal prompt only (the one whose Continue starts the download), so a two-screen cascade shows it once.
+     * The tainted decision (fresh disk read) is the outermost gate, so a hard refusal comes before any advisory warn. A
+     * REFUSE stops with the refusal chat, unless the resume was deliberate (the origin tag) and a fresh source
+     * discovery finds a clean backup, in which case the refusal becomes the blocked-offer screen; the auto join never
+     * opens it. The pre-resume backup reassurance rides on the terminal prompt only (the one whose Continue starts the
+     * download), so a two-screen cascade shows it once.
      */
     private void confirmThenResume(DownloadTarget target, String folderName) {
         WdlConfig config = configSupplier.get();
@@ -254,13 +222,6 @@ final class ResumeFlow {
         return source.zip().getFileName().toString();
     }
 
-    /**
-     * The map-id mismatch pre-flight for a resume: when {@code mismatch} is set, show the mismatch confirm (deferred to
-     * the next client tick) whose Continue runs {@code proceed} and whose Cancel returns to the game with a chat note;
-     * otherwise run {@code proceed} now. {@code backupHere} is whether this confirm is the terminal prompt that commits
-     * the resume, so it alone carries the backup reassurance while the earlier gates pass false, showing the line once.
-     * The reusable middle layer between the tainted gate and the resume tail.
-     */
     private void gateMapIdMismatch(String folderName, boolean mismatch, boolean backupHere, Runnable proceed) {
         if (!mismatch) {
             proceed.run();
@@ -283,12 +244,6 @@ final class ResumeFlow {
         });
     }
 
-    /**
-     * Show the shared merge confirm for a command-driven resume, deferred to the next client tick: the target is always
-     * a RESUME, so the existing level.dat name is kept. Continue starts the download and returns to the game; Cancel
-     * returns to the game with a chat note. When {@code confirmResume} is off the prompt is skipped and the resume
-     * starts directly; the pre-merge backup is independent, governed by {@code zipOnResume}.
-     */
     private void mergeConfirmThenResume(DownloadTarget target, String folderName, WdlConfig config) {
         if (!config.confirmResume()) {
             deferScreen.accept(() -> startDownload.accept(target));

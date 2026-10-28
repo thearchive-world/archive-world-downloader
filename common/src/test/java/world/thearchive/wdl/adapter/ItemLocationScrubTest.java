@@ -55,16 +55,6 @@ import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The automated guard for the item-coordinate privacy scrub: {@link ItemLocationScrub} blanks the lodestone target and
- * the beehive bee flower positions on every item it reaches, over a serialized item list (the inventory or the ender
- * items), a block entity's own NBT (a decorated pot, a campfire), and a serialized entity (an item frame, mob
- * equipment, an inventory list, passengers), reaching items nested inside a shulker box (the
- * {@code minecraft:container} component) and inside a bundle (the {@code minecraft:bundle_contents} component), while
- * leaving the scrubbed item valid and every other item untouched. Real {@link ItemStack}s serialized via the production
- * {@link ContainerSink#captureItems} drive the round-trip, so neither a live menu nor a {@code Level} is needed; the
- * scrub key strings are pinned by the assertions (a wrong key leaves the coordinate and fails).
- */
 class ItemLocationScrubTest {
     private static RegistryAccess registries;
     private final ContainerSink sink = new ContainerSinkImpl();
@@ -129,9 +119,9 @@ class ItemLocationScrubTest {
     }
 
     /**
-     * A session with no bound level, which is all the scrub gate needs. Entity and container capture are off so the
-     * constructor publishes no process-wide capture into the static activation slots, which only finish() clears; the
-     * toggles are asserted rather than assumed, since an unrecognized key falls back to a default that is on.
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots, which only {@code finish()} clears; the toggles are asserted rather than assumed, since an
+     * unrecognized key falls back to a default that is on.
      */
     private static LiveCaptureSession session(Path configDirectory, boolean saveItemCoordinates) {
         Properties properties = new Properties();
@@ -149,7 +139,6 @@ class ItemLocationScrubTest {
                 () -> {});
     }
 
-    /** The gate is private and its production callers run behind the client singleton a headless test lacks. */
     private static void scrubAndRemapItems(LiveCaptureSession session, CompoundTag holder) {
         try {
             Method method = LiveCaptureSession.class
@@ -362,7 +351,7 @@ class ItemLocationScrubTest {
         CompoundTag frame = entity("minecraft:item_frame");
         frame.put("Item", itemNbt(lodestoneCompass()));
         CompoundTag display = entity("minecraft:item_display");
-        display.put("item", itemNbt(lodestoneCompass())); // lowercase key: the case-agnostic walk must reach it
+        display.put("item", itemNbt(lodestoneCompass()));
 
         ItemLocationScrub.scrubEntity(frame);
         ItemLocationScrub.scrubEntity(display);
@@ -394,19 +383,18 @@ class ItemLocationScrubTest {
 
     @Test
     void scrubEntityBlanksPre1215HandAndArmorItems() {
-        // 1.21.4-shape mob equipment: HandItems/ArmorItems ListTags of item NBT (empty slots are {}), the
-        // pre-1.21.5 home, before equipment moved to the slot-map "equipment" compound. The generic
-        // name-agnostic ListTag walk must reach them, or a captured 1.21.4 mob's held lodestone leaks its target.
+        // Mob equipment as HandItems/ArmorItems ListTags of item NBT (empty slots are {}), the shape a version without
+        // the slot-map "equipment" compound writes.
         CompoundTag zombie = entity("minecraft:zombie");
         ListTag handItems = new ListTag();
-        handItems.add(itemNbt(lodestoneCompass())); // mainhand
-        handItems.add(itemNbt(shulkerHoldingLodestone())); // offhand: nested lodestone must also be reached
+        handItems.add(itemNbt(lodestoneCompass()));
+        handItems.add(itemNbt(shulkerHoldingLodestone()));
         zombie.put("HandItems", handItems);
         ListTag armorItems = new ListTag();
-        armorItems.add(new CompoundTag()); // feet, empty as vanilla writes empty slots
-        armorItems.add(new CompoundTag()); // legs
-        armorItems.add(new CompoundTag()); // chest
-        armorItems.add(itemNbt(lodestoneCompass())); // head slot holding a lodestone compass
+        armorItems.add(new CompoundTag());
+        armorItems.add(new CompoundTag());
+        armorItems.add(new CompoundTag());
+        armorItems.add(itemNbt(lodestoneCompass()));
         zombie.put("ArmorItems", armorItems);
         assertTrue(targetOf(itemFrom(handItems.get(0))).isPresent(), "precondition: the mainhand compass has a target");
         assertTrue(targetOf(itemFrom(armorItems.get(3))).isPresent(), "precondition: the armor compass has a target");

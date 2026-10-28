@@ -25,12 +25,6 @@ import world.thearchive.wdl.testsupport.EntityFixtures;
 import world.thearchive.wdl.testsupport.ItemFixtures;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for the resume entity read-merge: {@link EntityMerge} carries forward a container vehicle's (or
- * chested animal's) on-disk {@code "Items"} into a freshly re-captured entity-chunk, matched by {@code "UUID"},
- * preferring non-empty, so a parked storage minecart the prior session opened is not wiped by a fly-through that never
- * re-opened it. The UUID-keyed sibling of {@link ChunkMerge}.
- */
 class EntityMergeTest {
     private static final UUID UUID_A = new UUID(0x1111_1111_1111_1111L, 0x2222_2222_2222_2222L);
     private static final UUID UUID_B = new UUID(0x3333_3333_3333_3333L, 0x4444_4444_4444_4444L);
@@ -82,8 +76,8 @@ class EntityMergeTest {
     }
 
     /**
-     * A villager entity node carrying the trade experience vanilla writes unconditionally (so a client-reconstructed
-     * node carries the client zero here), and the offers holder only when {@code offers} is present.
+     * A villager entity node carrying a trade experience (vanilla writes it unconditionally, so a client-reconstructed
+     * node carries the client zero).
      */
     private static CompoundTag villager(UUID uuid, @Nullable CompoundTag offers, int xp) {
         CompoundTag tag = EntityFixtures.entity("minecraft:villager", uuid);
@@ -94,7 +88,6 @@ class EntityMergeTest {
         return tag;
     }
 
-    /** The Recipes offers holder vanilla's own MerchantOffers codec writes, one offer selling the given item. */
     private static CompoundTag offersWith(String sellId) {
         MerchantOffers offers = new MerchantOffers();
         offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, 1), ItemFixtures.stack(sellId), 1, 0, 0.0f));
@@ -118,7 +111,7 @@ class EntityMergeTest {
     @Test
     void mergeCarriesOffersForwardWhenFreshVillagerHasNone() {
         CompoundTag disk = entitiesChunk(villager(UUID_A, offersWith("minecraft:emerald"), 27));
-        CompoundTag fresh = entitiesChunk(villager(UUID_A, null, 0)); // reconstructed: no Offers, Xp:0
+        CompoundTag fresh = entitiesChunk(villager(UUID_A, null, 0));
 
         int carried = EntityMerge.merge(disk, fresh);
 
@@ -208,11 +201,8 @@ class EntityMergeTest {
 
     @Test
     void aPartialReflushKeepsThePriorEntities() {
-        // A chunk re-flushed with a partial entity set (the rest re-streamed late, or on a revisit)
-        // must not overwrite the entities a prior flush already wrote. Union by UUID so both survive; the bug
-        // was that only "Items" carried forward, so the fresh (partial) write replaced the on-disk full set.
-        CompoundTag onDisk = entities(vehicle(UUID_A, "minecraft:diamond")); // a prior flush saved A
-        CompoundTag fresh = entities(vehicle(UUID_B)); // a later partial flush of the same chunk; A not in this batch
+        CompoundTag onDisk = entities(vehicle(UUID_A, "minecraft:diamond"));
+        CompoundTag fresh = entities(vehicle(UUID_B));
 
         EntityMerge.merge(onDisk, fresh);
 
@@ -224,11 +214,11 @@ class EntityMergeTest {
 
     @Test
     void anEntityAbsentFromTheFreshCaptureIsCarriedForward() {
-        // Union always: a re-flush (or a resume) carries forward an entity absent from the fresh capture
-        // rather than dropping it. Accepted ghosting (over-capture > under-capture), UUID-deduped so never
-        // duplicated. The within-session-only alternative (resume strictly current) is rejected.
+        // Union always: a re-flush (or a resume) carries forward an entity absent from the fresh capture rather than
+        // dropping it. Accepted ghosting (over-capture > under-capture). The within-session-only alternative (resume
+        // strictly current) is rejected.
         CompoundTag onDisk = entities(vehicle(UUID_A, "minecraft:diamond"));
-        CompoundTag fresh = entities(); // A not in the fresh capture
+        CompoundTag fresh = entities();
 
         assertEquals(1, EntityMerge.merge(onDisk, fresh), "A is carried forward");
         assertEquals(1, ((ListTag) fresh.get("Entities")).size(), "carried, not dropped");
@@ -247,10 +237,8 @@ class EntityMergeTest {
 
     @Test
     void aNullUuidOnDiskEntityIsCarriedForwardNotDropped() {
-        // An on-disk entity whose "UUID" is absent or malformed cannot be UUID-deduped, but the union's
-        // stated contract is to carry forward every on-disk entity the fresh capture lacks (over-capture beats
-        // under-capture). We always write a valid UUID, so the trigger is corruption or a foreign-written save;
-        // dropping it would silently lose the user's existing world data. Carry it forward, the same as a keyed one.
+        // An on-disk entity whose "UUID" is absent or malformed cannot be UUID-deduped, but dropping it would silently
+        // lose the user's existing world data.
         CompoundTag noUuid = EntityFixtures.entityWithoutUuid("minecraft:chest_minecart");
         CompoundTag onDisk = entities(noUuid);
         CompoundTag fresh = entities(vehicle(UUID_A));
@@ -261,11 +249,8 @@ class EntityMergeTest {
 
     @Test
     void anAbsentEntitiesListOnEitherSideChangesNothing() {
-        // The early-return guard covers an ABSENT "Entities" key, not just a present-but-empty list. A chunk
-        // with no list fresh (defensive) or none on disk (a first write) has nothing to union; merge is a no-op
-        // and never throws. Production always hands a fresh tag carrying an "Entities" list.
         CompoundTag onDiskWithEntities = entities(vehicle(UUID_A, "minecraft:diamond"));
-        CompoundTag freshNoList = new CompoundTag(); // no "Entities" key at all
+        CompoundTag freshNoList = new CompoundTag();
         assertEquals(0, EntityMerge.merge(onDiskWithEntities, freshNoList), "fresh has no list: nothing to merge into");
 
         CompoundTag onDiskNoList = new CompoundTag();

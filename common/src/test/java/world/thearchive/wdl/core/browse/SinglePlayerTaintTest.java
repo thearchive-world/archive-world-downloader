@@ -31,7 +31,6 @@ class SinglePlayerTaintTest {
 
     @Test
     void playersDataIsTheModsOwnOutputNotTaint(@TempDir Path folder) throws IOException {
-        // The 26.x player file, which WDL writes itself because createTag carries no player compound there.
         Files.createDirectories(folder.resolve("players").resolve("data"));
         Files.createFile(folder.resolve("players").resolve("data").resolve("host.dat"));
         assertEquals(SinglePlayerTaint.TaintState.CLEAN, SinglePlayerTaint.classify(folder));
@@ -39,7 +38,6 @@ class SinglePlayerTaintTest {
 
     @Test
     void theDeepBandsStillRestOnPlayerData(@TempDir Path folder) throws IOException {
-        // Point-of-interest does not exist before 1.14, so playerdata is the only member covering those bands.
         Files.createDirectories(folder.resolve("playerdata"));
         Files.createFile(folder.resolve("playerdata").resolve("host.dat"));
         assertEquals(SinglePlayerTaint.TaintState.TAINTED, SinglePlayerTaint.classify(folder));
@@ -107,22 +105,18 @@ class SinglePlayerTaintTest {
 
     @Test
     void poiAtDimensionRootsMeansTainted() throws IOException {
-        // Overworld root poi.
         Path save = folderWith("poi/r.0.0.mca");
         assertEquals(SinglePlayerTaint.TaintState.TAINTED, SinglePlayerTaint.classify(save));
-        // Vanilla nether and end roots.
         assertEquals(SinglePlayerTaint.TaintState.TAINTED,
                 SinglePlayerTaint.classify(folderWith("DIM-1/poi/r.0.0.mca")));
         assertEquals(SinglePlayerTaint.TaintState.TAINTED,
                 SinglePlayerTaint.classify(folderWith("DIM1/poi/r.0.0.mca")));
-        // Datapack dimension root (two-level enumeration under dimensions/).
         assertEquals(SinglePlayerTaint.TaintState.TAINTED,
                 SinglePlayerTaint.classify(folderWith("dimensions/mypack/myworld/poi/r.0.0.mca")));
     }
 
     @Test
     void poiOnlyCountsAtDimensionRoots() throws IOException {
-        // A bare data segment or a nested poi never matches: WDL itself writes data/ (captured maps).
         assertEquals(SinglePlayerTaint.TaintState.CLEAN, SinglePlayerTaint.classify(folderWith("data/map_0.dat")));
         assertEquals(SinglePlayerTaint.TaintState.CLEAN,
                 SinglePlayerTaint.classify(folderWith("datapacks/pack/data/ns/poi/thing.json")));
@@ -130,7 +124,6 @@ class SinglePlayerTaintTest {
 
     @Test
     void emptyPoiDirectoryStaysClean() throws IOException {
-        // Mirrors the shipped playerdata rule: presence needs an entry.
         Path save = temporaryDirectory.resolve("save-empty-poi");
         Files.createDirectories(save.resolve("poi"));
         assertEquals(SinglePlayerTaint.TaintState.CLEAN, SinglePlayerTaint.classify(save));
@@ -138,25 +131,19 @@ class SinglePlayerTaintTest {
 
     @Test
     void entryMatcherPinsPositionsAndCase() {
-        // Save-root player data, both band layouts, case-insensitive.
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("playerdata/uuid.dat"));
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("Playerdata/uuid.dat"));
-        // Every export and pre-resume backup carries the 26.x player file, so matching it would exclude WDL's
-        // own archives from its own restore.
         assertFalse(SinglePlayerTaint.entryPathIsServerArtifact("players/data/uuid.dat"));
-        // POI at each dimension root.
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("poi/r.0.0.mca"));
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("DIM-1/poi/r.0.0.mca"));
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("DIM1/poi/r.0.0.mca"));
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("dimensions/ns/id/poi/r.0.0.mca"));
         assertTrue(SinglePlayerTaint.entryPathIsServerArtifact("POI/r.0.0.mca"));
-        // The negative cases: arbitrary depth, nested player data, bare data, and the segment alone as a
-        // file name (a file named poi is not a directory member).
         assertFalse(SinglePlayerTaint.entryPathIsServerArtifact("region/r.0.0.mca"));
         assertFalse(SinglePlayerTaint.entryPathIsServerArtifact("data/map_0.dat"));
         assertFalse(SinglePlayerTaint.entryPathIsServerArtifact("backup/playerdata/uuid.dat"));
         assertFalse(SinglePlayerTaint.entryPathIsServerArtifact("dimensions/ns/id/deeper/poi/x"));
-        assertFalse(SinglePlayerTaint.entryPathIsServerArtifact("poi"));
+        assertFalse(SinglePlayerTaint.entryPathIsServerArtifact("poi")); // a file named poi is not a directory member
         assertFalse(SinglePlayerTaint.entryPathIsServerArtifact("myplayers/database/x"));
     }
 

@@ -4,9 +4,9 @@
 package world.thearchive.wdl.core;
 
 /**
- * MC-free crafter slot helpers: translate the open menu's per-slot disabled flags into vanilla's sparse
- * {@code disabled_slots} form (the indices of the disabled slots, ascending), which is how the crafter block entity
- * persists them; a 9-flag mask is not the on-disk shape.
+ * Crafter slot helpers: translate the open menu's per-slot disabled flags into vanilla's sparse {@code disabled_slots}
+ * form (the indices of the disabled slots, ascending), which is how the crafter block entity persists them; a 9-flag
+ * mask is not the on-disk shape.
  */
 public final class CrafterSlots {
     /** The crafter input grid size (3x3). */

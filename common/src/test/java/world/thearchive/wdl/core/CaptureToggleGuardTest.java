@@ -10,13 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
-/**
- * The consequence-naming guard classification: disabling a core capture toggle is a download-harming edit that warrants
- * a hard confirm; disabling recapture warrants the milder staleness confirm; everything else is benign. The guard fires
- * only on the disable direction, so it classifies by key, not by direction here. The passive-indicator predicate
- * ({@link CaptureToggleGuard#isCapturePartiallyDisabled}) shares the same core notion so both settings surfaces read
- * one source.
- */
 class CaptureToggleGuardTest {
     private static WdlConfig config(String... keyValues) {
         Properties properties = new Properties();
