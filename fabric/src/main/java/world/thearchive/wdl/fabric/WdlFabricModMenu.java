@@ -10,9 +10,8 @@ import net.minecraft.client.gui.screens.Screen;
 import world.thearchive.wdl.Wdl;
 
 /**
- * ModMenu integration (optional soft-dependency): the mod-list config button opens the in-mod settings screen with the
- * mods screen as its back target. ModMenu discovers this through the {@code modmenu} entrypoint only when it is
- * installed, so the class never loads without it; the ModMenu API is compile-only and never ships.
+ * ModMenu discovers this through the {@code modmenu} entrypoint only when it is installed, so the class never loads
+ * without it; the ModMenu API is compile-only and never ships.
  */
 public final class WdlFabricModMenu implements ModMenuApi {
     @Override

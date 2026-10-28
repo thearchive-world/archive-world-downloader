@@ -30,26 +30,16 @@ import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.testsupport.HeadlessPlatformBridge;
 import world.thearchive.wdl.testsupport.TestRegistries;
 
-/**
- * The headless guard for what following the player across a portal does to the session's per-dimension bookkeeping.
- * Chunk positions are dimension-local, so the overworld and the nether name different chunks by the same numbers, and
- * the session therefore keeps a set per dimension and counts the sum of them rather than the one it is currently
- * writing through.
- *
- * <p>A single dimension distinguishes neither property: it makes the sum indistinguishable from the current set's size,
- * and a shared set indistinguishable from a per-dimension one.
- */
 class LiveCaptureSessionDimensionRebindTest {
     @BeforeAll
     static void bootstrapVanilla() {
-        TestRegistries.frozen(); // initialize the vanilla static constants the value types touch
+        TestRegistries.frozen();
     }
 
     /**
-     * A session with no bound level, which the rebind under test does not need. Entity and container capture are off so
-     * the constructor publishes no process-wide capture into the static activation slots, which only {@code finish()}
-     * would clear; the toggles are asserted rather than assumed, since an unrecognized config key falls back to the
-     * default, which is on for both.
+     * Entity and container capture are off so the constructor publishes no process-wide capture into the static
+     * activation slots, which only the finish path clears; the toggles are asserted rather than assumed, since an
+     * unrecognized config key falls back to the default, which is on for both.
      */
     private static LiveCaptureSession session(Path configDirectory) {
         Properties properties = new Properties();
@@ -103,13 +93,12 @@ class LiveCaptureSessionDimensionRebindTest {
 
         assertEquals(Level.NETHER, field(session, "targetDimension"),
                 "the layout follows the entered dimension's type, so a server that names its own worlds still "
-                        + "writes DIM-1 rather than a folder named after the world");
+                        + "writes the vanilla nether folder rather than one named after the world");
         assertEquals("minecraft:worlds/example/example_nether", field(session, "liveDimensionId"),
                 "while the packet-side stores stay keyed by the name entities are announced under, which on that "
                         + "server is not the vanilla one");
     }
 
-    /** Mark {@code positions} captured in the dimension the session is currently bound to. */
     private static void capture(LiveCaptureSession session, ChunkPos... positions) throws Exception {
         LongOpenHashSet captured = capturedPositions(session);
         for (ChunkPos pos : positions) {
@@ -117,10 +106,6 @@ class LiveCaptureSessionDimensionRebindTest {
         }
     }
 
-    /**
-     * The captured-position set of the currently bound dimension. Read reflectively because the only production path
-     * that fills one runs against a live chunk source.
-     */
     private static LongOpenHashSet capturedPositions(LiveCaptureSession session) throws Exception {
         return (LongOpenHashSet) field(session, "allCaptured");
     }

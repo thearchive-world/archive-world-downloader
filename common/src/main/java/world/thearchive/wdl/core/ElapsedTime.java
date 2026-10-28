@@ -5,8 +5,6 @@ package world.thearchive.wdl.core;
 
 /**
  * A non-negative time span decomposed into hours, minutes, and seconds, with two-digit zero-padding for a component.
- * MC-free and Java-8-clean, so the one decomposition and pad are shared by the HUD, chat, and toast status copy and the
- * download report rather than re-derived in each.
  */
 public final class ElapsedTime {
     private final long hours;
@@ -42,7 +40,6 @@ public final class ElapsedTime {
         return seconds;
     }
 
-    /** The whole-minute count with the hours folded back in, for an uncapped {@code m:ss} render. */
     long totalMinutes() {
         return hours * 60L + minutes;
     }

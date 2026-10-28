@@ -47,14 +47,6 @@ import world.thearchive.wdl.core.SettingsLayout;
 import world.thearchive.wdl.core.WdlConfig;
 import world.thearchive.wdl.core.WorldType;
 
-/**
- * The in-mod settings screen: a tabbed, staged editor over the MC-free config model. Each descriptor value-type becomes
- * a vanilla widget (boolean/game-rule toggle, ranged slider, enum/marker cycle, seed/hex field), built from the public
- * widget primitives rather than vanilla's package-private option wrapper so the feature needs no access-widener and no
- * mixin. Edits stage into a {@link SettingsDraft} held on this instance (surviving a resize rebuild); Done and Esc
- * commit, Discard abandons behind a confirm, and disabling a core capture toggle confirms at the change. The rows,
- * their order, and the gamerule group come from {@link SettingsLayout}.
- */
 public final class WdlSettingsScreen extends Screen {
     private static final int TAB_TOP = 6;
     private static final int TAB_HEIGHT = 20;
@@ -71,10 +63,6 @@ public final class WdlSettingsScreen extends Screen {
     private static final int REVERT_ICON_WIDTH = 10;
     private static final int REVERT_ICON_HEIGHT = 10;
 
-    /**
-     * The keys stay declared in {@link ConfigSchema} and laid out in {@link SettingsLayout}, which ship byte-identical
-     * to every band, so refusing the row here is what keeps them unforked.
-     */
     private static final Set<String> HIDDEN_ROWS = Set.of("outlineLineWidthScale");
 
     private final @Nullable Screen parent;
@@ -122,7 +110,6 @@ public final class WdlSettingsScreen extends Screen {
         for (int i = 0; i < count; i++) {
             int index = i;
             int tabX = column.left() + i * tabWidth;
-            // the last tab absorbs the division remainder so the strip's right edge meets the control edge
             int thisTabWidth = i == count - 1 ? column.right() - tabX : tabWidth;
             Component title = Component.translatable(SettingsLayout.tabLabelKey(SettingsLayout.TABS.get(i).id()));
             Button tab = Button.builder(title, button -> selectTab(index))
@@ -132,15 +119,13 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /** The option content band width, the single source the tab strip, footer, and list rows all size to. */
     private int contentBandWidth() {
         return Math.min(this.width - 20, ROW_BAND_MAX);
     }
 
     /**
-     * The visible option column the tab strip and footer both bracket: labels start at the row content inset, and the
-     * right-anchored control stops a revert-affordance slot short of the band edge, so neither spans the raw band, only
-     * the column between them. Matching the list's own width/2 - band/2 origin keeps them aligned.
+     * The visible option column the tab strip and footer both bracket: labels start at the row content inset. Matching
+     * the list's own width/2 - band/2 origin keeps them aligned.
      */
     private ColumnBounds optionColumn() {
         int band = contentBandWidth();
@@ -149,7 +134,6 @@ public final class WdlSettingsScreen extends Screen {
         return new ColumnBounds(left, right);
     }
 
-    /** The visible option column's horizontal bounds. */
     private record ColumnBounds(int left, int right) {
         int width() {
             return this.right - this.left;
@@ -167,7 +151,6 @@ public final class WdlSettingsScreen extends Screen {
                 .bounds(doneX, footerY, buttonWidth, 20).build());
         this.defaults = addRenderableWidget(Button.builder(Component.translatable("wdl.settings.defaults"),
                 button -> onDefaults()).bounds(defaultsX, footerY, buttonWidth, 20).build());
-        // the last button absorbs the division remainder so the footer's right edge meets the control edge
         addRenderableWidget(Button.builder(Component.translatable("wdl.settings.discard"), button -> onDiscard())
                 .bounds(discardX, footerY, column.right() - discardX, 20).build());
     }
@@ -175,10 +158,7 @@ public final class WdlSettingsScreen extends Screen {
     @Override
     public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(poseStack);
-        // The Defaults button would only revert to a state the draft is already in, so it grays out (never
-        // hides, keeping the footer stable and the feature discoverable) while the draft equals defaults, and
-        // a tooltip on the gray state says why. Kept current with live edits by resolving before the widgets
-        // draw; the equality check gates the write so the tooltip is rebuilt only when the state flips.
+        // The Defaults button grays out (never hides, keeping the footer stable and the feature discoverable).
         if (this.defaults != null) {
             boolean atDefaults = this.draft.isAtDefaults(this::isRowVisible);
             if (this.defaults.active == atDefaults) {
@@ -207,7 +187,7 @@ public final class WdlSettingsScreen extends Screen {
             }
             boolean hasGameRuleRows = section.isGameRuleGroup() && !this.curatedById.isEmpty();
             if (visibleKeys.isEmpty() && !hasGameRuleRows) {
-                continue; // a section left with no row to show, install-gated or hidden here, drops its header
+                continue;
             }
             if (section.labelKey() != null) {
                 settingsList.add(new HeaderRow(section.labelKey()));
@@ -229,10 +209,6 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /**
-     * Whether {@code key}'s row shows: a hidden row never appears, and a row that names required mods appears only when
-     * one of them is loaded.
-     */
     private boolean isRowVisible(String key) {
         if (HIDDEN_ROWS.contains(key)) {
             return false;
@@ -333,11 +309,6 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /**
-     * The confirm for reducing recapture freshness (the enum sibling of {@link #showDisableConfirm}): the widget has
-     * already cycled to the lower mode, so confirming stages it and canceling leaves the draft untouched, and returning
-     * to this screen re-reads the mode from the draft so a cancel visibly snaps it back.
-     */
     private void showReduceRecaptureConfirm(String key, RecaptureMode value) {
         Minecraft minecraft = Minecraft.getInstance();
         BooleanConsumer choice = confirmed -> {
@@ -346,8 +317,6 @@ public final class WdlSettingsScreen extends Screen {
             }
             minecraft.setScreen(this);
         };
-        // The lost capability differs by target: switching to OFF freezes every area after its first capture,
-        // while switching to NEARBY only drops the revisit overwrite (the area around you stays current).
         String messageKey = value == RecaptureMode.OFF
                 ? "wdl.settings.confirm.recapture.to_off.message"
                 : "wdl.settings.confirm.recapture.to_nearby.message";
@@ -378,7 +347,6 @@ public final class WdlSettingsScreen extends Screen {
         return SettingsLayout.valueLabelKey(value);
     }
 
-    /** Attach the option's help tooltip to its control, only when the language file carries the key (helpKey). */
     private static void applyTooltip(AbstractWidget widget, String key) {
         String tooltipKey = SettingsLayout.optionTooltipKey(key);
         if (I18n.exists(tooltipKey)) {
@@ -394,14 +362,8 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /**
-     * The confirm for turning a download-harming capture toggle off: the widget has already flipped to off, so
-     * confirming stages the disable and canceling leaves the draft untouched; either way returning to this screen
-     * re-reads the toggle from the draft, so a cancel visibly snaps it back on. The body names the per-toggle outcome,
-     * and the confirm focuses the safe keep choice by default.
-     */
     private void showDisableConfirm(String key) {
-        String base = "wdl.settings.confirm.capture"; // only the boolean capture toggles route here
+        String base = "wdl.settings.confirm.capture";
         Minecraft minecraft = Minecraft.getInstance();
         BooleanConsumer choice = confirmed -> {
             if (confirmed) {
@@ -458,7 +420,6 @@ public final class WdlSettingsScreen extends Screen {
 
     private record Control(AbstractWidget widget, Runnable refresh) {}
 
-    /** The scrollable list of rows for the active tab; rebuilt whole on a tab switch or resize. */
     private final class SettingsList extends ContainerObjectSelectionList<SettingsEntry> {
         SettingsList(Minecraft minecraft, int width, int height, int top, int bottom, int itemHeight) {
             super(minecraft, width, height, top, bottom, itemHeight);
@@ -475,14 +436,12 @@ public final class WdlSettingsScreen extends Screen {
 
         @Override
         protected int getScrollbarPosition() {
-            // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row, so with this
-            // screen's wider row it lands inside each row and cuts through the controls; later bands derive it
-            // from the row right edge, which this follows.
+            // This band's default is a fixed width/2 + 124 that assumes the 220-wide default row, so with this screen's
+            // wider row it lands inside each row and cuts through the controls.
             return this.x0 + this.width / 2 + getRowWidth() / 2 + 10;
         }
     }
 
-    /** A list row: a section header, an option, or a game rule. */
     private abstract class SettingsEntry extends ContainerObjectSelectionList.Entry<SettingsEntry> {
         private int contentX;
         private int contentY;
@@ -513,7 +472,6 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /** A non-interactive section caption drawn in the brand accent. */
     private final class HeaderRow extends SettingsEntry {
         private final Component label;
 
@@ -540,7 +498,6 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /** A row with a label, one editing control, and a revert affordance, master-gated when applicable. */
     private abstract class ControlRow extends SettingsEntry {
         private final Component label;
         private final Button revert;
@@ -564,7 +521,6 @@ public final class WdlSettingsScreen extends Screen {
 
         abstract void refresh();
 
-        /** Whether this row shows the passive "capture disabled" mark beside its control (off core toggles). */
         boolean showsCaptureWarning() {
             return false;
         }
@@ -590,8 +546,6 @@ public final class WdlSettingsScreen extends Screen {
             control.setY(controlY);
             control.render(poseStack, mouseX, mouseY, partialTick);
 
-            // Passive indicator: an amber caution mark sits just left of an off core-capture toggle, a
-            // defense-in-depth reminder that the download will be missing that data beyond the confirm-at-change.
             if (showsCaptureWarning()) {
                 int glyphY = controlY + (CONTROL_HEIGHT - font.lineHeight) / 2;
                 surface.text(font, CAPTURE_WARNING_GLYPH,
@@ -599,8 +553,7 @@ public final class WdlSettingsScreen extends Screen {
                         BrandColors.opaque(BrandColors.AMBER));
             }
 
-            // The revert affordance is shown only when the row differs from its default, hidden otherwise
-            // (not grayed). The control slot above stays reserved either way, so nothing reflows as it appears.
+            // The revert affordance is shown only when the row differs from its default, hidden otherwise (not grayed).
             boolean modified = isModified();
             this.revert.visible = modified;
             this.revert.active = enabled && modified;
@@ -608,15 +561,11 @@ public final class WdlSettingsScreen extends Screen {
             this.revert.setY(controlY);
             this.revert.render(poseStack, mouseX, mouseY, partialTick);
 
-            // The revert icon is a bundled sprite, not a font glyph: the revert codepoint resolves only through
-            // the tiny unifont fallback, which no scale renders crisply. The button carries a blank label so
-            // vanilla draws nothing underneath. The white source is tinted to carry the enabled/disabled color,
-            // and a second offset draw gives it the same drop shadow the surrounding button text has.
+            // The button carries a blank label so vanilla draws nothing underneath.
             if (modified) {
                 int iconColor = BrandColors.opaque(enabled ? BrandColors.WHITE : BrandColors.GRAY);
                 // Quarter-brightness of the foreground, matching vanilla Font's drop-shadow derivation.
                 int shadowColor = (iconColor & 0xFCFCFC) >> 2 | (iconColor & 0xFF000000);
-                // Center on the button face, which excludes the one-pixel bottom shadow row of the widget sprite.
                 int iconX = revertX + (REVERT_WIDTH - REVERT_ICON_WIDTH) / 2;
                 int iconY = controlY + (CONTROL_HEIGHT - 1 - REVERT_ICON_HEIGHT) / 2;
                 surface.blitSprite(REVERT_ICON, iconX + 1, iconY + 1,
@@ -637,7 +586,6 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /** A descriptor-backed option row: reverts to the descriptor default. */
     private final class OptionRow extends ControlRow {
         private final String key;
         private final AbstractWidget control;
@@ -677,7 +625,6 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /** A curated game-rule row: a toggle over the sparse override map, reverting by deleting its entry. */
     private final class GameRuleRow extends ControlRow {
         private final CuratedGameRule rule;
         private final CycleButton<Boolean> toggle;
@@ -716,11 +663,6 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /**
-     * A slider over a descriptor range; its message renders the current value through the option's value key. The
-     * message and the draft write both use {@link #currentText()}, so a subclass supplies only the value quantization
-     * and formatting (int versus tenth-quantized float).
-     */
     private abstract class RangeSlider extends AbstractSliderButton {
         final String key;
 
@@ -729,10 +671,8 @@ public final class WdlSettingsScreen extends Screen {
             this.key = key;
         }
 
-        /** The current slider value, quantized and formatted for both the label and the draft. */
         abstract String currentText();
 
-        /** The slider fraction for the value currently staged in the draft. */
         abstract double draftFraction();
 
         @Override
@@ -777,7 +717,6 @@ public final class WdlSettingsScreen extends Screen {
         }
     }
 
-    /** Quantized to a tenth, for the outline rim-width scale. */
     private final class FloatSlider extends RangeSlider {
         private final float min;
         private final float max;

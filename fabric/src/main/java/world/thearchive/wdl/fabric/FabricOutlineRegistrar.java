@@ -10,12 +10,6 @@ import world.thearchive.wdl.adapter.RimRenderer;
 import world.thearchive.wdl.adapter.impl.RimRendererImpl;
 import world.thearchive.wdl.client.WdlOutlineRenderer;
 
-/**
- * The Fabric half of the outline render seam. It draws on the post-terrain debug-render event, mixin-free, handing the
- * band-agnostic {@link WdlOutlineRenderer} the render context's pose, buffers and view frustum and the band
- * {@link RimRenderer} it constructs. The frustum is read straight off the context, which carries it from AFTER_SETUP
- * onward, so the draw needs no per-frame stash at this band.
- */
 final class FabricOutlineRegistrar {
     private final RimRenderer rimRenderer = new RimRendererImpl();
 
